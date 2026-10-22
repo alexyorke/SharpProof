@@ -9,7 +9,7 @@ public static partial class Inference
     private sealed partial class Session
     {
         private HmType ApplyMemberNullability(ISymbol member, HmType value, bool forStorage = false,
-            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null)
+            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null, ExpressionSyntax? syntax = null)
         {
             if (member is null)
             { throw new ArgumentNullException(nameof(member)); }
@@ -27,7 +27,8 @@ public static partial class Inference
             });
             if (member is IPropertySymbol { GetMethod: { } getter })
             { attributes = attributes.Concat(getter.GetReturnTypeAttributes()); }
-            return ApplyNullabilityContract(type, value, attributes, forStorage, arguments, argumentValues);
+            var result = ApplyNullabilityContract(type, value, attributes, forStorage, arguments, argumentValues);
+            return syntax is null ? result : ApplyNullableReadFlow(syntax, member, result, forStorage);
         }
 
         private HmType WithExpression(WithExpressionSyntax syntax)
@@ -68,7 +69,7 @@ public static partial class Inference
             Dictionary<int, HmType>? argumentValues = forStorage ? null : [];
             BindArguments(indexer.Arguments, definition.Parameters.Select(parameter =>
             { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray(), argumentValues);
-            return ApplyMemberNullability(indexer.Property, CSharpTypes.Rigid(definition.Type, mapping), forStorage, indexer.Arguments, argumentValues);
+            return ApplyMemberNullability(indexer.Property, CSharpTypes.Rigid(definition.Type, mapping), forStorage, indexer.Arguments, argumentValues, syntax);
         }
 
         private HmType IndexedImplicitly(ElementAccessExpressionSyntax syntax, IImplicitIndexerReferenceOperation indexer, bool forStorage = false)
@@ -80,7 +81,7 @@ public static partial class Inference
             foreach (var argument in syntax.ArgumentList.Arguments)
             { Anchor(argument.Expression); }
             var original = model.GetTypeInfo(syntax.Expression, cancellationToken).Type ?? throw new InferenceException("Unresolved implicit indexer receiver.");
-            return ApplyMemberNullability(indexer.IndexerSymbol, PatternSymbolType(indexer.IndexerSymbol, Expression(syntax.Expression), original), forStorage);
+            return ApplyMemberNullability(indexer.IndexerSymbol, PatternSymbolType(indexer.IndexerSymbol, Expression(syntax.Expression), original), forStorage, syntax: syntax);
         }
 
         private static string? MemberSymbol(ISymbol symbol)

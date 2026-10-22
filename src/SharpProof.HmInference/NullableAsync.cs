@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.HmInference;
 
@@ -59,7 +60,7 @@ public static partial class Inference
             return ApplyMaybeNullContract(returnType, value);
         }
 
-        private HmType ApplyParameterReadFlow(IdentifierNameSyntax syntax, ISymbol symbol, HmType value, bool forStorage)
+        private HmType ApplyNullableReadFlow(ExpressionSyntax syntax, ISymbol symbol, HmType value, bool forStorage)
         {
             if (syntax is null)
             { throw new ArgumentNullException(nameof(syntax)); }
@@ -67,14 +68,30 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(symbol)); }
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
-            if (forStorage || !parameterReadFlow.TryGetValue(syntax.SpanStart, out var state))
+            if (forStorage || !nullableReadFlow.TryGetValue(syntax.Span, out var state))
             { return value; }
-            var type = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, _ => null };
+            var type = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, IFieldSymbol field => field.Type, IPropertySymbol property => property.Type, _ => null };
             return state == NullableFlowState.NotNull ? ConversionCore(value)
                 : state == NullableFlowState.MaybeNull && type is not null ? ApplyMaybeNullContract(type, value) : value;
         }
 
-        private MethodResult? RefineParameterPostconditions(Compilation compilation, MethodDeclarationSyntax original,
+        private static bool HasMemberPostconditions(ISymbol? symbol)
+        {
+            if (symbol is not (IMethodSymbol or IPropertySymbol))
+            { return false; }
+            IEnumerable<AttributeData> attributes = symbol.GetAttributes();
+            if (symbol is IPropertySymbol { GetMethod: { } getter })
+            { attributes = attributes.Concat(getter.GetAttributes()); }
+            return attributes.Any(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return attribute.AttributeClass?.ToDisplayString() is "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute"
+                    or "System.Diagnostics.CodeAnalysis.MemberNotNullWhenAttribute";
+            });
+        }
+
+        private MethodResult? RefineNullablePostconditions(Compilation compilation, MethodDeclarationSyntax original,
             MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
         {
             if (compilation is null)
@@ -110,21 +127,42 @@ public static partial class Inference
                 { targets.Add(local.Local); }
                 else if (operand is IParameterReferenceOperation input)
                 { targets.Add(input.Parameter); }
+                else if (operand is IMemberReferenceOperation member)
+                { targets.Add(member.Member); }
             }
-            if (targets.Count == 0)
+            static ExpressionSyntax[] ReadSites(SyntaxNode root)
+            {
+                if (root is null)
+                { throw new ArgumentNullException(nameof(root)); }
+                return root.DescendantNodesAndSelf().OfType<ExpressionSyntax>().Where(expression =>
+                {
+                    if (expression is null)
+                    { throw new ArgumentNullException(nameof(expression)); }
+                    return expression is SimpleNameSyntax or MemberAccessExpressionSyntax or MemberBindingExpressionSyntax
+                        or ElementAccessExpressionSyntax or ElementBindingExpressionSyntax;
+                }).ToArray();
+            }
+            var before = ReadSites(body);
+            var symbols = before.Select(expression =>
+            {
+                if (expression is null)
+                { throw new ArgumentNullException(nameof(expression)); }
+                return model.GetSymbolInfo(expression, cancellationToken).Symbol;
+            }).ToArray();
+            var members = symbols.Any(HasMemberPostconditions);
+            if (targets.Count == 0 && !members)
             { return null; }
-            var before = body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().ToArray();
-            var after = changedBody.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>().ToArray();
+            var after = ReadSites(changedBody);
             if (before.Length != after.Length)
-            { throw new InferenceException("Cannot correlate parameter-postcondition reads."); }
+            { throw new InferenceException("Cannot correlate nullable postcondition reads."); }
             var candidateModel = compilation.GetSemanticModel(candidate.SyntaxTree);
-            var next = new Dictionary<int, NullableFlowState>();
+            var next = new Dictionary<TextSpan, NullableFlowState>();
             for (var i = 0; i < before.Length; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (before[i].Identifier.ValueText != after[i].Identifier.ValueText)
-                { throw new InferenceException("Cannot correlate parameter-postcondition reads."); }
-                if (model.GetSymbolInfo(before[i], cancellationToken).Symbol is not { } symbol || !targets.Contains(symbol))
+                if (!SyntaxFactory.AreEquivalent(before[i], after[i]))
+                { throw new InferenceException("Cannot correlate nullable postcondition reads."); }
+                if (symbols[i] is not { } symbol || !targets.Contains(symbol) && !(members && symbol is IFieldSymbol or IPropertySymbol))
                 { continue; }
                 var info = candidateModel.GetTypeInfo(after[i], cancellationToken);
                 var state = info.Nullability.FlowState;
@@ -146,14 +184,14 @@ public static partial class Inference
                 }
                 // A representability bound added for C# 8 must not erase the flow
                 // evidence that required that bound in the preceding pass.
-                if (state == NullableFlowState.NotNull && parameterReadFlow.TryGetValue(before[i].SpanStart, out var previous)
+                if (state == NullableFlowState.NotNull && nullableReadFlow.TryGetValue(before[i].Span, out var previous)
                     && previous == NullableFlowState.MaybeNull && (info.Type?.IsValueType == true
                         || info.Type is ITypeParameterSymbol { HasValueTypeConstraint: true }))
                 { state = previous; }
                 if (state != NullableFlowState.None)
-                { next[before[i].SpanStart] = state; }
+                { next[before[i].Span] = state; }
             }
-            static bool SameFlow(Dictionary<int, NullableFlowState> left, Dictionary<int, NullableFlowState> right)
+            static bool SameFlow(Dictionary<TextSpan, NullableFlowState> left, Dictionary<TextSpan, NullableFlowState> right)
             {
                 if (left is null)
                 { throw new ArgumentNullException(nameof(left)); }
@@ -161,7 +199,7 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(right)); }
                 return left.Count == right.Count && left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
             }
-            if (SameFlow(parameterReadFlow, next))
+            if (SameFlow(nullableReadFlow, next))
             { return null; }
             if (readFlowHistory.Any(previous =>
             {
@@ -169,8 +207,8 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(previous)); }
                 return SameFlow(previous, next);
             }))
-            { return new(original.Identifier.ValueText, "Rejected", "Parameter-postcondition flow refinement does not converge."); }
-            readFlowHistory.Add(parameterReadFlow);
+            { return new(original.Identifier.ValueText, "Rejected", "Nullable postcondition flow refinement does not converge."); }
+            readFlowHistory.Add(nullableReadFlow);
             return new Session(model, cancellationToken, next, readFlowHistory).Analyze(original, pins);
         }
 
@@ -204,10 +242,12 @@ public static partial class Inference
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
             value = value.Root;
-            if (value.Name == CSharpTypes.NullableValue || !value.IsVariable && returnType.IsValueType && returnType is not ITypeParameterSymbol)
+            if (value.Name == CSharpTypes.NullableValue)
             { return value; }
             if (value.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
             { defaultValueAnnotations.Add(value); return value; }
+            if (!value.IsVariable && returnType.IsValueType && returnType is not ITypeParameterSymbol)
+            { return value; }
             if (value.IsVariable || value.CSharpSymbol is ITypeParameterSymbol)
             {
                 var position = currentMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration
@@ -314,7 +354,7 @@ public static partial class Inference
                 Dictionary<int, HmType> argumentValues = [];
                 BindArguments(property.Arguments, property.Property.OriginalDefinition.Parameters.Select(parameter =>
                 { if (parameter is null) { throw new ArgumentNullException(nameof(parameter)); } return CSharpTypes.Rigid(parameter.Type, mapping); }).ToArray(), argumentValues);
-                return ApplyMemberNullability(property.Property, CSharpTypes.Rigid(property.Property.OriginalDefinition.Type, mapping), arguments: property.Arguments, argumentValues: argumentValues);
+                return ApplyMemberNullability(property.Property, CSharpTypes.Rigid(property.Property.OriginalDefinition.Type, mapping), arguments: property.Arguments, argumentValues: argumentValues, syntax: expression);
             }
             if (operation is IFieldReferenceOperation field)
             {
@@ -323,7 +363,7 @@ public static partial class Inference
                     for (var i = 0; i < tuple.TupleElements.Length; i++)
                     { if (tuple.TupleElements[i].Name == field.Field.Name) { return receiver.Value.Root.Arguments[i]; } }
                 }
-                return ApplyMemberNullability(field.Field, PatternSymbolType(field.Field, receiver.Value, receiver.Type));
+                return ApplyMemberNullability(field.Field, PatternSymbolType(field.Field, receiver.Value, receiver.Type), syntax: expression);
             }
             throw new InferenceException("Unresolved conditional member binding.");
         }
@@ -973,7 +1013,7 @@ public static partial class Inference
                     }
                 }
             }
-            var storageType = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, _ => null };
+            var storageType = symbol switch { ILocalSymbol local => local.Type, IParameterSymbol parameter => parameter.Type, IFieldSymbol field => field.Type, IPropertySymbol property => property.Type, _ => null };
             if (storageType is null || !defaultStores.TryGetValue(symbol, out var literals))
             { return type; }
             foreach (var literal in literals)

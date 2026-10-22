@@ -27,7 +27,28 @@ public sealed class InputCell<T>{public T Value=default!;public T Accept([System
 public delegate T InputAction<T>(InputCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
 public sealed class OutcomeCell<T>{public bool Try([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){value=default!;return false;}}
 public delegate bool OutcomeAction<T>(OutcomeCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+public sealed class FieldCell<T>where T:class{public T? Value=default;}
+#if ANNOTATED_REF
+public sealed class StateBox<T>{public StateCell<T> Nested=new StateCell<T>();}
+public sealed class StateCell<T>{public T? Field=default;public T? Property=>Field;[System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Field),nameof(Property))]public void Ensure(){if(Field is null||Property is null)throw new Exception();}[System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Field),nameof(Property))]public bool Ready=>Field is not null&&Property is not null;}
+#endif
 public static class QueryConsumer{
+  static void FillField<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback)where T:class{if(fallback is null)throw new Exception();value=fallback;}
+  static void ClearField<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;
+  public static string FieldFill(FieldCell<string> cell,string fallback){FillField(out cell.Value,fallback);return cell.Value;}
+  public static string? FieldClear(FieldCell<string> cell){ClearField(out cell.Value);return cell.Value;}
+#if ANNOTATED_REF
+  public static int StateRead(StateCell<int> cell){cell.Ensure();return cell.Field;}
+  public static int StateProperty(StateCell<int> cell){cell.Ensure();return cell.Property;}
+  public static int StateConditional(StateCell<int> cell,int fallback)=>cell.Ready?cell.Field:fallback;
+  public static int StateFailure(StateCell<int> cell,int fallback){if(!cell.Ready)return cell.Field;return fallback;}
+  public static int StateNested(StateBox<int> box,StateCell<int> other){other.Ensure();return box.Nested.Field;}
+  public static int StateOther(StateCell<int> first,StateCell<int> other){first.Ensure();return other.Field;}
+  public static int StateInvalidated(StateCell<int> cell){cell.Ensure();cell.Field=default;return cell.Field;}
+  public static IEnumerable<int> StateQuery(IEnumerable<StateCell<int>> cells,int fallback)=>from cell in cells select cell.Ready?cell.Field:fallback;
+  public static async Task<int> StateAsync(Task<StateCell<int>> input){var cell=await input;cell.Ensure();return cell.Field;}
+  public static async ValueTask<int> StateValueAsync(ValueTask<StateCell<int>> input){var cell=await input;cell.Ensure();return cell.Property;}
+#endif
   public static int OutcomeRead(OutcomeCell<int> cell){cell.Try(out var value);return value;}
   public static int OutcomeSuccess(OutcomeCell<int> cell,int fallback){if(cell.Try(out var value))return value;return fallback;}
   public static int OutcomeConditional(OutcomeCell<int> cell,int fallback)=>cell.Try(out var value)?value:fallback;
@@ -180,6 +201,24 @@ EOF
   grep -Fq 'global::System.Threading.Tasks.Task<T1> ConditionalAsync<T1, T2>(global::System.Threading.Tasks.Task<T1> value, T2 tag)' "$log"
   grep -Fq 'T1[]? ContractArray<T1, T2>(T1[] value, T2 tag)' "$log"
   grep -Fq 'T1 ContractRequire<T1, T2>(T1? value, T2 tag) where T1 : class' "$log"
+  grep -Fq 'T1 FieldFill<T1>(global::FieldCell<T1> cell, T1 fallback) where T1 : class' "$log"
+  grep -Fq 'T1? FieldClear<T1>(global::FieldCell<T1> cell) where T1 : class' "$log"
+  if [ "$language" != 8 ]; then
+    grep -Fq 'T1 StateRead<T1>(global::StateCell<T1> cell)' "$log"
+    grep -Fq 'T1 StateProperty<T1>(global::StateCell<T1> cell)' "$log"
+    grep -Fq 'T1 StateConditional<T1>(global::StateCell<T1> cell, T1 fallback)' "$log"
+    grep -Fq 'T1? StateFailure<T1>(global::StateCell<T1> cell, T1 fallback)' "$log"
+    grep -Fq 'T1? StateNested<T1, T2>(global::StateBox<T1> box, global::StateCell<T2> other)' "$log"
+    grep -Fq 'T2? StateOther<T1, T2>(global::StateCell<T1> first, global::StateCell<T2> other)' "$log"
+    grep -Fq 'T1? StateInvalidated<T1>(global::StateCell<T1> cell)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> StateQuery<T1>(global::System.Collections.Generic.IEnumerable<global::StateCell<T1>> cells, T1 fallback)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> StateAsync<T1>(global::System.Threading.Tasks.Task<global::StateCell<T1>> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> StateValueAsync<T1>(global::System.Threading.Tasks.ValueTask<global::StateCell<T1>> input)' "$log"
+    if grep -E ' (StateRead|StateProperty|StateConditional|StateQuery|StateAsync|StateValueAsync)<T1>\(' "$log" | grep -Fq 'where T1'; then
+      printf 'Member postconditions gained an unnecessary bound (C# %s)\n' "$language"
+      exit 1
+    fi
+  fi
   grep -Fq 'T1 OutcomeSuccess<T1>(global::OutcomeCell<T1> cell, T1 fallback)' "$log"
   grep -Fq 'T1 OutcomeConditional<T1>(global::OutcomeCell<T1> cell, T1 fallback)' "$log"
   if grep -E 'T1 Outcome(Success|Conditional)<T1>\(' "$log" | grep -Fq 'where T1'; then

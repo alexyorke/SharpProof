@@ -841,7 +841,19 @@ C# 8 retains representable value bounds when a nullable output requires them;
 compiler facts are rechecked until stable, with cyclic refinements rejected.
 Applied fixes execute original and new reference/nullable-value domains, compare
 helper counts and identities, and check suspension, exact faults and cancellation.
-Member-state contracts and remaining indirect-storage flow still need work.
+Member reads also honor `MemberNotNull` and `MemberNotNullWhen`, including getter
+attributes, inherited/static members and source/metadata contracts. Compiler facts
+use each expression span (start and length), preserving nested reads, receiver
+isolation and invalidating writes;
+failure-branch optionality does not widen independent fallback parameters. Query
+selectors and Task/ValueTask results retain these relationships. Ordinary nullable fields
+passed to parameter postconditions now participate in the same refinement while
+reference binding preserves their declared storage type. Applied fixes verify
+member/getter counts, receiver identity, mutations, lazy query disposal, nullable
+value/reference domains, suspension, exact faults and cancellation. CLI and package
+consumers cover member-state declarations in C# 9/13 and indirect field outputs in
+C# 8/9/13. The pinned compiler rejects member-state declarations in C# 8 (CS8400).
+Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

@@ -28,6 +28,13 @@ internal static class QueryRuntimeChecks
             }
             public delegate T QueryInputAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.AllowNull]T value,T fallback);
             public delegate bool QueryOutcomeAction<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value);
+            public sealed class StateBox<T>{public StateCell<T> Nested;public StateBox(StateCell<T> value){Nested=value;}}
+            public sealed class StateCell<T>{
+                public T? Field;public int Checks,Gets;public StateCell(T? value){Field=value;}
+                public T? Property{get{Interlocked.Increment(ref Gets);return Field;}}
+                [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(Field),nameof(Property))]public void Ensure(){Interlocked.Increment(ref Checks);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(Field is null||Property is null)throw QueryTrace.ContractFailure;}
+                [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(true,nameof(Field),nameof(Property))]public bool Ready{get{Interlocked.Increment(ref Checks);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return Field is not null&&Property is not null;}}
+            }
             public sealed class MemberCell<T>{
                 public T Stored;public T? OptionalStored;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field;public bool Present;public int Reads,Indices,Writes,Refs;
                 public bool TryRead([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value){Interlocked.Increment(ref Reads);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;value=Present?Stored:default!;return Present;}
@@ -43,6 +50,20 @@ internal static class QueryRuntimeChecks
                 static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
                 static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
                 static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static int StateField(StateCell<int> cell){cell.Ensure();return cell.Field;}
+                public static int StateProperty(StateCell<int> cell){cell.Ensure();return cell.Property;}
+                public static int StateConditional(StateCell<int> cell,int fallback)=>cell.Ready?cell.Field:fallback;
+                public static int StateFailure(StateCell<int> cell,int fallback){if(!cell.Ready)return cell.Field;return fallback;}
+                public static int StateNested(StateBox<int> box,StateCell<int> other){other.Ensure();return box.Nested.Field;}
+                public static int StateOther(StateCell<int> first,StateCell<int> other){first.Ensure();return other.Field;}
+                public static int StateInvalidated(StateCell<int> cell){cell.Ensure();cell.Field=default;return cell.Field;}
+                static void FillState<T>([System.Diagnostics.CodeAnalysis.NotNull]out T? value,T fallback){if(fallback is null)throw QueryTrace.ContractFailure;value=fallback;}
+                static void ClearState<T>([System.Diagnostics.CodeAnalysis.MaybeNull]out T value)=>value=default;
+                public static int StateOutFill(StateCell<int> cell,int fallback){FillState(out cell.Field,fallback);return cell.Field;}
+                public static int StateOutClear(StateCell<int> cell){ClearState(out cell.Field);return cell.Field;}
+                public static IEnumerable<int> StateQuery(IEnumerable<StateCell<int>> cells,int fallback)=>from cell in cells select cell.Ready?cell.Field:fallback;
+                public static async Task<int> StateAsync(Task<StateCell<int>> input){var cell=await input;cell.Ensure();return cell.Field;}
+                public static async ValueTask<int> StateValueAsync(ValueTask<StateCell<int>> input){var cell=await input;cell.Ensure();return cell.Property;}
                 public static bool TryOutcome<T>(MemberCell<T> cell,[System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)]out T value)=>cell.TryRead(out value);
                 public static int OutcomeRead(MemberCell<int> cell){cell.TryRead(out var value);return value;}
                 public static int OutcomeSuccess(MemberCell<int> cell,int fallback){if(cell.TryRead(out var value))return value;return fallback;}
@@ -280,7 +301,34 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> MemberStateContracts(CancellationToken cancellationToken){
+                    var cell=new StateCell<int>(7);if(QueryProbe.StateField(cell)!=7||cell.Checks!=1||cell.Gets!=1||QueryProbe.StateProperty(cell)!=7||cell.Checks!=2||cell.Gets!=3)return false;
+                    if(QueryProbe.StateConditional(cell,9)!=7||QueryProbe.StateFailure(cell,9)!=9||cell.Checks!=4||cell.Gets!=5)return false;
+                    var nested=new StateCell<int>(0);if(QueryProbe.StateNested(new StateBox<int>(nested),new StateCell<int>(7))!=0||nested.Checks!=0||nested.Gets!=0)return false;
+                    var other=new StateCell<int>(3);if(QueryProbe.StateOther(cell,other)!=3||other.Checks!=0||other.Gets!=0||QueryProbe.StateInvalidated(cell)!=0||cell.Field!=0)return false;
+                    if(QueryProbe.StateOutFill(other,11)!=11||other.Field!=11||QueryProbe.StateOutClear(other)!=0||other.Field!=0||other.Gets!=0)return false;
+                    var first=new StateCell<int>(5);var second=new StateCell<int>(7);QueryTrace.Value="";var query=QueryProbe.StateQuery(QueryTrace.Source(new[]{first,second}),9);
+                    if(first.Checks!=0||second.Checks!=0||QueryTrace.Value!="")return false;
+                    using(var iterator=query.GetEnumerator()){if(!iterator.MoveNext()||iterator.Current!=5||first.Checks!=1||first.Gets!=1||second.Checks!=0)return false;}
+                    if(QueryTrace.Value!="open;dispose;")return false;
+                    var failure=new InvalidOperationException("member state");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault"}){
+                        var delayed=new StateCell<int>(7);var gate=new TaskCompletionSource<StateCell<int>>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.Failure=outcome=="HelperFault"?failure:null;
+                        try{var task=QueryProbe.StateAsync(gate.Task);var valueTask=QueryProbe.StateValueAsync(new ValueTask<StateCell<int>>(gate.Task)).AsTask();
+                            if(task.IsCompleted||valueTask.IsCompleted||delayed.Checks!=0||delayed.Gets!=0)return false;
+                            if(outcome is "Value" or "HelperFault")gate.SetResult(delayed);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result!=7)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(delayed.Checks!=(outcome is "Value" or "HelperFault"?2:0)||delayed.Gets!=(outcome=="Value"?3:0))return false;
+                        }finally{QueryTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> PostconditionContracts(CancellationToken cancellationToken){
+                    if(!await MemberStateContracts(cancellationToken))return false;
                     var cell=new MemberCell<int>(7);var absent=new MemberCell<int>(7,false);
                     if(QueryProbe.OutcomeRead(cell)!=7||QueryProbe.OutcomeRead(absent)!=0||QueryProbe.OutcomeSuccess(absent,9)!=9||QueryProbe.OutcomeConditional(cell,9)!=7||QueryProbe.OutcomeDelegate(QueryProbe.TryOutcome,absent)!=0||QueryProbe.OutcomeOptional(absent)!=0||cell.Reads!=2||absent.Reads!=4)return false;
                     string? missing=null;var text=new string('p',3);if(!ReferenceEquals(QueryProbe.CheckedInput(text),text)||!ReferenceEquals(QueryProbe.ConditionalInput(missing,text),text))return false;
@@ -502,7 +550,24 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> MemberStateContracts(string text,CancellationToken cancellationToken){
+                    var cell=new StateCell<string>(text);var missing=new StateCell<string>(null);
+                    if(!ReferenceEquals(QueryProbe.StateField(cell),text)||!ReferenceEquals(QueryProbe.StateProperty(cell),text)||cell.Checks!=2||cell.Gets!=3||!ReferenceEquals(QueryProbe.StateConditional(missing,text),text)||QueryProbe.StateFailure(missing,text)!=null||missing.Checks!=2||missing.Gets!=0)return false;
+                    var nested=new StateCell<string>(null);if(QueryProbe.StateNested(new StateBox<string>(nested),new StateCell<decimal?>(23m))!=null||nested.Checks!=0||nested.Gets!=0)return false;
+                    var uri=new Uri("https://example.invalid/member-state");var receiver=new StateCell<Uri>(uri);if(QueryProbe.StateOther(receiver,missing)!=null||receiver.Checks!=1||missing.Checks!=2)return false;
+                    if(QueryProbe.StateInvalidated(cell)!=null||cell.Field!=null||!ReferenceEquals(QueryProbe.StateOutFill(cell,text),text)||!ReferenceEquals(cell.Field,text)||QueryProbe.StateOutClear(cell)!=null||cell.Field!=null)return false;
+                    var numeric=new StateCell<decimal?>(23m);if(QueryProbe.StateField(numeric)!=23m||QueryProbe.StateOutClear(numeric)!=null||numeric.Field!=null)return false;
+                    try{_=QueryProbe.StateField(missing);return false;}catch(InvalidOperationException error)when(ReferenceEquals(error,QueryTrace.ContractFailure)){}
+                    var first=new StateCell<string>(text);var second=new StateCell<string>(null);var query=QueryProbe.StateQuery(new[]{first,second},text);if(first.Checks!=0||second.Checks!=0)return false;
+                    var values=query.ToArray();if(values.Length!=2||!ReferenceEquals(values[0],text)||!ReferenceEquals(values[1],text)||first.Checks!=1||first.Gets!=1||second.Checks!=1||second.Gets!=0)return false;
+                    var gate=new TaskCompletionSource<StateCell<string>>(TaskCreationOptions.RunContinuationsAsynchronously);var delayed=new StateCell<string>(text);
+                    var task=QueryProbe.StateAsync(gate.Task);var valueTask=QueryProbe.StateValueAsync(new ValueTask<StateCell<string>>(gate.Task)).AsTask();
+                    if(task.IsCompleted||valueTask.IsCompleted||delayed.Checks!=0)return false;gate.SetResult(delayed);
+                    foreach(var pending in new[]{task,valueTask}){if(!ReferenceEquals(await pending.WaitAsync(cancellationToken),text))return false;}
+                    return delayed.Checks==2&&delayed.Gets==3;
+                }
                 static async Task<bool> PostconditionContracts(string text,CancellationToken cancellationToken){
+                    if(!await MemberStateContracts(text,cancellationToken))return false;
                     var cell=new MemberCell<string>(text);var absent=new MemberCell<string>(text,false);
                     if(!ReferenceEquals(QueryProbe.OutcomeRead(cell),text)||QueryProbe.OutcomeRead(absent)!=null||!ReferenceEquals(QueryProbe.OutcomeSuccess(absent,text),text)||!ReferenceEquals(QueryProbe.OutcomeConditional(cell,text),text)||QueryProbe.OutcomeDelegate(QueryProbe.TryOutcome,absent)!=null||QueryProbe.OutcomeOptional(absent)!=null||cell.Reads!=2||absent.Reads!=4)return false;
                     if(QueryProbe.OutcomeRead(new MemberCell<decimal?>(23m,false))!=null||QueryProbe.OutcomeOptional(new MemberCell<decimal?>(23m,false))!=null)return false;

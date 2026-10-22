@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.HmInference;
 
@@ -98,12 +99,12 @@ public static partial class Inference
     }
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
-        Dictionary<int, NullableFlowState>? parameterReadFlow = null, List<Dictionary<int, NullableFlowState>>? readFlowHistory = null)
+        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
-        private readonly Dictionary<int, NullableFlowState> parameterReadFlow = parameterReadFlow ?? [];
-        private readonly List<Dictionary<int, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
+        private readonly Dictionary<TextSpan, NullableFlowState> nullableReadFlow = nullableReadFlow ?? [];
+        private readonly List<Dictionary<TextSpan, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -376,7 +377,7 @@ public static partial class Inference
                 changedCompilation = ReplaceCandidate(changed);
             }
             var postconditionMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
-            if (RefineParameterPostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
+            if (RefineNullablePostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
             { return refinedPostconditions; }
 
             if (needsBuilderEmission)
@@ -1055,7 +1056,7 @@ public static partial class Inference
                     var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
                     if (symbol is not null && environment.TryGetValue(symbol, out var type))
                     {
-                        return ApplyParameterReadFlow(identifier, symbol, CapturedDefaultValue(identifier, symbol, type), forStorage);
+                        return ApplyNullableReadFlow(identifier, symbol, CapturedDefaultValue(identifier, symbol, type), forStorage);
                     }
 
                     // Captured constructor parameters retain their instance storage type.
@@ -1068,12 +1069,12 @@ public static partial class Inference
                     { return CSharpTypes.Rigid(captured.Type); }
                     if (symbol is IFieldSymbol field)
                     {
-                        return ApplyMemberNullability(field, CSharpTypes.Rigid(field.Type), forStorage);
+                        return ApplyMemberNullability(field, CSharpTypes.Rigid(field.Type), forStorage, syntax: identifier);
                     }
 
                     if (symbol is IPropertySymbol property)
                     {
-                        return ApplyMemberNullability(property, CSharpTypes.Rigid(property.Type), forStorage);
+                        return ApplyMemberNullability(property, CSharpTypes.Rigid(property.Type), forStorage, syntax: identifier);
                     }
 
                     throw new InferenceException("Only local and parameter references are supported.");
@@ -1769,10 +1770,10 @@ public static partial class Inference
                 var shape = receiverType is IPointerTypeSymbol pointer
                     ? PatternSymbolType(selected, PointerElement(member.Expression), pointer.PointedAtType)
                     : PatternSymbolType(selected, Expression(member.Expression), receiverType ?? throw new InferenceException("Unresolved member receiver."));
-                return ApplyMemberNullability(selected, shape, forStorage);
+                return ApplyMemberNullability(selected, shape, forStorage, syntax: member);
             }
 
-            return ApplyMemberNullability(selected, CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!), forStorage);
+            return ApplyMemberNullability(selected, CSharpTypes.Rigid(model.GetTypeInfo(member, cancellationToken).Type!), forStorage, syntax: member);
         }
 
         private HmType MethodCall(InvocationExpressionSyntax invocation, bool forStorage = false)
