@@ -912,6 +912,35 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(ValidateProbeBody(declaration, false), Is.EqualTo(expected));
     }
 
+    [TestCase("10u/unchecked((uint)value)", "Div_un")]
+    [TestCase("10u%unchecked((uint)value)", "Rem_un")]
+    [TestCase("checked(unchecked((uint)value)+1u)", "Add_ovf_un")]
+    [TestCase("checked(unchecked((uint)value)-1u)", "Sub_ovf_un")]
+    [TestCase("checked(unchecked((uint)value)*2u)", "Mul_ovf_un")]
+    [TestCase("10/value", "Div")]
+    [TestCase("10%value", "Rem")]
+    [TestCase("checked(value+1)", "Add_ovf")]
+    [TestCase("checked(value*2)", "Mul_ovf")]
+    [TestCase("checked(-value)", "Sub_ovf")]
+    [TestCase("checked((byte)value)", "Conv_ovf_u1")]
+    public void FaultingArithmeticRequiresTheProtectedSourceRegion(string expression, string rawCode)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        ArgumentNullException.ThrowIfNull(rawCode);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            var extra = "var observed=" + expression + ";";
+            var declaration = "public static void Probe(int value) { " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? extra : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? extra : "") + "builder.SetException(e); } " +
+                (location == "after" ? extra : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
+                Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundarySourceEscape"), location);
+        }
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
@@ -957,7 +986,7 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.Throws<OperationCanceledException>(check);
     }
 
-    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false)
+    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false, string? requiredRawCode = null)
     {
         ArgumentNullException.ThrowIfNull(declaration);
         var source = "using System; using System.Threading.Tasks; public static class C {" + declaration +
@@ -977,6 +1006,15 @@ public sealed class NativeTaskCarrierStorageTests
         var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
             .Single(value => metadata.GetString(value.Name) == (asyncBody ? "MoveNext" : "Probe"));
         var body = image.GetMethodBody(method.RelativeVirtualAddress);
+        if (requiredRawCode is not null)
+        {
+            var code = body.GetILBytes()!;
+            var cursor = 0;
+            var found = false;
+            while (cursor < code.Length && CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
+            { found |= instruction.RawCode == requiredRawCode; }
+            Assert.That(found, Is.True, "The emitted fixture must contain " + requiredRawCode);
+        }
         using var cancellation = new CancellationTokenSource();
         if (cancel)
         { cancellation.Cancel(); }

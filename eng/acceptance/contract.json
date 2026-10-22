@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 59,
+    "schemaVersion": 60,
     "enabledByDefault": true,
     "maximumMiB": 512
   },

@@ -109,6 +109,61 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Faulting arithmetic outside the protected region
+
+The corrected emitted-body controls reproduced an admission gap: division,
+remainder, checked addition/multiplication/negation and checked conversion in the
+handler received boundary evidence rather than
+`TaskRootExceptionBoundarySourceEscape`. The protected placements were admitted
+before each failing handler assertion. The six expected-failure results are
+retained in `artifacts/resource-boundary-arithmetic-corrected-red.log`.
+The earlier fixture-check failure read past the IL stream; it is separately
+retained in `artifacts/resource-boundary-arithmetic-red.log` and is not evidence
+of the production gap.
+
+The validator now requires division/remainder and overflow-checking opcodes to
+be inside the protected source region. The expanded controls add unsigned
+division/remainder and checked unsigned arithmetic: eleven operation families,
+each checked in the protected region, handler and continuation, for 33 states.
+Every fixture must contain its expected opcode. The fixture uses an inferred
+local type for unsigned values; the collector uses the .NET Standard 2.0
+string-search API. Two superseded local green builds were stopped before test
+completion while correcting those compatibility issues; neither is a passing
+result. All eleven compatible focused controls passed, covering all 33 states
+with zero build warnings or errors
+(`artifacts/resource-boundary-arithmetic-compatible-green.log`). The canonical
+formatter copied zero changes, and full quality/API checks passed. All 1252
+selected carrier/projection/protocol/native-resource tests passed, including
+the acceptance/defaults alignment and previous projection-version rejection
+(`artifacts/resource-boundary-arithmetic-tests.log`). The broader build also
+reported zero warnings or errors. Documentation checks passed
+(`artifacts/resource-boundary-arithmetic-docs.log`).
+
+Nested projection 8 and response cache 60 invalidate earlier boundary evidence;
+the acceptance contract, protocol defaults test and living version documentation
+are updated together. Protocol 43, manifest 6 and artifact schema 55 are unchanged.
+This strengthens arithmetic placement only. CLR/helper frames, cold initialization,
+builder completion failures and cumulative runtime-byte root composition remain
+open, along with the pending runtime-model choice.
+
+### Hosted source-call abstention coverage
+
+Coverage run 39863111569 for checkpoint
+`143c2f1cfb7e4b9907dd2077ea0e3683a646cd1d` completed all fifteen shards.
+Aggregate job 120124093755 produced a complete report and failed the unchanged
+100 percent floor: 6972/7105 changed trusted lines (98.13 percent), with 133 gaps.
+The unchanged source-call analysis file now covers lines 71 and 77, closing two
+gaps for missing callee bodies and unsupported argument costs; no new gaps
+appear in this comparison. This report does not measure the arithmetic fix.
+
+Evidence is retained in
+`artifacts/resource-143c-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `ab1e8cd35ee88b9846686fd51d622fc2bc86eb37` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `143c2f1cf`.
+Full canonical CI (39863111641) and package consumers (39863111518) passed for
+that exact predecessor. The newer arithmetic-boundary fix still requires
+hosted qualification.
+
 ### Hosted replay-entry contract qualification
 
 Checkpoint `ad478e5b74a2ad3da4d8febf10666743d768a53b` passed package consumers

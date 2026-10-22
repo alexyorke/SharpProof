@@ -418,6 +418,11 @@ internal sealed class CompilerTaskCarrierCollector
                 { return "TaskRootExceptionBoundaryCallUnsupported"; }
                 if (instruction.RawCode is "Newobj" or "Newarr" or "Throw" or "Rethrow" && !inside)
                 { return "TaskRootExceptionBoundarySourceEscape"; }
+                // Arithmetic faults also escape when emitted in the handler or
+                // continuation. Checked conversions share the overflow suffix.
+                if (!inside && (instruction.RawCode is "Div" or "Div_un" or "Rem" or "Rem_un" ||
+                    instruction.RawCode.IndexOf("_ovf", StringComparison.Ordinal) >= 0))
+                { return "TaskRootExceptionBoundarySourceEscape"; }
                 if (instruction.RawCode is not ("Call" or "Callvirt"))
                 { continue; }
                 var called = MetadataTokens.EntityHandle(checked((int)instruction.Operand));
