@@ -109,6 +109,64 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Linux array-dimension fault message strings
+
+A new private component composes both managed string candidates in one
+array-dimension fault materialization: the 61-character default OOM constructor
+message (144 aligned bytes) and the 42-character replacement (112 bytes).
+Its cumulative bound is 256 bytes per independently bounded materialization,
+under `coreclr8-linux-array-dimension-fault-strings-v1`. Counting only the final
+message would omit the discarded constructor string. Constant/symbolic counts
+are supported; constructor-platform/layout failures and both dependent and
+final composition-budget failures return Unknown without partial bounds.
+Cancellation propagates.
+
+Pinned [`ThrowOutOfMemoryDimensionsExceeded`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/gchelpers.cpp#L573)
+constructs the OOM-kind message exception with the dimension resource ID on
+x64. The resource has 42 characters and no format substitutions. Its native
+constructor selects that kind's primary `HRESULT`.
+[`rexcep.h`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/rexcep.h#L270)
+disables messages derived from `HRESULT` for OOM, so a resource lookup failure keeps
+the default constructor message rather than introducing another replacement.
+The exception metadata was fetched at the pinned revision and registered with
+verified blob identity, byte count and SHA-256 in the research manifest.
+
+The independent control requests `int.MaxValue` elements only after checking
+that it exceeds the pinned array dimension limit. `AllocateSzArray` rejects
+that extent before GC allocation. The control observes the replacement message
+and compares measured allocation with the message/instance components plus
+trace components using the observed raw trace count. These observed frames
+validate that execution only; they do not establish a CLR frame bridge, bound
+materialization retries, or account for cold initialization/culture callbacks.
+Those obligations and the root cumulative-byte result remain open.
+
+Automatic PR workflows appeared for predecessor `7d86a8aa1` after its branch
+dispatches. The duplicate manual CI (39825955362), coverage attempt 2
+(39825959374) and package-consumer (39825964217) runs were cancelled and their
+terminal cancellation states verified. Automatic CI (39827073233), coverage
+(39827072595) and package consumers (39827072972) remain pending/running.
+Security (39827072917) and documentation (39827072761) passed for that
+predecessor. No result is attributed to the newer component changes.
+
+All 261 Specs cases passed on the formatted final source, with zero build
+warnings or errors (`artifacts/resource-dimension-fault-strings-tests-fixed.log`).
+The first build identified the helper's missing explicit range guard and block
+body; the corrected helper accepts only lengths above `Array.MaxLength`.
+Full quality/API checks passed
+(`artifacts/resource-dimension-fault-strings-lint-fixed.log`), as did final
+documentation checks (`artifacts/resource-dimension-fault-strings-docs-final.log`).
+The canonical private formatter copied zero source changes
+(`artifacts/resource-dimension-fault-strings-format-fixed.log`).
+
+The completed automatic coverage report for `7d86a8aa1` (39827072595, merge
+`9cb5c8674131f33b81b429856ef787d769fe8502`) passed all fifteen shards and
+failed the unchanged 100% floor: 6868/7019 changed trusted lines, 97.85%,
+151 gaps. All new OOM-instance component lines are covered; two substitution
+and two lower-projection guard gaps closed. The retained report is
+`artifacts/resource-7d86-coverage-evidence/coverage/SharpProof.coverage.json`.
+It predates the native OOM and dimension-message components, whose hosted
+coverage remains unverified. Root runtime-byte obligations remain open.
+
 ### Linux native OOM constructor message storage
 
 A new private component bounds the returned managed string from the CoreCLR

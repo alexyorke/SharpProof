@@ -11,6 +11,11 @@ internal sealed record ResourcePrimitiveHCallFrameCheck(int? DirectFramesUpper, 
     internal string? RequiredRuntimeModel => DirectFramesUpper is null ? null : ResourceTaskFaultCarrierCatalog.PrimitiveHCallFrameModel;
 }
 
+internal sealed record ResourceNativeDimensionMessageCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.NativeDimensionMessageModel;
+}
+
 internal sealed record ResourceNativeOomMessageCheck(ResourceExpression? CumulativeUpper, string? UnknownReason)
 {
     internal string? RequiredRuntimeModel => CumulativeUpper is null ? null : ResourceTaskFaultCarrierCatalog.NativeOomMessageModel;
@@ -70,6 +75,33 @@ internal static class ResourceTaskFaultCarrierCatalog
         // and the JIT_NewArr1 worker are HCIMPL entries in the pinned source.
         return new(0, null);
     }
+    internal const string NativeDimensionMessageModel = "coreclr8-linux-array-dimension-fault-strings-v1";
+    internal const string NativeDimensionMessageSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/clrex.cpp";
+
+    // String candidates in one dimension-fault materialization: the default
+    // OOM constructor message plus a replacement from the fixed 42-character
+    // Unix resource with no substitutions. A failed resource lookup retains
+    // the default: this EEMessageException uses the primary OOM HRESULT and
+    // rexcep.h disables HRESULT-derived messages for its kind. Caller-bound
+    // materializations, instance/trace storage, lookup callbacks, helper faults
+    // and initialization are separate obligations. This is not a root verdict.
+    internal static ResourceNativeDimensionMessageCheck BoundNativeDimensionFaultStrings(ResourceExpression materializations,
+        string operatingSystem, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        materializations = ArgumentNullGuard.NotNull(materializations, nameof(materializations));
+        operatingSystem = ArgumentNullGuard.NotNull(operatingSystem, nameof(operatingSystem));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var constructor = BoundNativeOomConstructorMessages(materializations, operatingSystem, layout, cancellation);
+        if (constructor.CumulativeUpper is not { } initial)
+        { return new(null, constructor.UnknownReason); }
+        var replacement = ResourceRuntimeLayout.Bound(ResourceAllocationShape.String(ResourceExpression.Literal(42)), layout, cancellation);
+        try
+        { return new(ResourceExpression.Add(initial, ResourceExpression.Multiply(replacement.Bounds!.Upper, materializations)), null); }
+        catch (ResourceExpressionLimitException)
+        { return new(null, "NativeDimensionMessageBudgetExceeded"); }
+    }
+
     internal const string NativeOomMessageModel = "coreclr8-linux-native-oom-message-storage-v1";
     internal const string NativeOomMessageSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/comutilnative.cpp";
 

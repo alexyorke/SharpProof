@@ -14,6 +14,109 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(16)]
+    public void DimensionFaultStringsIncludeDiscardedConstructorAndReplacementMessages(int materializations)
+    {
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(ResourceExpression.Literal(materializations), "Linux",
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.Null);
+        Assert.That(check.CumulativeUpper!.Constant, Is.EqualTo(new BigInteger(256) * materializations));
+        Assert.That(check.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.NativeDimensionMessageModel));
+    }
+
+    [TestCase("Windows")]
+    [TestCase("macOS")]
+    public void DimensionFaultStringsPropagateUnsupportedConstructorPlatforms(string operatingSystem)
+    {
+        ArgumentNullException.ThrowIfNull(operatingSystem);
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(ResourceExpression.Zero, operatingSystem,
+            new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.EqualTo("UnsupportedNativeOomMessagePlatform"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+    }
+
+    [Test]
+    public void DimensionFaultStringCompositionPreservesCountsWithoutPartialResultsOnFailure()
+    {
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var count = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "materializations", int.MaxValue));
+        var check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(count, "Linux", layout, cancellation);
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+            cancellation), Is.EqualTo(new BigInteger(1792)));
+        for (var depth = count.Depth; depth < ResourceExpression.MaximumDepth - 1; depth++)
+        { count = ResourceExpression.Add(count, ResourceExpression.One); }
+        check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(count, "Linux", layout, cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("NativeDimensionMessageBudgetExceeded"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        count = ResourceExpression.Add(count, ResourceExpression.One);
+        check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(count, "Linux", layout, cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("NativeOomMessageBudgetExceeded"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(ResourceExpression.Zero, "Linux",
+            new("CoreCLR", "8.0.32", "arm64", 8), cancellation);
+        Assert.That(check.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.RequiredRuntimeModel, Is.Null);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Action operation = () => { _ = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(ResourceExpression.One, "Linux", layout, canceled.Token); };
+        Assert.Throws<OperationCanceledException>(operation);
+    }
+
+    [Test]
+    public void DimensionFaultAllocationsFitMessageInstanceAndObservedTraceComponents()
+    {
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(OperatingSystem.IsLinux(), Is.True);
+        Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
+            Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
+        Assert.That(Array.MaxLength, Is.LessThan(int.MaxValue));
+        var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var messages = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(ResourceExpression.One, "Linux", layout, cancellation);
+        var instance = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(ResourceTaskFaultNotificationCatalog.ExceptionFields), layout, cancellation);
+        var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        for (var warmup = 0; warmup < 64; warmup++)
+        { GC.KeepAlive(CaptureDimensionFault()); }
+        for (var iteration = 0; iteration < 32; iteration++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var fault = CaptureDimensionFault();
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            var trace = (byte[])traceField.GetValue(fault)!;
+            var frames = checked((int)BitConverter.ToUInt64(trace, 0));
+            var raw = ResourceTaskFaultCarrierCatalog.BoundRawTraceBuffers(frames, 0, layout, cancellation);
+            var resolver = ResourceTaskFaultCarrierCatalog.BoundResolverTraceBuffers(frames, 0, 30, layout, cancellation);
+            var bound = messages.CumulativeUpper!.Constant!.Value + instance.Bounds!.Upper.Constant!.Value +
+                raw.CumulativeUpper!.Constant!.Value + resolver.CumulativeUpper!.Constant!.Value;
+            Assert.That(fault.Message.Length, Is.EqualTo(42));
+            Assert.That(new BigInteger(allocated), Is.GreaterThan(0).And.LessThanOrEqualTo(bound));
+            GC.KeepAlive(fault);
+        }
+    }
+
+    private static OutOfMemoryException CaptureDimensionFault()
+    {
+        try
+        { GC.KeepAlive(CreateOversizedByteArray(int.MaxValue)); }
+        catch (OutOfMemoryException fault)
+        { return fault; }
+        throw new InvalidOperationException("Expected the checked dimension limit to reject the array.");
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static byte[] CreateOversizedByteArray(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Array.MaxLength);
+        return new byte[length];
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(16)]
     public void NativeOomMessageStorageBoundsOneReturnedStringPerConstructor(int attempts)
     {
         var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(ResourceExpression.Literal(attempts), "Linux",
