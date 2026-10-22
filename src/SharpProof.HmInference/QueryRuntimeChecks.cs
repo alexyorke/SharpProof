@@ -14,16 +14,35 @@ internal static class QueryRuntimeChecks
             #nullable enable
             using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
             public static class QueryTrace{
-                public static string Value="";public static Exception? Failure;
+                public static string Value="";public static Exception? Failure;public static Action? OnDispose;public static int RefCalls,IndexCalls;
+                public static int Index(){IndexCalls++;return 0;}
                 public static bool Accept<T>(T value){Value+="where;";return true;}
                 public static T Touch<T>(T value){Value+="touch;";if(Failure!=null)throw Failure;return value;}
-                public static IEnumerable<T> Source<T>(IEnumerable<T> values){Value+="open;";try{foreach(var value in values)yield return value;}finally{Value+="dispose;";}}
+                public static IEnumerable<T> Source<T>(IEnumerable<T> values){Value+="open;";try{foreach(var value in values)yield return value;}finally{Value+="dispose;";OnDispose?.Invoke();}}
             }
             public sealed class QueryBox<T>{
                 public IEnumerable<T> Values;public QueryBox(IEnumerable<T> values){Values=values;}
                 public QueryBox<U> Select<U>(Func<T,U> selector){QueryTrace.Value+="select;";return new QueryBox<U>(Values.Select(selector));}
             }
             public static class QueryProbe{
+                static ref T Borrow<T>(ref T value){QueryTrace.RefCalls++;return ref value;}
+                static ref T? BorrowNullable<T>(ref T? value){QueryTrace.RefCalls++;return ref value;}
+                static ref T ArrayBorrow<T>(T[] value){QueryTrace.RefCalls++;return ref value[QueryTrace.Index()];}
+                public static IEnumerable<int> ArrayRefStore(IEnumerable<int[]> values)=>from row in values select ArrayBorrow(row)=default;
+                public static void RefLocalQuery(IEnumerable<int[]> values){void Clear(){foreach(var item in(from row in values select Borrow(ref row[QueryTrace.Index()])=default)){}}Clear();}
+                public static int RefLocal(int[] values){void Clear(){Borrow(ref values[QueryTrace.Index()])=default;}Clear();return values[0];}
+                public static Func<int> RefCaptured(int[] values)=>()=>Borrow(ref values[QueryTrace.Index()])=default;
+                #pragma warning disable CS8601
+                public static IEnumerable<int> RefStoreSuppressed(IEnumerable<int[]> values)=>from row in values select Borrow(ref row[QueryTrace.Index()])=default;
+                #pragma warning restore CS8601
+                public static IEnumerable<int> RefStore(IEnumerable<int[]> values)=>from row in values select Borrow(ref row[QueryTrace.Index()])=default;
+                public static IEnumerable<int> NullableRefStore(IEnumerable<int[]> values)=>from row in values select BorrowNullable(ref row[QueryTrace.Index()])=default;
+                public static IEnumerable<(int copy,int stored)> RefCopy(IEnumerable<int[]> values)=>from row in values select(row[0],Borrow(ref row[QueryTrace.Index()])=default);
+                public static IEnumerable<string> RefSibling(IEnumerable<(int[] row,string tag)> values)=>from pair in values select(Borrow(ref pair.row[QueryTrace.Index()])=default,pair.tag).Item2;
+                public static int RefBlock(int[] values){values[0]=default;Borrow(ref values[QueryTrace.Index()])=default;return values[0];}
+                public static int RefParameter(ref int value){Borrow(ref value)=default;return value;}
+                public static async Task<IEnumerable<int>> RefAsync(Task<IEnumerable<int[]>> values)=>from row in await values select Borrow(ref row[QueryTrace.Index()])=default;
+                public static async ValueTask<IEnumerable<int>> NullableRefAsync(ValueTask<IEnumerable<int[]>> values)=>from row in await values select BorrowNullable(ref row[QueryTrace.Index()])=default;
                 public static IEnumerable<int> DefaultJoin(IEnumerable<int> values,bool flag)=>from x in values select flag?x:default;
                 public static IEnumerable<string?> NullJoin(IEnumerable<string> values,bool flag)=>from x in values select flag?x:null;
                 public static IEnumerable<int> Coalesce(IEnumerable<int?> values,int fallback)=>from x in values select x??fallback;
@@ -44,6 +63,7 @@ internal static class QueryRuntimeChecks
             }
             public static class OriginalQueryRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
+                    if(!await Stores(cancellationToken))return false;
                     if(!QueryProbe.DefaultJoin(new[]{7},true).SequenceEqual(new[]{7})||!QueryProbe.DefaultJoin(new[]{7},false).SequenceEqual(new[]{0})
                         ||!QueryProbe.NullJoin(new[]{"value"},true).SequenceEqual(new[]{"value"})||QueryProbe.NullJoin(new[]{"value"},false).Single()!=null
                         ||!QueryProbe.Coalesce(new int?[]{null,7},9).SequenceEqual(new[]{9,7}))return false;
@@ -85,14 +105,45 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> Stores(CancellationToken cancellationToken){
+                    int[] row={7};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                    QueryTrace.OnDispose=()=>row[0]=99;
+                    try{var query=QueryProbe.RefStore(QueryTrace.Source(new[]{row}));if(row[0]!=7||QueryTrace.RefCalls!=0||QueryTrace.Value!="")return false;
+                        if(query.Take(1).Single()!=0||row[0]!=99||QueryTrace.RefCalls!=1||QueryTrace.IndexCalls!=1||QueryTrace.Value!="open;dispose;")return false;
+                    }finally{QueryTrace.OnDispose=null;}
+                    row[0]=7;var copied=QueryProbe.RefCopy(new[]{row}).Single();if(copied!=(7,0)||row[0]!=0)return false;
+                    row[0]=7;if(QueryProbe.RefSibling(new[]{(row,"tag")}).Single()!="tag"||row[0]!=0)return false;
+                    row[0]=7;if(QueryProbe.RefBlock(row)!=0||row[0]!=0)return false;int value=7;if(QueryProbe.RefParameter(ref value)!=0||value!=0)return false;
+                    row[0]=7;QueryProbe.RefLocalQuery(new[]{row});if(row[0]!=0)return false;row[0]=7;if(QueryProbe.RefLocal(row)!=0||row[0]!=0)return false;
+                    row[0]=7;var captured=QueryProbe.RefCaptured(row);if(row[0]!=7||captured()!=0||row[0]!=0)return false;
+                    row[0]=7;if(QueryProbe.ArrayRefStore(new[]{row}).Single()!=0||row[0]!=0)return false;
+                    row[0]=7;if(QueryProbe.RefStoreSuppressed(new[]{row}).Single()!=0||row[0]!=0)return false;
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel"}){
+                        row[0]=7;QueryTrace.RefCalls=QueryTrace.IndexCalls=0;var gate=new TaskCompletionSource<IEnumerable<int[]>>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var task=QueryProbe.RefAsync(gate.Task);var valueTask=QueryProbe.NullableRefAsync(new ValueTask<IEnumerable<int[]>>(gate.Task)).AsTask();
+                        if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.RefCalls!=0)return false;var failure=new InvalidOperationException("ref-store-await");
+                        if(outcome=="Value")gate.SetResult(new[]{row});else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                        int executions=0;foreach(var pending in new[]{task,valueTask}){
+                            try{var query=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||QueryTrace.RefCalls!=executions)return false;
+                                if(query.Single()!=0||row[0]!=0||QueryTrace.RefCalls!=++executions||QueryTrace.IndexCalls!=executions)return false;}
+                            catch(InvalidOperationException error)when(outcome=="Fault"&&ReferenceEquals(error,failure)){}
+                            catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                        }
+                        if(outcome!="Value"&&(row[0]!=7||QueryTrace.RefCalls!=0||QueryTrace.IndexCalls!=0))return false;
+                    }
+                    return true;
+                }
             }
             """;
         const string newSource = """
             #nullable enable
             using System;using System.Linq;using System.Linq.Expressions;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+            public struct QueryStoreValue{public static int Calls;public int Value;public string? Text;public QueryStoreValue(){Calls++;Value=99;Text="ctor";}}
             public static class NewQueryRunner{
                 public static async Task<bool> Run(CancellationToken cancellationToken){
                     string text=new string('x',2);var uri=new Uri("https://example.invalid/query");
+                    if(!await Stores(text,cancellationToken))return false;
                     if(!ReferenceEquals(QueryProbe.DefaultJoin(new[]{text},true).Single(),text)||QueryProbe.DefaultJoin(new[]{text},false).Single()!=null
                         ||QueryProbe.DefaultJoin(new decimal?[]{23m},false).Single()!=null||!ReferenceEquals(QueryProbe.NullJoin(new[]{uri},true).Single(),uri)
                         ||QueryProbe.NullJoin(new[]{uri},false).Single()!=null||!QueryProbe.Coalesce(new decimal?[]{null,23m},99m).SequenceEqual(new[]{99m,23m}))return false;
@@ -116,6 +167,30 @@ internal static class QueryRuntimeChecks
                     if(task.IsCompleted||valueTask.IsCompleted||QueryTrace.Value!="")return false;gate.SetResult(new string?[]{text,null});
                     foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(QueryTrace.Value!=""||!result.SequenceEqual(new string?[]{text,null})||QueryTrace.Value!="touch;touch;")return false;QueryTrace.Value="";}
                     return true;
+                }
+                static async Task<bool> Stores(string text,CancellationToken cancellationToken){
+                    decimal[] number={23m};if(QueryProbe.RefStore(new[]{number}).Single()!=0m||number[0]!=0m)return false;
+                    var original=new QueryStoreValue();QueryStoreValue.Calls=0;var row=new[]{original};var copied=QueryProbe.RefCopy(new[]{row}).Single();
+                    if(copied.copy.Value!=99||copied.copy.Text!="ctor"||copied.stored.Value!=0||copied.stored.Text!=null||row[0].Value!=0||row[0].Text!=null||QueryStoreValue.Calls!=0)return false;
+                    number[0]=23m;var tag=new Uri("https://example.invalid/ref-store");if(!ReferenceEquals(QueryProbe.RefSibling(new[]{(number,tag)}).Single(),tag)||number[0]!=0m)return false;
+                    number[0]=23m;if(QueryProbe.RefBlock(number)!=0m||number[0]!=0m)return false;decimal value=23m;if(QueryProbe.RefParameter(ref value)!=0m||value!=0m)return false;
+                    row[0]=original;QueryProbe.RefLocalQuery(new[]{row});if(row[0].Value!=0||row[0].Text!=null||QueryStoreValue.Calls!=0)return false;
+                    string?[] broad={text};if(QueryProbe.RefBlock(broad)!=null||broad[0]!=null)return false;
+                    broad[0]=text;if(QueryProbe.RefLocal(broad)!=null||broad[0]!=null)return false;
+                    broad[0]=text;var captured=QueryProbe.RefCaptured(broad);if(!ReferenceEquals(broad[0],text)||captured()!=null||broad[0]!=null)return false;
+                    broad[0]=text;if(QueryProbe.ArrayRefStore(new[]{broad}).Single()!=null||broad[0]!=null)return false;
+                    broad[0]=text;if(QueryProbe.RefStoreSuppressed(new[]{broad}).Single()!=null||broad[0]!=null)return false;
+                    string? slot=text;if(QueryProbe.RefParameter(ref slot)!=null||slot!=null)return false;
+                    string?[] reference={text};QueryTrace.Value="";QueryTrace.RefCalls=QueryTrace.IndexCalls=0;QueryTrace.OnDispose=()=>reference[0]=text;
+                    try{var query=QueryProbe.NullableRefStore(QueryTrace.Source(new[]{reference}));if(!ReferenceEquals(reference[0],text)||QueryTrace.RefCalls!=0)return false;
+                        if(query.Take(1).Single()!=null||!ReferenceEquals(reference[0],text)||QueryTrace.RefCalls!=1||QueryTrace.IndexCalls!=1||QueryTrace.Value!="open;dispose;")return false;
+                    }finally{QueryTrace.OnDispose=null;}
+                    decimal?[] optional={23m};if(QueryProbe.NullableRefStore(new[]{optional}).Single()!=null||optional[0]!=null)return false;
+                    var gate=new TaskCompletionSource<IEnumerable<string?[]>>(TaskCreationOptions.RunContinuationsAsynchronously);QueryTrace.RefCalls=QueryTrace.IndexCalls=0;
+                    var pending=QueryProbe.NullableRefAsync(new ValueTask<IEnumerable<string?[]>>(gate.Task)).AsTask();
+                    if(pending.IsCompleted||!ReferenceEquals(reference[0],text))return false;gate.SetResult(new[]{reference});
+                    var delayed=await pending.WaitAsync(cancellationToken);if(QueryTrace.RefCalls!=0||!ReferenceEquals(reference[0],text))return false;
+                    return delayed.Single()==null&&reference[0]==null&&QueryTrace.RefCalls==1&&QueryTrace.IndexCalls==1;
                 }
             }
             """;
@@ -152,9 +227,9 @@ internal static class QueryRuntimeChecks
             Program.Log.Info("PASS QueryOriginalLazinessDisposalOperatorsGroupsTreesAndAwaitEffects");
             await Execute(changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText(newSource, cancellationToken: cancellationToken)).WithAssemblyName("NewQueries"), "NewQueryRunner").ConfigureAwait(false);
             Program.Log.Info("PASS QueryNewReferenceNullableAndIndependentDomains");
-            var invalid = changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText("using System.Collections.Generic;class Bad{void Check(){_=QueryProbe.Numeric(new[]{\"bad\"});IEnumerable<string> values=QueryProbe.Typed(new[]{1});}}", cancellationToken: cancellationToken));
+            var invalid = changed.AddSyntaxTrees(CSharpSyntaxTree.ParseText("using System.Collections.Generic;class Bad{void Check(){_=QueryProbe.Numeric(new[]{\"bad\"});IEnumerable<string> values=QueryProbe.Typed(new[]{1});_=QueryProbe.RefStore(new[]{new[]{\"bad\"}});}}", cancellationToken: cancellationToken));
             if (invalid.GetDiagnostics(cancellationToken).Count(diagnostic =>
-                { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; }) != 2)
+                { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; }) != 3)
             { throw new InvalidOperationException("Query numeric or typed-from boundaries changed."); }
             Program.Log.Info("PASS QueryRetainsNumericAndExplicitCastDomains");
         }

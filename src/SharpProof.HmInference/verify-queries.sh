@@ -5,16 +5,34 @@ for language in 8 9 13; do
   fixture=$(mktemp -d /tmp/hm-query-consumer.XXXXXX)
   cp global.json "$fixture/global.json"
   package_reference=""
+  constants=""
+  if [ "$language" != 8 ]; then constants=ANNOTATED_REF; fi
   if [ "$#" -eq 3 ]; then
     package_reference="<ItemGroup><PackageReference Include=\"SharpProof.HmInference\" Version=\"$3\" PrivateAssets=\"all\" /></ItemGroup>"
   fi
   cat > "$fixture/Queries.csproj" << EOF
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>$language</LangVersion><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>$package_reference</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>$language</LangVersion><DefineConstants>$constants</DefineConstants><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001</WarningsNotAsErrors><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>$package_reference</Project>
 EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Linq;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
 public static class QueryConsumer{
+  static ref T Borrow<T>(ref T value)=>ref value;
+  static ref T ArrayBorrow<T>(T[] value)=>ref value[0];
+  public static IEnumerable<int> ArrayRefStore(IEnumerable<int[]> values)=>from row in values select ArrayBorrow(row)=default;
+  public static IEnumerable<int> RefStore(IEnumerable<int[]> values)=>from row in values select Borrow(ref row[0])=default;
+  public static IEnumerable<string> RefSibling(IEnumerable<(int[] row,string tag)> values)=>from pair in values select(Borrow(ref pair.row[0])=default,pair.tag).Item2;
+  public static int RefBlock(int[] values){values[0]=default;Borrow(ref values[0])=default;return values[0];}
+  public static int RefParameter(ref int value){Borrow(ref value)=default;return value;}
+  public static async Task<IEnumerable<int>> RefAsync(Task<IEnumerable<int[]>> values)=>from row in await values select Borrow(ref row[0])=default;
+#if ANNOTATED_REF
+  #pragma warning disable CS8601
+  public static IEnumerable<int> RefStoreSuppressed(IEnumerable<int[]> values)=>from row in values select Borrow(ref row[0])=default;
+  #pragma warning restore CS8601
+  static ref T? BorrowNullable<T>(ref T? value)=>ref value;
+  public static IEnumerable<int> NullableRefStore(IEnumerable<int[]> values)=>from row in values select BorrowNullable(ref row[0])=default;
+  public static async ValueTask<IEnumerable<int>> NullableRefAsync(ValueTask<IEnumerable<int[]>> values)=>from row in await values select BorrowNullable(ref row[0])=default;
+#endif
   public static IQueryable<int> QuotedDefault(IQueryable<int> values,bool flag,int tag)=>from x in values select flag?x:default;
   public static IEnumerable<int> DefaultJoin(IEnumerable<int> values,bool flag,int tag)=>from x in values select flag?x:default;
   public static IEnumerable<string?> NullJoin(IEnumerable<string> values,bool flag,int tag)=>from x in values select flag?x:null;
@@ -69,6 +87,9 @@ EOF
   fi
   cp "$log" "$destination"
   for expected in \
+    'global::System.Collections.Generic.IEnumerable<T1> RefStore<T1>(global::System.Collections.Generic.IEnumerable<T1[]> values) where T1 : struct' \
+    'global::System.Collections.Generic.IEnumerable<T2> RefSibling<T1, T2>(global::System.Collections.Generic.IEnumerable<(T1[] row, T2 tag)> values) where T1 : struct' \
+    'global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<T1>> RefAsync<T1>(global::System.Threading.Tasks.Task<global::System.Collections.Generic.IEnumerable<T1[]>> values) where T1 : struct' \
     'global::System.Collections.Generic.IEnumerable<T1?> NullJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : class' \
     'global::System.Collections.Generic.IEnumerable<T1> Coalesce<T1, T2>(global::System.Collections.Generic.IEnumerable<T1?> values, T1 fallback, T2 tag) where T1 : struct' \
     'global::System.Collections.Generic.IEnumerable<T1> Identity<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, T2 tag)' \
@@ -97,9 +118,18 @@ EOF
     exit 1
   fi
   if [ "$language" = 8 ]; then
+    grep -Fq 'T1 RefBlock<T1>(T1[] values) where T1 : struct' "$log"
+    grep -Fq 'T1 RefParameter<T1>(ref T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> ArrayRefStore<T1>(global::System.Collections.Generic.IEnumerable<T1[]> values) where T1 : struct' "$log"
     grep -Fq 'global::System.Linq.IQueryable<T1> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? RefBlock<T1>(T1?[] values)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> RefStoreSuppressed<T1>(global::System.Collections.Generic.IEnumerable<T1?[]> values)' "$log"
+    grep -Fq 'T1? RefParameter<T1>(ref T1? value)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> ArrayRefStore<T1>(global::System.Collections.Generic.IEnumerable<T1?[]> values)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> NullableRefStore<T1>(global::System.Collections.Generic.IEnumerable<T1?[]> values)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<T1?>> NullableRefAsync<T1>(global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.IEnumerable<T1?[]>> values)' "$log"
     grep -Fq 'global::System.Linq.IQueryable<T1?> QuotedDefault<T1, T2>(global::System.Linq.IQueryable<T1> values, bool flag, T2 tag)' "$log"
     grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> DefaultJoin<T1, T2>(global::System.Collections.Generic.IEnumerable<T1> values, bool flag, T2 tag)' "$log"
   fi

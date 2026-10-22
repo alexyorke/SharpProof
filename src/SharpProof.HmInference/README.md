@@ -11,7 +11,7 @@ selectors share inferred element graphs through transparent carriers. `IQueryabl
 quotes and custom query patterns retain their selected operators; supplied queries
 are checked again after signature edits. Typed `from` casts and numeric endpoints
 stay fixed, while nullable/default joins, coalescing and awaited sources retain
-their structural relationships. Applied Fix All checks cover deferred enumeration,
+their structural relationships. Scalar default writes through generic ref returns use the effective compiler diagnostics to infer a struct bound only where the proposed signature needs one. Ordinary blocks, annotated `ref T?` contracts and compatible array getters keep their broader domains. Nullable contexts, pragma suppression, per-tree severity and warning promotion retain their configured behavior. Query selectors and awaited query sources preserve independent sibling types; dependent value-domain bounds normalize to equality. Applied Fix All checks cover deferred enumeration,
 early disposal, traces, reference identity, provider expression trees, independent
 key/value domains, suspension, faults and cancellation. Bundled examples are in
 `Samples/Queries.cs.txt`; CLI and package fixtures cover C# 8, 9 and 13.

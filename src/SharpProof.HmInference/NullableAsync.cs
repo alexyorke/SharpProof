@@ -227,6 +227,40 @@ public static partial class Inference
         private Dictionary<ISymbol, HashSet<ISymbol>>? storageAliases;
         private readonly HashSet<ISymbol> preparedIndirectAliases = new(SymbolEqualityComparer.Default);
         private Dictionary<ISymbol, HmType>? storageLambdaInputs;
+        private readonly List<(HmType Shape, AssignmentExpressionSyntax Store)> refReturnDefaultDomains = [];
+
+        private bool ConstrainRefReturnDefaults(Compilation changed, MethodDeclarationSyntax original, MethodDeclarationSyntax replacement)
+        {
+            if (changed is null)
+            { throw new ArgumentNullException(nameof(changed)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (replacement is null)
+            { throw new ArgumentNullException(nameof(replacement)); }
+            var before = (SyntaxNode?)original.Body ?? original.ExpressionBody;
+            var after = (SyntaxNode?)replacement.Body ?? replacement.ExpressionBody;
+            if (before is null || after is null)
+            { return false; }
+            var offset = after.SpanStart - before.SpanStart;
+            var constrained = new HashSet<HmType>();
+            foreach (var diagnostic in changed.GetDiagnostics(cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (diagnostic.Id != "CS8601" || diagnostic.IsSuppressed || diagnostic.Severity is not (DiagnosticSeverity.Warning or DiagnosticSeverity.Error)
+                    || diagnostic.Location.SourceTree != replacement.SyntaxTree)
+                { continue; }
+                var position = diagnostic.Location.SourceSpan;
+                foreach (var domain in refReturnDefaultDomains)
+                {
+                    var start = domain.Store.SpanStart + offset;
+                    var shape = ConversionCore(domain.Shape);
+                    if (position.Start < start || position.End > start + domain.Store.Span.Length || shape.IsValueType == true || !constrained.Add(shape))
+                    { continue; }
+                    RequireKeyword(shape, "struct");
+                }
+            }
+            return constrained.Count != 0;
+        }
 
         private void PrepareIndirectStorage(HmType[] parameters)
         {

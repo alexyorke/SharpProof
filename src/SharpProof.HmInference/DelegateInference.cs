@@ -77,6 +77,7 @@ public static partial class Inference
                 { environment[storage] = MergeDefaultValues(previous, written); defaultAssignedStorages.Add(storage); }
             }
             inferredConstraints.AddRange(nested.inferredConstraints);
+            refReturnDefaultDomains.AddRange(nested.refReturnDefaultDomains);
             conversionTargets.AddRange(nested.conversionTargets);
             conversionBounds.AddRange(nested.conversionBounds);
             needsBuilderEmission |= nested.needsBuilderEmission;

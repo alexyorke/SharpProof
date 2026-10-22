@@ -351,6 +351,24 @@ public static partial class Inference
             }
 
             var changedCompilation = ReplaceCandidate(changed);
+            if (refReturnDefaultDomains.Count != 0 && ConstrainRefReturnDefaults(changedCompilation, method,
+                changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single()))
+            {
+                NormalizeConstraints();
+                variables.Clear();
+                nextName = 1;
+                foreach (var parameter in parameters)
+                { NameVariables(parameter); }
+                NameVariables(result);
+                if (variables.Count == 0)
+                { return new(symbol.Name, "Concrete", "Body requires concrete types; no generic suggestion."); }
+                nullableConstraints = BuildConstraints(variables, nullableAnnotations);
+                candidate = candidate.WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter)))))
+                    .WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints))
+                    .WithReturnType(RenderReturnSyntax()).WithParameterList(RenderParameters());
+                changed = CandidateTree();
+                changedCompilation = ReplaceCandidate(changed);
+            }
             if (needsBuilderEmission)
             {
                 var previousPins = pins.Count;
@@ -1311,6 +1329,17 @@ public static partial class Inference
 
             var target = AssignmentTarget(targetSyntax);
             var targetType = StorageType(targetSyntax);
+            if (value.Root.Name == CSharpTypes.NullableParameter && HasDefaultValueAnnotation(value)
+                && targetSyntax is InvocationExpressionSyntax referenceCall
+                && model.GetOperation(referenceCall, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true } referenceOperation
+                && referenceOperation.TargetMethod.OriginalDefinition.ReturnType is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } returnParameter
+                && returnParameter.NullableAnnotation != NullableAnnotation.Annotated
+                && targetSyntax.Parent is AssignmentExpressionSyntax store)
+            {
+                // Let effective compiler diagnostics decide whether the inferred
+                // ref contract needs a value-domain restriction.
+                refReturnDefaultDomains.Add((target, store));
+            }
             if (targetSyntax.Parent is AssignmentExpressionSyntax { Right: RefExpressionSyntax }
                 && model.GetSymbolInfo(targetSyntax, cancellationToken).Symbol is ILocalSymbol { RefKind: not RefKind.None } alias)
             {

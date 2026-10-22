@@ -17,6 +17,20 @@ public static partial class Inference
                 { continue; }
                 var source = ConversionCore(requirement.Variable);
                 var target = ConversionCore(requirement.Type);
+                if (target.IsVariable && inferredConstraints.Any(other =>
+                    {
+                        if (other.Variable is null)
+                        { throw new ArgumentException("Expected a constraint owner.", nameof(other)); }
+                        return ReferenceEquals(ConversionCore(other.Variable), target) && other.Keyword is "struct" or "unmanaged";
+                    }))
+                {
+                    // Value types are sealed: a value-domain T admits U : T only
+                    // when U is T. Keep that equality out of C# where clauses.
+                    HmType.Unify(source, target);
+                    inferredConstraints.RemoveAt(i);
+                    changed = true;
+                    continue;
+                }
                 var declared = target.CSharpSymbol;
                 if (declared is null)
                 { continue; }
