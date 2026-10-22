@@ -109,6 +109,48 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Native task declaration boundaries and fault escape review
+
+The task-root controls now include empty, malformed JSON, oversized and
+foreign-input declared bounds, each for returned and configured-await roots.
+Unsealed mutations must fail the claim-envelope validator. Resealed malformed
+JSON and foreign-input expressions then require `ForkJoinDeclaredBoundInvalid`,
+no inferred/observed bound, and no metadata assumptions or proof core. Empty
+and oversized payloads remain rejected by the envelope's size rules. Every
+case verifies the original owned declaration afterward. The first test run
+passed the existing 674 cases but stopped all eight probes at envelope checks;
+the corrected controls explicitly distinguish those validation layers.
+
+Pinned [`Task.ExecuteWithThreadLocal`](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/Task.cs#L2304)
+catches exceptions from `InnerInvoke` or its execution-context invocation.
+`HandleException` runs in the catch body, while `Finish(true)` and ETW work
+run outside that inner catch. An exception during fault recording or completion
+is therefore not covered by the callback catch itself. The complete root
+runtime-byte model must account for these escape paths, rather than infer a
+universal fault-processing attempt cap from one callback invocation. This
+review does not close the checked catch-boundary obligation.
+
+Published `8b6be36f1` has passed exact-commit security (39819962686) and
+documentation (39819967477) workflows. Canonical CI (39819949377), coverage
+(39819953795) and package consumers (39819958128) are still running. These
+results predate the new declaration-bound controls.
+
+All 682 native resource-contract cases passed on the corrected final source,
+with zero build warnings or errors
+(`artifacts/resource-task-declared-bound-tests-fixed.log`). Full quality/API
+checks passed (`artifacts/resource-task-declared-bound-lint-final.log`), as did
+documentation checks (`artifacts/resource-task-declared-bound-docs-final.log`).
+The final canonical private formatter copied zero source changes
+(`artifacts/resource-task-declared-bound-format-fixed.log`).
+
+The completed exact-commit coverage workflow for `8b6be36f1` (39819953795)
+passed all fifteen shards but failed the unchanged 100% changed-TCB floor.
+Its retained report measures 6849/7007 lines (97.75%, 158 gaps), closing six
+carrier-shape guard lines and all six remaining memory-program lines from the
+previous report. The report is retained at
+`artifacts/resource-8b6be-coverage-evidence/coverage/SharpProof.coverage.json`.
+It predates the new task-declaration controls; their coverage remains unverified.
+
 ### Mathematical integer widths and arithmetic guard rejection
 
 Three additional memory-program controls check the separation between legacy

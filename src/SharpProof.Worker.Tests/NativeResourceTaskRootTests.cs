@@ -19,6 +19,55 @@ internal sealed partial class NativeResourceContractTests
             "; static void Child(int count) {" + child + "} }", reviewedRuntime: true, x64: x64));
     }
 
+    [TestCase("empty", false)]
+    [TestCase("empty", true)]
+    [TestCase("json", false)]
+    [TestCase("json", true)]
+    [TestCase("oversized", false)]
+    [TestCase("oversized", true)]
+    [TestCase("foreign-input", false)]
+    [TestCase("foreign-input", true)]
+    public void TaskRootRejectsMalformedDeclaredBoundsWithoutPublishingPartialProof(string corruption, bool configuredAwait)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var target = TaskRoot("[ResourceUpperBound(ResourceMetric.LoopBodyEntries,3,nameof(n),1)]", configuredAwait: configuredAwait);
+        var claim = target.EffectClaims.Single();
+        var payload = corruption switch
+        {
+            "empty" => Array.Empty<byte>(),
+            "json" => System.Text.Encoding.UTF8.GetBytes("{}"),
+            "oversized" => new byte[ResourceExpressionCodec.MaximumPayloadBytes + 1],
+            "foreign-input" => ResourceExpressionCodec.Encode(ResourceExpression.InputSize(
+                new ResourceInput(1, ResourceInputKind.NonNegativeScalar, "foreign", int.MaxValue)), cancellation),
+            _ => throw new ArgumentOutOfRangeException(nameof(corruption))
+        };
+        var malformed = claim with
+        {
+            Constraint = claim.Constraint with
+            { ResourceUpperBound = claim.Constraint.ResourceUpperBound! with { UpperBound = payload } }
+        };
+        Action unsealed = () => { _ = NativeResourceContractVerifier.Verify(target, malformed, cancellation); };
+        Assert.That(unsealed, Throws.TypeOf<InvalidDataException>());
+        if (corruption is "json" or "foreign-input")
+        {
+            CompilerEffectClaimArtifactCodec.Seal(malformed);
+            var rejected = NativeResourceContractVerifier.Verify(target, malformed, cancellation);
+            Assert.That(rejected.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(rejected.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+            Assert.That(rejected.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinDeclaredBoundInvalid"));
+            Assert.That(rejected.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(rejected.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(rejected.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(rejected.ProofCore, Is.Empty);
+            Assert.That(rejected.EffectWitness, Is.Null);
+        }
+
+        // A failed declaration must not poison the independently owned valid claim.
+        var valid = NativeResourceContractVerifier.Verify(target, claim, cancellation);
+        Assert.That(valid.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), valid.ResourceBound?.UnknownReason);
+        Assert.That(valid.ResourceBound!.InferredUpperBound, Is.EqualTo("(max(0, n) + 3)"));
+    }
     [TestCase(false)]
     [TestCase(true)]
     public async Task TaskRootPublishesCheckedLoopUpperWithExplicitConditionalScope(bool configuredAwait)
