@@ -895,6 +895,23 @@ public sealed class NativeTaskCarrierStorageTests
             TestContext.CurrentContext.CancellationToken);
     }
 
+    [TestCase("none", null)]
+    [TestCase("try", null)]
+    [TestCase("handler", "TaskRootExceptionBoundarySourceEscape")]
+    [TestCase("after", "TaskRootExceptionBoundarySourceEscape")]
+    public void BoundaryCallsOutsideTheProtectedRegionMustHaveAKnownRole(string location, string? expected)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        const string extra = "int.Parse(\"0\");";
+        var declaration = "public static void Probe() { " +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            (location == "try" ? extra : "") +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) { " + (location == "handler" ? extra : "") + "builder.SetException(e); } " +
+            (location == "after" ? extra : "") + "builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false), Is.EqualTo(expected));
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
@@ -905,7 +922,7 @@ public sealed class NativeTaskCarrierStorageTests
     [TestCase("public static void Probe(Exception e) {try {int.Parse(\"0\");} catch(Exception) {} throw e;}", false, "TaskRootExceptionBoundarySourceEscape")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {} Task.WhenAll(Array.Empty<Task>());}", false, "TaskRootExceptionBoundarySourceEscape")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(Exception) {}}", false, "TaskRootExceptionBoundaryCallsIncomplete")]
-    [TestCase("public static async Task<int> Probe() => await Task.FromResult(1).ConfigureAwait(false);", true, "TaskRootExceptionBoundaryCallsIncomplete")]
+    [TestCase("public static async Task<int> Probe() => await Task.FromResult(1).ConfigureAwait(false);", true, "TaskRootExceptionBoundarySourceEscape")]
     [TestCase("public static void Probe(int n) {try {switch(n) {case 0: n=7;break;case 1:n=8;break;case 2:n=9;break;case 3:n=10;break;case 4:n=11;break;default:n=12;break;}} catch(Exception) {}}", false, "TaskRootExceptionBoundaryBodyUnsupported")]
     public void EmittedBodyValidatorRejectsUnsupportedBoundaries(string declaration, bool asyncBody, string expected)
     {

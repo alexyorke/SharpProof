@@ -109,6 +109,54 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Exception-boundary call roles
+
+The compiler boundary validator now rejects unclassified method calls outside
+its protected source region, including calls in the catch handler. Previously,
+only task and await calls were required to be protected; an unrelated framework
+call after the handler could pass the validator when the expected task calls
+and exception recording were also present.
+
+Outside the protected region, the admitted roles are the framework Task
+builder's `SetException` in the handler and `SetResult` outside the handler.
+Their type must match the exact framework assembly identity. These are placement
+facts only: the runtime methods are not assumed to be exception-free, and their
+own failure paths remain separate obligations. Unrecognized generic builders
+remain unsupported. Protected calls retain their earlier admission behavior.
+
+Four emitted-body controls place the same framework call inside the protected
+region, in the handler, after the handler, or omit it. The first and last retain
+admission; the escaping placements require
+`TaskRootExceptionBoundarySourceEscape`. Existing generated Debug/Release,
+configured/returned and detached transport controls remain part of validation.
+The nested projection advances to version 7 and the response cache to version
+59, preventing reuse of older boundary facts. A transport control explicitly
+rejects the preceding projection version. Protocol 43, manifest 6 and outer
+artifact schema 55 are unchanged.
+
+This strengthens one compiler fact; it does not complete the exception-boundary
+obligation. Returned roots still lack an owned catch, and configured roots do
+not establish that builder/runtime failures are contained. CLR/helper frames,
+materialization and initialization costs, cumulative trace costs and root
+composition remain open. Cumulative task runtime bytes remain Unknown.
+
+The original validator reproduced the gap: the two escaping placements failed
+the new expectations, while both protected/empty controls passed
+(`artifacts/resource-boundary-call-roles-red.log`). After the fix, all 1209
+selected worker tests passed: 275 carrier, 118 projection, 130 protocol and
+686 native resource-contract cases, with zero build warnings or errors
+(`artifacts/resource-boundary-call-roles-tests.log`). Full quality/API checks
+and documentation checks passed (`artifacts/resource-boundary-call-roles-lint.log`
+and `artifacts/resource-boundary-call-roles-docs.log`). The canonical formatter
+copied zero source changes (`artifacts/resource-boundary-call-roles-format.log`).
+
+For predecessor `7d9b7327e`, documentation (39839935319) and security
+(39839935295) passed. Canonical CI (39839935486) reports queued overall but
+its individual jobs include active and successful runs. Coverage (39839935291)
+has fourteen successful shards and one active shard; package consumers
+(39839935641) are active. These runs do not qualify the uncommitted boundary
+change.
+
 ### Scheduler captures before the first throw
 
 The private dispatch-copy model now distinguishes all dispatch captures from

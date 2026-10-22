@@ -427,6 +427,7 @@ internal sealed class NativeForkJoinProjectionTests
     }
 
     [TestCase("version")]
+    [TestCase("previous-version")]
     [TestCase("root")]
     [TestCase("missing")]
     [TestCase("extra")]
@@ -460,6 +461,9 @@ internal sealed class NativeForkJoinProjectionTests
                 break;
             case "missing-configured-kind":
                 node.Remove("configuredAwait");
+                break;
+            case "previous-version":
+                node["version"] = CompilerForkJoinProjectionCodec.Version - 1;
                 break;
             case "version":
                 node["version"] = 99;

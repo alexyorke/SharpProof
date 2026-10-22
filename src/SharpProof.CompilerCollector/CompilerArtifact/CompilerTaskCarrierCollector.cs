@@ -435,9 +435,16 @@ internal sealed class CompilerTaskCarrierCollector
                 { if (name == "Run") { runs++; } else { joins++; } }
                 if (awaitCall)
                 { awaits++; }
-                if (name == "SetException" && instruction.Offset >= region.HandlerOffset &&
-                    instruction.Offset < region.HandlerOffset + region.HandlerLength &&
-                    FrameworkType(metadata, member.Parent, "System.Runtime.CompilerServices", "AsyncTaskMethodBuilder", framework))
+                var inHandler = instruction.Offset >= region.HandlerOffset &&
+                    instruction.Offset < region.HandlerOffset + region.HandlerLength;
+                var taskBuilder = FrameworkType(metadata, member.Parent, "System.Runtime.CompilerServices", "AsyncTaskMethodBuilder", framework);
+                var record = name == "SetException" && taskBuilder && inHandler;
+                // Only the generated builder completion calls have an admitted
+                // role outside the protected source region. This records their
+                // placement, not a no-throw guarantee for the runtime methods.
+                if (!inside && !record && !(name == "SetResult" && taskBuilder && !inHandler))
+                { return "TaskRootExceptionBoundarySourceEscape"; }
+                if (record)
                 { records++; }
             }
             if (runs != children || joins != 1 || awaits != 1 || records != 1)
