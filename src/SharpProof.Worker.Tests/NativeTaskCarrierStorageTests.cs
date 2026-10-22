@@ -279,7 +279,19 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(result.UnknownReason, Is.EqualTo("TaskCallbackForwarderTargetUnavailable"));
     }
 
-    private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0)
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void CallbackBodyValidationRejectsMalformedInstructionsAndMissingReturns(int bodyMutation)
+    {
+        var result = ValidateForwarderProbe("public static void Probe() {Child(3);}",
+            bodyMutation: bodyMutation);
+        Assert.That(result.Target, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("TaskCallbackForwarderBodyUnsupported"));
+    }
+
+    private static (int? Target, string? UnknownReason) ValidateForwarderProbe(string declaration, int targetMutation = 0, int bodyMutation = 0)
     {
         ArgumentNullException.ThrowIfNull(declaration);
         var compilation = TestCompilation.Create("ForwarderBodyControl", [("Subject.cs",
@@ -293,6 +305,31 @@ public sealed class NativeTaskCarrierStorageTests
         var child = metadata.MethodDefinitions.Single(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name) == "Child");
         var targets = targetMutation == 1 ? ImmutableHashSet<int>.Empty :
             ImmutableHashSet.Create(targetMutation == 2 ? 0x0a000001 : System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(child));
+        if (bodyMutation != 0)
+        {
+            // Keep a real emitted PE/header. A malformed final opcode or missing
+            // return must discard a preceding owned call. A branch operand can
+            // also overflow before the parser checks its target range.
+            var bytes = stream.ToArray();
+            var section = image.PEHeaders.SectionHeaders.Single(value => probe.RelativeVirtualAddress >= value.VirtualAddress &&
+                probe.RelativeVirtualAddress < value.VirtualAddress + value.SizeOfRawData);
+            var offset = section.PointerToRawData + probe.RelativeVirtualAddress - section.VirtualAddress;
+            var headerBytes = (bytes[offset] & 3) == 2 ? 1 : (bytes[offset + 1] >> 4) * 4;
+            var code = image.GetMethodBody(probe.RelativeVirtualAddress).GetILBytes()!;
+            Assert.That(code[^1], Is.EqualTo(0x2a), "The fixture must end in ret.");
+            if (bodyMutation == 3)
+            {
+                Assert.That(code.Length, Is.GreaterThanOrEqualTo(5));
+                bytes[offset + headerBytes] = 0x38;
+                System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(offset + headerBytes + 1, 4), int.MaxValue);
+            }
+            else
+            { bytes[offset + headerBytes + code.Length - 1] = bodyMutation == 1 ? (byte)0xfe : bodyMutation == 4 ? (byte)0x24 : (byte)0x00; }
+            using var mutatedStream = new MemoryStream(bytes, false);
+            using var mutatedImage = new PEReader(mutatedStream);
+            return CompilerTaskCarrierCollector.ValidateCallbackForwarder(mutatedImage.GetMethodBody(probe.RelativeVirtualAddress), targets,
+                TestContext.CurrentContext.CancellationToken);
+        }
         return CompilerTaskCarrierCollector.ValidateCallbackForwarder(image.GetMethodBody(probe.RelativeVirtualAddress), targets,
             TestContext.CurrentContext.CancellationToken);
     }

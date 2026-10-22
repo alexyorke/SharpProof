@@ -63,6 +63,56 @@ try {
         Assert-CanonicalFailure { Read-SharpProofCanonicalDiscovery -Root $fixture } 'Actual NUnit discovery has an absent or duplicated per-case identity.'
     }
     finally { [IO.File]::WriteAllText($dumpPath, $validDump) }
+    $partsRoot = Join-Path $fixture 'parts'
+    [IO.Directory]::CreateDirectory($partsRoot) | Out-Null
+    foreach ($partName in @('worker-a', 'worker-b', 'projects')) {
+        ([ordered]@{
+            schemaVersion = 1; commit = 'commit'; tree = 'tree'; runId = 'run'; runAttempt = '1'
+            cohort = 'Remaining'; configuration = 'Release'; filter = 'filter'; projects = @('project')
+            expectedTasks = @($partName); completedTasks = @($partName); completed = @()
+            discovered = @($partName); discoveredCases = @(); cases = @()
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partsRoot "canonical-cohort.$partName.json") -Encoding utf8NoBOM
+    }
+    $merged = Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot
+    if (($merged.expectedTasks -join ',') -cne 'projects,worker-a,worker-b' -or $merged.discovered.Count -ne 3) {
+        throw 'Three-part canonical receipt merging lost a Worker half or the Projects cohort.'
+    }
+    $partPath = Join-Path $partsRoot 'canonical-cohort.worker-b.json'
+    $validPart = Get-Content -LiteralPath $partPath -Raw
+    $attempts = [ordered]@{
+        'canonical-cohort.projects.json' = '1'
+        'canonical-cohort.worker-a.json' = '1'
+        'canonical-cohort.worker-b.json' = '2'
+    }
+    $validPart.Replace('"runAttempt": "1"', '"runAttempt": "2"') | Set-Content -LiteralPath $partPath
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot } 'Canonical cohort parts differ in their run, source, or selection.'
+    $retained = Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2'
+    if ($retained.discovered.Count -ne 3) { throw 'Retained successful attempts lost canonical evidence.' }
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '1' } 'Canonical receipt differs from its successful producer attempt.'
+    $attempts['canonical-cohort.worker-b.json'] = '1'
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2' } 'Canonical receipt differs from its successful producer attempt.'
+    $attempts.Remove('canonical-cohort.projects.json')
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot -ExpectedAttempts $attempts -CurrentAttempt '2' } 'Canonical artifact attempts do not identify every receipt.'
+    $validPart | Set-Content -LiteralPath $partPath
+    $validPart.Replace('"commit": "commit"', '"commit": "other"') | Set-Content -LiteralPath $partPath
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $partsRoot } 'Canonical cohort parts differ in their run, source, or selection.'
+    $gatesPartsRoot = Join-Path $fixture 'gates-parts'
+    [IO.Directory]::CreateDirectory($gatesPartsRoot) | Out-Null
+    foreach ($partName in @('corpus', 'shards')) {
+        $partTasks = if ($partName -ceq 'corpus') { @('gates-corpus') } else { @('gates-remainder-1', 'gates-remainder-2', 'gates-remainder-3') }
+        ([ordered]@{
+            schemaVersion = 1; commit = 'commit'; tree = 'tree'; runId = 'run'; runAttempt = $(if ($partName -ceq 'corpus') { '1' } else { '2' })
+            cohort = 'Gates'; configuration = 'Release'; filter = 'filter'; projects = @('gates-project')
+            expectedTasks = $partTasks; completedTasks = $partTasks; completed = @()
+            discovered = $partTasks; discoveredCases = @(); cases = @()
+        }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $gatesPartsRoot "canonical-cohort.$partName.json") -Encoding utf8NoBOM
+    }
+    $gatesAttempts = [ordered]@{ 'canonical-cohort.corpus.json' = '1'; 'canonical-cohort.shards.json' = '2' }
+    $gatesMerged = Read-SharpProofCanonicalReceipt -CohortRoot $gatesPartsRoot -ExpectedAttempts $gatesAttempts -CurrentAttempt '2'
+    if (($gatesMerged.expectedTasks -join ',') -cne 'gates-corpus,gates-remainder-1,gates-remainder-2,gates-remainder-3') { throw 'Gates partition merging omitted or duplicated an existing task.' }
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $gatesPartsRoot -ExpectedAttempts $gatesAttempts -CurrentAttempt '1' } 'Canonical receipt differs from its successful producer attempt.'
+    $gatesAttempts.Remove('canonical-cohort.corpus.json')
+    Assert-CanonicalFailure { Read-SharpProofCanonicalReceipt -CohortRoot $gatesPartsRoot -ExpectedAttempts $gatesAttempts -CurrentAttempt '2' } 'Canonical artifact attempts do not identify every receipt.'
     Write-Host 'Canonical evidence regressions passed: deterministic ordering, encoded collisions, name multiplicity, missing definitions and duplicate execution/discovery identities.'
 }
 finally {

@@ -26,13 +26,11 @@ param(
 
     [switch]$AttributesCollectedSeparately,
 
-    # CI spreads the semantic tasks across runners. Coverage uses GatesCorpus
-    # (the Gates corpus task), GatesShards (the Gates remainder shards),
-    # WorkerA and WorkerB (two halves of the Worker remainder shards), and
-    # Projects (every other task). The canonical Remaining cohort uses Worker
-    # (every Worker remainder shard) and Projects. All keeps the single-runner
-    # task set.
-    [ValidateSet('All', 'GatesCorpus', 'GatesShards', 'Worker', 'WorkerA', 'WorkerB', 'Projects')]
+    # Coverage may split the original corpus selection into snapshot workflows
+    # and its complete complement. Analyzer, ProjectsRest, and Extras partition
+    # the original Projects group; the isolated collectors run in Extras.
+    # Legacy groups and All preserve the existing local task selections.
+    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerA4A', 'WorkerA4B', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
     [string]$TaskGroup = 'All'
 )
 
@@ -40,6 +38,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Import-Module (Join-Path `
@@ -108,8 +107,9 @@ if ($AttributesCollectedSeparately -and -not $coverageEnabled) {
     throw 'Separate Attributes collection requires coverage collection.'
 }
 if ($TaskGroup -ne 'All' -and -not $coverageEnabled -and
-    ($SemanticCohort -ne 'Remaining' -or $TaskGroup -notin @('Worker', 'Projects'))) {
-    throw 'Without coverage, task groups select only Worker or Projects of the Remaining cohort.'
+    -not (($SemanticCohort -eq 'Remaining' -and $TaskGroup -in @('Worker', 'WorkerA', 'WorkerB', 'Projects')) -or
+        ($SemanticCohort -eq 'Gates' -and $TaskGroup -in @('GatesCorpus', 'GatesShards')))) {
+    throw 'Without coverage, task groups must select an existing Remaining or Gates task partition.'
 }
 if ($coverageEnabled -and $TaskGroup -eq 'Worker') {
     throw 'Coverage selects the Worker remainder shards as WorkerA and WorkerB.'
@@ -321,6 +321,13 @@ foreach ($gatesCorpusClass in $gatesCorpusClasses) {
 $gatesCorpusFilterBuilder.Add('TestCategory=Corpus')
 $gatesRemainderFilterBuilder.Add('TestCategory!=Corpus')
 $gatesCorpusFilter = $gatesCorpusFilterBuilder.ToImmutable() -join '|'
+$unpartitionedCorpusFilter = "($gatesCorpusFilter)&($semanticFilter)"
+if ($TaskGroup -eq 'GatesCorpusA') {
+    $gatesCorpusFilter = "($gatesCorpusFilter)&(FullyQualifiedName~SharpProof.Gates.Test.CorpusSnapshotWorkflowTests.)"
+}
+elseif ($TaskGroup -eq 'GatesCorpusB') {
+    $gatesCorpusFilter = "($gatesCorpusFilter)&(FullyQualifiedName!~SharpProof.Gates.Test.CorpusSnapshotWorkflowTests.)"
+}
 $gatesRemainderFilter = $gatesRemainderFilterBuilder.ToImmutable() -join '&'
 $gatesPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 $gatesPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeEffectOracleGate'))
@@ -442,11 +449,18 @@ if (-not $ArchitectureOnly) {
                     DefaultEstimatedMilliseconds = 10000L
                 }).AsReadOnly())
     }
+    $unpartitionedWorkerA4Filter = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[3])"
     # Retain the upstream four-shard policy and memory-aware slot reservation.
     for ($index = 0; $index -lt $workerRemainderShardFilters.Length; $index++) {
+        $workerShardFilter = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
+        if ($index -eq 3 -and $TaskGroup -in @('WorkerA4A', 'WorkerA4B')) {
+            $firstPart = '(FullyQualifiedName~SharpProof.Worker.Test.Native|FullyQualifiedName~SharpProof.Worker.Test.Actual)'
+            $secondPart = '(FullyQualifiedName!~SharpProof.Worker.Test.Native&FullyQualifiedName!~SharpProof.Worker.Test.Actual)'
+            $workerShardFilter += '&' + $(if ($TaskGroup -ceq 'WorkerA4A') { $firstPart } else { $secondPart })
+        }
         $workerDescriptorBuilder.Add(([ordered]@{
                     Name                         = $workerRemainderTaskNames[$index]
-                    Filter                       = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
+                    Filter                       = $workerShardFilter
                     Slots                        = $(if ($coverageEnabled) { [Math]::Min($parallelism, 2) } else { 1 })
                     DefaultEstimatedMilliseconds = 200000L
                 }).AsReadOnly())
@@ -495,11 +509,22 @@ if ($TaskGroup -ne 'All') {
                 $taskName = [string]$_.Name
                 switch ($TaskGroup) {
                     'GatesCorpus' { $taskName -ceq 'gates-corpus' }
+                    'GatesCorpusA' { $taskName -ceq 'gates-corpus' }
+                    'GatesCorpusB' { $taskName -ceq 'gates-corpus' }
                     'GatesShards' { $taskName -cin $gatesRemainderTaskNames }
                     'Worker' { $taskName -cin $workerTaskNames }
                     'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
                     'WorkerB' { $taskName -cin $workerBTaskNames }
+                    'WorkerA1' { $taskName -cin @('worker-remainder-1', 'worker-fixed-checksum') }
+                    'WorkerA4' { $taskName -ceq 'worker-remainder-4' }
+                    'WorkerA4A' { $taskName -ceq 'worker-remainder-4' }
+                    'WorkerA4B' { $taskName -ceq 'worker-remainder-4' }
+                    'WorkerB2' { $taskName -ceq 'worker-remainder-2' }
+                    'WorkerB3' { $taskName -ceq 'worker-remainder-3' }
                     'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }
+                    'Analyzer' { $taskName -cin @('semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
+                    'ProjectsRest' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin @('architecture', 'semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
+                    'Extras' { $taskName -ceq 'architecture' }
                 }
             }))
     $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
@@ -550,8 +575,10 @@ else {
         'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
 }
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
+$retainCorpusDiscovery = $coverageEnabled -and $TaskGroup -in @('GatesCorpusA', 'GatesCorpusB')
+$retainWorkerA4Discovery = $coverageEnabled -and $TaskGroup -in @('WorkerA4A', 'WorkerA4B')
 $discoverySettings = ''
-if ($retainCanonicalResults) {
+if ($retainCanonicalResults -or $retainCorpusDiscovery -or $retainWorkerA4Discovery) {
     $discoverySettings = Join-Path $resultsRoot 'discovery.runsettings'
     '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' |
         Set-Content -LiteralPath $discoverySettings -Encoding utf8NoBOM
@@ -573,7 +600,7 @@ try {
                 SHARPPROOF_TEST_PROJECT_PARALLELISM = $processSlots.ToString(
                     [Globalization.CultureInfo]::InvariantCulture)
             }).AsReadOnly()
-        if ($retainCanonicalResults) {
+        if ($retainCanonicalResults -or $retainCorpusDiscovery -or $retainWorkerA4Discovery) {
             $taskRoot = Join-Path $resultsRoot $task.Name
             [IO.Directory]::CreateDirectory($taskRoot) | Out-Null
             $discoveryProjectBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -598,7 +625,7 @@ try {
                     '/ListFullyQualifiedTests',
                     ('/Settings:' + $discoverySettings),
                     ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
-                    ('/TestCaseFilter:' + $task.Filter)))
+                    ('/TestCaseFilter:' + $(if ($retainCorpusDiscovery) { $unpartitionedCorpusFilter } elseif ($retainWorkerA4Discovery) { $unpartitionedWorkerA4Filter } else { $task.Filter }))))
             Invoke-SharpProofRequiredDotnet -Arguments ([string[]]@($discoveryArgumentBuilder.ToImmutable())) `
                 -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
             $dumpRoot = Join-Path $taskRoot 'discovery'

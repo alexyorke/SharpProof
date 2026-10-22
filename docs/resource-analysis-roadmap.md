@@ -109,6 +109,72 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Latest master integration and complete published evidence
+
+The branch includes master `fe2a05235` after the MR developed conflicts
+with its CI/tooling changes. The merged workflows retain master's complete
+fifteen-shard coverage and four package partitions, including authenticated
+per-attempt evidence, plus this branch's Docker termination records. Package
+container and telemetry artifact names now include the partition to avoid
+collisions. The canonical package resource envelope and cold preparation fix
+are preserved.
+
+The xz-utils pin keeps revision `5.6.1+really5.4.5-1ubuntu0.4` and adopts master's
+immutable archive installation. A canonical-container download from Ubuntu's
+archive verified package identity/version/amd64 and SHA-256
+`18ef3c30308990626cfbda8b6336ef6ef5a412d1991bdad0cdaa226fd2041ffe`:
+`artifacts/resource-xz-archive-probe.log`. The tooling image rebuilt successfully:
+`artifacts/resource-master-merge-tooling-build.log`. Merged layout, container
+contract, documentation and full quality/API checks passed:
+`artifacts/resource-master-merge-layout.log`,
+`artifacts/resource-master-merge-contract.log`,
+`artifacts/resource-master-merge-docs-final.log` and
+`artifacts/resource-master-merge-lint-final.log`. Full formatting passed:
+`artifacts/resource-master-merge-format-check.log`. The final private formatting
+pass after the callback validation fix copied zero changes:
+`artifacts/resource-callback-malformed-format-final.log`. All 868 affected
+worker/parser/artifact/resource-contract cases passed with zero build warnings
+or errors: `artifacts/resource-master-merge-worker-tests-final.log`.
+
+Published `bbe9896a7` completed every coverage shard in run 39575056512. Its
+complete report for merge `64e9238229d53055e34170e362245e7bf18ef66d` measures
+6661/6864 changed trusted lines (97.04%, 203 uncovered), failing the unchanged
+100% floor. The symbolic trace catalog has no uncovered changed lines. Evidence:
+`artifacts/resource-bbe989-coverage-evidence/coverage/SharpProof.coverage.json`.
+Canonical run 39575056665 passed main builds, self-application, quality and
+package reproducibility; its corpus gate failed on worker method timeouts.
+Package consumers, documentation and security also passed. The failure logs are
+`artifacts/resource-bbe989-canonical-failure.log` and
+`artifacts/resource-bbe989-coverage-failure.log`. The previously failing
+`GateCountsAndRejectsAnUnreviewedSilentUnknown` passed in isolation at the
+original budgets (one case, 37 seconds, zero build warnings/errors):
+`artifacts/resource-corpus-timeout-repro-final.log`. This does not establish the
+hosted timeout's cause. Master's isolated canonical corpus cohort was checked
+in Release using the unchanged canonical category filter. All 14 cases,
+including all five previously failing workflows, passed in 2 minutes 47 seconds
+with zero build warnings/errors:
+`artifacts/resource-master-merge-corpus-gate-final.log`. The retained-evidence
+step then refused this local run because it requires an actual GitHub run,
+attempt and checked-out SHA. No identity was fabricated; hosted cohort
+authentication remains pending.
+Published `77dc4cc7e` adds the previously
+verified native contract rejection controls; master conflicts prevented its
+pull-request workflows from starting.
+
+Real-PE mutation controls exposed an unhandled parser exception in the callback
+body validator: a truncated opcode prefix escaped instead of clearing its fact.
+The shared parser intentionally preserves malformed-bytecode exceptions, so
+the fix belongs at the callback boundary. That boundary now converts malformed
+image and checked branch-target overflow failures to
+`TaskCallbackForwarderBodyUnsupported`, with no forwarding target. Cancellation
+still propagates. Controls cover truncation, overflow, an undefined opcode and
+a missing return; the latter cases also discard an already recognized owned
+call. Final verification includes the parser's existing exception/cursor
+contract and normal artifact and resource-contract workflows. No accepted
+evidence, schema or root verdict is widened. Exact-head hosted qualification
+of the merged checkpoint remains required. No root trace-byte proof is
+claimed; phase F remains open.
+
 ### Native contract rejection controls
 
 Additional native contract controls exercise a sealed declaration marked

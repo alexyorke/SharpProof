@@ -99,7 +99,13 @@ internal sealed class CompilerTaskCarrierCollector
         while (cursor < code.Length)
         {
             cancellation.ThrowIfCancellationRequested();
-            if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
+            CompilerIlToken instruction;
+            try
+            {
+                if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out instruction))
+                { return (null, "TaskCallbackForwarderBodyUnsupported"); }
+            }
+            catch (Exception exception) when (exception is BadImageFormatException or OverflowException)
             { return (null, "TaskCallbackForwarderBodyUnsupported"); }
             switch (instruction.RawCode)
             {
