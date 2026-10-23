@@ -426,6 +426,23 @@ internal sealed partial class ClaimManifestBuilder(
                 metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
                     _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()));
             }
+            if (taskPlan != null && requiresCumulativeLayout)
+            {
+                var runtime = CompilerTaskRuntimePremiseCollector.Parse(target, callableId, cancellationToken);
+                if (runtime.Declarations is { } declarations)
+                {
+                    var runtimeIds = declarations.Quantities.Select(declaration => declaration is null
+                        ? throw new ArgumentNullException(nameof(declaration))
+                        : ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration))
+                        .Prepend(ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations));
+                    assumptions = assumptions.AddRange(runtimeIds.Select(static id => new WorkerAssumptionEvidence
+                    {
+                        Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
+                        Kind = WorkerAssumptionKind.UserAssume,
+                        Used = false
+                    }));
+                }
+            }
             assumptions = assumptions.AddRange(metadataIds.Select(static id => new WorkerAssumptionEvidence
             {
                 Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,

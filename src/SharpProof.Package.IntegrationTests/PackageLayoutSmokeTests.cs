@@ -3773,6 +3773,8 @@ public sealed class PackageLayoutSmokeTests
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
         JsonAssert.Equal(claim, "outcome", "Unknown");
         JsonAssert.Equal(claim.GetProperty("resourceBound"), "unknownReason", "TaskRuntimeFaultFrameCompositionUnproved");
+        Assert.That(claim.GetProperty("proofCore").GetArrayLength(), Is.Zero);
+        Assert.That(claim.GetProperty("resourceBound").GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
         Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
     }
 

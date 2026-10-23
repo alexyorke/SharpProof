@@ -98,6 +98,19 @@ internal sealed class CompilerCallableLowerer
             }
             forkJoin = forkJoin with { Carriers = carriers };
         }
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+        {
+            var declarations = CompilerTaskRuntimePremiseCollector.Parse(target.Method, target.Entry.CallableId, cancellationToken);
+            if (declarations.UnknownReason != "TaskRuntimePremisesNotDeclared")
+            {
+                var capture = forkJoin.Carriers?.Shapes is { } shapes
+                    ? CompilerTaskRuntimePremiseCollector.Capture(target.Method, target.Entry.CallableId, shapes.ModuleSha256,
+                        shapes.CompilerIdentity, forkJoin.FrameworkAssemblyIdentity, cancellationToken)
+                    : new CompilerTaskRuntimePremiseCapture(null, declarations.UnknownReason ?? "TaskRuntimeCompilerOwnershipUnavailable");
+                forkJoin = forkJoin with { RuntimePremises = capture };
+            }
+        }
         if (forkJoin is { ConfiguredAwait: true })
         { reason = WorkerClaimReason.None; }
         return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };
@@ -120,10 +133,13 @@ internal sealed class CompilerCallableLowerer
         var contracts = binding.Contracts ?? throw new InvalidOperationException(
             "A successful contract binding must carry its contracts.");
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
         if (contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)) !=
                 assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.Precondition)) ||
             contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) !=
-                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)) ||
+                assumptions.Count(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) :
+                    evidence.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(evidence.Id)) ||
             !HasManifestParity(target, contracts))
         {
             return WorkerClaimReason.UnsupportedContract;

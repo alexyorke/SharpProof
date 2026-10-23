@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "43";
+    public const string Current = "44";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 66;
+    public const int Current = 67;
 }
 
 internal static class WorkerManifestVersions
@@ -176,6 +176,8 @@ internal static class WorkerResourceModels
     public const string TaskJoinScope = "joined-isolated-source-callbacks";
     public const string TaskSourceAllocationScope = "joined-isolated-source-allocation-prefixes";
     public const string TaskStorageScope = "joined-isolated-normal-completion";
+    public const string TaskRuntimeScope = "joined-isolated-cumulative-runtime-premises";
+    public const string TaskRuntimeCostModel = "task-join-declared-runtime-allocation-prefixes-v1";
     public const string TaskStorageModel = "task-join-normal-owned-storage-v1";
     public const string ConfiguredTaskStorageModel = "configured-task-join-normal-owned-storage-v1";
     public const string TaskCompilerCarrierModel = "emitted-task-compiler-carriers-v1";
@@ -274,6 +276,8 @@ internal sealed record WorkerResourceBoundEvidence
     public string? EvaluatedUpperBound { get; init; }
     [JsonRequired]
     public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; init; } = [];
+    [JsonRequired]
+    public WorkerResourceTaskRuntimePremiseEvidence? RuntimePremises { get; init; }
     [JsonRequired]
     public WorkerResourceAsymptoticEvidence? Asymptotic { get; init; }
     [JsonRequired]

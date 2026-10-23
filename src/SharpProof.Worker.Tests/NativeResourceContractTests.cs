@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
@@ -159,6 +160,7 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("[ResourceUpperBound((ResourceMetric)99, 0)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, -1)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"missing\", 1)]")]
+    [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"n.Length\", 1)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"n\", 0)]")]
     public async Task InvalidContractMetadataCannotBecomeAZeroBoundProof(string attributes)
     {
@@ -167,6 +169,10 @@ internal sealed partial class NativeResourceContractTests
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+        Assert.That(result.ResourceBound?.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound?.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound?.EvaluatedUpperBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
     }
 
     [Test]
@@ -193,6 +199,48 @@ internal sealed partial class NativeResourceContractTests
         other = other with { Callables = other.Callables.SetItem(0, other.Callables.Single() with { ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Zero, TestContext.CurrentContext.CancellationToken) }) };
         Action unowned = () => Read(other);
         Rejects(unowned);
+    }
+
+    [TestCase("missing")]
+    [TestCase("empty")]
+    [TestCase("oversized")]
+    [TestCase("control")]
+    [TestCase("program-and-gap")]
+    public void ResourceProofGapsMustBeValidAndExclusiveAtTheArtifactBoundary(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var hasProgram = mutation == "program-and-gap";
+        var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations,1)]",
+            hasProgram ? "var value=new int[1];" : "while(true) {}"));
+        var control = Read(artifact);
+        Assert.That(control.ResourceProgram, hasProgram ? Is.Not.Null : Is.Null);
+        Assert.That(control.ResourceUnknownReason, hasProgram ? Is.Null : Is.Not.Null.And.Not.Empty);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellation);
+        var root = JsonNode.Parse(json)!;
+        var callable = root["callables"]![0]!.AsObject();
+        switch (mutation)
+        {
+            case "missing":
+                Assert.That(callable.Remove("resourceUnknownReason"), Is.True);
+                break;
+            case "empty":
+                callable["resourceUnknownReason"] = "";
+                break;
+            case "oversized":
+                callable["resourceUnknownReason"] = new string('x', 129);
+                break;
+            case "control":
+                callable["resourceUnknownReason"] = "Unsupported\nBody";
+                break;
+            case "program-and-gap":
+                callable["resourceUnknownReason"] = "UnsupportedBody";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        Action decode = () => CompilerManifestArtifactJson.DeserializePrepared(root.ToJsonString(), out _, cancellation);
+        Rejects(decode);
     }
 
     [Test]

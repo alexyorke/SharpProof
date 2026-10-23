@@ -15,6 +15,32 @@ SharpProof.Attributes.ResourceMetric.RetainedBytes = 6 -> SharpProof.Attributes.
 SharpProof.Attributes.ResourceMetric.SourceActivationDepth = 7 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.SourceStackBytes = 8 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.Unspecified = 0 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceTaskDeploymentAttribute
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.DeploymentManifestSha256.get -> string!
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.Evidence.get -> string!
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.Profile.get -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.ResourceTaskDeploymentAttribute(SharpProof.Attributes.ResourceTaskDeploymentProfile profile, string! deploymentManifestSha256, string! evidence) -> void
+SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentProfile.CoreClr8032LinuxX64OrdinaryJitStockClosed = 1 -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentProfile.Unspecified = 0 -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.AwaitBytesPerConfiguredAwait = 9 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.FaultConstructionBytesPerFaultEpisode = 5 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.InitializationBytesPerInvocation = 10 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.JoinBytesPerJoinAttempt = 8 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.RawTraceArrayAttemptsPerFaultEpisode = 1 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.RawTracePayloadBytesPerArrayAttempt = 2 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverArrayAttemptsPerFaultEpisode = 3 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverReferentBytesPerFaultEpisode = 6 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverSlotsPerArrayAttempt = 4 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.SchedulingBytesPerChildStartAttempt = 7 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.TotalFaultEpisodesPerInvocation = 11 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.Unspecified = 0 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.Evidence.get -> string!
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.Quantity.get -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.ResourceTaskRuntimeUpperBoundAttribute(SharpProof.Attributes.ResourceTaskRuntimeQuantity quantity, long upperBound, string! evidence) -> void
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.UpperBound.get -> long
 SharpProof.Attributes.ResourceUpperBoundAttribute
 SharpProof.Attributes.ResourceUpperBoundAttribute.Coefficient.get -> long
 SharpProof.Attributes.ResourceUpperBoundAttribute.Constant.get -> long

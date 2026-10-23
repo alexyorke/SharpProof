@@ -23,12 +23,16 @@ internal static class CompilerTotalCallableLowerer
         {
             // An owned scalar entry for resource projection only. This does not
             // admit an async functional body or bypass any source contract.
+            var runtimeAssumptions = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+                target.Entry.CallableId, target.Entry.Assumptions, cancellationToken);
             if (ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) is not { ConfiguredAwait: true } ||
                 !target.Claims.IsEmpty || target.EffectClaims.IsEmpty ||
                 target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
                     !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
-                target.Entry.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary))
+                runtimeAssumptions is null ||
+                target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary &&
+                    !(assumption.Kind == WorkerAssumptionKind.UserAssume && runtimeAssumptions.Contains(assumption.Id))))
             { return null; }
             return new(target.Entry.CallableId, context.Factory,
                 [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
@@ -87,7 +91,10 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToImmutableArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
-        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) :
+            assumption.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(assumption.Id)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
             binding.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) != assumptions.Length)
         { return null; }

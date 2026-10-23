@@ -76,25 +76,32 @@ coverage. Neither samples nor diagnostic silence establish a universal proof.
   model, with conditional peak/retained byte proofs.
 - [x] Joined source work and array/element allocation prefixes, including the
   params array and arbitrary isolated child overlap, under stated runtime scope.
-- [ ] Cumulative task runtime-byte prefixes, including fault/exception storage;
-  keep Unknown until the complete declared cost model is established.
+- [x] Cumulative task runtime-byte prefixes, including fault/exception storage,
+  conditional on the complete explicitly declared deployment/runtime model.
 - [x] End-to-end runtime/allocation benchmark workflow, with input scales,
   units, environmental identity and comparable baselines. Measurements must
   remain distinguishable from proofs and must not establish Big-O by themselves.
 - [x] Cancellation, exceptional completion, shared-state and repeated-entry controls
   for the admitted task model; unsupported execution shapes remain Unknown.
 
-The cumulative-byte item remains open until all of these obligations are joined:
+The cumulative-byte model joins these obligations under the selected explicit-premise policy:
 
 - [x] Private fixed task carriers, fault records and notification components.
 - [x] Source-owned primitive fault candidates and fixed source-exception instances.
 - [x] Private compiler-owned source activation bounds.
-- [ ] Checked CLR/helper-frame bridge.
-- [ ] Checked exception escape/catch boundaries for every admitted root path.
-- [ ] Cumulative trace growth, retry, thread-affinity copy and dispatch-copy costs.
-- [ ] Referenced payloads, messages, scheduler faults and initialization costs.
-- [ ] Root composition with bound runtime premises, evidence identities and
-  consumer-level proof/Unknown controls. Private components do not satisfy this.
+- [x] Declared trace attempt/capacity bridge for the conditional model; no
+  substitution of source depth for physical CLR/helper frames.
+- [x] Checked configured-root catch boundary and owned returned factory shape,
+  with transitive runtime failure processing in declared episode budgets.
+- [x] Cumulative trace growth, retry, thread-affinity copy and dispatch-copy costs
+  included in the explicit attempt and capacity premises.
+- [x] Referenced payloads, messages, scheduler faults and cold initialization
+  covered by the complete transitive lifecycle budgets.
+- [x] Root composition with bound runtime premises, evidence identities and
+  actual compiler/worker proof/Unknown, cache, policy and SARIF controls.
+
+Source-derived closure of every physical frame and initialization edge remains
+an optional strengthening of this conditional model. It is not claimed here.
 
 ## Delivery and verification
 
@@ -108,6 +115,111 @@ The cumulative-byte item remains open until all of these obligations are joined:
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+### Conditional runtime model: combined local verification passed
+
+All 1736 selected worker tests passed after the precise async admission repair
+(`artifacts/resource-runtime-broad-worker-tests.log`). This includes returned and
+configured roots, independent sums, all runtime quantities, source/manifest and
+response tampering, malformed/foreign bounds, cache, SARIF, assumption policy,
+wide emitted slots, source/forwarder ownership and external resource-gap inputs.
+The Attributes suite passed 83 tests; frontend catalog passed two; analyzer
+resource/projection checks passed 296. The standalone helper selector passed 18.
+
+Formatting, documentation regeneration/automation, layout, and complete lint/API
+compatibility passed locally. Protocol is 44, cache 67, nested projection codec
+13; manifest 6 and outer compiler artifact 55 are unchanged. The new runtime
+scopes bind complete lifecycle budgets, including later internal finalization.
+There are no numeric defaults or unconditional physical-frame closure claims.
+
+This closes phase F's implementation under the explicitly selected premise
+policy. Rebase preservation, packaged verification of the resulting state,
+exact-head hosted qualification, the unchanged coverage floor and final scope
+review remain required. The merge request stays draft and the overall task is
+not complete.
+### Integrated conditional-model verification
+
+The focused worker build completed and ran 204 tests: 197 passed and seven
+configured-await cases failed. Returned-root conditional proofs, independent
+arithmetic, wire tampering, cache/SARIF/policy checks, protocol controls and the
+real wide-local-slot IL regression passed. All seven failures occur before the
+configured projection exists: async entry admission permits only
+`TrustedBoundary` assumptions, while valid declarations add twelve `UserAssume`
+identities. The correction now recognizes the complete owned identity set and
+preserves rejection of unrelated or incomplete assumptions. Six direct compiler
+admission controls were added; the broader worker suite is validating them.
+
+The full lint retry passed, including API compatibility and all regression
+controls. Documentation regeneration/automation passed; the generated reference
+was copied back. Both added getter/constructor sources in the initialization
+ledger had byte counts, SHA-256 and Git blob identities independently verified.
+The broader analyzer run passed all 296 tests, including the new enclosing-type
+initializer pair. No conditional-model commit
+has been published yet, and phase F remains unchecked pending integrated checks.
+
+### Explicit runtime premises: policy and implementation
+
+The user selected explicit reported runtime assumptions on 2026-10-22. The
+remaining cumulative task-byte proof may therefore be conditional on owned,
+versioned deployment and runtime premises. The earlier pending-policy references
+below are historical; that choice is now resolved.
+
+The implementation must distinguish checked compiler/runtime facts from declared
+quantities. Each quantitative premise needs precise units and execution-prefix
+scope, immutable caller declarations, root and reference ownership, canonical
+evidence identities, and result reporting. No numeric defaults, guessed frame
+caps, warm-only substitutions or circular root-total-byte premise are allowed.
+Missing, duplicate, malformed or incompatible evidence must remain Unknown.
+
+- [x] Define the typed public declaration and strict compiler-owned transport.
+- [x] Bind declarations to the exact root, runtime/reference model and manifest.
+- [x] Compose the checked task components with complete attempt/copy/imported
+  state, initialization, callback and referenced-payload premises.
+- [x] Verify conditional Proven and insufficient/missing-premise Unknown through
+  the real compiler-artifact-to-worker consumer, including tamper controls.
+- [x] Publish every used premise and model identity in JSON/SARIF evidence;
+  retain no successful dependencies or partial bound on Unknown.
+- [ ] Run local and exact-head hosted gates, then audit all phase F obligations
+  against the implemented conditional model before marking that phase complete.
+
+The conditional model and exact quantity scopes are documented in
+[task runtime premises](resource-task-runtime-premises.md). The private arithmetic
+checker passed 21 tests and the Linux helper selector passed 18 tests. Independent
+review confirmed that declared trace attempt/capacity bounds do not require a
+source-derived physical frame cap. The remaining lifecycle domains now explicitly
+include builder entry/completion, fault recording, notification and later internal
+finalization. This is a conditional guarantee; it does not prove the premises.
+
+The integrated compiler/worker checks are in progress. Initial builds identified
+the new public API baseline and guard/casing analyzer requirements; these are
+being corrected before runtime assertions can execute. A script-formatter retry
+hit a PSScriptAnalyzer null-reference failure; the previous script-format pass
+succeeded, and the subsequent changes affect C# only.
+
+Published head `5960b7e89` was superseded by remote `66e3e38ad`; its hosted runs
+are cancelled. Its canonical package partition exposed a stale Unknown-reason
+assertion. The corrected packaged-consumer test passed independently against
+that production head. The newer remote commit contains separate CI tooling
+changes and must be preserved before publishing this implementation. Exact-head
+qualification and the unchanged 100% coverage requirement remain open.
+
+The new layout check passed (2889 source files, 59 projects, 151 pinned common
+files). Lint compatibility, links, scripts, markdown and regression controls
+passed; one new documentation spelling issue was found and corrected. The
+complete lint gate must pass after that correction.
+
+The full Attributes suite passed 83 tests, including the new public declarations;
+both frontend catalog tests also passed. These checks do not certify the
+integrated compiler/worker path. Production now compiles; the latest build
+identified a mistakenly duplicated test edit and test-only analyzer requirements,
+which were corrected before another focused run.
+
+Remote `66e3e38ad` passed canonical run `39911049416`, package run
+`39911049343`, documentation and security. Coverage run `39911049275` passed
+all 15 shards but failed the unchanged 100% floor: 7508/7643 changed TCB lines
+(98.23%), with 135 uncovered lines. The retained report identifies merge
+`89326cb511ba8eaa51a6cf298d6165e0b2f04332`; its parents were verified as
+master `fe2a05235` and head `66e3e38ad`. This excludes the new conditional API.
 
 ### Parallel implementation and verification checkpoint
 

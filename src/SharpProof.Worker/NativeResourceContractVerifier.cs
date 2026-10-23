@@ -62,7 +62,14 @@ internal static class NativeResourceContractVerifier
         if (claim.Reason == WorkerClaimReason.UnsupportedContract)
         { return Unknown("UnsupportedResourceContract", WorkerClaimReason.UnsupportedContract); }
         if (target.ForkJoinProjection != null)
-        { return VerifyTaskJoin(); }
+        {
+            try
+            { return VerifyTaskJoin(); }
+            catch (ResourceExpressionLimitException)
+            { return Unknown("ForkJoinResourceBudgetExceeded", WorkerClaimReason.ResourceLimit); }
+            catch (InvalidDataException)
+            { return Unknown("ForkJoinDeclaredBoundInvalid", WorkerClaimReason.UnsupportedContract); }
+        }
         if (target.Total is not { IsBodyAbstraction: false } owner || !owner.EffectsCompleteAtEntry)
         { return Unknown("ResourceEntryUnavailable", WorkerClaimReason.UnsupportedBody); }
         if (!owner.ValidEffectClaimIds.Contains(claim.ClaimId))
@@ -220,13 +227,52 @@ internal static class NativeResourceContractVerifier
         {
             if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
             {
-                if (NativeResourceTaskBinding.Bind(target, cancellation) is null)
+                var runtimeDependency = NativeResourceTaskBinding.Bind(target, cancellation);
+                if (runtimeDependency is null)
                 { return Unknown("ForkJoinRuntimePremiseNotBound", WorkerClaimReason.UnsupportedBody); }
                 var faultLayout = new NativeResourceLayoutBinding(target);
                 if (faultLayout.Bind() is not { } faultContext)
                 { return Unknown("TaskStorageLayoutPremiseNotBound", WorkerClaimReason.UnsupportedBody); }
-                var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, faultContext, cancellation);
-                return Unknown(routes.UnknownReason ?? "TaskRuntimeFaultFrameCompositionUnproved", WorkerClaimReason.UnsupportedBody);
+                if (target.ForkJoinProjection!.RuntimePremises is null)
+                {
+                    var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, faultContext, cancellation);
+                    return Unknown(routes.UnknownReason ?? "TaskRuntimeFaultFrameCompositionUnproved", WorkerClaimReason.UnsupportedBody);
+                }
+                var binding = NativeResourceTaskRuntimeBinding.Bind(target, cancellation);
+                if (binding.Inputs is not { } runtimeInputs)
+                { return Unknown(binding.UnknownReason ?? "TaskRuntimePremisesUnproved", WorkerClaimReason.UnsupportedBody); }
+                var runtimeCheck = NativeTaskRuntimeCostVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!,
+                    faultContext, runtimeInputs, cancellation);
+                if (runtimeCheck.CumulativeUpper is not { } runtimeUpper)
+                { return Unknown(runtimeCheck.UnknownReason ?? "TaskRuntimeCostUnproved", WorkerClaimReason.UnsupportedBody); }
+                var runtimeLimit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, target.TotalEntry!, cancellation);
+                if (!ResourceBoundOrder.Proves(runtimeUpper, runtimeLimit, cancellation))
+                { return Unknown("TaskRuntimeBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
+                var runtimeResult = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
+                    WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
+                runtimeResult.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target,
+                    ImmutableHashSet.Create(StringComparer.Ordinal, runtimeDependency.AssumptionId));
+                runtimeResult.ProofCore = ["native-resource:" + claim.ClaimId,
+                    "resource-task-model:" + runtimeDependency.RuntimeModel,
+                    "resource-task-projection:" + WorkerProtocolJson.ComputeSha256([.. CompilerForkJoinProjectionCodec.Encode(
+                        target.ForkJoinProjection!, target.TotalEntry!, cancellation)]),
+                    "resource-task-runtime-model:" + NativeTaskRuntimeCostVerifier.Model,
+                    "resource-task-compiler-carriers:" + NativeTaskCarrierStorageVerifier.Model,
+                    "resource-asymptotic-model:" + WorkerResourceModels.Asymptotic];
+                runtimeResult = runtimeResult with { ResourceBound = Evidence(runtimeUpper.ToDisplayString(), null, runtimeUpper) };
+                runtimeResult = runtimeResult with
+                {
+                    ResourceBound = runtimeResult.ResourceBound! with
+                    {
+                        ExecutionScope = WorkerResourceModels.TaskRuntimeScope,
+                        MetadataAssumptions = [runtimeDependency],
+                        Asymptotic = runtimeResult.ResourceBound!.Asymptotic! with
+                        { Lower = new() { UnknownReason = "ResourceLowerTaskRuntimeDomainUnproved" } },
+                        Expected = new() { UnknownReason = "ResourceExpectedTaskModelUnsupported" }
+                    }
+                };
+                runtimeResult = faultLayout.Project(runtimeResult);
+                return NativeResourceTaskRuntimeBinding.Project(target, runtimeResult, binding);
             }
             var lifetime = constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes;
             var sourceAllocation = constraint.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements;
