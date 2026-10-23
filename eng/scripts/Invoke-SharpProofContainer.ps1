@@ -361,6 +361,8 @@ function Invoke-RepositoryGates {
         'Semantic build plan regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageBuildPlan.ps1' `
         'Package build plan regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperReproductionPlan.ps1' `
+        'Developer reproduction plan regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPublicApiGovernance.ps1' `
         'Public API governance controls failed.'
 }

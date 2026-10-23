@@ -102,9 +102,16 @@ function Invoke-ReproCommand([string]$Executable, [Nullable[Collections.Immutabl
             $process.WaitForExit()
         }
         $text = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
-        [IO.File]::WriteAllText((Join-Path $output "$LogName.log"), $text, [Text.UTF8Encoding]::new($false))
-        if ($timedOut) { throw "Reproducibility phase $LogName exceeded $reproductionTimeoutSeconds seconds; inspect its local log." }
-        if ($process.ExitCode -ne 0) { throw "Reproducibility phase $LogName failed with exit code $($process.ExitCode); inspect its local log." }
+        $diagnosticText = Get-SharpProofReproductionDiagnosticText -Text $text
+        [IO.File]::WriteAllText((Join-Path $output "$LogName.log"), $diagnosticText, [Text.UTF8Encoding]::new($false))
+        if ($timedOut) {
+            $summary = Get-SharpProofReproductionDiagnosticText -Text $diagnosticText -Tail
+            throw "Reproducibility phase $LogName exceeded $reproductionTimeoutSeconds seconds; inspect its local log. Diagnostic tail:`n$summary"
+        }
+        if ($process.ExitCode -ne 0) {
+            $summary = Get-SharpProofReproductionDiagnosticText -Text $diagnosticText -Tail
+            throw "Reproducibility phase $LogName failed with exit code $($process.ExitCode); inspect its local log. Diagnostic tail:`n$summary"
+        }
         return $text
     }
     finally { $process.Dispose() }
@@ -183,11 +190,11 @@ try {
             if ($IncludeDeveloperPackages) {
                 $developerFeed = Join-Path $clone 'artifacts/developer-reproduction-packages'
                 foreach ($name in @('Tool', 'CodeFixes', 'Templates')) {
-                    $developerArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                            'pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release', '--no-build', '--no-restore',
-                            '-o', $developerFeed, '-p:ContinuousIntegrationBuild=true', '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true',
-                            "-p:RepositoryCommit=$commit", "-p:SourceRevisionId=$commit", "-p:SharpProofConsumerImage=$DeveloperConsumerImage"))
-                    $null = Invoke-ReproCommand dotnet $developerArguments $clone "run-$index-developer-$name-pack"
+                    $developerPlan = Get-SharpProofDeveloperPackageBuildPlan -Name $name -OutputDirectory $developerFeed `
+                        -RepositoryCommit $commit -ConsumerImage $DeveloperConsumerImage
+                    foreach ($phase in $developerPlan) {
+                        $null = Invoke-ReproCommand dotnet $phase.Arguments $clone "run-$index-developer-$name-$($phase.Phase)"
+                    }
                 }
                 $developerRuns.Add((Get-SharpProofDeveloperPackageSnapshot -PackageSource $developerFeed -PackageVersion $packageVersion -RepositoryCommit $commit))
             }

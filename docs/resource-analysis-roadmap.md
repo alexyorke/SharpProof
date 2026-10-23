@@ -116,6 +116,34 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
+### Fresh qualification and remaining coverage work
+
+Published head `ca3b70301` is mergeable against master `70fba9efe`. Its hosted
+merge commit `1a583de04cb43b72af502e822682ea702810c873` has exactly those two
+parents. All fifteen coverage shards passed. The merged report compares current
+master and covers 8182 of 8329 changed-TCB lines (98.24%), leaving 147 gaps against
+the unchanged 100% floor. This is a new comparison universe, not a claim of
+improvement over the earlier historical percentage.
+
+Canonical worker, projects, corpus, shard, build, formatting, self-application,
+samples, API coverage and repository-security jobs passed. Package reproduction
+failed before byte comparison: the new optional Tool phase skipped restore and
+build even though the Tool lies outside the catalog product build closure. A
+canonical independent exact-source clone reproduced NETSDK1004 for its missing
+assets file. The fix adds locked restore/build prerequisites for every optional
+package and keeps the independent clones, exact identities and all comparisons.
+All 32 shared command-plan/diagnostic controls passed. A real independent
+exact-source clone then restored, built and packed all three optional packages,
+with 55 product payloads and matching source identities. Full two-clone
+reproduction still requires renewed qualification of the committed fix.
+
+The ten-agent gap audit uses the 147 exact uncovered lines as its universe.
+Reachable compiler, representation, ownership and publication boundaries receive
+behavior-focused controls. Checks dominated by validated constructors, immutable
+emission or earlier proof admission are recorded with their causal prerequisites;
+no invalid private state is fabricated and no coverage exclusion or floor changes.
+Further tests and their coverage effect remain unqualified until verification.
+
 ### Current master integration in progress
 
 Master advanced to `70fba9efe` while the resource branch was qualifying. GitHub
@@ -143,7 +171,13 @@ Four new fixtures exercise branch-order symmetry for a symbolic loop with a
 zero-cost alternative, checked credit versus unchecked overflow, real emitted
 array-read helper candidates, and explicit zero runtime quantities/empty-array
 headers. They use compiler/native workflows and independent numeric controls.
-Their verification and effect on changed-TCB coverage are pending.
+All 1785 selected worker tests, including the fourteen new cases and corrected
+transport assertions, passed on `ca3b70301`. All 471 selected analyzer/resource/
+final-compilation tests passed. Lint/API compatibility and final layout also
+passed (2951 source files, 62 projects, 151 pinned common files). Hosted
+documentation, toolchain image security, repository quality and dependency
+review passed for this head. Full canonical/package qualification and the
+effect on changed-TCB coverage remain pending.
 
 ### Hosted integration corrections at published head 93b13694e
 
