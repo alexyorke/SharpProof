@@ -109,6 +109,52 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted source-stack admission coverage
+
+Checkpoint `0ce19e86d3b3105f521d57e8b0cf6af30c84fa89` completed all fifteen
+coverage shards in run 39887528628. Aggregate job 120202984136 produced a
+complete report and failed the unchanged 100 percent floor: 7113/7257 changed
+trusted lines (98.02 percent), with 144 gaps. The unchanged source-stack
+analysis rejection paths at lines 48 and 66 are now covered: struct-receiver
+storage and source-traversal budget exhaustion. The preceding report had 146
+gaps. The newer task activation composition controls are not measured here.
+
+Evidence is retained in
+`artifacts/resource-0ce1-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `19c1fcc00845b8a43ffc8701e580f9f3fa3e5600` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `0ce19e86d`.
+Full canonical CI (39887528696) passed for that exact checkpoint. Package
+consumers (39887528698) remain active at this observation. The full task-runtime byte model, pending proof policy,
+coverage closure and final audit remain open.
+
+### Task activation composition budget controls
+
+Four detached-cost controls keep independent task work/array/element counts at
+zero while stressing activation composition. Every child must first derive a
+complete stack bound. Sixteen constant-mapped children distinguish an affordable
+choice tree from one exhausting the shared substitution budget in a later child;
+the latter must return `ForkJoinSourceActivationBudgetExceeded` without a
+partial activation bound or model identity, including callback propagation.
+
+Two controls bind actual emitted callback evidence and source activation
+expressions with 4092 or 4095 nodes. Adding the checked wrapper fits in the first
+case and must return `ForkJoinCallbackActivationBudgetExceeded` in the second.
+A complete source-only bound must not become a combined result after exhaustion.
+The existing expression-node budget is unchanged.
+
+The altered cost records are validator inputs, not executable recursion claims,
+CLR frame bounds, or root task-byte proofs. Production admission, runtime
+premises and wire identities are unchanged. The canonical formatter copied zero
+changes (`artifacts/resource-activation-composition-format.log`). All four
+focused controls passed with zero build warnings or errors
+(`artifacts/resource-activation-composition-probe.log`). Quality/API and
+documentation checks passed (`artifacts/resource-activation-composition-lint.log`
+and `artifacts/resource-activation-composition-docs.log`). The broader
+projection/carrier/resource-contract selection passed all 1172 tests with zero
+build warnings or errors (`artifacts/resource-activation-composition-tests.log`). The pending runtime
+proof policy, full task-runtime byte model, coverage closure and final audit
+remain open.
+
 ### Hosted allocation-admission coverage
 
 Checkpoint `d56e85af0a592ce82c91e03a79068a85a90cf7b3` completed all fifteen

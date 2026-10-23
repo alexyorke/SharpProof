@@ -102,6 +102,127 @@ internal sealed class NativeForkJoinProjectionTests
         var exception = Assert.Throws<System.Reflection.TargetInvocationException>(exhausted);
         Assert.That(exception!.InnerException, Is.TypeOf<ResourceExpressionLimitException>());
     }
+    [TestCase(64, true)]
+    [TestCase(128, false)]
+    public void ActivationSubstitutionBudgetIsSharedAcrossLaterChildren(int choices, bool fits)
+    {
+        var projection = ActivationBudgetProjection(true, choices, choices, 1);
+        var root = Root(projection);
+        var token = TestContext.CurrentContext.CancellationToken;
+        AssertKnownZeroTaskWork(projection, root);
+        var check = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, root, token);
+        if (fits)
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Upper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(4)));
+            Assert.That(check.RequiredSourceModel, Is.EqualTo(NativeResourceStackVerifier.ModelId));
+        }
+        else
+        {
+            Assert.That(check.Upper, Is.Null);
+            Assert.That(check.RequiredSourceModel, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinSourceActivationBudgetExceeded"));
+            var combined = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, root, Layout(), token);
+            Assert.That(combined.Upper, Is.Null);
+            Assert.That(combined.RequiredSourceModel, Is.Null);
+            Assert.That(combined.UnknownReason, Is.EqualTo(check.UnknownReason));
+        }
+    }
+
+    [TestCase(83, 4092, true)]
+    [TestCase(84, 4095, false)]
+    public void CallbackCompositionCannotPublishASourceOnlyPrefix(int lastChoices, int sourceNodes, bool fits)
+    {
+        var projection = ActivationBudgetProjection(false, 85, lastChoices, 2);
+        var root = Root(projection);
+        var token = TestContext.CurrentContext.CancellationToken;
+        AssertKnownZeroTaskWork(projection, root);
+        var source = NativeForkJoinSourceCostVerifier.CheckSourceActivations(projection, root, token);
+        Assert.That(source.UnknownReason, Is.Null);
+        Assert.That(source.Upper!.NodeCount, Is.EqualTo(sourceNodes));
+        var callbacks = NativeTaskCarrierStorageVerifier.CheckCallbackActivations(projection.Carriers!.Shapes!, projection, root, Layout(), token);
+        Assert.That(callbacks.WrapperActivationsUpper, Is.EqualTo(1), callbacks.UnknownReason);
+        var check = NativeForkJoinSourceCostVerifier.CheckCallbackSourceActivations(projection, root, Layout(), token);
+        if (fits)
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Upper!.NodeCount, Is.EqualTo(sourceNodes + 2));
+            Assert.That(check.RequiredSourceModel, Is.EqualTo(NativeForkJoinSourceCostVerifier.CallbackSourceActivationModel));
+        }
+        else
+        {
+            Assert.That(check.Upper, Is.Null);
+            Assert.That(check.RequiredSourceModel, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinCallbackActivationBudgetExceeded"));
+        }
+    }
+
+    private static void AssertKnownZeroTaskWork(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        ArgumentNullException.ThrowIfNull(root);
+        var check = NativeForkJoinSourceCostVerifier.Check(projection, root, TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.HasSourceCosts, Is.True, check.UnknownReason);
+        Assert.That(check.Upper!.LoopEntries.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        Assert.That(check.Upper.Arrays.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        Assert.That(check.Upper.Elements.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
+    }
+
+    private static CompilerForkJoinProjection ActivationBudgetProjection(bool constants, int choices, int lastChoices, int lastFirst)
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var calls = string.Join(",", Enumerable.Repeat(constants ? "Task.Run(()=>Child(3))" : "Task.Run(()=>Child(n))", 16));
+        var source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => Task.WhenAll(" +
+            calls + "); static void Child(int count) {}}";
+        var compilation = TestCompilation.Create("ActivationBudgetControl", [("Subject.cs", source)]);
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
+        var lowered = CompilerForkJoinResourceLowering.Lower(method, compilation, "root", token);
+        Assert.That(lowered.UnknownReason, Is.Null);
+        var projection = lowered.Projection!;
+        if (!constants)
+        {
+            var collector = new CompilerTaskCarrierCollector(compilation);
+            var carriers = collector.Capture(method, "root", token);
+            Assert.That(carriers.Shapes, Is.Not.Null, carriers.UnknownReason);
+            projection = projection with
+            {
+                Carriers = carriers with
+                {
+                    Shapes = carriers.Shapes! with { CallbackActivations = collector.CaptureCallbackActivations(method, "root", token) }
+                }
+            };
+        }
+        var children = projection.Children;
+        for (var index = 0; index < children.Length; index++)
+        {
+            var child = children[index];
+            var last = index == children.Length - 1;
+            var input = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "count", int.MaxValue));
+            // Detached cost records stress kernel composition, not source execution.
+            var cost = ResourceProgram.Activate(child.Cost.Activation,
+                ActivationChoices(input, last ? lastFirst : 1, last ? lastChoices : choices));
+            var stack = NativeResourceStackVerifier.Derive(cost, token);
+            Assert.That(stack.Bounds, Is.Not.Null, stack.UnknownReason);
+            children = children.SetItem(index, child with { Cost = cost });
+        }
+        return projection with { Children = children };
+    }
+
+    private static ResourceProgram ActivationChoices(ResourceExpression input, int first, int count)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentOutOfRangeException.ThrowIfLessThan(first, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        if (count == 1)
+        {
+            return ResourceProgram.Repeat(new ResourceLoopRank(ResourceLoopKind.DecreasingSubtract,
+                input, ResourceExpression.Zero, first, 32, false), ResourceRepeatKind.TailRecurrence, ResourceProgram.Zero);
+        }
+        var half = count / 2;
+        return ResourceProgram.Choice(ActivationChoices(input, first, half), ActivationChoices(input, first + half, count - half));
+    }
+
     [TestCase(false, 1)]
     [TestCase(true, 3)]
     public void SourceActivationBoundsComeFromOwnedCallPrograms(bool nested, int expected)
