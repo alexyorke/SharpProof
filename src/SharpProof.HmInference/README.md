@@ -147,6 +147,7 @@ method/local-function declarations supply schemes instantiated per call.
 | Tuple/custom deconstruction | Infer nested declarations, mixed assignments and discards; retain conversions and assignment-expression tuple results |
 | Explicit/target-typed construction and initializers | Preserve constructor/indexer/Add selection; pin initializer source types and support nested members |
 | String interpolation and nameof | Retain interpolation hole types; compiler-check nonexecuted nameof operands |
+| Type metadata expressions | Infer typeof as System.Type while preserving its type operand, including existing type parameters, unbound generics, nullable values, void and pointers |
 | Conditionals, return branches and guard returns | Unify results |
 | Declaration, recursive, positional and list patterns | Bind pattern variables; infer structural member/element types and retain implicit protocol selections |
 | Legacy type tests and safe casts | Infer the operand; retain the tested type and reference/nullable cast target, including awaited operands |
@@ -988,7 +989,10 @@ lambda payloads have source and applied-fix runtime checks. Suppressed returns,
 explicit result types and nested-function returns preserve their boundaries.
 Nested list, array and tuple results now map nullable return leaves back to the
 corresponding receiver parameters, including repeated result parameters and async
-list results. Independent tuple siblings retain their own contracts.
+list results. Direct conditional and switch return arms can refine interface
+receiver results when the warning is attached to an arm, including async and
+custom Task delegates. Mixed invariant list arms use a verified struct-constrained
+signature; independent tuple siblings retain their own contracts.
 Indirect ref-alias stores now discover nullable generic helper and member results
 before body inference, including generic owners, delegates, declared T? returns,
 MaybeNull fields and properties. Property flow attributes take precedence over
@@ -996,7 +1000,10 @@ getter return attributes. Imported metadata follows the emitted getter contract;
 the compiler can relocate property attributes during emit. Conditional return
 contracts distinguish inactive guards,
 boxed nullable defaults and user conversions from proven nonnull arguments;
-matching generic input/return contracts preserve bare generic storage when valid.
+matching generic input/return contracts preserve bare generic storage when valid,
+including individual tuple assignments and conditional/switch tuple branches
+through ref aliases. Modified guard inputs
+retain their nullable input and storage contracts.
 Resolved field/array/ref-property paths retain
 nullable storage while fill inputs and independent siblings remain separate.
 Checks cover chained aliases, earlier copies, metadata contracts, runtime effects,

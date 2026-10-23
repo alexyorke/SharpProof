@@ -68,6 +68,19 @@ internal static class IndirectStorageChecks
                 public static int ModifiedGuardedStore(IndirectBox<int> box,int fill){fill=default;ref var alias=ref box.Value;alias=Guarded(fill);return box.Value;}
                 public static int NullableGuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(Maybe(fill));return box.Value;}
                 public static int GuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(fill!);return box.Value;}
+                public static int TupleGuarded(IndirectPair<int,string> box,int fill,string other){ref var alias=ref box.Value;(alias,box.Other)=(Guarded(fill),other);return box.Value;}
+                public static int TupleOut(IndirectBox<int> box,int fill,string tag,out string copied){ref var alias=ref box.Value;(alias,copied)=(Guarded(fill),tag);return box.Value;}
+                public static int ConditionalTuple(IndirectBox<int> box,int fill,string tag,bool choose,out string copied){ref var alias=ref box.Value;(alias,copied)=(choose?Guarded(fill):Guarded(fill),tag);return box.Value;}
+                public static int SwitchTuple(IndirectBox<int> box,int fill,string tag,bool choose,out string copied){ref var alias=ref box.Value;(alias,copied)=(choose switch{true=>Guarded(fill),_=>Guarded(fill)},tag);return box.Value;}
+                public static int ConditionalOptionalTuple(IndirectBox<int> box,int fill,string tag,bool choose,out string copied){ref var alias=ref box.Value;(alias,copied)=(choose?Guarded(fill):Maybe(fill),tag);return box.Value;}
+                public static int SwitchOptionalTuple(IndirectBox<int> box,int fill,string tag,bool choose,out string copied){ref var alias=ref box.Value;(alias,copied)=(choose switch{true=>Guarded(fill),_=>Maybe(fill)},tag);return box.Value;}
+                public static int ReboundNullableTuple(IndirectBox<int> box,int fill,string tag,out string copied){ref var alias=ref box.Value;(alias,copied)=(fill,tag);alias=ref box.Other;(alias,copied)=(Maybe(fill),tag);return box.Other;}
+                public static int DirectField(IndirectBox<int> box,int fill){box.Value=Maybe(fill);return box.Value;}
+                public static int DirectElement(int[] values,int fill){values[0]=Maybe(fill);return values[0];}
+                public static int DirectProperty(IndirectBox<int> box,int fill){box.Slot=Maybe(fill);return box.Value;}
+                public static int DirectFieldGuardNull(IndirectBox<int> box,int fill){box.Value=Conditional(fill,null);return box.Value;}
+                public static int DirectFieldGuardUnknown(IndirectBox<int> box,int fill){box.Value=Guarded(fill);return box.Value;}
+                public static int DirectFieldGuardModified(IndirectBox<int> box,int fill){fill=default;box.Value=Guarded(fill);return box.Value;}
             }
             public static class OriginalIndirectRunner{
                 public static async Task<bool> Run(CancellationToken token){
@@ -88,6 +101,19 @@ internal static class IndirectStorageChecks
                     var conditionalUser=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalUserConversion(conditionalUser,9)!=0||conditionalUser.Value!=0)return false;
                     var unknownGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.UnknownGuardedStore(unknownGuarded,9)!=9||unknownGuarded.Value!=9)return false;
                     var modifiedGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.ModifiedGuardedStore(modifiedGuarded,9)!=0||modifiedGuarded.Value!=0)return false;
+                    var tupleGuarded=new IndirectPair<int,string>(7,"before");if(IndirectProbe.TupleGuarded(tupleGuarded,9,"after")!=9||tupleGuarded.Value!=9||tupleGuarded.Other!="after")return false;
+                    var tupleOut=new IndirectBox<int>(7,11);if(IndirectProbe.TupleOut(tupleOut,9,"tag",out var copied)!=9||tupleOut.Value!=9||copied!="tag")return false;
+                    var conditionalTuple=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalTuple(conditionalTuple,9,"tag",false,out var conditionalCopied)!=9||conditionalTuple.Value!=9||conditionalCopied!="tag")return false;
+                    var switchTuple=new IndirectBox<int>(7,11);if(IndirectProbe.SwitchTuple(switchTuple,9,"tag",true,out var switchCopied)!=9||switchTuple.Value!=9||switchCopied!="tag")return false;
+                    var conditionalOptional=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalOptionalTuple(conditionalOptional,9,"tag",false,out var optionalCopied)!=0||conditionalOptional.Value!=0||optionalCopied!="tag")return false;
+                    var switchOptional=new IndirectBox<int>(7,11);if(IndirectProbe.SwitchOptionalTuple(switchOptional,9,"tag",false,out var switchOptionalCopied)!=0||switchOptional.Value!=0||switchOptionalCopied!="tag")return false;
+                    var reboundNullable=new IndirectBox<int>(7,11);if(IndirectProbe.ReboundNullableTuple(reboundNullable,9,"tag",out var reboundCopied)!=0||reboundNullable.Value!=9||reboundNullable.Other!=0||reboundCopied!="tag")return false;
+                    var directField=new IndirectBox<int>(7,11);if(IndirectProbe.DirectField(directField,9)!=0||directField.Value!=0||directField.Other!=11)return false;
+                    var directElement=new[]{7};if(IndirectProbe.DirectElement(directElement,9)!=0||directElement[0]!=0)return false;
+                    var directProperty=new IndirectBox<int>(7,11);if(IndirectProbe.DirectProperty(directProperty,9)!=0||directProperty.Value!=0||directProperty.Gets!=1)return false;
+                    var directNull=new IndirectBox<int>(7,11);if(IndirectProbe.DirectFieldGuardNull(directNull,9)!=0||directNull.Value!=0)return false;
+                    var directUnknown=new IndirectBox<int>(7,11);if(IndirectProbe.DirectFieldGuardUnknown(directUnknown,9)!=9||directUnknown.Value!=9)return false;
+                    var directModified=new IndirectBox<int>(7,11);if(IndirectProbe.DirectFieldGuardModified(directModified,9)!=0||directModified.Value!=0)return false;
                     var nullableGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.NullableGuardedStore(nullableGuarded,9)!=0||nullableGuarded.Value!=0)return false;
                     var guarded=new IndirectBox<int>(7,11);if(IndirectProbe.GuardedStore(guarded,9)!=9||guarded.Value!=9)return false;
                     var conditionalConstant=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalConstant(conditionalConstant,9)!=9||conditionalConstant.Value!=9)return false;
@@ -132,6 +158,22 @@ internal static class IndirectStorageChecks
                     var conditionalNullable=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalNullableNew(conditionalNullable,value)!=null||conditionalNullable.Value!=null)return false;
                     var conditionalUser=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalUserConversion(conditionalUser,value)!=null||conditionalUser.Value!=null)return false;
                     var unknownGuarded=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.UnknownGuardedStore(unknownGuarded,value),value)||!ReferenceEquals(unknownGuarded.Value,value))return false;
+                    var modifiedGuarded=new IndirectBox<object?>(value,other);if(IndirectProbe.ModifiedGuardedStore(modifiedGuarded,value)!=null||modifiedGuarded.Value!=null)return false;
+                    var tupleGuarded=new IndirectPair<object,Uri>(value,new Uri("https://example.invalid/before"));var updatedOther=new Uri("https://example.invalid/after");
+                    if(!ReferenceEquals(IndirectProbe.TupleGuarded(tupleGuarded,value,updatedOther),value)||!ReferenceEquals(tupleGuarded.Value,value)||!ReferenceEquals(tupleGuarded.Other,updatedOther))return false;
+                    var tupleOut=new IndirectBox<object>(value,other);var tag=new Uri("https://example.invalid/out");
+                    if(!ReferenceEquals(IndirectProbe.TupleOut(tupleOut,value,tag,out Uri copied),value)||!ReferenceEquals(tupleOut.Value,value)||!ReferenceEquals(copied,tag))return false;
+                    var conditionalTuple=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.ConditionalTuple(conditionalTuple,value,tag,false,out Uri conditionalCopied),value)||!ReferenceEquals(conditionalTuple.Value,value)||!ReferenceEquals(conditionalCopied,tag))return false;
+                    var switchTuple=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.SwitchTuple(switchTuple,value,tag,true,out Uri switchCopied),value)||!ReferenceEquals(switchTuple.Value,value)||!ReferenceEquals(switchCopied,tag))return false;
+                    var conditionalOptional=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalOptionalTuple(conditionalOptional,value,tag,false,out Uri optionalCopied)!=null||conditionalOptional.Value!=null||!ReferenceEquals(optionalCopied,tag))return false;
+                    var switchOptional=new IndirectBox<object?>(value,other);if(IndirectProbe.SwitchOptionalTuple(switchOptional,value,tag,false,out Uri switchOptionalCopied)!=null||switchOptional.Value!=null||!ReferenceEquals(switchOptionalCopied,tag))return false;
+                    var reboundNullable=new IndirectBox<object?>(value,other);if(IndirectProbe.ReboundNullableTuple(reboundNullable,value,tag,out Uri reboundCopied)!=null||!ReferenceEquals(reboundNullable.Value,value)||reboundNullable.Other!=null||!ReferenceEquals(reboundCopied,tag))return false;
+                    var directField=new IndirectBox<object?>(value,other);if(IndirectProbe.DirectField(directField,value)!=null||directField.Value!=null||!ReferenceEquals(directField.Other,other))return false;
+                    object?[] directElement={value};if(IndirectProbe.DirectElement(directElement,value)!=null||directElement[0]!=null)return false;
+                    var directProperty=new IndirectBox<object?>(value,other);if(IndirectProbe.DirectProperty(directProperty,value)!=null||directProperty.Value!=null||directProperty.Gets!=1)return false;
+                    var directNull=new IndirectBox<object?>(value,other);if(IndirectProbe.DirectFieldGuardNull(directNull,value)!=null||directNull.Value!=null)return false;
+                    var directUnknown=new IndirectBox<object?>(value,other);if(!ReferenceEquals(IndirectProbe.DirectFieldGuardUnknown(directUnknown,value),value)||!ReferenceEquals(directUnknown.Value,value))return false;
+                    var directModified=new IndirectBox<object?>(value,other);if(IndirectProbe.DirectFieldGuardModified(directModified,value)!=null||directModified.Value!=null)return false;
                     var nullableGuarded=new IndirectBox<object?>(value,other);if(IndirectProbe.NullableGuardedStore(nullableGuarded,value)!=null||nullableGuarded.Value!=null)return false;
                     var guarded=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.GuardedStore(guarded,value),value)||!ReferenceEquals(guarded.Value,value))return false;
                     var optionalStore=new IndirectBox<object?>(value,other);if(IndirectProbe.OptionalStore(optionalStore,value)!=null||optionalStore.Value!=null)return false;
@@ -139,6 +181,9 @@ internal static class IndirectStorageChecks
                     var sibling=new IndirectPair<object?,Uri>(value,new Uri("https://example.invalid/sibling"));
                     if(!ReferenceEquals(IndirectProbe.Sibling(sibling,value),sibling.Other)||sibling.Value!=null)return false;
                     var optional=new IndirectBox<int?>(23,29);if(IndirectProbe.Physical(optional,19)!=null||optional.Value!=null)return false;
+                    var modifiedPhysical=new IndirectBox<int?>(23,29);if(IndirectProbe.ModifiedGuardedStore(modifiedPhysical,19)!=null||modifiedPhysical.Value!=null)return false;
+                    var optionalPhysical=new IndirectBox<int?>(23,29);if(IndirectProbe.ConditionalOptionalTuple(optionalPhysical,19,tag,false,out Uri optionalPhysicalCopied)!=null||optionalPhysical.Value!=null||!ReferenceEquals(optionalPhysicalCopied,tag))return false;
+                    var reboundPhysical=new IndirectBox<int?>(23,29);if(IndirectProbe.ReboundNullableTuple(reboundPhysical,19,tag,out Uri reboundPhysicalCopied)!=null||reboundPhysical.Value!=19||reboundPhysical.Other!=null||!ReferenceEquals(reboundPhysicalCopied,tag))return false;
                     var asyncBox=new IndirectBox<object?>(value,other);var gate=new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
                     var pending=IndirectProbe.Async(gate.Task,asyncBox);if(pending.IsCompleted||!ReferenceEquals(asyncBox.Value,value))return false;
                     gate.SetResult(value);if(await pending.WaitAsync(token)!=null||asyncBox.Value!=null)return false;
@@ -184,6 +229,20 @@ internal static class IndirectStorageChecks
             ["UnknownGuardedStore"] = "T1 UnknownGuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)",
             ["NullableGuardedStore"] = "T1? NullableGuardedStore<T1>(global::IndirectBox<T1?> box, T1 fill)",
             ["GuardedStore"] = "T1 GuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)",
+            ["ModifiedGuardedStore"] = "T1? ModifiedGuardedStore<T1>(global::IndirectBox<T1?> box, T1? fill)",
+            ["TupleGuarded"] = "T1 TupleGuarded<T1, T2>(global::IndirectPair<T1, T2> box, T1 fill, T2 other)",
+            ["TupleOut"] = "T1 TupleOut<T1, T2>(global::IndirectBox<T1> box, T1 fill, T2 tag, out T2 copied)",
+            ["ConditionalTuple"] = "T1 ConditionalTuple<T1, T2>(global::IndirectBox<T1> box, T1 fill, T2 tag, bool choose, out T2 copied)",
+            ["SwitchTuple"] = "T1 SwitchTuple<T1, T2>(global::IndirectBox<T1> box, T1 fill, T2 tag, bool choose, out T2 copied)",
+            ["ConditionalOptionalTuple"] = "T1? ConditionalOptionalTuple<T1, T2>(global::IndirectBox<T1?> box, T1 fill, T2 tag, bool choose, out T2 copied)",
+            ["SwitchOptionalTuple"] = "T1? SwitchOptionalTuple<T1, T2>(global::IndirectBox<T1?> box, T1 fill, T2 tag, bool choose, out T2 copied)",
+            ["ReboundNullableTuple"] = "T1? ReboundNullableTuple<T1, T2>(global::IndirectBox<T1?> box, T1 fill, T2 tag, out T2 copied)",
+            ["DirectField"] = "T1? DirectField<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["DirectElement"] = "T1? DirectElement<T1>(T1?[] values, T1 fill)",
+            ["DirectProperty"] = "T1? DirectProperty<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["DirectFieldGuardNull"] = "T1? DirectFieldGuardNull<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["DirectFieldGuardUnknown"] = "T1? DirectFieldGuardUnknown<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["DirectFieldGuardModified"] = "T1? DirectFieldGuardModified<T1>(global::IndirectBox<T1?> box, T1? fill)",
             ["OptionalStore"] = "T1? OptionalStore<T1>(global::IndirectBox<T1?> box, T1 fill)",
             ["Copy"] = "T1? Copy<T1>(global::IndirectBox<T1?> box, T1 fill)",
             ["Sibling"] = "T2 Sibling<T1, T2>(global::IndirectPair<T1?, T2> box, T1 fill)",
@@ -193,7 +252,7 @@ internal static class IndirectStorageChecks
             .Where(result =>
             {
                 ArgumentNullException.ThrowIfNull(result);
-                return expected.ContainsKey(result.Method) || result.Method is "Typed" or "ModifiedGuardedStore"
+                return expected.ContainsKey(result.Method) || result.Method is "Typed"
                     or "ConditionalConstant" or "ConditionalNew";
             })
             .ToDictionary(result =>
@@ -212,10 +271,6 @@ internal static class IndirectStorageChecks
             if (results[control].Signature?.Contains("?>", StringComparison.Ordinal) == true)
             { throw new InvalidOperationException("Indirect nonnullable control widened: " + control); }
         }
-        if (!results.TryGetValue("ModifiedGuardedStore", out var modified)
-            || modified.Status == "Suggestion" && modified.Signature ==
-                "T1 ModifiedGuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)")
-        { throw new InvalidOperationException("Indirect modified guard retained an unsound bare T storage signature."); }
         CheckMetadata(cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var context = new FixAllContext(document, provider, FixAllScope.Project, "HM.GeneralizeSignature",

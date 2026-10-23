@@ -39,13 +39,23 @@ public static partial class Inference
         {
             if (expression is null)
             { throw new ArgumentNullException(nameof(expression)); }
-            while (expression.Parent is ParenthesizedExpressionSyntax parentheses)
-            { expression = parentheses; }
-            return expression.Parent is AssignmentExpressionSyntax assignment
-                && assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
-                && assignment.Right == expression
-                && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol
-                    is ILocalSymbol { RefKind: not RefKind.None };
+            foreach (var assignment in expression.Ancestors().OfType<AssignmentExpressionSyntax>())
+            {
+                if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                { continue; }
+                foreach (var component in StorageComponents(assignment.Left, assignment.Right))
+                {
+                    if (model.GetSymbolInfo(StorageExpression(component.Target), cancellationToken).Symbol
+                        is not ILocalSymbol { RefKind: not RefKind.None })
+                    { continue; }
+                    foreach (var alternative in StoredAlternatives(component.Value))
+                    {
+                        if (StorageExpression(alternative).Span == expression.Span)
+                        { return true; }
+                    }
+                }
+            }
+            return false;
         }
         private readonly List<(TextSpan Call, int Argument, int Parameter, string Path, string TypePath)> nullableReceiverCandidates = [];
 
@@ -85,6 +95,33 @@ public static partial class Inference
             { parameters[i] = Rewrite(parameters[i], i, ""); }
         }
 
+        private void ApplyValueReceiverInputs(HmType[] parameters)
+        {
+            if (parameters is null)
+            { throw new ArgumentNullException(nameof(parameters)); }
+            foreach (var (parameter, path) in valueReceiverInputs)
+            {
+                if (path is null)
+                { throw new InvalidOperationException("Missing value receiver path."); }
+                if (parameter < 0 || parameter >= parameters.Length)
+                { throw new InferenceException("Value receiver parameter is outside the signature."); }
+                var node = parameters[parameter];
+                foreach (var step in path.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!int.TryParse(step, System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture, out var index)
+                        || index >= ConversionCore(node).Arguments.Length)
+                    { throw new InferenceException("Value receiver path no longer matches the signature."); }
+                    node = ConversionCore(node).Arguments[index];
+                }
+                var variable = ConversionCore(node);
+                if (!variable.IsVariable)
+                { throw new InferenceException("Value receiver is fixed by the method body."); }
+                variable.IsValueType = true;
+                RequireKeyword(variable, "struct");
+            }
+        }
+
         private MethodResult? RefineNullableReceiverInputs(Compilation compilation, MethodDeclarationSyntax original,
             MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
         {
@@ -112,7 +149,29 @@ public static partial class Inference
             if (before.Length != after.Length)
             { return null; }
             var next = new HashSet<(int Parameter, string Path)>(nullableReceiverInputs);
+            var valueFallbacks = new HashSet<(int Parameter, string Path)>();
             var candidateModel = compilation.GetSemanticModel(candidate.SyntaxTree);
+            var originalSymbol = model.GetDeclaredSymbol(original, cancellationToken);
+            bool HasConcreteValueOrigin(int parameter, string path)
+            {
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                if (originalSymbol is null || parameter < 0 || parameter >= originalSymbol.Parameters.Length)
+                { return false; }
+                var node = CSharpTypes.Rigid(originalSymbol.Parameters[parameter].Type);
+                foreach (var step in path.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!int.TryParse(step, System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture, out var slot)
+                        || slot >= node.Root.Arguments.Length)
+                    { return false; }
+                    node = node.Root.Arguments[slot];
+                }
+                var source = node.Root.CSharpSymbol;
+                return source is { IsValueType: true, IsRefLikeType: false }
+                    && source is not ITypeParameterSymbol
+                    && source is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+            }
             foreach (var input in nullableReceiverCandidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -127,7 +186,9 @@ public static partial class Inference
                 { continue; }
                 var argument = after[index].ArgumentList.Arguments[input.Argument];
                 var expression = argument.Expression;
-                if (!pins.Contains((input.Parameter, input.Path)) && warnings.Any(warning =>
+                if (pins.Contains((input.Parameter, input.Path)) || valueReceiverInputs.Contains((input.Parameter, input.Path)))
+                { continue; }
+                var matched = warnings.Where(warning =>
                     {
                         if (warning is null)
                         { throw new ArgumentNullException(nameof(warning)); }
@@ -142,12 +203,44 @@ public static partial class Inference
                             && (input.TypePath.Length == 0 || candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } parameter }
                                 && candidateModel.GetTypeInfo(expression, cancellationToken).Type is { } actual
                                 && HasAnnotatedReceiverLeaf(parameter.Type, actual, input.TypePath, compilation));
-                    }))
-                { next.Add((input.Parameter, input.Path)); }
+                    }).ToArray();
+                if (matched.Length == 0)
+                { continue; }
+                var origin = (input.Parameter, input.Path);
+                next.Add(origin);
+                if (matched.Any(warning =>
+                    { if (warning is null) { throw new ArgumentNullException(nameof(warning)); } return warning.Id == "CS8619"; })
+                    && HasConcreteValueOrigin(origin.Parameter, origin.Path))
+                { valueFallbacks.Add(origin); }
             }
-            return next.Count == nullableReceiverInputs.Count ? null
-                : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: nullableCollectionInputs,
-                    nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: next).Analyze(original, pins);
+            if (next.Count == nullableReceiverInputs.Count)
+            { return null; }
+            var widenedPins = new HashSet<(int Parameter, string Path)>(pins);
+            var widened = new Session(model, cancellationToken, nullableReadFlow,
+                nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults,
+                nullableReceiverInputs: next, valueReceiverInputs: valueReceiverInputs).Analyze(original, widenedPins);
+            if (widened.Status == "Suggestion")
+            { pins.UnionWith(widenedPins); return widened; }
+            foreach (var origin in valueFallbacks.OrderBy(item => item.Parameter).ThenBy(item => item.Path, StringComparer.Ordinal))
+            {
+                var trialValues = new HashSet<(int Parameter, string Path)>(valueReceiverInputs) { origin };
+                var trialPins = new HashSet<(int Parameter, string Path)>(pins);
+                MethodResult trial;
+                try
+                {
+                    trial = new Session(model, cancellationToken, nullableReadFlow,
+                        nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults,
+                        nullableReceiverInputs: nullableReceiverInputs, valueReceiverInputs: trialValues).Analyze(original, trialPins);
+                }
+                catch (InferenceException)
+                { continue; }
+                if (trial.Status != "Suggestion")
+                { continue; }
+                pins.UnionWith(trialPins);
+                return trial;
+            }
+            pins.UnionWith(widenedPins);
+            return widened;
         }
 
         private static readonly char[] ReceiverTypePathSeparators = ['/'];
@@ -263,20 +356,30 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(returned)); }
                 while (returned is ParenthesizedExpressionSyntax wrapped)
                 { returned = wrapped.Expression; }
-                if (returned.Span != warning.Location.SourceSpan)
-                { return false; }
-                if (warning.Id == "CS8603")
-                { return returnPaths.Contains(""); }
-                if (warning.Id != "CS8619" || candidateModel.GetTypeInfo(returned, cancellationToken).Type is not { } actualReturn)
-                { return false; }
-                foreach (var returnPath in returnPaths)
+                if (returned.Span == warning.Location.SourceSpan)
                 {
-                    if (returnPath is null)
-                    { throw new InvalidOperationException("Missing delegate return path."); }
-                    if (returnPath.Length != 0 && HasAnnotatedReceiverLeaf(expectedReturn, actualReturn, returnPath, compilation))
-                    { return true; }
+                    if (warning.Id == "CS8603")
+                    { return returnPaths.Contains(""); }
+                    if (warning.Id != "CS8619" || candidateModel.GetTypeInfo(returned, cancellationToken).Type is not { } actualReturn)
+                    { return false; }
+                    foreach (var returnPath in returnPaths)
+                    {
+                        if (returnPath is null)
+                        { throw new InvalidOperationException("Missing delegate return path."); }
+                        if (returnPath.Length != 0 && HasAnnotatedReceiverLeaf(expectedReturn, actualReturn, returnPath, compilation))
+                        { return true; }
+                    }
                 }
-                return false;
+                if (warning.Id != "CS8619")
+                { return false; }
+                return returned switch
+                {
+                    ConditionalExpressionSyntax conditional => HasReturnWarning(conditional.WhenTrue)
+                        || HasReturnWarning(conditional.WhenFalse),
+                    SwitchExpressionSyntax selection => selection.Arms.Any(arm =>
+                    { if (arm is null) { throw new ArgumentNullException(nameof(arm)); } return HasReturnWarning(arm.Expression); }),
+                    _ => false
+                };
             }
         }
 
@@ -430,7 +533,7 @@ public static partial class Inference
             }
             return !changed ? null : new Session(model, cancellationToken, nullableReadFlow,
                 nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: next,
-                nullableReceiverInputs: nullableReceiverInputs).Analyze(original, pins);
+                nullableReceiverInputs: nullableReceiverInputs, valueReceiverInputs: valueReceiverInputs).Analyze(original, pins);
 
             static void Collect(HmType actual, HmType inferred, string path, HashSet<string> paths)
             {
@@ -916,7 +1019,7 @@ public static partial class Inference
             { return new(original.Identifier.ValueText, "Rejected", "Nullable postcondition flow refinement does not converge."); }
             readFlowHistory.Add(nullableReadFlow);
             return new Session(model, cancellationToken, next, readFlowHistory, nullableCollectionInputs,
-                nullableInvocationResults, nullableReceiverInputs).Analyze(original, pins);
+                nullableInvocationResults, nullableReceiverInputs, valueReceiverInputs).Analyze(original, pins);
         }
 
         private static HmType ApplyInputNullability(IParameterSymbol parameter, HmType value)
@@ -1340,7 +1443,8 @@ public static partial class Inference
             var template = HmType.Function(parameters, new("void"));
             var fresh = new HmScheme(template, template.FreeVariables()).Instantiate();
             var probe = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs,
-                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs)
+                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs,
+                valueReceiverInputs: valueReceiverInputs)
             { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
             probe.SetIteratorReturn(declaration, currentMethod);
             if (probe.iteratorReturn is null)

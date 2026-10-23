@@ -100,7 +100,8 @@ public static partial class Inference
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
         Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null, Dictionary<TextSpan, HashSet<string>>? nullableInvocationResults = null,
-        HashSet<(int Parameter, string Path)>? nullableReceiverInputs = null)
+        HashSet<(int Parameter, string Path)>? nullableReceiverInputs = null,
+        HashSet<(int Parameter, string Path)>? valueReceiverInputs = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
@@ -109,6 +110,7 @@ public static partial class Inference
         private readonly HashSet<TextSpan> nullableCollectionInputs = nullableCollectionInputs ?? [];
         private readonly Dictionary<TextSpan, HashSet<string>> nullableInvocationResults = nullableInvocationResults ?? [];
         private readonly HashSet<(int Parameter, string Path)> nullableReceiverInputs = nullableReceiverInputs ?? [];
+        private readonly HashSet<(int Parameter, string Path)> valueReceiverInputs = valueReceiverInputs ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -160,6 +162,7 @@ public static partial class Inference
             }
 
             ApplyNullableReceiverInputs(parameters);
+            ApplyValueReceiverInputs(parameters);
             for (var i = 0; i < parameters.Length; i++)
             { ImportConstructedConstraints(symbol.Parameters[i].Type, parameters[i]); }
             currentMethod = symbol;
@@ -996,6 +999,10 @@ public static partial class Inference
                     return AddressOf(address);
                 case StackAllocArrayCreationExpressionSyntax or ImplicitStackAllocArrayCreationExpressionSyntax:
                     return StackAllocation(expression);
+                case TypeOfExpressionSyntax typeOf:
+                    // The type operand remains source syntax; its value has the fixed System.Type contract.
+                    return CSharpTypes.Rigid(model.GetTypeInfo(typeOf, cancellationToken).Type
+                        ?? throw new InferenceException("Unresolved typeof expression."));
                 case SizeOfExpressionSyntax:
                     return new("int");
                 case RefExpressionSyntax reference:

@@ -124,6 +124,29 @@ public static partial class Inference
             }
         }
 
+        private bool ResolveConcreteLowerBounds()
+        {
+            var changed = false;
+            foreach (var requirement in inferredConstraints)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (requirement.Type is null || ConversionCore(requirement.Variable).IsVariable
+                    || !ConversionCore(requirement.Type).IsVariable)
+                { continue; }
+                // A concrete T in `where T : U` cannot establish a C# constraint
+                // on an inferred U: `where U : T` reverses the conversion. Keep
+                // the original U endpoint, while other method inputs stay free.
+                var argument = requirement.Type;
+                while (argument.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+                { argument = argument.Arguments[0]; }
+                if (OriginalConstraintShape(argument) is not { } original || original.FreeVariables().Count != 0)
+                { continue; }
+                HmType.Unify(argument, original);
+                changed = true;
+            }
+            return changed;
+        }
+
         private List<TypeParameterConstraintClauseSyntax> BuildConstraints(Dictionary<HmType, string> variables, bool nullableAnnotations)
         {
             if (variables is null)

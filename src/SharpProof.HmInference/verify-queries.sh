@@ -24,6 +24,8 @@ public sealed class LambdaReceiver<T>{public T Run(T seed,Func<T> action)=>actio
 public sealed class IndirectReceiver<T>{public T Value;public IndirectReceiver(T value){Value=value;}}
 public sealed class IndirectSource<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read(T fill)=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;}
 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T IndirectRead<T>(T fill);
+public sealed class LambdaOuter<T>{public sealed class Inner<U>{public T Run(T seed,Func<T> action)=>action();}}
+public sealed class LambdaReadOnlyReceiver<T>{public IReadOnlyList<T> Run(T seed,Func<IReadOnlyList<T>> action)=>action();}
 public sealed class LambdaListReceiver<T>{public List<T> Run(T seed,Func<List<T>> action)=>action();public Task<List<T>> RunAsync(T seed,Func<Task<List<T>>> action)=>action();}
 public sealed class LambdaTupleReceiver<T,U>{public (T value,U tag) Run(T seed,Func<(T value,U tag)> action)=>action();}
 public sealed class IndirectPrioritySource<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}}
@@ -109,11 +111,22 @@ public static class QueryConsumer{
   public static int IndirectDelegateMaybe(IndirectReceiver<int> receiver,IndirectRead<int> read,int fill){ref var alias=ref receiver.Value;alias=read(fill);return receiver.Value;}
   public static int IndirectPropertyMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Property;return receiver.Value;}
   public static int IndirectMemberMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Field;return receiver.Value;}
+  public static (Type kind,int value) TypeOfTuple(int value)=>(typeof(int?),value);
+  public static (Type kind,int value) TypeOfGeneric<T>(int value)=>(typeof(T),value);
+  public static async Task<(Type kind,int value)> TypeOfAsync(Task<int> value)=>(typeof(List<>),await value);
   static List<T> LambdaValues<T>(T first,T second)=>new List<T>{first,second};
+#if ANNOTATED_REF
+  public static int LambdaNestedOwner(LambdaOuter<int>.Inner<string> receiver,int value,string sibling)=>receiver.Run(value,()=>GenericResultMaybe(value));
+  public static IReadOnlyList<int> LambdaInterfaceConditional(LambdaReadOnlyReceiver<int> receiver,int value,bool choose)=>receiver.Run(value,()=>choose?LambdaValues(value,GenericResultMaybe(value)):new[]{value});
+#endif
+  public static List<int> LambdaListMixed(LambdaListReceiver<int> receiver,int value,bool choose)=>receiver.Run(value,()=>choose?LambdaValues(value,GenericResultMaybe(value)):LambdaValues(value,value));
   public static List<int> LambdaListReturn(LambdaListReceiver<int> receiver,int value)=>receiver.Run(value,()=>LambdaValues(value,GenericResultMaybe(value)));
   public static async Task<List<int>> LambdaListAsyncReturn(LambdaListReceiver<int> receiver,int value)=>await receiver.RunAsync(value,async()=>{await Task.Yield();return LambdaValues(value,GenericResultMaybe(value));});
   public static (int value,string tag) LambdaTupleReturn(LambdaTupleReceiver<int,string> receiver,int value,string tag)=>receiver.Run(value,()=> (GenericResultMaybe(value),tag));
   [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("hint")]static T NullableStoreGuard<T>(T value,object? hint){if(hint is null)return default;if(value is null)throw new InvalidOperationException();return value;}
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("value")]static T NullableStoreIdentity<T>(T value)=>value;
+  public static int IndirectTupleGuarded(IndirectReceiver<int> receiver,int fill,string tag,out string copied){ref var alias=ref receiver.Value;(alias,copied)=(NullableStoreIdentity(fill),tag);return receiver.Value;}
+  public static int IndirectTupleConditional(IndirectReceiver<int> receiver,int fill,string tag,bool choose,out string copied){ref var alias=ref receiver.Value;(alias,copied)=choose?(NullableStoreIdentity(fill),tag):(fill,tag);return receiver.Value;}
   public static int IndirectInactiveGuard(IndirectReceiver<int> receiver,int fill){ref var alias=ref receiver.Value;alias=NullableStoreGuard(fill,null);return receiver.Value;}
   public static int IndirectPriorityMaybe(IndirectReceiver<int> receiver,IndirectPrioritySource<int> source){ref var alias=ref receiver.Value;alias=source.Property;return receiver.Value;}
   static CompoundInheritedInput<T> CompoundValues<T>(T first,T second)=>new CompoundInheritedInput<T>{first,second};
@@ -432,12 +445,20 @@ EOF
     grep -Fq 'T1 IndirectInactiveGuard<T1>(global::IndirectReceiver<T1> receiver, T1 fill) where T1 : struct' "$log"
     grep -Fq 'T1 IndirectPriorityMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectPrioritySource<T1> source) where T1 : struct' "$log"
   else
+    grep -Fq 'T1? LambdaNestedOwner<T1, T2, T3>(global::LambdaOuter<T1?>.Inner<T2> receiver, T1 value, T3 sibling)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IReadOnlyList<T1?> LambdaInterfaceConditional<T1>(global::LambdaReadOnlyReceiver<T1?> receiver, T1 value, bool choose)' "$log"
     grep -Fq 'global::System.Collections.Generic.List<T1?> LambdaListReturn<T1>(global::LambdaListReceiver<T1?> receiver, T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> LambdaListAsyncReturn<T1>(global::LambdaListReceiver<T1?> receiver, T1 value)' "$log"
     grep -Fq '(T1? value, T2 tag) LambdaTupleReturn<T1, T2>(global::LambdaTupleReceiver<T1?, T2> receiver, T1 value, T2 tag)' "$log"
     grep -Fq 'T1? IndirectInactiveGuard<T1>(global::IndirectReceiver<T1?> receiver, T1 fill)' "$log"
     grep -Fq 'T1? IndirectPriorityMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectPrioritySource<T1> source)' "$log"
   fi
+  grep -Fq 'global::System.Collections.Generic.List<T1> LambdaListMixed<T1>(global::LambdaListReceiver<T1> receiver, T1 value, bool choose) where T1 : struct' "$log"
+  grep -Fq 'T1 IndirectTupleGuarded<T1, T2>(global::IndirectReceiver<T1> receiver, T1 fill, T2 tag, out T2 copied)' "$log"
+  grep -Fq 'T1 IndirectTupleConditional<T1, T2>(global::IndirectReceiver<T1> receiver, T1 fill, T2 tag, bool choose, out T2 copied)' "$log"
+  grep -Fq '(global::System.Type kind, T1 value) TypeOfTuple<T1>(T1 value)' "$log"
+  grep -Fq '(global::System.Type kind, T1 value) TypeOfGeneric<T, T1>(T1 value)' "$log"
+  grep -Fq 'global::System.Threading.Tasks.Task<(global::System.Type kind, T1 value)> TypeOfAsync<T1>(global::System.Threading.Tasks.Task<T1> value)' "$log"
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredDelegateForward<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

@@ -117,7 +117,8 @@ internal static class DynamicChecks
         { throw new InvalidOperationException(string.Join("\n", failures)); }
         return tests.Length + await Runtime(cancellationToken).ConfigureAwait(false)
             + await EnumerationRuntime(cancellationToken).ConfigureAwait(false)
-            + await ReceiverRuntime(cancellationToken).ConfigureAwait(false);
+            + await ReceiverRuntime(cancellationToken).ConfigureAwait(false)
+            + await RefModifierRuntime(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<int> Runtime(CancellationToken cancellationToken)
@@ -616,6 +617,71 @@ internal static class DynamicChecks
         Program.Log.Info("PASS UnresolvedDynamicReceiverRebindingProof");
         Program.Log.Info("PASS CrossFileDynamicReceiverProtectionAndUnrelatedIdeFix");
         return 2;
+    }
+
+
+    private static async Task<int> RefModifierRuntime(CancellationToken cancellationToken)
+    {
+        const string source = """
+            #nullable enable
+            public class RefModifierTarget {
+                public int M(ref int value,string tag){value++;return value;}
+            }
+            public static class RefModifierCaller {
+                public static dynamic Wrong(dynamic target,out int value)=>target.M(out value,"tag");
+                public static int Good(RefModifierTarget target){int value=3;return target.M(ref value,"tag");}
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(), "DynamicRefModifier", "DynamicRefModifier", LanguageNames.CSharp,
+            compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: Program.Compile([]).References));
+        var document = project.AddDocument("DynamicRefModifier.cs", source);
+        var compilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        var before = Load(compilation, cancellationToken);
+        var diagnostics = await compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(new AnalyzerOptions([]), null, true, false))
+            .GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
+        var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+        var candidates = diagnostics.Where(diagnostic =>
+        {
+            ArgumentNullException.ThrowIfNull(diagnostic);
+            return diagnostic.Id == "HM0001" && root.FindNode(diagnostic.Location.SourceSpan).AncestorsAndSelf().OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault()?.Identifier.ValueText == "M";
+        }).ToArray();
+        if (candidates.Length != 1)
+        { throw new InvalidOperationException("A mismatched out argument suppressed a safe ref-method suggestion."); }
+        var actions = new List<CodeAction>();
+        var provider = new HmSignatureCodeFixProvider();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(document, candidates[0], (action, _) =>
+        { ArgumentNullException.ThrowIfNull(action); actions.Add(action); }, cancellationToken)).ConfigureAwait(false);
+        var operations = await actions.Single().GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+        document = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        var after = Load((await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken);
+        foreach (var assembly in new[] { before, after })
+        {
+            var target = Activator.CreateInstance(assembly.GetType("RefModifierTarget")!)!;
+            var caller = assembly.GetType("RefModifierCaller")!;
+            try
+            {
+                caller.GetMethod("Wrong")!.Invoke(null, [target, null]);
+                throw new InvalidOperationException("An out argument unexpectedly bound to a ref parameter.");
+            }
+            catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException?.GetType().FullName == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException") { }
+            if (!Equals(caller.GetMethod("Good")!.Invoke(null, [target]), 4))
+            { throw new InvalidOperationException("The valid ref call changed its result."); }
+        }
+        var changedMethod = after.GetType("RefModifierTarget")!.GetMethod("M")!;
+        var typeParameters = changedMethod.GetGenericArguments();
+        var tagType = changedMethod.GetParameters()[1].ParameterType;
+        if (!changedMethod.IsGenericMethodDefinition || !tagType.IsGenericParameter)
+        { throw new InvalidOperationException("The unrelated tag was not generalized."); }
+        var typeArguments = Enumerable.Repeat(typeof(int), typeParameters.Length).ToArray();
+        typeArguments[tagType.GenericParameterPosition] = typeof(Uri);
+        var arguments = new object[] { 3, new Uri("https://example.invalid/dynamic-ref") };
+        if (!Equals(changedMethod.MakeGenericMethod(typeArguments).Invoke(Activator.CreateInstance(after.GetType("RefModifierTarget")!)!, arguments), 4)
+            || !Equals(arguments[0], 4))
+        { throw new InvalidOperationException("Generalizing the unrelated tag changed ref behavior."); }
+        Program.Log.Info("PASS DynamicReceiverRefModifierAndIndependentTag");
+        return 1;
     }
 
 

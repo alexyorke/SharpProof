@@ -1,5 +1,11 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.HmInference.CodeFixes;
 
 namespace SharpProof.HmInference;
 
@@ -81,6 +87,137 @@ internal static class PartialMethodChecks
 
         if (failures.Count != 0)
         { throw new InvalidOperationException(string.Join("\n", failures)); }
-        return cases.Length * 2 + builderCases.Length + await PartialMethodRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
+        return cases.Length * 2 + builderCases.Length + await PartialMethodRuntimeChecks.Run(cancellationToken).ConfigureAwait(false)
+            + await GeneratedPartnerChecks(cancellationToken).ConfigureAwait(false);
     }
+
+    private static async Task<int> GeneratedPartnerChecks(CancellationToken cancellationToken)
+    {
+        (string Name, string Definition, string Implementation, string InvalidImplementation, int Arity)[] cases =
+        [
+            ("Concrete", "public partial int Echo(int value);", "public partial int Echo(int value)=>value;",
+                "public partial T Echo<T>(T value)=>value;", 0),
+            ("ExistingGeneric", "public partial (T,int) Echo<T>(T value,int tag);", "public partial (T,int) Echo<T>(T value,int tag)=>(value,tag);",
+                "public partial (T,T1) Echo<T,T1>(T value,T1 tag)=>(value,tag);", 1)
+        ];
+        var descriptor = new DiagnosticDescriptor("HM0001", "Generalize", "Generalize", "Design", DiagnosticSeverity.Info, true);
+        var provider = new HmSignatureCodeFixProvider();
+        foreach (var test in cases)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var workspace = new AdhocWorkspace();
+            var references = Program.Compile([]).References;
+            var project = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(),
+                "GeneratedPartial" + test.Name, "GeneratedPartial" + test.Name, LanguageNames.CSharp,
+                compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: references,
+                analyzerReferences: [new PartialGeneratorReference(test.Definition)]));
+            var source = project.AddDocument("Implementation.cs", "public partial class Probe { " + test.Implementation + " }");
+            var compilation = (await source.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+            var generatedTree = compilation.SyntaxTrees.Single(tree =>
+            {
+                ArgumentNullException.ThrowIfNull(tree);
+                return tree.FilePath.EndsWith("GeneratedPartial.g.cs", StringComparison.Ordinal);
+            });
+            var generatedDocument = source.Project.GetDocument(generatedTree);
+            if (generatedDocument is null || source.Project.DocumentIds.Contains(generatedDocument.Id)
+                || compilation.GetDiagnostics(cancellationToken).Any(Inference.IsCompilationError))
+            { throw new InvalidOperationException("Invalid source-generated partial fixture " + test.Name); }
+            using var originalImage = new MemoryStream();
+            if (!compilation.Emit(originalImage, cancellationToken: cancellationToken).Success)
+            { throw new InvalidOperationException("Source-generated partial did not emit: " + test.Name); }
+
+            var method = ((CompilationUnitSyntax)(await source.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!)
+                .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var result = Inference.Analyze(method, compilation.GetSemanticModel(method.SyntaxTree), cancellationToken);
+            if (result.Status != "Suggestion")
+            { throw new InvalidOperationException("Source-generated partial candidate was not reproduced: " + test.Name + ": " + result); }
+            var invalidTree = CSharpSyntaxTree.ParseText("public partial class Probe { " + test.InvalidImplementation + " }",
+                path: "Implementation.cs", cancellationToken: cancellationToken);
+            var invalid = compilation.ReplaceSyntaxTree(method.SyntaxTree, invalidTree);
+            var invalidIds = invalid.GetDiagnostics(cancellationToken).Where(Inference.IsCompilationError).Select(diagnostic =>
+            {
+                ArgumentNullException.ThrowIfNull(diagnostic);
+                return diagnostic.Id;
+            }).ToHashSet(StringComparer.Ordinal);
+            if (!invalidIds.Contains("CS8795") || !invalidIds.Contains("CS0759"))
+            { throw new InvalidOperationException("Native partial pairing accepted an implementation-only arity change: " + test.Name); }
+
+            var diagnosis = Diagnostic.Create(descriptor, method.Identifier.GetLocation());
+            var actions = new List<CodeAction>();
+            await provider.RegisterCodeFixesAsync(new CodeFixContext(source, diagnosis, (action, _) =>
+            {
+                ArgumentNullException.ThrowIfNull(action);
+                actions.Add(action);
+            }, cancellationToken)).ConfigureAwait(false);
+            if (actions.Count != 0)
+            { throw new InvalidOperationException("Code fix offered an uneditable source-generated partner change: " + test.Name); }
+
+            var editableProject = workspace.AddProject(ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Create(),
+                "EditablePartial" + test.Name, "EditablePartial" + test.Name, LanguageNames.CSharp,
+                compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary), metadataReferences: references));
+            var editableDefinition = editableProject.AddDocument("EditablePartial.g.cs", "public partial class Probe { " + test.Definition + " }");
+            var editableSource = editableDefinition.Project.AddDocument("Implementation.cs", "public partial class Probe { " + test.Implementation + " }");
+            var editableMethod = ((CompilationUnitSyntax)(await editableSource.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!)
+                .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+            var editableActions = new List<CodeAction>();
+            await provider.RegisterCodeFixesAsync(new CodeFixContext(editableSource,
+                Diagnostic.Create(descriptor, editableMethod.Identifier.GetLocation()), (action, _) =>
+                {
+                    ArgumentNullException.ThrowIfNull(action);
+                    editableActions.Add(action);
+                }, cancellationToken)).ConfigureAwait(false);
+            if (editableActions.Count != 1)
+            { throw new InvalidOperationException("Editable .g.cs partial partner lost its code fix: " + test.Name); }
+            var solution = (await editableActions[0].GetOperationsAsync(cancellationToken).ConfigureAwait(false))
+                .OfType<ApplyChangesOperation>().Single().ChangedSolution;
+            var changed = (await solution.GetDocument(editableSource.Id)!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+            var changedMethod = changed.GetTypeByMetadataName("Probe")!.GetMembers("Echo").OfType<IMethodSymbol>().Single();
+            if (changedMethod.Arity != test.Arity + 1 || changedMethod.PartialImplementationPart?.Arity != test.Arity + 1)
+            { throw new InvalidOperationException("Editable .g.cs partial pair was not generalized: " + test.Name); }
+            using var changedImage = new MemoryStream();
+            if (!changed.Emit(changedImage, cancellationToken: cancellationToken).Success)
+            { throw new InvalidOperationException("Editable .g.cs partial fix did not emit: " + test.Name); }
+            Program.Log.Info("PASS GeneratedPartialPartner" + test.Name + "ImmutableAndEditableControls");
+        }
+        return cases.Length;
+    }
+
+    private sealed class PartialGeneratorReference : AnalyzerReference
+    {
+        private readonly string definition;
+
+        internal PartialGeneratorReference(string definition)
+        { this.definition = definition ?? throw new ArgumentNullException(nameof(definition)); }
+
+        public override string Display => "GeneratedPartialPartner";
+        public override string FullPath => string.Empty;
+        public override object Id => this;
+        public override ImmutableArray<DiagnosticAnalyzer> GetAnalyzers(string language)
+        {
+            ArgumentNullException.ThrowIfNull(language);
+            return [];
+        }
+        public override ImmutableArray<DiagnosticAnalyzer> GetAnalyzersForAllLanguages()
+        { return []; }
+        public override ImmutableArray<ISourceGenerator> GetGenerators(string language)
+        {
+            ArgumentNullException.ThrowIfNull(language);
+            return [new PartialGenerator(definition)];
+        }
+    }
+
+#pragma warning disable RS1042 // In-memory generator for an integration fixture, not a packaged generator.
+    private sealed class PartialGenerator : ISourceGenerator
+    {
+        private readonly string definition;
+
+        internal PartialGenerator(string definition)
+        { this.definition = definition ?? throw new ArgumentNullException(nameof(definition)); }
+
+        public void Initialize(GeneratorInitializationContext context) { }
+
+        public void Execute(GeneratorExecutionContext /* SPINT001: all values valid - Roslyn supplies initialized contexts for this fixture generator. */ context)
+        { context.AddSource("GeneratedPartial.g.cs", "public partial class Probe { " + definition + " }"); }
+    }
+#pragma warning restore RS1042
 }

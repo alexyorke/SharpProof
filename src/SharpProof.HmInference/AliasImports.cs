@@ -71,7 +71,18 @@ public static partial class Inference
         }))
         { return false; }
         var root = model.SyntaxTree.GetRoot(cancellationToken);
-        if (root.DescendantTokens(descendIntoTrivia: true).Any(token => token.IsKind(SyntaxKind.IdentifierToken) && token.ValueText == alias))
+        // A parameter may share the extern alias name: Alias::Type still names
+        // the assembly, while ordinary identifier uses keep binding to the parameter.
+        // Leave all other same-file names conservative until their scopes are proven.
+        if (root.DescendantTokens(descendIntoTrivia: true).Any(token =>
+        {
+            if (!token.IsKind(SyntaxKind.IdentifierToken) || token.ValueText != alias)
+            { return false; }
+            if (token.Parent is ParameterSyntax parameter && parameter.Identifier == token)
+            { return false; }
+            return token.Parent is not IdentifierNameSyntax identifier
+                || model.GetSymbolInfo(identifier, cancellationToken).Symbol is not IParameterSymbol;
+        }))
         { return false; }
         foreach (var tree in model.Compilation.SyntaxTrees)
         {

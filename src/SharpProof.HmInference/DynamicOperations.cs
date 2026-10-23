@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -122,7 +123,13 @@ public static partial class Inference
                     { return false; }
                     index = parameters.Length - 1;
                 }
-                if (parameters[index].RefKind == RefKind.None && argument.RefKindKeyword.RawKind != 0)
+                var modifier = argument.RefKindKeyword.Kind();
+                if (index >= changedRoot.Parameters.Length
+                    || parameters[index].RefKind != changedRoot.Parameters[index].RefKind)
+                { return true; }
+                if (parameters[index].RefKind == RefKind.None && modifier != SyntaxKind.None
+                    || parameters[index].RefKind == RefKind.Ref && modifier != SyntaxKind.RefKeyword
+                    || parameters[index].RefKind == RefKind.Out && modifier != SyntaxKind.OutKeyword)
                 { return false; }
                 supplied[index] = true;
             }

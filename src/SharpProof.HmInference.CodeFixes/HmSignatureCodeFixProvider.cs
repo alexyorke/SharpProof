@@ -19,6 +19,28 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
         return new SequentialFixAll();
     }
 
+    private static bool CanEditAllMethodParts(Document document, MethodDeclarationSyntax method, SemanticModel model, CancellationToken cancellationToken)
+    {
+        var symbol = model.GetDeclaredSymbol(method, cancellationToken);
+        var partner = symbol?.PartialDefinitionPart ?? symbol?.PartialImplementationPart;
+        if (partner is null)
+        {
+            return true;
+        }
+
+        foreach (var reference in partner.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var partnerDocument = document.Project.GetDocument(reference.SyntaxTree);
+            if (partnerDocument is null || !document.Project.DocumentIds.Contains(partnerDocument.Id))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
@@ -49,7 +71,8 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
                 continue;
             }
 
-            if (Inference.Analyze(method, model, context.CancellationToken).Status != "Suggestion")
+            if (!CanEditAllMethodParts(context.Document, method, model, context.CancellationToken)
+                || Inference.Analyze(method, model, context.CancellationToken).Status != "Suggestion")
             {
                 continue;
             }
@@ -93,6 +116,11 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
 
             return Inference.IsCompilationError(d);
         }))
+        {
+            return document;
+        }
+
+        if (!CanEditAllMethodParts(document, method, model, cancellationToken))
         {
             return document;
         }
@@ -167,8 +195,245 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
             });
             solution = solution.WithDocumentSyntaxRoot(entry.Key, unformattedRoot);
         }
+        solution = await UpdateLinkedDocumentsAsync(document.Project.Solution, solution, originals.Keys, document.Id, method.Identifier.SpanStart, result.Signature, cancellationToken).ConfigureAwait(false)
+            ?? document.Project.Solution;
         return solution.GetDocument(document.Id)!;
 
+    }
+
+    private static async Task<Solution?> UpdateLinkedDocumentsAsync(Solution original, Solution changed,
+        IEnumerable<DocumentId> changedIds, DocumentId targetId, int targetPosition, string expectedSignature, CancellationToken cancellationToken)
+    {
+        if (original is null)
+        {
+            throw new ArgumentNullException(nameof(original));
+        }
+        if (changed is null)
+        {
+            throw new ArgumentNullException(nameof(changed));
+        }
+        if (changedIds is null)
+        {
+            throw new ArgumentNullException(nameof(changedIds));
+        }
+        if (targetId is null)
+        {
+            throw new ArgumentNullException(nameof(targetId));
+        }
+        if (expectedSignature is null)
+        {
+            throw new ArgumentNullException(nameof(expectedSignature));
+        }
+
+        var changedDocumentIds = new HashSet<DocumentId>(changedIds);
+        var linkedProjects = new HashSet<ProjectId>();
+        var targetDocument = original.GetDocument(targetId)!;
+        var targetText = await targetDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var changedId in changedDocumentIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var originalDocument = original.GetDocument(changedId)!;
+            if (originalDocument.FilePath is null)
+            {
+                continue;
+            }
+
+            var originalText = await originalDocument.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var changedText = await changed.GetDocument(changedId)!.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var linked in original.Projects.SelectMany(project =>
+            {
+                if (project is null)
+                {
+                    throw new ArgumentNullException(nameof(project));
+                }
+                return project.Documents;
+            }))
+            {
+                if (linked.Id == changedId || linked.FilePath != originalDocument.FilePath
+                    || changedDocumentIds.Contains(linked.Id))
+                {
+                    continue;
+                }
+
+                var linkedText = await linked.GetTextAsync(cancellationToken).ConfigureAwait(false);
+                if (!linkedText.ContentEquals(originalText))
+                {
+                    continue;
+                }
+
+                changed = changed.WithDocumentText(linked.Id, changedText);
+                linkedProjects.Add(linked.Project.Id);
+            }
+        }
+
+        foreach (var projectId in linkedProjects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Document? linkedTarget = null;
+            foreach (var candidate in original.GetProject(projectId)!.Documents)
+            {
+                if (candidate.FilePath != targetDocument.FilePath)
+                {
+                    continue;
+                }
+
+                var candidateText = await candidate.GetTextAsync(cancellationToken).ConfigureAwait(false);
+                if (candidateText.ContentEquals(targetText))
+                {
+                    linkedTarget = candidate;
+                    break;
+                }
+            }
+
+            if (linkedTarget is null)
+            {
+                return null;
+            }
+
+            var linkedRoot = await linkedTarget.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+            if (linkedRoot is null || !linkedRoot.FullSpan.Contains(targetPosition))
+            {
+                return null;
+            }
+
+            var linkedMethod = linkedRoot.FindToken(targetPosition).Parent?.FirstAncestorOrSelf<MethodDeclarationSyntax>();
+            if (linkedMethod?.Identifier.SpanStart != targetPosition)
+            {
+                return null;
+            }
+
+            var linkedModel = await linkedTarget.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            if (linkedModel is null || linkedModel.Compilation.GetDiagnostics(cancellationToken).Any(Inference.IsCompilationError)
+                || !CanEditAllMethodParts(linkedTarget, linkedMethod, linkedModel, cancellationToken))
+            {
+                return null;
+            }
+
+            var linkedResult = Inference.Analyze(linkedMethod, linkedModel, cancellationToken);
+            if (linkedResult.Status != "Suggestion" || linkedResult.Signature != expectedSignature)
+            {
+                return null;
+            }
+        }
+
+        var affectedProjects = new HashSet<ProjectId>(linkedProjects);
+        foreach (var changedId in changedDocumentIds)
+        {
+            affectedProjects.Add(changedId.ProjectId);
+        }
+
+        var dependents = new Dictionary<ProjectId, List<ProjectId>>();
+        foreach (var project in original.Projects)
+        {
+            foreach (var reference in project.ProjectReferences)
+            {
+                if (!dependents.TryGetValue(reference.ProjectId, out var referringProjects))
+                {
+                    referringProjects = new List<ProjectId>();
+                    dependents.Add(reference.ProjectId, referringProjects);
+                }
+
+                referringProjects.Add(project.Id);
+            }
+        }
+
+        var pending = new Queue<ProjectId>(affectedProjects);
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var projectId = pending.Dequeue();
+            if (!dependents.TryGetValue(projectId, out var referringProjects))
+            {
+                continue;
+            }
+
+            foreach (var referringId in referringProjects)
+            {
+                if (affectedProjects.Add(referringId))
+                {
+                    pending.Enqueue(referringId);
+                }
+            }
+        }
+
+        foreach (var projectId in affectedProjects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await HasNewCompilationErrorsAsync(original.GetProject(projectId)!, changed.GetProject(projectId)!,
+                cancellationToken).ConfigureAwait(false))
+            {
+                return null;
+            }
+        }
+
+        return changed;
+    }
+
+    private static async Task<bool> HasNewCompilationErrorsAsync(Project before, Project after, CancellationToken cancellationToken)
+    {
+        if (before is null)
+        {
+            throw new ArgumentNullException(nameof(before));
+        }
+        if (after is null)
+        {
+            throw new ArgumentNullException(nameof(after));
+        }
+
+        var beforeCompilation = await before.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+        var afterCompilation = await after.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+        if (beforeCompilation is null || afterCompilation is null)
+        {
+            return true;
+        }
+
+        (string Id, DocumentId? DocumentId, string Path, int Start, int Length, string Message) ErrorKey(Diagnostic diagnostic, Project project)
+        {
+            if (diagnostic is null)
+            {
+                throw new ArgumentNullException(nameof(diagnostic));
+            }
+            if (project is null)
+            {
+                throw new ArgumentNullException(nameof(project));
+            }
+
+            var tree = diagnostic.Location.SourceTree;
+            return (diagnostic.Id, tree is null ? null : project.GetDocument(tree)?.Id,
+                tree?.FilePath ?? string.Empty, diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length,
+                diagnostic.GetMessage(global::System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        var previousErrors = new Dictionary<(string Id, DocumentId? DocumentId, string Path, int Start, int Length, string Message), int>();
+        foreach (var diagnostic in beforeCompilation.GetDiagnostics(cancellationToken))
+        {
+            if (!Inference.IsCompilationError(diagnostic))
+            {
+                continue;
+            }
+
+            var key = ErrorKey(diagnostic, before);
+            previousErrors.TryGetValue(key, out var count);
+            previousErrors[key] = count + 1;
+        }
+
+        foreach (var diagnostic in afterCompilation.GetDiagnostics(cancellationToken))
+        {
+            if (!Inference.IsCompilationError(diagnostic))
+            {
+                continue;
+            }
+
+            var key = ErrorKey(diagnostic, after);
+            if (!previousErrors.TryGetValue(key, out var count) || count == 0)
+            {
+                return true;
+            }
+
+            previousErrors[key] = count - 1;
+        }
+
+        return false;
     }
 
     private sealed class SequentialFixAll : FixAllProvider

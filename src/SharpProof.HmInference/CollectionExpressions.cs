@@ -59,7 +59,7 @@ public static partial class Inference
             }
             return next.Count == nullableCollectionInputs.Count ? null : new Session(model, cancellationToken, nullableReadFlow,
                 nullableCollectionInputs: next, nullableInvocationResults: nullableInvocationResults,
-                nullableReceiverInputs: nullableReceiverInputs).Analyze(original, pins);
+                nullableReceiverInputs: nullableReceiverInputs, valueReceiverInputs: valueReceiverInputs).Analyze(original, pins);
         }
 
         private HmType OptionalCollectionElement(HmType collection, HmType element)

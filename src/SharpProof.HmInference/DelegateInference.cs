@@ -30,7 +30,8 @@ public static partial class Inference
                 return copy;
             }
             var nested = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs,
-                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs)
+                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs,
+                valueReceiverInputs: valueReceiverInputs)
             { currentMethod = currentMethod };
             foreach (var entry in environment)
             { nested.environment.Add(entry.Key, Copy(entry.Value)); }
@@ -263,9 +264,30 @@ public static partial class Inference
                 || !SymbolEqualityComparer.Default.Equals(declared.OriginalDefinition, called.ContainingType.OriginalDefinition))
             { return null; }
             var shape = ConversionCore(receiver);
-            var offset = shape.NestedTypeName is null ? 0 : 1;
-            if (shape.Arguments.Length - offset != declared.TypeArguments.Length)
+            if (!CSharpTypes.MapNamedArguments(declared, shape,
+                    new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default)))
             { return null; }
+            var ownerSlots = new Dictionary<ITypeParameterSymbol, (HmType Type, string Path)>(SymbolEqualityComparer.Default);
+            void MapOwnerSlots(INamedTypeSymbol owner, HmType ownerShape, string path)
+            {
+                if (owner is null)
+                { throw new ArgumentNullException(nameof(owner)); }
+                if (ownerShape is null)
+                { throw new ArgumentNullException(nameof(ownerShape)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                ownerShape = ConversionCore(ownerShape);
+                var offset = ownerShape.NestedTypeName is null ? 0 : 1;
+                for (var item = 0; item < owner.TypeArguments.Length; item++)
+                {
+                    var slot = item + offset;
+                    ownerSlots[owner.OriginalDefinition.TypeParameters[item]] =
+                        (ownerShape.Arguments[slot], path + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                if (ownerShape.NestedTypeName is not null && owner.ContainingType is { } enclosing)
+                { MapOwnerSlots(enclosing, ownerShape.Arguments[0], path + "/0"); }
+            }
+            MapOwnerSlots(declared, shape, "");
             var origins = new List<(int Parameter, string Path)>();
             void FindOrigin(HmType node, int parameter, string path)
             {
@@ -313,20 +335,19 @@ public static partial class Inference
                     var actualCore = actualRoot is null ? null : ConversionCore(actualRoot);
                     if (formal is ITypeParameterSymbol ownerParameter)
                     {
-                        if (!SymbolEqualityComparer.Default.Equals(ownerParameter.ContainingSymbol, called.ContainingType.OriginalDefinition)
+                        if (!ownerSlots.TryGetValue(ownerParameter, out var ownerSlot)
                             || ownerParameter.NullableAnnotation == NullableAnnotation.Annotated
                             || expectedRoot.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
                         { return; }
-                        var slot = ownerParameter.Ordinal + offset;
-                        if (slot >= shape.Arguments.Length || !expectedCore.IsVariable
-                            || !ReferenceEquals(expectedCore, ConversionCore(shape.Arguments[slot])))
+                        if (!expectedCore.IsVariable
+                            || !ReferenceEquals(expectedCore, ConversionCore(ownerSlot.Type)))
                         { return; }
                         var direct = actualRoot?.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference
                             && ReferenceEquals(actualCore, expectedCore);
                         if (typePath.Length != 0 || direct)
                         {
                             nullableReceiverCandidates.Add((invocation.Span, index, origin.Parameter,
-                                origin.Path + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture), typePath));
+                                origin.Path + ownerSlot.Path, typePath));
                         }
                         return;
                     }

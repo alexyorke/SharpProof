@@ -93,7 +93,8 @@ public static partial class Inference
 
         private bool NormalizeConstraintPass()
         {
-            var expanded = ResolveDependentConstraints();
+            var expanded = ResolveConcreteLowerBounds();
+            expanded |= ResolveDependentConstraints();
             expanded |= NormalizeConstraintNullability();
             foreach (var requirement in inferredConstraints)
             {
