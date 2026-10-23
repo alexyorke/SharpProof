@@ -116,6 +116,24 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
+### Boundary controls verified locally
+
+All 1852 selected worker cases passed after correcting two new fixture setups.
+The focused 39-case correction run established the actual emit-only diagnostic,
+intentional compiler-error inputs, emitted metadata reference ownership and
+canonical hash encoding. All 481 selected analyzer/resource/final-compilation,
+18 frontend/parity and 9 IR representation/lifetime cases passed. Together the ten
+new fixtures add 102 real boundary cases; none changes production proof behavior.
+The initial IR reference-kind assertion and erroneous property recovery premise
+were corrected or removed rather than changing production code to fit them.
+
+Final formatting, lint/API compatibility and layout passed with the fixtures
+and complete audit links (2963 source files, 62 projects, 151 pinned common
+files). The 102 cases
+have no qualified coverage count yet. The 147-line baseline and its source audit
+remain explicit until a fresh report replaces them. Exact-head hosted
+qualification and the unchanged 100% floor still prevent overall completion.
+
 ### Fresh qualification and remaining coverage work
 
 Published head `ca3b70301` is mergeable against master `70fba9efe`. Its hosted
@@ -129,13 +147,17 @@ Canonical worker, projects, corpus, shard, build, formatting, self-application,
 samples, API coverage and repository-security jobs passed. Package reproduction
 failed before byte comparison: the new optional Tool phase skipped restore and
 build even though the Tool lies outside the catalog product build closure. A
-canonical independent exact-source clone reproduced NETSDK1004 for its missing
+canonical independent exact-source clone reproduced SDK error 1004 for its missing
 assets file. The fix adds locked restore/build prerequisites for every optional
 package and keeps the independent clones, exact identities and all comparisons.
 All 32 shared command-plan/diagnostic controls passed. A real independent
 exact-source clone then restored, built and packed all three optional packages,
 with 55 product payloads and matching source identities. Full two-clone
-reproduction still requires renewed qualification of the committed fix.
+reproduction then passed for committed fix `04c67d3c8`: 50 managed DLL/PDB
+entries and 60 optional product payloads matched. Raw package ZIP bytes differed;
+the SDK 10 gate reports that separately and does not treat payload equality as
+archive equality. Evidence is retained in
+`artifacts/resource-04c-reproducibility-evidence/report.json`.
 
 The ten-agent gap audit uses the 147 exact uncovered lines as its universe.
 Reachable compiler, representation, ownership and publication boundaries receive
@@ -143,6 +165,8 @@ behavior-focused controls. Checks dominated by validated constructors, immutable
 emission or earlier proof admission are recorded with their causal prerequisites;
 no invalid private state is fabricated and no coverage exclusion or floor changes.
 Further tests and their coverage effect remain unqualified until verification.
+The [coverage admission audit](resource-coverage-admission-audit.md) partitions
+all 147 units and separates invariant findings from unresolved reachability.
 
 ### Current master integration in progress
 
