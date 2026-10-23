@@ -109,6 +109,22 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Published assignment-repair coverage checkpoint
+
+Coverage run 39896297981 completed all 15 shards successfully for published
+head `d48d6a218`. Aggregate job 120231000477 failed the unchanged 100%
+changed-TCB floor: 7,148/7,283 lines, 98.15%, with 135 uncovered lines. The
+complete report is retained at
+`artifacts/resource-d48d-coverage-evidence/coverage/SharpProof.coverage.json`.
+Verified merge `bc7104925448481d5596cfcb371a6f817b8cc9f4` has parents the
+recorded master base and `d48d6a218`. The production repair changed the coverage
+universe; raw gap counts are not a same-source comparison with its predecessor.
+
+The queued null-field controls (`cfb13f234`) and subsequent field-store identity
+repair (`b0073b093`) are not measured by this report. Canonical CI (39896298085)
+passed. Package consumers (39896298027) remain live at this checkpoint. Coverage
+closure, full runtime-byte composition and final audit remain required.
+
 ### Field-store observation identity repair
 
 Two additional field-store observation controls reproduced missing identity
