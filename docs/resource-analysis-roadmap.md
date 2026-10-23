@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Null-field replay compatibility controls
+
+Three additional interpreter/replay controls check fields after the identity
+repair. An explicit null store returns null with 24 cumulative/peak auxiliary
+bytes and zero retained bytes. Allocating a 32-byte child, storing it and then
+clearing the field yields 56 cumulative/peak auxiliary bytes and zero retained
+bytes. Both supported paths execute normally and retain their exact bounds.
+
+The concrete interpreter does not supply an uninitialized reference field's
+value. That control stops as Unsupported and replay returns
+`MemoryReplayIncomplete` with no bounds. The identity resolver's ability to
+recognize a fresh null field does not make this interpreter path supported.
+The initial probe's normal-return expectation failed for this case; the evidence
+is retained in `artifacts/resource-null-field-alias-tests.log` and the test now
+asserts the actual unsupported boundary explicitly.
+
+All 239 memory trace/replay/graph tests passed in
+`artifacts/resource-null-field-alias-corrected-tests.log`. Formatting copied zero
+changes (`artifacts/resource-null-field-alias-final-format.log`). Lint/API and documentation checks passed. This checkpoint
+adds tests only; the production repair remains `d48d6a218`. Its canonical,
+package and coverage workflows are still running and are not claimed as passed.
+The full runtime-byte model, proof-policy choice, 100% changed-TCB coverage and
+final audit remain open.
+
 ### Replay reference-assignment identity repair
 
 A new replay control reproduced an incorrect lifetime result without a field

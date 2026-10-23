@@ -349,6 +349,51 @@ public sealed class ResourceMemoryReplayTests
         }
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void FreshAndClearedFieldReadsRespectReplaySupport(int stores)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
+        factory.RegisterClosedClassReferenceType(node, null);
+        factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, IrFieldSites.Prefix + "child", array, false);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", node);
+        var alias = factory.CreateVariable("alias", array);
+        builder.Allocate(entry, factory.CreateOperation(), node, root);
+        var receiver = factory.Cast(factory.ObjectType, factory.Variable(root));
+        if (stores == 2)
+        {
+            var child = factory.CreateVariable("child", array);
+            builder.Allocate(entry, factory.CreateOperation(), array, child, factory.Integer(1));
+            builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, factory.Variable(child));
+        }
+        if (stores > 0)
+        { builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, factory.Null(array)); }
+        builder.Assign(entry, factory.CreateOperation(), alias, factory.PureOpaque(field, receiver));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(alias));
+        var program = builder.Build();
+        if (stores == 0)
+        {
+            var replay = new ResourceMemoryReplay(program);
+            var options = new IrProgramReplayOptions(static _ => null) { CompletedInstructionObserver = replay.Observe };
+            var execution = new IrProgramInterpreter(factory).Execute(program, null, 10000, options, TestContext.CurrentContext.CancellationToken);
+            Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+            var incomplete = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
+            Assert.That(incomplete.Bounds, Is.Null);
+            Assert.That(incomplete.UnknownReason, Is.EqualTo("MemoryReplayIncomplete"));
+            return;
+        }
+        var observed = Replay(program, Layout);
+        var bytes = stores == 2 ? 56 : 24;
+        Assert.That(observed.UnknownReason, Is.Null);
+        Assert.That(observed.Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, bytes, bytes, 0, 0)));
+    }
+
     [TestCase(false, false)]
     [TestCase(false, true)]
     [TestCase(true, false)]
