@@ -3,6 +3,9 @@ param(
     [Parameter(Mandatory)][string]$ConsumerImage,
     [string]$PackageSource = '',
     [string]$ToolPackageSource = '',
+    [string]$PreparedCodeFixesSource = '',
+    [string]$DeveloperHarness = '',
+    [ValidateNotNullOrEmpty()][string]$BuildTarget = 'SharpProof.slnx',
     [ValidateSet('AnalyzerEnabled', 'FeedbackOnly')][string]$QualificationMode = 'AnalyzerEnabled',
     [switch]$PackOnly
 )
@@ -11,7 +14,16 @@ Set-StrictMode -Version Latest
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
 Assert-SharpProofContainer 'Developer-experience qualification requires the canonical container.'
+$preparedDeveloperBuild = -not [string]::IsNullOrWhiteSpace($PreparedCodeFixesSource) -or
+-not [string]::IsNullOrWhiteSpace($DeveloperHarness)
+if ($preparedDeveloperBuild -and
+    ([string]::IsNullOrWhiteSpace($PreparedCodeFixesSource) -or [string]::IsNullOrWhiteSpace($DeveloperHarness) -or
+    [string]::IsNullOrWhiteSpace($PackageSource) -or [string]::IsNullOrWhiteSpace($ToolPackageSource) -or
+    $QualificationMode -cne 'AnalyzerEnabled' -or $PackOnly)) {
+    throw 'Prepared developer qualification requires all exact producer inputs, normal analyzers, and the complete qualification.'
+}
 if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$') {
     throw 'Supply the exact qualified consumer-image digest.'
 }
@@ -30,6 +42,7 @@ $startedAt = [DateTimeOffset]::UtcNow.ToString('O')
 $status = 'failed'
 $toolPackageMode = if ([string]::IsNullOrWhiteSpace($ToolPackageSource)) { 'packed-in-run' } else { 'qualified-artifact' }
 $qualifiedToolSha256 = $null
+$qualifiedCodeFixesSha256 = $null
 $fixtureRoot = $null
 $previousDeveloperNugetPackages = $env:NUGET_PACKAGES
 function Run([string]$Name, [string]$Executable, [string[]]$Arguments, [int]$Expected = 0) {
@@ -73,12 +86,12 @@ function Save-Reports([string]$Source, [string]$Phase) {
     }
 }
 try {
-    # The caller builds the solution, including the internal analyzer, first.
-    if (-not $PackOnly) {
+    # The caller builds the selected product and test closure, including the internal analyzer, first.
+    if (-not $PackOnly -and -not $preparedDeveloperBuild) {
         Run 'developer-unit-tests' 'dotnet' @('test', 'src/SharpProof.DeveloperExperience.Tests/SharpProof.DeveloperExperience.Tests.csproj', '-c', 'Release', '--no-build', '--no-restore')
     }
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-        Run 'pack-product' 'dotnet' @('pack', 'SharpProof.slnx', '-c', 'Release', '--no-build', '--no-restore', '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit")
+        Run 'pack-product' 'dotnet' @('pack', $BuildTarget, '-c', 'Release', '--no-build', '--no-restore', '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit")
     }
     else {
         & (Join-Path $PSScriptRoot 'Test-SharpProofPackageConsumers.ps1') -PackageSource $PackageSource -ValidatePackageSourceOnly
@@ -100,7 +113,25 @@ try {
         $qualifiedToolSha256 = (Get-FileHash -LiteralPath $toolArchives[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         Copy-Item -LiteralPath $toolArchives[0].FullName -Destination $feed
     }
-    $developerPackages = if ($toolPackageMode -eq 'qualified-artifact') { @('CodeFixes', 'Templates') } else { @('Tool', 'CodeFixes', 'Templates') }
+    if ($preparedDeveloperBuild) {
+        $editor = Get-SharpProofPreparedCodeFixesPackage -PackageSource $PreparedCodeFixesSource `
+            -PackageVersion $version -RepositoryCommit $sourceCommit
+        $qualifiedCodeFixesSha256 = $editor.Sha256
+        Copy-Item -LiteralPath $editor.Path -Destination $feed
+        # The receipt binds all seven existing archives before any supplied
+        # test assembly is loaded. Templates are packed below with this job's
+        # actual consumer-image digest and retain their complete regressions.
+        Run 'developer-unit-tests' 'pwsh' @('-NoLogo', '-NoProfile', '-File',
+            (Join-Path $PSScriptRoot 'Invoke-SharpProofDeveloperHarnessTests.ps1'),
+            '-HarnessRoot', $DeveloperHarness, '-PackageSource', $feed,
+            '-ResultsDirectory', (Join-Path $evidenceRoot 'developer-unit-tests'))
+        Run 'restore-Templates' 'dotnet' @('restore', 'src/SharpProof.Templates/SharpProof.Templates.csproj',
+            '--locked-mode', '-p:Configuration=Release')
+        $developerPackages = @('Templates')
+    }
+    else {
+        $developerPackages = if ($toolPackageMode -eq 'qualified-artifact') { @('CodeFixes', 'Templates') } else { @('Tool', 'CodeFixes', 'Templates') }
+    }
     foreach ($name in $developerPackages) {
         Run "pack-$name" 'dotnet' @('pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release', '--no-build', '--no-restore',
             '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit", '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true', "-p:SharpProofConsumerImage=$ConsumerImage")
@@ -115,6 +146,9 @@ try {
         $hash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($name -ceq 'SharpProof.Tool' -and $toolPackageMode -eq 'qualified-artifact' -and $hash -cne $qualifiedToolSha256) {
             throw 'The installed tool archive does not match the supplied qualified bytes.'
+        }
+        if ($name -ceq 'SharpProof.CodeFixes' -and $preparedDeveloperBuild -and $hash -cne $qualifiedCodeFixesSha256) {
+            throw 'The installed editor archive does not match the supplied qualified bytes.'
         }
         $packageEvidence.Add([ordered]@{ id = $name; version = $version; repositoryCommit = $sourceCommit; fileName = [IO.Path]::GetFileName($packagePath); sha256 = $hash })
     }
@@ -287,6 +321,8 @@ finally {
         consumerImage              = $ConsumerImage
         toolPackageMode            = $toolPackageMode
         qualifiedToolSha256        = $qualifiedToolSha256
+        developerBuildMode         = if ($preparedDeveloperBuild) { 'qualified-artifact' } else { 'built-in-run' }
+        qualifiedCodeFixesSha256   = $qualifiedCodeFixesSha256
         startedAtUtc               = $startedAt
         finishedAtUtc              = [DateTimeOffset]::UtcNow.ToString('O')
         phaseCount                 = $timings.Count

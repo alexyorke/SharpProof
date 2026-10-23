@@ -12,7 +12,10 @@ param(
 
     [Parameter()]
     [ValidateRange(0, 1000000)]
-    [int]$RetainedCases
+    [int]$RetainedCases,
+
+    [Parameter()]
+    [Collections.IDictionary]$PreparedRunnerReceipt
 )
 
 Set-StrictMode -Version Latest
@@ -22,6 +25,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.FuzzEvidenceLifecycle.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.FuzzRunnerBuild.ps1')
 Import-Module (Join-Path `
         $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $resolvedOutput = Resolve-SharpProofContainedPath `
@@ -80,15 +84,25 @@ try {
     $fuzzProject = Join-Path `
         $repositoryRoot 'src\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
 
-    $buildArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-            'build', $fuzzProject, '-c', 'Release', '--no-restore', '--no-incremental', '--nologo'))
-    $buildProcess = Start-SharpProofEncodedPowerShell `
-        -WrapperPath $dotnetWrapper `
-        -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
-        -WorkingDirectory $repositoryRoot `
-        -ImmutableArguments $buildArguments
-    if ($buildProcess.ExitCode -ne 0) {
-        throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
+    if ($PSBoundParameters.ContainsKey('PreparedRunnerReceipt')) {
+        if ($null -eq $PreparedRunnerReceipt) {
+            throw 'A prepared fuzz runner requires its same-workspace build receipt.'
+        }
+        Assert-SharpProofFuzzRunnerBuildReceipt -RepositoryRoot $repositoryRoot `
+            -SourceCommit $sourceCommit -Receipt $PreparedRunnerReceipt
+        Write-Host 'Fuzz runner: validated the fresh normal build in this private workspace.'
+    }
+    else {
+        $buildArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                'build', $fuzzProject, '-c', 'Release', '--no-restore', '--no-incremental', '--nologo'))
+        $buildProcess = Start-SharpProofEncodedPowerShell `
+            -WrapperPath $dotnetWrapper `
+            -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
+            -WorkingDirectory $repositoryRoot `
+            -ImmutableArguments $buildArguments
+        if ($buildProcess.ExitCode -ne 0) {
+            throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
+        }
     }
     $builtCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
@@ -195,6 +209,10 @@ try {
         -RepositoryRoot $repositoryRoot
     if ($completedCommit -cne $sourceCommit) {
         throw 'Fuzz source changed during the campaign.'
+    }
+    if ($null -ne $PreparedRunnerReceipt) {
+        Assert-SharpProofFuzzRunnerBuildReceipt -RepositoryRoot $repositoryRoot `
+            -SourceCommit $sourceCommit -Receipt $PreparedRunnerReceipt
     }
     $runSnapshot = $runs.ToImmutable()
     $failedRuns = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($runSnapshot | Where-Object {

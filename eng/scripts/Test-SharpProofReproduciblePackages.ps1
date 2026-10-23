@@ -5,7 +5,15 @@ param(
     [ValidateRange(60, 7200)][int]$CommandTimeoutSeconds = 2100,
     [switch]$RequirePackageBytes,
     [switch]$IncludeDeveloperPackages,
-    [string]$DeveloperConsumerImage = ''
+    [string]$DeveloperConsumerImage = '',
+    [ValidateSet('Sequential', 'Build', 'Compare')][string]$ExecutionMode = 'Sequential',
+    [ValidateRange(-1, 1)][int]$RunIndex = -1,
+    [string]$WorkflowRunId = '',
+    [ValidateRange(0, 2147483647)][int]$WorkflowRunAttempt = 0,
+    [string]$FirstRunDirectory = '',
+    [string]$SecondRunDirectory = '',
+    [ValidateRange(0, 2147483647)][int]$FirstRunAttempt = 0,
+    [ValidateRange(0, 2147483647)][int]$SecondRunAttempt = 0
 )
 
 Set-StrictMode -Version Latest
@@ -19,6 +27,14 @@ if ($IncludeDeveloperPackages -and ($Scope -ne 'Full' -or $DeveloperConsumerImag
     throw 'Optional package reproduction requires Full scope and an explicit fixture consumer-image digest.'
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReproductionEvidence.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+$executionPlan = Get-SharpProofReproductionExecutionPlan -ExecutionMode $ExecutionMode -Scope $Scope `
+    -IncludeDeveloperPackages:$IncludeDeveloperPackages -RunIndex $RunIndex -WorkflowRunId $WorkflowRunId `
+    -WorkflowRunAttempt $WorkflowRunAttempt -FirstRunDirectory $FirstRunDirectory -SecondRunDirectory $SecondRunDirectory `
+    -FirstRunAttempt $FirstRunAttempt -SecondRunAttempt $SecondRunAttempt
+$FirstRunAttempt = $executionPlan.FirstRunAttempt
+$SecondRunAttempt = $executionPlan.SecondRunAttempt
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $commit = (& git -C $repository rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Cannot identify the exact source commit.' }
@@ -35,6 +51,8 @@ $clones = [Collections.Immutable.ImmutableArray]::Create[string]((Join-Path $tem
 $sdk = [string](Get-Content (Join-Path $repository 'global.json') -Raw | ConvertFrom-Json).sdk.version
 [xml]$versions = Get-Content -LiteralPath (Join-Path $repository 'eng/Versions.props') -Raw
 $packageVersion = ([string]$versions.Project.PropertyGroup.SharpProofPackageVersion).Replace('$(SharpProofVersionPrefix)', [string]$versions.Project.PropertyGroup.SharpProofVersionPrefix)
+$sourceTree = (& git -C $repository rev-parse 'HEAD^{tree}').Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceTree -cnotmatch '\A[a-f0-9]{40}\z') { throw 'Cannot identify the exact source tree.' }
 $report = [ordered]@{
     schemaVersion = 1; sourceCommit = $commit; scope = $Scope; sdkVersion = $sdk
     configuration = 'Release'; continuousIntegrationBuild = $true
@@ -169,20 +187,37 @@ function Get-PackedPayloads([string]$Clone) {
     return , ([ordered]@{ Payloads = $hashes.ToImmutable(); Archives = $archives.ToImmutable() }).AsReadOnly()
 }
 
+function Assert-ReproductionClone([string]$Clone, [switch]$Fresh) {
+    $cloneHead = (& git -C $Clone rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $cloneHead -cne $commit) { throw 'An independent clone changed its exact source commit.' }
+    $common = (& git -C $Clone rev-parse --path-format=absolute --git-common-dir).Trim()
+    if ($LASTEXITCODE -ne 0 -or $common -cne ($Clone + '/.git')) { throw 'An independent clone shares Git metadata outside its private checkout.' }
+    if ([IO.File]::Exists((Join-Path $common 'objects/info/alternates'))) { throw 'An independent clone still borrows Git object storage.' }
+    $cloneDirty = (& git -C $Clone status --porcelain --untracked-files=all | Out-String)
+    if ($LASTEXITCODE -ne 0 -or -not [string]::IsNullOrWhiteSpace($cloneDirty)) { throw 'An independent clone changed its source inputs.' }
+    if ($Fresh -and ([IO.Directory]::Exists((Join-Path $Clone 'artifacts/bin')) -or [IO.Directory]::Exists((Join-Path $Clone 'artifacts/obj')))) {
+        throw 'An independent clone already contains compiler output.'
+    }
+    return $common
+}
+
 try {
     $report.nativeInputs = Get-NativeInputReceipt
     if ($report.nativeInputs.Length -eq 0) { throw 'The canonical native payload input set is empty.' }
     $runs = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     $developerRuns = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
-    for ($index = 0; $index -lt 2; $index++) {
+    foreach ($index in $executionPlan.Indices) {
         $clone = $clones[$index]
         [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($clone)) | Out-Null
-        & git -c core.autocrlf=false clone --quiet --no-hardlinks --no-checkout $repository $clone
+        $cloneArguments = Get-SharpProofReproductionCloneArguments -Repository $repository -Clone $clone -Isolated:($ExecutionMode -eq 'Build')
+        [string[]]$nativeCloneArguments = @($cloneArguments)
+        & git @nativeCloneArguments
         if ($LASTEXITCODE -ne 0) { throw 'Creating an independent local source clone failed.' }
         & git -C $clone remote set-url origin $report.origin
         if ($LASTEXITCODE -ne 0) { throw 'Setting the canonical Source Link origin failed.' }
         & git -C $clone -c core.autocrlf=false checkout --quiet --detach $commit
         if ($LASTEXITCODE -ne 0 -or (& git -C $clone rev-parse HEAD).Trim() -cne $commit) { throw 'The independent clone did not select the exact source commit.' }
+        if ($ExecutionMode -eq 'Build') { $cloneCommon = Assert-ReproductionClone -Clone $clone -Fresh }
         $runSdk = (Invoke-ReproCommand dotnet ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('--version'))) $clone "run-$index-sdk").Trim()
         if ($runSdk -cne $sdk) { throw 'An independent workspace selected a different SDK.' }
         if ($Scope -eq 'Full') {
@@ -218,6 +253,75 @@ try {
                         (Join-Path $clone 'eng/scripts/Export-SharpProofEmbeddedSymbols.ps1'), '-RepositoryRoot', $clone, '-Configuration', 'Release'))) $clone "run-$index-export-symbols"
             $runs.Add(([ordered]@{ payloads = (Get-RepresentativePayloads $clone); archives = $null }).AsReadOnly())
         }
+        if ($ExecutionMode -eq 'Build') {
+            if ((Assert-ReproductionClone -Clone $clone) -cne $cloneCommon) { throw 'The independent clone changed its Git isolation.' }
+            $nativeAfter = Get-NativeInputReceipt
+            $harness = Join-Path $clone 'artifacts/consumer-harness'
+            $harnessReceipt = Join-Path $harness 'receipt.json'
+            $harnessFiles = @(Get-ChildItem -LiteralPath (Join-Path $harness 'payload') -Recurse -File)
+            $logHashes = [ordered]@{}
+            foreach ($name in (Get-SharpProofReproductionLogNames -RunIndex $index)) {
+                $logHashes[$name] = (Get-FileHash -LiteralPath (Join-Path $output $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            $receipt = ([ordered]@{
+                    schemaVersion = 1; runIndex = $index; workflowRunId = $WorkflowRunId; workflowRunAttempt = $WorkflowRunAttempt
+                    sourceCommit = $commit; sourceTree = $sourceTree; scope = 'Full'; sdkVersion = $sdk; configuration = 'Release'
+                    continuousIntegrationBuild = $true; origin = $report.origin; toolchainCatalogSha256 = $report.toolchainCatalogSha256
+                    packageVersion = $packageVersion; developerConsumerImage = $DeveloperConsumerImage; workspacePath = $clone
+                    cloneRelativePath = $(if ($index -eq 0) { 'a' } else { 'independent longer path/checkout-b' })
+                    gitCommonDirectory = $cloneCommon; freshClone = $true; analyzersEnabled = $true
+                    core              = $runs[0]
+                    developer         = ([ordered]@{ payloads = $developerRuns[0].Payloads; archives = $developerRuns[0].Archives }).AsReadOnly()
+                    nativeInputsBefore = $report.nativeInputs; nativeInputsAfter = $nativeAfter
+                    consumerHarness   = ([ordered]@{
+                            receiptSha256 = (Get-FileHash -LiteralPath $harnessReceipt -Algorithm SHA256).Hash.ToLowerInvariant()
+                            payloadFileCount = $harnessFiles.Count; payloadBytes = [long]($harnessFiles | Measure-Object -Property Length -Sum).Sum
+                        }).AsReadOnly()
+                    logs              = $logHashes.AsReadOnly()
+                }).AsReadOnly()
+            $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $output "run-$index-receipt.json") -Encoding utf8NoBOM
+            $null = Read-SharpProofReproductionRunEvidence -Directory $output -RunIndex $index -SourceCommit $commit -SourceTree $sourceTree `
+                -WorkflowRunId $WorkflowRunId -ProducerAttempt $WorkflowRunAttempt -SdkVersion $sdk `
+                -ToolchainCatalogSha256 $report.toolchainCatalogSha256 -PackageVersion $packageVersion `
+                -DeveloperConsumerImage $DeveloperConsumerImage -NativeInputs $nativeAfter
+        }
+    }
+    if ($ExecutionMode -eq 'Build') {
+        $sourceHead = (& git -C $repository rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or $sourceHead -cne $commit) { throw 'The source checkout changed during the reproduction experiment.' }
+        $report.runs = $runs.ToImmutable()
+        Write-Host "Independent reproduction run $RunIndex completed with all normal build, package, native, and harness checks."
+        return
+    }
+    if ($ExecutionMode -eq 'Compare') {
+        $directories = @($FirstRunDirectory, $SecondRunDirectory)
+        $attempts = @($FirstRunAttempt, $SecondRunAttempt)
+        $evidence = [Collections.Generic.List[object]]::new()
+        for ($index = 0; $index -lt 2; $index++) {
+            $inputDirectory = Resolve-SharpProofContainedPath -Root $repository -Path $directories[$index] -ParameterName 'Reproduction run input'
+            $item = Read-SharpProofReproductionRunEvidence -Directory $inputDirectory -RunIndex $index -SourceCommit $commit -SourceTree $sourceTree `
+                -WorkflowRunId $WorkflowRunId -ProducerAttempt $attempts[$index] -SdkVersion $sdk `
+                -ToolchainCatalogSha256 $report.toolchainCatalogSha256 -PackageVersion $packageVersion `
+                -DeveloperConsumerImage $DeveloperConsumerImage -NativeInputs $report.nativeInputs
+            $evidence.Add($item)
+            $runs.Add($item.Core)
+            $developerRuns.Add($item.Developer)
+        }
+        if ($evidence[0].Receipt.workspacePath -ceq $evidence[1].Receipt.workspacePath -or
+            $evidence[0].Receipt.gitCommonDirectory -ceq $evidence[1].Receipt.gitCommonDirectory) {
+            throw 'Reproduction runs do not have distinct independent checkouts.'
+        }
+        foreach ($item in $evidence) { Copy-SharpProofReproductionRunLogs -Evidence $item -OutputDirectory $output }
+        $report.workspacePaths = [Collections.Immutable.ImmutableArray]::Create[string](
+            $evidence[0].Receipt.workspacePath, $evidence[1].Receipt.workspacePath)
+        $report['workflowRunId'] = $WorkflowRunId
+        $report['comparisonAttempt'] = $WorkflowRunAttempt
+        $report['runEvidence'] = @($evidence | ForEach-Object {
+                ([ordered]@{
+                    runIndex = $_.Receipt.runIndex; producerAttempt = $_.Receipt.workflowRunAttempt; receiptSha256 = $_.ReceiptSha256
+                    sourceTree = $_.Receipt.sourceTree; workspacePath = $_.Receipt.workspacePath; consumerHarness = $_.Receipt.consumerHarness
+                }).AsReadOnly()
+            })
     }
     $mismatches = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $keyBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -273,7 +377,8 @@ try {
 }
 finally {
     $reportSnapshot = $report.AsReadOnly()
-    $reportSnapshot | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $output 'report.json') -Encoding utf8NoBOM
+    $reportName = if ($ExecutionMode -eq 'Build') { "run-$RunIndex-diagnostics.json" } else { 'report.json' }
+    $reportSnapshot | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $output $reportName) -Encoding utf8NoBOM
     $fullTemporary = [IO.Path]::GetFullPath($temporary)
     if (-not $fullTemporary.StartsWith($parent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal) -or
         [IO.Path]::GetFileName($fullTemporary) -notlike 'sharpproof-repro-*') { throw 'Refusing to remove an unexpected reproducibility workspace.' }
