@@ -8,6 +8,11 @@ namespace SharpProof.Tool.Test;
 [TestFixture]
 public sealed class ExtendedCommandRoutingTests
 {
+    [TestCase("doctor positional", "Expected a named --option")]
+    [TestCase("compare --", "Expected a named --option")]
+    [TestCase("compare --baseline --current <missing>", "Missing value for --baseline")]
+    [TestCase("compare --baseline <missing> --current <missing> --fail-on-regression --fail-on-regression", "Duplicate option --fail-on-regression")]
+    [TestCase("export-test", "Required option --project")]
     [TestCase("doctor --verification portable", "Required option --project")]
     [TestCase("doctor --verification portable --project", "Missing value for --project")]
     [TestCase("doctor --json --project <missing>", "Missing value for --json")]
@@ -95,6 +100,52 @@ public sealed class ExtendedCommandRoutingTests
         Assert.That(error.ToString(), Is.Empty);
     }
 
+    [TestCase("")]
+    [TestCase("--help")]
+    [TestCase("-h")]
+    public async Task DeveloperHelpDocumentsEvidenceInputsAndExitPolicy(string command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        Assert.That(await DeveloperCommands.RunAsync(command.Length == 0 ? [] : [command], output, error,
+            TestContext.CurrentContext.CancellationToken), Is.Zero);
+        Assert.That(error.ToString(), Is.Empty);
+        Assert.That(output.ToString(), Does.Contain("doctor --project").And.Contain("explain --result")
+            .And.Contain("compare --baseline").And.Contain("export-test --project")
+            .And.Contain("--baseline-request").And.Contain("--baseline-compiler-manifest")
+            .And.Contain("1 setup/regression failure").And.Contain("2 invalid arguments/evidence"));
+    }
+
+    [Test]
+    public async Task UnknownDeveloperCommandReturnsAnActionableArgumentFailure()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        Assert.That(await DeveloperCommands.RunAsync(["prove"], output, error,
+            TestContext.CurrentContext.CancellationToken), Is.EqualTo(2));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Does.Contain("Unknown command. Run sharpproof --help."));
+    }
+
+    [TestCase("args")]
+    [TestCase("output")]
+    [TestCase("error")]
+    public void MissingCommandDependenciesFailBeforeDispatch(string missing)
+    {
+        ArgumentNullException.ThrowIfNull(missing);
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        var failure = Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+        {
+            _ = await DeveloperCommands.RunAsync(missing == "args" ? null! : ["--help"],
+                missing == "output" ? null! : output, missing == "error" ? null! : error,
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(failure!.ParamName, Is.EqualTo(missing));
+        Assert.That(output.ToString(), Is.Empty);
+        Assert.That(error.ToString(), Is.Empty);
+    }
     private static ImmutableArray<string> Arguments(string command)
     {
         ArgumentNullException.ThrowIfNull(command);

@@ -132,6 +132,12 @@ public sealed class FinalCompilationProbeTests
             workspace.PackedProbeArtifactPath);
         var firstManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
+        var firstCompilation = CompilerManifestArtifactJson.Deserialize(
+            Encoding.UTF8.GetString(firstManifest.Bytes.AsSpan()),
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var firstResponse = IsSupportedWorkerHost
+            ? WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(workspace.VerifyResultPath))
+            : null;
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -157,6 +163,20 @@ public sealed class FinalCompilationProbeTests
             noOpOracle.GetTreeChecksum(
                 CompilerProbeContract.ContractHintName),
             Is.EqualTo(firstGeneratedChecksum));
+        if (IsSupportedWorkerHost)
+        {
+            var baselineResponse = firstResponse ?? throw new InvalidOperationException("The first worker response was not published.");
+            var noOpResponse = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(baselineResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+                Assert.That(noOpResponse.InputHash, Is.EqualTo(baselineResponse.InputHash));
+                Assert.That(noOpResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+                Assert.That(noOpResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+                Assert.That(noOpResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            }
+        }
 
         workspace.WriteProbeInput("changed-generator-input");
         var changed = await workspace.RebuildAsync();
@@ -165,6 +185,9 @@ public sealed class FinalCompilationProbeTests
             workspace.PackedProbeArtifactPath);
         var changedManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
+        var changedCompilation = CompilerManifestArtifactJson.Deserialize(
+            Encoding.UTF8.GetString(changedManifest.Bytes.AsSpan()),
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -182,12 +205,48 @@ public sealed class FinalCompilationProbeTests
                 Has.Some.EndsWith(CompilerProbeContract.ContractHintName));
             Assert.That(
                 changedManifest.ArtifactSha256,
-                Is.EqualTo(firstManifest.ArtifactSha256),
-                "Changing unrelated generated constants preserves the selected semantic artifact.");
+                Is.Not.EqualTo(firstManifest.ArtifactSha256),
+                "The retained final-compilation snapshot includes changed generated source bytes.");
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.Compilation.SyntaxTrees, WorkerProtocolJson.Options),
+                Is.Not.EqualTo(JsonSerializer.Serialize(firstCompilation.Compilation.SyntaxTrees, WorkerProtocolJson.Options)));
+            Assert.That(changedCompilation.Compilation.References, Is.Not.Empty);
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.Manifest, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.Manifest, WorkerProtocolJson.Options)),
+                "Unrelated generated constants must preserve every callable and claim identity.");
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.Callables, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.Callables, WorkerProtocolJson.Options)),
+                "Unrelated generated constants must preserve selected callable IR.");
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.ReachableSource, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.ReachableSource, WorkerProtocolJson.Options)),
+                "Unrelated generated constants must preserve reachable source IR.");
         }
         if (IsSupportedWorkerHost)
         {
+            var baselineResponse = firstResponse ?? throw new InvalidOperationException("The first worker response was not published.");
+            var changedResponse = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(changedResponse.InputHash, Is.Not.EqualTo(baselineResponse.InputHash));
+                Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+                Assert.That(baselineResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+                Assert.That(changedResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+                Assert.That(baselineResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(changedResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(changedResponse.ClaimResults.Single().ClaimId, Is.EqualTo(baselineResponse.ClaimResults.Single().ClaimId));
+                Assert.That(changedResponse.CallableResults, Is.Not.Empty);
+                Assert.That(
+                    JsonSerializer.Serialize(changedResponse.CallableResults, WorkerProtocolJson.Options),
+                    Is.EqualTo(JsonSerializer.Serialize(baselineResponse.CallableResults, WorkerProtocolJson.Options)),
+                    "All callable response identities and coverage must remain stable.");
+            }
             var verification = await workspace.VerifyPackedArtifactAsync();
+            var replayResponse = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -197,6 +256,12 @@ public sealed class FinalCompilationProbeTests
                 Assert.That(
                     verification.Output,
                     Does.Contain("SharpProof Proven"));
+                Assert.That(await File.ReadAllBytesAsync(workspace.CompilerManifestPath), Is.EqualTo(changedManifest.Bytes));
+                Assert.That(replayResponse.InputHash, Is.EqualTo(changedResponse.InputHash));
+                Assert.That(replayResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+                Assert.That(replayResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+                Assert.That(replayResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(replayResponse.ClaimResults.Single().ClaimId, Is.EqualTo(changedResponse.ClaimResults.Single().ClaimId));
             }
         }
     }

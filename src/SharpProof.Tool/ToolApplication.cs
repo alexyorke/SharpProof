@@ -50,10 +50,6 @@ internal static class ToolApplication
             }
             if (args[0] == "doctor")
             {
-                if (args.Length > 2 || args.Length == 2 && args[1] != "--json")
-                {
-                    throw new ArgumentException("doctor accepts only --json.");
-                }
                 var sdk = await discoverSdk(cancellationToken).ConfigureAwait(false);
                 var report = new
                 {

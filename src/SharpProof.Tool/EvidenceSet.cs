@@ -73,12 +73,24 @@ internal sealed class EvidenceSet
         }
 
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (stream.Length != info.Length)
+        return ReadBounded(stream, checked((int)info.Length), maximumBytes, cancellationToken);
+    }
+
+    internal static string ReadBounded(Stream stream, int expectedLength, int maximumBytes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (expectedLength <= 0 || expectedLength > maximumBytes)
+        {
+            throw new InvalidDataException("Required evidence must have a nonempty observed length within the size limit.");
+        }
+        if (stream.Length != expectedLength)
         {
             throw new InvalidDataException("Evidence changed while opening it.");
         }
 
-        var bytes = new byte[checked((int)info.Length)];
+        var bytes = new byte[expectedLength];
         var offset = 0;
         while (offset < bytes.Length)
         {

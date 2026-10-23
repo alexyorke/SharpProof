@@ -706,7 +706,7 @@ switch ($Command) {
     'package-reproducibility' {
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproduciblePackages.ps1' `
             'Independent-path package reproduction failed.' `
-        ([ordered]@{ Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility' }).AsReadOnly()
+        ([ordered]@{ Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility'; IncludeDeveloperPackages = $true; DeveloperConsumerImage = ('ghcr.io/alexyorke/sharpproof@sha256:' + ('0' * 64)) }).AsReadOnly()
     }
     'package-partition-gate' {
         . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
@@ -827,7 +827,7 @@ switch ($Command) {
         }
         if ($Fast) { Write-Host 'Development feedback only: analyzer qualification was disabled by -Fast.' }
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
-            'Developer-experience qualification failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource }
+            'Developer-experience qualification failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; ToolPackageSource = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES; QualificationMode = $(if ($Fast) { 'FeedbackOnly' } else { 'AnalyzerEnabled' }) }
         $developerEvidence = Join-Path $repositoryRoot 'artifacts/developer-experience'
         [IO.File]::WriteAllText((Join-Path $developerEvidence 'qualification-mode.txt'),
             $(if ($Fast) { "Development feedback; repository analyzers disabled.`n" } else { "Repository analyzers enabled.`n" }), [Text.UTF8Encoding]::new($false))
@@ -835,7 +835,7 @@ switch ($Command) {
     'developer-packages' {
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
-            'Developer package creation failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; PackOnly = $true }
+            'Developer package creation failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; ToolPackageSource = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES; QualificationMode = 'AnalyzerEnabled'; PackOnly = $true }
     }
     'pack-tool' {
         Invoke-RequiredScript 'eng/scripts/Pack-SharpProofTool.ps1' `

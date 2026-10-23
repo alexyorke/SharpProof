@@ -2,6 +2,8 @@
 param(
     [Parameter(Mandatory)][string]$ConsumerImage,
     [string]$PackageSource = '',
+    [string]$ToolPackageSource = '',
+    [ValidateSet('AnalyzerEnabled', 'FeedbackOnly')][string]$QualificationMode = 'AnalyzerEnabled',
     [switch]$PackOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -23,6 +25,11 @@ $evidenceRoot = Join-Path $repositoryRoot "artifacts/developer-experience/$runId
 $feed = Join-Path $evidenceRoot 'packages'
 [void][IO.Directory]::CreateDirectory($feed)
 $timings = [Collections.Generic.List[object]]::new()
+$packageEvidence = [Collections.Generic.List[object]]::new()
+$startedAt = [DateTimeOffset]::UtcNow.ToString('O')
+$status = 'failed'
+$toolPackageMode = if ([string]::IsNullOrWhiteSpace($ToolPackageSource)) { 'packed-in-run' } else { 'qualified-artifact' }
+$qualifiedToolSha256 = $null
 $fixtureRoot = $null
 $previousDeveloperNugetPackages = $env:NUGET_PACKAGES
 function Run([string]$Name, [string]$Executable, [string[]]$Arguments, [int]$Expected = 0) {
@@ -79,7 +86,22 @@ try {
             Copy-Item -LiteralPath $file.FullName -Destination $feed
         }
     }
-    foreach ($name in @('Tool', 'CodeFixes', 'Templates')) {
+    if (-not [string]::IsNullOrWhiteSpace($ToolPackageSource)) {
+        $toolSource = (Resolve-Path -LiteralPath $ToolPackageSource).Path
+        if (-not (Test-Path -LiteralPath $toolSource -PathType Container)) { throw 'The qualified tool package source must be a directory.' }
+        $toolArchives = @(Get-ChildItem -LiteralPath $toolSource -Filter '*.nupkg' -File)
+        if ($toolArchives.Count -ne 1 -or $toolArchives[0].Name -cne "SharpProof.Tool.$version.nupkg") {
+            throw 'The qualified tool source must contain exactly the expected SharpProof.Tool archive.'
+        }
+        $toolIdentity = Get-SharpProofPackageIdentity -Path $toolArchives[0].FullName -RequireRepository -RequireSingleIdentity
+        if ($toolIdentity.Id -cne 'SharpProof.Tool' -or $toolIdentity.Version -cne $version -or $toolIdentity.RepositoryCommit -cne $sourceCommit) {
+            throw 'The qualified tool archive differs from the expected version or source commit.'
+        }
+        $qualifiedToolSha256 = (Get-FileHash -LiteralPath $toolArchives[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        Copy-Item -LiteralPath $toolArchives[0].FullName -Destination $feed
+    }
+    $developerPackages = if ($toolPackageMode -eq 'qualified-artifact') { @('CodeFixes', 'Templates') } else { @('Tool', 'CodeFixes', 'Templates') }
+    foreach ($name in $developerPackages) {
         Run "pack-$name" 'dotnet' @('pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release', '--no-build', '--no-restore',
             '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit", '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true', "-p:SharpProofConsumerImage=$ConsumerImage")
     }
@@ -90,7 +112,15 @@ try {
         if ($identity.Id -cne $name -or $identity.Version -cne $version -or $identity.RepositoryCommit -cne $sourceCommit) {
             throw "Package $name does not match the qualified package version and source commit."
         }
+        $hash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($name -ceq 'SharpProof.Tool' -and $toolPackageMode -eq 'qualified-artifact' -and $hash -cne $qualifiedToolSha256) {
+            throw 'The installed tool archive does not match the supplied qualified bytes.'
+        }
+        $packageEvidence.Add([ordered]@{ id = $name; version = $version; repositoryCommit = $sourceCommit; fileName = [IO.Path]::GetFileName($packagePath); sha256 = $hash })
     }
+    Run 'template-regressions' 'pwsh' @('-NoLogo', '-NoProfile', '-File', (Join-Path $PSScriptRoot 'Test-SharpProofTemplates.ps1'),
+        '-PackagePath', (Join-Path $feed "SharpProof.Templates.$version.nupkg"), '-PackageVersion', $version,
+        '-ConsumerImage', $ConsumerImage, '-RepositoryCommit', $sourceCommit)
     $editorArchive = [IO.Compression.ZipFile]::OpenRead((Join-Path $feed "SharpProof.CodeFixes.$version.nupkg"))
     try {
         if (@($editorArchive.Entries | Where-Object FullName -CEQ 'analyzers/dotnet/cs/SharpProof.CodeFixes.dll').Count -ne 1) {
@@ -101,7 +131,7 @@ try {
         }
     }
     finally { $editorArchive.Dispose() }
-    if ($PackOnly) { return }
+    if ($PackOnly) { $status = 'passed'; return }
     $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) "sharpproof-dx-$runId"
     [void][IO.Directory]::CreateDirectory($fixtureRoot)
     # Every run must consume its exact packed bytes, even when the preview
@@ -225,6 +255,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $native $name) -Destination $retained
     }
     Copy-Item -LiteralPath $resultRoot -Destination (Join-Path $retained 'evidence') -Recurse
+    $status = 'passed'
 }
 finally {
     if ($null -eq $previousDeveloperNugetPackages) { Remove-Item Env:NUGET_PACKAGES -ErrorAction SilentlyContinue }
@@ -244,6 +275,24 @@ finally {
             foreach ($report in Get-ChildItem -LiteralPath $reports -File) { Copy-Item -LiteralPath $report.FullName -Destination $retainedReports -Force }
         }
     }
-    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'timings.json'), ($timings | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'timings.json'), (ConvertTo-Json -InputObject @($timings.ToArray()) -Depth 5), [Text.UTF8Encoding]::new($false))
+    $run = [ordered]@{
+        schemaVersion              = 1
+        status                     = $status
+        scope                      = if ($PackOnly) { 'packages' } else { 'developer-experience' }
+        qualificationMode          = $QualificationMode
+        repositoryAnalyzersEnabled = $QualificationMode -eq 'AnalyzerEnabled'
+        sourceCommit               = $sourceCommit
+        packageVersion             = $version
+        consumerImage              = $ConsumerImage
+        toolPackageMode            = $toolPackageMode
+        qualifiedToolSha256        = $qualifiedToolSha256
+        startedAtUtc               = $startedAt
+        finishedAtUtc              = [DateTimeOffset]::UtcNow.ToString('O')
+        phaseCount                 = $timings.Count
+        packages                   = @($packageEvidence.ToArray())
+    }
+    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'run.json'), (ConvertTo-Json -InputObject $run -Depth 5), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText((Join-Path $evidenceRoot 'qualification-mode.txt'), "$QualificationMode`n", [Text.UTF8Encoding]::new($false))
     Write-Host "Developer-experience evidence: $evidenceRoot"
 }

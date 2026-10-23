@@ -11,6 +11,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Getting started](getting-started.md) | Package references, first contract, profiles, and verifier policies |
 | [Project templates](../templates/README.md) | Portable/verified class libraries with version-authoritative local installation |
 | [Developer tools](developer-experience.md) | Optional packaged templates, project setup checks, evidence comparison, NUnit regression export, and companion scaffolding |
+| [Developer experience checklist](developer-experience-plan.md) | Seven implemented areas, validation commands, retained evidence scope, and remaining CI/release decisions |
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |

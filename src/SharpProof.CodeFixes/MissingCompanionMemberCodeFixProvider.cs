@@ -23,10 +23,8 @@ public sealed class MissingCompanionMemberCodeFixProvider : CodeFixProvider
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         var contextDeclaration = root?.FindNode(context.Span).FirstAncestorOrSelf<TypeDeclarationSyntax>();
-        if (contextDeclaration == null)
-        { return; }
-        var model = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
-        if (model?.GetDeclaredSymbol(contextDeclaration, context.CancellationToken) is not INamedTypeSymbol contextType)
+        var model = contextDeclaration == null ? null : await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
+        if (contextDeclaration == null || model?.GetDeclaredSymbol(contextDeclaration, context.CancellationToken) is not INamedTypeSymbol contextType)
         { return; }
         // Missing-member diagnostics normally point to the target method, even
         // when its companion is declared in a different document.
@@ -42,7 +40,8 @@ public sealed class MissingCompanionMemberCodeFixProvider : CodeFixProvider
         { return; }
         for (var index = 0; index < target.TypeParameters.Length; index++)
         {
-            if (target.TypeParameters[index].Name != companion.TypeParameters[index].Name)
+            if (target.TypeParameters[index].Name != companion.TypeParameters[index].Name ||
+                target.TypeParameters[index].ReferenceTypeConstraintNullableAnnotation != companion.TypeParameters[index].ReferenceTypeConstraintNullableAnnotation)
             { return; }
         }
         var generator = SyntaxGenerator.GetGenerator(context.Document);
@@ -55,7 +54,7 @@ public sealed class MissingCompanionMemberCodeFixProvider : CodeFixProvider
         { return; }
         var reference = companion.DeclaringSyntaxReferences.FirstOrDefault();
         if (reference == null || await reference.GetSyntaxAsync(context.CancellationToken).ConfigureAwait(false) is not ClassDeclarationSyntax declaration ||
-            context.Document.Project.Solution.GetDocument(reference.SyntaxTree) is not { } document)
+            context.Document.Project.Solution.GetDocument(reference.SyntaxTree) is not { } document || document is SourceGeneratedDocument)
         { return; }
         var companionModel = await document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
         var annotationsEnabled = (companionModel!.GetNullableContext(declaration.CloseBraceToken.SpanStart) & NullableContext.AnnotationsEnabled) != 0;

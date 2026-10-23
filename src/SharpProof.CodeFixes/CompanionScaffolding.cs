@@ -157,10 +157,7 @@ internal static class CompanionScaffolding
             if (document == null)
             { return false; }
             var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            if (model == null)
-            { return false; }
-            var context = model.GetNullableContext(reference.Span.Start);
-            if (((context & NullableContext.AnnotationsEnabled) != 0) != annotationsEnabled)
+            if (model == null || ((model.GetNullableContext(reference.Span.Start) & NullableContext.AnnotationsEnabled) != 0) != annotationsEnabled)
             { return false; }
         }
         return true;
@@ -212,12 +209,10 @@ internal static class CompanionScaffolding
         SyntaxList<TypeParameterConstraintClauseSyntax> clauses, ImmutableArray<ITypeParameterSymbol> parameters)
     {
         global::SharpProof.Internal.CodeFixInputValidation.Require(clauses, nameof(clauses));
-        if (parameters.IsDefault)
-        { throw new ArgumentNullException(nameof(parameters)); }
+        global::SharpProof.Internal.CodeFixInputValidation.Require(parameters.IsDefault ? null : (object)parameters, nameof(parameters));
         foreach (var parameter in parameters)
         {
-            if (parameter == null)
-            { throw new ArgumentNullException(nameof(parameters)); }
+            global::SharpProof.Internal.CodeFixInputValidation.Require(parameter, nameof(parameters));
             if (!parameter.HasReferenceTypeConstraint || parameter.ReferenceTypeConstraintNullableAnnotation != NullableAnnotation.Annotated)
             { continue; }
             for (var index = 0; index < clauses.Count; index++)
@@ -247,8 +242,7 @@ internal static class CompanionScaffolding
 
     private static SyntaxTokenList ParameterModifiers(IParameterSymbol parameter)
     {
-        if (parameter == null)
-        { throw new ArgumentNullException(nameof(parameter)); }
+        global::SharpProof.Internal.CodeFixInputValidation.Require(parameter, nameof(parameter));
         var modifiers = new List<SyntaxToken>();
         if (parameter.IsParams)
         { modifiers.Add(SyntaxFactory.Token(SyntaxKind.ParamsKeyword)); }
@@ -277,8 +271,7 @@ internal static class CompanionScaffolding
 
     private static bool CanExpose(ITypeSymbol type, bool requirePublic)
     {
-        if (type == null)
-        { throw new ArgumentNullException(nameof(type)); }
+        global::SharpProof.Internal.CodeFixInputValidation.Require(type, nameof(type));
         if (type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer or TypeKind.Error)
         { return false; }
         if (type is IArrayTypeSymbol array)

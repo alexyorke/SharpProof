@@ -26,8 +26,8 @@ internal static class ToolProcess
         using var process = new Process { StartInfo = start };
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        if (!process.Start())
-        { throw new IOException("Could not start " + command); }
+        // Direct execution starts a fresh process or throws; shell reuse is disabled.
+        process.Start();
         var output = ReadOutputAsync(process.StandardOutput, timeout.Token);
         var errors = DrainAsync(process.StandardError, timeout.Token);
         var exit = process.WaitForExitAsync(timeout.Token);

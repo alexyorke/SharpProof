@@ -6,6 +6,8 @@ SharpProof's optional developer packages are versioned with the three product pa
 These additions do not change existing verification or assumption policies. Package
 availability on a public feed is not implied; use the matching packages from your
 configured feed or this checkout's qualified package artifacts.
+The [delivery checklist](developer-experience-plan.md) distinguishes implementation,
+workflow evidence, and the remaining CI and release decisions.
 
 ## Install and start
 
@@ -24,27 +26,57 @@ verification. Its demonstration caller deliberately emits SP0027; change -1 to 0
 remove it. The [checkout project templates](../templates/README.md) remain available
 through their existing installation workflow.
 
-Use `--verification container` to generate strict verification, retained evidence,
-and a CI workflow. Run `docker compose pull verify`, then
-`docker compose run --rm verify build MyLibrary.csproj`. The consumer image is pinned
+Choose `--verification container` when creating the project to generate strict
+verification, retained evidence, and a CI workflow. Run `docker compose pull verify`,
+`docker compose run --rm verify restore MyLibrary.csproj`, then
+`docker compose run --rm verify build MyLibrary.csproj --no-restore`. The consumer image is pinned
 by digest and derives from the canonical Linux amd64 toolchain. No SharpProof source
 checkout is required. Private-feed authentication belongs in your normal NuGet secret
 mechanism, never in a committed generated project.
+The portable variant produces analyzer diagnostics without worker evidence; the
+evidence commands below use the container variant's retained paths. They require
+access to its matching packages and qualified image; public publication is a separate
+release step.
 
-The CLI requires the .NET 10 runtime. In the consumer directory, create a manifest
+The CLI executes on the .NET 10 runtime; installing or restoring a local tool also
+requires a .NET SDK. The template's pinned SDK and the consumer image provide both.
+In the consumer directory, create a manifest
 with `dotnet new tool-manifest` if one does not already exist, then run
 `dotnet tool install SharpProof.Tool --version <version>`. Use the same version as
 the consumer packages. Teammates use `dotnet tool restore`.
+
+The container does not inherit the host's user-level NuGet configuration or package
+cache. Put source URLs in a project `NuGet.config`, use container-visible paths for
+local feeds, and supply private-feed credentials through your usual secret mechanism.
+A local feed outside the project needs an explicit read-only bind mount. The generated
+CI workflow likewise needs registry/feed access configured before its restore/build
+steps. Keep credentials out of the committed configuration.
+
+For the container starter, restore the local tool and inspect setup through the same
+service so evaluation uses its container-owned restore assets:
+
+```sh
+docker compose run --rm verify tool restore
+docker compose run --rm verify sharpproof doctor --project MyLibrary.csproj --verification container
+```
+
+These commands assume the matching tool is already recorded in the local manifest.
+Host explanation and comparison can read the retained reports; exporting a test can
+also require source and reference files that remain inside the build container.
 
 ## Inspect setup and evidence
 
 `dotnet sharpproof doctor --project MyLibrary.csproj --verification portable` checks
 SDK, evaluated package references, restored versions, and contract configuration.
-The container mode also inspects Docker and the configured local consumer image.
+Outside the canonical container, explicit container mode also inspects Docker and
+the configured local consumer image. Inside that container, the build still validates
+the container contract; doctor does not qualify it.
 Doctor does not restore, build, install, pull images, or execute application code.
 Project evaluation reads MSBuild imports without invoking build targets.
-Run it only against a trusted project. A passing setup check does not execute a proof
-or establish that restored files match today's edited source.
+Run it only against a trusted project. Restore after dependency changes before using
+its package checks. A passing setup check does not execute a proof or establish source
+freshness. Advisory project checks require SDK 9.0.300 or newer; evaluated active
+verification requires SDK 10.0.100 or newer. The tool itself requires .NET 10.
 
 The existing `dotnet sharpproof doctor [--json]` command remains SDK discovery only.
 The positional `dotnet sharpproof explain <result.json>` form still reads a standalone
@@ -58,6 +90,14 @@ Use `--claim <id>` to focus on one claim. `--request` and `--compiler-manifest` 
 the default sibling filenames. Missing or inconsistent evidence is an error.
 Validation establishes consistency with recorded inputs; an archived report does not
 authenticate an arbitrary worker binary or prove that today's edited source was checked.
+
+The export snapshot records compiler options, source trees, and reference metadata,
+so compiler-option or unrelated-source edits can change the artifact digest and miss
+the complete worker-response cache even when the lowered verification model is equivalent.
+The [cache](../src/SharpProof.Worker/VerificationCache.cs) continues to bind the
+[exact artifact bytes](../src/SharpProof.Worker/ArtifactValidator.cs) with its other
+existing inputs, without changing callable/claim identities or proof semantics or
+promising broader reuse or a performance improvement.
 
 When lowering retains a source abstention, Unknown evidence includes its stage, typed
 detail code, and source location. Some failures expose only the broader claim reason.
@@ -127,7 +167,24 @@ Select a supported top-level interface/class and choose **Generate SharpProof co
 The preview adds ordinary editable source with explicit receivers, generic constraints,
 matching parameter types, and placeholder bodies. No contracts are guessed.
 SPCF0004 offers missing-member scaffolding when the target and missing names are unambiguous.
-Ambiguous overload repairs and Fix All are intentionally unavailable.
+Ambiguous companion repairs are declined, and companion repair has no Fix All. The
+existing Result-type correction retains its own Fix All support.
+
+## Author a contract and inspect its result
+
+Start with the [complete first-proof example](getting-started.md#first-use-in-three-steps).
+Keep direct `Requires` and `Ensures` clauses in a contiguous method prologue; use `Old`
+for parameter-entry state and `Result` for the normal return value. Scaffolding only
+creates signatures and placeholders: replace those bodies with reviewed clauses using
+the [public API](public-api.md) and [companion rules](diagnostic-examples.md#contractfor-diagnostics).
+
+Build the consumer, then review the selected claims, completed run status, assumptions,
+and vacuity in its [evidence](verification-results.md). Portable diagnostic silence
+does not establish a proof, and Unknown does not establish a counterexample. For a
+supported replay-confirmed Refuted postcondition, export the original obligation as a
+runtime regression, observe its assertion fail, fix the implementation, then require
+both the regression and a fresh strict verification build to pass. Keep ordinary runtime
+input validation at application boundaries; static contracts do not insert guards.
 
 ## Export an NUnit regression
 
@@ -138,7 +195,37 @@ Keep the generated project outside the consumer's source tree so its test source
 included by the consumer's default compile glob. Run
 `dotnet test ../MyLibrary.Regressions/SharpProof.Regression.csproj` in a canonical
 container workspace that contains both projects. The starter's project-only Compose
-mount needs to be extended to expose this sibling directory before running that test.
+mount needs an extra writable parent mount for container export and test. Exported
+project references use absolute paths, so preserve the same mount paths for both steps.
+
+For the generated starter, create a writable sibling `Regressions` directory, then add
+this service override in `compose.override.yaml` (merge it with any existing override):
+
+```yaml
+services:
+  verify:
+    volumes:
+      - ../Regressions:/workspace/regressions
+```
+
+With the local tool restored in that service and the original compiler inputs still
+available, export into a new child directory and run the generated project:
+
+```sh
+docker compose run --rm verify sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output /workspace/regressions/MyLibrary
+docker compose run --rm verify test /workspace/regressions/MyLibrary/SharpProof.Regression.csproj
+```
+
+If your package sources are configured only in the consumer's `NuGet.config`, first
+restore the generated test with
+`docker compose run --rm verify restore /workspace/regressions/MyLibrary/SharpProof.Regression.csproj --configfile /workspace/consumer/NuGet.config`,
+then add `--no-restore` to its test command. A sibling test project does not inherit
+the consumer directory's configuration by its location.
+
+The mounted parent exists; `/workspace/regressions/MyLibrary` must not exist before
+export. Mounting the intended output directory itself would create it and make export
+fail. The test is expected to fail its original postcondition before the implementation
+is fixed; run it again after the fix, then require a fresh strict consumer build.
 
 The initial exporter supports replayed direct `Refuted` postconditions on public,
 synchronous static methods without type parameters, declared on public types without
@@ -171,6 +258,10 @@ Set `SHARPPROOF_CONSUMER_IMAGE` to the qualified immutable GHCR image reference,
 This builds the solution, packs all six packages, installs the tool/template in isolated
 locations, and checks generated portable/native consumers, comparison, and regression export.
 Evidence and phase timings are exported beneath `artifacts/developer-experience/<run-id>`.
+`run.json` records scope, pass/fail status, analyzer mode, source identity, package
+hashes, and consumer image reference. A complete local consumer run requires
+`scope=developer-experience`, `qualificationMode=AnalyzerEnabled`, and `status=passed`;
+a package-only or feedback-only pass does not establish that result.
 Timings are observations, not a claim of improvement over an unmeasured baseline.
 `-Fast` permits development feedback without repository build analyzers; it does not
 qualify a release and is never used by the release workflow.

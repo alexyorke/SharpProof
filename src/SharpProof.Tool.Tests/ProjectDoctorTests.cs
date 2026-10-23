@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Tool;
 
@@ -198,6 +200,356 @@ public sealed class ProjectDoctorTests
         Assert.That(alive, Is.False);
     }
 
+    [TestCase("effects", 0)]
+    [TestCase("contracts", 0)]
+    [TestCase("all", 0)]
+    [TestCase("invalid", 1)]
+    public async Task FeatureSelectionFollowsTheConsumerContract(string features, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(features);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofFeatures"] = features;
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(expected), fixture.Output.ToString());
+    }
+
+    [TestCase("advisory", 0)]
+    [TestCase("warn-on-unknown", 0)]
+    [TestCase("require-proven", 0)]
+    [TestCase("invalid", 1)]
+    public async Task ActiveVerificationValidatesPolicyWithoutInvokingNativeCode(string policy, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Properties["SharpProofVerifyPolicy"] = policy;
+        Assert.That(await fixture.RunAsync(null), Is.EqualTo(expected), fixture.Output.ToString());
+        Assert.That(fixture.Commands, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task DisabledProfileDoesNotRequireAnAnalyzerSdkOrNativeHost()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofProfile"] = " OFF ";
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Properties["NETCoreSdkVersion"] = "not-an-sdk-version";
+        Assert.That(await fixture.RunAsync(null), Is.Zero, fixture.Output.ToString());
+        Assert.That(fixture.Output.ToString(), Does.Not.Contain("Native host").And.Not.Contain("Verification policy"));
+        Assert.That(fixture.Commands, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task DisabledProfileCannotActivateContainerProof()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofProfile"] = "off";
+        fixture.Properties["SharpProofVerify"] = "true";
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Verification activation"));
+    }
+
+    [Test]
+    public async Task MalformedSdkVersionFailsTheCompilerCheck()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["NETCoreSdkVersion"] = "not-an-sdk-version";
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Compiler SDK"));
+    }
+
+    [Test]
+    public async Task CompatibilityVerifierReferenceCanSupplyItsTransitiveAttributes()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.ReferenceIds.Clear();
+        fixture.ReferenceIds.Add("SharpProof.Verifier");
+        fixture.Libraries.Remove("SharpProof/1.2.3");
+        fixture.WriteAssets();
+        Assert.That(await fixture.RunAsync("portable"), Is.Zero, fixture.Output.ToString());
+    }
+
+    [Test]
+    public async Task AttributesAloneDoNotClaimAnalyzerInstallation()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.ReferenceIds.Clear();
+        fixture.ReferenceIds.Add("SharpProof.Attributes");
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL SharpProof package"));
+    }
+
+    [TestCase("SharpProof/1.2.3")]
+    [TestCase("SharpProof.Verifier/1.2.3")]
+    public async Task DirectFacadeRequiresItsOwnAndVerifierRestoreEvidence(string removed)
+    {
+        ArgumentNullException.ThrowIfNull(removed);
+        using var fixture = new DoctorFixture();
+        fixture.Libraries.Remove(removed);
+        fixture.WriteAssets();
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Resolved package compatibility"));
+    }
+
+    [Test]
+    public async Task GraphIgnoresUnrelatedAndProjectLibrariesAndMatchesPackageIdsWithoutCase()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Libraries.Clear();
+        fixture.Libraries.Add("sharpproof/1.2.3", new { type = "package" });
+        fixture.Libraries.Add("sharpproof.attributes/1.2.3", new { type = "package" });
+        fixture.Libraries.Add("sharpproof.verifier/1.2.3", new { type = "package" });
+        fixture.Libraries.Add("SharpProof.Verifier/9.9.9", new { type = "project" });
+        fixture.Libraries.Add("Unrelated/2.0.0", new { type = "package" });
+        fixture.Libraries.Add("NoVersionSeparator", new { type = "project" });
+        fixture.WriteAssets();
+        Assert.That(await fixture.RunAsync("portable"), Is.Zero, fixture.Output.ToString());
+    }
+
+    [Test]
+    public async Task BlankResolvedVersionIsNotCompatibleEvidence()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Libraries.Clear();
+        fixture.Libraries.Add("SharpProof/", new { type = "package" });
+        fixture.Libraries.Add("SharpProof.Attributes/", new { type = "package" });
+        fixture.Libraries.Add("SharpProof.Verifier/", new { type = "package" });
+        fixture.WriteAssets();
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Resolved package compatibility"));
+    }
+
+    [Test]
+    public async Task RelativeAssetsAreResolvedFromTheProjectAndMultitargetingRemainsAWarning()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["ProjectAssetsFile"] = "project.assets.json";
+        fixture.Properties["TargetFrameworks"] = "net9.0;net10.0";
+        Assert.That(await fixture.RunAsync("portable"), Is.Zero, fixture.Output.ToString());
+        Assert.That(fixture.Output.ToString(), Does.Contain("WARN Multitarget project").And.Contain("PASS Resolved package compatibility"));
+    }
+
+    [Test]
+    public async Task NullOptionalPropertyValuesRemainEmptyInsteadOfCrashing()
+    {
+        using var fixture = new DoctorFixture();
+        var evaluation = JsonNode.Parse(fixture.EvaluationJson)!.AsObject();
+        evaluation["Properties"]!["DefineConstants"] = null;
+        evaluation["Properties"]!["TargetFrameworks"] = null;
+        fixture.Responses.Add("msbuild", (0, evaluation.ToJsonString()));
+        Assert.That(await fixture.RunAsync("portable"), Is.Zero, fixture.Output.ToString());
+    }
+
+    [Test]
+    public async Task EvaluationFailureDoesNotParseOrRevealItsDiagnosticOutput()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Responses.Add("msbuild", (1, "synthetic-private-evaluation-detail"));
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Project evaluation").And.Not.Contain("synthetic-private"));
+    }
+
+    [TestCase("not-json")]
+    [TestCase("{}")]
+    [TestCase("{\"Properties\":[]}")]
+    public async Task InvalidEvaluatedMetadataReportsAnInspectionFailure(string metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        using var fixture = new DoctorFixture();
+        fixture.Responses.Add("msbuild", (0, metadata));
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Setup inspection"));
+    }
+
+    [TestCase("not-json")]
+    [TestCase("{}")]
+    [TestCase("{\"libraries\":[]}")]
+    public async Task InvalidRestoreMetadataReportsAnInspectionFailure(string metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        using var fixture = new DoctorFixture();
+        await File.WriteAllTextAsync(fixture.Properties["ProjectAssetsFile"], metadata, TestContext.CurrentContext.CancellationToken);
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Setup inspection"));
+    }
+
+    [TestCase("missing-executable")]
+    [TestCase("io")]
+    [TestCase("access")]
+    [TestCase("state")]
+    [TestCase("range")]
+    [TestCase("index")]
+    public async Task ExpectedInspectionFailuresDoNotExposeExceptionDetails(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        using var fixture = new DoctorFixture();
+        const string detail = "synthetic-private-runner-detail";
+        if (kind == "index")
+        {
+            var values = Array.Empty<string>();
+            try
+            { _ = values[kind.Length]; }
+            catch (IndexOutOfRangeException exception)
+            { fixture.RunnerFailure = exception; }
+            Assert.That(fixture.RunnerFailure, Is.TypeOf<IndexOutOfRangeException>());
+        }
+        else
+        {
+            fixture.RunnerFailure = kind switch
+            {
+                "missing-executable" => new Win32Exception(detail),
+                "io" => new IOException(detail),
+                "access" => new UnauthorizedAccessException(detail),
+                "state" => new InvalidOperationException(detail),
+                "range" => new ArgumentOutOfRangeException(nameof(kind), detail),
+                _ => throw new AssertionException("Unknown failure fixture.")
+            };
+        }
+        Assert.That(await fixture.RunAsync("portable"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Setup inspection").And.Not.Contain(detail));
+    }
+
+    [TestCase(1, "unavailable")]
+    [TestCase(0, "windows")]
+    public async Task DockerMustBeAnAvailableLinuxEngine(int exitCode, string engine)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Responses.Add("info", (exitCode, engine));
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Docker Linux engine"));
+    }
+
+    [Test]
+    public async Task FailedComposeConfigurationDoesNotInspectOrPullAnImage()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Responses.Add("compose", (1, "synthetic-private-compose-detail"));
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Consumer container configuration").And.Not.Contain("synthetic-private"));
+        Assert.That(fixture.Commands, Has.Count.EqualTo(3));
+    }
+
+    [Test]
+    public async Task MissingLocalImageRequiresAnExplicitPullOutsideDoctor()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Responses.Add("image", (1, "synthetic-private-inspect-detail"));
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Contain("FAIL Local consumer image").And.Contain("Doctor does not pull images")
+            .And.Not.Contain("synthetic-private"));
+        Assert.That(fixture.Commands, Has.Count.EqualTo(4));
+    }
+
+    [TestCase("null-image")]
+    [TestCase("wrong-platform")]
+    [TestCase("missing-service")]
+    public async Task UnusableComposeServiceNeverTriggersImageInspection(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        var image = JsonSerializer.Serialize(fixture.Image);
+        var metadata = kind switch
+        {
+            "null-image" => "{\"services\":{\"verify\":{\"image\":null,\"platform\":\"linux/amd64\"}}}",
+            "wrong-platform" => "{\"services\":{\"verify\":{\"image\":" + image + ",\"platform\":\"linux/arm64\"}}}",
+            "missing-service" => "{\"services\":{}}",
+            _ => throw new AssertionException("Unknown compose fixture.")
+        };
+        fixture.Responses.Add("compose", (0, metadata));
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Commands, Has.Count.EqualTo(3));
+    }
+
+    [TestCase("[]")]
+    [TestCase("{}")]
+    [TestCase("[{\"Config\":{\"Labels\":null},\"Os\":\"linux\",\"Architecture\":\"amd64\"}]")]
+    [TestCase("[{\"Config\":{\"Labels\":{}},\"Os\":\"linux\",\"Architecture\":\"amd64\"}]")]
+    [TestCase("[{\"Config\":{\"Labels\":{}},\"Os\":\"windows\",\"Architecture\":\"amd64\"}]")]
+    public async Task IncompleteOrWrongPlatformImageMetadataCannotPass(string metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Responses.Add("image", (0, metadata));
+        Assert.That(await fixture.RunAsync("container"), Is.EqualTo(1));
+        Assert.That(fixture.Output.ToString(), Does.Not.Contain("PASS Image/package compatibility"));
+    }
+
+    [TestCase("", false)]
+    [TestCase("ghcr.io/alexyorke/sharpproof:latest", false)]
+    [TestCase("ghcr.io/otheryorke/sharpproof@sha256:", false)]
+    [TestCase("ghcr.io/alexyorke/sharpproof@sha256:", true)]
+    public void ConsumerImageRequiresTheExactRepositoryAndHexDigest(string prefix, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(prefix);
+        Assert.That(SetupDoctor.IsPinnedConsumerImage(prefix + new string('a', 64)), Is.EqualTo(expected));
+    }
+
+    [TestCase('A')]
+    [TestCase('g')]
+    [TestCase('/')]
+    public void ConsumerImageRejectsNonCanonicalDigestCharacters(char character)
+    {
+        Assert.That(SetupDoctor.IsPinnedConsumerImage("ghcr.io/alexyorke/sharpproof@sha256:" + new string(character, 64)), Is.False);
+    }
+
+    [Test]
+    public void ConsumerImageValidationRejectsNull()
+    {
+        Assert.Throws<ArgumentNullException>(new Action(() => SetupDoctor.IsPinnedConsumerImage(null!)));
+    }
+
+    [Test]
+    public void ProjectDoctorRejectsInvalidArgumentsBeforeStartingTheRunner()
+    {
+        using var fixture = new DoctorFixture();
+        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await fixture.RunAsync("unsupported")));
+        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await SetupDoctor.RunAsync(
+            Path.Combine(fixture.DirectoryPath, "missing.csproj"), null, fixture.Output, TestContext.CurrentContext.CancellationToken)));
+        var wrongExtension = Path.Combine(fixture.DirectoryPath, "consumer.txt");
+        File.WriteAllText(wrongExtension, string.Empty);
+        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await SetupDoctor.RunAsync(
+            wrongExtension, null, fixture.Output, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(fixture.Commands, Is.Empty);
+    }
+
+    [Test]
+    public void ProjectDoctorRejectsNullBoundaryArguments()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+            _ = await SetupDoctor.RunAsync(null!, null, output, TestContext.CurrentContext.CancellationToken)));
+        Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
+            _ = await SetupDoctor.RunAsync("project.csproj", null, null!, TestContext.CurrentContext.CancellationToken)));
+        Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () => _ = await SetupDoctor.RunAsync(
+            "project.csproj", null, output, null!, false, TestContext.CurrentContext.CancellationToken)));
+    }
+
+    [Test]
+    public void AlreadyCanceledProjectDoctorDoesNotInvokeTheRunner()
+    {
+        using var fixture = new DoctorFixture();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () => _ = await SetupDoctor.RunAsync(
+            Path.Combine(fixture.DirectoryPath, "Consumer.csproj"), null, fixture.Output,
+            static (_, _, _, _) => throw new AssertionException("Runner must not start."), false, cancellation.Token)));
+        Assert.That(fixture.Output.ToString(), Is.Empty);
+    }
+
+    [Test]
+    public void RunnerCancellationIsNotConvertedToAnInspectionFailure()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.RunnerFailure = new OperationCanceledException(TestContext.CurrentContext.CancellationToken);
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () => _ = await fixture.RunAsync("portable")));
+        Assert.That(fixture.Output.ToString(), Is.Empty);
+    }
+
     private sealed class DoctorFixture : IDisposable
     {
         internal string DirectoryPath { get; } = Path.Combine(Path.GetTempPath(), "sharpproof-doctor-" + Guid.NewGuid().ToString("N"));
@@ -210,6 +562,21 @@ public sealed class ProjectDoctorTests
         };
         internal StringWriter Output { get; } = new(CultureInfo.InvariantCulture);
         internal List<string> Commands { get; } = [];
+        internal List<string> ReferenceIds { get; } = ["SharpProof"];
+        internal Dictionary<string, (int ExitCode, string Output)> Responses { get; } = new(StringComparer.Ordinal);
+        internal Exception? RunnerFailure { get; set; }
+        internal string EvaluationJson => JsonSerializer.Serialize(new
+        {
+            Properties,
+            Items = new
+            {
+                PackageReference = ReferenceIds.Select(static identity =>
+            {
+                ArgumentNullException.ThrowIfNull(identity);
+                return new { Identity = identity };
+            }).ToArray()
+            }
+        });
         internal string Image { get; set; } = "ghcr.io/alexyorke/sharpproof@sha256:" + new string('a', 64);
         internal string? ImageVersion { get; set; } = "1.2.3";
         internal string ImageArchitecture { get; set; } = "amd64";
@@ -250,13 +617,13 @@ public sealed class ProjectDoctorTests
             cancellationToken.ThrowIfCancellationRequested();
             Assert.That(directory, Is.EqualTo(DirectoryPath));
             Commands.Add(command + " " + string.Join(' ', arguments));
+            if (RunnerFailure != null)
+            { throw RunnerFailure; }
+            if (Responses.TryGetValue(arguments[0], out var response))
+            { return Task.FromResult(response); }
             var output = arguments[0] switch
             {
-                "msbuild" => JsonSerializer.Serialize(new
-                {
-                    Properties,
-                    Items = new { PackageReference = new[] { new { Identity = "SharpProof" } } }
-                }),
+                "msbuild" => EvaluationJson,
                 "info" => "linux\n",
                 "compose" => JsonSerializer.Serialize(new { services = new { verify = new { image = Image, platform = "linux/amd64" } } }),
                 "image" => JsonSerializer.Serialize(new[]

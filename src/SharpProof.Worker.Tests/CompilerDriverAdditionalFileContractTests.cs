@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerCollector;
+using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
@@ -55,7 +56,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
             var root = manifest.RootElement;
             Assert.That(root.GetProperty("schema").GetString(),
                 Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(31));
+            Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(CompilerManifestArtifactVersions.Current));
             Assert.That(root.GetProperty("compilerDiagnostics").GetArrayLength(), Is.Zero);
             Assert.That(root.GetProperty("maximumExpressionDepth").GetInt32(),
                 Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));

@@ -336,11 +336,12 @@ jobs:
     if: >-
       always() && needs.package.result == 'success' &&
       needs.container-verifier.result == 'success' && needs.portable-consumers.result == 'success' &&
+      needs.optional-tool.result == 'success' &&
       (!startsWith(github.ref, 'refs/tags/v') ||
         (needs.repository-quality.result == 'success' && needs.release-qualification.result == 'success' &&
          needs.security.result == 'success' && needs.native-linux-verifier.result == 'success' &&
          needs.native-windows-arm64-verifier.result == 'success' && needs.visual-studio-consumers.result == 'success' &&
-         needs.optional-tool.result == 'success' && needs.provenance.result == 'success'))
+         needs.provenance.result == 'success'))
     outputs:
       developer-artifact-id: ${{ steps.developer-upload.outputs.artifact-id }}
     runs-on: ubuntu-latest
@@ -357,6 +358,12 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           artifact-id: ${{ needs.package.outputs.package-artifact-id }}
+      - name: Download the exact separately qualified CLI archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.optional-tool.outputs.tool-artifact-id }}
+          merge-multiple: true
+          path: tool-nupkgs
       - name: Build candidate consumer image
         id: consumer
         shell: bash
@@ -366,47 +373,47 @@ jobs:
           template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' eng/Versions.props)"
           version="${template//\$(SharpProofVersionPrefix)/$prefix}"
           docker buildx build --platform linux/amd64 --file eng/container/Dockerfile \
-            --target consumer --build-arg "SHARPPROOF_PACKAGE_VERSION=${version}" \
+            --target consumer --build-arg "SHARPPROOF_PACKAGE_VERSION=${version}" --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --provenance=false --load --metadata-file consumer-image.json \
             --tag "ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}" .
           digest="$(jq -r '."containerimage.digest"' consumer-image.json)"
           [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
           echo "reference=ghcr.io/alexyorke/sharpproof@${digest}" >> "${GITHUB_OUTPUT}"
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          mkdir -p artifacts/developer-experience
+          cp consumer-image.json artifacts/developer-experience/consumer-image.json
       - name: Qualify exact packages and generated consumers
         env:
           SHARPPROOF_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
+          SHARPPROOF_QUALIFIED_TOOL_PACKAGES: tool-nupkgs
         run: >-
-          docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE tooling
+          docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE -e SHARPPROOF_QUALIFIED_TOOL_PACKAGES tooling
           developer-experience -Configuration Release -PackageSource nupkgs
-      - name: Exercise generated project in candidate consumer image
+      - name: Exercise the retained generated Compose project in the exact candidate image
+        env:
+          QUALIFIED_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
         shell: bash
         run: |
           set -euo pipefail
           fixture="$(find artifacts/developer-experience -mindepth 2 -maxdepth 2 -type d -name consumer -print -quit)"
-          packages="$(dirname "${fixture}")/packages"
           test -f "${fixture}/Native.csproj"
-          cat > "${fixture}/NuGet.config" <<'XML'
-          <configuration><packageSources><clear/><add key="fixture" value="/packages"/><add key="nuget.org" value="https://api.nuget.org/v3/index.json"/></packageSources><packageSourceMapping><packageSource key="fixture"><package pattern="SharpProof"/><package pattern="SharpProof.*"/></packageSource><packageSource key="nuget.org"><package pattern="*"/></packageSource></packageSourceMapping></configuration>
-          XML
           image="ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}"
-          docker run --rm --platform linux/amd64 \
-            --mount "type=bind,source=${PWD}/${fixture},target=/workspace/consumer" \
-            --mount "type=bind,source=${PWD}/${packages},target=/packages,readonly" \
-            --volume "${COMPOSE_PROJECT_NAME}-consumer-packages:/home/sharpproof/.nuget/packages" \
-            "${image}" restore Native.csproj --configfile NuGet.config
-          docker run --rm --platform linux/amd64 \
-            --mount "type=bind,source=${PWD}/${fixture},target=/workspace/consumer" \
-            --mount "type=bind,source=${PWD}/${packages},target=/packages,readonly" \
-            --volume "${COMPOSE_PROJECT_NAME}-consumer-packages:/home/sharpproof/.nuget/packages" \
-            "${image}" build Native.csproj -c Release --no-restore
+          pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
+            -EvidenceDirectory "$(dirname "${fixture}")" -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
+            -LocalImage "${image}" -BuildMetadataPath consumer-image.json
       - name: Record exact optional editor and template archives
+        env:
+          QUALIFIED_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
         run: |
           set -euo pipefail
           fixture="$(find artifacts/developer-experience -mindepth 2 -maxdepth 2 -type d -name packages -print -quit)"
           test -n "$fixture"
-          docker compose run --rm -e QUALIFIED_DEVELOPER_PACKAGES="$fixture" -e QUALIFIED_COMMIT="$GITHUB_SHA" tooling dev -lc \
-            'pwsh -NoProfile -File eng/scripts/Record-SharpProofDeveloperPackages.ps1 -PackageSource "$QUALIFIED_DEVELOPER_PACKAGES" -RepositoryCommit "$QUALIFIED_COMMIT"'
+          docker compose run --rm -e QUALIFIED_DEVELOPER_PACKAGES="$fixture" -e QUALIFIED_COMMIT="$GITHUB_SHA" -e QUALIFIED_CONSUMER_IMAGE tooling dev -lc \
+            '
+            set -euo pipefail
+            pwsh -NoProfile -File eng/scripts/Test-SharpProofDeveloperRelease.ps1
+            pwsh -NoProfile -File eng/scripts/Record-SharpProofDeveloperPackages.ps1 -PackageSource "$QUALIFIED_DEVELOPER_PACKAGES" -RepositoryCommit "$QUALIFIED_COMMIT" -ConsumerImage "$QUALIFIED_CONSUMER_IMAGE"
+            '
       - name: Attest qualified developer archives and their identity inventory
         if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -427,13 +434,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
-          image="ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}"
-          docker push "${image}"
-          actual="$(docker image inspect "${image}" --format '{{index .RepoDigests 0}}')"
-          test "${actual#*@}" = "${EXPECTED_DIGEST}"
-          docker tag "${image}" "ghcr.io/alexyorke/sharpproof:${GITHUB_REF_NAME}"
-          docker push "ghcr.io/alexyorke/sharpproof:${GITHUB_REF_NAME}"
+          bash eng/scripts/Test-SharpProofConsumerImagePublication.sh
+          bash eng/scripts/Publish-SharpProofConsumerImage.sh "$GITHUB_SHA" "$GITHUB_REF_NAME" "$EXPECTED_DIGEST"
+      - name: Attest the same published consumer-image digest
+        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ghcr.io/alexyorke/sharpproof
+          subject-digest: ${{ steps.consumer.outputs.digest }}
+          push-to-registry: true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -845,6 +854,11 @@ jobs:
               --predicate-type https://slsa.dev/provenance/v1 --deny-self-hosted-runners
           done
           (cd developer-nupkgs && sha256sum --check --strict SHA256SUMS)
+          jq -e --arg source "$GITHUB_SHA" --arg version "${GITHUB_REF_NAME#v}" '
+            .schemaVersion == 1 and .repositoryCommit == $source and .packageVersion == $version and
+            (.consumerImage | test("^ghcr\\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$")) and
+            ([.packages[].id] | sort) == ["SharpProof.CodeFixes", "SharpProof.Templates"]
+          ' developer-nupkgs/developer-release-manifest.json > /dev/null
       - name: Reject public developer package versions with different content
         if: github.ref_name != 'v1.0.0-preview.1'
         run: bash developer-nupkgs/Test-SharpProofPublishedPackages.sh preflight developer-nupkgs

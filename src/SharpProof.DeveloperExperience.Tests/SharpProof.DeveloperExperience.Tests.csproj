@@ -11,6 +11,7 @@
     <ProjectReference Include="../SharpProof.Attributes/SharpProof.Attributes.csproj" />
     <ProjectReference Include="../SharpProof.Analyzer/SharpProof.Analyzer.csproj" />
     <ProjectReference Include="../SharpProof.Tool/SharpProof.Tool.csproj" />
+    <ProjectReference Include="../SharpProof.Reporting/SharpProof.Reporting.csproj" Aliases="global,ReportingAssembly" />
     <ProjectReference Include="../SharpProof.CodeFixes/SharpProof.CodeFixes.csproj" />
   </ItemGroup>
 </Project>

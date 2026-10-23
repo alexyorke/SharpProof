@@ -284,6 +284,7 @@ internal sealed class ProtocolJsonTests
         Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(null), Is.True);
         Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic), Is.True);
         Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic with { Code = new string('A', 128) }), Is.True);
+        Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic with { Code = "Lowering.Code_09" }), Is.True);
         var invalid = new[]
         {
             diagnostic with { Stage = null! },

@@ -132,7 +132,7 @@ internal static class NUnitExporter
             variables.Add($"        var _argument{index} = {ModelLiteral(values[0], symbol.Parameters[index].Type)};");
         }
 
-        var call = TypeName(symbol.ContainingType) + ".@" + symbol.Name + "(" + string.Join(", ", Enumerable.Range(0, symbol.Parameters.Length).Select(static index => "_argument" + index.ToString(CultureInfo.InvariantCulture))) + ")";
+        var call = ContainingTypeName(symbol.ContainingType) + ".@" + symbol.Name + "(" + string.Join(", ", Enumerable.Range(0, symbol.Parameters.Length).Select(static index => "_argument" + index.ToString(CultureInfo.InvariantCulture))) + ")";
         var checkedKeyword = snapshot.Options.CheckOverflow ? "checked" : "unchecked";
         var source = "// Generated from validated SharpProof claim " + System.Text.Json.JsonSerializer.Serialize(claimId) + ".\n" + "// Expected to fail until the implementation satisfies its original contract.\n" + "using NUnit.Framework;\n\n[TestFixture]\npublic sealed class SharpProofRegression\n{\n    [Test]\n    public void ReplayedInputSatisfiesPostcondition()\n    {\n" + string.Join("\n", variables) + "\n        var _sharpProofResult = " + call + ";\n" + "        Assert.That(" + checkedKeyword + "(" + assertion + "), Is.True, \"The original postcondition must hold.\");\n    }\n}\n";
         var testFramework = snapshot.TargetFramework switch
@@ -368,7 +368,7 @@ internal static class NUnitExporter
             throw new InvalidDataException("Replay value exceeds the parameter's integral range.");
         }
 
-        return "(" + TypeName(type) + ")(" + integer.ToString(CultureInfo.InvariantCulture) + (type.SpecialType == SpecialType.System_UInt64 ? "UL" : "L") + ")";
+        return "(" + ScalarTypeName(type) + ")(" + integer.ToString(CultureInfo.InvariantCulture) + (type.SpecialType == SpecialType.System_UInt64 ? "UL" : "L") + ")";
     }
 
     internal static bool IsContract(SemanticModel model, InvocationExpressionSyntax invocation, string method)
@@ -381,10 +381,10 @@ internal static class NUnitExporter
             model.Compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")) && symbol.ContainingAssembly.Name == "SharpProof.Attributes";
     }
 
-    private static string TypeName(ITypeSymbol type)
+    internal static string ScalarTypeName(ITypeSymbol type)
     {
         ArgumentNullException.ThrowIfNull(type);
-        var keyword = type.SpecialType switch
+        return type.SpecialType switch
         {
             SpecialType.System_Boolean => "bool",
             SpecialType.System_SByte => "sbyte",
@@ -396,16 +396,17 @@ internal static class NUnitExporter
             SpecialType.System_UInt32 => "uint",
             SpecialType.System_Int64 => "long",
             SpecialType.System_UInt64 => "ulong",
-            _ => null
+            _ => throw new InvalidOperationException("Only Boolean and integral scalar type names can be exported.")
         };
-        if (keyword != null)
-        { return keyword; }
-        if (type is not INamedTypeSymbol named || named.IsGenericType)
-        { throw new InvalidOperationException("A nongeneric named type is required for source export."); }
+    }
+
+    private static string ContainingTypeName(INamedTypeSymbol type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
         var parts = new Stack<string>();
-        for (var current = named; current != null; current = current.ContainingType)
+        for (var current = type; current != null; current = current.ContainingType)
         { parts.Push("@" + current.Name); }
-        for (var current = named.ContainingNamespace; !current.IsGlobalNamespace; current = current.ContainingNamespace)
+        for (var current = type.ContainingNamespace; !current.IsGlobalNamespace; current = current.ContainingNamespace)
         { parts.Push("@" + current.Name); }
         return "global::" + string.Join(".", parts);
     }
@@ -427,17 +428,21 @@ internal static class NUnitExporter
             ArgumentNullException.ThrowIfNull(expression);
             var body = expression.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Body ??
                 throw new InvalidOperationException("Postcondition export requires a method body.");
-            var dataFlow = _model.AnalyzeDataFlow(body);
+
+            _unobservableParameters.Clear();
+            _unobservableParameters.UnionWith(GetUnobservableStorage(_model.AnalyzeDataFlow(body)));
+            var operation = _model.GetOperation(expression) ?? throw new InvalidOperationException("Contract expression could not be bound.");
+            return Translate(operation);
+        }
+
+        internal static IEnumerable<ISymbol> GetUnobservableStorage(DataFlowAnalysis? dataFlow)
+        {
             if (dataFlow is not { Succeeded: true })
             {
                 throw new InvalidOperationException("Parameter storage could not be analyzed for postcondition export.");
             }
 
-            _unobservableParameters.Clear();
-            _unobservableParameters.UnionWith(dataFlow.WrittenInside);
-            _unobservableParameters.UnionWith(dataFlow.UnsafeAddressTaken);
-            var operation = _model.GetOperation(expression) ?? throw new InvalidOperationException("Contract expression could not be bound.");
-            return Translate(operation);
+            return dataFlow.WrittenInside.Concat(dataFlow.UnsafeAddressTaken);
         }
 
         private string Translate(IOperation operation)
@@ -455,10 +460,8 @@ internal static class NUnitExporter
                     return Constant(literal.ConstantValue.Value!, literal.Type);
                 case IFieldReferenceOperation field when field.Field.HasConstantValue && IsScalar(field.Field.Type):
                     return Constant(field.Field.ConstantValue!, field.Field.Type);
-                case IParenthesizedOperation parentheses:
-                    return "(" + Translate(parentheses.Operand) + ")";
                 case IConversionOperation conversion when conversion.OperatorMethod == null && conversion.Type != null && IsScalar(conversion.Type):
-                    return (conversion.IsChecked ? "checked" : "unchecked") + "((" + TypeName(conversion.Type) + ")(" + Translate(conversion.Operand) + "))";
+                    return (conversion.IsChecked ? "checked" : "unchecked") + "((" + ScalarTypeName(conversion.Type) + ")(" + Translate(conversion.Operand) + "))";
                 case IBinaryOperation binary when binary.OperatorMethod == null && binary.Syntax is BinaryExpressionSyntax syntax && binary.Type != null && IsScalar(binary.Type) && !binary.IsLifted:
                     return (binary.IsChecked ? "checked" : "unchecked") + "(" + Translate(binary.LeftOperand) + " " + syntax.OperatorToken.Text + " " + Translate(binary.RightOperand) + ")";
                 case IUnaryOperation unary when unary.OperatorMethod == null && unary.Syntax is PrefixUnaryExpressionSyntax syntax && !unary.IsLifted:

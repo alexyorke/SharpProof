@@ -156,7 +156,7 @@ internal static class VerificationReport
         const string prefix = "parameter:";
         if (result.Presentation is { } presentation && variable.StartsWith(prefix, StringComparison.Ordinal) &&
             int.TryParse(variable.Substring(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal) &&
-            ordinal >= 0 && ordinal < presentation.ParameterNames.Length)
+            ordinal < presentation.ParameterNames.Length)
         {
             return presentation.ParameterNames[ordinal];
         }
