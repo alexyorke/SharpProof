@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 trap { Write-Host $_.ScriptStackTrace; break }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer 'Developer harness regressions require the canonical Linux container.'
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperHarness.psm1') -Force
+$harnessModule = Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperHarness.psm1') -Force -PassThru
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-developer-harness-test-' + [Guid]::NewGuid().ToString('N'))
@@ -66,6 +66,19 @@ function Write-DeveloperFixtureResults([string[]]$Names, [string[]]$Outcomes) {
     }
     $trx = '<TestRun><TestDefinitions>' + $definitions + '</TestDefinitions><Results>' + $results + '</Results><ResultSummary><Counters total="' + $Names.Count + '"/></ResultSummary></TestRun>'
     [IO.File]::WriteAllText((Join-Path $taskRoot 'results.trx'), $trx)
+}
+
+function New-DeveloperRuntimeFixture {
+    $runtime = Join-Path $fixture ('runtime-' + [Guid]::NewGuid().ToString('N'))
+    foreach ($file in $receipt.files) {
+        $destination = Join-Path $runtime $file.path
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $destination)) | Out-Null
+        [IO.File]::Copy((Join-Path $payload $file.path), $destination, $false)
+    }
+    [IO.Directory]::CreateDirectory((Join-Path $runtime 'Dump')) | Out-Null
+    [IO.File]::WriteAllText((Join-Path $runtime 'Dump/D_SharpProof.DeveloperExperience.Test.dll.dump'), '<test-run/>')
+    [IO.File]::WriteAllText((Join-Path $runtime 'nunit_random_seed.tmp'), '123456789')
+    return $runtime
 }
 
 try {
@@ -243,6 +256,55 @@ try {
     } 'past UTC'
     $checks += 2
     Test-DeveloperFixtureReceipt
+
+    $runtime = New-DeveloperRuntimeFixture
+    $seedPath = Join-Path $runtime 'nunit_random_seed.tmp'
+    foreach ($validSeed in @('0', '123456789', '2147483647')) {
+        [IO.File]::WriteAllText($seedPath, $validSeed)
+        $observedSeed = & $harnessModule { param($Root) Get-DeveloperHarnessAdapterSeed -RuntimeRoot $Root } $runtime
+        if ($observedSeed -cne $validSeed) { throw 'Developer harness did not preserve the actual NUnit seed.' }
+        $checks++
+    }
+    foreach ($invalidSeed in @('', '-1', '01', '2147483648', "1`n", '1.0', 'not-a-seed', '11111111111')) {
+        [IO.File]::WriteAllText($seedPath, $invalidSeed)
+        Assert-DeveloperHarnessRejected { & $harnessModule { param($Root) Get-DeveloperHarnessAdapterSeed -RuntimeRoot $Root } $runtime } 'Developer harness NUnit seed must be'
+        $checks++
+    }
+    [IO.File]::Delete($seedPath)
+    Assert-DeveloperHarnessRejected { & $harnessModule { param($Root) Get-DeveloperHarnessAdapterSeed -RuntimeRoot $Root } $runtime } 'actual NUnit discovery seed'
+    [void](New-Item -ItemType SymbolicLink -Path $seedPath -Target $assembly)
+    Assert-DeveloperHarnessRejected { & $harnessModule { param($Root) Get-DeveloperHarnessAdapterSeed -RuntimeRoot $Root } $runtime } 'bounded ordinary integer file'
+    [IO.File]::Delete($seedPath)
+    $checks += 2
+
+    [IO.File]::WriteAllText((Join-Path $payload 'nunit_random_seed.tmp'), '123456789')
+    Assert-DeveloperHarnessRejected {
+        New-SharpProofDeveloperHarnessReceipt -RepositoryRoot $sourceRoot -PackageSource $core -ToolPackageSource $tool -PreparedCodeFixesSource $codeFixes -PayloadDirectory $payload -BuildStartedUtc $started
+    } 'producer payload must not contain adapter run data'
+    [IO.File]::Delete((Join-Path $payload 'nunit_random_seed.tmp'))
+    $checks++
+
+    $runtime = New-DeveloperRuntimeFixture
+    $adapterResults = Join-Path $fixture 'adapter-results'
+    & $harnessModule { param($Root, $Results) Move-DeveloperHarnessAdapterData -RuntimeRoot $Root -ResultsDirectory $Results -ExpectedSeed '123456789' } $runtime $adapterResults
+    & $harnessModule { param($Root, $Files) Assert-DeveloperHarnessRecords -Actual $Files -Expected @(Get-DeveloperHarnessInventory -Root $Root) -Description 'executed runtime' } $runtime $receipt.files
+    if ([IO.File]::ReadAllText((Join-Path $adapterResults 'adapter-runtime-data/nunit_random_seed.tmp')) -cne '123456789' -or
+        -not (Test-Path -LiteralPath (Join-Path $adapterResults 'adapter-runtime-data/Dump/D_SharpProof.DeveloperExperience.Test.dll.dump') -PathType Leaf)) { throw 'Developer harness did not retain its exact adapter run data.' }
+    $checks++
+    $runtime = New-DeveloperRuntimeFixture
+    [IO.File]::WriteAllText((Join-Path $runtime 'nunit_random_seed.tmp'), '123456788')
+    Assert-DeveloperHarnessRejected { & $harnessModule { param($Root, $Results) Move-DeveloperHarnessAdapterData -RuntimeRoot $Root -ResultsDirectory $Results -ExpectedSeed '123456789' } $runtime (Join-Path $fixture 'changed-seed-results') } 'seed changed between discovery and execution'
+    $runtime = New-DeveloperRuntimeFixture
+    [IO.File]::Delete((Join-Path $runtime 'Dump/D_SharpProof.DeveloperExperience.Test.dll.dump'))
+    Assert-DeveloperHarnessRejected { & $harnessModule { param($Root, $Results) Move-DeveloperHarnessAdapterData -RuntimeRoot $Root -ResultsDirectory $Results -ExpectedSeed '123456789' } $runtime (Join-Path $fixture 'missing-dump-results') } 'exact ordinary output files'
+    $checks += 2
+    $runtime = New-DeveloperRuntimeFixture
+    [IO.File]::WriteAllText((Join-Path $runtime 'unexpected.tmp'), 'unexpected')
+    & $harnessModule { param($Root, $Results) Move-DeveloperHarnessAdapterData -RuntimeRoot $Root -ResultsDirectory $Results -ExpectedSeed '123456789' } $runtime (Join-Path $fixture 'extra-runtime-results')
+    Assert-DeveloperHarnessRejected { & $harnessModule { param($Root, $Files) Assert-DeveloperHarnessRecords -Actual $Files -Expected @(Get-DeveloperHarnessInventory -Root $Root) -Description 'executed runtime' } $runtime $receipt.files } 'executed runtime file set differs'
+    $checks++
+    Test-DeveloperFixtureReceipt
+    $checks++
 
     $names = @('SharpProof.DeveloperExperience.Tests.Fixture.First(1)', 'SharpProof.DeveloperExperience.Tests.Fixture.Second(2)')
     Write-DeveloperFixtureResults $names @('Passed', 'Passed')

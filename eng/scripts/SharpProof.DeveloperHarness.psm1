@@ -173,6 +173,9 @@ function Get-DeveloperHarnessPackages([string[]]$PackageSources, [string]$Reposi
 
 function Assert-DeveloperHarnessPayload([object[]]$Files) {
     $paths = @($Files | ForEach-Object { [string]$_.path })
+    if (@($paths | Where-Object { $_ -ceq 'nunit_random_seed.tmp' -or $_.StartsWith('Dump/', [StringComparison]::Ordinal) }).Count -ne 0) {
+        throw 'Developer harness producer payload must not contain adapter run data.'
+    }
     foreach ($required in @('SharpProof.DeveloperExperience.Test.dll', 'SharpProof.DeveloperExperience.Test.deps.json', 'SharpProof.DeveloperExperience.Test.runtimeconfig.json', 'nunit.framework.dll', 'NUnit3.TestAdapter.dll', 'testhost.dll')) {
         if ($paths -cnotcontains $required) { throw "Developer harness is missing runtime dependency '$required'." }
     }
@@ -294,6 +297,39 @@ function Assert-SharpProofDeveloperHarnessResults {
     return [ordered]@{ discovered = $discovery.Count; cases = $cases.Count; passed = $cases.Count; notExecuted = 0 }
 }
 
+function Get-DeveloperHarnessAdapterSeed([string]$RuntimeRoot) {
+    $path = Join-Path $RuntimeRoot 'nunit_random_seed.tmp'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Developer harness requires the actual NUnit discovery seed.' }
+    $file = Get-Item -LiteralPath $path -Force
+    if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $file.Length -eq 0 -or $file.Length -gt 10) {
+        throw 'Developer harness NUnit seed must be a bounded ordinary integer file.'
+    }
+    $seed = [IO.File]::ReadAllText($path)
+    [int]$number = 0
+    if ($seed -cnotmatch '^(0|[1-9][0-9]{0,9})$' -or -not [int]::TryParse($seed, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$number)) {
+        throw 'Developer harness NUnit seed must be a canonical nonnegative Int32.'
+    }
+    return $seed
+}
+
+function Move-DeveloperHarnessAdapterData([string]$RuntimeRoot, [string]$ResultsDirectory, [string]$ExpectedSeed) {
+    if ((Get-DeveloperHarnessAdapterSeed -RuntimeRoot $RuntimeRoot) -cne $ExpectedSeed) {
+        throw 'Developer harness NUnit seed changed between discovery and execution.'
+    }
+    $output = Join-Path $ResultsDirectory 'adapter-runtime-data'
+    foreach ($relative in @('nunit_random_seed.tmp', 'Dump/D_SharpProof.DeveloperExperience.Test.dll.dump')) {
+        $source = Join-Path $RuntimeRoot $relative
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or
+            ((Get-Item -LiteralPath $source -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'Developer harness adapter run data must be the exact ordinary output files.'
+        }
+        $destination = Join-Path $output $relative
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $destination)) | Out-Null
+        [IO.File]::Copy($source, $destination, $false)
+        [IO.File]::Delete($source)
+    }
+}
+
 function Invoke-SharpProofDeveloperHarnessTests {
     [CmdletBinding()]
     param(
@@ -329,13 +365,16 @@ function Invoke-SharpProofDeveloperHarnessTests {
         $dumpPath = Join-Path $runtime ('Dump/' + $dumpName)
         if (-not (Test-Path -LiteralPath $dumpPath -PathType Leaf)) { throw 'Developer harness discovery did not produce its actual NUnit case dump.' }
         Copy-Item -LiteralPath $dumpPath -Destination (Join-Path $dumpRoot 'SharpProof.DeveloperExperience.Test.dll.discovery.dump')
+        $discoverySeed = Get-DeveloperHarnessAdapterSeed -RuntimeRoot $runtime
         # Deliberately no test filter or category exclusion: preserve dotnet
         # test's complete DeveloperExperience test universe.
         Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $assembly, ('/TestAdapterPath:' + $runtime), ('/Settings:' + $settings), ('/ResultsDirectory:' + $taskRoot), '/Logger:trx;LogFileName=developer-tests.trx') | Out-Host
         $result = Assert-SharpProofDeveloperHarnessResults -ResultsDirectory $results
+        # NUnit shares this seed between discovery and execution. Preserve it
+        # until both complete, then separate only its two known data files.
+        Move-DeveloperHarnessAdapterData -RuntimeRoot $runtime -ResultsDirectory $results -ExpectedSeed $discoverySeed
         $after = @(Get-DeveloperHarnessInventory -Root $runtime)
-        $runtimeFiles = @($after | Where-Object { $_.path -cne ('Dump/' + $dumpName) })
-        Assert-DeveloperHarnessRecords -Actual $validated.Files -Expected $runtimeFiles -Description 'executed runtime'
+        Assert-DeveloperHarnessRecords -Actual $validated.Files -Expected $after -Description 'executed runtime'
         $revalidated = Test-SharpProofDeveloperHarnessReceipt -HarnessRoot $HarnessRoot -RepositoryRoot $RepositoryRoot -PackageSource $PackageSource
         if ($revalidated.ReceiptSha256 -cne $validated.ReceiptSha256) { throw 'Developer harness receipt changed during execution.' }
         $qualification = [ordered]@{ schemaVersion = 1; commit = $validated.RepositoryCommit; receiptSha256 = $validated.ReceiptSha256; selection = 'all-discovered-no-filter'; discovered = $result.discovered; cases = $result.cases; passed = $result.passed; notExecuted = $result.notExecuted }
