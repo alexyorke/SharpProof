@@ -13,9 +13,6 @@ param(
 
     [string]$ConsumerHarness = '',
 
-    [ValidateSet('ConsumerQualification', 'ProductPayloads')]
-    [string]$PackageBuildScope = 'ConsumerQualification',
-
     [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
 
     [ValidateRange(0, 3)][int]$PackagePartition = 0,
@@ -113,9 +110,6 @@ if ($PSBoundParameters.ContainsKey('SelfApplicationPhase') -and $Command -ne 'se
 }
 if (($PSBoundParameters.ContainsKey('PackagePartition') -or $PSBoundParameters.ContainsKey('PackagePartitionCount')) -and $Command -ne 'package-tests') {
     throw 'Package partition options are supported only for package-tests.'
-}
-if ($PSBoundParameters.ContainsKey('PackageBuildScope') -and $Command -ne 'pack') {
-    throw '-PackageBuildScope is supported only for pack.'
 }
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
@@ -376,9 +370,13 @@ function Invoke-DeveloperQualification([switch]$PackOnly) {
                 }).AsReadOnly()
         }).AsReadOnly() | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath $buildFilter -Encoding utf8NoBOM
-        $buildArguments = if ($Fast) { @('-p:RunAnalyzersDuringBuild=false') } else { @() }
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $buildFilter `
-            -AdditionalBuildArguments $buildArguments
+        if ($Fast) {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $buildFilter `
+                -AdditionalBuildArguments @('-p:RunAnalyzersDuringBuild=false')
+        }
+        else {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $buildFilter
+        }
         if ($Fast) { Write-Host 'Development feedback only: analyzer qualification was disabled by -Fast.' }
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
             'Developer-experience qualification failed.' `
@@ -928,8 +926,7 @@ switch ($Command) {
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
         . (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
         $packageBuildProjects = Get-SharpProofPackageBuildProjects `
-            -RepositoryRoot $repositoryRoot `
-            -IncludeConsumerHarness:($PackageBuildScope -eq 'ConsumerQualification')
+            -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
         $packageBuildFilter = Join-Path $repositoryRoot (
             '.sharpproof-package-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
         try {
@@ -964,10 +961,8 @@ switch ($Command) {
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
         ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
-        if ($PackageBuildScope -eq 'ConsumerQualification') {
-            Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
-                'Consumer harness export failed.' `
-            ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
-        }
+        Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
+            'Consumer harness export failed.' `
+        ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
     }
 }

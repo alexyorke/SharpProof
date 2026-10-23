@@ -161,4 +161,95 @@ try {
 finally {
     if ([IO.Directory]::Exists($buildFixture)) { [IO.Directory]::Delete($buildFixture, $true) }
 }
+
+$containerTokens = $null
+$containerErrors = $null
+$containerAst = [Management.Automation.Language.Parser]::ParseFile(
+    (Join-Path $PSScriptRoot 'Invoke-SharpProofContainer.ps1'), [ref]$containerTokens, [ref]$containerErrors)
+$qualificationFunctions = @($containerAst.FindAll({ param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Invoke-DeveloperQualification'
+        }, $true))
+if ($containerErrors.Count -ne 0 -or $qualificationFunctions.Count -ne 1) {
+    throw 'Expected one parseable actual developer qualification implementation.'
+}
+$qualificationBody = $qualificationFunctions[0].Body.GetScriptBlock()
+
+function Test-DeveloperQualificationRoute {
+    param(
+        [scriptblock]$Body,
+        [ValidateSet('Normal', 'Fast', 'PackOnly', 'ConsumerFailure')][string]$Route
+    )
+    $repositoryRoot = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-developer-route-' + [Guid]::NewGuid().ToString('N'))
+    $Fast = $Route -ceq 'Fast'
+    $PackOnly = $Route -ceq 'PackOnly'
+    $PackageSource = 'fixture-package-feed'
+    $observed = [ordered]@{ filter = $null; buildArguments = $null; consumer = $false; projects = $expectedRoots }
+    function Invoke-SharpProofSolutionBuild {
+        param([string]$BuildConfiguration, [string[]]$AdditionalBuildArguments = @(), [string]$BuildTarget)
+        if ($BuildConfiguration -cne 'Release' -or $null -eq $AdditionalBuildArguments) {
+            throw 'Developer qualification supplied null build arguments or lost Release configuration.'
+        }
+        if (-not [IO.File]::Exists($BuildTarget)) { throw 'Developer build filter was not created before building.' }
+        $observed.filter = $BuildTarget
+        $observed.buildArguments = $AdditionalBuildArguments
+        $selection = Get-Content -LiteralPath $BuildTarget -Raw | ConvertFrom-Json
+        if ($selection.solution.path -cne 'SharpProof.slnx' -or
+            @($selection.solution.projects).Count -ne $observed.projects.Count -or
+            @($selection.solution.projects | Where-Object { $observed.projects -cnotcontains $_ }).Count -ne 0) {
+            throw 'Developer qualification changed the selected graph.'
+        }
+    }
+    function Invoke-RequiredScript {
+        param([string]$Path, [string]$FailureMessage, [object]$Arguments)
+        if ($Path -cne 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' -or [string]::IsNullOrWhiteSpace($FailureMessage) -or
+            $Arguments['BuildTarget'] -cne $observed.filter -or -not [IO.File]::Exists($Arguments['BuildTarget']) -or
+            $Arguments['PackageSource'] -cne $PackageSource -or $Arguments['PackOnly'] -ne $PackOnly -or
+            $Arguments['QualificationMode'] -cne $(if ($Fast) { 'FeedbackOnly' } else { 'AnalyzerEnabled' })) {
+            throw 'Developer qualification lost its live build filter, package input, or analyzer mode.'
+        }
+        $observed.consumer = $true
+        if ($Route -ceq 'ConsumerFailure') { throw 'Fixture developer consumer failure.' }
+        [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot 'artifacts/developer-experience')) | Out-Null
+    }
+    try {
+        [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot 'eng/scripts')) | Out-Null
+        foreach ($project in $observed.projects) {
+            $path = Join-Path $repositoryRoot $project
+            [IO.Directory]::CreateDirectory((Split-Path -Parent $path)) | Out-Null
+            [IO.File]::WriteAllText($path, '<Project />')
+        }
+        $solutionText = '<Solution>' + (($observed.projects | ForEach-Object { '<Project Path="' + $_ + '" />' }) -join '') + '</Solution>'
+        [IO.File]::WriteAllText((Join-Path $repositoryRoot 'SharpProof.slnx'), $solutionText)
+        $catalogProjects = @($observed.projects | Where-Object { $_ -notmatch 'DeveloperExperience.Tests|SharpProof.Templates' })
+        [IO.File]::WriteAllText((Join-Path $repositoryRoot 'eng/scripts/package-projects.json'),
+            (([ordered]@{ schemaVersion = 1; projects = $catalogProjects }) | ConvertTo-Json))
+        $consumerFailed = $false
+        try { & $Body }
+        catch {
+            if ($Route -cne 'ConsumerFailure' -or $_.Exception.Message -cne 'Fixture developer consumer failure.') { throw }
+            $consumerFailed = $true
+        }
+        if (-not $observed.consumer -or $consumerFailed -ne ($Route -ceq 'ConsumerFailure') -or
+            $null -eq $observed.filter -or [IO.File]::Exists($observed.filter)) {
+            throw 'Developer qualification did not execute its consumer or clean its filter after completion.'
+        }
+        $expectedArguments = if ($Fast) { 1 } else { 0 }
+        if ($null -eq $observed.buildArguments -or $observed.buildArguments.Count -ne $expectedArguments -or
+            ($Fast -and $observed.buildArguments[0] -cne '-p:RunAnalyzersDuringBuild=false')) {
+            throw 'Normal developer builds must keep analyzer defaults; only Fast may explicitly disable analyzers.'
+        }
+        $modeFile = Join-Path $repositoryRoot 'artifacts/developer-experience/qualification-mode.txt'
+        if ([IO.File]::Exists($modeFile) -ne ($Route -cin @('Normal', 'Fast'))) {
+            throw 'Developer qualification mode evidence differs from the completed route.'
+        }
+    }
+    finally {
+        if ([IO.Directory]::Exists($repositoryRoot)) { [IO.Directory]::Delete($repositoryRoot, $true) }
+    }
+}
+
+foreach ($route in @('Normal', 'Fast', 'PackOnly', 'ConsumerFailure')) {
+    Test-DeveloperQualificationRoute -Body $qualificationBody -Route $route
+    $checks++
+}
 Write-Host "Developer reproduction regressions passed: $checks preparation, identity, independent-path, and redacted diagnostic controls."
