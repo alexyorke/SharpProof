@@ -109,6 +109,49 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted composition-budget coverage
+
+Checkpoint `4cb72a04754e1f477886f2eca077030da39d86f1` completed all fifteen
+coverage shards in run 39890853760. Aggregate job 120213837220 produced a
+complete report and failed the unchanged 100 percent floor: 7119/7257 changed
+trusted lines (98.10 percent), with 138 gaps. Six previously uncovered lines in
+`NativeForkJoinSourceCostVerifier` are now covered: the activation-substitution,
+callback-addition and child-storage budget handlers (52-53, 91-92 and 132-133).
+The preceding report had 144 gaps. The newer malformed-expression and late
+memory-aggregation controls are not measured here.
+
+Evidence is retained in
+`artifacts/resource-4cb7-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `8ede82520587a75d70185802fa4442361c52dd8d` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `4cb72a047`.
+Canonical CI (39890853984) and package consumers (39890853824) remain active at
+this observation. Full task-runtime bytes, the pending runtime proof policy,
+coverage closure and final audit remain open.
+
+### Late memory-trace aggregation budget controls
+
+Two finite owned traces retain every allocated object through a distinct root.
+Both stay below the event-count cap. Their reachability passes complete before
+snapshot-size aggregation; the 706-object case fits the unchanged work budget,
+while 707 objects must return `MemoryTraceBudgetExceeded` with no bounds after
+cumulative allocation has already been computed.
+
+With no output graph, each of the two snapshots per allocation contains every
+object allocated so far. Reachability and size summation consume
+`2*n*(n+1)+1` work units in total for these traces. The smaller case therefore
+has exact cumulative and peak auxiliary storage of `706*24 = 16944` bytes and
+zero retained bytes under the supplied trace sizes. These are source-owned
+strong-reachability traces, not GC timing or physical-heap measurements.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-memory-aggregation-budget-format.log`). All 225 memory trace,
+replay and related graph tests passed with zero build warnings or errors
+(`artifacts/resource-memory-aggregation-budget-tests.log`). Quality/API and
+documentation checks passed (`artifacts/resource-memory-aggregation-budget-lint.log`
+and `artifacts/resource-memory-aggregation-budget-docs.log`). Production budgets,
+runtime assumptions and wire identities are unchanged. Full task-runtime bytes,
+the pending runtime proof policy, coverage closure and final audit remain open.
+
 ### Unclassified storage-expression controls
 
 Two malformed detached-input controls place an unclassified expression kind

@@ -122,6 +122,30 @@ public sealed class ResourceMemoryTraceTests
         }
     }
 
+    [TestCase(706, true)]
+    [TestCase(707, false)]
+    public void LateSnapshotAggregationCannotPublishComputedCumulativeStorage(int count, bool fits)
+    {
+        var events = Enumerable.Range(1, count)
+            .Select(static identity => Allocate(identity, identity, 24, 24)).ToImmutableArray();
+        Assert.That(events.Length, Is.LessThanOrEqualTo(ResourceMemoryTrace.MaximumEvents));
+        // Distinct permanent roots keep every fresh object live. Allocation and
+        // reachability finish before the later snapshot-size aggregation limit.
+        var result = ResourceMemoryTrace.Evaluate(events, 0, TestContext.CurrentContext.CancellationToken);
+        if (fits)
+        {
+            Assert.That(result.UnknownReason, Is.Null);
+            Assert.That(result.Bounds, Is.EqualTo(new ResourceMemoryBounds(count * 24, count * 24,
+                count * 24, count * 24, 0, 0)));
+        }
+        else
+        {
+            Assert.That(result.Verified, Is.False);
+            Assert.That(result.Bounds, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("MemoryTraceBudgetExceeded"));
+        }
+    }
+
     [Test]
     public void EventBudgetAndCancellationDoNotYieldPartialResults()
     {
