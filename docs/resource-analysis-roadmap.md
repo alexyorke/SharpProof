@@ -109,6 +109,57 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Explicit outside-instruction policy
+
+All five emitted controls reproduced the permissive non-call fallback: typed
+object load/store, initialization through an arbitrary pointer, stack allocation
+and function-pointer loading acquired escaping boundary evidence. Each fixture
+requires its expected opcode. Stack allocation is excluded from handler
+placement because C# does not permit it there. The original results are retained
+in `artifacts/resource-boundary-opcode-policy-red.log`.
+
+The validator now explicitly classifies every decoded outside instruction as
+reviewed bookkeeping, separately checked field/call/local initialization, or
+`TaskRootExceptionBoundaryInstructionUnsupported`. The bookkeeping list has no
+permissive prefix or default. Local initialization requires a direct stack-local
+address, an owned local-signature slot, an exact metadata type match, and no
+incoming branch bypass of that address prefix. Complex local signatures remain
+unsupported instead of being guessed. All eleven focused fixed checks passed,
+including the five new cases, normal generated field sequences and existing
+outside-call role controls. The build reported zero warnings or errors
+(`artifacts/resource-boundary-opcode-policy-green.log`). Full quality/API checks
+passed (`artifacts/resource-boundary-opcode-policy-lint.log`). The broader
+carrier/projection/protocol/native-resource selection passed all 1291 tests
+with zero build warnings or errors
+(`artifacts/resource-boundary-opcode-policy-tests.log`). Documentation checks
+passed (`artifacts/resource-boundary-opcode-policy-docs.log`).
+The canonical formatter copied zero changes.
+
+Nested projection 11 and response cache 63 invalidate older instruction facts;
+acceptance constants, defaults tests and current documentation are coordinated.
+Protocol 43, manifest 6 and artifact schema 55 remain unchanged. This policy does
+not prove framework helpers cannot fail and does not close caller-stack,
+cold-initialization or root runtime-byte composition. The runtime-model choice
+remains pending.
+
+### Hosted instance-field coverage
+
+Coverage run 39872880430 for checkpoint
+`1121baa799fa0f6ab0cfe7723c3193fe487a4895` completed all fifteen shards.
+Aggregate job 120154290296 produced a complete report and failed the unchanged
+100 percent floor: 7047/7190 changed trusted lines (98.01 percent), with 143 gaps.
+The field-ownership implementation increased the line universe and introduced
+additional untested rejection paths: the preceding complete report had 133 gaps.
+This is not coverage closure, and raw line-number comparisons across the edited
+collector do not establish individual guard coverage.
+
+Evidence is retained in
+`artifacts/resource-1121-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `e2c6476579297fe7ed1ddad37098c093c0f9bbe7` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `1121baa79`.
+Full canonical CI (39872880794) and package consumers (39872880575) passed for
+that exact checkpoint. This report does not qualify the newer instruction policy.
+
 ### Instance-field boundary ownership
 
 Three arbitrary-receiver controls reproduced escaping field load, store and

@@ -1064,6 +1064,31 @@ public sealed class NativeTaskCarrierStorageTests
             Is.EqualTo("TaskRootExceptionBoundarySourceEscape"));
     }
 
+    [TestCase("var observed=*pointer;", "Ldobj", true)]
+    [TestCase("*pointer=value;", "Stobj", true)]
+    [TestCase("*pointer=default;", "Initobj", true)]
+    [TestCase("byte* observed=stackalloc byte[1];", "Localloc", false)]
+    [TestCase("delegate*<void> observed=&Helper;", "Ldftn", true)]
+    public void UnreviewedInstructionsCannotAcquireOutsideBoundaryEvidence(string statement, string rawCode, bool handlerAllowed)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(rawCode);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            if (location == "handler" && !handlerAllowed)
+            { continue; }
+            var declaration = "public struct Cell {public long First,Second;} " +
+                "public static unsafe void Probe(Cell* pointer,Cell value) { " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? statement : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
+                (location == "after" ? statement : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
+                Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundaryInstructionUnsupported"), location);
+        }
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]

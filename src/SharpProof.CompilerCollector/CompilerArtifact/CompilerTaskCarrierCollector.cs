@@ -463,6 +463,90 @@ internal sealed class CompilerTaskCarrierCollector
         return values[0] ? reference : type == 0x08;
     }
 
+    // No permissive prefix or default case: newly decoded operations remain
+    // unsupported outside the protected region until explicitly reviewed.
+    private static bool ReviewedBoundaryBookkeeping(string raw)
+    {
+        raw = ArgumentNullGuard.NotNull(raw, nameof(raw));
+        return raw is
+            "Nop" or "Ret" or "Pop" or "Dup" or "Ldnull" or
+            "Ldarg" or "Ldarg_s" or "Ldarg_0" or "Ldarg_1" or "Ldarg_2" or "Ldarg_3" or
+            "Ldarga" or "Ldarga_s" or "Starg" or "Starg_s" or
+            "Ldloc" or "Ldloc_s" or "Ldloc_0" or "Ldloc_1" or "Ldloc_2" or "Ldloc_3" or
+            "Ldloca" or "Ldloca_s" or "Stloc" or "Stloc_s" or "Stloc_0" or "Stloc_1" or "Stloc_2" or "Stloc_3" or
+            "Ldc_i4" or "Ldc_i4_s" or "Ldc_i4_m1" or "Ldc_i4_0" or "Ldc_i4_1" or "Ldc_i4_2" or
+            "Ldc_i4_3" or "Ldc_i4_4" or "Ldc_i4_5" or "Ldc_i4_6" or "Ldc_i4_7" or "Ldc_i4_8" or
+            "Ldc_i8" or "Ldc_r4" or "Ldc_r8" or
+            "Add" or "Sub" or "Mul" or "Neg" or "Not" or "And" or "Or" or "Xor" or "Shl" or "Shr" or "Shr_un" or
+            "Ceq" or "Cgt" or "Cgt_un" or "Clt" or "Clt_un" or
+            "Conv_i1" or "Conv_i2" or "Conv_i4" or "Conv_i8" or "Conv_u1" or "Conv_u2" or "Conv_u4" or "Conv_u8" or
+            "Conv_i" or "Conv_u" or "Conv_r4" or "Conv_r8" or "Conv_r_un" or
+            "Br" or "Br_s" or "Brtrue" or "Brtrue_s" or "Brfalse" or "Brfalse_s" or
+            "Beq" or "Beq_s" or "Bne_un" or "Bne_un_s" or
+            "Bge" or "Bge_s" or "Bge_un" or "Bge_un_s" or "Bgt" or "Bgt_s" or "Bgt_un" or "Bgt_un_s" or
+            "Ble" or "Ble_s" or "Ble_un" or "Ble_un_s" or "Blt" or "Blt_s" or "Blt_un" or "Blt_un_s" or
+            "Leave" or "Leave_s";
+    }
+
+    private static bool OwnedBoundaryLocalInitialization(MetadataReader metadata, MethodBodyBlock body,
+        List<CompilerIlToken> instructions, int index, HashSet<int> entries, CancellationToken cancellation)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        instructions = ArgumentNullGuard.NotNull(instructions, nameof(instructions));
+        entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
+        if (index < 0 || index >= instructions.Count)
+        { throw new ArgumentOutOfRangeException(nameof(index)); }
+        cancellation.ThrowIfCancellationRequested();
+        var previous = index - 1;
+        while (previous >= 0 && instructions[previous].RawCode == "Nop")
+        { cancellation.ThrowIfCancellationRequested(); previous--; }
+        if (previous < 0 || instructions[previous].RawCode is not ("Ldloca" or "Ldloca_s") || body.LocalSignature.IsNil)
+        { return false; }
+        for (var position = previous + 1; position <= index; position++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (entries.Contains(instructions[position].Offset))
+            { return false; }
+        }
+        var slot = instructions[previous].Operand;
+        var target = MetadataTokens.EntityHandle(checked((int)instructions[index].Operand));
+        if (target.Kind is not (HandleKind.TypeDefinition or HandleKind.TypeReference or HandleKind.TypeSpecification) || target.IsNil)
+        { return false; }
+        var signature = metadata.GetBlobReader(metadata.GetStandaloneSignature(body.LocalSignature).Signature);
+        if (signature.ReadByte() != 0x07)
+        { return false; }
+        var count = signature.ReadCompressedInteger();
+        if (slot < 0 || slot >= count)
+        { return false; }
+        for (var local = 0; local <= slot; local++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var kind = signature.ReadByte();
+            if (kind is 0x11 or 0x12)
+            {
+                var encoded = signature.ReadCompressedInteger();
+                EntityHandle type = (encoded & 3) switch
+                {
+                    0 => MetadataTokens.TypeDefinitionHandle(encoded >> 2),
+                    1 => MetadataTokens.TypeReferenceHandle(encoded >> 2),
+                    2 => MetadataTokens.TypeSpecificationHandle(encoded >> 2),
+                    _ => default
+                };
+                if (local == slot)
+                { return kind == 0x11 && !type.IsNil && type == target; }
+            }
+            else if (kind is >= 0x02 and <= 0x0e or 0x18 or 0x19 or 0x1c)
+            {
+                if (local == slot)
+                { return false; }
+            }
+            else
+            { return false; }
+        }
+        return false;
+    }
+
     // Body facts only. The caller separately binds the emitted module, owning
     // state-machine method and callable before constructing a boundary record.
     internal static string? ValidateExceptionBoundary(PEReader image, MethodDefinitionHandle method,
@@ -530,6 +614,10 @@ internal sealed class CompilerTaskCarrierCollector
                     instruction.RawCode.StartsWith("Ldind", StringComparison.Ordinal) ||
                     instruction.RawCode.StartsWith("Stind", StringComparison.Ordinal)))
                 { return "TaskRootExceptionBoundarySourceEscape"; }
+                if (!inside && instruction.RawCode is not ("Call" or "Callvirt" or "Ldfld" or "Ldflda" or "Stfld") &&
+                    !ReviewedBoundaryBookkeeping(instruction.RawCode) &&
+                    !(instruction.RawCode == "Initobj" && OwnedBoundaryLocalInitialization(metadata, body, instructions, index, entries, cancellation)))
+                { return "TaskRootExceptionBoundaryInstructionUnsupported"; }
                 if (instruction.RawCode is not ("Call" or "Callvirt"))
                 { continue; }
                 var called = MetadataTokens.EntityHandle(checked((int)instruction.Operand));
