@@ -93,6 +93,9 @@ function Test-InlinePreparation([string]$Name, [bool]$ShouldPass, [scriptblock]$
     }
     elseif ($observedExit -eq 0 -or (Test-Path -LiteralPath $outputPath) -or
         (-not $MayInvokeDocker -and (Test-Path -LiteralPath $env:DOCKER_MOCK_LOG))) { throw "Rejected preparation reached outputs or execution: $Name" }
+    # The expected native rejection is asserted above; do not leak it to the
+    # repository gate that invokes this script in the same PowerShell process.
+    $global:LASTEXITCODE = 0
     $script:controls++
 }
 try {
