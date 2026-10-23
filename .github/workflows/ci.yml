@@ -396,13 +396,21 @@ jobs:
           mode: report
 
   # Formatting and independent-path reproduction remain required and run in parallel.
-  # Independent-path package reproduction rebuilds and packs the solution
-  # twice and needs no other job's output. It runs here, beside the canonical
-  # jobs, rather than in the package job that every consumer job waits for.
+  # Each reproduction compiles a fresh independent checkout with all analyzers.
+  # Their original named gate authenticates and compares both complete results.
   # Release qualification requires this workflow's exact-commit success on master.
-  formatting:
+  formatting-partition:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    outputs:
+      shard-0-artifact-id: ${{ steps.identity.outputs.shard-0-artifact-id }}
+      shard-1-artifact-id: ${{ steps.identity.outputs.shard-1-artifact-id }}
+      shard-0-attempt: ${{ steps.identity.outputs.shard-0-attempt }}
+      shard-1-attempt: ${{ steps.identity.outputs.shard-1-attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -411,18 +419,183 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Require C#, PowerShell, and shell linting and formatting
-        run: docker compose run --rm tooling format-check
+      - name: Check all files in the complete formatting project partition
+        env:
+          FORMAT_SHARD: ${{ matrix.shard }}
+        run: >-
+          docker compose run --rm -e GITHUB_SHA -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling
+          format-check -FormatShardCount 2 -FormatShardIndex "${FORMAT_SHARD}"
+      - name: Upload the successful source-bound formatting receipt
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: formatting-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/formatting/shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+      - name: Bind the successful formatting producer
+        id: identity
+        env:
+          FORMAT_SHARD: ${{ matrix.shard }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+        run: |
+          echo "shard-${FORMAT_SHARD}-artifact-id=${ARTIFACT_ID}" >> "${GITHUB_OUTPUT}"
+          echo "shard-${FORMAT_SHARD}-attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
 
+  formatting:
+    if: always() && github.event_name != 'schedule'
+    needs: formatting-partition
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require every formatting project partition
+        env:
+          PARTITION_RESULT: ${{ needs.formatting-partition.result }}
+        run: test "${PARTITION_RESULT}" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Authenticate both immutable formatting receipts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FIRST_ID: ${{ needs.formatting-partition.outputs.shard-0-artifact-id }}
+          SECOND_ID: ${{ needs.formatting-partition.outputs.shard-1-artifact-id }}
+          FIRST_ATTEMPT: ${{ needs.formatting-partition.outputs.shard-0-attempt }}
+          SECOND_ATTEMPT: ${{ needs.formatting-partition.outputs.shard-1-attempt }}
+        run: |
+          set -euo pipefail
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${FIRST_ID}" \
+            --name "formatting-shard-0-${GITHUB_RUN_ID}-${GITHUB_SHA}-${FIRST_ATTEMPT}" \
+            --producer-attempt "${FIRST_ATTEMPT}"
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${SECOND_ID}" \
+            --name "formatting-shard-1-${GITHUB_RUN_ID}-${GITHUB_SHA}-${SECOND_ATTEMPT}" \
+            --producer-attempt "${SECOND_ATTEMPT}"
+      - name: Download the first formatting receipt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.formatting-partition.outputs.shard-0-artifact-id }}
+          merge-multiple: true
+          path: artifacts/formatting
+      - name: Download the second formatting receipt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.formatting-partition.outputs.shard-1-artifact-id }}
+          merge-multiple: true
+          path: artifacts/formatting
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+      - name: Require the unchanged complete solution and tracked-file formatting universe
+        env:
+          SHARPPROOF_FORMAT_ARTIFACT_ATTEMPTS: '{"0":"${{ needs.formatting-partition.outputs.shard-0-attempt }}","1":"${{ needs.formatting-partition.outputs.shard-1-attempt }}"}'
+        run: >-
+          docker compose run --rm -e GITHUB_SHA -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT
+          -e SHARPPROOF_FORMAT_ARTIFACT_ATTEMPTS tooling format-shard-gate
+      - name: Upload complete formatting reconciliation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: formatting-validation-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/formatting/formatting-validation.json
+          if-no-files-found: error
 
-  package-reproducibility:
+  package-reproducibility-first:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    outputs:
+      artifact-id: ${{ steps.reproduction.outputs.artifact-id }}
+      producer-attempt: ${{ steps.reproduction.outputs.producer-attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: ./.github/actions/reproduce-packages
+        id: reproduction
+        with:
+          run-index: "0"
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  package-reproducibility-second:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-id: ${{ steps.reproduction.outputs.artifact-id }}
+      producer-attempt: ${{ steps.reproduction.outputs.producer-attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/reproduce-packages
+        id: reproduction
+        with:
+          run-index: "1"
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  package-reproducibility:
+    if: always() && github.event_name != 'schedule'
+    needs: [package-reproducibility-first, package-reproducibility-second]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require both independent analyzer-enabled reproductions
+        env:
+          FIRST_RESULT: ${{ needs.package-reproducibility-first.result }}
+          SECOND_RESULT: ${{ needs.package-reproducibility-second.result }}
+        run: |
+          set -euo pipefail
+          [[ "${FIRST_RESULT}" == success && "${SECOND_RESULT}" == success ]]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Authenticate both independent immutable run artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FIRST_ID: ${{ needs.package-reproducibility-first.outputs.artifact-id }}
+          SECOND_ID: ${{ needs.package-reproducibility-second.outputs.artifact-id }}
+          FIRST_ATTEMPT: ${{ needs.package-reproducibility-first.outputs.producer-attempt }}
+          SECOND_ATTEMPT: ${{ needs.package-reproducibility-second.outputs.producer-attempt }}
+        run: |
+          set -euo pipefail
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${FIRST_ID}" \
+            --name "package-reproducibility-run-0-${GITHUB_RUN_ID}-${GITHUB_SHA}-${FIRST_ATTEMPT}" \
+            --producer-attempt "${FIRST_ATTEMPT}"
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${SECOND_ID}" \
+            --name "package-reproducibility-run-1-${GITHUB_RUN_ID}-${GITHUB_SHA}-${SECOND_ATTEMPT}" \
+            --producer-attempt "${SECOND_ATTEMPT}"
+      - name: Download the first exact independent reproduction
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package-reproducibility-first.outputs.artifact-id }}
+          merge-multiple: true
+          path: artifacts/reproducibility-inputs/0
+      - name: Download the second exact independent reproduction
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package-reproducibility-second.outputs.artifact-id }}
+          merge-multiple: true
+          path: artifacts/reproducibility-inputs/1
 
       - uses: ./.github/actions/prepare-qualified-packages
         with:
@@ -430,9 +603,13 @@ jobs:
 
       - name: Require full independent-path managed payload reproducibility
         id: package-reproducibility
-        if: ${{ !cancelled() }}
+        env:
+          FIRST_ATTEMPT: ${{ needs.package-reproducibility-first.outputs.producer-attempt }}
+          SECOND_ATTEMPT: ${{ needs.package-reproducibility-second.outputs.producer-attempt }}
         run: >-
-          docker compose run --rm tooling package-reproducibility -Configuration Release
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling
+          package-reproducibility -Configuration Release -ReproductionMode Compare
+          -FirstRunAttempt "${FIRST_ATTEMPT}" -SecondRunAttempt "${SECOND_ATTEMPT}"
 
       - name: Summarize managed payload and raw ZIP comparisons separately
         if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
@@ -455,7 +632,7 @@ jobs:
         if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}
+          name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/reproducibility/
           if-no-files-found: error
 

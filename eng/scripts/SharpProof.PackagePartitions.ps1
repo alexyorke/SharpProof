@@ -11,15 +11,83 @@ function Get-SharpProofPackagePartition {
     return $remainder
 }
 
+function Test-SharpProofPackageCasePartitionedMethod {
+    param([string]$Method)
+    # These independently isolated cases dominate package-0 when their entire
+    # parameterized method is assigned to one runner. All other methods retain
+    # their original ownership, including their parameterized cases.
+    return $Method -ceq 'SharpProof.Package.Test.PackageLayoutSmokeTests.MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance'
+}
+
+function Get-SharpProofPackageCasePartition {
+    param([string]$Method, [string]$Name, [ValidateRange(1, 4)][int]$Count = 4)
+    if (Test-SharpProofPackageCasePartitionedMethod -Method $Method) {
+        if ([string]::IsNullOrWhiteSpace($Name)) { throw 'Package case ownership requires a discovered case name.' }
+        return Get-SharpProofPackagePartition -Method ($Method + '|' + $Name) -Count $Count
+    }
+    return Get-SharpProofPackagePartition -Method $Method -Count $Count
+}
+
+function ConvertTo-SharpProofPackageFilterValue {
+    param([string]$Value)
+    # VSTest filter operators and backslashes must be escaped in exact NUnit
+    # case names. Pass this value as one argument, without a shell evaluation.
+    return [regex]::Replace($Value, '[\\()&|=!~]', '\$0')
+}
+
+function Get-SharpProofPackagePartitionFilter {
+    param([object[]]$Cases)
+    if ($Cases.Count -eq 0) { throw 'Package partition selected no cases.' }
+    return @($Cases | ForEach-Object {
+            $defaultName = $_.name -ceq $_.method -or $_.name.StartsWith($_.method + '(', [StringComparison]::Ordinal)
+            # A custom TestName is a different discovery leaf from its source
+            # method. Select that leaf explicitly so adapter discovery and
+            # execution agree even when a parent method also matches.
+            if ((Test-SharpProofPackageCasePartitionedMethod -Method $_.method) -or -not $defaultName) {
+                'FullyQualifiedName=' + (ConvertTo-SharpProofPackageFilterValue -Value $_.name)
+            }
+            else {
+                'FullyQualifiedName~' + $_.method
+            }
+        } | Sort-Object -Unique -CaseSensitive) -join '|'
+}
+
+function ConvertTo-SharpProofPackageCaseShardFilter {
+    param([string]$Filter, [object[]]$Cases)
+    foreach ($method in @($Cases | Where-Object { Test-SharpProofPackageCasePartitionedMethod -Method $_.method } | ForEach-Object { $_.method } | Sort-Object -Unique -CaseSensitive)) {
+        $parentSelector = 'FullyQualifiedName~' + $method
+        if ($Filter.Contains($parentSelector, [StringComparison]::Ordinal)) {
+            # Wider local waves can put renamed children and their source
+            # method in different inner buckets. Match only the source
+            # method's default-name leaves here; aliases keep their own bucket.
+            $defaultCases = @($Cases | Where-Object { $_.method -ceq $method -and $_.name.StartsWith($method + '(', [StringComparison]::Ordinal) })
+            $leaves = Get-SharpProofPackagePartitionFilter -Cases $defaultCases
+            $Filter = $Filter.Replace($parentSelector, '(' + $leaves + ')', [StringComparison]::Ordinal)
+        }
+    }
+    return $Filter
+}
+
+function Assert-SharpProofPackagePartitionSelection {
+    param([object[]]$Expected, [string[]]$Discovered)
+    $expectedNames = @($Expected | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
+    $actualNames = @($Discovered | Sort-Object -CaseSensitive)
+    if ($expectedNames.Count -eq 0 -or ($expectedNames -join "`n") -cne ($actualNames -join "`n")) {
+        throw 'Package partition filtered discovery differs from its assigned cases.'
+    }
+}
+
 function Read-SharpProofPackageDiscovery {
     param([string]$Dump, [string]$Filter = '')
     [xml]$document = Get-Content -LiteralPath $Dump -Raw
     $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $names = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
     foreach ($test in $document.SelectNodes('//*[local-name()="test-case"]')) {
         $categories = @($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') | ForEach-Object { [string]$_.value })
         if ($Filter -ne '' -and @($categories | Where-Object { $_ -in @('Performance', 'Coverage', 'Corpus') }).Count -gt 0) { continue }
         $method = [string]$test.classname + '.' + [string]$test.methodname
-        if ($method -notmatch '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*\.[A-Za-z_][A-Za-z0-9_]*$' -or [string]::IsNullOrWhiteSpace([string]$test.fullname)) {
+        if ($method -notmatch '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*\.[A-Za-z_][A-Za-z0-9_]*$' -or [string]::IsNullOrWhiteSpace([string]$test.fullname) -or
+            -not $names.Add([string]$test.fullname)) {
             throw 'Package discovery has an invalid method or case name.'
         }
         $cases.Add(([ordered]@{ method = $method; name = [string]$test.fullname }).AsReadOnly())
@@ -60,7 +128,7 @@ function Assert-SharpProofPackagePartitions {
     $assigned = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($root in $Roots) {
         $receipt = Get-Content -LiteralPath (Join-Path $root 'package-partition.json') -Raw | ConvertFrom-Json
-        if ($receipt.schemaVersion -ne 1 -or $receipt.count -ne 4 -or $receipt.index -notin 0..3 -or
+        if ($receipt.schemaVersion -ne 2 -or $receipt.count -ne 4 -or $receipt.index -notin 0..3 -or
             -not $indices.Add([int]$receipt.index) -or $receipt.commit -cne $Commit -or
             $receipt.runId -cne [string]$RunId -or $receipt.filter -cne $Filter) {
             throw 'Package partitions have duplicated, missing, or mismatched identities.'
@@ -69,9 +137,19 @@ function Assert-SharpProofPackagePartitions {
         $names = @($cases | ForEach-Object { $_.method + '|' + $_.name } | Sort-Object -CaseSensitive)
         if ($null -ne $universe -and ($universe -join "`n") -cne ($names -join "`n")) { throw 'Package partitions discovered different test universes.' }
         $universe = $names
-        $expected = @($cases | Where-Object { (Get-SharpProofPackagePartition -Method $_.method) -eq $receipt.index })
+        $expected = @($cases | Where-Object { (Get-SharpProofPackageCasePartition -Method $_.method -Name $_.name) -eq $receipt.index })
         $expectedNames = @($expected | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
-        if (($expectedNames -join "`n") -cne (@($receipt.selected | Sort-Object -CaseSensitive) -join "`n")) { throw 'Package partition assignments differ from SHA-256 method ownership.' }
+        if (($expectedNames -join "`n") -cne (@($receipt.selected | Sort-Object -CaseSensitive) -join "`n") -or
+            $receipt.selectionFilter -cne (Get-SharpProofPackagePartitionFilter -Cases $expected)) { throw 'Package partition assignments differ from SHA-256 case ownership.' }
+        $discovered = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $shards = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+        foreach ($shard in @($receipt.shards)) {
+            if ($shard.name -cnotmatch '^[a-z][a-z0-9-]+$' -or -not $shards.Add([string]$shard.name)) { throw 'Package partition has invalid or duplicated discovery shards.' }
+            $listing = Join-Path $root ($shard.name + '.txt')
+            if ($shard.sha256 -cnotmatch '^[A-F0-9]{64}$' -or (Get-FileHash -LiteralPath $listing -Algorithm SHA256).Hash -cne $shard.sha256) { throw 'Package partition discovery hash differs from its receipt.' }
+            $discovered.AddRange([string[]]@(Get-Content -LiteralPath $listing))
+        }
+        Assert-SharpProofPackagePartitionSelection -Expected $expected -Discovered @($discovered.ToImmutable())
         Assert-SharpProofPackagePartitionReceipt -Root $root -Expected $expected
         foreach ($case in $expected) { $assigned.Add($case.method + '|' + $case.name) }
     }

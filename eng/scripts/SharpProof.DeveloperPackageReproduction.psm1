@@ -8,12 +8,14 @@ function Get-SharpProofDeveloperQualificationBuildProjects {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+
+        [switch]$IncludeConsumerHarness
     )
 
     $root = [IO.Path]::GetFullPath($RepositoryRoot)
     $projects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
-    foreach ($project in (Get-SharpProofPackageBuildProjects -RepositoryRoot $root)) {
+    foreach ($project in (Get-SharpProofPackageBuildProjects -RepositoryRoot $root -IncludeConsumerHarness:$IncludeConsumerHarness)) {
         [void]$projects.Add($project)
     }
     [xml]$solution = [IO.File]::ReadAllText((Join-Path $root 'SharpProof.slnx'))
@@ -36,6 +38,37 @@ function Get-SharpProofDeveloperQualificationBuildProjects {
     }
     return , [Collections.Immutable.ImmutableArray]::CreateRange[string](
         [string[]]@($projects.ToImmutable() | Sort-Object -CaseSensitive))
+}
+
+function Get-SharpProofPreparedCodeFixesPackage {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageSource,
+        [Parameter(Mandatory)][string]$PackageVersion,
+        [Parameter(Mandatory)][string]$RepositoryCommit
+    )
+    if ([string]::IsNullOrWhiteSpace($PackageVersion) -or $RepositoryCommit -cnotmatch '\A[0-9a-f]{40}\z') {
+        throw 'Prepared editor qualification requires the expected version and exact source commit.'
+    }
+    $source = Get-Item -LiteralPath $PackageSource -Force
+    if (-not $source.PSIsContainer -or ($source.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw 'The prepared editor package source must be an ordinary directory.'
+    }
+    $files = @(Get-ChildItem -LiteralPath $source.FullName -Force)
+    if ($files.Count -ne 1 -or $files[0].PSIsContainer -or
+        ($files[0].Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        $files[0].Name -cne "SharpProof.CodeFixes.$PackageVersion.nupkg") {
+        throw 'The prepared editor source must contain only the expected SharpProof.CodeFixes archive.'
+    }
+    $identity = Get-SharpProofPackageIdentity -Path $files[0].FullName -RequireRepository -RequireSingleIdentity
+    if ($identity.Id -cne 'SharpProof.CodeFixes' -or $identity.Version -cne $PackageVersion -or
+        $identity.RepositoryCommit -cne $RepositoryCommit) {
+        throw 'The prepared editor archive differs from the expected version or source commit.'
+    }
+    return ([ordered]@{
+            Path   = $files[0].FullName
+            Sha256 = (Get-FileHash -LiteralPath $files[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        }).AsReadOnly()
 }
 
 function Get-SharpProofDeveloperPackageBuildPlan {
@@ -163,4 +196,4 @@ function Compare-SharpProofDeveloperPackageSnapshots {
         }).AsReadOnly()
 }
 
-Export-ModuleMember -Function Get-SharpProofDeveloperQualificationBuildProjects, Get-SharpProofDeveloperPackageBuildPlan, Get-SharpProofReproductionDiagnosticText, Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots
+Export-ModuleMember -Function Get-SharpProofDeveloperQualificationBuildProjects, Get-SharpProofPreparedCodeFixesPackage, Get-SharpProofDeveloperPackageBuildPlan, Get-SharpProofReproductionDiagnosticText, Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots

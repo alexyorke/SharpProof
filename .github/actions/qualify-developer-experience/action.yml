@@ -9,6 +9,23 @@ inputs:
     description: Immutable artifact ID emitted by the optional tool producer in this run.
     required: true
 
+  producer-attempt:
+    description: Successful attempt that prepared the core/editor/runtime inputs.
+    required: false
+    default: ""
+  tool-producer-attempt:
+    description: Successful attempt that qualified the CLI archive.
+    required: false
+    default: ""
+  codefix-artifact-id:
+    description: Immutable editor archive from the combined product build.
+    required: false
+    default: ""
+  developer-harness-artifact-id:
+    description: Authenticated runtime from the combined analyzer-enabled build.
+    required: false
+    default: ""
+
 outputs:
   developer-artifact-id:
     description: Immutable artifact containing the qualified editor and template archives.
@@ -34,6 +51,28 @@ runs:
       run: |
         set -euo pipefail
         [[ "${PACKAGE_ARTIFACT_ID}" =~ ^[0-9]+$ && "${TOOL_ARTIFACT_ID}" =~ ^[0-9]+$ ]]
+    - name: Authenticate every prepared source and runtime artifact
+      if: inputs.developer-harness-artifact-id != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        CORE_ARTIFACT_ID: ${{ inputs.package-artifact-id }}
+        TOOL_ARTIFACT_ID: ${{ inputs.tool-artifact-id }}
+        CODEFIX_ARTIFACT_ID: ${{ inputs.codefix-artifact-id }}
+        HARNESS_ARTIFACT_ID: ${{ inputs.developer-harness-artifact-id }}
+        PRODUCER_ATTEMPT: ${{ inputs.producer-attempt }}
+        TOOL_PRODUCER_ATTEMPT: ${{ inputs.tool-producer-attempt }}
+      run: |
+        set -euo pipefail
+        validate() {
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "$1" \
+            --name "$2-${GITHUB_RUN_ID}-${GITHUB_SHA}-$3" --producer-attempt "$3"
+        }
+        validate "${CORE_ARTIFACT_ID}" nuget-packages "${PRODUCER_ATTEMPT}"
+        validate "${TOOL_ARTIFACT_ID}" nuget-tool "${TOOL_PRODUCER_ATTEMPT}"
+        validate "${CODEFIX_ARTIFACT_ID}" prepared-codefix "${PRODUCER_ATTEMPT}"
+        validate "${HARNESS_ARTIFACT_ID}" developer-harness "${PRODUCER_ATTEMPT}"
     - uses: ./.github/actions/prepare-qualified-packages
       id: prepared
       with:
@@ -44,6 +83,20 @@ runs:
         artifact-ids: ${{ inputs.tool-artifact-id }}
         merge-multiple: true
         path: tool-nupkgs
+    - name: Download the exact prepared editor archive
+      if: inputs.developer-harness-artifact-id != ''
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        artifact-ids: ${{ inputs.codefix-artifact-id }}
+        merge-multiple: true
+        path: artifacts/prepared-developer-packages
+    - name: Download the authenticated developer runtime
+      if: inputs.developer-harness-artifact-id != ''
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        artifact-ids: ${{ inputs.developer-harness-artifact-id }}
+        merge-multiple: true
+        path: artifacts/developer-harness
     - name: Build candidate consumer image
       id: consumer
       shell: bash
@@ -71,8 +124,13 @@ runs:
       env:
         SHARPPROOF_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
         SHARPPROOF_QUALIFIED_TOOL_PACKAGES: tool-nupkgs
+        SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES: ${{ inputs.developer-harness-artifact-id != '' && 'artifacts/prepared-developer-packages' || '' }}
+        SHARPPROOF_DEVELOPER_HARNESS: ${{ inputs.developer-harness-artifact-id != '' && 'artifacts/developer-harness' || '' }}
+        SHARPPROOF_DEVELOPER_PRODUCER_ATTEMPT: ${{ inputs.producer-attempt }}
       run: >-
-        docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE -e SHARPPROOF_QUALIFIED_TOOL_PACKAGES tooling
+        docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE -e SHARPPROOF_QUALIFIED_TOOL_PACKAGES
+        -e SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES -e SHARPPROOF_DEVELOPER_HARNESS
+        -e SHARPPROOF_DEVELOPER_PRODUCER_ATTEMPT -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling
         developer-experience -Configuration Release -PackageSource nupkgs
     - name: Exercise the retained generated Compose project in the exact candidate image
       env:

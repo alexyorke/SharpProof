@@ -177,15 +177,17 @@ $qualificationBody = $qualificationFunctions[0].Body.GetScriptBlock()
 function Test-DeveloperQualificationRoute {
     param(
         [scriptblock]$Body,
-        [ValidateSet('Normal', 'Fast', 'PackOnly', 'ConsumerFailure')][string]$Route
+        [ValidateSet('Normal', 'Fast', 'PackOnly', 'ConsumerFailure', 'Prepared', 'PreparedFailure', 'PreparedPackOnly')][string]$Route
     )
     $repositoryRoot = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-developer-route-' + [Guid]::NewGuid().ToString('N'))
     $Fast = $Route -ceq 'Fast'
-    $PackOnly = $Route -ceq 'PackOnly'
+    $PackOnly = $Route -cin @('PackOnly', 'PreparedPackOnly')
+    $hasPreparedDeveloperInput = $Route.StartsWith('Prepared', [StringComparison]::Ordinal)
     $PackageSource = 'fixture-package-feed'
     $observed = [ordered]@{ filter = $null; buildArguments = $null; consumer = $false; projects = $expectedRoots }
     function Invoke-SharpProofSolutionBuild {
         param([string]$BuildConfiguration, [string[]]$AdditionalBuildArguments = @(), [string]$BuildTarget)
+        if ($hasPreparedDeveloperInput) { throw 'Prepared developer qualification must not invoke a managed build.' }
         if ($BuildConfiguration -cne 'Release' -or $null -eq $AdditionalBuildArguments) {
             throw 'Developer qualification supplied null build arguments or lost Release configuration.'
         }
@@ -201,6 +203,21 @@ function Test-DeveloperQualificationRoute {
     }
     function Invoke-RequiredScript {
         param([string]$Path, [string]$FailureMessage, [object]$Arguments)
+        if ($hasPreparedDeveloperInput) {
+            if ($Path -cne 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' -or [string]::IsNullOrWhiteSpace($FailureMessage) -or
+                $Arguments.Count -ne 6 -or $Arguments['PackageSource'] -cne $PackageSource -or
+                $Arguments['ConsumerImage'] -cne $env:SHARPPROOF_CONSUMER_IMAGE -or
+                $Arguments['ToolPackageSource'] -cne $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES -or
+                $Arguments['PreparedCodeFixesSource'] -cne $env:SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES -or
+                $Arguments['DeveloperHarness'] -cne $env:SHARPPROOF_DEVELOPER_HARNESS -or
+                $Arguments['QualificationMode'] -cne 'AnalyzerEnabled') {
+                throw 'Prepared developer qualification lost its exact input route or normal analyzer mode.'
+            }
+            $observed.consumer = $true
+            if ($Route -ceq 'PreparedFailure') { throw 'Fixture developer consumer failure.' }
+            [IO.Directory]::CreateDirectory((Join-Path $repositoryRoot 'artifacts/developer-experience')) | Out-Null
+            return
+        }
         if ($Path -cne 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' -or [string]::IsNullOrWhiteSpace($FailureMessage) -or
             $Arguments['BuildTarget'] -cne $observed.filter -or -not [IO.File]::Exists($Arguments['BuildTarget']) -or
             $Arguments['PackageSource'] -cne $PackageSource -or $Arguments['PackOnly'] -ne $PackOnly -or
@@ -226,8 +243,21 @@ function Test-DeveloperQualificationRoute {
         $consumerFailed = $false
         try { & $Body }
         catch {
-            if ($Route -cne 'ConsumerFailure' -or $_.Exception.Message -cne 'Fixture developer consumer failure.') { throw }
+            if ($Route -ceq 'PreparedPackOnly' -and $_.Exception.Message -ceq 'A prepared developer harness requires complete qualification.') {
+                if ($observed.consumer -or $null -ne $observed.filter) { throw 'Prepared PackOnly admission executed work before rejecting the route.' }
+                return
+            }
+            if ($Route -cnotin @('ConsumerFailure', 'PreparedFailure') -or $_.Exception.Message -cne 'Fixture developer consumer failure.') { throw }
             $consumerFailed = $true
+        }
+        if ($hasPreparedDeveloperInput) {
+            $modeFile = Join-Path $repositoryRoot 'artifacts/developer-experience/qualification-mode.txt'
+            if (-not $observed.consumer -or $null -ne $observed.filter -or $null -ne $observed.buildArguments -or
+                $consumerFailed -ne ($Route -ceq 'PreparedFailure') -or
+                [IO.File]::Exists($modeFile) -ne ($Route -ceq 'Prepared')) {
+                throw 'Prepared developer qualification must preserve consumer failure and avoid a redundant build.'
+            }
+            return
         }
         if (-not $observed.consumer -or $consumerFailed -ne ($Route -ceq 'ConsumerFailure') -or
             $null -eq $observed.filter -or [IO.File]::Exists($observed.filter)) {
@@ -248,7 +278,7 @@ function Test-DeveloperQualificationRoute {
     }
 }
 
-foreach ($route in @('Normal', 'Fast', 'PackOnly', 'ConsumerFailure')) {
+foreach ($route in @('Normal', 'Fast', 'PackOnly', 'ConsumerFailure', 'Prepared', 'PreparedFailure', 'PreparedPackOnly')) {
     Test-DeveloperQualificationRoute -Body $qualificationBody -Route $route
     $checks++
 }

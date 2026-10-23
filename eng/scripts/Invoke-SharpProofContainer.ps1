@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'format-shard-gate', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -49,7 +49,19 @@ param(
     [ValidateSet('Text', 'Json')]
     [string]$Format = 'Text',
 
-    [string]$TargetFramework = ''
+    [string]$TargetFramework = '',
+
+    [ValidateSet(1, 2)][int]$FormatShardCount = 1,
+
+    [ValidateRange(0, 1)][int]$FormatShardIndex = 0,
+
+    [ValidateSet('Sequential', 'Build', 'Compare')][string]$ReproductionMode = 'Sequential',
+
+    [ValidateRange(0, 1)][int]$ReproductionRunIndex = 0,
+
+    [ValidateRange(0, 2147483647)][int]$FirstRunAttempt = 0,
+
+    [ValidateRange(0, 2147483647)][int]$SecondRunAttempt = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -128,11 +140,31 @@ else {
     , [Collections.Immutable.ImmutableArray[string]]::Empty
 }
 
+$hasPreparedDeveloperInput = $Command -eq 'developer-experience' -and (
+    -not [string]::IsNullOrWhiteSpace($env:SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES) -or
+    -not [string]::IsNullOrWhiteSpace($env:SHARPPROOF_DEVELOPER_HARNESS))
+if ($hasPreparedDeveloperInput -and ($Fast -or
+        [string]::IsNullOrWhiteSpace($PackageSource) -or
+        [string]::IsNullOrWhiteSpace($env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES) -or
+        [string]::IsNullOrWhiteSpace($env:SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES) -or
+        [string]::IsNullOrWhiteSpace($env:SHARPPROOF_DEVELOPER_HARNESS))) {
+    throw 'Prepared developer qualification requires all exact producer inputs and enabled analyzers.'
+}
+if (($FormatShardCount -ne 1 -or $PSBoundParameters.ContainsKey('FormatShardIndex')) -and $Command -ne 'format-check') {
+    throw 'Formatting partition options require format-check.'
+}
+if (($ReproductionMode -ne 'Sequential' -or
+        $PSBoundParameters.ContainsKey('ReproductionRunIndex') -or
+        $PSBoundParameters.ContainsKey('FirstRunAttempt') -or
+        $PSBoundParameters.ContainsKey('SecondRunAttempt')) -and $Command -ne 'package-reproducibility') {
+    throw 'Independent reproduction options require package-reproducibility.'
+}
+
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
-    -not $NoBuild -and -not $Fast -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'format-shard-gate', 'lint', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
+    -not $NoBuild -and -not $Fast -and -not $hasPreparedDeveloperInput -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
     Invoke-SharpProofRequiredDotnet @(
@@ -327,6 +359,14 @@ function Invoke-DependencyAudit {
 # Source-only checks that pr runs before its solution build. They need no
 # build output, so CI runs them beside the canonical build instead of before it.
 function Invoke-RepositoryGates {
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperHarness.ps1' `
+        'Developer runtime receipt regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproductionEvidence.ps1' `
+        'Independent reproduction evidence regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofCSharpFormatting.ps1' `
+        'Complete formatting shard regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperQualificationInputs.ps1' `
+        'Prepared developer qualification input regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofFuzzRunnerBuild.ps1' `
         'Fuzz runner build receipt regressions failed.'
     Invoke-PipelineCommand 'docs' $Configuration
@@ -355,7 +395,138 @@ function Invoke-RepositoryGates {
         'Public API governance controls failed.'
 }
 
+function Invoke-ProductPack([switch]$IncludeDeveloperInputs) {
+    $output = Join-Path $repositoryRoot 'artifacts/container-packages'
+    $artifactsRoot = [IO.Path]::GetFullPath(
+        (Join-Path $repositoryRoot 'artifacts'))
+    $resolvedOutput = [IO.Path]::GetFullPath($output)
+    if (-not $resolvedOutput.StartsWith(
+            $artifactsRoot + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::Ordinal)) {
+        throw "Refusing to clean package output outside artifacts: $resolvedOutput"
+    }
+    if ([IO.Directory]::Exists($resolvedOutput)) {
+        [IO.Directory]::Delete($resolvedOutput, $true)
+    }
+    [System.IO.Directory]::CreateDirectory($output) | Out-Null
+    $repositoryCommit = (& git rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
+        throw 'Could not resolve the repository commit for package provenance.'
+    }
+    $diagnostics = Join-Path $repositoryRoot 'artifacts/pack-diagnostics'
+    [IO.Directory]::CreateDirectory($diagnostics) | Out-Null
+    Write-Host "Pack diagnostics: $diagnostics"
+    $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
+    . (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
+    $packageBuildProjects = Get-SharpProofPackageBuildProjects `
+        -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
+    Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
+    $qualifiedBuildFilter = $null
+    $buildStartedUtc = $null
+    $packageBuildFilter = Join-Path $repositoryRoot (
+        '.sharpproof-package-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        # The package catalog defines roots; MSBuild retains their full
+        # product, analyzer and generator closure. The parallel canonical
+        # build continues to verify every source and test project.
+        ([ordered]@{
+            solution = ([ordered]@{
+                    path     = 'SharpProof.slnx'
+                    projects = $packageBuildProjects
+                }).AsReadOnly()
+        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath $packageBuildFilter -Encoding utf8NoBOM
+        $selectedBuildFilter = $packageBuildFilter
+        $buildArguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArguments.AddRange([string[]]@(
+                '/p:GeneratePackageOnBuild=false',
+                "-bl:$(Join-Path $diagnostics 'build.binlog');ProjectImports=None",
+                $repositoryCommitProperty))
+        if ($IncludeDeveloperInputs) {
+            $qualifiedBuildFilter = Join-Path $repositoryRoot (
+                '.sharpproof-ci-products-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+            ([ordered]@{ solution = ([ordered]@{
+                        path     = 'SharpProof.slnx'
+                        projects = Get-SharpProofDeveloperQualificationBuildProjects `
+                            -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
+                    }).AsReadOnly()
+            }).AsReadOnly() | ConvertTo-Json -Depth 4 |
+                Set-Content -LiteralPath $qualifiedBuildFilter -Encoding utf8NoBOM
+            $selectedBuildFilter = $qualifiedBuildFilter
+            $buildArguments.AddRange([string[]]@(
+                    '-p:ContinuousIntegrationBuild=true',
+                    "-p:SourceRevisionId=$repositoryCommit",
+                    '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true'))
+        }
+        $buildStartedUtc = [DateTime]::UtcNow
+        Invoke-SharpProofSolutionBuild `
+            -BuildConfiguration 'Release' -BuildTarget $selectedBuildFilter `
+            -AdditionalBuildArguments ([string[]]@($buildArguments.ToImmutable()))
+        Invoke-SharpProofRequiredDotnet @(
+            'pack', $packageBuildFilter, '--configuration', 'Release',
+            '--output', $output, '--no-build', '--no-restore',
+            '/p:GeneratePackageOnBuild=false',
+            "-bl:$(Join-Path $diagnostics 'pack.binlog');ProjectImports=None",
+            $repositoryCommitProperty)
+    }
+    finally {
+        if (Test-Path -LiteralPath $packageBuildFilter) {
+            Remove-Item -LiteralPath $packageBuildFilter -Force
+        }
+        if ($null -ne $qualifiedBuildFilter -and (Test-Path -LiteralPath $qualifiedBuildFilter)) {
+            Remove-Item -LiteralPath $qualifiedBuildFilter -Force
+        }
+    }
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
+        'Package graph validation failed.' `
+    ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
+    Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
+        'Consumer harness export failed.' `
+    ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
+    if ($IncludeDeveloperInputs) {
+        foreach ($product in @(
+                ([ordered]@{ Name = 'Tool'; Directory = 'tool-packages' }).AsReadOnly(),
+                ([ordered]@{ Name = 'CodeFixes'; Directory = 'prepared-developer-packages' }).AsReadOnly())) {
+            $productOutput = [IO.Path]::GetFullPath((Join-Path $artifactsRoot $product.Directory))
+            if (-not $productOutput.StartsWith($artifactsRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) {
+                throw 'Refusing to clean optional product output outside artifacts.'
+            }
+            if ([IO.Directory]::Exists($productOutput)) { [IO.Directory]::Delete($productOutput, $true) }
+            [void][IO.Directory]::CreateDirectory($productOutput)
+            Invoke-SharpProofRequiredDotnet @(
+                'pack', "src/SharpProof.$($product.Name)/SharpProof.$($product.Name).csproj",
+                '--configuration', 'Release', '--no-build', '--no-restore', '--output', $productOutput,
+                '-p:ContinuousIntegrationBuild=true', '-p:GeneratePackageOnBuild=false',
+                "-p:RepositoryCommit=$repositoryCommit", "-p:SourceRevisionId=$repositoryCommit",
+                '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true')
+        }
+        Invoke-RequiredScript 'eng/scripts/Export-SharpProofDeveloperHarness.ps1' `
+            'Developer harness export failed.' ([ordered]@{
+                PackageSource           = $output
+                ToolPackageSource       = (Join-Path $artifactsRoot 'tool-packages')
+                PreparedCodeFixesSource = (Join-Path $artifactsRoot 'prepared-developer-packages')
+                Configuration           = 'Release'
+                BuildStartedUtc         = $buildStartedUtc
+            }).AsReadOnly()
+    }
+}
+
 function Invoke-DeveloperQualification([switch]$PackOnly) {
+    if ($hasPreparedDeveloperInput) {
+        if ($PackOnly) { throw 'A prepared developer harness requires complete qualification.' }
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
+            'Prepared developer-experience qualification failed.' ([ordered]@{
+                ConsumerImage           = $env:SHARPPROOF_CONSUMER_IMAGE
+                PackageSource           = $PackageSource
+                ToolPackageSource       = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES
+                PreparedCodeFixesSource = $env:SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES
+                DeveloperHarness        = $env:SHARPPROOF_DEVELOPER_HARNESS
+                QualificationMode       = 'AnalyzerEnabled'
+            }).AsReadOnly()
+        [IO.File]::WriteAllText((Join-Path $repositoryRoot 'artifacts/developer-experience/qualification-mode.txt'),
+            "Repository analyzers enabled in authenticated producer.`n", [Text.UTF8Encoding]::new($false))
+        return
+    }
     Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
     $buildProjects = Get-SharpProofDeveloperQualificationBuildProjects -RepositoryRoot $repositoryRoot
     $buildFilter = Join-Path $repositoryRoot (
@@ -404,12 +575,20 @@ switch ($Command) {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofLint.ps1')
     }
     'format-check' {
-        Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
-            'Repository script linting or formatting failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofScriptTools.ps1' `
-            'Script-tool regression tests failed.'
+        if ($FormatShardIndex -eq 0) {
+            Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
+                'Repository script linting or formatting failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
+            Invoke-RequiredScript 'eng/scripts/Test-SharpProofScriptTools.ps1' `
+                'Script-tool regression tests failed.'
+        }
         Invoke-RequiredScript 'eng/scripts/Format-CSharp.ps1' `
-            'Repository formatting check failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
+            'Repository formatting check failed.' ([ordered]@{
+                VerifyNoChanges = $true; ShardCount = $FormatShardCount; ShardIndex = $FormatShardIndex
+            }).AsReadOnly()
+    }
+    'format-shard-gate' {
+        Import-Module (Join-Path $PSScriptRoot 'SharpProof.CSharpFormatting.psm1') -Force
+        Assert-SharpProofCSharpFormattingShards -RepositoryRoot $repositoryRoot
     }
     'doctor' {
         $doctorTarget = if ($PSBoundParameters.ContainsKey('Target')) { $Target } else { '' }
@@ -762,9 +941,27 @@ switch ($Command) {
             'Coverage shard collection failed.' $coverageShardArguments
     }
     'package-reproducibility' {
+        $reproductionArguments = [ordered]@{
+            Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility'
+            IncludeDeveloperPackages = $true
+            DeveloperConsumerImage   = ('ghcr.io/alexyorke/sharpproof@sha256:' + ('0' * 64))
+            ExecutionMode            = $ReproductionMode
+        }
+        if ($ReproductionMode -ne 'Sequential') {
+            $reproductionArguments['WorkflowRunId'] = $env:GITHUB_RUN_ID
+            $reproductionArguments['WorkflowRunAttempt'] = $env:GITHUB_RUN_ATTEMPT
+        }
+        if ($ReproductionMode -eq 'Build') {
+            $reproductionArguments['RunIndex'] = $ReproductionRunIndex
+        }
+        elseif ($ReproductionMode -eq 'Compare') {
+            $reproductionArguments['FirstRunDirectory'] = 'artifacts/reproducibility-inputs/0'
+            $reproductionArguments['SecondRunDirectory'] = 'artifacts/reproducibility-inputs/1'
+            $reproductionArguments['FirstRunAttempt'] = $FirstRunAttempt
+            $reproductionArguments['SecondRunAttempt'] = $SecondRunAttempt
+        }
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproduciblePackages.ps1' `
-            'Independent-path package reproduction failed.' `
-        ([ordered]@{ Scope = 'Full'; OutputDirectory = 'artifacts/reproducibility'; IncludeDeveloperPackages = $true; DeveloperConsumerImage = ('ghcr.io/alexyorke/sharpproof@sha256:' + ('0' * 64)) }).AsReadOnly()
+            'Independent-path package reproduction failed.' $reproductionArguments.AsReadOnly()
     }
     'package-partition-gate' {
         . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
@@ -903,66 +1100,9 @@ switch ($Command) {
             'Optional Tool consumer validation failed.' ([ordered]@{ PackageSource = $PackageSource }).AsReadOnly()
     }
     'pack' {
-        $output = Join-Path $repositoryRoot 'artifacts/container-packages'
-        $artifactsRoot = [IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot 'artifacts'))
-        $resolvedOutput = [IO.Path]::GetFullPath($output)
-        if (-not $resolvedOutput.StartsWith(
-                $artifactsRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::Ordinal)) {
-            throw "Refusing to clean package output outside artifacts: $resolvedOutput"
-        }
-        if ([IO.Directory]::Exists($resolvedOutput)) {
-            [IO.Directory]::Delete($resolvedOutput, $true)
-        }
-        [System.IO.Directory]::CreateDirectory($output) | Out-Null
-        $repositoryCommit = (& git rev-parse HEAD).Trim()
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
-            throw 'Could not resolve the repository commit for package provenance.'
-        }
-        $diagnostics = Join-Path $repositoryRoot 'artifacts/pack-diagnostics'
-        [IO.Directory]::CreateDirectory($diagnostics) | Out-Null
-        Write-Host "Pack diagnostics: $diagnostics"
-        $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
-        . (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
-        $packageBuildProjects = Get-SharpProofPackageBuildProjects `
-            -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
-        $packageBuildFilter = Join-Path $repositoryRoot (
-            '.sharpproof-package-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
-        try {
-            # The package catalog defines roots; MSBuild retains their full
-            # product, analyzer and generator closure. The parallel canonical
-            # build continues to verify every source and test project.
-            ([ordered]@{
-                solution = ([ordered]@{
-                        path     = 'SharpProof.slnx'
-                        projects = $packageBuildProjects
-                    }).AsReadOnly()
-            }).AsReadOnly() | ConvertTo-Json -Depth 4 |
-                Set-Content -LiteralPath $packageBuildFilter -Encoding utf8NoBOM
-            Invoke-SharpProofSolutionBuild `
-                -BuildConfiguration 'Release' -BuildTarget $packageBuildFilter `
-                -AdditionalBuildArguments @(
-                '/p:GeneratePackageOnBuild=false',
-                "-bl:$(Join-Path $diagnostics 'build.binlog');ProjectImports=None",
-                $repositoryCommitProperty)
-            Invoke-SharpProofRequiredDotnet @(
-                'pack', $packageBuildFilter, '--configuration', 'Release',
-                '--output', $output, '--no-build', '--no-restore',
-                '/p:GeneratePackageOnBuild=false',
-                "-bl:$(Join-Path $diagnostics 'pack.binlog');ProjectImports=None",
-                $repositoryCommitProperty)
-        }
-        finally {
-            if (Test-Path -LiteralPath $packageBuildFilter) {
-                Remove-Item -LiteralPath $packageBuildFilter -Force
-            }
-        }
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
-            'Package graph validation failed.' `
-        ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
-        Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
-            'Consumer harness export failed.' `
-        ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
+        Invoke-ProductPack
+    }
+    'pack-ci-products' {
+        Invoke-ProductPack -IncludeDeveloperInputs
     }
 }

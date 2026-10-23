@@ -25,6 +25,9 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof > /dev/null 2>&1; then
   elif [[ "${command_name}" = "canonical-cohort-gate" ]]; then
     # Normalize only the receipt output directory; downloaded evidence stays unchanged.
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/canonical-cohorts"
+  elif [[ "${command_name}" = "format-shard-gate" ]]; then
+    # The gate exports one new validation file beside immutable downloaded receipts.
+    install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/formatting"
   fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
@@ -78,7 +81,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly | fuzz-nightly | pack | pack-tool | package-reproducibility | developer-packages)
+    nightly | fuzz-nightly | pack | pack-ci-products | pack-tool | package-reproducibility | developer-packages)
       return 0
       ;;
     *)
@@ -92,7 +95,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate | package-partition-gate)
+    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate | package-partition-gate | format-shard-gate)
       return 0
       ;;
     *)
@@ -215,6 +218,25 @@ if [[ "${command_name}" == package-consumers ]]; then
     cp -a -- "${harness_source}" "${task_root}/artifacts/consumer-harness"
   fi
 fi
+# Prepared developer qualification accepts only its two declared artifact inputs.
+# Every runtime and archive byte is authenticated again in the private workspace.
+if [[ "${command_name}" == developer-experience ]] &&
+  [[ -n "${SHARPPROOF_DEVELOPER_HARNESS:-}${SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES:-}" ]]; then
+  if [[ "${SHARPPROOF_DEVELOPER_HARNESS:-}" != artifacts/developer-harness ||
+    "${SHARPPROOF_QUALIFIED_CODEFIX_PACKAGES:-}" != artifacts/prepared-developer-packages ]]; then
+    echo "Prepared developer inputs must use the explicit authenticated artifact paths." >&2
+    exit 2
+  fi
+  for developer_input in developer-harness prepared-developer-packages; do
+    input_source="${repo_root}/artifacts/${developer_input}"
+    if [[ ! -d "${input_source}" || -L "${input_source}" ]] ||
+      [[ -n "$(find "${input_source}" -type l -print -quit)" ]]; then
+      echo "Prepared developer inputs must be directories without symbolic links." >&2
+      exit 2
+    fi
+    cp -a -- "${input_source}" "${task_root}/artifacts/${developer_input}"
+  done
+fi
 # The optional tool feed is an explicit input to its following qualification
 # task. Copy only its release archives and known identity sidecars; keep all
 # other ignored artifact output outside the private workspace snapshot.
@@ -260,11 +282,50 @@ case "${command_name}" in
       cp -a "${repo_root}/artifacts/canonical-cohorts" "${task_root}/artifacts/"
     fi
     ;;
+  format-shard-gate)
+    input_source="${repo_root}/artifacts/formatting"
+    if [[ ! -d "${input_source}" || -L "${input_source}" ]] ||
+      [[ -n "$(find "${input_source}" -type l -print -quit)" ]]; then
+      echo "Formatting receipts must be directories without symbolic links." >&2
+      exit 2
+    fi
+    cp -a -- "${input_source}" "${task_root}/artifacts/formatting"
+    ;;
+  package-reproducibility)
+    reproduction_mode=""
+    previous_argument=""
+    for argument in "$@"; do
+      if [[ "${previous_argument,,}" == -reproductionmode ]]; then
+        reproduction_mode="${argument,,}"
+        break
+      fi
+      previous_argument="${argument}"
+    done
+    if [[ "${reproduction_mode}" == compare ]]; then
+      input_source="${repo_root}/artifacts/reproducibility-inputs"
+      if [[ ! -d "${input_source}" || -L "${input_source}" ]] ||
+        [[ -n "$(find "${input_source}" -type l -print -quit)" ]]; then
+        echo "Reproduction inputs must be directories without symbolic links." >&2
+        exit 2
+      fi
+      cp -a -- "${input_source}" "${task_root}/artifacts/reproducibility-inputs"
+    fi
+    ;;
 esac
 if [[ "${source_has_git}" = "true" ]] &&
   [[ -d "${task_root}/.git" ]]; then
   # Keep generated task artifacts outside tracked-file discovery.
   printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
+  if [[ "${command_name}" == developer-experience && -n "${SHARPPROOF_DEVELOPER_HARNESS:-}" ]]; then
+    # These exact data inputs are authenticated separately. Keep other
+    # untracked files visible to the clean-source and runtime-receipt checks.
+    printf '%s\n' \
+      '/nupkgs/packages.tsv' '/nupkgs/packages.lock.json' \
+      '/nupkgs/Test-SharpProofPublishedPackages.sh' \
+      '/tool-nupkgs/packages.tsv' '/tool-nupkgs/packages.lock.json' \
+      '/tool-nupkgs/Test-SharpProofPublishedPackages.sh' \
+      '/consumer-image.json' >> "${task_root}/.git/info/exclude"
+  fi
   # Include copied additions in changed-line checks and remove deleted paths
   # from tracked-file discovery after moves. Only the disposable task index
   # is modified; existing content edits remain unstaged.
@@ -285,6 +346,7 @@ set -e
 # tool restore output and temporary build roots stay in the disposable task.
 # Aggregate gates consume downloaded evidence owned by the runner. Export only
 # their new results, preserving the authenticated inputs and their ownership.
+input_excludes=()
 case "${command_name}" in
   package-consumers)
     if [[ -n "${consumer_harness:-}" ]]; then
@@ -304,6 +366,16 @@ case "${command_name}" in
   coverage-gate)
     result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json)
     ;;
+  format-shard-gate)
+    result_paths=(formatting/formatting-validation.json)
+    ;;
+  package-reproducibility)
+    result_paths=(reproducibility)
+    ;;
+  developer-experience)
+    result_paths=(.)
+    input_excludes=(--exclude='./developer-harness' --exclude='./prepared-developer-packages')
+    ;;
   *)
     result_paths=(.)
     ;;
@@ -319,5 +391,6 @@ if [[ ${#export_paths[@]} -eq 0 ]]; then
 fi
 tar -C "${task_root}/artifacts" \
   --exclude='./bin' --exclude='./obj' --exclude='./toolset' --exclude='./tmp' \
+  "${input_excludes[@]}" \
   -cf - "${export_paths[@]}" | tar -C "${repo_root}/artifacts" -xf -
 exit "${task_status}"

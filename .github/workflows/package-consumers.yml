@@ -54,6 +54,10 @@ jobs:
     outputs:
       package-artifact-id: ${{ steps.package-upload.outputs.artifact-id }}
       consumer-harness-artifact-id: ${{ steps.consumer-harness-upload.outputs.artifact-id }}
+      prepared-tool-artifact-id: ${{ steps.prepared-tool-upload.outputs.artifact-id }}
+      codefix-artifact-id: ${{ steps.codefix-upload.outputs.artifact-id }}
+      developer-harness-artifact-id: ${{ steps.developer-harness-upload.outputs.artifact-id }}
+      producer-attempt: ${{ steps.product-identity.outputs.attempt }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,7 +87,7 @@ jobs:
         run: docker compose run --rm tooling format-check
 
       - name: Pack and validate the package graph
-        run: docker compose run --rm tooling pack -Configuration Release
+        run: docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling pack-ci-products -Configuration Release
 
       - name: Record qualified package identities and hashes
         run: |
@@ -105,6 +109,32 @@ jobs:
           path: artifacts/consumer-harness/
           if-no-files-found: error
           include-hidden-files: true
+
+      - name: Upload the prepared optional tool archive
+        id: prepared-tool-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepared-tool-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/tool-packages/*.nupkg
+          if-no-files-found: error
+      - name: Upload the prepared editor archive
+        id: codefix-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepared-codefix-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/prepared-developer-packages/*.nupkg
+          if-no-files-found: error
+      - name: Upload the authenticated developer test harness
+        id: developer-harness-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: developer-harness-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/developer-harness/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Bind the successful product producer attempt
+        id: product-identity
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -413,6 +443,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -423,10 +454,14 @@ jobs:
         with:
           package-artifact-id: ${{ needs.package-artifacts.outputs.package-artifact-id }}
           tool-artifact-id: ${{ needs.optional-tool.outputs.tool-artifact-id }}
+          tool-producer-attempt: ${{ needs.optional-tool.outputs.producer-attempt }}
+          producer-attempt: ${{ needs.package-artifacts.outputs.producer-attempt }}
+          codefix-artifact-id: ${{ needs.package-artifacts.outputs.codefix-artifact-id }}
+          developer-harness-artifact-id: ${{ needs.package-artifacts.outputs.developer-harness-artifact-id }}
 
   developer-experience:
     name: Developer tools, templates, and canonical consumer image
-    needs: [repository-quality, release-qualification, security, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool, provenance, developer-experience-candidate]
+    needs: [repository-quality, release-qualification, security, package-artifacts, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool, provenance, developer-experience-candidate]
     if: >-
       always() && needs.package.result == 'success' &&
       needs.container-verifier.result == 'success' && needs.portable-consumers.result == 'success' &&
@@ -493,12 +528,21 @@ jobs:
         with:
           package-artifact-id: ${{ needs.package.outputs.package-artifact-id }}
           tool-artifact-id: ${{ needs.optional-tool.outputs.tool-artifact-id }}
+          tool-producer-attempt: ${{ needs.optional-tool.outputs.producer-attempt }}
+          producer-attempt: ${{ needs.package-artifacts.outputs.producer-attempt }}
+          codefix-artifact-id: ${{ needs.package-artifacts.outputs.codefix-artifact-id }}
+          developer-harness-artifact-id: ${{ needs.package-artifacts.outputs.developer-harness-artifact-id }}
 
   optional-tool:
     name: Pack and qualify the optional CLI tool
+    needs: package-artifacts
     outputs:
       tool-artifact-id: ${{ steps.tool-upload.outputs.artifact-id }}
+      producer-attempt: ${{ steps.tool-identity.outputs.attempt }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -507,8 +551,23 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Pack the isolated optional tool feed
-        run: docker compose run --rm tooling pack-tool -Configuration Release
+      - name: Authenticate the prepared optional tool archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PREPARED_TOOL_ARTIFACT_ID: ${{ needs.package-artifacts.outputs.prepared-tool-artifact-id }}
+          PRODUCER_ATTEMPT: ${{ needs.package-artifacts.outputs.producer-attempt }}
+        run: >-
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs
+          --artifact-id "${PREPARED_TOOL_ARTIFACT_ID}"
+          --name "prepared-tool-${GITHUB_RUN_ID}-${GITHUB_SHA}-${PRODUCER_ATTEMPT}"
+          --producer-attempt "${PRODUCER_ATTEMPT}"
+      - name: Download the isolated exact-source optional tool feed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package-artifacts.outputs.prepared-tool-artifact-id }}
+          merge-multiple: true
+          path: artifacts/tool-packages
       - name: Restore the exact tool into an outside-repository local manifest and exercise it
         run: >-
           docker compose run --rm tooling tool-consumer
@@ -524,6 +583,9 @@ jobs:
           name: nuget-tool-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/tool-packages/*
           if-no-files-found: error
+      - name: Bind the successful tool qualification attempt
+        id: tool-identity
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
   provenance:
     name: Attest qualified release packages
