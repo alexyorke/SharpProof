@@ -6,6 +6,32 @@ unchanged 100% changed-TCB floor still applies.
 
 ## Qualified evidence and scope
 
+The latest measured report is [workflow 39933180738](https://github.com/alexyorke/SharpProof/actions/runs/39933180738).
+All fifteen shards passed. It covers merge commit
+`7e5c83bb58ea44e89f228e5ceab81292bf699643`, whose verified parents are master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature head
+`17c2d67036a0fd1ae1213e205bc93172cb788ad1`. It measures 8231/8329
+changed-TCB lines (98.82%), leaving 98 gaps against the unchanged 100% floor.
+The 102 added controls closed 49 of the previous 147 gaps. Local follow-up
+tests are not counted in this report. The report and deduplicated gap list are
+retained in `artifacts/resource-17c-coverage-evidence` and
+`artifacts/resource-17c-coverage-gaps.txt`.
+
+The baseline partition below remains historical evidence. The remaining 98
+units are under renewed review, distinguishing enforced helper preconditions
+from invariants supplied only by current callers. Neither classification
+grants a coverage exemption.
+
+The follow-up batch adds 26 verified cases (128 across eleven boundary fixtures
+in total). Its local checks passed 20 analyzer/SDK/source cases, 19 frontend
+cases, 10 IR cases, 25 focused worker cases and two replay-observation cases.
+It covers genuine parenthesized initializer syntax, recursive varargs,
+256/257-parameter expression-bodied closures, nested object initializers and
+partial-property recovery, as well as explicitly scoped typed helper negatives.
+A malformed typed allocation observation is tested separately from interpreter
+output, with atomic Unknown on its mismatched identity. The coverage effect of
+this batch is not measured yet. Formatting, lint and layout passed.
+
 The report from [workflow 39925263744](https://github.com/alexyorke/SharpProof/actions/runs/39925263744) covers merge commit
 `1a583de04cb43b72af502e822682ea702810c873`, whose parents are master
 `70fba9efeefe8cb621cbf834998941985a5227ee` and feature head
@@ -40,6 +66,9 @@ renewed review.
 
 - Certified closure frames require the Total factory, whose supported integer
   widths and type kinds exclude the fallback cases in `IrClosureFrameSite`.
+  This is a caller invariant: the standalone helper also accepts Legacy inputs.
+  A verified helper-only control now rejects a width-zero Legacy integer field;
+  it establishes no certified Total lifetime proof.
   Allocation-shape constructors require initialized arrays and valid storage
   kinds; zero multiplication is normalized before growth traversal.
 - Replay event bounds follow the admitted observation count. Normal completion
@@ -55,7 +84,10 @@ renewed review.
 - A reviewed layout and validated literal allocation/frame shapes give constant
   replay bounds. Unsupported reference-array storage fails before violation
   replay. Root activation establishes stack ownership before repetition.
-  Expected verification yields complete success or explicit Unknown.
+  Expected verification yields complete success or explicit Unknown. Its
+  projection helper separately accepts nullable typed records: five verified
+  controls cover a complete result and four individually missing fields, with
+  atomic `ResourceExpectedEvidenceIncomplete` and no partial evidence.
 - Canonical runtime declarations contain exactly eleven unique sorted quantities
   and separate deployment/quantity identity domains. Namespace-name recursion
   stops before the global namespace. These precede the repeated guards.
@@ -63,6 +95,9 @@ renewed review.
   required by later carrier revalidation. The image stream rejects growth beyond
   its limit before the later image-length check. No compiler assembly emission
   that passes creation but produces a non-assembly reference was established.
+  The validator component has a broader input domain than generated MoveNext:
+  real emitted constructors now verify mutable versus readonly owned stores,
+  and a nil method handle in the same valid image is rejected explicitly.
 - Outer lambda capture analysis covers the nested capture union, and the complete
   descendant scan precedes parent traversal. Valid C# supplies one field per
   variable initializer; the new frontend controls inspect actual operations.
@@ -73,10 +108,14 @@ Do not label these proven unreachable merely because no test was found:
 
 - Compiler emission stream overflow within the admitted source limit. Source
   exception shadows now establish a real emit-only failure control.
-- Foreign compilation-reference ownership in resource call analysis.
+- Foreign compilation-reference ownership is now covered by verified rejection
+  and same-compilation controls; the fresh coverage effect remains unmeasured.
 - Runtime arithmetic composition and contract replay budget catches after all
   earlier source, envelope and immutable-limit checks.
-- A parsed method declaration with no declared symbol in the diagnostic fallback.
+- A genuine speculative semantic model now verifies the diagnostic helper's
+  missing-declared-symbol fallback through public SDK context construction.
+  This is not a normal analyzer-driver callback: that driver rejects trees not
+  present in the compilation. A normal-model control reports Proven.
 
 The next stopping condition is a fresh report after the new controls pass,
 followed by a deduplicated update of each remaining unit. Any change to coverage
@@ -128,4 +167,40 @@ They are not a list of approved exclusions.
 | [NativeResourceTaskRuntimeBinding.cs](../src/SharpProof.Worker/NativeResourceTaskRuntimeBinding.cs#L17) | 17, 30, 33, 86 |
 | [NativeResourceViolationReplay.cs](../src/SharpProof.Worker/NativeResourceViolationReplay.cs#L83) | 83, 140, 153, 266 |
 | [NativeTaskEmittedFaultSiteVerifier.cs](../src/SharpProof.Worker/NativeTaskEmittedFaultSiteVerifier.cs#L37) | 37, 44 |
+| [NativeTaskRuntimeCostVerifier.cs](../src/SharpProof.Worker/NativeTaskRuntimeCostVerifier.cs#L62) | 62, 80, 81 |
+
+## Exact latest measured units
+
+These 98 units remain uncovered in the latest qualified report. Follow-up
+controls are pending verification and measurement; these are not exclusions.
+
+| File | Uncovered lines |
+| --- | --- |
+| [ResourceBoundsDiagnostics.cs](../src/SharpProof.Analyzer.Core/ResourceBoundsDiagnostics.cs#L38) | 38 |
+| [ResourceBoundsAnalysis.Allocations.cs](../src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Allocations.cs#L164) | 164 |
+| [ResourceBoundsAnalysis.Calls.cs](../src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Calls.cs#L66) | 66, 84 |
+| [ResourceBoundsAnalysis.cs](../src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.cs#L182) | 182 |
+| [ResourceBoundsAnalysis.Recursion.cs](../src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Recursion.cs#L54) | 54, 70 |
+| [ResourceBoundsAnalysis.Stack.cs](../src/SharpProof.Compiler.Semantics/ResourceBoundsAnalysis.Stack.cs#L54) | 54, 83 |
+| [CompilerForkJoinResourceLowering.cs](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerForkJoinResourceLowering.cs#L38) | 38 |
+| [CompilerTaskCarrierCollector.cs](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerTaskCarrierCollector.cs#L51) | 51, 52, 65, 68, 82, 86, 102, 103, 120, 160, 191, 194, 195, 289, 297, 301, 304, 308, 309, 321, 324, 335, 353, 366, 381, 384, 387, 426, 430, 442, 445, 460, 461, 469, 474, 490, 625, 684, 706, 707, 712, 721 |
+| [CompilerTaskRuntimePremiseCollector.cs](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerTaskRuntimePremiseCollector.cs#L34) | 34, 154, 163 |
+| [RootParameterClosurePlan.cs](../src/SharpProof.Frontend/RootParameterClosurePlan.cs#L129) | 129, 147 |
+| [RoslynTotalProgramLowerer.Calls.cs](../src/SharpProof.Frontend/RoslynTotalProgramLowerer.Calls.cs#L171) | 171, 224, 235 |
+| [IrClosureFrameSite.cs](../src/SharpProof.Ir/IrClosureFrameSite.cs#L73) | 73, 75 |
+| [ResourceAllocationShape.cs](../src/SharpProof.Ir/ResourceAllocationShape.cs#L26) | 26 |
+| [ResourceAsymptoticGrowth.cs](../src/SharpProof.Ir/ResourceAsymptoticGrowth.cs#L80) | 80, 120 |
+| [ResourceBooleanDistribution.cs](../src/SharpProof.Ir/ResourceBooleanDistribution.cs#L20) | 20 |
+| [ResourceMemoryReplay.cs](../src/SharpProof.Ir/ResourceMemoryReplay.cs#L210) | 210, 301, 303, 315, 325, 365 |
+| [ResourceRuntimeLayout.cs](../src/SharpProof.Ir/ResourceRuntimeLayout.cs#L160) | 160 |
+| [ResourcePrimitiveHelperSelection.cs](../src/SharpProof.Specs/ResourcePrimitiveHelperSelection.cs#L66) | 66 |
+| [NativeResourceAccountingVerifier.cs](../src/SharpProof.Worker/NativeResourceAccountingVerifier.cs#L20) | 20 |
+| [NativeResourceAllocationVerifier.cs](../src/SharpProof.Worker/NativeResourceAllocationVerifier.cs#L70) | 70 |
+| [NativeResourceContractVerifier.cs](../src/SharpProof.Worker/NativeResourceContractVerifier.cs#L28) | 28, 35, 38, 44, 46, 47, 48, 166 |
+| [NativeResourceExpectedVerifier.cs](../src/SharpProof.Worker/NativeResourceExpectedVerifier.cs#L74) | 74 |
+| [NativeResourceMemoryEnvelope.cs](../src/SharpProof.Worker/NativeResourceMemoryEnvelope.cs#L60) | 60, 143 |
+| [NativeResourceProgramVerifier.cs](../src/SharpProof.Worker/NativeResourceProgramVerifier.cs#L169) | 169, 177 |
+| [NativeResourceStackVerifier.cs](../src/SharpProof.Worker/NativeResourceStackVerifier.cs#L73) | 73 |
+| [NativeResourceViolationReplay.cs](../src/SharpProof.Worker/NativeResourceViolationReplay.cs#L83) | 83, 140, 153, 266 |
+| [NativeTaskEmittedFaultSiteVerifier.cs](../src/SharpProof.Worker/NativeTaskEmittedFaultSiteVerifier.cs#L44) | 44 |
 | [NativeTaskRuntimeCostVerifier.cs](../src/SharpProof.Worker/NativeTaskRuntimeCostVerifier.cs#L62) | 62, 80, 81 |

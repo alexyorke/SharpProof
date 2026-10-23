@@ -116,7 +116,37 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
-### Boundary controls verified locally
+### Measured qualification at feature head 17c2d6703
+
+[Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39933180922)
+passed, including the repaired full package reproduction job. All fifteen
+[coverage shards](https://github.com/alexyorke/SharpProof/actions/runs/39933180738)
+passed, but the coverage gate remains below its unchanged 100% floor:
+8231/8329 changed-TCB lines (98.82%), leaving 98 gaps. The report covers merge
+`7e5c83bb58ea44e89f228e5ceab81292bf699643`, with verified parents master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature
+`17c2d67036a0fd1ae1213e205bc93172cb788ad1`. The 102 controls closed 49
+of the preceding 147 gaps in the same comparison universe.
+
+Follow-up local verification passed twenty analyzer/SDK/source cases, nineteen
+frontend cases, ten IR representation/helper cases, twenty-five focused worker
+cases and two malformed-observation cases. The batch adds 26 cases, bringing
+these boundary fixtures to 128 cases across eleven files. The final analyzer
+selector-only correction was rerun with the canonical `-Fast` test command;
+the preceding normal build compiled all twenty cases without warnings. Formatting,
+lint/API compatibility and layout passed (2964 source files, 62 projects, 151
+pinned common files). These later tests have no measured coverage claim.
+Overall completion still requires the unchanged coverage floor
+and qualification of the final committed source. The exact remaining units are
+tracked in the [coverage audit](resource-coverage-admission-audit.md).
+
+A concurrent chat advanced the same MR to `78bc5a24d`, preserving this head via
+a merge. Five read-only component audits found no concrete soundness regression
+in the incoming production changes. The local follow-up batch still needs to
+be integrated with that commit and verified together. The older package workflow
+was cancelled on the newer push; its result is not reported as a pass.
+
+### Prior boundary-control checkpoint
 
 All 1852 selected worker cases passed after correcting two new fixture setups.
 The focused 39-case correction run established the actual emit-only diagnostic,
@@ -129,12 +159,10 @@ were corrected or removed rather than changing production code to fit them.
 
 Final formatting, lint/API compatibility and layout passed with the fixtures
 and complete audit links (2963 source files, 62 projects, 151 pinned common
-files). The 102 cases
-have no qualified coverage count yet. The 147-line baseline and its source audit
-remain explicit until a fresh report replaces them. Exact-head hosted
-qualification and the unchanged 100% floor still prevent overall completion.
+files). Their measured effect is now recorded above. The prior 147-line baseline
+remains historical evidence. The unchanged 100% floor prevents overall completion.
 
-### Fresh qualification and remaining coverage work
+### Previous qualification and package repair
 
 Published head `ca3b70301` is mergeable against master `70fba9efe`. Its hosted
 merge commit `1a583de04cb43b72af502e822682ea702810c873` has exactly those two
@@ -168,7 +196,7 @@ Further tests and their coverage effect remain unqualified until verification.
 The [coverage admission audit](resource-coverage-admission-audit.md) partitions
 all 147 units and separates invariant findings from unresolved reachability.
 
-### Current master integration in progress
+### Completed master integration
 
 Master advanced to `70fba9efe` while the resource branch was qualifying. GitHub
 reported merge conflicts, preventing canonical PR qualification of `46602a45f`.

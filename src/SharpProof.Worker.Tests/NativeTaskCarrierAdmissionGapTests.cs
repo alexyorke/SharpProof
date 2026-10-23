@@ -1,3 +1,6 @@
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -142,6 +145,74 @@ internal sealed class NativeTaskCarrierAdmissionGapTests
         Assert.That(control.Projection!.Children, Has.Length.EqualTo(2));
         Action lower = () => { _ = CompilerForkJoinResourceLowering.Lower(method, compilation, callableId, cancellation); };
         Assert.That(Assert.Throws<ArgumentException>(lower)!.ParamName, Is.EqualTo("callableId"));
+    }
+
+    [Test]
+    public void BoundaryValidationRejectsANilMethodHandleInAValidImage()
+    {
+        var (bytes, framework) = CompileBoundaryConstructor(false);
+        using var stream = new MemoryStream(bytes, false);
+        using var image = new PEReader(stream);
+        var method = BoundaryConstructor(image.GetMetadataReader());
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method, framework, 2, cancellation), Is.Null);
+        Assert.That(CompilerTaskCarrierCollector.ValidateExceptionBoundary(image,
+            MetadataTokens.MethodDefinitionHandle(0), framework, 2, cancellation),
+            Is.EqualTo("TaskRootExceptionBoundaryMethodUnavailable"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ConstructorBoundaryStorageRequiresAWritableOwnedField(bool readOnly)
+    {
+        var (bytes, framework) = CompileBoundaryConstructor(readOnly);
+        using var stream = new MemoryStream(bytes, false);
+        using var image = new PEReader(stream);
+        var metadata = image.GetMetadataReader();
+        var method = BoundaryConstructor(metadata);
+        var definition = metadata.GetMethodDefinition(method);
+        var field = metadata.GetTypeDefinition(definition.GetDeclaringType()).GetFields().Single();
+        Assert.That((metadata.GetFieldDefinition(field).Attributes & System.Reflection.FieldAttributes.InitOnly) != 0,
+            Is.EqualTo(readOnly));
+        var body = image.GetMethodBody(definition.RelativeVirtualAddress);
+        var region = body.ExceptionRegions.Single();
+        Assert.That(region.Kind, Is.EqualTo(ExceptionRegionKind.Catch));
+        var code = body.GetILBytes()!;
+        var cursor = 0;
+        var ownsStoreBeforeTry = false;
+        while (cursor < region.TryOffset)
+        {
+            Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction), Is.True);
+            ownsStoreBeforeTry |= instruction.RawCode == "Stfld" && instruction.Operand == MetadataTokens.GetToken(field);
+        }
+        Assert.That(ownsStoreBeforeTry, Is.True, "The real constructor must write its owned field outside the protected region.");
+        // These are component body checks on real constructors, not generated
+        // MoveNext ownership or a task-root runtime bound.
+        Assert.That(CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method, framework, 2,
+            TestContext.CurrentContext.CancellationToken),
+            Is.EqualTo(readOnly ? "TaskRootExceptionBoundarySourceEscape" : null));
+    }
+
+    private static (byte[] Bytes, AssemblyIdentity Framework) CompileBoundaryConstructor(bool readOnly)
+    {
+        var source = "using System; using System.Threading.Tasks; using System.Runtime.CompilerServices; public struct C {public " +
+            (readOnly ? "readonly " : "") + "int Value; public C(int ignored) {Value=7; AsyncTaskMethodBuilder builder=default; " +
+            "try {Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult();} " +
+            "catch(Exception exception) {builder.SetException(exception);} builder.SetResult();} static void Helper() {}}";
+        var initial = TestCompilation.Create("ConstructorBoundary", [("Subject.cs", source)]);
+        var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(OptimizationLevel.Debug));
+        TestCompilation.AssertNoErrors(compilation);
+        using var emitted = new MemoryStream();
+        var emission = compilation.Emit(emitted, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
+        return (emitted.ToArray(), compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity);
+    }
+
+    private static MethodDefinitionHandle BoundaryConstructor(MetadataReader metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        var owner = metadata.TypeDefinitions.Single(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "C");
+        return metadata.GetTypeDefinition(owner).GetMethods().Single(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name) == ".ctor");
     }
 
     private static (CompilerManifestArtifact Artifact, CompilerCallablePreparation Target) RoundTrip(CSharpCompilation compilation)

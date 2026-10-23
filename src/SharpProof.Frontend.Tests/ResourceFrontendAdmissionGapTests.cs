@@ -4,6 +4,7 @@ using System.Numerics;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -166,6 +167,42 @@ public sealed class ResourceFrontendAdmissionGapTests
     }
 
     [Test]
+    public void NestedObjectInitializerCannotHideAnUnmodeledMetadataCall()
+    {
+        const string target = "int Target() { var item = new Payload(); return item.Child.Value; }";
+        const string cell = "public sealed class Cell { public int Value; }";
+        using var subject = TypedProgramSubject.Create(target,
+            "public sealed class Payload { public Cell Child = new Cell { Value = System.Math.Abs(-7) }; }" + cell);
+        Assert.That(subject.Invoke([]), Is.EqualTo(7));
+        var tree = subject.Compilation.SyntaxTrees.Single();
+        var model = subject.Compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().Single(static field => field is null
+            ? throw new ArgumentNullException(nameof(field)) : field.Declaration.Variables.Any(static variable => variable is null
+                ? throw new ArgumentNullException(nameof(variable)) : variable.Identifier.ValueText == "Child"));
+        var initializer = (IFieldInitializerOperation)model.GetOperation(declaration.Declaration.Variables.Single().Initializer!)!;
+        var creation = (IObjectCreationOperation)initializer.Value;
+        Assert.That(creation.Initializer!.Initializers.Single(), Is.InstanceOf<ISimpleAssignmentOperation>());
+        var assignment = (ISimpleAssignmentOperation)creation.Initializer.Initializers.Single();
+        var invocation = (IInvocationOperation)assignment.Value;
+        Assert.That(invocation.TargetMethod.ContainingType.ToDisplayString(), Is.EqualTo("System.Math"));
+        Assert.That(invocation.TargetMethod.DeclaringSyntaxReferences, Is.Empty);
+        var lowered = subject.LowerSourceCalls();
+        Assert.That(lowered.IsExact, Is.False);
+        Assert.That(lowered.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None));
+        Assert.That(lowered.ConstructionLimitExceeded, Is.False);
+
+        using var control = TypedProgramSubject.Create(target,
+            "public sealed class Payload { public Cell Child = new Cell { Value = 7 }; }" + cell);
+        Assert.That(control.Invoke([]), Is.EqualTo(7));
+        var exact = control.LowerSourceCalls();
+        Assert.That(exact.IsExact, Is.True, exact.Classification.Abstention.ToString());
+        var replay = control.Execute(exact, []);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(7)));
+    }
+
+    [Test]
     public void MultipleDeclaratorInitializersBindAndExecuteDistinctFieldSlots()
     {
         using var subject = TypedProgramSubject.Create(
@@ -189,6 +226,65 @@ public sealed class ResourceFrontendAdmissionGapTests
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
         Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(34)));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PartialPropertyInitializerRecoveryRequiresTheActualAssociatedBackingField(bool duplicateInitializer)
+    {
+        var source = "public sealed partial class Payload { public partial int Value { get; set; } = 7; " +
+            "public partial int Value { get => field; set => field = value; }" + (duplicateInitializer ? " = 9;" : "") +
+            " } public static class Subject { public static int Target() { var item = new Payload(); return 17; } }";
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create("PartialPropertyInitializerAdmission", [tree], TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null
+            ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id).ToArray();
+        if (duplicateInitializer)
+        {
+            Assert.That(errors, Has.Length.EqualTo(1));
+            Assert.That(errors[0], Is.EqualTo("CS9263"));
+        }
+        else
+        { Assert.That(errors, Is.Empty); }
+        var model = compilation.GetSemanticModel(tree);
+        var declarations = tree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>().ToArray();
+        Assert.That(declarations, Has.Length.EqualTo(2));
+        var definition = (IPropertySymbol)model.GetDeclaredSymbol(declarations[0])!;
+        var implementation = (IPropertySymbol)model.GetDeclaredSymbol(declarations[1])!;
+        Assert.That(SymbolEqualityComparer.Default.Equals(definition.PartialImplementationPart, implementation), Is.True);
+        Assert.That(SymbolEqualityComparer.Default.Equals(implementation.PartialDefinitionPart, definition), Is.True);
+        var fields = definition.ContainingType.GetMembers().OfType<IFieldSymbol>().ToArray();
+        Assert.That(fields, Has.Length.EqualTo(1));
+        Assert.That(SymbolEqualityComparer.Default.Equals(fields[0].AssociatedSymbol, definition), Is.True);
+        Assert.That(SymbolEqualityComparer.Default.Equals(fields[0].AssociatedSymbol, implementation), Is.False);
+        foreach (var declaration in declarations)
+        {
+            if (declaration.Initializer is not { } value)
+            { continue; }
+            var initializer = model.GetOperation(value) as IPropertyInitializerOperation;
+            Assert.That(initializer, Is.Not.Null);
+            Assert.That(initializer!.InitializedProperties, Has.Length.EqualTo(1));
+            Assert.That(initializer.Value.ConstantValue.Value, Is.EqualTo(declaration == declarations[0] ? 7 : 9));
+        }
+        var methodSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var context = new TotalLoweringContext(factory, method);
+        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(methodSyntax, model)!, context,
+            static _ => true, TestContext.CurrentContext.CancellationToken);
+        Assert.That(lowered.IsExact, Is.EqualTo(!duplicateInitializer), lowered.Classification.Abstention.ToString());
+        Assert.That(lowered.ConstructionLimitExceeded, Is.False);
+        if (duplicateInitializer)
+        { Assert.That(lowered.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None)); }
+        else
+        {
+            var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, ImmutableDictionary<IrVarId, IrValue>.Empty);
+            Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(replay.ConsumedApproximation, Is.False);
+            Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(17)));
+        }
     }
 
     [TestCase(-2, 0)]

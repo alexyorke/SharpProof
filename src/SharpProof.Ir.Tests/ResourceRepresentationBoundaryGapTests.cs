@@ -66,6 +66,31 @@ public sealed class ResourceRepresentationBoundaryGapTests
         Assert.That(Assert.Throws<ArgumentOutOfRangeException>(pastEnd)!.ParamName, Is.EqualTo("slot"));
     }
 
+    [Test]
+    public void StandaloneCaptureHelperRejectsLegacyIntegersWithoutPrimitiveStorage()
+    {
+        // This is standalone helper input validation using builder-valid Legacy
+        // IR, not a registered Total frame certificate or a lifetime proof.
+        var factory = new IrFactory(IrExecutionSemantics.Legacy);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var frameType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        var frame = factory.CreateVariable("frame", frameType);
+        var allocation = builder.Allocate(entry, factory.CreateOperation(IrClosureFrameSite.Description), frameType, frame);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
+            IrClosureFrameSite.FieldName(0), factory.IntegerType, false);
+        var receiver = factory.Cast(factory.ObjectType, factory.Variable(frame));
+        var store = builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field,
+            receiver, field, factory.Integer(1));
+        builder.Return(entry, factory.CreateOperation());
+        _ = builder.Build();
+        Assert.That(factory.GetTypeInfo(factory.GetMemberInfo(field).ReturnType).Width, Is.Zero);
+        Assert.That(IrClosureFrameSite.Matches(factory, allocation), Is.True);
+        Assert.That(IrClosureFrameSite.TryGetCapture(factory, allocation, store, 0,
+            ResourceStorageKind.Word32, out var captured), Is.False);
+        Assert.That(captured.IsDefault, Is.True);
+    }
+
     [TestCase(false, 0, 24)]
     [TestCase(false, 1, 32)]
     [TestCase(false, 17, 96)]

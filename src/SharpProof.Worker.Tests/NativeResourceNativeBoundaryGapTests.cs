@@ -13,6 +13,33 @@ internal sealed partial class NativeResourceContractTests
 {
     private static readonly ImmutableArray<long> BoundaryRuntimeQuantities = [2, 5, 3, 7, 11, 13, 17, 19, 23, 29, 31];
 
+    [Test]
+    public void MemoryEnvelopeValidatesReconstructedAssignmentTypesAtItsComponentBoundary()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("scalar", factory.IntegerType);
+        var assignment = builder.Assign(entry, factory.CreateOperation(), target, factory.Integer(0));
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        var owner = new CompilerTotalCallablePreparation("native-component", program, [], null, [])
+        { EffectsCompleteAtEntry = true };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, cancellation), Is.True);
+
+        // Model constructors can represent a mismatched assignment without
+        // passing through the builder's type check. The component must reject
+        // that input before treating the reference value as a scalar transfer.
+        var reference = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var mismatched = new IrAssignInstruction(assignment.Id, assignment.Operation, assignment.Target, factory.Null(reference));
+        var block = program.Blocks.Single();
+        var reconstructed = new IrBasicBlock(block.Id, block.Name, block.Instructions.SetItem(0, mismatched));
+        var malformed = new IrProgram(factory, program.Scope, program.Entry, program.Blocks.SetItem(0, reconstructed));
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner with { Program = malformed }, cancellation), Is.False);
+        Assert.That(NativeResourceMemoryEnvelope.Admits(owner, cancellation), Is.True);
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

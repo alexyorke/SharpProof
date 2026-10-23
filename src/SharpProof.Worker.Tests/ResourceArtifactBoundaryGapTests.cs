@@ -11,6 +11,28 @@ namespace SharpProof.Worker.Test;
 internal sealed partial class NativeResourceContractTests
 {
     [Test]
+    public void BooleanDistributionNamesRejectMalformedInputsAndAdmitTheMaximumCanonicalLength()
+    {
+        var boundaryName = new string('x', ResourceExpression.MaximumTextLength);
+        foreach (var name in new[] { " \t", "selected\n", boundaryName + "x" })
+        {
+            ResourceBooleanDistribution? distribution = null;
+            Action construct = () => { distribution = new ResourceBooleanDistribution(0, name, 1, 3); };
+            var exception = Assert.Throws<ArgumentException>(construct);
+            Assert.That(exception!.ParamName, Is.EqualTo("name"));
+            Assert.That(distribution, Is.Null);
+        }
+
+        var admitted = new ResourceBooleanDistribution(0, boundaryName, 1, 3);
+        Assert.That(admitted.Name, Is.EqualTo(boundaryName));
+        Assert.That(admitted.Ordinal, Is.Zero);
+        Assert.That(admitted.TrueWeight, Is.EqualTo(1));
+        Assert.That(admitted.FalseWeight, Is.EqualTo(3));
+        Assert.That(admitted.ExpectedUpper(ResourceExpression.One, ResourceExpression.Literal(3)).Constant,
+            Is.EqualTo(new BigInteger(2)));
+    }
+
+    [Test]
     public void ResourceArtifactProducerRejectsSimultaneousProofAndGapBeforePublishingACallable()
     {
         var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var allocated = new int[3];")));
