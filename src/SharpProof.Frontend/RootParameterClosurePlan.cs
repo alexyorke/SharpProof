@@ -97,6 +97,8 @@ internal sealed class RootParameterClosurePlan
         foreach (var function in functions)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // The root region includes captures made by all nested functions.
+            // Later root-owned capture unions are subsets of that bounded set.
             if (function.Syntax is not ExpressionSyntax expression || model.AnalyzeDataFlow(expression) is not { Succeeded: true } flow ||
                 flow.CapturedInside.IsEmpty || flow.CapturedInside.Length > ResourceAllocationShape.MaximumFields)
             { return null; }
@@ -125,8 +127,6 @@ internal sealed class RootParameterClosurePlan
                 usesRoot = true;
                 if (!captures.Contains(capture, SymbolEqualityComparer.Default))
                 { captures.Add(capture); }
-                if (captures.Count > ResourceAllocationShape.MaximumFields)
-                { return null; }
             }
             if (usesRoot && sharesRoot && !SymbolEqualityComparer.Default.Equals(function.Symbol, anonymous.Symbol))
             { rootCacheSlots++; }
@@ -139,12 +139,11 @@ internal sealed class RootParameterClosurePlan
             for (var index = 1; index < functions.Count; index++)
             {
                 var parent = functions[index].Parent;
-                var steps = 0;
+                // This parent chain stays inside the root body whose complete
+                // descendant inventory already passed the 4096-operation cap.
                 while (parent != null && parent is not IAnonymousFunctionOperation)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (++steps > 4096)
-                    { return null; }
                     parent = parent.Parent;
                 }
                 if (parent is not IAnonymousFunctionOperation containing ||

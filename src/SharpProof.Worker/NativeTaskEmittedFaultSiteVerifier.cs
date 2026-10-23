@@ -30,23 +30,21 @@ internal static class NativeTaskEmittedFaultSiteVerifier
         }
         if (capture.UnknownReason is not null || projection.RootCallableId != root.CallableId || shapes.RootCallableId != root.CallableId)
         { return new(null, "TaskEmittedFaultBodyEvidenceInvalid"); }
-        if (CompilerTaskEmittedFaultBodyOwnership.Validate(inventory, shapes, projection.FrameworkAssemblyIdentity, cancellation) is { } failure)
+        if (CompilerTaskEmittedFaultBodyOwnership.ValidateAndDecode(inventory, shapes, projection.FrameworkAssemblyIdentity,
+                cancellation, out var decodedBodies) is { } failure)
         { return new(null, failure); }
         var source = NativeTaskCarrierStorageVerifier.CheckSourceBodies(shapes, projection, root, layout, cancellation);
         if (source.DirectSourceActivationsUpper is null)
         { return new(null, source.UnknownReason); }
         var sites = ImmutableArray.CreateBuilder<NativeTaskEmittedFaultSite>();
-        foreach (var body in inventory.Bodies)
+        foreach (var body in decodedBodies)
         {
             cancellation.ThrowIfCancellationRequested();
-            var scan = CompilerTaskPrimitiveIlScanner.Scan(body.Code, cancellation);
-            if (scan.Instructions is not { } instructions)
-            { return new(null, scan.UnknownReason); }
-            foreach (var instruction in instructions)
+            foreach (var instruction in body.Instructions)
             {
                 cancellation.ThrowIfCancellationRequested();
                 if (instruction.Faults != CompilerTaskPrimitiveFaultKind.None)
-                { sites.Add(new(body.MethodToken, instruction.Offset, instruction.OpCode, instruction.Faults)); }
+                { sites.Add(new(body.Body.MethodToken, instruction.Offset, instruction.OpCode, instruction.Faults)); }
             }
         }
         return new(sites.ToImmutable(), null);

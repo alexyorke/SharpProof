@@ -139,8 +139,9 @@ internal static class NativeResourceMemoryEnvelope
             { continue; }
             if (block == use)
             { return false; }
-            if (IrInstructionFacts.TryGetSuccessors(program.GetBlock(block).Terminator) is not { } successors)
-            { return false; }
+            // IrBasicBlock admits only the closed IIrTerminator implementations;
+            // each has an initialized successor set, including terminal exits.
+            var successors = IrInstructionFacts.TryGetSuccessors(program.GetBlock(block).Terminator)!.Value;
             if (successors.First is { } first)
             { pending.Push(first); }
             if (successors.Second is { } second)

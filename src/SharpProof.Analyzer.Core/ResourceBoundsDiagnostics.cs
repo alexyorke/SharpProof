@@ -34,7 +34,14 @@ internal static class ResourceBoundsDiagnostics
         if (!enabled)
         { return; }
         var declaration = (MethodDeclarationSyntax)context.Node;
-        if (context.SemanticModel.GetDeclaredSymbol(declaration, context.CancellationToken) is not IMethodSymbol method)
+        AnalyzeBoundDeclaration(context, context.SemanticModel.GetDeclaredSymbol(declaration, context.CancellationToken));
+    }
+
+    internal static void AnalyzeBoundDeclaration(SyntaxNodeAnalysisContext context, ISymbol? binding)
+    {
+        context = RepositoryParameterGuard.ValidateInitialized(context, context.Node is null, nameof(context), "Value must be initialized.");
+        var declaration = (MethodDeclarationSyntax)context.Node;
+        if (binding is not IMethodSymbol method)
         { return; }
         if (AnalyzerGeneratedCodePolicy.IsGenerated(method, declaration.SyntaxTree, context.Compilation, context.CancellationToken))
         { return; }

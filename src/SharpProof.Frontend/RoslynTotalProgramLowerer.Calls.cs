@@ -200,45 +200,106 @@ internal sealed partial class RoslynTotalProgramLowerer
             !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken))
         { return true; }
         var type = constructor.ContainingType;
-        if (_calls == null || _context.Compilation is not { } compilation || type.IsGenericType ||
+        if (_calls is not { } calls || _context.Compilation is not { } compilation || type.IsGenericType ||
             type.DeclaringSyntaxReferences.Length != 1 ||
             type.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration)
         { return false; }
         var model = CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
-        var values = ImmutableArray.CreateBuilder<(IFieldSymbol Field, IOperation Value)>();
-        foreach (var member in declaration.Members)
+        return TryConsumeConstructionInitializerValues(type, Harvest(), _cancellationToken, out initializers);
+
+        IEnumerable<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> Harvest()
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-            if (!_calls.Spend())
-            { return false; }
-            if (member is Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field &&
-                !field.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword) || modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ConstKeyword)))
+            foreach (var member in declaration.Members)
             {
-                foreach (var variable in field.Declaration.Variables)
+                _cancellationToken.ThrowIfCancellationRequested();
+                if (!calls.Spend())
+                { throw new ConstructionInitializerHarvestRejectedException(); }
+                if (member is Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field &&
+                    !field.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword) || modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ConstKeyword)))
                 {
-                    if (!_calls.Spend())
-                    { return false; }
-                    if (variable.Initializer == null)
-                    { continue; }
-                    if (model.GetOperation(variable.Initializer, _cancellationToken) is not IFieldInitializerOperation { InitializedFields.Length: 1 } initializer)
-                    { return false; }
-                    values.Add((initializer.InitializedFields[0], initializer.Value));
+                    foreach (var variable in field.Declaration.Variables)
+                    {
+                        if (!calls.Spend())
+                        { throw new ConstructionInitializerHarvestRejectedException(); }
+                        if (variable.Initializer == null)
+                        { continue; }
+                        yield return (true, model.GetOperation(variable.Initializer, _cancellationToken), null);
+                    }
                 }
+                else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax { Initializer: { } value } property &&
+                    !property.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)))
+                {
+                    var symbol = model.GetDeclaredSymbol(property, _cancellationToken) as IPropertySymbol;
+                    var operation = symbol == null ? null : model.GetOperation(value, _cancellationToken);
+                    yield return (false, operation, symbol);
+                }
+                else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax)
+                { throw new ConstructionInitializerHarvestRejectedException(); }
             }
-            else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax { Initializer: { } value } property &&
-                !property.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)))
-            {
-                if (model.GetDeclaredSymbol(property, _cancellationToken) is not IPropertySymbol symbol ||
-                    model.GetOperation(value, _cancellationToken) is not IPropertyInitializerOperation initializer ||
-                    type.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-                        SymbolEqualityComparer.Default.Equals(candidate.AssociatedSymbol, symbol)) is not { } backing)
-                { return false; }
-                values.Add((backing, initializer.Value));
-            }
-            else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax)
-            { return false; }
         }
+    }
+
+    internal static bool TryConstructionInitializerValues(INamedTypeSymbol type,
+        ImmutableArray<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> candidates,
+        CancellationToken cancellationToken, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
+        return TryConsumeConstructionInitializerValues(type, candidates, cancellationToken, out initializers);
+    }
+
+    // Consume one compiler candidate at a time, validating before MoveNext can
+    // spend on or query another declaration. Publish only the complete inventory.
+    internal static bool TryConsumeConstructionInitializerValues(INamedTypeSymbol type,
+        IEnumerable<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> candidates,
+        CancellationToken cancellationToken, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        candidates = RepositoryParameterGuard.NotNull(candidates, nameof(candidates));
+        cancellationToken.ThrowIfCancellationRequested();
+        initializers = [];
+        var values = ImmutableArray.CreateBuilder<(IFieldSymbol Field, IOperation Value)>();
+        try
+        {
+            foreach (var candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryConstructionInitializerValue(type, candidate, cancellationToken, out var initializer))
+                { return false; }
+                values.Add(initializer);
+            }
+        }
+        catch (ConstructionInitializerHarvestRejectedException)
+        { return false; }
         initializers = values.ToImmutable();
+        return true;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private initializer-harvest control flow.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064", Justification = "Private harvest rejection is caught by the atomic initializer consumer.")]
+    private sealed class ConstructionInitializerHarvestRejectedException : Exception;
+
+    private static bool TryConstructionInitializerValue(INamedTypeSymbol type,
+        (bool IsField, IOperation? Operation, IPropertySymbol? Property) candidate,
+        CancellationToken cancellationToken, out (IFieldSymbol Field, IOperation Value) value)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        cancellationToken.ThrowIfCancellationRequested();
+        value = default;
+        if (candidate.IsField)
+        {
+            if (candidate.Operation is not IFieldInitializerOperation { InitializedFields.Length: 1 } initializer)
+            { return false; }
+            value = (initializer.InitializedFields[0], initializer.Value);
+        }
+        else
+        {
+            if (candidate.Property is not { } symbol || candidate.Operation is not IPropertyInitializerOperation initializer ||
+                type.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(field => field is null ? throw new ArgumentNullException(nameof(field)) :
+                    SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, symbol)) is not { } backing)
+            { return false; }
+            value = (backing, initializer.Value);
+        }
         return true;
     }
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)

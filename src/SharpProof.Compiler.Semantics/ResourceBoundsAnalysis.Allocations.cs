@@ -84,7 +84,7 @@ internal sealed partial class ResourceBoundsAnalysis
                 foreach (var reference in field.DeclaringSyntaxReferences)
                 {
                     if (reference.GetSyntax(_cancellation) is VariableDeclaratorSyntax { Initializer.Value: { } value })
-                    { AddInitializer(value); }
+                    { AddFieldInitializer(compilation, value, initializers); }
                 }
             }
             if (member is IPropertySymbol { IsStatic: false } property)
@@ -104,7 +104,7 @@ internal sealed partial class ResourceBoundsAnalysis
                     fields.Add(storage);
                 }
                 if (declaration.Initializer?.Value is { } value)
-                { AddInitializer(value); }
+                { AddFieldInitializer(compilation, value, initializers); }
             }
         }
         var arguments = Cost.Zero;
@@ -154,15 +154,18 @@ internal sealed partial class ResourceBoundsAnalysis
             }
         }
 
-        void AddInitializer(ExpressionSyntax value)
-        {
-            value = ArgumentNullGuard.NotNull(value, nameof(value));
-            var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, value.SyntaxTree);
-            if (model.GetOperation(value, _cancellation) is { } operation)
-            { initializers.Add(operation); }
-            else
-            { _unknown ??= "MissingFieldInitializer"; }
-        }
+    }
+
+    private void AddFieldInitializer(Compilation compilation, ExpressionSyntax value, List<IOperation> initializers)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        initializers = ArgumentNullGuard.NotNull(initializers, nameof(initializers));
+        var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, value.SyntaxTree);
+        if (model.GetOperation(value, _cancellation) is { } operation)
+        { initializers.Add(operation); }
+        else
+        { _unknown ??= "MissingFieldInitializer"; }
     }
 
     private static ResourceStorageKind FieldStorage(ITypeSymbol type)

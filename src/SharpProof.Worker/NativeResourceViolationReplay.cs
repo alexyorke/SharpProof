@@ -73,15 +73,7 @@ internal static class NativeResourceViolationReplay
             {
                 ArgumentNullException.ThrowIfNull(input);
                 var value = inputs[owner.Parameters[input.Ordinal].Entry];
-                return input.Kind switch
-                {
-                    ResourceInputKind.NonNegativeScalar => value.IntegerNumericValue,
-                    ResourceInputKind.ArrayLength when value.Kind == IrValueKind.Null => BigInteger.Zero,
-                    ResourceInputKind.ArrayLength => value.Elements.Length,
-                    ResourceInputKind.StringLength when value.Kind == IrValueKind.Null => BigInteger.Zero,
-                    ResourceInputKind.StringLength => value.String.Length,
-                    _ => throw new InvalidDataException("Unsupported resource input during replay.")
-                };
+                return ReadReplayInput(input.Kind, value);
             }, cancellation);
             var unsupportedByteStorage = false;
             BigInteger observed = 0;
@@ -90,6 +82,8 @@ internal static class NativeResourceViolationReplay
             void Observe(OperationId operation, BigInteger amount, bool approximation)
             {
                 RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+                // Unsupported storage is sticky across all resource callbacks:
+                // no later observation can authorize a partial byte prefix.
                 if (approximation || unsupportedByteStorage || site is not null)
                 { return; }
                 observed += amount;
@@ -136,9 +130,9 @@ internal static class NativeResourceViolationReplay
                     { return; }
                     var shape = ResourceAllocationShape.String(ResourceExpression.Literal(characters));
                     var bound = ResourceRuntimeLayout.Bound(shape, layout!, cancellation);
-                    if (bound.Bounds is not { IsExact: true, Lower.Constant: { } bytes })
-                    { unsupportedByteStorage = true; return; }
-                    Observe(instruction.Operation, bytes, false);
+                    var bytes = ReadFootprintBytes(bound, requireExact: true);
+                    unsupportedByteStorage |= bytes is null;
+                    Observe(instruction.Operation, bytes.GetValueOrDefault(), false);
                 }, (instruction, approximation) =>
                 {
                     ArgumentNullException.ThrowIfNull(instruction);
@@ -149,9 +143,9 @@ internal static class NativeResourceViolationReplay
                     if (factory.TryGetClosureFrameType(instruction.AllocatedType, out var fields))
                     {
                         var frame = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(fields), layout!, cancellation);
-                        if (frame.Bounds?.Lower.Constant is not { } frameBytes)
-                        { unsupportedByteStorage = true; return; }
-                        Observe(instruction.Operation, frameBytes, false);
+                        var frameBytes = ReadFootprintBytes(frame, requireExact: false);
+                        unsupportedByteStorage |= frameBytes is null;
+                        Observe(instruction.Operation, frameBytes.GetValueOrDefault(), false);
                         return;
                     }
                     // Certified delegates have a reviewed fixed footprint. Other
@@ -245,6 +239,26 @@ internal static class NativeResourceViolationReplay
             { return false; }
         }
         return true;
+    }
+
+    private static BigInteger? ReadFootprintBytes(ResourceLayoutCheck check, bool requireExact)
+    {
+        check = ArgumentNullGuard.NotNull(check, nameof(check));
+        return check.Bounds is { Lower.Constant: { } bytes } bounds && (!requireExact || bounds.IsExact) ? bytes : null;
+    }
+
+    private static BigInteger ReadReplayInput(ResourceInputKind kind, IrValue value)
+    {
+        value = ArgumentNullGuard.NotNull(value, nameof(value));
+        return kind switch
+        {
+            ResourceInputKind.NonNegativeScalar => value.IntegerNumericValue,
+            ResourceInputKind.ArrayLength when value.Kind == IrValueKind.Null => BigInteger.Zero,
+            ResourceInputKind.ArrayLength => value.Elements.Length,
+            ResourceInputKind.StringLength when value.Kind == IrValueKind.Null => BigInteger.Zero,
+            ResourceInputKind.StringLength => value.String.Length,
+            _ => throw new InvalidDataException("Unsupported resource input during replay.")
+        };
     }
 
     private static BigInteger? ExactArrayBytes(IrFactory factory, IrAllocationInstruction instruction, int elements,

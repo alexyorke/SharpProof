@@ -25,82 +25,112 @@ internal sealed class CompilerTaskCarrierCollector
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        var source = CaptureValidatedSourceBodies(method, callableId, cancellation);
+        return new(source.Context?.Inventory, source.UnknownReason);
+    }
+
+    internal sealed record ValidatedSourceBody(ImmutableArray<byte> Code,
+        ImmutableArray<CompilerTaskPrimitiveIlInstruction> Instructions)
+    {
+        public ImmutableArray<byte> Code { get; init; } = Code.IsDefault
+            ? throw new ArgumentException("Source code must be initialized.", nameof(Code)) : Code;
+        public ImmutableArray<CompilerTaskPrimitiveIlInstruction> Instructions { get; init; } = Instructions.IsDefault
+            ? throw new ArgumentException("Source instructions must be initialized.", nameof(Instructions)) : Instructions;
+    }
+
+    internal sealed record ValidatedSourceBodies(CompilerTaskSourceBodyInventory Inventory,
+        CompilerTaskCarrierShapes Shapes, string RuntimeFrameworkIdentity, AssemblyIdentity ScalarFramework,
+        ImmutableArray<(int MethodToken, ValidatedSourceBody Body)> Bodies)
+    {
+        public CompilerTaskSourceBodyInventory Inventory { get; init; } = RepositoryParameterGuard.NotNull(Inventory, nameof(Inventory));
+        public CompilerTaskCarrierShapes Shapes { get; init; } = RepositoryParameterGuard.NotNull(Shapes, nameof(Shapes));
+        public string RuntimeFrameworkIdentity { get; init; } = RepositoryParameterGuard.NotNull(RuntimeFrameworkIdentity, nameof(RuntimeFrameworkIdentity));
+        public AssemblyIdentity ScalarFramework { get; init; } = RepositoryParameterGuard.NotNull(ScalarFramework, nameof(ScalarFramework));
+        public ImmutableArray<(int MethodToken, ValidatedSourceBody Body)> Bodies { get; init; } = Bodies.IsDefault
+            ? throw new ArgumentException("Source bodies must be initialized.", nameof(Bodies)) : Bodies;
+    }
+
+    // Keep the bytes and lexical admission together. Both public captures use
+    // this context, so fault-body capture cannot reread or rescan a different
+    // body after the source inventory has already admitted it.
+    private (ValidatedSourceBodies? Context, string? UnknownReason) CaptureValidatedSourceBodies(
+        IMethodSymbol method, string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
         cancellation.ThrowIfCancellationRequested();
-        var callbacks = CaptureCallbackActivations(method, callableId, cancellation);
+        var carriers = Capture(method, callableId, cancellation);
+        if (carriers.Shapes is not { } shapes)
+        { return (null, carriers.UnknownReason); }
+        var callbacks = CaptureCallbackActivations(method, callableId, shapes, cancellation);
         if (callbacks.Activations is not { } activations)
-        { return new(null, callbacks.UnknownReason); }
-        try
+        { return (null, callbacks.UnknownReason); }
+        // Capture admitted this plan against the same immutable compilation.
+        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+        return ReadSourceBodies(_image!, activations, shapes,
+            plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(),
+            _compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity, cancellation);
+    }
+
+    // Bind the admitted callback targets to their actual emitted PE bodies.
+    internal static (ValidatedSourceBodies? Context, string? UnknownReason) ReadSourceBodies(byte[] image,
+        CompilerTaskCallbackActivation activations, CompilerTaskCarrierShapes shapes,
+        string runtimeFrameworkIdentity, AssemblyIdentity framework, CancellationToken cancellation)
+    {
+        image = ArgumentNullGuard.NotNull(image, nameof(image));
+        activations = ArgumentNullGuard.NotNull(activations, nameof(activations));
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        runtimeFrameworkIdentity = ArgumentNullGuard.NotNull(runtimeFrameworkIdentity, nameof(runtimeFrameworkIdentity));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        cancellation.ThrowIfCancellationRequested();
+        return ReadEmission<(ValidatedSourceBodies? Context, string? UnknownReason)>(image, reader =>
         {
-            using var stream = new MemoryStream(_image!, false);
-            using var image = new PEReader(stream);
-            var metadata = image.GetMetadataReader();
-            var framework = _compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity;
+            reader = ArgumentNullGuard.NotNull(reader, nameof(reader));
+            var metadata = reader.GetMetadataReader();
             var methods = activations.Forwarders.Select(static forwarder =>
                 forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)
                 .Distinct().OrderBy(static token => token).ToImmutableArray();
+            var bodies = ImmutableArray.CreateBuilder<(int MethodToken, ValidatedSourceBody Body)>(methods.Length);
             foreach (var token in methods)
             {
                 cancellation.ThrowIfCancellationRequested();
                 var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(token));
-                var body = image.GetMethodBody(definition.RelativeVirtualAddress);
-                if (ValidateSourceBody(metadata, body, framework, cancellation) is { } reason)
-                { return new(null, reason); }
+                var body = reader.GetMethodBody(definition.RelativeVirtualAddress);
+                var validated = ValidateSourceBodyCore(metadata, body, framework, cancellation);
+                if (validated.Body is not { } sourceBody)
+                { return (null, validated.UnknownReason); }
+                bodies.Add((token, sourceBody));
             }
-            return new(new(callableId, activations.ModuleSha256, methods), null);
-        }
-        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
-        { return new(null, "TaskSourceBodyEmissionInvalid"); }
+            return (new(new(activations.RootCallableId, activations.ModuleSha256, methods), shapes,
+                runtimeFrameworkIdentity, framework, bodies.MoveToImmutable()), null);
+        }, static () => (null, "TaskSourceBodyEmissionInvalid"));
     }
 
     internal CompilerTaskEmittedFaultBodyCapture CaptureEmittedFaultBodies(IMethodSymbol method, string callableId, CancellationToken cancellation)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
-        cancellation.ThrowIfCancellationRequested();
-        var source = CaptureSourceBodies(method, callableId, cancellation);
-        if (source.Inventory is not { } inventory)
+        var source = CaptureValidatedSourceBodies(method, callableId, cancellation);
+        if (source.Context is not { } context)
         { return new(null, source.UnknownReason); }
-        var carriers = Capture(method, callableId, cancellation);
-        if (carriers.Shapes is not { } shapes)
-        { return new(null, carriers.UnknownReason); }
-        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation);
-        if (plan is null)
-        { return new(null, "TaskEmittedFaultBodyEvidenceInvalid"); }
-        try
+        var bodies = ImmutableArray.CreateBuilder<CompilerTaskEmittedFaultBody>();
+        foreach (var (token, body) in context.Bodies)
         {
-            using var stream = new MemoryStream(_image!, false);
-            using var image = new PEReader(stream);
-            var metadata = image.GetMetadataReader();
-            var framework = _compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity;
-            var bodies = ImmutableArray.CreateBuilder<CompilerTaskEmittedFaultBody>();
-            foreach (var token in inventory.MethodTokens)
+            cancellation.ThrowIfCancellationRequested();
+            var operands = ImmutableArray.CreateBuilder<CompilerTaskEmittedArrayTypeOperand>();
+            foreach (var instruction in body.Instructions)
             {
                 cancellation.ThrowIfCancellationRequested();
-                var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(token));
-                var body = image.GetMethodBody(definition.RelativeVirtualAddress);
-                if (ValidateSourceBody(metadata, body, framework, cancellation) is { } failure)
-                { return new(null, failure); }
-                ImmutableArray<byte> code = [.. body.GetILBytes()!];
-                var scan = CompilerTaskPrimitiveIlScanner.Scan(code, cancellation);
-                if (scan.Instructions is not { } instructions)
-                { return new(null, scan.UnknownReason); }
-                var operands = ImmutableArray.CreateBuilder<CompilerTaskEmittedArrayTypeOperand>();
-                foreach (var instruction in instructions)
+                if (instruction.OpCode == 0x8d)
                 {
-                    cancellation.ThrowIfCancellationRequested();
-                    if (instruction.OpCode == 0x8d)
-                    {
-                        operands.Add(new(instruction.Offset, instruction.Operand,
-                            CompilerTaskEmittedArrayElementKind.FrameworkInt32, framework.ToString()));
-                    }
+                    operands.Add(new(instruction.Offset, instruction.Operand,
+                        CompilerTaskEmittedArrayElementKind.FrameworkInt32, context.ScalarFramework.ToString()));
                 }
-                bodies.Add(new(token, code, WorkerProtocolJson.ComputeSha256(code), operands.ToImmutable()));
             }
-            return new(new(callableId, inventory.ModuleSha256, shapes.CompilerIdentity,
-                plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), bodies.ToImmutable()), null);
+            bodies.Add(new(token, body.Code, WorkerProtocolJson.ComputeSha256(body.Code), operands.ToImmutable()));
         }
-        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
-        { return new(null, "TaskEmittedFaultBodyEmissionInvalid"); }
+        return new(new(callableId, context.Inventory.ModuleSha256, context.Shapes.CompilerIdentity,
+            context.RuntimeFrameworkIdentity, bodies.ToImmutable()), null);
     }
 
     // No source calls, constructors, fields, casts, unboxing or handlers. This
@@ -112,28 +142,35 @@ internal sealed class CompilerTaskCarrierCollector
         metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
         body = ArgumentNullGuard.NotNull(body, nameof(body));
         framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
+        return ValidateSourceBodyCore(metadata, body, framework, cancellation).UnknownReason;
+    }
+
+    private static (ValidatedSourceBody? Body, string? UnknownReason) ValidateSourceBodyCore(
+        MetadataReader metadata, MethodBodyBlock body, AssemblyIdentity framework, CancellationToken cancellation)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
         cancellation.ThrowIfCancellationRequested();
         if (!body.ExceptionRegions.IsEmpty)
-        { return "TaskSourceBodyHandlingUnsupported"; }
-        var bytes = body.GetILBytes();
-        if (bytes is null)
-        { return "TaskSourceBodyInstructionUnsupported"; }
+        { return (null, "TaskSourceBodyHandlingUnsupported"); }
+        var bytes = body.GetILContent();
         try
         {
-            var scan = CompilerTaskPrimitiveIlScanner.Scan([.. bytes], cancellation, token =>
+            var scan = CompilerTaskPrimitiveIlScanner.Scan(bytes, cancellation, token =>
                 FrameworkType(metadata, MetadataTokens.EntityHandle(token), "System", "Int32", framework)
                     ? null : "TaskSourceBodyArrayTypeUnsupported");
-            if (scan.Instructions is not null)
-            { return null; }
-            return scan.UnknownReason switch
+            if (scan.Instructions is { } instructions)
+            { return (new(bytes, instructions), null); }
+            return (null, scan.UnknownReason switch
             {
                 "TaskSourceBodyArrayTypeUnsupported" => "TaskSourceBodyArrayTypeUnsupported",
                 "TaskEmittedFaultBodyCallUnsupported" => "TaskSourceBodyCallUnsupported",
                 _ => "TaskSourceBodyInstructionUnsupported"
-            };
+            });
         }
         catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or OverflowException)
-        { return "TaskSourceBodyInstructionUnsupported"; }
+        { return (null, "TaskSourceBodyInstructionUnsupported"); }
     }
 
     internal CompilerTaskCallbackActivationCapture CaptureCallbackActivations(IMethodSymbol method, string callableId, CancellationToken cancellation)
@@ -144,13 +181,37 @@ internal sealed class CompilerTaskCarrierCollector
         var capture = Capture(method, callableId, cancellation);
         if (capture.Shapes is not { } shapes)
         { return new(null, capture.UnknownReason); }
+        return CaptureCallbackActivations(method, callableId, shapes, cancellation);
+    }
+
+    private CompilerTaskCallbackActivationCapture CaptureCallbackActivations(IMethodSymbol method,
+        string callableId, CompilerTaskCarrierShapes shapes, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        cancellation.ThrowIfCancellationRequested();
         var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+        return ReadCallbackActivations(method, plan, _assembly!, _image!, shapes, callableId, cancellation);
+    }
+
+    internal static CompilerTaskCallbackActivationCapture ReadCallbackActivations(IMethodSymbol method,
+        ResourceForkJoinPlan plan, IAssemblySymbol assembly, byte[] image, CompilerTaskCarrierShapes shapes,
+        string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        plan = ArgumentNullGuard.NotNull(plan, nameof(plan));
+        assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
+        image = ArgumentNullGuard.NotNull(image, nameof(image));
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
         var targets = ImmutableHashSet.CreateBuilder<int>();
         foreach (var invocation in plan.Children)
         {
             cancellation.ThrowIfCancellationRequested();
             var child = invocation.TargetMethod;
-            var imported = _assembly!.GetTypeByMetadataName(MetadataName(child.ContainingType));
+            var imported = assembly.GetTypeByMetadataName(MetadataName(child.ContainingType));
             var candidates = imported?.GetMembers(child.MetadataName).OfType<IMethodSymbol>().Where(candidate =>
                 candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.IsStatic && candidate.ReturnsVoid &&
                 candidate.Arity == 0 && candidate.Parameters.Length == child.Parameters.Length && candidate.Parameters.All(static parameter =>
@@ -162,12 +223,11 @@ internal sealed class CompilerTaskCarrierCollector
         }
         var forwarders = ImmutableArray.CreateBuilder<CompilerTaskCallbackForwarder>();
         var pending = new Stack<INamedTypeSymbol>();
-        pending.Push(_assembly!.GetTypeByMetadataName(MetadataName(method.ContainingType))!);
-        try
+        pending.Push(assembly.GetTypeByMetadataName(MetadataName(method.ContainingType))!);
+        return ReadEmission<CompilerTaskCallbackActivationCapture>(image, reader =>
         {
-            using var stream = new MemoryStream(_image!, false);
-            using var image = new PEReader(stream);
-            var metadata = image.GetMetadataReader();
+            reader = ArgumentNullGuard.NotNull(reader, nameof(reader));
+            var metadata = reader.GetMetadataReader();
             while (pending.Count != 0)
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -179,7 +239,7 @@ internal sealed class CompilerTaskCarrierCollector
                     if (!callback.MetadataName.StartsWith("<" + method.MetadataName + ">b__", StringComparison.Ordinal))
                     { continue; }
                     var handle = (MethodDefinitionHandle)MetadataTokens.EntityHandle(callback.MetadataToken);
-                    var body = image.GetMethodBody(metadata.GetMethodDefinition(handle).RelativeVirtualAddress);
+                    var body = reader.GetMethodBody(metadata.GetMethodDefinition(handle).RelativeVirtualAddress);
                     var check = ValidateCallbackForwarder(body, targets.ToImmutable(), cancellation);
                     if (check.Target is not { } target)
                     { return new(null, check.UnknownReason); }
@@ -190,9 +250,7 @@ internal sealed class CompilerTaskCarrierCollector
             if (forwarders.Count != shapes.MatchedCallbacks)
             { return new(null, "TaskCallbackForwarderCoverageIncomplete"); }
             return new(new(callableId, shapes.ModuleSha256, forwarders.ToImmutable()), null);
-        }
-        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
-        { return new(null, "TaskCallbackForwarderEmissionInvalid"); }
+        }, static () => new(null, "TaskCallbackForwarderEmissionInvalid"));
     }
 
     // Counts compiler-owned wrapper activations only. CLR helpers, source-child
@@ -282,31 +340,57 @@ internal sealed class CompilerTaskCarrierCollector
         { return new(null, capture.UnknownReason); }
         if (shapes.StateMachine is not { } machine)
         { return new(null, "TaskRootExceptionBoundaryAsyncRequired"); }
-        var state = _assembly!.GetTypeByMetadataName(machine.MetadataName);
+        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
+        return ReadExceptionBoundary(_assembly!, _image!, shapes, machine, callableId,
+            _compilation.GetTypeByMetadataName("System.Exception")?.ContainingAssembly.Identity,
+            plan.Children.Length, cancellation);
+    }
+
+    internal static CompilerTaskRootExceptionBoundaryCapture ReadExceptionBoundary(IAssemblySymbol assembly,
+        byte[] image, CompilerTaskCarrierShapes shapes, CompilerTaskCarrierType machine, string callableId,
+        AssemblyIdentity? framework, int childCount, CancellationToken cancellation)
+    {
+        assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
+        image = ArgumentNullGuard.NotNull(image, nameof(image));
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        machine = ArgumentNullGuard.NotNull(machine, nameof(machine));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var state = assembly.GetTypeByMetadataName(machine.MetadataName);
         var entries = state?.GetMembers("MoveNext").OfType<IMethodSymbol>().Where(static candidate =>
             candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Parameters.IsEmpty && candidate.Arity == 0).ToArray();
         if (entries is not { Length: 1 })
         { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
-        try
+        return ReadEmission<CompilerTaskRootExceptionBoundaryCapture>(image, reader =>
         {
-            using var stream = new MemoryStream(_image!, false);
-            using var pe = new PEReader(stream);
-            var metadata = pe.GetMetadataReader();
+            reader = ArgumentNullGuard.NotNull(reader, nameof(reader));
+            var metadata = reader.GetMetadataReader();
             var handle = MetadataTokens.EntityHandle(entries[0].MetadataToken);
             if (handle.Kind != HandleKind.MethodDefinition)
             { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
-            var body = pe.GetMethodBody(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).RelativeVirtualAddress);
-            var framework = _compilation.GetTypeByMetadataName("System.Exception")?.ContainingAssembly.Identity;
+            var body = reader.GetMethodBody(metadata.GetMethodDefinition((MethodDefinitionHandle)handle).RelativeVirtualAddress);
             if (framework is null)
             { return new(null, "TaskRootExceptionBoundaryCatchUnsupported"); }
-            var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation)!;
-            if (ValidateExceptionBoundary(pe, (MethodDefinitionHandle)handle, framework, plan.Children.Length, cancellation) is { } failure)
+            if (ValidateExceptionBoundary(reader, (MethodDefinitionHandle)handle, framework, childCount, cancellation) is { } failure)
             { return new(null, failure); }
             var region = body.ExceptionRegions[0];
             return new(new(callableId, shapes.ModuleSha256, machine.MetadataName, entries[0].MetadataToken, region.TryOffset, region.TryLength), null);
+        }, static () => new(null, "TaskRootExceptionBoundaryEmissionInvalid"));
+    }
+
+    private static T ReadEmission<T>(byte[] image, Func<PEReader, T> read, Func<T> invalid)
+    {
+        image = ArgumentNullGuard.NotNull(image, nameof(image));
+        read = ArgumentNullGuard.NotNull(read, nameof(read));
+        invalid = ArgumentNullGuard.NotNull(invalid, nameof(invalid));
+        try
+        {
+            using var stream = new MemoryStream(image, false);
+            using var reader = new PEReader(stream);
+            return read(reader);
         }
         catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
-        { return new(null, "TaskRootExceptionBoundaryEmissionInvalid"); }
+        { return invalid(); }
     }
 
     // Recognize only a direct owned receiver and simple emitted bookkeeping.
@@ -446,7 +530,9 @@ internal sealed class CompilerTaskCarrierCollector
         var count = signature.ReadCompressedInteger();
         if (slot < 0 || slot >= count)
         { return false; }
-        for (var local = 0; local <= slot; local++)
+        // The checked slot is reached before this counter can overflow. Every
+        // signature kind returns when local equals slot, or rejects sooner.
+        for (var local = 0; ; local++)
         {
             cancellation.ThrowIfCancellationRequested();
             var kind = signature.ReadByte();
@@ -471,7 +557,6 @@ internal sealed class CompilerTaskCarrierCollector
             else
             { return false; }
         }
-        return false;
     }
 
     // Body facts only. The caller separately binds the emitted module, owning
@@ -620,7 +705,20 @@ internal sealed class CompilerTaskCarrierCollector
         { return Unknown("TaskCarrierRootUnsupported"); }
         if (!EnsureEmission(cancellation))
         { return Unknown(_emissionFailure ?? "TaskCarrierEmissionUnavailable"); }
-        var type = _assembly!.GetTypeByMetadataName(MetadataName(method.ContainingType));
+        return CaptureEmittedCarriers(method, plan, _assembly!, _moduleHash!, callableId, cancellation);
+    }
+
+    internal static CompilerTaskCarrierCapture CaptureEmittedCarriers(IMethodSymbol method,
+        ResourceForkJoinPlan plan, IAssemblySymbol assembly, string moduleHash, string callableId,
+        CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        plan = ArgumentNullGuard.NotNull(plan, nameof(plan));
+        assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
+        moduleHash = ArgumentNullGuard.NotNull(moduleHash, nameof(moduleHash));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var type = assembly.GetTypeByMetadataName(MetadataName(method.ContainingType));
         if (type is null)
         { return Unknown("TaskCarrierRootMetadataUnavailable"); }
         var roots = type.GetMembers(method.MetadataName).OfType<IMethodSymbol>().Where(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
@@ -682,7 +780,7 @@ internal sealed class CompilerTaskCarrierCollector
         }
         if (callbacks < plan.Children.Length)
         { return Unknown("TaskCarrierCallbackMetadataIncomplete"); }
-        return new(new(callableId, _moduleHash!, typeof(CSharpCompilation).Assembly.FullName!, callbacks,
+        return new(new(callableId, moduleHash, typeof(CSharpCompilation).Assembly.FullName!, callbacks,
             frames.ToImmutable(), stateMachine), null);
     }
 
@@ -700,16 +798,13 @@ internal sealed class CompilerTaskCarrierCollector
             { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
         }
         using var stream = new CarrierImageStream();
-        Microsoft.CodeAnalysis.Emit.EmitResult emission;
-        try
-        { emission = _compilation.Emit(stream, cancellationToken: cancellation); }
-        catch (InvalidDataException)
-        { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
+        // Pinned Roslyn wraps PE write failures in an unsuccessful EmitResult.
+        // CarrierImageStream remains the serialized-size enforcement boundary.
+        var emission = _compilation.Emit(stream, cancellationToken: cancellation);
         cancellation.ThrowIfCancellationRequested();
         if (!emission.Success)
         { _emissionFailure = "TaskCarrierEmissionFailed"; return false; }
-        if (stream.Length > MaximumImageBytes)
-        { _emissionFailure = "TaskCarrierEmissionBudgetExceeded"; return false; }
+        // CarrierImageStream rejects growth at every write/SetLength boundary.
         var image = stream.ToArray();
         _image = image;
         var reference = MetadataReference.CreateFromImage(image);

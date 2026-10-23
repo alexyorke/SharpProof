@@ -33,6 +33,14 @@ internal sealed partial class ResourceBoundsAnalysis
         { return AnalyzeCase(method, body, cancellation); }
         var whenFalse = AnalyzeCase(method, body, cancellation, parameter, false);
         var whenTrue = AnalyzeCase(method, body, cancellation, parameter, true);
+        return CombineInputCases(distribution, whenFalse, whenTrue);
+    }
+
+    private static Result CombineInputCases(ResourceBooleanDistribution distribution, Result whenFalse, Result whenTrue)
+    {
+        distribution = ArgumentNullGuard.NotNull(distribution, nameof(distribution));
+        whenFalse = ArgumentNullGuard.NotNull(whenFalse, nameof(whenFalse));
+        whenTrue = ArgumentNullGuard.NotNull(whenTrue, nameof(whenTrue));
         if (whenFalse.Bounds is not { } noCost || whenTrue.Bounds is not { } yesCost)
         { return new(null, whenFalse.UnknownReason ?? whenTrue.UnknownReason ?? "ResourceInputModelUnsupported"); }
         try

@@ -101,8 +101,9 @@ internal sealed class ResourceMemoryReplay
         var liveRoots = new HashSet<IrVarId>();
         var events = ImmutableArray.CreateBuilder<ResourceMemoryEvent>();
         events.Add(new(ResourceMemoryEventKind.Allocate, ResourceMemoryProgram.EmptyStringIdentity, ResourceMemoryProgram.EmptyStringIdentity, 0));
-        var output = 0;
-        for (var index = 0; index < _observed.Count; index++)
+        // Admission above requires the owned final return. Its reads remain in
+        // lastUse, while its output identity is checked after replaying the body.
+        for (var index = 0; index < _observed.Count - 1; index++)
         {
             cancellation.ThrowIfCancellationRequested();
             var (instruction, value) = _observed[index];
@@ -275,14 +276,6 @@ internal sealed class ResourceMemoryReplay
                         events.Add(new(ResourceMemoryEventKind.StoreReference, receiver, fieldSlot, child));
                     }
                     break;
-                case IrReturnInstruction:
-                    if (value != null && value.Kind is IrValueKind.Sequence or IrValueKind.Reference or IrValueKind.String)
-                    {
-                        output = Find(value, identities);
-                        if (output == 0)
-                        { return Unknown("MemoryReplayBorrowedReference"); }
-                    }
-                    return ResourceMemoryTrace.Evaluate(events.ToImmutable(), output, cancellation);
                 case IrGotoInstruction or IrBranchInstruction or IrWriteInstruction { Region: IrWriteRegion.Local, IsStore: false }:
                     break;
                 default:
@@ -297,10 +290,21 @@ internal sealed class ResourceMemoryReplay
                     liveRoots.Remove(root);
                 }
             }
-            if (events.Count > ResourceMemoryTrace.MaximumEvents)
-            { return Unknown("MemoryReplayBudgetExceeded"); }
         }
-        return Unknown("MemoryReplayIncomplete");
+        // Observe admits N <= MaximumEvents / 4 instructions. Starting with
+        // empty liveRoots, each instruction adds at most one event and births
+        // at most one root; every root death adds one event. Including the one
+        // anchor gives at most 1 + 2*N <= 513 events. The independent 1024-event
+        // admission check in ResourceMemoryTrace.Evaluate remains authoritative.
+        var output = 0;
+        var returned = _observed[_observed.Count - 1].Value;
+        if (returned != null && returned.Kind is IrValueKind.Sequence or IrValueKind.Reference or IrValueKind.String)
+        {
+            output = Find(returned, identities);
+            if (output == 0)
+            { return Unknown("MemoryReplayBorrowedReference"); }
+        }
+        return ResourceMemoryTrace.Evaluate(events.ToImmutable(), output, cancellation);
     }
 
     private static bool ObservedKindMatches(IrTypeKind type, IrValueKind value)

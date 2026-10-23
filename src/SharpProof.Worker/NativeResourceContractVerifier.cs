@@ -14,39 +14,64 @@ internal static class NativeResourceContractVerifier
         if (claim.Constraint.ResourceUpperBound?.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ||
             result.ResourceBound?.UnknownReason != "ResourceBoundComparisonUnproved")
         { return result; }
-        try
+        return await WithinReplayBudgetAsync(result, async () =>
         {
             var limit = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
                 target.Entry.CallableId, target.Total!, cancellation);
             var violation = await NativeResourceViolationReplay.FindAsync(target, claim, limit, budgets, cancellation).ConfigureAwait(false);
             if (violation is null)
             { return result; }
-            if (claim.Constraint.ResourceUpperBound!.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes)
-            {
-                var lifetimeLayout = new NativeResourceLayoutBinding(target);
-                if (lifetimeLayout.Bind() is null)
-                { return result; }
-                violation = lifetimeLayout.Project(violation);
-                return violation;
-            }
-            var metadata = new NativeResourceMetadataBinding(target);
-            var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, cancellation);
-            if (!check.Verified)
-            { return result; }
-            var layout = new NativeResourceLayoutBinding(target);
-            if (claim.Constraint.ResourceUpperBound!.Metric == WorkerResourceMetric.AllocatedBytes && layout.Bind() is null)
-            { return result; }
-            violation = metadata.Project(violation);
-            if (claim.Constraint.ResourceUpperBound.Metric == WorkerResourceMetric.AllocatedBytes)
-            { violation = layout.Project(violation); }
-            return violation;
-        }
+            return ProjectReplayViolation(target, claim, result, violation, cancellation);
+        }, cancellation).ConfigureAwait(false);
+    }
+
+    // No incomplete replay result crosses the publication boundary when a
+    // bounded resource operation exhausts its construction or display budget.
+    private static async Task<WorkerClaimResult> WithinReplayBudgetAsync(WorkerClaimResult fallback,
+        Func<Task<WorkerClaimResult>> replay, CancellationToken cancellation)
+    {
+        fallback = ArgumentNullGuard.NotNull(fallback, nameof(fallback));
+        replay = ArgumentNullGuard.NotNull(replay, nameof(replay));
+        cancellation.ThrowIfCancellationRequested();
+        try
+        { return await replay().ConfigureAwait(false); }
         catch (ResourceExpressionLimitException)
         {
-            result = result with { Reason = WorkerClaimReason.ResourceLimit };
-            result = result with { ResourceBound = result.ResourceBound! with { UnknownReason = "ResourceReplayBudgetExceeded" } };
-            return result;
+            fallback = fallback with { Reason = WorkerClaimReason.ResourceLimit };
+            fallback = fallback with { ResourceBound = fallback.ResourceBound! with { UnknownReason = "ResourceReplayBudgetExceeded" } };
+            return fallback;
         }
+    }
+
+    // A replay candidate is not a publishable resource refutation until the
+    // independent program and layout premises have been admitted here.
+    private static WorkerClaimResult ProjectReplayViolation(CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact claim, WorkerClaimResult fallback, WorkerClaimResult violation,
+        CancellationToken cancellation)
+    {
+        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
+        fallback = ArgumentNullGuard.NotNull(fallback, nameof(fallback));
+        violation = ArgumentNullGuard.NotNull(violation, nameof(violation));
+        if (claim.Constraint.ResourceUpperBound!.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes)
+        {
+            var lifetimeLayout = new NativeResourceLayoutBinding(target);
+            if (lifetimeLayout.Bind() is null)
+            { return fallback; }
+            violation = lifetimeLayout.Project(violation);
+            return violation;
+        }
+        var metadata = new NativeResourceMetadataBinding(target);
+        var check = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, cancellation);
+        if (!check.Verified)
+        { return fallback; }
+        var layout = new NativeResourceLayoutBinding(target);
+        if (claim.Constraint.ResourceUpperBound!.Metric == WorkerResourceMetric.AllocatedBytes && layout.Bind() is null)
+        { return fallback; }
+        violation = metadata.Project(violation);
+        if (claim.Constraint.ResourceUpperBound.Metric == WorkerResourceMetric.AllocatedBytes)
+        { violation = layout.Project(violation); }
+        return violation;
     }
 
     internal static WorkerClaimResult Verify(CompilerCallablePreparation target, CompilerEffectClaimArtifact claim, CancellationToken cancellation)
@@ -149,15 +174,7 @@ internal static class NativeResourceContractVerifier
                 { return Unknown(allocation.UnknownReason ?? "ResourceAllocationProofUnavailable", WorkerClaimReason.UnsupportedBody); }
                 bytes = allocationUpper;
             }
-            var upper = constraint.Metric switch
-            {
-                WorkerResourceMetric.LoopBodyEntries => check.Cost!.LoopEntries,
-                WorkerResourceMetric.ArrayAllocations => check.Cost!.Arrays,
-                WorkerResourceMetric.AllocatedElements => check.Cost!.Elements,
-                WorkerResourceMetric.AllocatedBytes => bytes!,
-                WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes => stackUpper!,
-                _ => throw new InvalidDataException("Resource metric is unsupported.")
-            };
+            var upper = SelectUpperBound(constraint.Metric, check.Cost!, bytes, stackUpper);
             if (!ResourceBoundOrder.Proves(upper, limit, cancellation))
             { return Unknown("ResourceBoundComparisonUnproved", WorkerClaimReason.SolverIncomplete); }
             var result = CallableClaimResultAssembler.Create(target, claim.ClaimId, WorkerClaimOutcome.Proven,
@@ -332,6 +349,21 @@ internal static class NativeResourceContractVerifier
             return result;
         }
     }
+    private static ResourceExpression SelectUpperBound(WorkerResourceMetric metric, NativeResourceCost cost,
+        ResourceExpression? bytes, ResourceExpression? stack)
+    {
+        cost = ArgumentNullGuard.NotNull(cost, nameof(cost));
+        return metric switch
+        {
+            WorkerResourceMetric.LoopBodyEntries => cost.LoopEntries,
+            WorkerResourceMetric.ArrayAllocations => cost.Arrays,
+            WorkerResourceMetric.AllocatedElements => cost.Elements,
+            WorkerResourceMetric.AllocatedBytes => bytes!,
+            WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes => stack!,
+            _ => throw new InvalidDataException("Resource metric is unsupported.")
+        };
+    }
+
     private static WorkerResourceLowerAsymptoticEvidence LowerEvidence(WorkerResourceAsymptoticEvidence upper,
         ResourceExpression? lower, string? domainReason, CancellationToken cancellation)
     {

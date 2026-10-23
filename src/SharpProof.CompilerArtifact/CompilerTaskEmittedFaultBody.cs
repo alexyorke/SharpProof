@@ -37,11 +37,26 @@ internal sealed record CompilerTaskEmittedFaultBodyInventory(string RootCallable
 
 internal sealed record CompilerTaskEmittedFaultBodyCapture(CompilerTaskEmittedFaultBodyInventory? Inventory, string? UnknownReason);
 
+internal sealed record CompilerTaskDecodedFaultBody(CompilerTaskEmittedFaultBody Body,
+    ImmutableArray<CompilerTaskPrimitiveIlInstruction> Instructions)
+{
+    public CompilerTaskEmittedFaultBody Body { get; init; } = RepositoryParameterGuard.NotNull(Body, nameof(Body));
+    public ImmutableArray<CompilerTaskPrimitiveIlInstruction> Instructions { get; init; } = Instructions.IsDefault
+        ? throw new ArgumentException("Decoded instructions must be initialized.", nameof(Instructions)) : Instructions;
+}
+
 internal static class CompilerTaskEmittedFaultBodyOwnership
 {
     internal static string? Validate(CompilerTaskEmittedFaultBodyInventory inventory, CompilerTaskCarrierShapes shapes,
         string framework, CancellationToken cancellation)
     {
+        return ValidateAndDecode(inventory, shapes, framework, cancellation, out _);
+    }
+
+    internal static string? ValidateAndDecode(CompilerTaskEmittedFaultBodyInventory inventory, CompilerTaskCarrierShapes shapes,
+        string framework, CancellationToken cancellation, out ImmutableArray<CompilerTaskDecodedFaultBody> decodedBodies)
+    {
+        decodedBodies = [];
         inventory = ArgumentNullGuard.NotNull(inventory, nameof(inventory));
         shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
         framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
@@ -75,6 +90,7 @@ internal static class CompilerTaskEmittedFaultBodyOwnership
         }
         if (!sourceMethods.SetEquals(targets))
         { return "TaskEmittedFaultBodyCoverageInvalid"; }
+        var decoded = ImmutableArray.CreateBuilder<CompilerTaskDecodedFaultBody>(inventory.Bodies.Length);
         var methods = new HashSet<int>();
         var previous = 0;
         foreach (var body in inventory.Bodies)
@@ -103,8 +119,12 @@ internal static class CompilerTaskEmittedFaultBodyOwnership
             }
             if (arrayIndex != body.ArrayTypeOperands.Length)
             { return "TaskEmittedFaultBodyEvidenceInvalid"; }
+            decoded.Add(new(body, instructions));
         }
-        return methods.SetEquals(sourceMethods) ? null : "TaskEmittedFaultBodyCoverageInvalid";
+        if (!methods.SetEquals(sourceMethods))
+        { return "TaskEmittedFaultBodyCoverageInvalid"; }
+        decodedBodies = decoded.MoveToImmutable();
+        return null;
     }
 
     private static bool MethodToken(int token)

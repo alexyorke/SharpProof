@@ -9,10 +9,15 @@ internal static class NativeResourceAccountingVerifier
     internal static WorkerResourceAccountingEvidence[] Evidence(ResourceProgram program, CancellationToken cancellation)
     {
         program = ArgumentNullGuard.NotNull(program, nameof(program));
+        return Collect(program, ResourceExpression.MaximumNodes, cancellation);
+    }
+
+    private static WorkerResourceAccountingEvidence[] Collect(ResourceProgram program, int remaining, CancellationToken cancellation)
+    {
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
         var pending = new Stack<ResourceProgram>();
         var result = new List<WorkerResourceAccountingEvidence>();
         pending.Push(program);
-        var remaining = ResourceExpression.MaximumNodes;
         while (pending.Count != 0)
         {
             cancellation.ThrowIfCancellationRequested();
