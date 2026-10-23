@@ -109,6 +109,26 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Allocation admission and shared-budget controls
+
+Two valid-source controls use unsupported repeated-string extents: arithmetic
+on a scalar input and an array element. Each places arrays before and after the
+string creation and requires `UnsupportedStringAllocationSize` with no partial
+bounds. A separate valid-source constructor with 4096 declared instance fields
+must exhaust the existing shared analysis budget before publishing any bound,
+including those from surrounding allocations (`AnalysisBudgetExceeded`).
+
+The canonical formatter copied zero changes
+(`artifacts/resource-allocation-admission-format.log`). All 251 analyzer resource
+tests passed, including the three new controls, with zero build warnings or
+errors (`artifacts/resource-allocation-admission-tests.log`). Full quality/API and
+documentation checks passed (`artifacts/resource-allocation-admission-lint.log` and
+`artifacts/resource-allocation-admission-docs.log`). Production admission, runtime premises and wire
+identities are unchanged. The complete runtime-byte model, pending proof-policy
+choice, coverage closure and final audit remain open. The prior exact-head
+canonical retry passed on attempt 2; queued commits remain local until this
+verification completes.
+
 ### Hosted detached-certificate coverage
 
 Checkpoint `a92aec45641d04e3cf9e34c64be8290b70a4725f` completed all fifteen
@@ -127,15 +147,15 @@ Merge `1e240f97e8bf4aaecdf3cf29fe32d6887a97bbec` has verified parents master
 Canonical worker-a job 120182033859 failed before compilation because the
 registry returned HTTP 503 for the pinned minimum-framework SDK image.
 Its completed job log is retained in `artifacts/resource-a92a-worker-a-job.log`.
-Package consumers (39882126605) passed for this exact checkpoint. Canonical CI
-(39882126553) is still running at this observation and is not claimed to have
-passed. Its first attempt completed with only worker-a and the dependent
-summary failing; the summary log confirms all other result groups succeeded
-(`artifacts/resource-a92a-canonical-summary-job.log`). A rerun of worker-a
-was accepted as attempt 2 against the unchanged checkpoint; only that job and
-its dependent summary require another result. No live job was restarted.
-The tested constructor controls are committed locally while these exact-head jobs finish,
-so a new push does not cancel them. Runtime-byte composition, the pending
+Package consumers (39882126605) and full canonical CI (39882126553, attempt 2)
+passed for this exact checkpoint. The first canonical attempt completed with
+only worker-a and the dependent summary failing; the summary log confirms all
+other result groups succeeded
+(`artifacts/resource-a92a-canonical-summary-job.log`). Only worker-a and its
+dependent summary were rerun against the unchanged checkpoint. Image
+preparation then succeeded and the complete canonical result passed. No live
+job was restarted. The newer constructor and allocation-admission controls
+require their own exact-head hosted qualification after pushing. Runtime-byte composition, the pending
 proof-policy choice, coverage closure and final audit remain open.
 
 ### Constructor-chain admission controls

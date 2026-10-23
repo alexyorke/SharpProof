@@ -65,6 +65,29 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds, Is.Null);
         Assert.That(result.UnknownReason, Is.EqualTo(reason));
     }
+    [TestCase("n+1")]
+    [TestCase("values[0]")]
+    public void UnsupportedStringExtentsDiscardEarlierAllocationBounds(string extent)
+    {
+        ArgumentNullException.ThrowIfNull(extent);
+        var result = Analyze("var prefix=new byte[3]; var value=new string('x', " + extent + "); var suffix=new byte[5];");
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("UnsupportedStringAllocationSize"));
+    }
+
+    [Test]
+    public void ConstructorMemberInventorySharesTheAnalysisBudget()
+    {
+        var fields = string.Concat(Enumerable.Range(0, 4096).Select(index =>
+            "public int field" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + ";"));
+        var result = AnalyzeSource("public class Cell {" + fields + "} public static class Subject {" +
+            "public static void Root() {var prefix=new byte[3]; var cell=new Cell(); var suffix=new byte[5];}}");
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.Bounds, Is.Null);
+        Assert.That(result.UnknownReason, Is.EqualTo("AnalysisBudgetExceeded"));
+    }
+
     [TestCase("var value=new string('x', 0);")]
     [TestCase("var value=new string('x', 3);")]
     [TestCase("var value=new string('x', n);")]
