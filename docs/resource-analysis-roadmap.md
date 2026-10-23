@@ -116,7 +116,50 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
-### Measured qualification at feature head 17c2d6703
+### Integrated qualification and final delivery pending
+
+The latest qualified upstream feature head is `78bc5a24d`.
+[Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39936190992)
+passed, including package reproduction.
+[Coverage](https://github.com/alexyorke/SharpProof/actions/runs/39936190695)
+passed all fifteen shards and the unchanged 100% floor: 8454/8454 changed-TCB
+lines, with no uncovered lines. The report commit is
+`0178520098047ef98e3fd12cee541310db40a4a9`; its verified parents are master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature
+`78bc5a24ddd3ba12364fa0ce893a390fcd280fb0`. Production extraction changed the
+line universe from the historical 8329 lines; this is not a per-line mapping
+of the old 98 gaps.
+
+Local merge `2cecd8789` preserves the qualified upstream changes and the 26
+additional source/component cases in `b6fd68812`. Canonical container targeted
+checks with `-Fast` passed 1040 worker cases, 495 analyzer/resource cases,
+935 IR cases, 45 frontend/parity cases and 21 helper-selection cases.
+Five component reviews found no concrete soundness regression in the incoming
+production changes. Final repository checks, publication and hosted qualification
+of the combined commit remain. These local results do not substitute for that
+exact-commit qualification.
+
+The final bounded A-F audit found no material missing behavior within the stated
+admitted families. Its evidence uses real source, execution and packaged controls,
+independently of private-state corruption tests or the coverage percentage:
+
+- A-B: `ResourceBoundsLoopTests`, `ResourceBoundsCallTests` and
+  `ResourceBoundsRecursionTests`, with native phased-counter/source-call checks
+  and packaged phased-loop contracts.
+- C-D: native byte, lifetime, object/closure/boxing and logical stack controls;
+  `WorkerResourceContractConsumerTests` exercises real artifact-to-worker proof,
+  refutation, independent outcomes, provenance, cache and SARIF. Package layout
+  smoke tests cover shipped contracts and byte evidence.
+- E-F: packaged expected/accounting/tightness and task lifetime controls, all
+  eleven runtime quantities and twelve used caller assumptions, absent-premise
+  Unknown, evidence tamper/policy/cache checks, and the benchmark's matched
+  source/environment/output with measurements separated from proofs.
+
+The remaining gate is delivery qualification of the final pushed revision,
+tracked by the MR checks. No broader physical-frame or elapsed-time guarantee
+is inferred from these tests.
+
+### Historical measured qualification at feature head 17c2d6703
 
 [Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39933180922)
 passed, including the repaired full package reproduction job. All fifteen
@@ -142,8 +185,11 @@ tracked in the [coverage audit](resource-coverage-admission-audit.md).
 
 A concurrent chat advanced the same MR to `78bc5a24d`, preserving this head via
 a merge. Five read-only component audits found no concrete soundness regression
-in the incoming production changes. The local follow-up batch still needs to
-be integrated with that commit and verified together. The older package workflow
+in the incoming production changes. Local merge `2cecd8789` preserves that
+commit and follow-up commit `b6fd68812`; combined verification is running.
+The incoming suite also includes private-state corruption and direct private
+helper tests. Those test defensive behavior only; they are not evidence that
+such states arise from admitted source programs. The older package workflow
 was cancelled on the newer push; its result is not reported as a pass.
 
 ### Prior boundary-control checkpoint

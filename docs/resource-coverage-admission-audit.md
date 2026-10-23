@@ -6,7 +6,18 @@ unchanged 100% changed-TCB floor still applies.
 
 ## Qualified evidence and scope
 
-The latest measured report is [workflow 39933180738](https://github.com/alexyorke/SharpProof/actions/runs/39933180738).
+The latest qualified upstream report is [workflow 39936190695](https://github.com/alexyorke/SharpProof/actions/runs/39936190695).
+All fifteen shards and the unchanged 100% floor passed: 8454/8454 changed-TCB
+lines, with zero gaps. Report commit
+`0178520098047ef98e3fd12cee541310db40a4a9` has verified parents master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature
+`78bc5a24ddd3ba12364fa0ce893a390fcd280fb0`. Its report is retained under
+`artifacts/resource-78b-coverage-evidence`. Production extractions changed the
+line universe; the historical gap lists below are not current exclusions.
+Local merge `2cecd8789` passed combined targeted checks and awaits final hosted
+qualification. The 26 additional cases have no separate measured coverage claim.
+
+The previous measured report is [workflow 39933180738](https://github.com/alexyorke/SharpProof/actions/runs/39933180738).
 All fifteen shards passed. It covers merge commit
 `7e5c83bb58ea44e89f228e5ceab81292bf699643`, whose verified parents are master
 `70fba9efeefe8cb621cbf834998941985a5227ee` and feature head
@@ -17,20 +28,28 @@ tests are not counted in this report. The report and deduplicated gap list are
 retained in `artifacts/resource-17c-coverage-evidence` and
 `artifacts/resource-17c-coverage-gaps.txt`.
 
-The baseline partition below remains historical evidence. The remaining 98
-units are under renewed review, distinguishing enforced helper preconditions
-from invariants supplied only by current callers. Neither classification
-grants a coverage exemption.
+The baseline partition below remains historical evidence. Review of its 98
+remaining units distinguished enforced helper preconditions from invariants
+supplied only by current callers. Neither classification grants a coverage
+exemption.
 
 The follow-up batch adds 26 verified cases (128 across eleven boundary fixtures
 in total). Its local checks passed 20 analyzer/SDK/source cases, 19 frontend
 cases, 10 IR cases, 25 focused worker cases and two replay-observation cases.
-It covers genuine parenthesized initializer syntax, recursive varargs,
+It covers genuine parenthesized initializer syntax, variadic recursion,
 256/257-parameter expression-bodied closures, nested object initializers and
 partial-property recovery, as well as explicitly scoped typed helper negatives.
 A malformed typed allocation observation is tested separately from interpreter
 output, with atomic Unknown on its mismatched identity. The coverage effect of
 this batch is not measured yet. Formatting, lint and layout passed.
+
+Incoming merge `78bc5a24d`, preserved by local merge `2cecd8789`, adds a separate
+suite with private-state corruption and direct private-helper tests. Those
+controls establish defensive behavior for their supplied states, not source
+reachability or support for fabricated proof records. They do not invalidate
+the causal distinctions in this ledger. Combined targeted verification passed
+1040 worker, 495 analyzer/resource, 935 IR, 45 frontend/parity and 21 helper-selection
+cases in canonical containers. Exact final hosted qualification is pending.
 
 The report from [workflow 39925263744](https://github.com/alexyorke/SharpProof/actions/runs/39925263744) covers merge commit
 `1a583de04cb43b72af502e822682ea702810c873`, whose parents are master
