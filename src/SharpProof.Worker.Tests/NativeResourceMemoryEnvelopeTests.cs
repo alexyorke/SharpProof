@@ -206,6 +206,38 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
     }
 
+    [Test]
+    public async Task NonconstantNegatedScalarReturnsUseCumulativeMemoryEnvelopes()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.RetainedBytes,0)] public static int Target(int n) {var value=new int[n]; return -n;} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        Assert.That(target.Total, Is.Not.Null);
+        var owner = target.Total!;
+        var nonconstantNegation = false;
+        foreach (var block in owner.Program.Blocks)
+        {
+            foreach (var instruction in block.Instructions)
+            {
+                foreach (var read in IrInstructionFacts.ReadTerms(instruction))
+                {
+                    nonconstantNegation |= IrTraversal.Any(read, static term =>
+                    {
+                        ArgumentNullException.ThrowIfNull(term);
+                        return term is IrUnaryTerm { Operator: IrUnaryOperator.Negate } unary &&
+                            !IrTraversal.CollectVariables(unary.Operand).IsEmpty;
+                    });
+                }
+            }
+        }
+        Assert.That(nonconstantNegation, Is.True, "The compiled parameter negation must remain a nonconstant unary IR term.");
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
+        Assert.That(result.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+    }
+
     [TestCase(5, "public static int[] Target(int n,int[] input) => input;")]
     [TestCase(6, "public static int[] Target(int n,int[] input) => input;")]
     [TestCase(5, "public int[] Target(int n) => new int[n];")]

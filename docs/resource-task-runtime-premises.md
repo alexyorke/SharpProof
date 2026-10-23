@@ -96,7 +96,11 @@ false invalidates the conditional guarantee.
 The private arithmetic checker passed 21 targeted tests; the Linux Int32 helper
 selector passed 18 targeted tests. The package's existing no-premise consumer
 passed its corrected `Unknown` assertion against the preceding production head.
-All 1736 selected worker tests passed, including the integrated compiler/worker,
+All 1741 selected worker tests passed, including the integrated compiler/worker,
 response tamper, cache, policy and SARIF checks for both root forms. The Attributes
 suite passed 83 tests, the frontend catalog two, and analyzer resource/projection
-checks 296. Exact-head hosted qualification and the required coverage gate remain open.
+checks 296. Packaged conditional-Proven controls passed for returned and configured roots,
+including all quantities, used assumptions, task/layout provenance and SARIF.
+The no-premise Unknown package regression also passed after the rebase.
+Exact-head hosted qualification and the unchanged 100% changed-TCB coverage gate
+also remain open.

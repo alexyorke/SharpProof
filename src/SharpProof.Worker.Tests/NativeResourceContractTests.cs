@@ -418,6 +418,86 @@ internal sealed partial class NativeResourceContractTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TaskJoinComparisonBudgetPublishesEvidenceOnlyAfterComparisonCompletes(bool directComparisonFirst)
+    {
+        var artifact = CreateArtifact("""
+            using SharpProof.Attributes;
+            using System.Threading.Tasks;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, nameof(n), 1)]
+                public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(0)));
+                static void Child(int count) { for(int i=0;i<count;i++) {} }
+            }
+            """, reviewedRuntime: true);
+        var preparation = Read(artifact);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(preparation.Total, Is.Null);
+        Assert.That(preparation.TotalEntry, Is.Not.Null);
+        Assert.That(preparation.ForkJoinProjection, Is.Not.Null, preparation.ResourceUnknownReason);
+        var claim = artifact.Callables.Single().EffectClaims.Single();
+        var input = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
+            preparation.Entry.CallableId, preparation.TotalEntry!, cancellation);
+        var source = NativeForkJoinSourceCostVerifier.Check(preparation.ForkJoinProjection!, preparation.TotalEntry!, cancellation);
+        Assert.That(source.Upper, Is.Not.Null, source.UnknownReason);
+        Assert.That(source.Upper!.LoopEntries, Is.EqualTo(input));
+        var alternatives = Enumerable.Range(1, 1024).Select(offset => ResourceExpression.Difference(input, offset)).ToArray();
+        while (alternatives.Length > 1)
+        {
+            var combined = new ResourceExpression[alternatives.Length / 2];
+            for (var index = 0; index < combined.Length; index++)
+            { combined[index] = ResourceExpression.Max(alternatives[index * 2], alternatives[index * 2 + 1]); }
+            alternatives = combined;
+        }
+        // The same valid task bound either proves immediately or exhausts the
+        // comparison budget before reaching the final direct alternative.
+        var limit = directComparisonFirst ? ResourceExpression.Max(input, alternatives[0]) :
+            ResourceExpression.Max(alternatives[0], input);
+        var constraint = claim.Constraint.ResourceUpperBound! with { UpperBound = ResourceExpressionCodec.Encode(limit, cancellation) };
+        claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = constraint } };
+        CompilerEffectClaimArtifactCodec.Seal(claim);
+        artifact = artifact with
+        {
+            Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { EffectClaims = [claim] }),
+            Manifest = artifact.Manifest with
+            {
+                Claims = artifact.Manifest.Claims.SetItem(0, artifact.Manifest.Claims.Single() with { ResourceUpperBound = constraint })
+            }
+        };
+        WorkerProtocolJson.SealManifest(artifact.Manifest);
+        preparation = Read(artifact);
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), cancellation)).Single();
+        if (directComparisonFirst)
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("max(0, n)"));
+            Assert.That(result.ResourceBound.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskJoinScope));
+            var dependency = result.ResourceBound.MetadataAssumptions.Single();
+            Assert.That(dependency.RuntimeModel, Is.EqualTo(WorkerResourceModels.TaskJoinModel));
+            Assert.That(result.Assumptions.Single().Id, Is.EqualTo(dependency.AssumptionId));
+            Assert.That(result.Assumptions.Single().Used, Is.True);
+            Assert.That(result.ProofCore, Does.Contain("resource-task-model:" + dependency.RuntimeModel));
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinResourceBudgetExceeded"));
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.Asymptotic, Is.Null);
+            Assert.That(result.ResourceBound.Expected, Is.Null);
+            Assert.That(result.ResourceBound.Accounting, Is.Empty);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.ProofCore, Is.Empty);
+            Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+            Assert.That(result.EffectWitness, Is.Null);
+        }
+    }
+
     [TestCase("missing-entry", "ResourceEntryUnavailable")]
     [TestCase("abstract-entry", "ResourceEntryUnavailable")]
     [TestCase("incomplete-entry", "ResourceEntryUnavailable")]

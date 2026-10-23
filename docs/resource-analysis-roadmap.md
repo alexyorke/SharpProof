@@ -116,6 +116,41 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
+### Final local delivery checks passed
+
+All 1741 selected worker tests passed on the combined production implementation
+and final test changes (`artifacts/resource-runtime-final-worker-tests.log`). The
+five additional controls exercise a real task comparison-budget boundary,
+16/17-record accounting evidence limits with bound metadata, and a nonconstant
+negated scalar return through the cumulative retained-memory envelope. Their
+coverage effect is unmeasured until the next merged hosted report.
+
+The rebased no-premise package test and both returned/configured conditional
+package tests passed. The final lint retry passed, including API compatibility,
+spelling and links. No production changes were needed for those delivery fixes.
+The complete A-F implementation remains subject to its documented admission
+rules and explicit assumptions. Exact-head hosted CI and the unchanged 100%
+changed-TCB coverage floor remain required before overall completion.
+
+### Rebased delivery checkpoint
+
+Implementation and progress docs are committed at `9f7e0ab7b`, rebased onto
+`66e3e38ad`. Both newer CI commits were preserved. The only conflict was the
+already corrected package Unknown reason; the resolved test also retains the
+additional no-proof/no-metadata assertions. The pre/post-rebase source comparison
+contains only the eight preserved CI tooling files, with no production-code delta.
+
+The no-premise package regression passed against the resulting state. Both
+packaged conditional-Proven controls also passed: returned and configured roots
+compile against the shipped attributes, report all eleven quantities and twelve
+used caller assumptions, bind task/layout evidence, and preserve it in SARIF
+(`artifacts/resource-runtime-positive-package-tests-v3.log`). Final scope review
+found no further implementation omission under the documented admission rules.
+Exact-head hosted CI, the unchanged 100% changed-TCB floor and final delivery
+review remain open. The new package fixture first failed a test-style analyzer
+check and then an expected callable ID that omitted its return type. Those
+fixture issues were corrected; the passing run executes every evidence assertion.
+
 ### Conditional runtime model: combined local verification passed
 
 All 1736 selected worker tests passed after the precise async admission repair
@@ -133,10 +168,11 @@ scopes bind complete lifecycle budgets, including later internal finalization.
 There are no numeric defaults or unconditional physical-frame closure claims.
 
 This closes phase F's implementation under the explicitly selected premise
-policy. Rebase preservation, packaged verification of the resulting state,
+policy. Packaged returned/configured conditional-Proven verification,
 exact-head hosted qualification, the unchanged coverage floor and final scope
 review remain required. The merge request stays draft and the overall task is
 not complete.
+
 ### Integrated conditional-model verification
 
 The focused worker build completed and ran 204 tests: 197 passed and seven

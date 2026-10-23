@@ -3778,6 +3778,147 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackagePublishesCompleteDeclaredTaskRuntimePremises(bool configured)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        const string deploymentHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        const string deploymentEvidence = "package fixture deployment assertion; not measured";
+        const string quantityEvidence = "package fixture caller-declared upper bound; not measured";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
+            using SharpProof.Attributes;
+            using System.Threading.Tasks;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.AllocatedBytes,1000000)]
+                [ResourceTaskDeployment(ResourceTaskDeploymentProfile.CoreClr8032LinuxX64OrdinaryJitStockClosed,
+                    "{{deploymentHash}}","{{deploymentEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.RawTraceArrayAttemptsPerFaultEpisode,2L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.RawTracePayloadBytesPerArrayAttempt,5L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverArrayAttemptsPerFaultEpisode,3L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverSlotsPerArrayAttempt,7L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.FaultConstructionBytesPerFaultEpisode,11L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverReferentBytesPerFaultEpisode,13L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.SchedulingBytesPerChildStartAttempt,17L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.JoinBytesPerJoinAttempt,19L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.AwaitBytesPerConfiguredAwait,23L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.InitializationBytesPerInvocation,29L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.TotalFaultEpisodesPerInvocation,31L,"{{quantityEvidence}}")]
+                public static {{(configured ? "async " : "")}}Task Target(int n) =>
+                    {{(configured ? "await " : "")}}Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))){{(configured ? ".ConfigureAwait(false)" : "")}};
+                static void Child(int n) { var values=new int[3]; }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", "joined-isolated-cumulative-runtime-premises");
+        JsonAssert.Equal(bound, "costModel", "coreclr-8.0.32-x64-source-storage-v1:cumulative-bytes-v1");
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+        Assert.That(bound.GetProperty("unknownReason").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(bound.GetProperty("observedLowerBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(bound.GetProperty("evaluatedUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(claim.GetProperty("model").GetArrayLength(), Is.Zero);
+        var runtimeRecordCount = 0;
+        foreach (var token in claim.GetProperty("proofCore").EnumerateArray())
+        {
+            if (token.GetString()?.StartsWith("resource-runtime-premise-record:", StringComparison.Ordinal) != true)
+            { continue; }
+            Assert.That(token.GetString(), Does.Match("^resource-runtime-premise-record:[0-9a-f]{64}$"));
+            runtimeRecordCount++;
+        }
+        Assert.That(runtimeRecordCount, Is.EqualTo(1));
+        Assert.That(claim.GetProperty("proofCore").EnumerateArray().Count(static token =>
+            token.GetString() == "resource-task-runtime-model:task-join-declared-runtime-allocation-prefixes-v1"), Is.EqualTo(1));
+        var premises = bound.GetProperty("runtimePremises");
+        JsonAssert.Equal(premises, "model", "declared-task-runtime-premises-v1");
+        JsonAssert.Equal(premises, "profile", "CoreClr8032LinuxX64OrdinaryJitStockClosed");
+        JsonAssert.Equal(premises, "rootCallableId", "M:Subject.Target(System.Int32)~System.Threading.Tasks.Task");
+        JsonAssert.Equal(premises, "deploymentManifestSha256", deploymentHash);
+        JsonAssert.Equal(premises, "deploymentEvidence", deploymentEvidence);
+        Assert.That(premises.GetProperty("compilerIdentity").GetString(), Does.Contain("Microsoft.CodeAnalysis.CSharp"));
+        foreach (var field in new[] { "profileCatalogSha256", "moduleSha256", "referenceSha256", "declarationSha256" })
+        { Assert.That(premises.GetProperty(field).GetString(), Does.Match("^[0-9a-f]{64}$"), field); }
+        var expectedQuantities = new (string Name, long Value, string Unit)[]
+        {
+            ("RawTraceArrayAttemptsPerFaultEpisode", 2, "allocation-attempts"),
+            ("RawTracePayloadBytesPerArrayAttempt", 5, "payload-bytes"),
+            ("ResolverArrayAttemptsPerFaultEpisode", 3, "allocation-attempts"),
+            ("ResolverSlotsPerArrayAttempt", 7, "reference-slots"),
+            ("FaultConstructionBytesPerFaultEpisode", 11, "managed-instance-bytes"),
+            ("ResolverReferentBytesPerFaultEpisode", 13, "managed-instance-bytes"),
+            ("SchedulingBytesPerChildStartAttempt", 17, "managed-instance-bytes"),
+            ("JoinBytesPerJoinAttempt", 19, "managed-instance-bytes"),
+            ("AwaitBytesPerConfiguredAwait", 23, "managed-instance-bytes"),
+            ("InitializationBytesPerInvocation", 29, "managed-instance-bytes"),
+            ("TotalFaultEpisodesPerInvocation", 31, "fault-episodes")
+        };
+        var quantities = premises.GetProperty("quantities");
+        Assert.That(quantities.GetArrayLength(), Is.EqualTo(11));
+        var declaredIds = new HashSet<string>(StringComparer.Ordinal);
+        var deploymentId = premises.GetProperty("deploymentAssumptionId").GetString()!;
+        Assert.That(deploymentId, Does.Match("^resource-runtime-deployment-v1:[0-9a-f]{64}$"));
+        declaredIds.Add(deploymentId);
+        for (var index = 0; index < expectedQuantities.Length; index++)
+        {
+            var quantity = quantities[index];
+            JsonAssert.Equal(quantity, "quantity", expectedQuantities[index].Name);
+            JsonAssert.Equal(quantity, "upperBound", expectedQuantities[index].Value);
+            JsonAssert.Equal(quantity, "unit", expectedQuantities[index].Unit);
+            JsonAssert.Equal(quantity, "evidence", quantityEvidence);
+            Assert.That(quantity.GetProperty("scope").GetString(), Does.StartWith("per-"));
+            var id = quantity.GetProperty("assumptionId").GetString()!;
+            Assert.That(id, Does.Match("^resource-runtime-quantity-v1:[0-9a-f]{64}$"));
+            Assert.That(declaredIds.Add(id), Is.True);
+        }
+        var usedUserIds = new HashSet<string>(StringComparer.Ordinal);
+        var usedTrustedIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var assumption in claim.GetProperty("assumptions").EnumerateArray())
+        {
+            if (!assumption.GetProperty("used").GetBoolean())
+            { continue; }
+            var kind = assumption.GetProperty("kind").GetString();
+            if (kind == "UserAssume")
+            { usedUserIds.Add(assumption.GetProperty("id").GetString()!); }
+            else if (kind == "TrustedBoundary")
+            { usedTrustedIds.Add(assumption.GetProperty("id").GetString()!); }
+        }
+        Assert.That(usedUserIds, Has.Count.EqualTo(12));
+        Assert.That(usedUserIds, Is.EquivalentTo(declaredIds));
+        var dependencies = bound.GetProperty("metadataAssumptions").EnumerateArray().ToArray();
+        Assert.That(dependencies, Has.Length.EqualTo(2));
+        Assert.That(usedTrustedIds, Has.Count.EqualTo(2));
+        var witnesses = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var dependency in dependencies)
+        {
+            witnesses.Add(dependency.GetProperty("witnessIdentifier").GetString()!);
+            Assert.That(usedTrustedIds, Does.Contain(dependency.GetProperty("assumptionId").GetString()));
+            Assert.That(dependency.GetProperty("catalogSha256").GetString(), Does.Match("^[0-9a-fA-F]{64}$"));
+            Assert.That(dependency.GetProperty("referenceSha256").GetString(), Does.Match("^[0-9a-fA-F]{64}$"));
+            Assert.That(dependency.GetProperty("evidenceSource").GetString(), Does.StartWith("https://github.com/dotnet/runtime/"));
+            if (dependency.GetProperty("witnessIdentifier").GetString() == "bcl.task.run-action.when-all-array")
+            {
+                JsonAssert.Equal(dependency, "runtimeModel", configured ? "configured-task-join-source-at-most-once-v1" : "task-join-source-at-most-once-v1");
+                JsonAssert.Equal(dependency, "referenceAssembly", premises.GetProperty("referenceAssembly").GetString());
+                JsonAssert.Equal(dependency, "referenceSha256", premises.GetProperty("referenceSha256").GetString());
+            }
+        }
+        Assert.That(witnesses, Does.Contain("bcl.task.run-action.when-all-array"));
+        Assert.That(witnesses, Does.Contain("runtime-layout.coreclr-x64"));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        var published = row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound");
+        JsonAssert.Equal(published, "executionScope", "joined-isolated-cumulative-runtime-premises");
+        JsonAssert.Equal(published.GetProperty("runtimePremises"), "declarationSha256", premises.GetProperty("declarationSha256").GetString());
+        Assert.That(published.GetProperty("runtimePremises").GetProperty("quantities").GetArrayLength(), Is.EqualTo(11));
+    }
+
     [TestCase(5, false)]
     [TestCase(6, false)]
     [TestCase(5, true)]

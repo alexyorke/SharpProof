@@ -251,13 +251,13 @@ and Git blob identities independently rechecked:
 
 | Source | Bytes | SHA-256 |
 | --- | --- | --- |
-| [loaderallocator.inl](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/loaderallocator.inl) | 5392 | `337a856d3ecb67cdb637a86e00e34818a623f93ae583f39161c49d15b53b6e51` |
+| [Native loader allocator inline definitions](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/loaderallocator.inl) | 5392 | `337a856d3ecb67cdb637a86e00e34818a623f93ae583f39161c49d15b53b6e51` |
 | [LoaderAllocator.cs](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Reflection/LoaderAllocator.cs) | 2870 | `cbb24b7e0a3b32620b8c905ff15cfa5e9d07adae6e971ae8ca63bde952cd43e1` |
 
 The getter selects null or reads the existing weak handle. Its body does not
 establish when the referent was created or the helper's effects. The managed
 constructor allocates an initial reference array and scout; setup can abandon
 candidates before publication. Later growth, native helpers, generated binding,
-cleanup and finalizer retries remain outside this bounded source audit. The
+cleanup and finalization retries remain outside this bounded source audit. The
 conditional runtime budgets explicitly include those transitive costs and
 attempts rather than treating the getter as proof of root-entry preexistence.
