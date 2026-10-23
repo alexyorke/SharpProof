@@ -380,8 +380,6 @@ jobs:
           [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
           echo "reference=ghcr.io/alexyorke/sharpproof@${digest}" >> "${GITHUB_OUTPUT}"
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
-          mkdir -p artifacts/developer-experience
-          cp consumer-image.json artifacts/developer-experience/consumer-image.json
       - name: Qualify exact packages and generated consumers
         env:
           SHARPPROOF_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
@@ -443,6 +441,12 @@ jobs:
           subject-name: ghcr.io/alexyorke/sharpproof
           subject-digest: ${{ steps.consumer.outputs.digest }}
           push-to-registry: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: developer-consumer-image-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: consumer-image.json
+          if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
