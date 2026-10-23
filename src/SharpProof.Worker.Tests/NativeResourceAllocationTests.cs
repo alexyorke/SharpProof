@@ -246,6 +246,84 @@ public sealed class NativeResourceAllocationTests
         Action tooMany = () => ResourceProgram.Sequence(pair, pair);
         Assert.Throws<ResourceExpressionLimitException>(tooMany);
     }
+    [TestCase("array-lower", "MalformedResourceLowerExtent")]
+    [TestCase("orphan-lower", "MalformedResourceLowerExtent")]
+    [TestCase("missing-credit", "MalformedResourceCredit")]
+    [TestCase("missing-rank", "MalformedResourceCredit")]
+    [TestCase("missing-drain", "MalformedResourceCredit")]
+    [TestCase("recursive-credit", "MalformedResourceCredit")]
+    [TestCase("orphan-credit", "MalformedResourceCredit")]
+    [TestCase("orphan-distribution", "ResourceInputModelPayloadInvalid")]
+    [TestCase("missing-distribution", "ResourceInputModelOwnershipInvalid")]
+    [TestCase("unowned-distribution", "ResourceInputModelOwnershipInvalid")]
+    public void DetachedProgramsRequireCompleteAndScopedResourceCertificates(string mutation, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        ArgumentNullException.ThrowIfNull(expected);
+        var kind = ResourceProgramKind.CreditLoop;
+        ResourceExpression? length = null;
+        ResourceExpression? lower = null;
+        ResourceLoopRank? rank = new(ResourceLoopKind.IncreasingAdd, ResourceExpression.Zero,
+            ResourceExpression.Literal(2), 1, 32, false);
+        ResourceCreditShape? credit = new(0, 1, 32, false);
+        ResourceBooleanDistribution? distribution = null;
+        var repeat = ResourceRepeatKind.Loop;
+        System.Collections.Immutable.ImmutableArray<ResourceProgram> children = [ResourceProgram.Zero, ResourceProgram.Zero];
+        switch (mutation)
+        {
+            case "array-lower":
+            case "orphan-lower":
+                kind = mutation == "array-lower" ? ResourceProgramKind.AllocateArray : ResourceProgramKind.Zero;
+                length = mutation == "array-lower" ? ResourceExpression.One : null;
+                lower = mutation == "orphan-lower" ? ResourceExpression.Zero : null;
+                rank = null;
+                credit = null;
+                children = [];
+                break;
+            case "missing-credit":
+                credit = null;
+                break;
+            case "missing-rank":
+                rank = null;
+                break;
+            case "missing-drain":
+                children = [ResourceProgram.Zero];
+                break;
+            case "recursive-credit":
+                repeat = ResourceRepeatKind.TailRecurrence;
+                break;
+            case "orphan-credit":
+                kind = ResourceProgramKind.Sequence;
+                rank = null;
+                break;
+            case "orphan-distribution":
+            case "missing-distribution":
+            case "unowned-distribution":
+                kind = mutation == "orphan-distribution" ? ResourceProgramKind.Sequence : ResourceProgramKind.BooleanDistribution;
+                distribution = mutation == "missing-distribution" ? null : new(0, "selected", 1, 1);
+                rank = null;
+                credit = null;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        // Detached inputs deliberately bypass the producer's construction API.
+        // No source execution or compiler emission is claimed for these records.
+        var constructor = typeof(ResourceProgram).GetConstructors(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single();
+        var program = (ResourceProgram)constructor.Invoke([kind, length, rank, repeat, children, null, null, null, lower, credit, distribution]);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var owner = Owner();
+        Assert.That(NativeResourceProgramVerifier.Verify(ResourceProgram.Zero, "owned", owner, token).Verified, Is.True);
+        var counts = NativeResourceProgramVerifier.Verify(program, "owned", owner, token);
+        Assert.That(counts.Verified, Is.False);
+        Assert.That(counts.Cost, Is.Null);
+        Assert.That(counts.LowerCost, Is.Null);
+        Assert.That(counts.UnknownReason, Is.EqualTo(expected));
+        var bytes = NativeResourceAllocationVerifier.Verify(program, "owned", owner, Layout(), token);
+        Assert.That(bytes.ConditionalUpperBound, Is.Null);
+        Assert.That(bytes.UnknownReason, Is.EqualTo(expected));
+    }
+
     [TestCase(0, "MalformedResourceActivation")]
     [TestCase(1, "MalformedResourceActivation")]
     [TestCase(2, "MalformedResourceAllocation")]

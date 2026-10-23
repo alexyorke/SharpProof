@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Detached certificate completeness controls
+
+Ten detached-program controls require explicit Unknown and no count, lower-count
+or byte bound for malformed certificates. They cover missing array lower
+extents, lower extents attached to unrelated nodes, absent credit/rank/drain
+parts, recurrence credit, credit attached to unrelated nodes, and missing or
+unowned probability annotations. Each independently checks the count verifier
+and byte verifier. A valid zero program verifies under the same owner before
+the malformed input is checked.
+
+These records deliberately bypass the producer's construction API. They are
+validator inputs, not executable-source claims. Production admission, runtime
+premises and wire identities are unchanged. The first build stopped before
+tests on formatting errors because its private source copy preceded formatting
+(`artifacts/resource-detached-certificates-probe.log`). The canonical formatter
+corrected one file (`artifacts/resource-detached-certificates-format.log`).
+The corrected allocation/program/expected-cost selection passed all 132 tests,
+including the ten new controls, with zero build warnings or errors
+(`artifacts/resource-detached-certificates-corrected-tests.log`). Full quality/API and
+documentation gates passed (`artifacts/resource-detached-certificates-lint.log`
+and `artifacts/resource-detached-certificates-docs.log`). The complete
+runtime-byte model, pending runtime-model choice, coverage closure and final
+audit remain open.
+
 ### Local-initialization branch-entry control
 
 A compiled conditional local initialization retains boundary evidence. An
