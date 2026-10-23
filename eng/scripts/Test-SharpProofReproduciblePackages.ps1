@@ -187,7 +187,8 @@ try {
         if ($runSdk -cne $sdk) { throw 'An independent workspace selected a different SDK.' }
         if ($Scope -eq 'Full') {
             $null = Invoke-ReproCommand pwsh ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('-NoLogo', '-NoProfile', '-File',
-                        (Join-Path $clone 'eng/scripts/Invoke-SharpProofContainer.ps1'), '-Command', 'pack', '-Configuration', 'Release'))) $clone "run-$index-full-pack"
+                        (Join-Path $clone 'eng/scripts/Invoke-SharpProofContainer.ps1'), '-Command', 'pack', '-Configuration', 'Release',
+                        '-PackageBuildScope', 'ProductPayloads'))) $clone "run-$index-full-pack"
             $packed = Get-PackedPayloads $clone
             $runs.Add(([ordered]@{ payloads = $packed.Payloads; archives = $packed.Archives }).AsReadOnly())
             if ($IncludeDeveloperPackages) {

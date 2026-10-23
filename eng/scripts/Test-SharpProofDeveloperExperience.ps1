@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string]$ConsumerImage,
     [string]$PackageSource = '',
     [string]$ToolPackageSource = '',
+    [ValidateNotNullOrEmpty()][string]$BuildTarget = 'SharpProof.slnx',
     [ValidateSet('AnalyzerEnabled', 'FeedbackOnly')][string]$QualificationMode = 'AnalyzerEnabled',
     [switch]$PackOnly
 )
@@ -73,12 +74,12 @@ function Save-Reports([string]$Source, [string]$Phase) {
     }
 }
 try {
-    # The caller builds the solution, including the internal analyzer, first.
+    # The caller builds the selected product and test closure, including the internal analyzer, first.
     if (-not $PackOnly) {
         Run 'developer-unit-tests' 'dotnet' @('test', 'src/SharpProof.DeveloperExperience.Tests/SharpProof.DeveloperExperience.Tests.csproj', '-c', 'Release', '--no-build', '--no-restore')
     }
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-        Run 'pack-product' 'dotnet' @('pack', 'SharpProof.slnx', '-c', 'Release', '--no-build', '--no-restore', '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit")
+        Run 'pack-product' 'dotnet' @('pack', $BuildTarget, '-c', 'Release', '--no-build', '--no-restore', '-o', $feed, "-p:RepositoryCommit=$sourceCommit", "-p:SourceRevisionId=$sourceCommit")
     }
     else {
         & (Join-Path $PSScriptRoot 'Test-SharpProofPackageConsumers.ps1') -PackageSource $PackageSource -ValidatePackageSourceOnly

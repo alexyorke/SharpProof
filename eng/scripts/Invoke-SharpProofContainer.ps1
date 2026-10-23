@@ -13,6 +13,9 @@ param(
 
     [string]$ConsumerHarness = '',
 
+    [ValidateSet('ConsumerQualification', 'ProductPayloads')]
+    [string]$PackageBuildScope = 'ConsumerQualification',
+
     [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
 
     [ValidateRange(0, 3)][int]$PackagePartition = 0,
@@ -111,6 +114,9 @@ if ($PSBoundParameters.ContainsKey('SelfApplicationPhase') -and $Command -ne 'se
 if (($PSBoundParameters.ContainsKey('PackagePartition') -or $PSBoundParameters.ContainsKey('PackagePartitionCount')) -and $Command -ne 'package-tests') {
     throw 'Package partition options are supported only for package-tests.'
 }
+if ($PSBoundParameters.ContainsKey('PackageBuildScope') -and $Command -ne 'pack') {
+    throw '-PackageBuildScope is supported only for pack.'
+}
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
     throw '-ReuseTestHarness is supported only for package-tests.'
@@ -131,7 +137,7 @@ else {
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
     -not $NoBuild -and -not $Fast -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -285,24 +291,14 @@ function Invoke-SharpProofSolutionBuild(
 
 function Invoke-SharpProofCoverageAuthorityBuild {
     param([string[]]$AdditionalProjects = @())
-    # The gate recomputes every production PDB and source identity. Its build
-    # need not also compile the test projects already exercised by the shards
-    # and the required PR gate. Derive this complete set from the same inventory
-    # authority as the validator instead of maintaining another project list.
-    $selectionPath = Join-Path ([IO.Path]::GetTempPath()) (
-        'sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.json')
+    # Conservatively build every non-test solution root and the assigned tests.
+    # The post-build authority still independently evaluates production projects,
+    # PDBs, and source identities before accepting any coverage evidence.
     $filterPath = Join-Path $repositoryRoot (
         '.sharpproof-coverage-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
     try {
-        Invoke-RequiredScript 'eng/scripts/Get-SharpProofProductionInventory.ps1' `
-            'Coverage build project selection failed.' ([ordered]@{
-                RepositoryRoot = $repositoryRoot
-                Configuration  = 'Release'
-                OutputPath     = $selectionPath
-            }).AsReadOnly()
-        $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
-        $projects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@((@($selection.projects | ForEach-Object { [string]$_.projectPath }) + $AdditionalProjects | Sort-Object -CaseSensitive -Unique)))
-        if ($projects.Length -eq 0) { throw 'Coverage build project selection is empty.' }
+        $projects = Get-SharpProofCoverageAuthorityBuildProjects `
+            -RepositoryRoot $repositoryRoot -AdditionalProjects $AdditionalProjects
         ([ordered]@{ solution = ([ordered]@{
                     path = 'SharpProof.slnx'; projects = $projects
                 }).AsReadOnly()
@@ -318,11 +314,7 @@ function Invoke-SharpProofCoverageAuthorityBuild {
         & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration Release
     }
     finally {
-        foreach ($temporaryPath in @($filterPath, $selectionPath)) {
-            if (Test-Path -LiteralPath $temporaryPath) {
-                Remove-Item -LiteralPath $temporaryPath -Force
-            }
-        }
+        if (Test-Path -LiteralPath $filterPath) { Remove-Item -LiteralPath $filterPath -Force }
     }
 }
 
@@ -341,6 +333,8 @@ function Invoke-DependencyAudit {
 # Source-only checks that pr runs before its solution build. They need no
 # build output, so CI runs them beside the canonical build instead of before it.
 function Invoke-RepositoryGates {
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofFuzzRunnerBuild.ps1' `
+        'Fuzz runner build receipt regressions failed.'
     Invoke-PipelineCommand 'docs' $Configuration
     & (Join-Path $repositoryRoot `
             'eng/scripts/Test-SharpProofContainerContract.ps1')
@@ -365,6 +359,46 @@ function Invoke-RepositoryGates {
         'Developer reproduction plan regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPublicApiGovernance.ps1' `
         'Public API governance controls failed.'
+}
+
+function Invoke-DeveloperQualification([switch]$PackOnly) {
+    Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
+    $buildProjects = Get-SharpProofDeveloperQualificationBuildProjects -RepositoryRoot $repositoryRoot
+    $buildFilter = Join-Path $repositoryRoot (
+        '.sharpproof-developer-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        # Build every package producer and developer test dependency once.
+        # The required canonical build retains the complete source solution.
+        ([ordered]@{
+            solution = ([ordered]@{
+                    path     = 'SharpProof.slnx'
+                    projects = $buildProjects
+                }).AsReadOnly()
+        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath $buildFilter -Encoding utf8NoBOM
+        $buildArguments = if ($Fast) { @('-p:RunAnalyzersDuringBuild=false') } else { @() }
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $buildFilter `
+            -AdditionalBuildArguments $buildArguments
+        if ($Fast) { Write-Host 'Development feedback only: analyzer qualification was disabled by -Fast.' }
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
+            'Developer-experience qualification failed.' `
+        ([ordered]@{
+                ConsumerImage     = $env:SHARPPROOF_CONSUMER_IMAGE
+                PackageSource     = $PackageSource
+                ToolPackageSource = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES
+                QualificationMode = $(if ($Fast) { 'FeedbackOnly' } else { 'AnalyzerEnabled' })
+                BuildTarget       = $buildFilter
+                PackOnly          = [bool]$PackOnly
+            }).AsReadOnly()
+        if (-not $PackOnly) {
+            $developerEvidence = Join-Path $repositoryRoot 'artifacts/developer-experience'
+            [IO.File]::WriteAllText((Join-Path $developerEvidence 'qualification-mode.txt'),
+                $(if ($Fast) { "Development feedback; repository analyzers disabled.`n" } else { "Repository analyzers enabled.`n" }), [Text.UTF8Encoding]::new($false))
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $buildFilter) { Remove-Item -LiteralPath $buildFilter -Force }
+    }
 }
 
 switch ($Command) {
@@ -836,32 +870,28 @@ switch ($Command) {
         if ($Configuration -ne 'Release') {
             throw 'fuzz-nightly requires -Configuration Release.'
         }
+        . (Join-Path $PSScriptRoot 'SharpProof.FuzzRunnerBuild.ps1')
+        $fuzzBuildCommit = Get-SharpProofCleanFuzzSourceCommit -RepositoryRoot $repositoryRoot
+        $fuzzBuildStartedUtc = [DateTime]::UtcNow
         Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        $fuzzBuildReceipt = New-SharpProofFuzzRunnerBuildReceipt `
+            -RepositoryRoot $repositoryRoot -SourceCommit $fuzzBuildCommit `
+            -BuildStartedUtc $fuzzBuildStartedUtc
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofFuzzCampaign.ps1' `
             'Nightly fuzz campaign failed.' `
-        ([ordered]@{ OutputDirectory = 'artifacts/fuzz/nightly' }).AsReadOnly()
+        ([ordered]@{
+                OutputDirectory       = 'artifacts/fuzz/nightly'
+                PreparedRunnerReceipt = $fuzzBuildReceipt
+            }).AsReadOnly()
     }
     'dependency-audit' {
         Invoke-DependencyAudit
     }
     'developer-experience' {
-        if ($Fast) {
-            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -AdditionalBuildArguments @('-p:RunAnalyzersDuringBuild=false')
-        }
-        else {
-            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
-        }
-        if ($Fast) { Write-Host 'Development feedback only: analyzer qualification was disabled by -Fast.' }
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
-            'Developer-experience qualification failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; ToolPackageSource = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES; QualificationMode = $(if ($Fast) { 'FeedbackOnly' } else { 'AnalyzerEnabled' }) }
-        $developerEvidence = Join-Path $repositoryRoot 'artifacts/developer-experience'
-        [IO.File]::WriteAllText((Join-Path $developerEvidence 'qualification-mode.txt'),
-            $(if ($Fast) { "Development feedback; repository analyzers disabled.`n" } else { "Repository analyzers enabled.`n" }), [Text.UTF8Encoding]::new($false))
+        Invoke-DeveloperQualification
     }
     'developer-packages' {
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
-            'Developer package creation failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; ToolPackageSource = $env:SHARPPROOF_QUALIFIED_TOOL_PACKAGES; QualificationMode = 'AnalyzerEnabled'; PackOnly = $true }
+        Invoke-DeveloperQualification -PackOnly
     }
     'pack-tool' {
         Invoke-RequiredScript 'eng/scripts/Pack-SharpProofTool.ps1' `
@@ -898,7 +928,8 @@ switch ($Command) {
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
         . (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
         $packageBuildProjects = Get-SharpProofPackageBuildProjects `
-            -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
+            -RepositoryRoot $repositoryRoot `
+            -IncludeConsumerHarness:($PackageBuildScope -eq 'ConsumerQualification')
         $packageBuildFilter = Join-Path $repositoryRoot (
             '.sharpproof-package-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
         try {
@@ -933,8 +964,10 @@ switch ($Command) {
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
         ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
-        Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
-            'Consumer harness export failed.' `
-        ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
+        if ($PackageBuildScope -eq 'ConsumerQualification') {
+            Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
+                'Consumer harness export failed.' `
+            ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
+        }
     }
 }

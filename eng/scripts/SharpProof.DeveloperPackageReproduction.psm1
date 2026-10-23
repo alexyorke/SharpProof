@@ -1,6 +1,42 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+. (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
+
+function Get-SharpProofDeveloperQualificationBuildProjects {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$RepositoryRoot
+    )
+
+    $root = [IO.Path]::GetFullPath($RepositoryRoot)
+    $projects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string]([StringComparer]::Ordinal)
+    foreach ($project in (Get-SharpProofPackageBuildProjects -RepositoryRoot $root)) {
+        [void]$projects.Add($project)
+    }
+    [xml]$solution = [IO.File]::ReadAllText((Join-Path $root 'SharpProof.slnx'))
+    $solutionProjects = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($project in $solution.SelectNodes('/Solution//Project')) {
+        [void]$solutionProjects.Add($project.GetAttribute('Path').Replace('\', '/'))
+    }
+    # The test root owns Tool, CodeFixes, and their actual project-reference
+    # closure. Templates has no reference edge from that test assembly.
+    # Catalog roots also retain the local pack-product fallback.
+    foreach ($project in @(
+            'src/SharpProof.DeveloperExperience.Tests/SharpProof.DeveloperExperience.Tests.csproj',
+            'src/SharpProof.Templates/SharpProof.Templates.csproj')) {
+        $absolute = Resolve-SharpProofContainedPath -Root $root -Path $project `
+            -ParameterName 'Developer qualification build project'
+        if (-not [IO.File]::Exists($absolute) -or -not $solutionProjects.Contains($project)) {
+            throw "Developer qualification build project is missing from the source solution: '$project'."
+        }
+        [void]$projects.Add($project)
+    }
+    return , [Collections.Immutable.ImmutableArray]::CreateRange[string](
+        [string[]]@($projects.ToImmutable() | Sort-Object -CaseSensitive))
+}
 
 function Get-SharpProofDeveloperPackageBuildPlan {
     param(
@@ -127,4 +163,4 @@ function Compare-SharpProofDeveloperPackageSnapshots {
         }).AsReadOnly()
 }
 
-Export-ModuleMember -Function Get-SharpProofDeveloperPackageBuildPlan, Get-SharpProofReproductionDiagnosticText, Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots
+Export-ModuleMember -Function Get-SharpProofDeveloperQualificationBuildProjects, Get-SharpProofDeveloperPackageBuildPlan, Get-SharpProofReproductionDiagnosticText, Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots
