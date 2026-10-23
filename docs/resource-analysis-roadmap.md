@@ -116,7 +116,7 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
-### Implementation merged; supplementary boundary qualification pending
+### Implementation merged; supplementary MR published
 
 [MR #334](https://github.com/alexyorke/SharpProof/pull/334) merged on
 2026-10-23 as master commit `7f7cac39503f23890e9cff35bac85f9339c19779`.
@@ -129,10 +129,15 @@ The extra 26 boundary cases completed in this chat were not part of that merge.
 They are preserved on `codex/resource-boundary-followups`, created from that
 current master, together with this ledger. Its implementation and test source
 matches the verified local integration described below; it changes no production
-proof rules. Supplementary MR publication and exact-head hosted qualification
-remain. The original merge and the supplementary delivery are tracked separately.
+proof rules. [Supplementary MR #355](https://github.com/alexyorke/SharpProof/pull/355)
+contains those cases and this progress record. Its exact-commit checks are the
+authoritative hosted qualification status. All 2536 selected local tests,
+formatting, lint/API compatibility and layout passed (2978 source files,
+62 projects and 151 pinned common files). No required implementation work remains
+in phases A-F; delivery acceptance requires the MR checks to pass. The original
+merge and the supplementary delivery are tracked separately.
 
-### Integrated qualification and final delivery pending
+### Historical integrated qualification checkpoint
 
 The latest qualified upstream feature head is `78bc5a24d`.
 [Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39936190992)
