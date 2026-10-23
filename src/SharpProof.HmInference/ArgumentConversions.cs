@@ -93,6 +93,87 @@ public static partial class Inference
             return shape;
         }
 
+        // A by-value nullable formal permits an unannotated actual. Match the
+        // cores before descending so the actual's variable never links to the
+        // formal's nullable wrapper; physical Nullable<T> remains invariant.
+        private static void BindByValueInput(HmType formal, HmType actual)
+        {
+            if (formal is null)
+            { throw new ArgumentNullException(nameof(formal)); }
+            if (actual is null)
+            { throw new ArgumentNullException(nameof(actual)); }
+            formal = formal.Root;
+            actual = actual.Root;
+            if (formal.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+            {
+                BindByValueInput(formal.Arguments[0], ConversionCore(actual));
+                return;
+            }
+            if (!formal.IsVariable && actual.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+            {
+                BindByValueInput(formal, actual.Arguments[0]);
+                return;
+            }
+            if (formal.IsVariable || actual.IsVariable || formal.Name != actual.Name
+                || formal.CSharpSymbol is not null && actual.CSharpSymbol is not null
+                    && CSharpTypes.ConstructorIdentity(formal.CSharpSymbol) != CSharpTypes.ConstructorIdentity(actual.CSharpSymbol)
+                || formal.NestedTypeName != actual.NestedTypeName || formal.Arguments.Length != actual.Arguments.Length)
+            {
+                HmType.Unify(formal, actual);
+                return;
+            }
+            var declared = formal.CSharpSymbol as INamedTypeSymbol;
+            formal.CSharpSymbol ??= actual.CSharpSymbol;
+            actual.CSharpSymbol ??= formal.CSharpSymbol;
+            formal.IsValueType ??= actual.IsValueType;
+            actual.IsValueType ??= formal.IsValueType;
+            var definition = (formal.CSharpSymbol ?? actual.CSharpSymbol) as INamedTypeSymbol;
+            var offset = formal.NestedTypeName is null ? 0 : 1;
+            for (var i = 0; i < formal.Arguments.Length; i++)
+            {
+                if (i >= offset && definition is { IsGenericType: true }
+                    && definition.OriginalDefinition.TypeParameters.Length == formal.Arguments.Length - offset
+                    && definition.OriginalDefinition.TypeParameters[i - offset].Variance == VarianceKind.In)
+                {
+                    // A callback can both observe nullable input and write a
+                    // nullable value into storage supplied by its caller.
+                    HmType.Unify(formal.Arguments[i], actual.Arguments[i]);
+                }
+                else if (i >= offset && declared is { IsGenericType: true }
+                    && declared.TypeArguments.Length == formal.Arguments.Length - offset
+                    && declared.OriginalDefinition.TypeParameters[i - offset].Variance == VarianceKind.None
+                    && HasDeclaredNullableAnnotation(declared.TypeArguments[i - offset]))
+                {
+                    // Invariant constructed inputs must retain a nullable
+                    // annotation declared by the callee, such as Task<T?>.
+                    HmType.Unify(formal.Arguments[i], actual.Arguments[i]);
+                }
+                else
+                { BindByValueInput(formal.Arguments[i], actual.Arguments[i]); }
+            }
+        }
+
+        private static bool HasDeclaredNullableAnnotation(ITypeSymbol type)
+        {
+            if (type is null)
+            { throw new ArgumentNullException(nameof(type)); }
+            if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
+            { return false; }
+            if (type.NullableAnnotation == NullableAnnotation.Annotated && (type.IsReferenceType || type is ITypeParameterSymbol))
+            { return true; }
+            if (type is IArrayTypeSymbol array)
+            { return HasDeclaredNullableAnnotation(array.ElementType); }
+            if (type is INamedTypeSymbol named)
+            {
+                foreach (var argument in named.TypeArguments)
+                {
+                    if (HasDeclaredNullableAnnotation(argument))
+                    { return true; }
+                }
+            }
+            return false;
+        }
+
         private void BindConvertedArgument(ITypeSymbol source, ITypeSymbol target, HmType inferred, HmType expected, bool allowUserDefined = true)
         {
             if (source is null)
@@ -104,7 +185,7 @@ public static partial class Inference
             if (expected is null)
             { throw new ArgumentNullException(nameof(expected)); }
             if (SymbolEqualityComparer.Default.Equals(source, target))
-            { UnifyDeconstructionReceiver(expected, inferred); return; }
+            { BindByValueInput(expected, inferred); return; }
             var destination = ConversionCore(expected);
             if (destination.IsVariable && (target is IArrayTypeSymbol || target is INamedTypeSymbol { IsGenericType: true }))
             {
@@ -164,7 +245,7 @@ public static partial class Inference
             var value = ConversionCore(inferred);
             var destination = ConversionCore(expected);
             if (SymbolEqualityComparer.Default.Equals(source, target))
-            { UnifyDeconstructionReceiver(expected, inferred); return; }
+            { BindByValueInput(expected, inferred); return; }
             if (!value.IsVariable && destination.IsVariable)
             {
                 // A constructed source cannot appear on the left of a C# where
@@ -232,7 +313,7 @@ public static partial class Inference
                 var before = source.TypeArguments[i];
                 var after = target.TypeArguments[i];
                 if (SymbolEqualityComparer.Default.Equals(before, after))
-                { UnifyDeconstructionReceiver(destinationArguments[i], projectedArguments[i]); }
+                { BindByValueInput(destinationArguments[i], projectedArguments[i]); }
                 else if (target.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.Out)
                 { BindSubtype(before, after, projectedArguments[i], destinationArguments[i], true); }
                 else if (target.OriginalDefinition.TypeParameters[i].Variance == VarianceKind.In)

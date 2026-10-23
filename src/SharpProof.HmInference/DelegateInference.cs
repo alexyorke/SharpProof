@@ -294,21 +294,78 @@ public static partial class Inference
                 { throw new ArgumentNullException(nameof(expected)); }
                 if (actual is null)
                 { throw new ArgumentNullException(nameof(actual)); }
-                if (argument.Parameter is not { } parameter || argument.Syntax is not ArgumentSyntax syntax
-                    || called.OriginalDefinition.Parameters[parameter.Ordinal].Type is not ITypeParameterSymbol ownerParameter
-                    || !SymbolEqualityComparer.Default.Equals(ownerParameter.ContainingSymbol, called.ContainingType.OriginalDefinition))
-                { return; }
-                var slot = ownerParameter.Ordinal + offset;
-                if (slot >= shape.Arguments.Length || actual.Root.Name != CSharpTypes.NullableParameter
-                    || !ReferenceEquals(expected.Root, shape.Arguments[slot].Root)
-                    || !ReferenceEquals(actual.Root.Arguments[0].Root, expected.Root))
+                if (argument.Parameter is not { } parameter || argument.Syntax is not ArgumentSyntax syntax)
                 { return; }
                 var index = invocation.ArgumentList.Arguments.IndexOf(syntax);
-                if (index >= 0)
+                if (index < 0)
+                { return; }
+                void Collect(ITypeSymbol formal, HmType expectedNode, HmType? actualNode, string typePath)
                 {
-                    nullableReceiverCandidates.Add((invocation.Span, index, origin.Parameter,
-                    origin.Path + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    if (formal is null)
+                    { throw new ArgumentNullException(nameof(formal)); }
+                    if (expectedNode is null)
+                    { throw new ArgumentNullException(nameof(expectedNode)); }
+                    if (typePath is null)
+                    { throw new ArgumentNullException(nameof(typePath)); }
+                    var expectedRoot = expectedNode.Root;
+                    var expectedCore = ConversionCore(expectedRoot);
+                    var actualRoot = actualNode?.Root;
+                    var actualCore = actualRoot is null ? null : ConversionCore(actualRoot);
+                    if (formal is ITypeParameterSymbol ownerParameter)
+                    {
+                        if (!SymbolEqualityComparer.Default.Equals(ownerParameter.ContainingSymbol, called.ContainingType.OriginalDefinition)
+                            || ownerParameter.NullableAnnotation == NullableAnnotation.Annotated
+                            || expectedRoot.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+                        { return; }
+                        var slot = ownerParameter.Ordinal + offset;
+                        if (slot >= shape.Arguments.Length || !expectedCore.IsVariable
+                            || !ReferenceEquals(expectedCore, ConversionCore(shape.Arguments[slot])))
+                        { return; }
+                        var direct = actualRoot?.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference
+                            && ReferenceEquals(actualCore, expectedCore);
+                        if (typePath.Length != 0 || direct)
+                        {
+                            nullableReceiverCandidates.Add((invocation.Span, index, origin.Parameter,
+                                origin.Path + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture), typePath));
+                        }
+                        return;
+                    }
+                    if (formal is IArrayTypeSymbol array && expectedCore.Name == "[" + new string(',', array.Rank - 1) + "]")
+                    {
+                        var element = actualCore?.Name == expectedCore.Name ? actualCore.Arguments[0] : null;
+                        Collect(array.ElementType, expectedCore.Arguments[0], element, typePath + "/0");
+                        return;
+                    }
+                    if (formal is not INamedTypeSymbol named)
+                    { return; }
+                    if (named.IsTupleType && expectedCore.Name == "Tuple"
+                        && expectedCore.Arguments.Length == named.TupleElements.Length)
+                    {
+                        for (var item = 0; item < named.TupleElements.Length; item++)
+                        {
+                            var component = actualCore?.Name == "Tuple" && actualCore.Arguments.Length == named.TupleElements.Length
+                                ? actualCore.Arguments[item] : null;
+                            Collect(named.TupleElements[item].Type, expectedCore.Arguments[item], component,
+                                typePath + "/" + item.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        return;
+                    }
+                    if (!named.IsGenericType || named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+                    { return; }
+                    var formalOffset = expectedCore.NestedTypeName is null ? 0 : 1;
+                    if (expectedCore.Arguments.Length - formalOffset != named.TypeArguments.Length)
+                    { return; }
+                    var aligned = actualCore is not null && actualCore.Name == expectedCore.Name
+                        && actualCore.NestedTypeName == expectedCore.NestedTypeName
+                        && actualCore.Arguments.Length == expectedCore.Arguments.Length;
+                    for (var item = 0; item < named.TypeArguments.Length; item++)
+                    {
+                        Collect(named.TypeArguments[item], expectedCore.Arguments[item + formalOffset],
+                            aligned ? actualCore!.Arguments[item + formalOffset] : null,
+                            typePath + "/" + item.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    }
                 }
+                Collect(called.OriginalDefinition.Parameters[parameter.Ordinal].Type, expected, actual, "");
             };
         }
         private HmType MethodGroup(ExpressionSyntax expression, IMethodSymbol method, INamedTypeSymbol target)

@@ -171,6 +171,9 @@ internal static class NullableAsyncChecks
             ("ImportedNullableArray", "static int[] M(int x)=>NullableImports.Array(x);", "Suggestion", "T1?[] M<T1>(T1 x)"),
             ("ImportedNullableContainer", "static System.Collections.Generic.List<int> M(int x)=>NullableImports.Items(x);", "Suggestion", "global::System.Collections.Generic.List<T1?> M<T1>(T1 x)"),
             ("ImportedNullableAsyncValue", "static async Task<int> M(int x)=>await NullableImports.Async(x);", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(T1 x)"),
+            ("ImportedNullableInvariantTaskInput", "static async Task<int> M(Task<int> task)=>await NullableImports.AsyncInput(task);", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(global::System.Threading.Tasks.Task<T1?> task)"),
+            ("ImportedNullableInvariantValueTaskInput", "static async ValueTask<int> M(ValueTask<int> task)=>await NullableImports.ValueTaskInput(task);", "Suggestion", "global::System.Threading.Tasks.ValueTask<T1?> M<T1>(global::System.Threading.Tasks.ValueTask<T1?> task)"),
+            ("ImportedNullableInvariantListInput", "static System.Collections.Generic.List<int> M(System.Collections.Generic.List<int> items)=>NullableImports.ItemsInput(items);", "Suggestion", "global::System.Collections.Generic.List<T1?> M<T1>(global::System.Collections.Generic.List<T1?> items)"),
             ("ImportedNullableAsyncReference", "static async Task<string?> M(string x)=>await NullableImports.Async(x);", "Suggestion", "global::System.Threading.Tasks.Task<T1?> M<T1>(T1 x)"),
             ("ImportedNullableExplicitValue", "static int M(int x,bool ignored)=>NullableImports.Echo<int>(x);", "Suggestion", "int M<T1>(int x, T1 ignored)"),
             ("ImportedNullableExplicitReference", "static string? M(string x,bool ignored)=>NullableImports.Echo<string>(x);", "Suggestion", "string? M<T1>(string x, T1 ignored)"),
@@ -251,6 +254,9 @@ internal static class NullableAsyncChecks
             public static T?[] Array<T>(T x)=>new T?[]{x};
             public static System.Collections.Generic.List<T?> Items<T>(T x)=>new(){x};
             public static System.Threading.Tasks.Task<T?> Async<T>(T x)=>System.Threading.Tasks.Task.FromResult<T?>(x);
+            public static System.Threading.Tasks.Task<T?> AsyncInput<T>(System.Threading.Tasks.Task<T?> task)=>task;
+            public static System.Threading.Tasks.ValueTask<T?> ValueTaskInput<T>(System.Threading.Tasks.ValueTask<T?> task)=>task;
+            public static System.Collections.Generic.List<T?> ItemsInput<T>(System.Collections.Generic.List<T?> items)=>items;
         }
         class OptionalAwaitBox<T> { public OwnAwaiter<T?> GetAwaiter()=>new(); }
         class AwaitBox<T> {
@@ -385,7 +391,12 @@ internal static class NullableAsyncChecks
             applied++;
         }
         if (applied != 33)
-        { throw new InvalidOperationException($"Expected thirty-three nullable/async/lifetime code fixes; applied {applied}."); }
+        {
+            var remaining = Program.Results((CSharpCompilation)(await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!, cancellationToken)
+                .Where(result => { ArgumentNullException.ThrowIfNull(result); return result.Status == "Rejected"; })
+                .Select(result => { ArgumentNullException.ThrowIfNull(result); return result.Method + ": " + result.Message; });
+            throw new InvalidOperationException($"Expected thirty-three nullable/async/lifetime code fixes; applied {applied}." + "\n" + string.Join("\n", remaining));
+        }
         var finalCompilation = (await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var problems = finalCompilation.GetDiagnostics(cancellationToken).Where(d => { ArgumentNullException.ThrowIfNull(d); return d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning; }).ToArray();
         if (problems.Length != 0)

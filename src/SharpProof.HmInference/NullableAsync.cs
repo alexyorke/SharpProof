@@ -28,7 +28,7 @@ public static partial class Inference
         }
 
         private readonly Dictionary<TextSpan, HmType> invocationResultShapes = [];
-        private readonly List<(TextSpan Call, int Argument, int Parameter, string Path)> nullableReceiverCandidates = [];
+        private readonly List<(TextSpan Call, int Argument, int Parameter, string Path, string TypePath)> nullableReceiverCandidates = [];
 
         private void ApplyNullableReceiverInputs(HmType[] parameters)
         {
@@ -84,7 +84,7 @@ public static partial class Inference
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
                 return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
-                    && diagnostic.Id == "CS8604" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+                    && diagnostic.Id is ("CS8604" or "CS8620") && diagnostic.Location.SourceTree == candidate.SyntaxTree;
             }).ToArray();
             if (warnings.Length == 0)
             { return null; }
@@ -93,6 +93,7 @@ public static partial class Inference
             if (before.Length != after.Length)
             { return null; }
             var next = new HashSet<(int Parameter, string Path)>(nullableReceiverInputs);
+            var candidateModel = compilation.GetSemanticModel(candidate.SyntaxTree);
             foreach (var input in nullableReceiverCandidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -105,19 +106,93 @@ public static partial class Inference
                 if (index < 0 || input.Argument >= after[index].ArgumentList.Arguments.Count
                     || !SyntaxFactory.AreEquivalent(before[index].Expression, after[index].Expression))
                 { continue; }
-                var expression = after[index].ArgumentList.Arguments[input.Argument].Expression;
+                var argument = after[index].ArgumentList.Arguments[input.Argument];
+                var expression = argument.Expression;
                 if (!pins.Contains((input.Parameter, input.Path)) && warnings.Any(warning =>
                 {
                     if (warning is null)
                     { throw new ArgumentNullException(nameof(warning)); }
                     return warning.Location.SourceSpan == expression.Span
                         || warning.Location.SourceSpan == StorageExpression(expression).Span;
-                }))
+                }) && (input.TypePath.Length == 0 || candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } parameter }
+                    && candidateModel.GetTypeInfo(expression, cancellationToken).Type is { } actual
+                    && HasAnnotatedReceiverLeaf(parameter.Type, actual, input.TypePath, compilation)))
                 { next.Add((input.Parameter, input.Path)); }
             }
             return next.Count == nullableReceiverInputs.Count ? null
                 : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: nullableCollectionInputs,
                     nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: next).Analyze(original, pins);
+        }
+
+        private static readonly char[] ReceiverTypePathSeparators = ['/'];
+
+        private static bool HasAnnotatedReceiverLeaf(ITypeSymbol formal, ITypeSymbol actual, string typePath, Compilation compilation)
+        {
+            if (formal is null)
+            { throw new ArgumentNullException(nameof(formal)); }
+            if (actual is null)
+            { throw new ArgumentNullException(nameof(actual)); }
+            if (typePath is null)
+            { throw new ArgumentNullException(nameof(typePath)); }
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            var steps = typePath.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries);
+            for (var depth = 0; depth < steps.Length; depth++)
+            {
+                if (!int.TryParse(steps[depth], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var index))
+                { return false; }
+                if (formal is IArrayTypeSymbol formalArray && actual is IArrayTypeSymbol actualArray
+                    && formalArray.Rank == actualArray.Rank && index == 0)
+                {
+                    formal = formalArray.ElementType;
+                    actual = actualArray.ElementType;
+                    continue;
+                }
+                if (formal is not INamedTypeSymbol formalNamed)
+                { return false; }
+                if (formalNamed.IsTupleType && actual is INamedTypeSymbol { IsTupleType: true } actualTuple
+                    && formalNamed.TupleElements.Length == actualTuple.TupleElements.Length
+                    && index < formalNamed.TupleElements.Length)
+                {
+                    formal = formalNamed.TupleElements[index].Type;
+                    actual = actualTuple.TupleElements[index].Type;
+                    continue;
+                }
+                if (formalNamed.IsTupleType || !formalNamed.IsGenericType || index >= formalNamed.TypeArguments.Length)
+                { return false; }
+                if (actual is INamedTypeSymbol actualNamed)
+                {
+                    INamedTypeSymbol? projected = actualNamed;
+                    while (projected is not null && !SymbolEqualityComparer.Default.Equals(formalNamed.OriginalDefinition, projected.OriginalDefinition))
+                    { projected = projected.BaseType; }
+                    if (projected is null)
+                    {
+                        foreach (var implemented in actualNamed.AllInterfaces)
+                        {
+                            if (SymbolEqualityComparer.Default.Equals(formalNamed.OriginalDefinition, implemented.OriginalDefinition))
+                            { projected = implemented; break; }
+                        }
+                    }
+                    if (projected is not null && index < projected.TypeArguments.Length
+                        && compilation.ClassifyCommonConversion(actualNamed, formalNamed).IsImplicit)
+                    {
+                        formal = formalNamed.TypeArguments[index];
+                        actual = projected.TypeArguments[index];
+                        continue;
+                    }
+                }
+                if (actual is IArrayTypeSymbol { Rank: 1 } sourceArray && index == 0
+                    && formalNamed.TypeKind == TypeKind.Interface && formalNamed.TypeArguments.Length == 1
+                    && compilation.ClassifyCommonConversion(sourceArray, formalNamed).IsImplicit)
+                {
+                    formal = formalNamed.TypeArguments[0];
+                    actual = sourceArray.ElementType;
+                    continue;
+                }
+                return false;
+            }
+            return CSharpTypes.Rigid(actual).Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference;
         }
 
         private HmType ApplyInvocationAnnotations(ExpressionSyntax syntax, HmType value)
@@ -2015,21 +2090,7 @@ public static partial class Inference
             { return inferred; }
             if (TryBindArgumentConversion(value, expected, inferred))
             { return inferred; }
-            if (expected.Name == CSharpTypes.NullableParameter)
-            {
-                // A T? formal accepts an unannotated actual without making that
-                // actual nullable. The result scheme still retains its annotation.
-                UnifyDeconstructionReceiver(expected.Arguments[0], inferred);
-            }
-            else if (expected.Name == CSharpTypes.NullableReference && inferred.Name is not (CSharpTypes.NullableReference or CSharpTypes.NullableParameter))
-            {
-                UnifyDeconstructionReceiver(expected.Arguments[0], inferred);
-            }
-            else if (!expected.IsVariable && inferred.Name == CSharpTypes.NullableReference && expected.Name != CSharpTypes.NullableReference)
-            {
-                HmType.Unify(inferred.Arguments[0], expected);
-            }
-            else if (expected.Name == CSharpTypes.NullableValue && value.Syntax is ExpressionSyntax expression
+            if (expected.Name == CSharpTypes.NullableValue && value.Syntax is ExpressionSyntax expression
                 && model.GetTypeInfo(expression, cancellationToken).Type is ITypeSymbol source && value.Type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
                 && SymbolEqualityComparer.Default.Equals(source, nullable.TypeArguments[0]))
             {
@@ -2037,7 +2098,7 @@ public static partial class Inference
             }
             else
             {
-                HmType.Unify(inferred, expected);
+                BindByValueInput(expected, inferred);
             }
             return inferred;
         }

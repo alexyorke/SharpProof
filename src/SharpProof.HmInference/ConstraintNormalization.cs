@@ -94,7 +94,7 @@ public static partial class Inference
         private bool NormalizeConstraintPass()
         {
             var expanded = ResolveDependentConstraints();
-            NormalizeConstraintNullability();
+            expanded |= NormalizeConstraintNullability();
             foreach (var requirement in inferredConstraints)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -140,8 +140,9 @@ public static partial class Inference
             return expanded;
         }
 
-        private void NormalizeConstraintNullability()
+        private bool NormalizeConstraintNullability()
         {
+            var changed = false;
             var notNull = new HashSet<HmType>();
             foreach (var requirement in inferredConstraints)
             {
@@ -155,11 +156,25 @@ public static partial class Inference
             for (var i = 0; i < inferredConstraints.Count; i++)
             {
                 var requirement = inferredConstraints[i];
+                if (requirement.Keyword == "notnull" && requirement.Variable.Root.Name == CSharpTypes.NullableParameter
+                    && ConversionCore(requirement.Variable).IsVariable
+                    && OriginalConstraintShape(requirement.Variable) is { IsValueType: true } original
+                    && original.Name != CSharpTypes.NullableValue)
+                {
+                    // Solving the body can annotate a type argument after its
+                    // constraints were imported. Preserve its original value
+                    // domain when that annotation would otherwise violate notnull.
+                    var core = ConversionCore(requirement.Variable);
+                    if (!inferredConstraints.Any(existing => existing.Keyword is "struct" or "unmanaged"
+                        && ReferenceEquals(ConversionCore(existing.Variable), core)))
+                    { RequireKeyword(core, "struct"); changed = true; }
+                }
                 if (requirement.Keyword == "class?" && notNull.Contains(ConversionCore(requirement.Variable)))
                 { inferredConstraints[i] = (requirement.Variable, "class", requirement.Type, requirement.BaseClass); }
                 if (requirement.Type?.Root.Name == CSharpTypes.NullableReference && notNull.Contains(ConversionCore(requirement.Variable)))
                 { inferredConstraints[i] = (requirement.Variable, requirement.Keyword, ConversionCore(requirement.Type), requirement.BaseClass); }
             }
+            return changed;
         }
 
         private static bool SameConstraintShape(HmType left, HmType right)

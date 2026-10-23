@@ -19,6 +19,9 @@ using System;using System.Linq;using System.Collections.Generic;using System.Thr
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
 public delegate List<T> ReceiverPair<T>(T first,T second);
 public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second)=>new List<T>{first,second};}
+public delegate T[] CompoundPair<T>(T[] first,T[] second);
+public sealed class CompoundInheritedInput<T>:List<T>{}
+public sealed class CompoundReceiver<T>{public T[] Join(T[] first,T[] second)=>first;public IEnumerable<T> Enumerate(T seed,IEnumerable<T> values)=>values;}
 public sealed class MemberContractCell<T>{
   [System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;
   [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get=>Field!;set=>Field=value!;}
@@ -88,6 +91,14 @@ public static class QueryConsumer{
   public static List<int> ReceiverInstance(ReceiverBox<int> box,int value)=>box.Pair(value,GenericResultMaybe(value));
   public static async Task<List<int>> ReceiverTask(ReceiverPair<int> pair,Task<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
   public static async ValueTask<List<int>> ReceiverValueTask(ReceiverPair<int> pair,ValueTask<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
+  static CompoundInheritedInput<T> CompoundValues<T>(T first,T second)=>new CompoundInheritedInput<T>{first,second};
+  public static IEnumerable<int> CompoundInherited(CompoundReceiver<int> receiver,int value)=>receiver.Enumerate(value,CompoundValues(value,GenericResultMaybe(value)));
+  public static int[] CompoundInstance(CompoundReceiver<int> receiver,int value)=>receiver.Join(new[]{value},new[]{GenericResultMaybe(value)});
+  public static int[] CompoundDelegate(CompoundPair<int> pair,int value)=>pair(new[]{value},new[]{GenericResultMaybe(value)});
+  public static async Task<int[]> CompoundInstanceTask(CompoundReceiver<int> receiver,Task<int> input){var value=await input;return receiver.Join(new[]{value},new[]{GenericResultMaybe(value)});}
+  public static async Task<int[]> CompoundDelegateTask(CompoundPair<int> pair,Task<int> input){var value=await input;return pair(new[]{value},new[]{GenericResultMaybe(value)});}
+  public static async ValueTask<int[]> CompoundInstanceValueTask(CompoundReceiver<int> receiver,ValueTask<int> input){var value=await input;return receiver.Join(new[]{value},new[]{GenericResultMaybe(value)});}
+  public static async ValueTask<int[]> CompoundDelegateValueTask(CompoundPair<int> pair,ValueTask<int> input){var value=await input;return pair(new[]{value},new[]{GenericResultMaybe(value)});}
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -333,6 +344,13 @@ EOF
     grep -Fq 'global::System.Collections.Generic.List<T1> ReceiverInstance<T1>(global::ReceiverBox<T1> box, T1 value) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1>> ReceiverTask<T1>(global::ReceiverPair<T1> pair, global::System.Threading.Tasks.Task<T1> input) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.List<T1>> ReceiverValueTask<T1>(global::ReceiverPair<T1> pair, global::System.Threading.Tasks.ValueTask<T1> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1> CompoundInherited<T1>(global::CompoundReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1[] CompoundInstance<T1>(global::CompoundReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1[] CompoundDelegate<T1>(global::CompoundPair<T1> pair, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1[]> CompoundInstanceTask<T1>(global::CompoundReceiver<T1> receiver, global::System.Threading.Tasks.Task<T1> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1[]> CompoundDelegateTask<T1>(global::CompoundPair<T1> pair, global::System.Threading.Tasks.Task<T1> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1[]> CompoundInstanceValueTask<T1>(global::CompoundReceiver<T1> receiver, global::System.Threading.Tasks.ValueTask<T1> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1[]> CompoundDelegateValueTask<T1>(global::CompoundPair<T1> pair, global::System.Threading.Tasks.ValueTask<T1> input) where T1 : struct' "$log"
   else
     grep -Fq 'global::System.Collections.Generic.List<T1?> GenericCallList<T1>(T1 value)' "$log"
     grep -Fq 'T1?[] GenericCallArray<T1>(T1 value)' "$log"
@@ -343,6 +361,13 @@ EOF
     grep -Fq 'global::System.Collections.Generic.List<T1?> ReceiverInstance<T1>(global::ReceiverBox<T1?> box, T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> ReceiverTask<T1>(global::ReceiverPair<T1?> pair, global::System.Threading.Tasks.Task<T1> input)' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.List<T1?>> ReceiverValueTask<T1>(global::ReceiverPair<T1?> pair, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
+    grep -Fq 'global::System.Collections.Generic.IEnumerable<T1?> CompoundInherited<T1>(global::CompoundReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1?[] CompoundInstance<T1>(global::CompoundReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1?[] CompoundDelegate<T1>(global::CompoundPair<T1?> pair, T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?[]> CompoundInstanceTask<T1>(global::CompoundReceiver<T1?> receiver, global::System.Threading.Tasks.Task<T1> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?[]> CompoundDelegateTask<T1>(global::CompoundPair<T1?> pair, global::System.Threading.Tasks.Task<T1> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?[]> CompoundInstanceValueTask<T1>(global::CompoundReceiver<T1?> receiver, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?[]> CompoundDelegateValueTask<T1>(global::CompoundPair<T1?> pair, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
   fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

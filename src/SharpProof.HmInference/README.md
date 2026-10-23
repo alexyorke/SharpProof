@@ -967,9 +967,21 @@ Source/metadata and applied-fix checks cover direct delegates, aliases, instance
 methods and Task/ValueTask suspension, faults and cancellation; C# 8/9/13 CLI and
 package checks enforce representable signatures. Nullable async coverage also
 includes configured awaits, custom awaiters, iterators and foreach elements.
-Receiver promotion currently requires a direct owner type-parameter formal and
-one traceable input origin. Compound formals, other nullable argument shapes and
-remaining indirect-storage flow still need work.
+Compound receiver formals also match nullable payloads through arrays, tuples,
+named generic arguments and substituted base/interface projections. The candidate
+argument's type selects the affected leaf, so a suppressed sibling does not widen
+another owner slot. Recursive by-value binding retains separate scalar and awaited
+input annotations; contravariant callback inputs retain their own nullable views.
+Invariant inputs retain nullable annotations declared by the callee, including
+Task, ValueTask and List payloads.
+Constraints are normalized again when body inference makes a `notnull` argument
+nullable, preserving the original nonnullable value domain where required.
+Source/metadata and applied-fix checks cover array identity and runtime element
+types, inherited collections, helper/delegate calls, suspension, faults and
+cancellation, with C# 8/9/13 CLI/package checks. Physical `Nullable<T>` and optional
+formal controls retain their distinct contracts. Receiver shapes without a unique
+input origin, receiver refinement from lambda return flow and indirect-storage
+flow remain open.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

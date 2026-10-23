@@ -41,6 +41,10 @@ internal static class QueryRuntimeChecks
                 public void Add([System.Diagnostics.CodeAnalysis.AllowNull]T value){Interlocked.Increment(ref CollectionInputTrace.Adds);if(CollectionInputTrace.Failure!=null)throw CollectionInputTrace.Failure;Items.Add(value!);}
                 public IEnumerator<T> GetEnumerator()=>Items.GetEnumerator();System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
             }
+            public delegate T[] CompoundInputPair<T>(T[] first,T[] second);
+            public static class CompoundInputTrace{public static object? First,Second;public static int Calls;public static Exception? Failure;public static T[] Join<T>(T[] first,T[] second){Interlocked.Increment(ref Calls);First=first;Second=second;if(Failure!=null)throw Failure;return second;}}
+            public sealed class CompoundInputValues<T>:List<T>{}
+            public sealed class CompoundInputBox<T>{public T[] Join(T[] first,T[] second)=>CompoundInputTrace.Join(first,second);public IEnumerable<T> Enumerate(T seed,IEnumerable<T> values)=>values;}
             public delegate List<T> ReceiverPair<T>(T first,T second);
             public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second){Interlocked.Increment(ref NestedResultTrace.Factories);if(NestedResultTrace.Failure!=null)throw NestedResultTrace.Failure;return new List<T>{first,second};}}
             public static class NestedResultTrace{public static int Helpers,Factories,Disposals;public static Exception? Failure;}
@@ -127,6 +131,13 @@ internal static class QueryRuntimeChecks
                 public static async Task<List<int>> GenericTask(Task<int> input){var value=await input;return NestedPair(value,NestedMaybe(value));}
                 public static async ValueTask<int[]> GenericValueTask(ValueTask<int> input){var value=await input;return NestedArrayPair(value,NestedMaybe(value));}
                 public static async Task<List<int>> GenericAwaited(int value,Task gate)=>await NestedAsyncPair(value,NestedMaybe(value),gate);
+                static CompoundInputValues<T> CompoundValues<T>(T first,T second)=>new(){first,second};
+                public static IEnumerable<int> CompoundInherited(CompoundInputBox<int> box,int value)=>box.Enumerate(value,CompoundValues(value,NestedMaybe(value)));
+                public static int[] CompoundInstance(CompoundInputBox<int> box,int value)=>box.Join(new[]{value},new[]{NestedMaybe(value)});
+                public static int[] CompoundDelegate(CompoundInputPair<int> pair,int value)=>pair(new[]{value},new[]{NestedMaybe(value)});
+                public static int[] CompoundAlias(CompoundInputPair<int> pair,int value){var local=pair;return local(new[]{value},new[]{NestedMaybe(value)});}
+                public static async Task<int[]> CompoundTask(CompoundInputBox<int> box,Task<int> input){var value=await input;return box.Join(new[]{value},new[]{NestedMaybe(value)});}
+                public static async ValueTask<int[]> CompoundValueTask(CompoundInputPair<int> pair,ValueTask<int> input){var value=await input;return pair(new[]{value},new[]{NestedMaybe(value)});}
                 public static List<int> ReceiverList(ReceiverPair<int> pair,int value)=>pair(value,NestedMaybe(value));
                 public static List<int> ReceiverAlias(ReceiverPair<int> pair,int value){var local=pair;return local(value,NestedMaybe(value));}
                 public static List<int> ReceiverInstance(ReceiverBox<int> box,int value)=>box.Pair(value,NestedMaybe(value));
@@ -442,7 +453,20 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> CompoundInputContracts(CancellationToken cancellationToken){
+                    CompoundInputTrace.Calls=NestedResultTrace.Helpers=0;var box=new CompoundInputBox<int>();CompoundInputPair<int> pair=CompoundInputTrace.Join;
+                    var direct=QueryProbe.CompoundInstance(box,7);if(direct.Length!=1||direct[0]!=0||direct.GetType()!=typeof(int[])||!ReferenceEquals(direct,CompoundInputTrace.Second)||((int[])CompoundInputTrace.First!)[0]!=7)return false;
+                    var callback=QueryProbe.CompoundDelegate(pair,7);var alias=QueryProbe.CompoundAlias(pair,7);if(callback[0]!=0||alias[0]!=0||!ReferenceEquals(alias,CompoundInputTrace.Second)||CompoundInputTrace.Calls!=3||NestedResultTrace.Helpers!=3)return false;
+                    var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);var pending=QueryProbe.CompoundTask(box,gate.Task);if(pending.IsCompleted||CompoundInputTrace.Calls!=3||NestedResultTrace.Helpers!=3)return false;gate.SetResult(7);var delayed=await pending.WaitAsync(cancellationToken);if(delayed[0]!=0||!ReferenceEquals(delayed,CompoundInputTrace.Second)||CompoundInputTrace.Calls!=4)return false;
+                    var optional=await QueryProbe.CompoundValueTask(pair,new ValueTask<int>(7));if(optional[0]!=0||CompoundInputTrace.Calls!=5||NestedResultTrace.Helpers!=5)return false;
+                    var failure=new InvalidOperationException("compound-receiver-fault");CompoundInputTrace.Failure=failure;try{await QueryProbe.CompoundTask(box,Task.FromResult(7));return false;}catch(InvalidOperationException caught){if(!ReferenceEquals(caught,failure)||CompoundInputTrace.Calls!=6)return false;}finally{CompoundInputTrace.Failure=null;}
+                    try{await QueryProbe.CompoundTask(box,Task.FromException<int>(failure));return false;}catch(InvalidOperationException caught){if(!ReferenceEquals(caught,failure)||CompoundInputTrace.Calls!=6)return false;}
+                    QueryTrace.Failure=failure;try{QueryProbe.CompoundDelegate(pair,7);return false;}catch(InvalidOperationException caught){if(!ReferenceEquals(caught,failure)||CompoundInputTrace.Calls!=6)return false;}finally{QueryTrace.Failure=null;}
+                    using var cancelled=new CancellationTokenSource();cancelled.Cancel();try{await QueryProbe.CompoundValueTask(pair,new ValueTask<int>(Task.FromCanceled<int>(cancelled.Token)));return false;}catch(OperationCanceledException caught){if(caught.CancellationToken!=cancelled.Token||CompoundInputTrace.Calls!=6)return false;}
+                    var inherited=QueryProbe.CompoundInherited(box,7);return inherited is CompoundInputValues<int> typed&&typed.Count==2&&typed[0]==7&&typed[1]==0;
+                }
                 static async Task<bool> ReceiverInputContracts(CancellationToken cancellationToken){
+                    if(!await CompoundInputContracts(cancellationToken))return false;
                     var calls=0;ReceiverPair<int> pair=(first,second)=>{calls++;return new List<int>{first,second};};
                     var direct=QueryProbe.ReceiverList(pair,7);var alias=QueryProbe.ReceiverAlias(pair,7);var instance=QueryProbe.ReceiverInstance(new ReceiverBox<int>(),7);
                     if(direct[0]!=7||direct[1]!=0||alias[0]!=7||alias[1]!=0||instance[0]!=7||instance[1]!=0||calls!=2)return false;
@@ -891,7 +915,17 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> CompoundInputContracts(string text,CancellationToken cancellationToken){
+                    CompoundInputTrace.Calls=NestedResultTrace.Helpers=0;var box=new CompoundInputBox<string?>();CompoundInputPair<string?> pair=CompoundInputTrace.Join;
+                    var direct=QueryProbe.CompoundInstance(box,text);if(direct[0]!=null||direct.GetType()!=typeof(string[])||!ReferenceEquals(direct,CompoundInputTrace.Second)||!ReferenceEquals(((string?[])CompoundInputTrace.First!)[0],text))return false;
+                    var callback=QueryProbe.CompoundDelegate(pair,text);var alias=QueryProbe.CompoundAlias(pair,text);if(callback[0]!=null||alias[0]!=null||!ReferenceEquals(alias,CompoundInputTrace.Second)||CompoundInputTrace.Calls!=3)return false;
+                    var gate=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var pending=QueryProbe.CompoundTask(box,gate.Task);if(pending.IsCompleted||CompoundInputTrace.Calls!=3)return false;gate.SetResult(text);var delayed=await pending.WaitAsync(cancellationToken);if(delayed[0]!=null||!ReferenceEquals(delayed,CompoundInputTrace.Second)||CompoundInputTrace.Calls!=4)return false;
+                    var optional=await QueryProbe.CompoundValueTask(pair,new ValueTask<string>(text));if(optional[0]!=null||CompoundInputTrace.Calls!=5)return false;
+                    var inherited=QueryProbe.CompoundInherited(box,text);if(inherited is not CompoundInputValues<string?> typed||typed.Count!=2||!ReferenceEquals(typed[0],text)||typed[1]!=null)return false;
+                    var physical=QueryProbe.CompoundInstance(new CompoundInputBox<decimal?>(),(decimal?)7m);return physical[0]==null&&physical.GetType()==typeof(decimal?[])&&((decimal?[])CompoundInputTrace.First!)[0]==7m&&ReferenceEquals(physical,CompoundInputTrace.Second);
+                }
                 static async Task<bool> ReceiverInputContracts(string text,CancellationToken cancellationToken){
+                    if(!await CompoundInputContracts(text,cancellationToken))return false;
                     var calls=0;ReceiverPair<string?> pair=(first,second)=>{calls++;return new List<string?>{first,second};};
                     var direct=QueryProbe.ReceiverList(pair,text);var alias=QueryProbe.ReceiverAlias(pair,text);var instance=QueryProbe.ReceiverInstance(new ReceiverBox<string?>(),text);
                     if(!ReferenceEquals(direct[0],text)||direct[1]!=null||!ReferenceEquals(alias[0],text)||alias[1]!=null||!ReferenceEquals(instance[0],text)||instance[1]!=null||calls!=2)return false;
