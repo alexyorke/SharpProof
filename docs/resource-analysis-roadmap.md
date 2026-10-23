@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted detached-certificate coverage
+
+Checkpoint `a92aec45641d04e3cf9e34c64be8290b70a4725f` completed all fifteen
+coverage shards in run 39882126614. Aggregate job 120185851048 produced a
+complete report and failed the unchanged 100 percent floor: 7108/7257 changed
+trusted lines (97.95 percent), with 149 gaps. The unchanged
+`ResourceProgramOwnership` rejection paths at lines 35, 39 and 43 are now
+covered; the preceding report had 152 gaps. The newer constructor-chain controls
+are not measured by this report.
+
+Evidence is retained in
+`artifacts/resource-a92a-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `1e240f97e8bf4aaecdf3cf29fe32d6887a97bbec` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `a92aec456`.
+
+Canonical worker-a job 120182033859 failed before compilation because the
+registry returned HTTP 503 for the pinned minimum-framework SDK image.
+Its completed job log is retained in `artifacts/resource-a92a-worker-a-job.log`.
+Canonical CI (39882126553) and package consumers (39882126605) are still
+running at this observation; neither is claimed to have passed. The tested
+constructor controls are committed locally while these exact-head jobs finish,
+so a new push does not cancel them. Runtime-byte composition, the pending
+proof-policy choice, coverage closure and final audit remain open.
+
 ### Constructor-chain admission controls
 
 Three valid-source controls distinguish unsupported `this(...)` constructor
