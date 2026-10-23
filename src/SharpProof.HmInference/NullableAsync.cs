@@ -103,7 +103,7 @@ public static partial class Inference
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
             if (argument.Parameter is { RefKind: not RefKind.Out } parameter && HasDisallowNull(parameter))
-            { disallowNullArguments[argument.Syntax.Span] = value; }
+            { disallowNullArguments[(argument.Syntax is ArgumentSyntax syntax ? syntax.Expression : argument.Value.Syntax).Span] = value; }
         }
 
         private bool RefineDisallowNullInputs(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate)
@@ -119,12 +119,12 @@ public static partial class Inference
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
                 return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
-                    && diagnostic.Id is "CS8604" or "CS8607" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+                    && diagnostic.Id is "CS8601" or "CS8604" or "CS8607" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
             }).ToArray();
             if (diagnostics.Length == 0)
             { return false; }
-            var before = original.DescendantNodes().OfType<ArgumentSyntax>().ToArray();
-            var after = candidate.DescendantNodes().OfType<ArgumentSyntax>().ToArray();
+            var before = ContractInputSites(original);
+            var after = ContractInputSites(candidate);
             if (before.Length != after.Length)
             { return false; }
             var changed = false;
@@ -135,25 +135,24 @@ public static partial class Inference
                 {
                     if (diagnostic is null)
                     { throw new ArgumentNullException(nameof(diagnostic)); }
-                    return after[i].Span.Contains(diagnostic.Location.SourceSpan);
-                }) || model.GetOperation(before[i], cancellationToken) is not IArgumentOperation { Parameter: { } target }
-                    || target.RefKind == RefKind.Out || !HasDisallowNull(target))
+                    return after[i].Value.Span.Contains(diagnostic.Location.SourceSpan) || after[i].Target?.Span.Contains(diagnostic.Location.SourceSpan) == true || after[i].Target is not null && diagnostic.Location.SourceSpan.Contains(after[i].Value.Span);
+                }) || !disallowNullArguments.TryGetValue(before[i].Value.Span, out var actual))
                 { continue; }
-                if (StorageExpression(before[i].Expression) is IdentifierNameSyntax identifier
+                if (StorageExpression(before[i].Value) is IdentifierNameSyntax identifier
                     && model.GetSymbolInfo(identifier, cancellationToken).Symbol is IParameterSymbol source
                     && SymbolEqualityComparer.Default.Equals(source.ContainingSymbol, currentMethod))
                 {
                     if (!HasDisallowNull(source))
                     { changed |= forwardedDisallowNull.Add(source.Ordinal); }
                 }
-                else if (disallowNullArguments.TryGetValue(before[i].Span, out var actual))
+                else
                 {
                     if (ForwardAliasedDisallowNull(compilation, candidate, i, actual))
                     { return true; }
                     var required = actual.Root;
                     var keyword = "notnull";
                     if (required.Name == CSharpTypes.NullableParameter && HasDefaultValueAnnotation(required)
-                        && model.GetOperation(before[i], cancellationToken) is IArgumentOperation { Value.Type: { IsValueType: true } originalType }
+                        && model.GetTypeInfo(before[i].Value, cancellationToken).Type is { IsValueType: true } originalType
                         && originalType is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T })
                     {
                         required = required.Arguments[0].Root;
@@ -229,16 +228,42 @@ public static partial class Inference
                 var rewritten = compilation.ReplaceSyntaxTree(tree, replacement);
                 if (rewritten.Options.SyntaxTreeOptionsProvider is { } sourceOptions)
                 { rewritten = rewritten.WithOptions(rewritten.Options.WithSyntaxTreeOptionsProvider(new CandidateTreeOptions(sourceOptions, tree, replacement))); }
-                var argument = replacement.GetRoot(cancellationToken).GetAnnotatedNodes(marker).Single().DescendantNodes().OfType<ArgumentSyntax>().ElementAt(argumentIndex);
+                var argument = ContractInputSites((MethodDeclarationSyntax)replacement.GetRoot(cancellationToken).GetAnnotatedNodes(marker).Single())[argumentIndex];
                 return !rewritten.GetDiagnostics(cancellationToken).Any(diagnostic =>
                 {
                     if (diagnostic is null)
                     { throw new ArgumentNullException(nameof(diagnostic)); }
                     return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
-                        && diagnostic.Id is "CS8604" or "CS8607" && diagnostic.Location.SourceTree == replacement
-                        && argument.Span.Contains(diagnostic.Location.SourceSpan);
+                        && diagnostic.Id is "CS8601" or "CS8604" or "CS8607" && diagnostic.Location.SourceTree == replacement
+                        && (argument.Value.Span.Contains(diagnostic.Location.SourceSpan) || argument.Target?.Span.Contains(diagnostic.Location.SourceSpan) == true || argument.Target is not null && diagnostic.Location.SourceSpan.Contains(argument.Value.Span));
                 });
             }
+        }
+
+        private static (ExpressionSyntax Value, ExpressionSyntax? Target)[] ContractInputSites(MethodDeclarationSyntax method)
+        {
+            if (method is null)
+            { throw new ArgumentNullException(nameof(method)); }
+            var sites = new List<(ExpressionSyntax Value, ExpressionSyntax? Target)>();
+            foreach (var node in method.DescendantNodes())
+            {
+                if (node is ArgumentSyntax argument)
+                { sites.Add((argument.Expression, null)); }
+                else if (node is AssignmentExpressionSyntax assignment && assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    foreach (var component in StorageComponents(assignment.Left, assignment.Right))
+                    { sites.Add((component.Value, component.Target)); }
+                }
+            }
+            return sites.GroupBy(site =>
+            {
+                return site.Value.Span;
+            }).Select(group =>
+            {
+                if (group is null)
+                { throw new ArgumentNullException(nameof(group)); }
+                return group.OrderByDescending(site => site.Target is not null).First();
+            }).ToArray();
         }
 
         private static bool HasDisallowNull(IParameterSymbol parameter)
@@ -332,6 +357,17 @@ public static partial class Inference
                 { targets.Add(input.Parameter); }
                 else if (operand is IMemberReferenceOperation member)
                 { targets.Add(NullableReadTarget(member.Member)); }
+            }
+            foreach (var assignment in body.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>())
+            {
+                if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                { continue; }
+                foreach (var component in StorageComponents(assignment.Left, assignment.Right))
+                {
+                    if (MemberWriteContract(component.Target).AllowNull
+                        && model.GetSymbolInfo(component.Target, cancellationToken).Symbol is { } member)
+                    { targets.Add(NullableReadTarget(member)); }
+                }
             }
             static ExpressionSyntax[] ReadSites(SyntaxNode root)
             {
@@ -808,6 +844,8 @@ public static partial class Inference
                     foreach (var component in StorageComponents(assignment.Left, assignment.Right))
                     {
                         if (component.Target is not (MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or InvocationExpressionSyntax))
+                        { continue; }
+                        if (MemberWriteContract(component.Target).AllowNull)
                         { continue; }
                         var type = StorageType(component.Target);
                         foreach (var literal in StoredAlternatives(component.Value))

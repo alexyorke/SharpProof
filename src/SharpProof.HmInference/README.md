@@ -916,6 +916,18 @@ proves that domain applies. These candidates rerender both parameters and result
 after constraint normalization. Applied fixes verify zero-initialized structs
 without invoking constructors, mutation, identity, suspension, exact faults and
 cancellation. Remaining relational and optional-storage contracts still need work.
+Member writes now distinguish `AllowNull` and `DisallowNull` input contracts from
+read and storage types. An allowed null/default store retains the generic owner
+payload, while subsequent field/property reads follow compiler flow; indexer reads
+retain their compiler contract. Assignment expressions preserve the assigned value's
+nullability. Required field/property/indexer writes forward value preconditions or
+infer projected bounds, including tuple deconstruction and async writes. Mixed
+input flags give `DisallowNull` precedence. Source property annotations and emitted
+setter-parameter annotations follow their distinct compiler behavior. Ref/out
+storage and physical nullable values keep their existing representation. Source,
+metadata, guard, suppression, receiver-isolation and C# 8/9/13 CLI/package checks
+cover these rules. Applied fixes verify null results, identity, receiver/index
+counts, writes, suspension, exact setter/await faults and cancellation.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

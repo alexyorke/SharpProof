@@ -40,6 +40,7 @@ public void ObserveRef([System.Diagnostics.CodeAnalysis.AllowNull]ref readonly T
 #endif
 }
 public sealed class PriorityInputCell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Maybe{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}[System.Diagnostics.CodeAnalysis.NotNull]public T Required{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get=>default!;}}
+public sealed class MemberInputCell<T>{public T Stored=default!;[System.Diagnostics.CodeAnalysis.AllowNull]public T Field=default!;[System.Diagnostics.CodeAnalysis.AllowNull]public T Optional{get=>Stored;set=>Stored=value!;}[System.Diagnostics.CodeAnalysis.DisallowNull]public T Required{get=>Stored;set=>Stored=value;}[System.Diagnostics.CodeAnalysis.AllowNull]public T this[int index]{get=>Stored;set=>Stored=value!;}}
 public delegate T RequiredInputAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
 #if ANNOTATED_REF
 public static partial class ForwardInputPartial{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryConsumer.RequiredForwardHelper(value);}
@@ -55,6 +56,11 @@ public static class QueryConsumer{
   public static int RequiredChoiceForward(int left,int right,bool choose){var local=choose?left:right;return RequiredForwardHelper(local);}
   public static int RequiredDefaultProjection(int[] values){values[0]=default;return RequiredForwardHelper(values[0]);}
   public static async ValueTask<int> RequiredDefaultAwaitProjection(ValueTask<int[]> input){var values=await input;values[0]=default;return RequiredForwardHelper(values[0]);}
+  public static int AllowMemberStore(MemberInputCell<int> cell){cell.Optional=default;return cell.Stored;}
+  public static int AllowMemberIndex(MemberInputCell<int> cell){cell[0]=default;return cell[0];}
+  public static int[]? AllowMemberArray(MemberInputCell<int[]> cell,int[]? value){cell.Field=value;return cell.Field;}
+  public static int RequireMemberStore(MemberInputCell<int> cell,int value){cell.Required=value;return value;}
+  public static async ValueTask<int> RequireMemberAwait(MemberInputCell<int> cell,int value,Task gate){await gate;cell.Required=value;return value;}
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -274,6 +280,11 @@ EOF
   grep -Fq 'T1 RequiredChoiceForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 left, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 right, bool choose)' "$log"
   grep -Fq 'T1 RequiredDefaultProjection<T1>(T1[] values) where T1 : struct' "$log"
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequiredDefaultAwaitProjection<T1>(global::System.Threading.Tasks.ValueTask<T1[]> input) where T1 : struct' "$log"
+  grep -Fq 'T1 AllowMemberStore<T1>(global::MemberInputCell<T1> cell)' "$log"
+  grep -Fq 'T1 AllowMemberIndex<T1>(global::MemberInputCell<T1> cell)' "$log"
+  grep -Fq 'T1[]? AllowMemberArray<T1>(global::MemberInputCell<T1[]> cell, T1[]? value)' "$log"
+  grep -Fq 'T1 RequireMemberStore<T1>(global::MemberInputCell<T1> cell, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
+  grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequireMemberAwait<T1>(global::MemberInputCell<T1> cell, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value, global::System.Threading.Tasks.Task gate)' "$log"
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredDelegateForward<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

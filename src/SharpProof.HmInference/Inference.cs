@@ -1357,6 +1357,19 @@ public static partial class Inference
             targetSyntax = StorageExpression(targetSyntax);
             var target = AssignmentTarget(targetSyntax);
             var targetType = StorageType(targetSyntax);
+            var writeContract = MemberWriteContract(targetSyntax);
+            if (writeContract.DisallowNull && store is not null && store.Right is not RefExpressionSyntax)
+            {
+                foreach (var location in StoreValueLocations(targetSyntax, store))
+                { disallowNullArguments[location.Value.Span] = value; }
+            }
+            if (writeContract.AllowNull && target.Root.Name != CSharpTypes.NullableValue
+                && (sourceType is null || SymbolEqualityComparer.Default.Equals(sourceType, targetType)
+                    && !IsDynamicIdentityBoundary(sourceType, targetType)))
+            {
+                UnifyDeconstructionReceiver(ConversionCore(target), ConversionCore(value));
+                return value;
+            }
             if (value.Root.Name == CSharpTypes.NullableParameter && HasDefaultValueAnnotation(value)
                 && targetSyntax is InvocationExpressionSyntax referenceCall
                 && model.GetOperation(referenceCall, cancellationToken) is IInvocationOperation { TargetMethod.ReturnsByRef: true } referenceOperation

@@ -37,6 +37,38 @@ public static partial class Inference
             return syntax is null ? result : ApplyNullableReadFlow(syntax, member, result, forStorage);
         }
 
+        private (bool AllowNull, bool DisallowNull) MemberWriteContract(ExpressionSyntax target)
+        {
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            ISymbol? member = model.GetOperation(StorageExpression(target), cancellationToken) switch
+            {
+                IFieldReferenceOperation field => field.Field,
+                IPropertyReferenceOperation { Property: { SetMethod: not null, ReturnsByRef: false, ReturnsByRefReadonly: false } property } => property,
+                _ => null
+            };
+            if (member is null)
+            { return default; }
+            IEnumerable<AttributeData> attributes = member.GetAttributes();
+            // Source binding reads property annotations. Imported property input
+            // annotations are encoded on the setter's value parameter.
+            if (member is IPropertySymbol propertySymbol && !propertySymbol.Locations.Any(location =>
+            {
+                if (location is null)
+                { throw new ArgumentNullException(nameof(location)); }
+                return location.IsInSource;
+            }) && propertySymbol.SetMethod is { Parameters.Length: > 0 } setter)
+            { attributes = attributes.Concat(setter.Parameters[setter.Parameters.Length - 1].GetAttributes()); }
+            var allow = false;
+            var disallow = false;
+            foreach (var attribute in attributes)
+            {
+                allow |= attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute";
+                disallow |= attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.DisallowNullAttribute";
+            }
+            return (allow && !disallow, disallow);
+        }
+
         private HmType WithExpression(WithExpressionSyntax syntax)
         {
             if (syntax is null)
