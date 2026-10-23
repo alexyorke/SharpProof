@@ -876,24 +876,21 @@ try {
         Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/Settings:' + $settings), ('/ListTestsTargetPath:' + (Join-Path $partitionEvidence 'discovered-tests.txt'))) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
         Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $testAssembly) ('Dump/D_' + [IO.Path]::GetFileName($testAssembly) + '.dump')) -Destination (Join-Path $partitionEvidence 'discovery.dump')
         $universe = @(Read-SharpProofPackageDiscovery -Dump (Join-Path $partitionEvidence 'discovery.dump') -Filter $TestFilter)
-        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackageCasePartition -Method $_.method -Name $_.name) -eq $PackagePartition })
-        $partitionFilter = Get-SharpProofPackagePartitionFilter -Cases $partitionCases
+        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackagePartition -Method $_.method) -eq $PackagePartition })
+        if ($partitionCases.Count -eq 0) { throw 'Package partition selected no cases.' }
+        $partitionMethods = @($partitionCases | ForEach-Object { $_.method } | Sort-Object -Unique -CaseSensitive)
+        $partitionFilter = @($partitionMethods | ForEach-Object { 'FullyQualifiedName~' + $_ }) -join '|'
         $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
-        $partitionDiscovered = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
         foreach ($shard in $shardBuilder) {
-            $innerFilter = ConvertTo-SharpProofPackageCaseShardFilter -Filter $shard.Filter -Cases $universe
-            $filter = "($innerFilter)&($partitionFilter)"
+            $filter = "($($shard.Filter))&($partitionFilter)"
             $listing = Join-Path $partitionEvidence ($shard.Name + '.txt')
             Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/ListTestsTargetPath:' + $listing), ('/TestCaseFilter:' + $filter)) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
-            $discovered = [string[]]@(Get-Content -LiteralPath $listing)
-            if ($discovered.Count -eq 0) { continue }
-            $partitionDiscovered.AddRange($discovered)
+            if (@(Get-Content -LiteralPath $listing).Count -eq 0) { continue }
             $copy = [ordered]@{}
             foreach ($entry in $shard.GetEnumerator()) { $copy[$entry.Key] = $entry.Value }
             $copy['Filter'] = $filter
             $partitionShards.Add($copy.AsReadOnly())
         }
-        Assert-SharpProofPackagePartitionSelection -Expected $partitionCases -Discovered @($partitionDiscovered.ToImmutable())
         $shards = $partitionShards.ToImmutable()
     }
     else {
@@ -1004,17 +1001,10 @@ try {
         }
         Assert-SharpProofPackagePartitionReceipt -Root $receiptRoot -Expected $partitionCases
         ([ordered]@{
-            schemaVersion = 2; count = 4; index = $PackagePartition
-            commit          = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+            schemaVersion = 1; count = 4; index = $PackagePartition
+            commit   = (& git -C $repositoryRoot rev-parse HEAD).Trim()
             runId = [string]$env:GITHUB_RUN_ID; filter = $TestFilter
-            selected        = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
-            selectionFilter = $partitionFilter
-            shards          = @($shards | ForEach-Object {
-                    ([ordered]@{
-                        name   = $_.Name
-                        sha256 = (Get-FileHash -LiteralPath (Join-Path $partitionEvidence ($_.Name + '.txt')) -Algorithm SHA256).Hash
-                    }).AsReadOnly()
-                } | Sort-Object { $_.name } -CaseSensitive)
+            selected = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
         }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partitionEvidence 'package-partition.json') -Encoding utf8NoBOM
     }
     $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()

@@ -19,6 +19,10 @@ $codeFixes = Join-Path $sourceRoot 'artifacts/codefixes'
 $joined = Join-Path $sourceRoot 'artifacts/joined'
 $receiptPath = Join-Path $harnessRoot 'receipt.json'
 $checks = 0
+$savedFixtureActions = $env:GITHUB_ACTIONS
+$savedFixtureRunId = $env:GITHUB_RUN_ID
+$savedFixtureRunAttempt = $env:GITHUB_RUN_ATTEMPT
+$savedFixtureProducerAttempt = $env:SHARPPROOF_DEVELOPER_PRODUCER_ATTEMPT
 
 function Assert-DeveloperHarnessRejected([scriptblock]$Operation, [string]$Expected) {
     try { & $Operation | Out-Null }
@@ -30,6 +34,9 @@ function Assert-DeveloperHarnessRejected([scriptblock]$Operation, [string]$Expec
 }
 
 function Write-DeveloperFixtureReceipt([object]$Receipt) {
+    if ($Receipt.buildStartedUtc -is [DateTime]) {
+        $Receipt.buildStartedUtc = $Receipt.buildStartedUtc.ToString('O', [Globalization.CultureInfo]::InvariantCulture)
+    }
     [IO.File]::WriteAllText($receiptPath, ($Receipt | ConvertTo-Json -Depth 14), [Text.UTF8Encoding]::new($false))
 }
 
@@ -82,6 +89,12 @@ function New-DeveloperRuntimeFixture {
 }
 
 try {
+    # Offline fixture receipts use their own explicit workflow identities below.
+    # Repository gates can inherit GITHUB_ACTIONS without forwarding run metadata.
+    $env:GITHUB_ACTIONS = ''
+    $env:GITHUB_RUN_ID = ''
+    $env:GITHUB_RUN_ATTEMPT = ''
+    $env:SHARPPROOF_DEVELOPER_PRODUCER_ATTEMPT = ''
     foreach ($directory in @($payload, $core, $tool, $codeFixes, $joined)) { [IO.Directory]::CreateDirectory($directory) | Out-Null }
     $sourceFiles = @('global.json', 'eng/container/toolchain.json', 'eng/Versions.props', 'Directory.Build.props', 'Directory.Build.targets', 'NuGet.config', 'SharpProof.slnx', 'eng/scripts/package-projects.json')
     foreach ($project in (Get-SharpProofDeveloperQualificationBuildProjects -RepositoryRoot $repositoryRoot -IncludeConsumerHarness)) { $sourceFiles += [string]$project }
@@ -120,6 +133,15 @@ try {
     $null = Test-SharpProofDeveloperHarnessReceipt -HarnessRoot $harnessRoot -RepositoryRoot $sourceRoot -PackageSource $core -ToolPackageSource $tool -PreparedCodeFixesSource $codeFixes
     $original = [IO.File]::ReadAllText($receiptPath)
     $checks += 2
+
+    foreach ($preciseTime in @('2026-01-01T00:00:00.0000000Z', '2026-01-01T00:00:00.1000000Z')) {
+        $changedTime = $original | ConvertFrom-Json -AsHashtable
+        $changedTime.buildStartedUtc = [DateTime]::ParseExact($preciseTime, 'O', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)
+        Write-DeveloperFixtureReceipt $changedTime
+        Test-DeveloperFixtureReceipt
+        $checks++
+    }
+    [IO.File]::WriteAllText($receiptPath, $original)
 
     $savedRunId = $env:GITHUB_RUN_ID
     $savedRunAttempt = $env:GITHUB_RUN_ATTEMPT
@@ -323,6 +345,10 @@ try {
     $checks += 2
 }
 finally {
+    $env:GITHUB_ACTIONS = $savedFixtureActions
+    $env:GITHUB_RUN_ID = $savedFixtureRunId
+    $env:GITHUB_RUN_ATTEMPT = $savedFixtureRunAttempt
+    $env:SHARPPROOF_DEVELOPER_PRODUCER_ATTEMPT = $savedFixtureProducerAttempt
     if ([IO.Directory]::Exists($fixture)) { [IO.Directory]::Delete($fixture, $true) }
 }
 Write-Host "Developer harness regressions passed: $checks exact-source, build-profile, package, runtime, and complete-case controls."

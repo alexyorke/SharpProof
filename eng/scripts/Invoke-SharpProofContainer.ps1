@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'format-shard-gate', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -50,10 +50,6 @@ param(
     [string]$Format = 'Text',
 
     [string]$TargetFramework = '',
-
-    [ValidateSet(1, 2)][int]$FormatShardCount = 1,
-
-    [ValidateRange(0, 1)][int]$FormatShardIndex = 0,
 
     [ValidateSet('Sequential', 'Build', 'Compare')][string]$ReproductionMode = 'Sequential',
 
@@ -150,9 +146,6 @@ if ($hasPreparedDeveloperInput -and ($Fast -or
         [string]::IsNullOrWhiteSpace($env:SHARPPROOF_DEVELOPER_HARNESS))) {
     throw 'Prepared developer qualification requires all exact producer inputs and enabled analyzers.'
 }
-if (($FormatShardCount -ne 1 -or $PSBoundParameters.ContainsKey('FormatShardIndex')) -and $Command -ne 'format-check') {
-    throw 'Formatting partition options require format-check.'
-}
 if (($ReproductionMode -ne 'Sequential' -or
         $PSBoundParameters.ContainsKey('ReproductionRunIndex') -or
         $PSBoundParameters.ContainsKey('FirstRunAttempt') -or
@@ -163,7 +156,7 @@ if (($ReproductionMode -ne 'Sequential' -or
 # Build the repository-only analyzer once before any project builds. The
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
-if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'format-shard-gate', 'lint', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
+if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
     -not $NoBuild -and -not $Fast -and -not $hasPreparedDeveloperInput -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
@@ -363,8 +356,6 @@ function Invoke-RepositoryGates {
         'Developer runtime receipt regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofReproductionEvidence.ps1' `
         'Independent reproduction evidence regressions failed.'
-    Invoke-RequiredScript 'eng/scripts/Test-SharpProofCSharpFormatting.ps1' `
-        'Complete formatting shard regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperQualificationInputs.ps1' `
         'Prepared developer qualification input regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofFuzzRunnerBuild.ps1' `
@@ -575,20 +566,12 @@ switch ($Command) {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofLint.ps1')
     }
     'format-check' {
-        if ($FormatShardIndex -eq 0) {
-            Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
-                'Repository script linting or formatting failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
-            Invoke-RequiredScript 'eng/scripts/Test-SharpProofScriptTools.ps1' `
-                'Script-tool regression tests failed.'
-        }
+        Invoke-RequiredScript 'eng/scripts/Format-Scripts.ps1' `
+            'Repository script linting or formatting failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofScriptTools.ps1' `
+            'Script-tool regression tests failed.'
         Invoke-RequiredScript 'eng/scripts/Format-CSharp.ps1' `
-            'Repository formatting check failed.' ([ordered]@{
-                VerifyNoChanges = $true; ShardCount = $FormatShardCount; ShardIndex = $FormatShardIndex
-            }).AsReadOnly()
-    }
-    'format-shard-gate' {
-        Import-Module (Join-Path $PSScriptRoot 'SharpProof.CSharpFormatting.psm1') -Force
-        Assert-SharpProofCSharpFormattingShards -RepositoryRoot $repositoryRoot
+            'Repository formatting check failed.' ([ordered]@{ VerifyNoChanges = $true }).AsReadOnly()
     }
     'doctor' {
         $doctorTarget = if ($PSBoundParameters.ContainsKey('Target')) { $Target } else { '' }

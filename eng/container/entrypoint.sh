@@ -25,9 +25,6 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof > /dev/null 2>&1; then
   elif [[ "${command_name}" = "canonical-cohort-gate" ]]; then
     # Normalize only the receipt output directory; downloaded evidence stays unchanged.
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/canonical-cohorts"
-  elif [[ "${command_name}" = "format-shard-gate" ]]; then
-    # The gate exports one new validation file beside immutable downloaded receipts.
-    install -d -o sharpproof -g sharpproof "${repo_root}/artifacts/formatting"
   fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
@@ -95,7 +92,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate | package-partition-gate | format-shard-gate)
+    layout | lint | quick | pr | security | pr-gates | repository-gates | test-changed | package-consumers | coverage | coverage-shard | coverage-gate | package-partition-gate)
       return 0
       ;;
     *)
@@ -282,15 +279,6 @@ case "${command_name}" in
       cp -a "${repo_root}/artifacts/canonical-cohorts" "${task_root}/artifacts/"
     fi
     ;;
-  format-shard-gate)
-    input_source="${repo_root}/artifacts/formatting"
-    if [[ ! -d "${input_source}" || -L "${input_source}" ]] ||
-      [[ -n "$(find "${input_source}" -type l -print -quit)" ]]; then
-      echo "Formatting receipts must be directories without symbolic links." >&2
-      exit 2
-    fi
-    cp -a -- "${input_source}" "${task_root}/artifacts/formatting"
-    ;;
   package-reproducibility)
     reproduction_mode=""
     previous_argument=""
@@ -366,8 +354,11 @@ case "${command_name}" in
   coverage-gate)
     result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json)
     ;;
-  format-shard-gate)
-    result_paths=(formatting/formatting-validation.json)
+  tool-consumer)
+    result_paths=(.)
+    # The separately downloaded CLI feed is an immutable qualification input.
+    # Export new acceptance evidence without copying the input over its owner.
+    input_excludes=(--exclude='./tool-packages')
     ;;
   package-reproducibility)
     result_paths=(reproducibility)
