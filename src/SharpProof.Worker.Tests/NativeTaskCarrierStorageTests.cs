@@ -1107,6 +1107,19 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"), Is.Null);
     }
 
+    [Test]
+    public void LocalInitializationRejectsBranchBypassingAddress()
+    {
+        const string declaration = "public struct Cell {public long Value;} public static void Probe(bool skip) { " +
+            "Cell observed; if(skip) {observed=default;} else {observed=default;} " +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) {builder.SetException(e);} builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"), Is.Null);
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj", initializationMutation: "branch"),
+            Is.EqualTo("TaskRootExceptionBoundaryInstructionUnsupported"));
+    }
+
     [TestCase("type")]
     [TestCase("slot")]
     public void LocalInitializationRejectsMismatchedTypeOrUnownedSlot(string mutation)
@@ -1223,9 +1236,12 @@ public sealed class NativeTaskCarrierStorageTests
         var code = image.GetMethodBody(method.RelativeVirtualAddress).GetILBytes()!;
         var cursor = 0;
         var address = -1;
+        var branch = -1;
         while (cursor < code.Length)
         {
             Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction), Is.True);
+            if (instruction.RawCode is "Brfalse_s" or "Brtrue_s")
+            { branch = instruction.Offset; }
             if (instruction.RawCode == "Ldloca_s")
             { address = instruction.Offset; }
             if (instruction.RawCode != "Initobj")
@@ -1236,6 +1252,14 @@ public sealed class NativeTaskCarrierStorageTests
                 var cell = metadata.TypeDefinitions.Single(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "Cell");
                 System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(
                     bytes.AsSpan(offset + headerBytes + instruction.Offset + 2, 4), System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(cell));
+            }
+            else if (mutation == "branch")
+            {
+                Assert.That(branch, Is.GreaterThanOrEqualTo(0));
+                Assert.That(address, Is.GreaterThan(branch));
+                var delta = instruction.Offset - branch - 2;
+                Assert.That(delta, Is.InRange((int)sbyte.MinValue, (int)sbyte.MaxValue));
+                bytes[offset + headerBytes + branch + 1] = unchecked((byte)(sbyte)delta);
             }
             else if (mutation == "slot")
             { bytes[offset + headerBytes + address + 1] = byte.MaxValue; }

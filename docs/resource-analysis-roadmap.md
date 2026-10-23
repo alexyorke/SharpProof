@@ -109,6 +109,42 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Local-initialization branch-entry control
+
+A compiled conditional local initialization retains boundary evidence. An
+adversarial emitted-body control redirects the conditional branch directly to
+`initobj`, bypassing its required local address. The validator must return
+`TaskRootExceptionBoundaryInstructionUnsupported` with no boundary evidence.
+This mutation is a validation input, not an executable-source claim.
+
+The focused control passed with zero build warnings or errors
+(`artifacts/resource-boundary-initialization-branch-probe.log`). The canonical
+formatter copied zero changes
+(`artifacts/resource-boundary-initialization-branch-format.log`). All 1298 related carrier/projection/protocol/native-resource tests passed with
+zero build warnings or errors
+(`artifacts/resource-boundary-initialization-branch-tests.log`). Full quality/API
+and documentation checks passed
+(`artifacts/resource-boundary-initialization-branch-lint.log` and
+`artifacts/resource-boundary-initialization-branch-docs.log`). Production behavior, runtime
+premises and wire identities are unchanged. The cumulative runtime-byte
+obligations and pending runtime-model choice remain open.
+
+### Hosted local-initialization coverage
+
+Checkpoint `f9b1b473e33376a92543759ac36043f80c5e7cc5` completed all fifteen
+coverage shards in run 39878413801. Aggregate job 120173015760 produced a
+complete report and failed the unchanged 100 percent floor: 7104/7257 changed
+trusted lines (97.89 percent), with 153 gaps. The unchanged collector's local
+slot-range and nominal type-match paths at lines 521 and 531 are now covered;
+the preceding report had 155 gaps. This is partial coverage progress, not closure.
+
+Evidence is retained in
+`artifacts/resource-f9b1-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `b6126fe370c249fe7be3599c2ff1a594b46fa99c` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `f9b1b473e`.
+Canonical and package-consumer qualification for that checkpoint are still
+running. The newer branch-entry control is not measured by this report.
+
 ### Local-initialization ownership controls
 
 The instruction policy's stack-local exemption is now tested directly. Four
