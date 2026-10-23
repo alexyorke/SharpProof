@@ -395,9 +395,13 @@ jobs:
           set -euo pipefail
           fixture="$(find artifacts/developer-experience -mindepth 2 -maxdepth 2 -type d -name consumer -print -quit)"
           test -f "${fixture}/Native.csproj"
+          evidence="$(realpath -e -- "$(dirname "${fixture}")")"
+          [[ "${evidence%/*}" == "$(realpath -e -- artifacts/developer-experience)" && "${evidence##*/}" =~ ^[a-f0-9]{32}$ ]]
+          # Hand only the run directory to the host; package/input ownership stays unchanged.
+          sudo chown -- "$(id -u):$(id -g)" "${evidence}"
           image="ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}"
           pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
-            -EvidenceDirectory "$(dirname "${fixture}")" -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
+            -EvidenceDirectory "${evidence}" -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
             -LocalImage "${image}" -BuildMetadataPath consumer-image.json
       - name: Record exact optional editor and template archives
         env:
