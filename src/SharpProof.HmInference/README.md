@@ -947,6 +947,18 @@ Source/metadata fixtures and applied IDE fixes verify null/default items, identi
 constructor/Add/helper counts, spread disposal, Task/ValueTask suspension, exact
 helper/Add/await faults and cancellation. C# 13 CLI/package fixtures verify the new
 signatures; earlier-language consumers retain their existing feature boundaries.
+Generic invocation results now preserve nullable arguments inside constructed
+return types. Generalized-candidate type information refines lists, arrays,
+delegates, lazy enumerables, named tuples and deeper containers without propagating
+nullable return annotations into inputs or unrelated result members. Return views are rebuilt independently of argument bindings; ref/out
+storage retains its existing contract. Declared return annotations and default
+markers survive the refinement. Source/metadata fixtures cover nullable-value and
+fixed-type controls, container-only nullability, non-null container contracts and
+awaited ValueTask results. Applied fixes verify identity, null/default payloads,
+array runtime types, selective tuple members, iterator laziness/disposal, helper/factory counts, suspension,
+exact faults and cancellation in original/reference/nullable-value domains.
+C# 8 uses representable value-domain bounds; C# 9/13 retain unconstrained nullable
+arguments. CLI/package fixtures check these language-specific signatures.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

@@ -29,7 +29,7 @@ public static partial class Inference
                 copies.Add(type, copy);
                 return copy;
             }
-            var nested = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs) { currentMethod = currentMethod };
+            var nested = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults) { currentMethod = currentMethod };
             foreach (var entry in environment)
             { nested.environment.Add(entry.Key, Copy(entry.Value)); }
             if (currentFunction is not null)
@@ -72,6 +72,8 @@ public static partial class Inference
             { HmType.Unify(entry.Key, entry.Value); }
             defaultValueAnnotations.UnionWith(nested.defaultValueAnnotations);
             optionalCollectionCandidates.UnionWith(nested.optionalCollectionCandidates);
+            foreach (var entry in nested.invocationResultShapes)
+            { invocationResultShapes[entry.Key] = entry.Value; }
             foreach (var storage in nested.defaultAssignedStorages)
             {
                 if (environment.TryGetValue(storage, out var previous) && nested.environment.TryGetValue(storage, out var written))

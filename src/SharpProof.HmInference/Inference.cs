@@ -99,13 +99,14 @@ public static partial class Inference
     }
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
-        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null)
+        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null, Dictionary<TextSpan, HashSet<string>>? nullableInvocationResults = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<TextSpan, NullableFlowState> nullableReadFlow = nullableReadFlow ?? [];
         private readonly List<Dictionary<TextSpan, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
         private readonly HashSet<TextSpan> nullableCollectionInputs = nullableCollectionInputs ?? [];
+        private readonly Dictionary<TextSpan, HashSet<string>> nullableInvocationResults = nullableInvocationResults ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -391,6 +392,8 @@ public static partial class Inference
             var postconditionMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
             if (RefineCollectionInputs(changedCompilation, method, postconditionMethod, pins) is { } refinedCollection)
             { return refinedCollection; }
+            if (RefineInvocationResults(changedCompilation, method, postconditionMethod, pins) is { } refinedInvocations)
+            { return refinedInvocations; }
             if (RefineNullablePostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
             { return refinedPostconditions; }
 

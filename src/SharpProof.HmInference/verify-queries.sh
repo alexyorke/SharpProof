@@ -72,6 +72,15 @@ public static class QueryConsumer{
   public static int OptionalCollectionPacked(int value)=>CollectionSeedInput(value,CollectionMaybeInput(value));
   public static async Task<OptionalCollectionBag<int>> OptionalCollectionAwait(Task<int> input){var value=await input;return[CollectionMaybeInput(value)];}
 #endif
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull]static T GenericResultMaybe<T>(T value)=>default;
+  static List<T> GenericResultList<T>(T first,T second)=>new List<T>{first,second};
+  static T[] GenericResultArray<T>(T first,T second)=>new[]{first,second};
+  static (A tag,List<B> values) GenericResultTagged<A,B>(A tag,B first,B second)=>(tag,new List<B>{first,second});
+  static async ValueTask<List<T>> GenericResultAwait<T>(T first,T second,Task gate){await gate;return new List<T>{first,second};}
+  public static List<int> GenericCallList(int value)=>GenericResultList(value,GenericResultMaybe(value));
+  public static int[] GenericCallArray(int value)=>GenericResultArray(value,GenericResultMaybe(value));
+  public static (bool tag,List<int> values) GenericCallTagged(bool tag,int value)=>GenericResultTagged(tag,value,GenericResultMaybe(value));
+  public static async Task<List<int>> GenericCallAwaited(int value,Task gate)=>await GenericResultAwait(value,GenericResultMaybe(value),gate);
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -306,6 +315,17 @@ EOF
     grep -Fq 'global::OptionalCollectionBag<T1?> OptionalCollectionSpread<T1>(global::System.Collections.Generic.IEnumerable<T1?> values) where T1 : class' "$log"
     grep -Fq 'T1? OptionalCollectionPacked<T1>(T1 value)' "$log"
     grep -Fq "global::System.Threading.Tasks.Task<global::OptionalCollectionBag<$collection_input>> OptionalCollectionAwait<T1>(global::System.Threading.Tasks.Task<T1> input)" "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'global::System.Collections.Generic.List<T1> GenericCallList<T1>(T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1[] GenericCallArray<T1>(T1 value) where T1 : struct' "$log"
+    grep -Fq '(T1 tag, global::System.Collections.Generic.List<T2> values) GenericCallTagged<T1, T2>(T1 tag, T2 value) where T2 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1>> GenericCallAwaited<T1, T2>(T1 value, T2 gate) where T1 : struct where T2 : global::System.Threading.Tasks.Task' "$log"
+  else
+    grep -Fq 'global::System.Collections.Generic.List<T1?> GenericCallList<T1>(T1 value)' "$log"
+    grep -Fq 'T1?[] GenericCallArray<T1>(T1 value)' "$log"
+    grep -Fq '(T1 tag, global::System.Collections.Generic.List<T2?> values) GenericCallTagged<T1, T2>(T1 tag, T2 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> GenericCallAwaited<T1, T2>(T1 value, T2 gate) where T2 : global::System.Threading.Tasks.Task' "$log"
   fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

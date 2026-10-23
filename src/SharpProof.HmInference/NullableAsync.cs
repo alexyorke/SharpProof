@@ -17,8 +17,122 @@ public static partial class Inference
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
             var result = ApplyNullabilityContract(operation.TargetMethod.ReturnType, value, operation.TargetMethod.GetReturnTypeAttributes(), forStorage, operation.Arguments, argumentValues);
-            return operation.Syntax is ExpressionSyntax syntax && nullableReadFlow.TryGetValue(syntax.Span, out var state) && state == NullableFlowState.MaybeNull
-                ? ApplyNullableReadFlow(syntax, operation.TargetMethod, result, forStorage) : result;
+            if (forStorage || operation.Syntax is not ExpressionSyntax syntax)
+            { return result; }
+            // A return occurrence can be nullable independently of its input variables.
+            result = ApplyInvocationAnnotations(syntax, result);
+            if (nullableReadFlow.TryGetValue(syntax.Span, out var state) && state == NullableFlowState.MaybeNull)
+            { result = ApplyNullableReadFlow(syntax, operation.TargetMethod, result, forStorage); }
+            invocationResultShapes[syntax.Span] = result;
+            return result;
+        }
+
+        private readonly Dictionary<TextSpan, HmType> invocationResultShapes = [];
+
+        private HmType ApplyInvocationAnnotations(ExpressionSyntax syntax, HmType value)
+        {
+            if (syntax is null)
+            { throw new ArgumentNullException(nameof(syntax)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (!nullableInvocationResults.TryGetValue(syntax.Span, out var paths))
+            { return value; }
+            return Rewrite(value, "");
+
+            HmType Rewrite(HmType node, string path)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                node = node.Root;
+                var core = ConversionCore(node);
+                var rebuilt = core.Arguments.Length == 0 ? core : core.WithArguments(core.Arguments.Select((argument, index) =>
+                {
+                    if (argument is null)
+                    { throw new ArgumentNullException(nameof(argument)); }
+                    if (index < 0)
+                    { throw new ArgumentOutOfRangeException(nameof(index)); }
+                    return Rewrite(argument, path + "/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }).ToArray());
+                if (defaultValueAnnotations.Contains(core))
+                { defaultValueAnnotations.Add(rebuilt); }
+                if (node.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+                {
+                    var annotated = node.WithArguments(rebuilt);
+                    if (defaultValueAnnotations.Contains(node))
+                    { defaultValueAnnotations.Add(annotated); }
+                    return annotated;
+                }
+                if (!paths.Contains(path) || rebuilt.IsValueType == true || rebuilt.Name == CSharpTypes.NullableValue)
+                { return rebuilt; }
+                var result = new HmType(rebuilt.IsVariable || rebuilt.CSharpSymbol is ITypeParameterSymbol ? CSharpTypes.NullableParameter : CSharpTypes.NullableReference, rebuilt);
+                if (result.Name == CSharpTypes.NullableParameter)
+                { defaultValueAnnotations.Add(result); }
+                return result;
+            }
+        }
+
+        private MethodResult? RefineInvocationResults(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
+            if (invocationResultShapes.Count == 0)
+            { return null; }
+            var before = original.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+            var after = candidate.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+            if (before.Length != after.Length)
+            { return null; }
+            var next = nullableInvocationResults.ToDictionary(entry => entry.Key, entry => new HashSet<string>(entry.Value));
+            var candidateModel = compilation.GetSemanticModel(candidate.SyntaxTree);
+            var changed = false;
+            for (var i = 0; i < before.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!invocationResultShapes.TryGetValue(before[i].Span, out var inferred)
+                    || !SyntaxFactory.AreEquivalent(before[i].Expression, after[i].Expression)
+                    || candidateModel.GetTypeInfo(after[i], cancellationToken).Type is not { } type)
+                { continue; }
+                var paths = new HashSet<string>();
+                Collect(CSharpTypes.Rigid(type), inferred, "", paths);
+                if (paths.Count == 0)
+                { continue; }
+                if (!next.TryGetValue(before[i].Span, out var retained))
+                { retained = []; next.Add(before[i].Span, retained); }
+                foreach (var path in paths)
+                { changed |= retained.Add(path); }
+            }
+            return !changed ? null : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: next).Analyze(original, pins);
+
+            static void Collect(HmType actual, HmType inferred, string path, HashSet<string> paths)
+            {
+                if (actual is null)
+                { throw new ArgumentNullException(nameof(actual)); }
+                if (inferred is null)
+                { throw new ArgumentNullException(nameof(inferred)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                if (paths is null)
+                { throw new ArgumentNullException(nameof(paths)); }
+                actual = actual.Root;
+                inferred = inferred.Root;
+                // Root flow is handled by return contracts; refine nested arguments here.
+                if (path.Length != 0 && actual.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference
+                    && inferred.Name is not (CSharpTypes.NullableParameter or CSharpTypes.NullableReference or CSharpTypes.NullableValue))
+                { paths.Add(path); }
+                actual = ConversionCore(actual);
+                inferred = ConversionCore(inferred);
+                if (actual.Name != inferred.Name || actual.Arguments.Length != inferred.Arguments.Length)
+                { return; }
+                for (var i = 0; i < actual.Arguments.Length; i++)
+                { Collect(actual.Arguments[i], inferred.Arguments[i], path + "/" + i.ToString(System.Globalization.CultureInfo.InvariantCulture), paths); }
+            }
         }
 
         private HmType ApplyNullabilityContract(ITypeSymbol returnType, HmType value, IEnumerable<AttributeData> attributes, bool forStorage,
@@ -451,7 +565,7 @@ public static partial class Inference
             }))
             { return new(original.Identifier.ValueText, "Rejected", "Nullable postcondition flow refinement does not converge."); }
             readFlowHistory.Add(nullableReadFlow);
-            return new Session(model, cancellationToken, next, readFlowHistory, nullableCollectionInputs).Analyze(original, pins);
+            return new Session(model, cancellationToken, next, readFlowHistory, nullableCollectionInputs, nullableInvocationResults).Analyze(original, pins);
         }
 
         private static HmType ApplyInputNullability(IParameterSymbol parameter, HmType value)
@@ -871,7 +985,7 @@ public static partial class Inference
             { return; }
             var template = HmType.Function(parameters, new("void"));
             var fresh = new HmScheme(template, template.FreeVariables()).Instantiate();
-            var probe = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs) { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
+            var probe = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults) { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
             probe.SetIteratorReturn(declaration, currentMethod);
             if (probe.iteratorReturn is null)
             { probe.SetAsyncReturn(currentMethod); }
