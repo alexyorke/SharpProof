@@ -139,7 +139,38 @@ jobs:
       - name: Build the canonical source toolchain without shared caches
         id: prepared
         shell: bash
-        run: bash "$GITHUB_WORKSPACE/artifacts/private-release-orchestration/eng/scripts/Prepare-SharpProofPrivatePreview.sh"
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == alexyorke/SharpProof-preview && "${SHARPPROOF_PRIVATE_PREVIEW:-}" == true ]]
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$SHARPPROOF_SOURCE_COMMIT" =~ ^[a-f0-9]{40}$ && "$SHARPPROOF_WORKFLOW_COMMIT" == "$GITHUB_WORKFLOW_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$SHARPPROOF_SOURCE_COMMIT" ]]
+          orchestration_root="$GITHUB_WORKSPACE/artifacts/private-release-orchestration"
+          [[ "$(realpath -e -- "$orchestration_root")" == "$orchestration_root" ]]
+          [[ "$(git -C "$orchestration_root" rev-parse HEAD)" == "$SHARPPROOF_WORKFLOW_COMMIT" ]]
+          [[ -n "${RUNNER_TEMP:-}" && "$RUNNER_TEMP" == /* && -n "${GITHUB_OUTPUT:-}" && "$GITHUB_OUTPUT" == /* ]]
+          runner_temp="$(realpath -e -- "$RUNNER_TEMP")"
+          [[ "$runner_temp" != / ]]
+          native_path="$runner_temp/sharpproof-private-windows-native"
+          [[ ! -e "$native_path" ]]
+          mkdir -p -- "$native_path"
+          container=''
+          cleanup() {
+            if [[ -n "$container" ]]; then docker rm --force "$container" > /dev/null; fi
+          }
+          trap cleanup EXIT
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_CACHE_URL ACTIONS_RUNTIME_URL ACTIONS_RESULTS_URL
+          docker buildx build --platform linux/amd64 --file eng/container/Dockerfile \
+            --target toolchain --no-cache --load --tag "${COMPOSE_PROJECT_NAME}-tooling:local" \
+            --build-arg USER_UID=1000 --build-arg USER_GID=1000 --progress plain .
+          container="$(docker create "${COMPOSE_PROJECT_NAME}-tooling:local")"
+          [[ "$container" =~ ^[a-f0-9]{64}$ ]]
+          docker cp "$container:/opt/sharpproof/windows-native" "$native_path/payload"
+          docker rm "$container" > /dev/null
+          container=''
+          test -f "$native_path/payload/win-x64/libz3.dll"
+          test -f "$native_path/payload/win-arm64/libz3.dll"
+          echo "windows-native-path=$native_path" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.qualified-packages.outputs.tool_artifact_id }}
