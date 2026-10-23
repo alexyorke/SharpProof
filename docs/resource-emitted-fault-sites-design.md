@@ -1,6 +1,6 @@
 # Owned emitted fault sites: implementation design
 
-Status: implemented; combined validation pending. This slice continues the checked CLR/helper-frame bridge in the resource-analysis roadmap. It does not choose between explicit reported runtime assumptions and derivation from a closed program entrypoint. Cumulative task runtime bytes remain Unknown.
+Status: implemented; combined local validation passed. This slice continues the checked CLR/helper-frame bridge in the resource-analysis roadmap. It does not choose between explicit reported runtime assumptions and derivation from a closed program entrypoint. Cumulative task runtime bytes remain Unknown.
 
 ## Outcome and smallest useful slice
 
@@ -157,7 +157,7 @@ Required controls cover:
 - An actual `AllocatedBytes` compiler-artifact-to-worker run that reaches the new consumer. A `new int[...]` child must surface unresolved dynamic/helper closure with no numeric root bound. Zero-site children must still expose remaining runtime composition Unknown. Missing or corrupted later evidence must not leave an earlier site/frame result attached.
 - Existing source-array/element, loop-entry, normal lifetime and configured/returned-root controls retain their existing outcomes. The new runtime selector is not authorization to change the public proof policy or narrow scope to warm execution.
 
-The implementation adds 55 emitted-site test cases covering the producer, strict transport, native ownership checks and actual cumulative-byte Unknown consumer. Combined validation is pending; this list remains the verification checklist rather than a claim that every obligation has passed.
+The implementation adds 55 emitted-site test cases covering the producer, strict transport, native ownership checks and actual cumulative-byte Unknown consumer. All 1646 selected worker tests passed on the combined branch, including this fixture. Formatting, layout, lint/API and documentation checks passed. This list remains the verification checklist; passing these controls does not close the unresolved runtime proof obligations.
 
 ## Compatibility and model versions
 

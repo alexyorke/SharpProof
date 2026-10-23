@@ -112,7 +112,8 @@ The cumulative-byte item remains open until all of these obligations are joined:
 ### Parallel implementation and verification checkpoint
 
 Ten Sol agents completed bounded implementation, test and evidence assignments.
-This checkpoint records the integrated changes; combined qualification is pending.
+This checkpoint records the integrated changes. Combined local verification
+passed; exact-head hosted qualification remains required.
 
 - Complete emitted primitive bodies now flow from the compiler through nested
   codec 12 to native ownership and fault-site checks. The actual task
@@ -131,8 +132,7 @@ This checkpoint records the integrated changes; combined qualification is pendin
   certify the combined emitted-body changes.
 - New worker controls cover emitted inventories, context dispatch storage,
   contract admission, compiler ownership, budget exhaustion and violation
-  boundaries. Their combined run passed all but the corrected enum fixture
-  described below; a fully passing run is still required.
+  boundaries. All 1646 worker tests passed after the fixture corrections below.
 - All 15 lengths and SHA-256 values in the [initialization evidence
   ledger](resource-runtime-initialization-ledger.md) were independently rechecked.
   All 18 initial closure sources were then retrieved at the pinned revision.
@@ -161,8 +161,16 @@ Its aggregate artifact identifies merge `234b7afa4`, whose parents are master
 signature-prefix collector; the other 134 remain. The new integrated changes
 are absent from all three runs.
 The remote branch advanced with non-overlapping CI tooling commit `bbdc67921`
-during local verification. It will be preserved and the resulting state checked
-before pushing this integration.
+during local verification. The resource checkpoint was rebased onto it without
+conflicts as `9e54da06f`. On that combined code, all 1646 selected worker tests
+passed with zero warnings/errors (`artifacts/resource-parallel-rebased-worker-tests.log`).
+Final lint/API checks passed after two spelling corrections in the expanded
+ledger (`artifacts/resource-parallel-final-lint.log`). Rebased layout passed
+with 2873 source files, 59 projects and 151 pinned common files; documentation
+automation and lifecycle regressions also passed
+(`artifacts/resource-parallel-rebased-layout.log` and
+`artifacts/resource-parallel-rebased-docs.log`). The follow-up commit records
+these results and does not change tested production or test code.
 
 Full task-runtime bytes, the runtime proof-policy decision, required coverage
 closure and the final phase-by-phase audit remain open. The merge request stays
