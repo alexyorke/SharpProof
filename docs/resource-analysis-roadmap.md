@@ -109,6 +109,31 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Child-storage composition budget controls
+
+Two detached-cost controls compose sixteen constant-mapped children. Each child
+must independently derive a complete byte bound. The smaller choice trees fit
+the existing shared substitution budget and yield 512 cumulative/peak auxiliary
+bytes and zero retained bytes under the declared layout. Larger trees exhaust
+the budget in a later child and must return `ForkJoinChildStorageBudgetExceeded`
+with all three storage bounds absent. Independent work/array/element counts
+remain known zero.
+
+The maximum selected string has three characters: the declared 22-byte header
+plus six payload bytes aligns to 32 bytes; sixteen such per-child upper bounds
+yield 512 bytes. These altered cost records are validator inputs, not executable
+source-allocation claims or root task-runtime byte proofs. The existing budgets,
+production admission, runtime premises and wire identities are unchanged.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-child-storage-budget-format.log`). The complete fork/join
+projection suite passed all 124 tests, including all six activation/storage
+composition controls, with zero build warnings or errors
+(`artifacts/resource-child-storage-budget-tests.log`). Quality/API and
+documentation checks passed (`artifacts/resource-child-storage-budget-lint.log`
+and `artifacts/resource-child-storage-budget-docs.log`). The pending runtime proof policy,
+full task-runtime byte model, coverage closure and final audit remain open.
+
 ### Hosted source-stack admission coverage
 
 Checkpoint `0ce19e86d3b3105f521d57e8b0cf6af30c84fa89` completed all fifteen
@@ -123,8 +148,8 @@ Evidence is retained in
 `artifacts/resource-0ce1-coverage-evidence/coverage/SharpProof.coverage.json`.
 Merge `19c1fcc00845b8a43ffc8701e580f9f3fa3e5600` has verified parents master
 `fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `0ce19e86d`.
-Full canonical CI (39887528696) passed for that exact checkpoint. Package
-consumers (39887528698) remain active at this observation. The full task-runtime byte model, pending proof policy,
+Full canonical CI (39887528696) and package consumers (39887528698) passed for
+that exact checkpoint. The full task-runtime byte model, pending proof policy,
 coverage closure and final audit remain open.
 
 ### Task activation composition budget controls

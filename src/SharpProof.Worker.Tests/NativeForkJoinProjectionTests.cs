@@ -102,6 +102,55 @@ internal sealed class NativeForkJoinProjectionTests
         var exception = Assert.Throws<System.Reflection.TargetInvocationException>(exhausted);
         Assert.That(exception!.InnerException, Is.TypeOf<ResourceExpressionLimitException>());
     }
+    [TestCase(32, true)]
+    [TestCase(64, false)]
+    public void ChildStorageBudgetDiscardsAllEarlierStoragePrefixes(int choices, bool fits)
+    {
+        var projection = ActivationBudgetProjection(true, 1, 1, 1);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var layout = Layout();
+        var children = projection.Children;
+        for (var index = 0; index < children.Length; index++)
+        {
+            var child = children[index];
+            var input = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "count", int.MaxValue));
+            var cost = ResourceProgram.Activate(child.Cost.Activation, StorageChoices(input, 1, choices));
+            var allocation = NativeResourceAllocationVerifier.Verify(cost, child.Owner.CallableId, child.Owner, layout, token);
+            Assert.That(allocation.ConditionalUpperBound, Is.Not.Null, allocation.UnknownReason);
+            Assert.That(allocation.ConditionalUpperBound!.NodeCount, Is.EqualTo(8 * choices - 2));
+            children = children.SetItem(index, child with { Cost = cost });
+        }
+        projection = projection with { Children = children };
+        var root = Root(projection);
+        AssertKnownZeroTaskWork(projection, root);
+        var check = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, root, layout, token);
+        if (fits)
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.CumulativeUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(512)));
+            Assert.That(check.PeakAuxiliaryUpper!.Constant, Is.EqualTo(new System.Numerics.BigInteger(512)));
+            Assert.That(check.RetainedUpper!.Constant, Is.EqualTo(System.Numerics.BigInteger.Zero));
+        }
+        else
+        {
+            Assert.That(check.CumulativeUpper, Is.Null);
+            Assert.That(check.PeakAuxiliaryUpper, Is.Null);
+            Assert.That(check.RetainedUpper, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinChildStorageBudgetExceeded"));
+        }
+    }
+
+    private static ResourceProgram StorageChoices(ResourceExpression input, int first, int count)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentOutOfRangeException.ThrowIfLessThan(first, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        if (count == 1)
+        { return ResourceProgram.Managed(ResourceAllocationShape.String(ResourceExpression.DivideCeiling(input, first))); }
+        var half = count / 2;
+        return ResourceProgram.Choice(StorageChoices(input, first, half), StorageChoices(input, first + half, count - half));
+    }
+
     [TestCase(64, true)]
     [TestCase(128, false)]
     public void ActivationSubstitutionBudgetIsSharedAcrossLaterChildren(int choices, bool fits)
