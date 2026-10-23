@@ -15,7 +15,10 @@ param(
     [switch]$FrameworkConsumersOnly,
 
     [Parameter()]
-    [switch]$ValidatePackageSourceOnly
+    [switch]$ValidatePackageSourceOnly,
+
+    [Parameter()]
+    [string]$ConsumerHarness = ''
 )
 
 Set-StrictMode -Version Latest
@@ -577,6 +580,16 @@ $resolvedPackageSource = if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 else {
     Resolve-SharpProofPackageSource -Path $PackageSource
 }
+$harness = if (-not [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
+    if ($ValidatePackageSourceOnly -or $FrameworkConsumersOnly -or
+        $null -eq $resolvedPackageSource -or -not $isSupportedWorkerHost) {
+        throw 'ConsumerHarness requires exact supplied packages and the full canonical Linux consumer profile.'
+    }
+    Import-Module (Join-Path $PSScriptRoot 'SharpProof.ConsumerHarness.psm1')
+    Test-SharpProofConsumerHarnessReceipt -HarnessRoot $ConsumerHarness -RepositoryRoot $repositoryRoot `
+        -Configuration $Configuration -PackageSource $resolvedPackageSource.Path
+}
+else { $null }
 if ($ValidatePackageSourceOnly) {
     if ($null -eq $resolvedPackageSource) {
         throw 'ValidatePackageSourceOnly requires PackageSource or SHARPPROOF_PACKAGE_SOURCE.'
@@ -620,6 +633,30 @@ if ($null -ne $resolvedPackageSource) {
 
 Push-Location $repositoryRoot
 try {
+    if ($null -ne $harness) {
+        $results = Join-Path $repositoryRoot 'artifacts/package-consumers/harness-results'
+        [IO.Directory]::CreateDirectory($results) | Out-Null
+        $trx = Join-Path $results 'consumer-harness.trx'
+        if ([IO.File]::Exists($trx)) { throw 'Consumer harness result already exists; refusing stale evidence.' }
+        $filter = ($harness.Tests | ForEach-Object { 'FullyQualifiedName=' + $_ }) -join '|'
+        # The immutable pack artifact contains the full compiled harness. VSTest
+        # executes it directly; consumer builds still use only the supplied feed.
+        & dotnet vstest $harness.AssemblyPath ('/TestAdapterPath:' + $harness.AdapterPath) `
+        ('/TestCaseFilter:' + $filter) ('/ResultsDirectory:' + $results) `
+            '/Logger:trx;LogFileName=consumer-harness.trx' '/Logger:console;verbosity=minimal'
+        if ($LASTEXITCODE -ne 0) { throw "SharpProof consumer harness failed with exit code $LASTEXITCODE." }
+        Assert-SharpProofConsumerHarnessResults -Path $trx
+        [IO.File]::WriteAllText((Join-Path $results 'qualification.json'),
+            (([ordered]@{
+                    schemaVersion        = 1
+                    repositoryCommit     = $harness.RepositoryCommit
+                    harnessReceiptSha256 = $harness.ReceiptSha256
+                    tests                = $harness.Tests
+                    outcome              = 'Passed'
+                }) | ConvertTo-Json -Depth 5) + "`n", [Text.UTF8Encoding]::new($false))
+        Write-Host 'SharpProof exact-package analyzer and real verifier consumer harness passed.'
+        return
+    }
     $packageTestArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     [void]$packageTestArgumentBuilder.AddRange([string[]]@(
             'test',

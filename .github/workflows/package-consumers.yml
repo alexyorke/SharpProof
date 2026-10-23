@@ -49,10 +49,11 @@ jobs:
     permissions:
       contents: read
 
-  package:
-    name: Pack exact container artifacts
+  package-artifacts:
+    name: Produce exact container artifacts
     outputs:
       package-artifact-id: ${{ steps.package-upload.outputs.artifact-id }}
+      consumer-harness-artifact-id: ${{ steps.consumer-harness-upload.outputs.artifact-id }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,30 +85,6 @@ jobs:
       - name: Pack and validate the package graph
         run: docker compose run --rm tooling pack -Configuration Release
 
-      - name: Verify DLL-only offline stack traces from the exact packed payload
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofOfflineStackTraces.ps1
-          -PackageSource artifacts/container-packages'
-
-      - name: Smoke test project templates against the exact package graph
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Install-SharpProofTemplates.ps1
-          -Verify -PackageSource artifacts/container-packages'
-
-      - name: Smoke test the consumer performance harness (one iteration)
-        # This verifies the harness and proof quality; it is not a statistical baseline.
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Measure-SharpProofConsumerPerformance.ps1
-          -PackageSource artifacts/container-packages -Iterations 1'
-
-      - name: Validate read-only doctor regressions
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofDoctor.ps1'
-
       - name: Record qualified package identities and hashes
         run: |
           docker compose run --rm tooling dev -lc 'pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofPackageManifest.ps1 -PackageDirectory artifacts/container-packages'
@@ -120,15 +97,24 @@ jobs:
           path: artifacts/container-packages/*
           if-no-files-found: error
 
+      - name: Upload the exact-commit prebuilt consumer harness
+        id: consumer-harness-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-harness-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/consumer-harness/
+          if-no-files-found: error
+          include-hidden-files: true
+
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
         with:
           mode: report
 
-  container-verifier:
-    name: Canonical Linux analyzer and verifier consumers
-    needs: package
+  package-qualification:
+    name: Qualify exact container artifacts
+    needs: package-artifacts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,13 +124,96 @@ jobs:
 
       - uses: ./.github/actions/prepare-qualified-packages
         with:
-          artifact-id: ${{ needs.package.outputs.package-artifact-id }}
+          artifact-id: ${{ needs.package-artifacts.outputs.package-artifact-id }}
+
+      - name: Verify DLL-only offline stack traces from the exact packed payload
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofOfflineStackTraces.ps1
+          -PackageSource nupkgs'
+
+      - name: Smoke test project templates against the exact package graph
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Install-SharpProofTemplates.ps1
+          -Verify -PackageSource nupkgs'
+
+      - name: Smoke test the consumer performance harness (one iteration)
+        # This verifies the harness and proof quality; it is not a statistical baseline.
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Measure-SharpProofConsumerPerformance.ps1
+          -PackageSource nupkgs -Iterations 1'
+
+      - name: Validate read-only doctor regressions
+        run: >-
+          docker compose run --rm tooling dev -lc
+          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofDoctor.ps1'
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
+  # Consumers can start as soon as immutable bytes exist. The established
+  # package check still fails closed unless every existing smoke check passes.
+  package:
+    name: Pack exact container artifacts
+    if: always()
+    needs: [package-artifacts, package-qualification]
+    outputs:
+      package-artifact-id: ${{ needs.package-artifacts.outputs.package-artifact-id }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful production and qualification of the exact artifacts
+        env:
+          ARTIFACT_RESULT: ${{ needs.package-artifacts.result }}
+          QUALIFICATION_RESULT: ${{ needs.package-qualification.result }}
+          PACKAGE_ARTIFACT_ID: ${{ needs.package-artifacts.outputs.package-artifact-id }}
+          CONSUMER_HARNESS_ARTIFACT_ID: ${{ needs.package-artifacts.outputs.consumer-harness-artifact-id }}
+        run: |
+          set -euo pipefail
+          test "$ARTIFACT_RESULT" = success
+          test "$QUALIFICATION_RESULT" = success
+          [[ "$PACKAGE_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          [[ "$CONSUMER_HARNESS_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+
+  container-verifier:
+    name: Canonical Linux analyzer and verifier consumers
+    needs: package-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          artifact-id: ${{ needs.package-artifacts.outputs.package-artifact-id }}
+
+      - name: Download the matching immutable prebuilt consumer harness
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package-artifacts.outputs.consumer-harness-artifact-id }}
+          merge-multiple: true
+          path: artifacts/consumer-harness
 
       - name: Run analyzer and real verifier consumers
         run: >-
           docker compose run --rm tooling package-consumers
           -Configuration Release
           -PackageSource nupkgs
+          -ConsumerHarness artifacts/consumer-harness
+
+      - name: Retain exact consumer harness qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-harness-results-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/package-consumers/harness-results/
+          if-no-files-found: warn
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -155,7 +224,7 @@ jobs:
   # x64 runs inside the Linux portable consumer job below, sharing its setup.
   native-linux-verifier:
     name: Plug-and-play native Linux verifier (${{ matrix.architecture }})
-    needs: package
+    needs: package-artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -172,7 +241,7 @@ jobs:
           global-json-file: global.json
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          artifact-ids: ${{ needs.package-artifacts.outputs.package-artifact-id }}
           merge-multiple: true
           path: nupkgs
       - name: Prove and refute with one package and default settings
@@ -187,7 +256,7 @@ jobs:
   # pull requests within the account's concurrent (especially macOS) job limit.
   portable-consumers:
     name: Portable package consumer (${{ matrix.os }})
-    needs: package
+    needs: package-artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -214,7 +283,7 @@ jobs:
           global-json-file: global.json
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          artifact-ids: ${{ needs.package-artifacts.outputs.package-artifact-id }}
           merge-multiple: true
           path: nupkgs
       - name: Run the portable consumer against the packed packages
@@ -266,7 +335,7 @@ jobs:
 
   visual-studio-consumers:
     name: Visual Studio ${{ matrix.majorVersion }} package consumer
-    needs: package
+    needs: package-artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -288,7 +357,7 @@ jobs:
           dotnet-version: ${{ matrix.sdkVersion }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          artifact-ids: ${{ needs.package-artifacts.outputs.package-artifact-id }}
           merge-multiple: true
           path: nupkgs
       - name: Qualify Visual Studio MSBuild and compiler host against the packed packages
@@ -299,7 +368,7 @@ jobs:
 
   native-windows-arm64-verifier:
     name: Native Windows ARM64 verifier
-    needs: package
+    needs: package-artifacts
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -311,7 +380,7 @@ jobs:
           architecture: arm64
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.package.outputs.package-artifact-id }}
+          artifact-ids: ${{ needs.package-artifacts.outputs.package-artifact-id }}
           merge-multiple: true
           path: nupkgs
       - name: Prove, refute, and consume a library with one package and default settings

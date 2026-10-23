@@ -313,6 +313,8 @@ param(
 
     [string]$PackageSource = '',
 
+    [string]$ConsumerHarness = '',
+
     [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
 
     [ValidateRange(0, 3)][int]$PackagePartition = 0,
