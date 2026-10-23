@@ -109,6 +109,24 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Recursive-control hosted coverage checkpoint
+
+Published head `d9cb2e515` passed canonical CI (39899979536). Coverage run
+39899979511 completed all 15 shards successfully; aggregate job 120242736512
+failed the unchanged 100% changed-TCB floor. The report remains 7,152/7,287
+lines, 98.15%, with 135 gaps. Comparing the complete uncovered-line sets with
+`443b5b0e6` found no changes, and production recursion code is unchanged between
+those heads. The passing recursive forwarding controls therefore add behavioral
+verification without closing a previously uncovered trusted-code line.
+
+The report is retained at
+`artifacts/resource-d9cb-coverage-evidence/coverage/SharpProof.coverage.json`.
+Verified merge `369468ff031411ef2747030a485f916e010ff8fc` has parents the recorded
+master base and `d9cb2e515`. The local signature controls (`2fd05191b`) are not
+measured by this report. Package consumers (39899979552) remain live at this
+checkpoint. Full runtime bytes, the pending proof-policy decision, coverage
+closure and the final audit remain open.
+
 ### Task-boundary local-signature prefix controls
 
 Three emitted-body controls compare a primitive local before a value-type local,
