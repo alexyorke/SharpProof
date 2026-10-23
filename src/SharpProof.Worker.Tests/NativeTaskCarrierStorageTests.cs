@@ -1107,6 +1107,21 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"), Is.Null);
     }
 
+    [TestCase("int previous=0; Cell observed=default;", false, true)]
+    [TestCase("int[] previous=null; Cell observed=default;", false, false)]
+    [TestCase("Cell<int> observed=default;", true, false)]
+    public void LocalInitializationRequiresAReviewedSignaturePrefix(string locals, bool generic, bool supported)
+    {
+        ArgumentNullException.ThrowIfNull(locals);
+        var declaration = (generic ? "public struct Cell<T> {public T Value;} " : "public struct Cell {public long Value;} ") +
+            "public static void Probe() { " + locals +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) {builder.SetException(e);} builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"),
+            Is.EqualTo(supported ? null : "TaskRootExceptionBoundaryInstructionUnsupported"));
+    }
+
     [Test]
     public void LocalInitializationRejectsBranchBypassingAddress()
     {

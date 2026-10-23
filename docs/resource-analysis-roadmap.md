@@ -109,6 +109,31 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Task-boundary local-signature prefix controls
+
+Three emitted-body controls compare a primitive local before a value-type local,
+an array local before it, and a constructed generic value-type local. The
+compiler emits valid Debug bodies containing `initobj`; the reviewed primitive
+prefix retains boundary evidence. The array and generic signature shapes must
+return `TaskRootExceptionBoundaryInstructionUnsupported` because the local
+signature parser does not admit them. These controls exercise emission admission;
+they do not establish CLR frame sizes or cumulative task-runtime byte bounds.
+
+Formatting copied zero changes
+(`artifacts/resource-local-signature-prefix-format.log`). All 1,180 related
+worker carrier/projection/resource-contract tests passed with zero build warnings
+or errors (`artifacts/resource-local-signature-prefix-tests.log`). Lint/API and
+documentation checks passed; final prose is checked again before commit.
+This checkpoint adds tests only; response cache 65 and other compatibility
+identities remain unchanged.
+
+Published predecessor `443b5b0e6` passed canonical CI (39898289224) and package
+consumers (39898289225). Its coverage failure is recorded below. The queued
+recursion controls and coverage checkpoint were published as `d9cb2e515`, whose
+own hosted qualification remains required. The runtime proof-policy decision,
+full runtime-byte composition, 100% changed-TCB coverage and final audit remain
+open.
+
 ### Field-store repair coverage checkpoint
 
 Published head `443b5b0e6` completed all 15 coverage shards successfully in run
