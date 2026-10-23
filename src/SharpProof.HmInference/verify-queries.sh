@@ -20,6 +20,10 @@ public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)
 public delegate List<T> ReceiverPair<T>(T first,T second);
 public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second)=>new List<T>{first,second};}
 public delegate T[] CompoundPair<T>(T[] first,T[] second);
+public sealed class LambdaReceiver<T>{public T Run(T seed,Func<T> action)=>action();public Task<T> RunAsync(T seed,Func<Task<T>> action)=>action();public ValueTask<T> RunValueAsync(T seed,Func<ValueTask<T>> action)=>action();}
+public sealed class IndirectReceiver<T>{public T Value;public IndirectReceiver(T value){Value=value;}}
+public sealed class IndirectSource<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read(T fill)=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;}
+[return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T IndirectRead<T>(T fill);
 public sealed class CompoundInheritedInput<T>:List<T>{}
 public sealed class CompoundReceiver<T>{public T[] Join(T[] first,T[] second)=>first;public IEnumerable<T> Enumerate(T seed,IEnumerable<T> values)=>values;}
 public sealed class MemberContractCell<T>{
@@ -91,6 +95,17 @@ public static class QueryConsumer{
   public static List<int> ReceiverInstance(ReceiverBox<int> box,int value)=>box.Pair(value,GenericResultMaybe(value));
   public static async Task<List<int>> ReceiverTask(ReceiverPair<int> pair,Task<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
   public static async ValueTask<List<int>> ReceiverValueTask(ReceiverPair<int> pair,ValueTask<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
+  public static int LambdaReturn(LambdaReceiver<int> receiver,int value)=>receiver.Run(value,()=>GenericResultMaybe(value));
+  public static int LambdaBlockReturn(LambdaReceiver<int> receiver,int value)=>receiver.Run(value,()=>{return GenericResultMaybe(value);});
+  public static async Task<int> LambdaAsyncReturn(LambdaReceiver<int> receiver,int value)=>await receiver.RunAsync(value,async()=>{await Task.Yield();return GenericResultMaybe(value);});
+  public static async ValueTask<int> LambdaValueAsyncReturn(LambdaReceiver<int> receiver,int value)=>await receiver.RunValueAsync(value,async()=>{await Task.Yield();return GenericResultMaybe(value);});
+  public static int IndirectFieldMaybe(IndirectReceiver<int> receiver,int fill){ref var alias=ref receiver.Value;alias=GenericResultMaybe(fill);return receiver.Value;}
+  public static int IndirectChainedMaybe(IndirectReceiver<int> receiver,int fill){ref var first=ref receiver.Value;ref var second=ref first;second=GenericResultMaybe(fill);return receiver.Value;}
+  public static int IndirectElementMaybe(int[] values,int fill){ref var alias=ref values[0];alias=GenericResultMaybe(fill);return values[0];}
+  public static int IndirectOwnerMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source,int fill){ref var alias=ref receiver.Value;alias=source.Read(fill);return receiver.Value;}
+  public static int IndirectDelegateMaybe(IndirectReceiver<int> receiver,IndirectRead<int> read,int fill){ref var alias=ref receiver.Value;alias=read(fill);return receiver.Value;}
+  public static int IndirectPropertyMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Property;return receiver.Value;}
+  public static int IndirectMemberMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Field;return receiver.Value;}
   static CompoundInheritedInput<T> CompoundValues<T>(T first,T second)=>new CompoundInheritedInput<T>{first,second};
   public static IEnumerable<int> CompoundInherited(CompoundReceiver<int> receiver,int value)=>receiver.Enumerate(value,CompoundValues(value,GenericResultMaybe(value)));
   public static int[] CompoundInstance(CompoundReceiver<int> receiver,int value)=>receiver.Join(new[]{value},new[]{GenericResultMaybe(value)});
@@ -368,6 +383,37 @@ EOF
     grep -Fq 'global::System.Threading.Tasks.Task<T1?[]> CompoundDelegateTask<T1>(global::CompoundPair<T1?> pair, global::System.Threading.Tasks.Task<T1> input)' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?[]> CompoundInstanceValueTask<T1>(global::CompoundReceiver<T1?> receiver, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?[]> CompoundDelegateValueTask<T1>(global::CompoundPair<T1?> pair, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'T1 LambdaReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 LambdaBlockReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1> LambdaAsyncReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> LambdaValueAsyncReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+  else
+    grep -Fq 'T1? LambdaReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1? LambdaBlockReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<T1?> LambdaAsyncReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> LambdaValueAsyncReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'T1 IndirectFieldMaybe<T1>(global::IndirectReceiver<T1> receiver, T1 fill) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectChainedMaybe<T1>(global::IndirectReceiver<T1> receiver, T1 fill) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectElementMaybe<T1>(T1[] values, T1 fill) where T1 : struct' "$log"
+  else
+    grep -Fq 'T1? IndirectFieldMaybe<T1>(global::IndirectReceiver<T1?> receiver, T1 fill)' "$log"
+    grep -Fq 'T1? IndirectChainedMaybe<T1>(global::IndirectReceiver<T1?> receiver, T1 fill)' "$log"
+    grep -Fq 'T1? IndirectElementMaybe<T1>(T1?[] values, T1 fill)' "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'T1 IndirectOwnerMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectSource<T1> source, T1 fill) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectDelegateMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectRead<T1> read, T1 fill) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectPropertyMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectSource<T1> source) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectMemberMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectSource<T1> source) where T1 : struct' "$log"
+  else
+    grep -Fq 'T1? IndirectOwnerMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectSource<T1> source, T1 fill)' "$log"
+    grep -Fq 'T1? IndirectDelegateMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectRead<T1> read, T1 fill)' "$log"
+    grep -Fq 'T1? IndirectPropertyMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectSource<T1> source)' "$log"
+    grep -Fq 'T1? IndirectMemberMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectSource<T1> source)' "$log"
   fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

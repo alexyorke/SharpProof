@@ -979,9 +979,21 @@ nullable, preserving the original nonnullable value domain where required.
 Source/metadata and applied-fix checks cover array identity and runtime element
 types, inherited collections, helper/delegate calls, suspension, faults and
 cancellation, with C# 8/9/13 CLI/package checks. Physical `Nullable<T>` and optional
-formal controls retain their distinct contracts. Receiver shapes without a unique
-input origin, receiver refinement from lambda return flow and indirect-storage
-flow remain open.
+formal controls retain their distinct contracts.
+Nullable lambda returns can also refine receiver payloads without widening a
+separate seed input. Effective return diagnostics are matched to the delegate's
+result parameter and the lambda's own return expressions. Expression and block
+lambdas, anonymous delegates, custom result-parameter ordering and Task/ValueTask
+lambda payloads have source and applied-fix runtime checks. Suppressed returns,
+explicit result types and nested-function returns preserve their boundaries.
+Indirect ref-alias stores now discover nullable generic helper and member results
+before body inference, including generic owners, delegates, declared T? returns,
+MaybeNull fields and properties. Resolved field/array/ref-property paths retain
+nullable storage while fill inputs and independent siblings remain separate.
+Checks cover chained aliases, earlier copies, metadata contracts, runtime effects,
+physical nullable values and async suspension, faults and cancellation. C# 8/9/13
+CLI and packaged consumers verify representable signatures. Unknown receiver
+origins, unresolved storage paths and general path-sensitive flow remain open.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

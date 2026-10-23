@@ -15,6 +15,7 @@
     <Compile Include="../SharpProof.HmInference/Inference.cs" Link="Inference.cs" />
     <Compile Include="../SharpProof.HmInference/CallerRefinement.cs" Link="CallerRefinement.cs" />
     <Compile Include="../SharpProof.HmInference/NullableAsync.cs" Link="NullableAsync.cs" />
+    <Compile Include="../SharpProof.HmInference/IndirectStorage.cs" Link="IndirectStorage.cs" />
     <Compile Include="../SharpProof.HmInference/LegacyBuilderLayouts.cs" Link="LegacyBuilderLayouts.cs" />
     <Compile Include="../SharpProof.HmInference/VariantConstraints.cs" Link="VariantConstraints.cs" />
     <Compile Include="../SharpProof.HmInference/LocalBuilderLayouts.cs" Link="LocalBuilderLayouts.cs" />

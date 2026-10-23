@@ -358,6 +358,9 @@ internal static class Program
         passed += await PartialMethodChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await PartialContractChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += DefaultValueChecks.Run(cancellationToken);
+        passed += await IndirectStorageChecks.Run(cancellationToken).ConfigureAwait(false);
+        passed += LambdaReceiverChecks.Run(cancellationToken);
+        passed += await LambdaReceiverChecks.RunApplied(cancellationToken).ConfigureAwait(false);
         passed += QueryChecks.Run(cancellationToken);
         passed += await QueryRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await DefaultValueRuntimeChecks.Run(cancellationToken).ConfigureAwait(false);

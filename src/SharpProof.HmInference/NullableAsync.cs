@@ -84,7 +84,7 @@ public static partial class Inference
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
                 return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
-                    && diagnostic.Id is ("CS8604" or "CS8620") && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+                    && diagnostic.Id is ("CS8603" or "CS8604" or "CS8620") && diagnostic.Location.SourceTree == candidate.SyntaxTree;
             }).ToArray();
             if (warnings.Length == 0)
             { return null; }
@@ -109,14 +109,20 @@ public static partial class Inference
                 var argument = after[index].ArgumentList.Arguments[input.Argument];
                 var expression = argument.Expression;
                 if (!pins.Contains((input.Parameter, input.Path)) && warnings.Any(warning =>
-                {
-                    if (warning is null)
-                    { throw new ArgumentNullException(nameof(warning)); }
-                    return warning.Location.SourceSpan == expression.Span
-                        || warning.Location.SourceSpan == StorageExpression(expression).Span;
-                }) && (input.TypePath.Length == 0 || candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } parameter }
-                    && candidateModel.GetTypeInfo(expression, cancellationToken).Type is { } actual
-                    && HasAnnotatedReceiverLeaf(parameter.Type, actual, input.TypePath, compilation)))
+                    {
+                        if (warning is null)
+                        { throw new ArgumentNullException(nameof(warning)); }
+                        if (warning.Id == "CS8603")
+                        {
+                            return candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } lambdaParameter }
+                            && IsLambdaReturnWarning(lambdaParameter.Type, expression, input.TypePath, warning);
+                        }
+                        return (warning.Location.SourceSpan == expression.Span
+                                || warning.Location.SourceSpan == StorageExpression(expression).Span)
+                            && (input.TypePath.Length == 0 || candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } parameter }
+                                && candidateModel.GetTypeInfo(expression, cancellationToken).Type is { } actual
+                                && HasAnnotatedReceiverLeaf(parameter.Type, actual, input.TypePath, compilation));
+                    }))
                 { next.Add((input.Parameter, input.Path)); }
             }
             return next.Count == nullableReceiverInputs.Count ? null
@@ -125,6 +131,78 @@ public static partial class Inference
         }
 
         private static readonly char[] ReceiverTypePathSeparators = ['/'];
+
+        private static bool IsLambdaReturnWarning(ITypeSymbol formal, ExpressionSyntax expression, string typePath, Diagnostic warning)
+        {
+            if (formal is null)
+            { throw new ArgumentNullException(nameof(formal)); }
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            if (typePath is null)
+            { throw new ArgumentNullException(nameof(typePath)); }
+            if (warning is null)
+            { throw new ArgumentNullException(nameof(warning)); }
+            if (formal is not INamedTypeSymbol { TypeKind: TypeKind.Delegate, IsGenericType: true } delegateType
+                || delegateType.OriginalDefinition.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } invoke)
+            { return false; }
+            while (expression is ParenthesizedExpressionSyntax parentheses)
+            { expression = parentheses.Expression; }
+            if (expression is not AnonymousFunctionExpressionSyntax lambda
+                || lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null })
+            { return false; }
+            var steps = typePath.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries);
+            if (steps.Length is < 1 or > 2 || !int.TryParse(steps[0], System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var returnIndex))
+            { return false; }
+            if (returnIndex >= delegateType.TypeArguments.Length)
+            { return false; }
+            var declaredReturn = invoke.ReturnType;
+            var direct = declaredReturn is ITypeParameterSymbol directParameter
+                && directParameter.Ordinal == returnIndex
+                && SymbolEqualityComparer.Default.Equals(directParameter.ContainingSymbol, delegateType.OriginalDefinition);
+            if (lambda.AsyncKeyword.RawKind != 0)
+            {
+                var task = direct && steps.Length == 2 && steps[1] == "0"
+                    ? delegateType.TypeArguments[returnIndex] as INamedTypeSymbol
+                    : !direct && steps.Length == 1 && declaredReturn is INamedTypeSymbol declaredTask
+                        && declaredTask.TypeArguments.Length == 1
+                        && declaredTask.TypeArguments[0] is ITypeParameterSymbol payload
+                        && payload.Ordinal == returnIndex
+                        && SymbolEqualityComparer.Default.Equals(payload.ContainingSymbol, delegateType.OriginalDefinition)
+                        && delegateType.DelegateInvokeMethod?.ReturnType is INamedTypeSymbol constructedTask
+                        && SymbolEqualityComparer.Default.Equals(constructedTask.OriginalDefinition, declaredTask.OriginalDefinition)
+                        && SymbolEqualityComparer.Default.Equals(constructedTask.TypeArguments[0], delegateType.TypeArguments[returnIndex])
+                        ? constructedTask : null;
+                if (task is null || task.OriginalDefinition.MetadataName is not ("Task`1" or "ValueTask`1")
+                    || task.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks")
+                { return false; }
+            }
+            else if (!direct || steps.Length != 1)
+            { return false; }
+            var body = lambda switch
+            {
+                LambdaExpressionSyntax lambdaExpression => lambdaExpression.Body,
+                AnonymousMethodExpressionSyntax anonymous => anonymous.Block,
+                _ => null
+            };
+            if (body is ExpressionSyntax returned)
+            { return HasReturnSpan(returned); }
+            return body is BlockSyntax block && block.DescendantNodes(node =>
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                return node is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax);
+            }).OfType<ReturnStatementSyntax>().Any(statement => { if (statement is null) { throw new ArgumentNullException(nameof(statement)); } return statement.Expression is { } value && HasReturnSpan(value); });
+
+            bool HasReturnSpan(ExpressionSyntax returned)
+            {
+                if (returned is null)
+                { throw new ArgumentNullException(nameof(returned)); }
+                while (returned is ParenthesizedExpressionSyntax wrapped)
+                { returned = wrapped.Expression; }
+                return returned.Span == warning.Location.SourceSpan;
+            }
+        }
 
         private static bool HasAnnotatedReceiverLeaf(ITypeSymbol formal, ITypeSymbol actual, string typePath, Compilation compilation)
         {
@@ -1336,7 +1414,7 @@ public static partial class Inference
                 { target = target is ParenthesizedExpressionSyntax parentheses ? parentheses.Expression : ((RefExpressionSyntax)target).Expression; }
                 if (target is ConditionalExpressionSyntax conditional)
                 { Discover(conditional.WhenTrue, literal, type, alias); Discover(conditional.WhenFalse, literal, type, alias); return; }
-                if (probe.StoredValueShape(literal, type) is null)
+                if ((probe.StoredValueShape(literal, type) ?? probe.IndirectNullableStoredValue(literal, type)) is null)
                 { return; }
                 try
                 {
@@ -1370,7 +1448,7 @@ public static partial class Inference
                 { node = node.WithArguments(arguments); }
                 foreach (var plan in plans)
                 {
-                    if (plan.Parameter == parameter && plan.Path.SequenceEqual(path) && StoredValueShape(plan.Literal, plan.Type) is { } literal)
+                    if (plan.Parameter == parameter && plan.Path.SequenceEqual(path) && (StoredValueShape(plan.Literal, plan.Type) ?? IndirectNullableStoredValue(plan.Literal, plan.Type)) is { } literal)
                     {
                         node = MergeDefaultValues(node, literal);
                         defaultValueAnnotations.Add(node.Root);
@@ -1538,7 +1616,8 @@ public static partial class Inference
                             { continue; }
                             foreach (var literal in StoredAlternatives(component.Value))
                             {
-                                if (StoredValueShape(literal, StorageType(component.Target)) is null)
+                                if (StoredValueShape(literal, StorageType(component.Target)) is null
+                                    && (assigned is not ILocalSymbol { RefKind: not RefKind.None } || IndirectNullableStoredValue(literal, StorageType(component.Target)) is null))
                                 { continue; }
                                 var targets = ReferenceStorageOwners(assigned);
                                 targets.Add(assigned);
@@ -1559,7 +1638,7 @@ public static partial class Inference
             foreach (var literal in literals)
             {
                 if ((!onlyCapturedWrites || !SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, model.GetEnclosingSymbol(literal.SpanStart, cancellationToken)))
-                    && StoredValueShape(literal, storageType) is { } value)
+                    && (StoredValueShape(literal, storageType) ?? IndirectNullableStoredValue(literal, storageType)) is { } value)
                 { type = MergeDefaultValues(type, value); }
             }
             return type;
