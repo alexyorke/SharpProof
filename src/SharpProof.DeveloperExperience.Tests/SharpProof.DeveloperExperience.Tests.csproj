@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>SharpProof.DeveloperExperience.Test</AssemblyName>
+    <IsTestProject>true</IsTestProject>
+    <SharpProofProductionProject>false</SharpProofProductionProject>
+    <IsShipping>false</IsShipping>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <ProjectReference Include="../SharpProof.Attributes/SharpProof.Attributes.csproj" />
+    <ProjectReference Include="../SharpProof.Analyzer/SharpProof.Analyzer.csproj" />
+    <ProjectReference Include="../SharpProof.Tool/SharpProof.Tool.csproj" />
+    <ProjectReference Include="../SharpProof.Reporting/SharpProof.Reporting.csproj" Aliases="global,ReportingAssembly" />
+    <ProjectReference Include="../SharpProof.CodeFixes/SharpProof.CodeFixes.csproj" />
+  </ItemGroup>
+</Project>

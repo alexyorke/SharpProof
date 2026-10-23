@@ -476,7 +476,14 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(bound.InputHash, Is.EqualTo(project.Snapshot.InputHash));
         Assert.That(artifact.Compilation.AssemblyName, Is.EqualTo(callerPe.AssemblyName));
         Assert.That(capturedReference.Aliases, Is.EqualTo(ShadowAliases));
-        Assert.That(roundTripReferences, Is.Empty, "Compilation references are intentionally excluded from worker transport.");
+        Assert.That(JsonSerializer.Serialize(roundTripReferences, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
+        var roundTripShadow = roundTripReferences.Single(reference => reference is null
+            ? throw new ArgumentNullException(nameof(reference)) : reference.Aliases.SequenceEqual(ShadowAliases));
+        Assert.That(roundTripShadow.Identity, Is.EqualTo(capturedReference.Identity));
+        Assert.That(roundTripShadow.Aliases, Is.EqualTo(ShadowAliases));
+        Assert.That(JsonSerializer.Serialize(roundTripShadow.Modules, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(capturedReference.Modules, WorkerProtocolJson.SharedOptions)));
         Assert.That(capturedModule.Path, Is.EqualTo(Path.Combine(directory, "producer.dll")));
         Assert.That(capturedModule.Sha256, Is.EqualTo(producerPe.Sha256));
         Assert.That(capturedModule.SizeBytes, Is.EqualTo(producerPe.Bytes));

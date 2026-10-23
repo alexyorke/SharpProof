@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 44,
+    "protocolVersion": 45,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 55,
+    "compilerArtifactSchemaVersion": 56,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 67,
+    "schemaVersion": 68,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -501,6 +501,7 @@
           "src/SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
           "src/SharpProof.Worker/Launcher/LauncherProjections.cs",
           "src/SharpProof.Worker/Launcher/LauncherResultPresentation.cs",
+          "src/SharpProof.Worker/Launcher/WorkerDeveloperPresentation.cs",
           "src/SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
@@ -538,6 +539,7 @@
           "src/SharpProof.Worker.Protocol/ResourceTaskRuntimePremiseEvidence.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJson.RuntimePremises.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs",
+          "src/SharpProof.Worker.Protocol/WorkerDeveloperContext.cs",
           "src/SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs"
         ],
         "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."

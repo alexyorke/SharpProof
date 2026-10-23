@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup Condition="'$(SHARPPROOF_CONTAINER)' == '1'">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).sharpproof-obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).sharpproof-bin/$(MSBuildProjectName)/</BaseOutputPath>
+  </PropertyGroup>
+</Project>

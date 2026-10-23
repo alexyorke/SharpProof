@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>13.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SharpProofProfile>strict</SharpProofProfile>
+    <SharpProofVerify>true</SharpProofVerify>
+    <SharpProofVerifyResultFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/result.json</SharpProofVerifyResultFile>
+    <SharpProofVerifyRequestFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/request.json</SharpProofVerifyRequestFile>
+    <SharpProofCompilerManifestFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/compiler-manifest.json</SharpProofCompilerManifestFile>
+    <SharpProofVerifySarifFile>$(MSBuildProjectDirectory)/artifacts/sharpproof/result.sarif</SharpProofVerifySarifFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof" Version="__SHARPPROOF_VERSION__" />
+  </ItemGroup>
+</Project>

@@ -754,6 +754,9 @@ internal static partial class WorkerProtocolJson
     {
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
+        errors.Check(IsPresentationValid(value.Presentation), "response.claim_presentation");
+        errors.Check(IsDiagnosticContextValid(value.Diagnostic) &&
+            (value.Diagnostic is null || value.Outcome == WorkerClaimOutcome.Unknown), "response.claim_diagnostic");
         var claim = manifestIndexes.ClaimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         var hasTrustedBoundary = false;

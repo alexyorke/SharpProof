@@ -78,7 +78,7 @@ esac
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    nightly | fuzz-nightly | pack | pack-tool | package-reproducibility)
+    nightly | fuzz-nightly | pack | pack-tool | package-reproducibility | developer-packages)
       return 0
       ;;
     *)
@@ -112,8 +112,9 @@ assert_clean_exact_commit_source() {
   local untracked_path
   while IFS= read -r -d '' untracked_path; do
     case "${untracked_path}" in
-      nupkgs/*)
-        # Release commands receive the exact package-job artifacts here.
+      nupkgs/* | tool-nupkgs/packages.tsv | tool-nupkgs/packages.lock.json | tool-nupkgs/Test-SharpProofPublishedPackages.sh)
+        # Release commands receive the exact package-job archives and these
+        # three optional-tool identity sidecars. Other source remains forbidden.
         ;;
       *)
         echo "SharpProof ${command_name} requires clean exact-commit source; an untracked source path was found." >&2
@@ -162,7 +163,7 @@ if [[ "${source_has_git}" = "true" ]]; then
       "${task_root}/${untracked_path}"
   done < <(git -C "${repo_root}" ls-files \
     --others --exclude-standard -z --)
-  # Package jobs download nupkg/snupkg inputs under nupkgs/. Those file
+  # Package jobs download immutable archives under nupkgs/ and tool-nupkgs/. Those file
   # extensions are intentionally ignored by Git, so the general untracked
   # copy above cannot see them. Preserve only ignored package-job inputs;
   # do not broaden the snapshot to other ignored build output.
@@ -172,7 +173,7 @@ if [[ "${source_has_git}" = "true" ]]; then
       "${repo_root}/${package_path}" \
       "${task_root}/${package_path}"
   done < <(git -C "${repo_root}" ls-files \
-    --others --ignored --exclude-standard -z -- nupkgs/)
+    --others --ignored --exclude-standard -z -- nupkgs/ tool-nupkgs/)
 else
   tar \
     --exclude='./artifacts' \

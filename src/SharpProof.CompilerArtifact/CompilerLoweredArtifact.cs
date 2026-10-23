@@ -23,6 +23,8 @@ internal static partial class CompilerLoweredArtifact
         var resource = EncodeResource(preparation, cancellationToken);
         return new CompilerCallableArtifact
         {
+            Presentation = preparation.Presentation,
+            Diagnostic = preparation.Diagnostic,
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
             EffectClaims = preparation.EffectClaims,
@@ -131,6 +133,10 @@ internal static partial class CompilerLoweredArtifact
         }
         return new CompilerCallablePreparation(entry, artifact.FailureReason)
         {
+            Presentation = WorkerProtocolJson.IsPresentationValid(artifact.Presentation) ? artifact.Presentation :
+                throw new InvalidDataException("Invalid callable presentation metadata."),
+            Diagnostic = WorkerProtocolJson.IsDiagnosticContextValid(artifact.Diagnostic) ? artifact.Diagnostic :
+                throw new InvalidDataException("Invalid callable diagnostic metadata."),
             EffectClaims = DecodeEffects(artifact, claims, cancellationToken),
             Compilation = compilation,
             Total = total,

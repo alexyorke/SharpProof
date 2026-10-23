@@ -18,7 +18,8 @@ internal sealed partial class NativeResourceContractTests
         var artifact = CreateArtifact(Source($"[ResourceUpperBound(ResourceMetric.AllocatedBytes, {upper})]", body), reviewedRuntime: true, x64: true);
         var target = Read(artifact);
         Assert.That(target.Compilation.ResourceTargetPlatform, Is.EqualTo("X64"));
-        Assert.That(target.Compilation.References, Is.Empty);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(target.Compilation.References, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
         Assert.That(target.Compilation.ResourceMetadataReferences, Has.Length.EqualTo(1));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);

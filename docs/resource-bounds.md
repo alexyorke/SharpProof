@@ -716,7 +716,7 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 44 and cache schema 67 invalidate older responses without this evidence.
+Protocol 45 and cache schema 68 invalidate older responses without this evidence.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
@@ -768,7 +768,7 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 44 and cache 67 invalidate prior responses; compiler artifact 55 and
+Protocol 45 and cache 68 invalidate prior responses; compiler artifact 56 and
 resource program 8 retain their current formats. Cache and SARIF preserve the
 lower record and its declared domain.
 
@@ -905,8 +905,8 @@ heap allocations. Task stack metrics remain Unknown. Cumulative task bytes use
 declarations bind; without them, they remain Unknown.
 Normal-completion lifetime bounds use the separate
 runtime storage model described below. Task lower, tight, expected and amortized
-results remain unavailable. Protocol 44 and cache 67 identify the
-required execution scope and configured-await variant; compiler artifact 55
+results remain unavailable. Protocol 45 and cache 68 identify the
+required execution scope and configured-await variant; compiler artifact 56
 identifies the projection execution kind.
 
 ### Configured async join source work
@@ -953,8 +953,8 @@ remain unsupported. The declared model excludes framework and ambient callback
 work. Lifetime storage uses a separately bound runtime/layout model; this source
 work model does not measure elapsed time.
 
-Projection codec 3 and compiler artifact 55 carry the required execution-kind
-Boolean. Protocol 44 and cache 67 identify the configured runtime-model variant;
+Projection codec 3 and compiler artifact 56 carry the required execution-kind
+Boolean. Protocol 45 and cache 68 identify the configured runtime-model variant;
 resource program 8 and manifest 6 retain their formats.
 
 ## Compiler carrier evidence
@@ -1006,5 +1006,5 @@ refutation, lower bound, tightness or expected value is invented.
 This model does not change AllocatedBytes: that cumulative metric includes
 exceptional prefixes, while this lifetime model describes successful completion.
 Cumulative task bytes instead require the complete declared runtime-premise
-model; see [the conditional byte model](resource-task-runtime-premises.md). Protocol 44 and cache 67 preserve the distinct lifetime
+model; see [the conditional byte model](resource-task-runtime-premises.md). Protocol 45 and cache 68 preserve the distinct lifetime
 scope through validated JSON, cache and SARIF evidence.

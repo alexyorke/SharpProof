@@ -10,13 +10,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "44";
+    public const string Current = "45";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 67;
+    public const int Current = 68;
 }
 
 internal static class WorkerManifestVersions
@@ -584,6 +584,10 @@ internal sealed record WorkerCallableResult
 
 internal sealed record WorkerClaimResult
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerCallablePresentation? Presentation { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerDiagnosticContext? Diagnostic { get; init; }
     [JsonRequired]
     public string ClaimId { get; init; } = string.Empty;
     [JsonRequired]

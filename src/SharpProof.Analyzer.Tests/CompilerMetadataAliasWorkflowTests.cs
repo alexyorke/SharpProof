@@ -241,12 +241,25 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var single = await PublishAsync(source, directory, "single", [first]);
             var aliased = await PublishAsync(source, directory, "aliased", [first, second]);
             var artifact = CompilerManifestArtifactJson.Deserialize(aliased, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var original = CompilerManifestArtifactJson.Deserialize(single, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var aliasedReference = artifact.Compilation.References.Single(static reference =>
+                reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Aliases.SequenceEqual(AlternateAlias));
+            var originalReference = original.Compilation.References.Single(reference =>
+                reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Identity == aliasedReference.Identity);
+            var normalized = artifact with { Compilation = artifact.Compilation with { References = original.Compilation.References } };
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
                 Assert.That(artifact.Callables, Has.Length.EqualTo(1));
                 Assert.That(artifact.Callables.Single().Total, Is.Not.Null);
-                Assert.That(aliased, Is.EqualTo(single));
+                Assert.That(aliased, Is.Not.EqualTo(single));
+                Assert.That(artifact.Compilation.References, Has.Length.EqualTo(original.Compilation.References.Length + 1));
+                Assert.That(aliasedReference.Modules.Single().Path, Is.EqualTo(secondPath.Replace('\\', '/')));
+                Assert.That(aliasedReference.Modules.Single().Sha256, Is.EqualTo(originalReference.Modules.Single().Sha256));
+                Assert.That(artifact.Manifest.Hash, Is.EqualTo(original.Manifest.Hash));
+                Assert.That(CompilerManifestArtifactJson.Serialize(normalized, TestContext.CurrentContext.CancellationToken),
+                    Is.EqualTo(CompilerManifestArtifactJson.Serialize(original, TestContext.CurrentContext.CancellationToken)),
+                    "Only captured reference provenance changes; manifest identities, lowered callables, and the reachable graph must remain identical.");
             }
         }
         finally

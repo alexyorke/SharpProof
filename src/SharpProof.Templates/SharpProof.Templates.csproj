@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable Condition="'$(SharpProofDeveloperPackages)' == 'true'">true</IsPackable>
+    <PackageId>SharpProof.Templates</PackageId>
+    <PackageType>Template</PackageType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NuspecFile>$(IntermediateOutputPath)SharpProof.Templates.nuspec</NuspecFile>
+    <IncludeSymbols>false</IncludeSymbols>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <SharpProofProductionProject>false</SharpProofProductionProject>
+    <Description>Portable and canonical-container SharpProof starter projects.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="content/**" />
+  </ItemGroup>
+  <Target Name="PrepareSharpProofTemplates" BeforeTargets="GenerateNuspec" Condition="'$(SharpProofDeveloperPackages)' == 'true'">
+    <Exec Command="pwsh -NoLogo -NoProfile -File &quot;$(MSBuildProjectDirectory)/../../eng/scripts/Prepare-SharpProofTemplates.ps1&quot; -Destination &quot;$(IntermediateOutputPath)templates&quot; -PackageVersion &quot;$(SharpProofPackageVersion)&quot; -ConsumerImage &quot;$(SharpProofConsumerImage)&quot; -NuspecPath &quot;$(NuspecFile)&quot;" />
+  </Target>
+</Project>

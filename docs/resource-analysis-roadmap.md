@@ -116,6 +116,35 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
+### Current master integration in progress
+
+Master advanced to `70fba9efe` while the resource branch was qualifying. GitHub
+reported merge conflicts, preventing canonical PR qualification of `46602a45f`.
+The integration preserves master developer diagnostics, callable presentation,
+consumer templates and tooling, together with resource evidence and exact runtime
+assumption admission. The combined wire shape uses protocol 45, cache 68 and
+compiler artifact 56; manifest 6 and nested resource codec 13 remain unchanged.
+
+The tooling image retains the reviewed xz-utils `1ubuntu0.4` archive and checksum
+through an immutable Ubuntu snapshot. No coverage threshold or exclusion changed.
+The merged implementation is undergoing formatting, targeted regression checks,
+packaged-consumer verification and renewed exact-head hosted qualification.
+Earlier local passes remain evidence for their recorded revisions only.
+
+All three packaged-consumer scenarios passed on the merged production code:
+no-premise Unknown and both returned/configured conditional proofs. Layout and
+full script/C# formatting passed. The first selected worker run passed 1763
+cases and failed eight stale expectations: one imported version assertion and
+seven resource assertions that compilation references were omitted. Master now
+retains those snapshots for export. The corrected tests require exact round-trip
+reference preservation and retain the independent resource-metadata checks.
+
+Four new fixtures exercise branch-order symmetry for a symbolic loop with a
+zero-cost alternative, checked credit versus unchecked overflow, real emitted
+array-read helper candidates, and explicit zero runtime quantities/empty-array
+headers. They use compiler/native workflows and independent numeric controls.
+Their verification and effect on changed-TCB coverage are pending.
+
 ### Hosted integration corrections at published head 93b13694e
 
 Documentation and toolchain security passed. Hosted project tests exposed two

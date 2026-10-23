@@ -704,9 +704,11 @@ internal sealed partial class NativeResourceContractTests
     public async Task ReviewedMetadataCostsRequireDeclaredOwnedReferenceEvidence(string method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
-            $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true));
-        Assert.That(preparation.Compilation.References, Is.Empty);
+        var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
+            $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true);
+        var preparation = Read(artifact);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(preparation.Compilation.References, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
         Assert.That(preparation.Compilation.ResourceMetadataReferences, Has.Length.EqualTo(1));
         Assert.That(preparation.Compilation.ResourceMetadataReferences[0].Identity, Is.EqualTo(preparation.ResourceProgram!.Children.Single().Metadata!.AssemblyIdentity));
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();

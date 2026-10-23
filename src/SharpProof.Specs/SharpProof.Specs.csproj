@@ -25,4 +25,8 @@
              Link="Polyfills\EmbeddedAttribute.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Tool" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+  </ItemGroup>
 </Project>

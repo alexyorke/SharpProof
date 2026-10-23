@@ -53,7 +53,7 @@ public sealed class ProjectDagTests
             new("SharpProof.Logging", []),
             new("SharpProof.Smt", ["SharpProof.Verify"]),
             new("SharpProof.Specs", ["SharpProof.Ir"]),
-            new("SharpProof.Tool", ["SharpProof.Worker.Protocol"]),
+            new("SharpProof.Reporting", ["SharpProof.Worker.Protocol"]), new("SharpProof.Tool", ["SharpProof.Worker.Protocol", "SharpProof.Reporting", "SharpProof.CompilerArtifact", "SharpProof.Specs", "SharpProof.Frontend"]),
             new("SharpProof.Verify", ["SharpProof.Ir"]),
             new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
@@ -70,7 +70,7 @@ public sealed class ProjectDagTests
         ImmutableHashSet.CreateRange<string>(StringComparer.Ordinal,
         [
             "SharpProof.CompilerProbe.TestAsset",
-            "SharpProof.Package",
+            "SharpProof.Package", "SharpProof.Templates",
             "SharpProof.Smoke.Net472",
             "SharpProof.Testing",
             "SharpProof.Verifier",
