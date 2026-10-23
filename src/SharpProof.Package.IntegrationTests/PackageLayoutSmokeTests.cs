@@ -3772,7 +3772,7 @@ public sealed class PackageLayoutSmokeTests
         using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
         var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
         JsonAssert.Equal(claim, "outcome", "Unknown");
-        JsonAssert.Equal(claim.GetProperty("resourceBound"), "unknownReason", "ForkJoinResourceMetricUnsupported");
+        JsonAssert.Equal(claim.GetProperty("resourceBound"), "unknownReason", "TaskRuntimeFaultFrameCompositionUnproved");
         Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
     }
 
