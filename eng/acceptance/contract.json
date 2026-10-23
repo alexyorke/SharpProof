@@ -461,6 +461,7 @@
           "src/SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
           "src/SharpProof.Worker/Launcher/LauncherProjections.cs",
           "src/SharpProof.Worker/Launcher/LauncherResultPresentation.cs",
+          "src/SharpProof.Worker/Launcher/WorkerDeveloperPresentation.cs",
           "src/SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
