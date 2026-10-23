@@ -156,9 +156,42 @@ try {
         throw 'Native initialization did not replace the existing protected project.'
     }
     $afterAcl = Get-Acl -LiteralPath $project
+    $afterDacl = $afterAcl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
+    $afterOwner = $afterAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value
     if (-not $afterAcl.AreAccessRulesProtected -or
-        $afterAcl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access) -cne $beforeDacl -or
-        $afterAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value -cne $beforeOwner) {
+        $afterDacl -cne $beforeDacl -or $afterOwner -cne $beforeOwner) {
+        # Keep the preservation requirements exact. These bounded descriptors
+        # identify owner, control-flag, or ACE drift without printing account
+        # names, consumer paths, package contents, or inherited environment.
+        $diagnostic = [ordered]@{
+            case        = 'existing-protected-project'
+            expected    = [ordered]@{
+                protected      = [bool]$beforeAcl.AreAccessRulesProtected
+                ownerSid       = $beforeOwner
+                daclSddl       = $beforeDacl.Substring(0, [Math]::Min(2048, $beforeDacl.Length))
+                daclSddlLength = $beforeDacl.Length
+                daclSha256     = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($beforeDacl))).ToLowerInvariant()
+            }
+            actual      = [ordered]@{
+                protected      = [bool]$afterAcl.AreAccessRulesProtected
+                ownerSid       = $afterOwner
+                daclSddl       = $afterDacl.Substring(0, [Math]::Min(2048, $afterDacl.Length))
+                daclSddlLength = $afterDacl.Length
+                daclSha256     = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($afterDacl))).ToLowerInvariant()
+            }
+            comparison  = [ordered]@{
+                protectionPreserved = $afterAcl.AreAccessRulesProtected -eq $beforeAcl.AreAccessRulesProtected
+                daclPreserved       = $afterDacl -ceq $beforeDacl
+                ownerPreserved      = $afterOwner -ceq $beforeOwner
+            }
+            initializer = [ordered]@{
+                exitCode           = $initialization.exitCode
+                projectChanged     = [bool]$projectChanges[0].changed
+                projectWritten     = [bool]$projectChanges[0].written
+                generatedFileCount = @($initialization.generatedFiles).Count
+            }
+        }
+        Write-Host ('Native Windows security mismatch: ' + ($diagnostic | ConvertTo-Json -Depth 5 -Compress))
         throw 'Native initialization failed to preserve the protected project DACL and owner.'
     }
     [xml]$projectXml = Get-Content -LiteralPath $project -Raw

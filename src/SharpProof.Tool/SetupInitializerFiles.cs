@@ -118,7 +118,8 @@ internal sealed class SetupInitializerFiles
         ArgumentException.ThrowIfNullOrEmpty(target);
         if (OperatingSystem.IsWindows() && _observed[target] != null)
         {
-            var security = new FileInfo(target).GetAccessControl(AccessControlSections.Access);
+            // ReplaceFile preserves the DACL, but the staged file must already have the original owner.
+            var security = new FileInfo(target).GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);
             return new FileInfo(temporary).Create(FileMode.CreateNew, FileSystemRights.FullControl, FileShare.None, 4096,
                 FileOptions.Asynchronous, security);
         }

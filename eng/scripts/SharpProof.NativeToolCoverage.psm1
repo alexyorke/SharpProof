@@ -376,7 +376,7 @@ function Import-SharpProofNativeToolCoverage {
     $daclPath = 'src/SharpProof.Tool/SetupInitializerFiles.cs'
     Assert-NativeToolCondition ($documents.ContainsKey($daclPath) -and $positive.ContainsKey($daclPath)) 'native report did not execute initializer DACL source.'
     $sourceLines = [IO.File]::ReadAllLines((Resolve-NativeToolFile $RepositoryRoot $daclPath))
-    foreach ($pattern in @('GetAccessControl(AccessControlSections.Access)', 'return new FileInfo(temporary).Create(')) {
+    foreach ($pattern in @('var security = new FileInfo(target).GetAccessControl(', 'return new FileInfo(temporary).Create(')) {
         $positions = @(for ($index = 0; $index -lt $sourceLines.Length; $index++) { if ($sourceLines[$index].Contains($pattern, [StringComparison]::Ordinal)) { $index + 1 } })
         Assert-NativeToolCondition ($positions.Count -eq 1) 'native DACL source contract is ambiguous or missing.'
         $statement = [int]$positions[0]

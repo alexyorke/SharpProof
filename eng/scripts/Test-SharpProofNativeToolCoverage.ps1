@@ -100,7 +100,7 @@ try {
     # This synthetic PE/PDB tests byte and symbol authentication. It does not
     # claim Windows execution; only the real Windows job supplies that evidence.
     $source = @(
-        'public enum AccessControlSections { Access }',
+        'public enum AccessControlSections { Access = 2, Owner = 4 }',
         'public sealed class FileInfo {',
         ' public FileInfo(string path) { }',
         ' public int GetAccessControl(AccessControlSections section) { return 1; }',
@@ -108,7 +108,7 @@ try {
         '}',
         'public static class Fixture {',
         ' public static int Run(string target, string temporary) {',
-        '  var security = new FileInfo(target).GetAccessControl(AccessControlSections.Access);',
+        '  var security = new FileInfo(target).GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);',
         '  return new FileInfo(temporary).Create();',
         ' }',
         '}'
