@@ -3,7 +3,9 @@ param(
     [ValidateSet('Representative', 'Full')][string]$Scope = 'Representative',
     [string]$OutputDirectory = 'artifacts/reproducibility',
     [ValidateRange(60, 7200)][int]$CommandTimeoutSeconds = 2100,
-    [switch]$RequirePackageBytes
+    [switch]$RequirePackageBytes,
+    [switch]$IncludeDeveloperPackages,
+    [string]$DeveloperConsumerImage = ''
 )
 
 Set-StrictMode -Version Latest
@@ -13,6 +15,10 @@ Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Fo
 Assert-SharpProofContainer 'Run independent reproducibility builds in the canonical Linux amd64 container.'
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::X64) { throw 'Reproducibility qualification requires Linux amd64.' }
 if ($RequirePackageBytes -and $Scope -ne 'Full') { throw '-RequirePackageBytes requires -Scope Full.' }
+if ($IncludeDeveloperPackages -and ($Scope -ne 'Full' -or $DeveloperConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$')) {
+    throw 'Optional package reproduction requires Full scope and an explicit fixture consumer-image digest.'
+}
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $commit = (& git -C $repository rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Cannot identify the exact source commit.' }
@@ -27,15 +33,23 @@ $temporary = Join-Path $parent ('sharpproof-repro-' + [guid]::NewGuid().ToString
 [IO.Directory]::CreateDirectory($temporary) | Out-Null
 $clones = [Collections.Immutable.ImmutableArray]::Create[string]((Join-Path $temporary 'a'), (Join-Path $temporary 'independent longer path/checkout-b'))
 $sdk = [string](Get-Content (Join-Path $repository 'global.json') -Raw | ConvertFrom-Json).sdk.version
+[xml]$versions = Get-Content -LiteralPath (Join-Path $repository 'eng/Versions.props') -Raw
+$packageVersion = ([string]$versions.Project.PropertyGroup.SharpProofPackageVersion).Replace('$(SharpProofVersionPrefix)', [string]$versions.Project.PropertyGroup.SharpProofVersionPrefix)
 $report = [ordered]@{
     schemaVersion = 1; sourceCommit = $commit; scope = $Scope; sdkVersion = $sdk
     configuration = 'Release'; continuousIntegrationBuild = $true
-    origin                 = 'https://github.com/alexyorke/SharpProof.git'
-    toolchainCatalogSha256 = (Get-FileHash (Join-Path $repository 'eng/container/toolchain.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+    origin                      = 'https://github.com/alexyorke/SharpProof.git'
+    toolchainCatalogSha256      = (Get-FileHash (Join-Path $repository 'eng/container/toolchain.json') -Algorithm SHA256).Hash.ToLowerInvariant()
     workspacePaths = $clones; managedPayloadsEqual = $false; managedPayloadCount = 0
     packageBytesEqual = $null; archiveComparisons = [Collections.Immutable.ImmutableArray[object]]::Empty; payloadMismatches = [Collections.Immutable.ImmutableArray[string]]::Empty; runs = [Collections.Immutable.ImmutableArray[object]]::Empty
-    packageScope           = 'SDK 10 archive container bytes are measured separately; managed payload equality does not imply ZIP equality.'
-    nativeInputs           = [Collections.Immutable.ImmutableArray[object]]::Empty
+    packageScope                = 'SDK 10 archive container bytes are measured separately; managed payload equality does not imply ZIP equality.'
+    nativeInputs                = [Collections.Immutable.ImmutableArray[object]]::Empty
+    developerPackagesIncluded   = [bool]$IncludeDeveloperPackages
+    developerConsumerImage      = if ($IncludeDeveloperPackages) { $DeveloperConsumerImage } else { $null }
+    developerPayloadsEqual = $null; developerPayloadCount = 0; developerPackageBytesEqual = $null
+    developerPayloadMismatches  = [Collections.Immutable.ImmutableArray[string]]::Empty
+    developerArchiveComparisons = [Collections.Immutable.ImmutableArray[object]]::Empty
+    developerScope              = 'Separate optional Tool, CodeFixes, and Templates product payloads including nuspecs and dependencies; SDK ZIP relationship/core-property metadata excluded from payload comparison. Raw archive hashes are reported separately. The explicit image digest is a fixture serialization input, never published-image authority.'
 }
 
 function Get-NativeInputReceipt {
@@ -149,6 +163,7 @@ try {
     $report.nativeInputs = Get-NativeInputReceipt
     if ($report.nativeInputs.Length -eq 0) { throw 'The canonical native payload input set is empty.' }
     $runs = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $developerRuns = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
     for ($index = 0; $index -lt 2; $index++) {
         $clone = $clones[$index]
         [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($clone)) | Out-Null
@@ -165,6 +180,17 @@ try {
                         (Join-Path $clone 'eng/scripts/Invoke-SharpProofContainer.ps1'), '-Command', 'pack', '-Configuration', 'Release'))) $clone "run-$index-full-pack"
             $packed = Get-PackedPayloads $clone
             $runs.Add(([ordered]@{ payloads = $packed.Payloads; archives = $packed.Archives }).AsReadOnly())
+            if ($IncludeDeveloperPackages) {
+                $developerFeed = Join-Path $clone 'artifacts/developer-reproduction-packages'
+                foreach ($name in @('Tool', 'CodeFixes', 'Templates')) {
+                    $developerArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                            'pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release', '--no-build', '--no-restore',
+                            '-o', $developerFeed, '-p:ContinuousIntegrationBuild=true', '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true',
+                            "-p:RepositoryCommit=$commit", "-p:SourceRevisionId=$commit", "-p:SharpProofConsumerImage=$DeveloperConsumerImage"))
+                    $null = Invoke-ReproCommand dotnet $developerArguments $clone "run-$index-developer-$name-pack"
+                }
+                $developerRuns.Add((Get-SharpProofDeveloperPackageSnapshot -PackageSource $developerFeed -PackageVersion $packageVersion -RepositoryCommit $commit))
+            }
         }
         else {
             foreach ($project in @('src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj',
@@ -211,6 +237,14 @@ try {
         $report.archiveComparisons = $comparisonBuilder.ToImmutable()
         $report.packageBytesEqual = $unequalCount -eq 0
     }
+    if ($IncludeDeveloperPackages) {
+        $developerComparison = Compare-SharpProofDeveloperPackageSnapshots -First $developerRuns[0] -Second $developerRuns[1]
+        $report.developerPayloadsEqual = $developerComparison.PayloadsEqual
+        $report.developerPayloadCount = $developerComparison.PayloadCount
+        $report.developerPayloadMismatches = $developerComparison.PayloadMismatches
+        $report.developerPackageBytesEqual = $developerComparison.PackageBytesEqual
+        $report.developerArchiveComparisons = $developerComparison.ArchiveComparisons
+    }
     $sourceHead = (& git -C $repository rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $sourceHead -cne $commit) { throw 'The source checkout changed during the reproduction experiment.' }
     $nativeInputJson = $report.nativeInputs | ConvertTo-Json -Depth 4 -Compress
@@ -218,7 +252,14 @@ try {
     if ($nativeInputJson -cne ($currentNativeInputs | ConvertTo-Json -Depth 4 -Compress)) { throw 'The native payload inputs changed during the reproduction experiment.' }
     if (-not $report.managedPayloadsEqual) { throw "Managed payload byte identity failed for $($mismatches.Count) entries; first differences: $(($mismatches | Select-Object -First 10) -join ', ')." }
     if ($RequirePackageBytes -and -not $report.packageBytesEqual) { throw 'Managed payloads match, but raw package ZIP bytes differ. The SDK 10 container result must not be called byte-reproducible.' }
+    if ($IncludeDeveloperPackages -and -not $report.developerPayloadsEqual) {
+        throw "Optional package payload byte identity failed for $($report.developerPayloadMismatches.Length) entries; first differences: $(($report.developerPayloadMismatches | Select-Object -First 10) -join ', ')."
+    }
+    if ($RequirePackageBytes -and $IncludeDeveloperPackages -and -not $report.developerPackageBytesEqual) {
+        throw 'Optional product payloads match, but raw optional package ZIP bytes differ.'
+    }
     Write-Host "Independent path reproduction passed: $($keys.Length) managed DLL/PDB entries; scope=$Scope; raw package ZIP equality=$($report.packageBytesEqual)."
+    if ($IncludeDeveloperPackages) { Write-Host "Optional package reproduction: $($report.developerPayloadCount) product payloads; raw package ZIP equality=$($report.developerPackageBytesEqual); fixture image only." }
 }
 finally {
     $reportSnapshot = $report.AsReadOnly()

@@ -754,6 +754,9 @@ internal static partial class WorkerProtocolJson
     {
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
+        errors.Check(IsPresentationValid(value.Presentation), "response.claim_presentation");
+        errors.Check(IsDiagnosticContextValid(value.Diagnostic) &&
+            (value.Diagnostic is null || value.Outcome == WorkerClaimOutcome.Unknown), "response.claim_diagnostic");
         var claim = manifestIndexes.ClaimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         var hasTrustedBoundary = false;
@@ -831,7 +834,8 @@ internal static partial class WorkerProtocolJson
         if (value.Outcome == WorkerClaimOutcome.Proven && value.Vacuity == WorkerVacuityKind.None
             ? !HasValidResourceAsymptotic(evidence.Asymptotic) || !HasValidResourceLowerAsymptotic(evidence.Asymptotic?.Lower, evidence.Asymptotic) : evidence.Asymptotic is not null)
         { return false; }
-        if (!HasValidResourceMetadata(claim!, value, evidence) || !HasValidResourceScope(value, evidence))
+        if (!HasValidResourceMetadata(claim!, value, evidence) || !HasValidResourceScope(value, evidence) ||
+            !HasValidTaskRuntimePremises(claim!, value, evidence))
         { return false; }
         if (!HasValidResourceExpected(value, evidence.Expected))
         { return false; }
@@ -870,6 +874,15 @@ internal static partial class WorkerProtocolJson
         { return evidence.Metric == WorkerResourceMetric.LoopBodyEntries && evidence.MetadataAssumptions.Length == 1 && storage.Length == 0 && tokens.Length == 2; }
         if (evidence.ExecutionScope == WorkerResourceModels.TaskSourceAllocationScope)
         { return evidence.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements && evidence.MetadataAssumptions.Length == 1 && storage.Length == 0 && tokens.Length == 2; }
+        if (evidence.ExecutionScope == WorkerResourceModels.TaskRuntimeScope)
+        {
+            var runtimeLayouts = evidence.MetadataAssumptions.Where(static dependency => dependency is not null &&
+                dependency.RuntimeModel == WorkerResourceModels.AllocationLayout).ToArray();
+            return evidence.Metric == WorkerResourceMetric.AllocatedBytes && evidence.MetadataAssumptions.Length == 2 &&
+                storage.Length == 0 && runtimeLayouts.Length == 1 && tokens.Length == 4 &&
+                OneTaskToken(tokens, "resource-task-runtime-model:", WorkerResourceModels.TaskRuntimeCostModel) &&
+                OneTaskToken(tokens, "resource-task-compiler-carriers:", WorkerResourceModels.TaskCompilerCarrierModel);
+        }
         if (evidence.ExecutionScope != WorkerResourceModels.TaskStorageScope ||
             evidence.Metric is not (WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes) ||
             evidence.MetadataAssumptions.Length != 3 || storage.Length != 1 || tokens.Length != 4 ||

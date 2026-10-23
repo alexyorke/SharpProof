@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 55;
+    internal const int Current = 56;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -55,6 +55,8 @@ internal sealed record CompilerCallablePreparation(
 )
 {
     internal bool IsSuccess => FailureReason == WorkerClaimReason.None;
+    internal WorkerDiagnosticContext? Diagnostic { get; init; }
+    internal WorkerCallablePresentation? Presentation { get; init; }
     internal ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     internal CompilerCompilationSnapshot Compilation { get; init; } = new();
     internal CompilerTotalCallablePreparation? Total { get; init; }
@@ -204,6 +206,10 @@ internal sealed record CompilerSpecificationPackConfiguration
 
 internal sealed record CompilerCallableArtifact
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerCallablePresentation? Presentation { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerDiagnosticContext? Diagnostic { get; init; }
     public string CallableId { get; init; } = string.Empty;
     public WorkerClaimReason FailureReason { get; init; }
     [JsonConverter(typeof(PortableIrArrayJsonConverter))]

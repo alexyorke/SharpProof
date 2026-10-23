@@ -1051,7 +1051,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 artifact.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(artifact.ProtocolVersion, Is.EqualTo("43"));
+            Assert.That(artifact.ProtocolVersion, Is.EqualTo(WorkerProtocolVersions.Current));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
             Assert.That(
                 artifact.MaximumExpressionDepth,
@@ -1117,10 +1117,24 @@ public sealed class FinalCompilationCollectorTests
                 Has.All.Matches<CompilerManifestArtifact>(artifact =>
                     artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (artifact.CompilerDiagnostics.Any(diagnostic =>
                         diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS0168")))));
-            Assert.That(Digest(warningLevel), Is.EqualTo(Digest(baseline)));
-            Assert.That(ImmutableArray.Create(generalError, specificError, providerError).Select(Digest),
-                Has.All.EqualTo(Digest(generalError)));
+            Assert.That(warningLevel.Compilation.Options.WarningLevel, Is.Zero);
+            Assert.That(generalError.Compilation.Options.GeneralDiagnosticOption, Is.EqualTo(CompilerReportDiagnostic.Error));
+            Assert.That(specificError.Compilation.Options.SpecificDiagnosticOptions,
+                Has.Some.Matches<CompilerDiagnosticOptionSnapshot>(option => option is null ? throw new ArgumentNullException(nameof(option)) :
+                    option.Id == "CS0168" && option.ReportDiagnostic == CompilerReportDiagnostic.Error));
+            Assert.That(Digest(warningLevel), Is.Not.EqualTo(Digest(baseline)));
+            Assert.That(ImmutableArray.Create(generalError, specificError, providerError).Select(Digest).Distinct().Count(), Is.EqualTo(3));
             Assert.That(Digest(generalError), Is.Not.EqualTo(Digest(baseline)));
+            Assert.That(Digest(warningLevel with { Compilation = warningLevel.Compilation with { Options = baseline.Compilation.Options } }),
+                Is.EqualTo(Digest(baseline)),
+                "Changing warning level without realized errors changes captured options while preserving all semantic evidence.");
+            Assert.That(ImmutableArray.Create(specificError, providerError).Select(artifact =>
+                artifact is null ? throw new ArgumentNullException(nameof(artifact)) :
+                    Digest(artifact with { Compilation = artifact.Compilation with { Options = generalError.Compilation.Options } })),
+                Has.All.EqualTo(Digest(generalError)),
+                "Equivalent realized errors preserve manifest identities, failed callables, diagnostics, and reachable graphs despite different diagnostic policies.");
+            Assert.That(ImmutableArray.Create(warningLevel, generalError, specificError, providerError).Select(artifact =>
+                artifact is null ? throw new ArgumentNullException(nameof(artifact)) : artifact.Manifest.Hash), Has.All.EqualTo(baseline.Manifest.Hash));
             Assert.That(
                 providerError.Callables.Single().FailureReason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedCallable));

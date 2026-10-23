@@ -65,6 +65,157 @@ Conditions and expressions are preserved. See the authored guides for interpreta
 <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.json'))</SharpProofCompilerManifestFile>
 ```
 
+## src/SharpProof.Attributes/ResourceTaskDeploymentAttribute.cs
+
+[Source](../../src/SharpProof.Attributes/ResourceTaskDeploymentAttribute.cs)
+
+```text
+namespace SharpProof.Attributes;
+
+/// <summary>Identifies a declared deployment profile for conditional task resource proofs.</summary>
+public enum ResourceTaskDeploymentProfile
+{
+    /// <summary>No deployment profile; this value cannot declare a premise.</summary>
+    Unspecified = 0,
+    /// <summary>Stock CoreCLR 8.0.32 on Linux x64 using ordinary JIT execution at every tier.</summary>
+    /// <remarks>
+    /// Declares stock unmodified helper bindings, the unchanged emitted module, the default scheduler,
+    /// default or suppressed execution context, invariant culture, stock embedded resources, and a closed
+    /// non-dynamic, non-collectible loader. Excludes ReadyToRun, NativeAOT, external callbacks and instrumentation.
+    /// Task and holder lifecycles are closed, without external mutation, external re-registration or external resurrection.
+    /// Internal stock task, holder and loader retries remain included in the declared runtime budgets.
+    /// The compiler records this deployment assertion; it does not inspect the deployed runtime.
+    /// </remarks>
+    CoreClr8032LinuxX64OrdinaryJitStockClosed = 1
+}
+
+/// <summary>Declares the deployment identity required by conditional task runtime bounds.</summary>
+/// <remarks>
+/// Applies only to the annotated root method. All required runtime quantities must also be declared.
+/// The deployment manifest digest identifies the caller's evidence; it does not prove compatibility.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+public sealed class ResourceTaskDeploymentAttribute : Attribute
+{
+    /// <summary>Creates an explicit deployment premise.</summary>
+    /// <param name="profile">The supported closed deployment profile.</param>
+    /// <param name="deploymentManifestSha256">The 64 hexadecimal digits of the deployment manifest SHA-256.</param>
+    /// <param name="evidence">A nonempty printable reference or explanation supporting the declaration.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The deployment profile is unsupported.</exception>
+    /// <exception cref="ArgumentException">The digest or evidence is malformed.</exception>
+    public ResourceTaskDeploymentAttribute(ResourceTaskDeploymentProfile profile, string deploymentManifestSha256, string evidence)
+    {
+        if (profile != ResourceTaskDeploymentProfile.CoreClr8032LinuxX64OrdinaryJitStockClosed)
+        { throw new ArgumentOutOfRangeException(nameof(profile)); }
+        if (deploymentManifestSha256 is null)
+        { throw new ArgumentNullException(nameof(deploymentManifestSha256)); }
+        if (deploymentManifestSha256.Length != 64 || deploymentManifestSha256.Any(static character =>
+            character is not (>= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F')))
+        { throw new ArgumentException("A deployment manifest SHA-256 is required.", nameof(deploymentManifestSha256)); }
+        if (string.IsNullOrWhiteSpace(evidence) || evidence.Length > 1024 || evidence.Any(static character => char.IsControl(character)))
+        { throw new ArgumentException("Printable deployment evidence is required.", nameof(evidence)); }
+        Profile = profile;
+        DeploymentManifestSha256 = new string(deploymentManifestSha256.Select(static character =>
+            character is >= 'A' and <= 'F' ? (char)(character + ('a' - 'A')) : character).ToArray());
+        Evidence = evidence;
+    }
+
+    /// <summary>Gets the declared deployment profile.</summary>
+    /// <value>The closed deployment profile.</value>
+    public ResourceTaskDeploymentProfile Profile { get; }
+    /// <summary>Gets the canonical lowercase deployment manifest digest.</summary>
+    /// <value>The deployment manifest SHA-256.</value>
+    public string DeploymentManifestSha256 { get; }
+    /// <summary>Gets the caller's deployment evidence reference.</summary>
+    /// <value>The printable deployment evidence.</value>
+    public string Evidence { get; }
+}
+```
+
+## src/SharpProof.Attributes/ResourceTaskRuntimeUpperBoundAttribute.cs
+
+[Source](../../src/SharpProof.Attributes/ResourceTaskRuntimeUpperBoundAttribute.cs)
+
+```text
+namespace SharpProof.Attributes;
+
+/// <summary>Identifies a caller-supplied runtime quantity with fixed units and scope.</summary>
+/// <remarks>
+/// Fault episodes are outermost entries, including processing existing exceptions, rethrow, dispatch
+/// capture/restore, recording and notifications. All nested construction, trace and referent work belongs to
+/// that episode; re-entry after exit starts another episode. Allocation attempts include failed,
+/// abandoned, losing and retried candidates. No quantity has an inferred or default value.
+/// </remarks>
+public enum ResourceTaskRuntimeQuantity
+{
+    /// <summary>No quantity; this value cannot declare a bound.</summary>
+    Unspecified = 0,
+    /// <summary>Raw trace array allocation attempts per fault episode, including affinity, restore and dispatch copies.</summary>
+    RawTraceArrayAttemptsPerFaultEpisode = 1,
+    /// <summary>Payload bytes per raw trace array allocation attempt, before modeled header and alignment.</summary>
+    RawTracePayloadBytesPerArrayAttempt = 2,
+    /// <summary>Resolver array allocation attempts per fault episode, including affinity, restore and dispatch copies.</summary>
+    ResolverArrayAttemptsPerFaultEpisode = 3,
+    /// <summary>Reference slots per resolver array allocation attempt.</summary>
+    ResolverSlotsPerArrayAttempt = 4,
+    /// <summary>Cumulative managed instance bytes for transitive fault construction, messages and replacement retries per episode.</summary>
+    FaultConstructionBytesPerFaultEpisode = 5,
+    /// <summary>Cumulative managed instance bytes for fresh loader/resolver referents and losing candidates per fault episode.</summary>
+    ResolverReferentBytesPerFaultEpisode = 6,
+    /// <summary>Cumulative managed instance bytes for remaining transitive scheduler, queue and worker lifecycle per child start attempt, including builder, recording, notification and later internal finalization.</summary>
+    SchedulingBytesPerChildStartAttempt = 7,
+    /// <summary>Cumulative managed instance bytes for remaining transitive runtime join lifecycle per attempt, including builder, recording, notification and later internal finalization.</summary>
+    JoinBytesPerJoinAttempt = 8,
+    /// <summary>Cumulative managed instance bytes for remaining transitive runtime await lifecycle, including builder, recording, notification and later internal finalization.</summary>
+    AwaitBytesPerConfiguredAwait = 9,
+    /// <summary>Cumulative managed instance bytes for all causally reached transitive cold initialization and retries per root invocation.</summary>
+    InitializationBytesPerInvocation = 10,
+    /// <summary>Total outermost source, helper, runtime, scheduler, initialization and existing-exception processing episodes per root invocation.</summary>
+    TotalFaultEpisodesPerInvocation = 11
+}
+
+/// <summary>Declares one immutable quantitative runtime premise for the annotated root method.</summary>
+/// <remarks>
+/// All eleven quantities and one deployment declaration are required. Fixed compiler/source allocation
+/// sites are derived independently and excluded from runtime domains. Classification of remaining allocation
+/// gives initialization precedence, then trace arrays, resolver referents, fault construction,
+/// and remaining control work. Source callback allocation is derived independently.
+/// These are reported assumptions, not measurements or compiler-established runtime facts.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = false)]
+public sealed class ResourceTaskRuntimeUpperBoundAttribute : Attribute
+{
+    /// <summary>Creates an explicit upper bound in the quantity's fixed units and scope.</summary>
+    /// <param name="quantity">The runtime quantity to bound.</param>
+    /// <param name="upperBound">The caller-provided nonnegative upper bound.</param>
+    /// <param name="evidence">A nonempty printable reference or explanation supporting the declaration.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The quantity is unsupported or the value is negative.</exception>
+    /// <exception cref="ArgumentException">The evidence is malformed.</exception>
+    public ResourceTaskRuntimeUpperBoundAttribute(ResourceTaskRuntimeQuantity quantity, long upperBound, string evidence)
+    {
+        if (quantity == ResourceTaskRuntimeQuantity.Unspecified || !Enum.IsDefined(typeof(ResourceTaskRuntimeQuantity), quantity))
+        { throw new ArgumentOutOfRangeException(nameof(quantity)); }
+        if (upperBound < 0)
+        { throw new ArgumentOutOfRangeException(nameof(upperBound)); }
+        if (string.IsNullOrWhiteSpace(evidence) || evidence.Length > 1024 || evidence.Any(static character => char.IsControl(character)))
+        { throw new ArgumentException("Printable runtime quantity evidence is required.", nameof(evidence)); }
+        Quantity = quantity;
+        UpperBound = upperBound;
+        Evidence = evidence;
+    }
+
+    /// <summary>Gets the declared runtime quantity.</summary>
+    /// <value>The quantity with fixed units and scope.</value>
+    public ResourceTaskRuntimeQuantity Quantity { get; }
+    /// <summary>Gets the caller-provided upper bound.</summary>
+    /// <value>The nonnegative upper bound.</value>
+    public long UpperBound { get; }
+    /// <summary>Gets the caller's supporting evidence reference.</summary>
+    /// <value>The printable runtime quantity evidence.</value>
+    public string Evidence { get; }
+}
+```
+
 ## src/SharpProof.Attributes/ResourceUpperBoundAttribute.cs
 
 [Source](../../src/SharpProof.Attributes/ResourceUpperBoundAttribute.cs)
@@ -303,7 +454,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -930,6 +1081,32 @@ SharpProof.Attributes.ResourceMetric.RetainedBytes = 6 -> SharpProof.Attributes.
 SharpProof.Attributes.ResourceMetric.SourceActivationDepth = 7 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.SourceStackBytes = 8 -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceMetric.Unspecified = 0 -> SharpProof.Attributes.ResourceMetric
+SharpProof.Attributes.ResourceTaskDeploymentAttribute
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.DeploymentManifestSha256.get -> string!
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.Evidence.get -> string!
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.Profile.get -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentAttribute.ResourceTaskDeploymentAttribute(SharpProof.Attributes.ResourceTaskDeploymentProfile profile, string! deploymentManifestSha256, string! evidence) -> void
+SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentProfile.CoreClr8032LinuxX64OrdinaryJitStockClosed = 1 -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskDeploymentProfile.Unspecified = 0 -> SharpProof.Attributes.ResourceTaskDeploymentProfile
+SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.AwaitBytesPerConfiguredAwait = 9 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.FaultConstructionBytesPerFaultEpisode = 5 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.InitializationBytesPerInvocation = 10 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.JoinBytesPerJoinAttempt = 8 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.RawTraceArrayAttemptsPerFaultEpisode = 1 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.RawTracePayloadBytesPerArrayAttempt = 2 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverArrayAttemptsPerFaultEpisode = 3 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverReferentBytesPerFaultEpisode = 6 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.ResolverSlotsPerArrayAttempt = 4 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.SchedulingBytesPerChildStartAttempt = 7 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.TotalFaultEpisodesPerInvocation = 11 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeQuantity.Unspecified = 0 -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.Evidence.get -> string!
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.Quantity.get -> SharpProof.Attributes.ResourceTaskRuntimeQuantity
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.ResourceTaskRuntimeUpperBoundAttribute(SharpProof.Attributes.ResourceTaskRuntimeQuantity quantity, long upperBound, string! evidence) -> void
+SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute.UpperBound.get -> long
 SharpProof.Attributes.ResourceUpperBoundAttribute
 SharpProof.Attributes.ResourceUpperBoundAttribute.Coefficient.get -> long
 SharpProof.Attributes.ResourceUpperBoundAttribute.Constant.get -> long

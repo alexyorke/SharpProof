@@ -23,12 +23,16 @@ internal static class CompilerTotalCallableLowerer
         {
             // An owned scalar entry for resource projection only. This does not
             // admit an async functional body or bypass any source contract.
+            var runtimeAssumptions = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+                target.Entry.CallableId, target.Entry.Assumptions, cancellationToken);
             if (ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) is not { ConfiguredAwait: true } ||
                 !target.Claims.IsEmpty || target.EffectClaims.IsEmpty ||
                 target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
                     !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
-                target.Entry.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary))
+                runtimeAssumptions is null ||
+                target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary &&
+                    !(assumption.Kind == WorkerAssumptionKind.UserAssume && runtimeAssumptions.Contains(assumption.Id))))
             { return null; }
             return new(target.Entry.CallableId, context.Factory,
                 [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
@@ -51,7 +55,7 @@ internal static class CompilerTotalCallableLowerer
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
         ManifestCallableTarget target, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
         ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Action<WorkerDiagnosticContext>? reportDiagnostic = null)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
@@ -87,7 +91,10 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToImmutableArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
-        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) :
+            assumption.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(assumption.Id)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
             binding.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) != assumptions.Length)
         { return null; }
@@ -116,6 +123,17 @@ internal static class CompilerTotalCallableLowerer
         if (lowering == null)
         { return null; }
         cancellationToken.ThrowIfCancellationRequested();
+        if (reportDiagnostic != null && !lowering.Abstentions.IsDefaultOrEmpty)
+        {
+            var abstention = lowering.Abstentions[0];
+            var source = context.Factory.GetOperationInfo(abstention.Operation).SourceSpan;
+            var tree = source == null ? null : documents.FirstOrDefault(pair => pair.Value == source.Document).Key;
+            if (source != null && tree != null)
+            {
+                var location = Location.Create(tree, new Microsoft.CodeAnalysis.Text.TextSpan(source.Start, source.Length));
+                reportDiagnostic(new WorkerDiagnosticContext { Code = abstention.Reason.ToString(), Location = CompilerSourceLocationProjection.Create(location) });
+            }
+        }
         var program = lowering.Program;
         var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)

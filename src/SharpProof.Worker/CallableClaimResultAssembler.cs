@@ -34,7 +34,7 @@ internal static class CallableClaimResultAssembler
         switch (check.Evidence.Outcome)
         {
             case ProvenOutcome:
-                record = record with { Outcome = WorkerClaimOutcome.Proven };
+                record = record with { Outcome = WorkerClaimOutcome.Proven, Diagnostic = null };
                 record = record with { Reason = WorkerClaimReason.None };
                 record = record with { Vacuity = check.Vacuity };
                 record = record with { ProofCore = [.. check.Evidence.Core.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] };
@@ -46,7 +46,7 @@ internal static class CallableClaimResultAssembler
                     total.Parameters.Any(parameter => !check.Evidence.EntryModel.TryGetValue(parameter.Entry, out var value) ||
                         value.Type != total.Program.Factory.GetVariableInfo(parameter.Entry).Type))
                 { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; break; }
-                record = record with { Outcome = WorkerClaimOutcome.Refuted };
+                record = record with { Outcome = WorkerClaimOutcome.Refuted, Diagnostic = null };
                 record = record with { Reason = WorkerClaimReason.None };
                 record = record with
                 {
@@ -160,6 +160,8 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         System.ArgumentNullException.ThrowIfNull(target);
         var record = new WorkerClaimResult
         {
+            Presentation = target.Presentation,
+            Diagnostic = outcome == WorkerClaimOutcome.Unknown ? target.Diagnostic : null,
             ClaimId = claimId,
             Outcome = outcome,
             Reason = reason,

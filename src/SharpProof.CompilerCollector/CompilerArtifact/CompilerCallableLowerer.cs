@@ -46,8 +46,9 @@ internal sealed class CompilerCallableLowerer
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken).ToImmutableArray();
+        WorkerDiagnosticContext? diagnostic = null;
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
-            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken);
+            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken, detail => { if (detail is null) { throw new ArgumentNullException(nameof(detail)); } diagnostic = detail; });
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
@@ -98,9 +99,36 @@ internal sealed class CompilerCallableLowerer
             }
             forkJoin = forkJoin with { Carriers = carriers };
         }
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+        {
+            var declarations = CompilerTaskRuntimePremiseCollector.Parse(target.Method, target.Entry.CallableId, cancellationToken);
+            if (declarations.UnknownReason != "TaskRuntimePremisesNotDeclared")
+            {
+                var capture = forkJoin.Carriers?.Shapes is { } shapes
+                    ? CompilerTaskRuntimePremiseCollector.Capture(target.Method, target.Entry.CallableId, shapes.ModuleSha256,
+                        shapes.CompilerIdentity, forkJoin.FrameworkAssemblyIdentity, cancellationToken)
+                    : new CompilerTaskRuntimePremiseCapture(null, declarations.UnknownReason ?? "TaskRuntimeCompilerOwnershipUnavailable");
+                forkJoin = forkJoin with { RuntimePremises = capture };
+            }
+        }
         if (forkJoin is { ConfiguredAwait: true })
         { reason = WorkerClaimReason.None; }
-        return new(target.Entry, reason) { Total = total, TotalEntry = entry, ResourceProgram = resourceProgram, ResourceUnknownReason = resourceUnknown, ForkJoinProjection = forkJoin };
+        return new(target.Entry, reason)
+        {
+            Total = total,
+            TotalEntry = entry,
+            ResourceProgram = resourceProgram,
+            ResourceUnknownReason = resourceUnknown,
+            ForkJoinProjection = forkJoin,
+            Diagnostic = diagnostic,
+            Presentation = new WorkerCallablePresentation
+            {
+                Name = target.Method.ContainingType.Name + "." + target.Method.Name,
+                ParameterNames = [.. target.Method.Parameters.Select(static parameter =>
+                    (parameter ?? throw new ArgumentNullException(nameof(parameter))).Name)]
+            }
+        };
     }
 
     private WorkerClaimReason Classify(ManifestCallableTarget target, bool hasTotal, CancellationToken cancellationToken)
@@ -120,10 +148,13 @@ internal sealed class CompilerCallableLowerer
         var contracts = binding.Contracts ?? throw new InvalidOperationException(
             "A successful contract binding must carry its contracts.");
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
         if (contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)) !=
                 assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.Precondition)) ||
             contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) !=
-                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)) ||
+                assumptions.Count(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) :
+                    evidence.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(evidence.Id)) ||
             !HasManifestParity(target, contracts))
         {
             return WorkerClaimReason.UnsupportedContract;

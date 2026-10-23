@@ -86,6 +86,38 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(result.UnknownReason, Does.StartWith("ForkJoinChildCostUnknown:"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void EnclosingChildInitializerRejectsTheWholeProjection(bool initializeOuter)
+    {
+        var initializer = initializeOuter ? "static Outer() { var allocated = new int[3]; }" : "";
+        var (compilation, method) = Compile("""
+            using System.Threading.Tasks;
+            public static class C {
+                public static Task Root(int n) => Task.WhenAll(
+                    Task.Run(()=>Good(n)), Task.Run(()=>Outer.Nested.Child(n)));
+                static void Good(int count) { for(int i=0;i<count;i++) {} }
+            }
+            public static class Outer {
+            """ + initializer + """
+                public static class Nested {
+                    public static void Child(int count) { for(int i=0;i<count;i++) {} }
+                }
+            }
+            """);
+        var result = CompilerForkJoinResourceLowering.Lower(method, compilation, "root", TestContext.CurrentContext.CancellationToken);
+        if (initializeOuter)
+        {
+            Assert.That(result.Projection, Is.Null, "The clean first child cannot survive an unknown enclosing initializer on the second child.");
+            Assert.That(result.UnknownReason, Is.EqualTo("ForkJoinEntryInitializationUnknown"));
+            return;
+        }
+        Assert.That(result.UnknownReason, Is.Null);
+        Assert.That(result.Projection, Is.Not.Null);
+        Assert.That(result.Projection!.Children.Length, Is.EqualTo(2));
+        Assert.That(result.Projection.Children[1].Owner.CallableId, Is.EqualTo("root:fork-child:1"));
+    }
+
     [Test]
     public void AggregateChildWorkHasAFiniteProjectionBudget()
     {

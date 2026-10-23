@@ -24,6 +24,8 @@ public sealed class ContractApiCatalogTests
                 "SharpProof.Attributes.EnforcePureAttribute",
                 "SharpProof.Attributes.ZeroAllocationsAttribute",
                 "SharpProof.Attributes.ResourceBooleanInputAttribute",
+                "SharpProof.Attributes.ResourceTaskDeploymentAttribute",
+                "SharpProof.Attributes.ResourceTaskRuntimeUpperBoundAttribute",
                 "SharpProof.Attributes.ResourceUpperBoundAttribute",
                 "SharpProof.Attributes.AllowedCapabilitiesAttribute",
                 "SharpProof.Attributes.DoesNotThrowAttribute",

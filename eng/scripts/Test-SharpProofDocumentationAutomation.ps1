@@ -38,7 +38,7 @@ try {
     $mutations = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
             ([ordered]@{ Path = 'src/SharpProof.Package/buildTransitive/SharpProof.props'; Before = '</Project>'; After = '<PropertyGroup><SharpProofDocumentationProbe>enabled</SharpProofDocumentationProbe></PropertyGroup></Project>'; Visible = 'SharpProofDocumentationProbe' }).AsReadOnly(),
             ([ordered]@{ Path = 'src/SharpProof.Attributes/SharpProofEffect.cs'; Before = 'None = 0,'; After = 'DocumentationProbe = 42, None = 0,'; Visible = 'DocumentationProbe' }).AsReadOnly(),
-            ([ordered]@{ Path = 'eng/scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update')"; After = "'docs-update', 'documentation-probe')"; Visible = 'documentation-probe' }).AsReadOnly(),
+            ([ordered]@{ Path = 'eng/scripts/Invoke-SharpProofContainer.ps1'; Before = "'docs-update',"; After = "'docs-update', 'documentation-probe',"; Visible = 'documentation-probe' }).AsReadOnly(),
             ([ordered]@{ Path = 'src/SharpProof.Gates/Program.cs'; Before = 'Usage: SharpProof.Gates ['; After = 'Usage: SharpProof.Gates [documentation-probe|'; Visible = 'documentation-probe' }).AsReadOnly(),
             ([ordered]@{ Path = 'src/SharpProof.Fuzz/FuzzOptions.cs'; Before = 'case "--cases":'; After = 'case "--documentation-probe": case "--cases":'; Visible = '--documentation-probe' }).AsReadOnly(),
             ([ordered]@{ Path = 'src/SharpProof.Attributes/PublicAPI.Unshipped.txt'; Before = '#nullable enable'; After = '#nullable enable' + "`n" + 'SharpProof.Attributes.DocumentationProbe'; Visible = 'SharpProof.Attributes.DocumentationProbe' }).AsReadOnly(),

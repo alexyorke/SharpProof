@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
@@ -159,6 +160,7 @@ internal sealed partial class NativeResourceContractTests
     [TestCase("[ResourceUpperBound((ResourceMetric)99, 0)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, -1)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"missing\", 1)]")]
+    [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"n.Length\", 1)]")]
     [TestCase("[ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, \"n\", 0)]")]
     public async Task InvalidContractMetadataCannotBecomeAZeroBoundProof(string attributes)
     {
@@ -167,6 +169,10 @@ internal sealed partial class NativeResourceContractTests
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+        Assert.That(result.ResourceBound?.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound?.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound?.EvaluatedUpperBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
     }
 
     [Test]
@@ -193,6 +199,48 @@ internal sealed partial class NativeResourceContractTests
         other = other with { Callables = other.Callables.SetItem(0, other.Callables.Single() with { ResourceProgram = ResourceProgramCodec.Encode(ResourceProgram.Zero, TestContext.CurrentContext.CancellationToken) }) };
         Action unowned = () => Read(other);
         Rejects(unowned);
+    }
+
+    [TestCase("missing")]
+    [TestCase("empty")]
+    [TestCase("oversized")]
+    [TestCase("control")]
+    [TestCase("program-and-gap")]
+    public void ResourceProofGapsMustBeValidAndExclusiveAtTheArtifactBoundary(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var hasProgram = mutation == "program-and-gap";
+        var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.ArrayAllocations,1)]",
+            hasProgram ? "var value=new int[1];" : "while(true) {}"));
+        var control = Read(artifact);
+        Assert.That(control.ResourceProgram, hasProgram ? Is.Not.Null : Is.Null);
+        Assert.That(control.ResourceUnknownReason, hasProgram ? Is.Null : Is.Not.Null.And.Not.Empty);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellation);
+        var root = JsonNode.Parse(json)!;
+        var callable = root["callables"]![0]!.AsObject();
+        switch (mutation)
+        {
+            case "missing":
+                Assert.That(callable.Remove("resourceUnknownReason"), Is.True);
+                break;
+            case "empty":
+                callable["resourceUnknownReason"] = "";
+                break;
+            case "oversized":
+                callable["resourceUnknownReason"] = new string('x', 129);
+                break;
+            case "control":
+                callable["resourceUnknownReason"] = "Unsupported\nBody";
+                break;
+            case "program-and-gap":
+                callable["resourceUnknownReason"] = "UnsupportedBody";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        Action decode = () => CompilerManifestArtifactJson.DeserializePrepared(root.ToJsonString(), out _, cancellation);
+        Rejects(decode);
     }
 
     [Test]
@@ -366,6 +414,86 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(result.ResourceBound.Expected, Is.Null);
             Assert.That(result.ResourceBound.Accounting, Is.Empty);
             Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.EffectWitness, Is.Null);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task TaskJoinComparisonBudgetPublishesEvidenceOnlyAfterComparisonCompletes(bool directComparisonFirst)
+    {
+        var artifact = CreateArtifact("""
+            using SharpProof.Attributes;
+            using System.Threading.Tasks;
+            public static class C {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, nameof(n), 1)]
+                public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(0)));
+                static void Child(int count) { for(int i=0;i<count;i++) {} }
+            }
+            """, reviewedRuntime: true);
+        var preparation = Read(artifact);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        Assert.That(preparation.Total, Is.Null);
+        Assert.That(preparation.TotalEntry, Is.Not.Null);
+        Assert.That(preparation.ForkJoinProjection, Is.Not.Null, preparation.ResourceUnknownReason);
+        var claim = artifact.Callables.Single().EffectClaims.Single();
+        var input = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
+            preparation.Entry.CallableId, preparation.TotalEntry!, cancellation);
+        var source = NativeForkJoinSourceCostVerifier.Check(preparation.ForkJoinProjection!, preparation.TotalEntry!, cancellation);
+        Assert.That(source.Upper, Is.Not.Null, source.UnknownReason);
+        Assert.That(source.Upper!.LoopEntries, Is.EqualTo(input));
+        var alternatives = Enumerable.Range(1, 1024).Select(offset => ResourceExpression.Difference(input, offset)).ToArray();
+        while (alternatives.Length > 1)
+        {
+            var combined = new ResourceExpression[alternatives.Length / 2];
+            for (var index = 0; index < combined.Length; index++)
+            { combined[index] = ResourceExpression.Max(alternatives[index * 2], alternatives[index * 2 + 1]); }
+            alternatives = combined;
+        }
+        // The same valid task bound either proves immediately or exhausts the
+        // comparison budget before reaching the final direct alternative.
+        var limit = directComparisonFirst ? ResourceExpression.Max(input, alternatives[0]) :
+            ResourceExpression.Max(alternatives[0], input);
+        var constraint = claim.Constraint.ResourceUpperBound! with { UpperBound = ResourceExpressionCodec.Encode(limit, cancellation) };
+        claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = constraint } };
+        CompilerEffectClaimArtifactCodec.Seal(claim);
+        artifact = artifact with
+        {
+            Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { EffectClaims = [claim] }),
+            Manifest = artifact.Manifest with
+            {
+                Claims = artifact.Manifest.Claims.SetItem(0, artifact.Manifest.Claims.Single() with { ResourceUpperBound = constraint })
+            }
+        };
+        WorkerProtocolJson.SealManifest(artifact.Manifest);
+        preparation = Read(artifact);
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), cancellation)).Single();
+        if (directComparisonFirst)
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("max(0, n)"));
+            Assert.That(result.ResourceBound.ExecutionScope, Is.EqualTo(WorkerResourceModels.TaskJoinScope));
+            var dependency = result.ResourceBound.MetadataAssumptions.Single();
+            Assert.That(dependency.RuntimeModel, Is.EqualTo(WorkerResourceModels.TaskJoinModel));
+            Assert.That(result.Assumptions.Single().Id, Is.EqualTo(dependency.AssumptionId));
+            Assert.That(result.Assumptions.Single().Used, Is.True);
+            Assert.That(result.ProofCore, Does.Contain("resource-task-model:" + dependency.RuntimeModel));
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinResourceBudgetExceeded"));
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.Asymptotic, Is.Null);
+            Assert.That(result.ResourceBound.Expected, Is.Null);
+            Assert.That(result.ResourceBound.Accounting, Is.Empty);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.ProofCore, Is.Empty);
+            Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
             Assert.That(result.EffectWitness, Is.Null);
         }
     }
@@ -576,9 +704,11 @@ internal sealed partial class NativeResourceContractTests
     public async Task ReviewedMetadataCostsRequireDeclaredOwnedReferenceEvidence(string method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
-            $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true));
-        Assert.That(preparation.Compilation.References, Is.Empty);
+        var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]",
+            $"int value=System.Math.{method}(n,0);"), reviewedRuntime: true);
+        var preparation = Read(artifact);
+        Assert.That(System.Text.Json.JsonSerializer.Serialize(preparation.Compilation.References, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(System.Text.Json.JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
         Assert.That(preparation.Compilation.ResourceMetadataReferences, Has.Length.EqualTo(1));
         Assert.That(preparation.Compilation.ResourceMetadataReferences[0].Identity, Is.EqualTo(preparation.ResourceProgram!.Children.Single().Metadata!.AssemblyIdentity));
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();

@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 43,
+    "protocolVersion": 45,
     "manifestSchemaVersion": 6,
-    "compilerArtifactSchemaVersion": 55,
+    "compilerArtifactSchemaVersion": 56,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 66,
+    "schemaVersion": 68,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -289,6 +289,7 @@
           "src/SharpProof.Specs/ResourceTaskCatalog.cs",
           "src/SharpProof.Specs/ResourceTaskStorageCatalog.cs",
           "src/SharpProof.Specs/ResourceTaskFaultCarrierCatalog.cs",
+          "src/SharpProof.Specs/ResourcePrimitiveHelperSelection.cs",
           "src/SharpProof.Specs/ResourceTaskFaultNotificationCatalog.cs",
           "src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs"
         ]
@@ -317,6 +318,8 @@
           "src/SharpProof.Attributes/ZeroAllocationsAttribute.cs",
           "src/SharpProof.Attributes/ResourceBooleanInputAttribute.cs",
           "src/SharpProof.Attributes/ResourceUpperBoundAttribute.cs",
+          "src/SharpProof.Attributes/ResourceTaskDeploymentAttribute.cs",
+          "src/SharpProof.Attributes/ResourceTaskRuntimeUpperBoundAttribute.cs",
           "src/SharpProof.Attributes/SharpProofEffect.cs",
           "src/SharpProof.Attributes/SharpProofCapability.cs"
         ]
@@ -498,6 +501,7 @@
           "src/SharpProof.CompilerArtifact/CompilerDiagnosticArtifactOrdering.cs",
           "src/SharpProof.Worker/Launcher/LauncherProjections.cs",
           "src/SharpProof.Worker/Launcher/LauncherResultPresentation.cs",
+          "src/SharpProof.Worker/Launcher/WorkerDeveloperPresentation.cs",
           "src/SharpProof.Worker/Launcher/SarifProjection.cs"
         ]
       },
@@ -531,7 +535,11 @@
           "src/SharpProof.Worker.Protocol/ProtocolManifest.cs",
           "src/SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJson.cs",
+          "src/SharpProof.Worker.Protocol/ResourceTaskRuntimePremiseIdentity.cs",
+          "src/SharpProof.Worker.Protocol/ResourceTaskRuntimePremiseEvidence.cs",
+          "src/SharpProof.Worker.Protocol/ProtocolJson.RuntimePremises.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs",
+          "src/SharpProof.Worker.Protocol/WorkerDeveloperContext.cs",
           "src/SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs"
         ],
         "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."
@@ -806,6 +814,11 @@
           "src/SharpProof.Worker/NativeTaskCarrierStorageVerifier.cs",
           "src/SharpProof.Worker/NativeTaskEmittedFaultSiteVerifier.cs",
           "src/SharpProof.Worker/NativeTaskPrimitiveHelperRouteVerifier.cs",
+          "src/SharpProof.Worker/NativeTaskRuntimeCostVerifier.cs",
+          "src/SharpProof.CompilerArtifact/CompilerTaskRuntimePremises.cs",
+          "src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.RuntimePremises.cs",
+          "src/SharpProof.CompilerCollector/CompilerArtifact/CompilerTaskRuntimePremiseCollector.cs",
+          "src/SharpProof.Worker/NativeResourceTaskRuntimeBinding.cs",
           "src/SharpProof.Worker/NativeTaskStorageVerifier.cs",
           "src/SharpProof.Worker/NativeTaskFaultCarrierStorageVerifier.cs",
           "src/SharpProof.Worker/NativeTaskFaultNotificationStorageVerifier.cs",

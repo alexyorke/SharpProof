@@ -98,14 +98,74 @@
           "Microsoft.TestPlatform.ObjectModel": "18.8.1"
         }
       },
-      "sharpproof.tool": {
+      "sharpproof.compilerartifact": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+        }
+      },
+      "sharpproof.frontend": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
+          "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
+        }
+      },
+      "sharpproof.ir": {
+        "type": "Project"
+      },
+      "sharpproof.reporting": {
         "type": "Project",
         "dependencies": {
           "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
         }
       },
+      "sharpproof.specs": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
+        }
+      },
+      "sharpproof.tool": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
+          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
+          "SharpProof.Frontend": "[1.0.0-preview.1, )",
+          "SharpProof.Reporting": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+        }
+      },
       "sharpproof.worker.protocol": {
         "type": "Project"
+      },
+      "Microsoft.CodeAnalysis.Analyzers": {
+        "type": "CentralTransitive",
+        "requested": "[4.14.0, )",
+        "resolved": "4.14.0",
+        "contentHash": "fCj+MzjJxN/4iYAz7JPLONGKeTomaZNzx4UgGA0AerTrx4Ou6Rw2J5YF4V51vWW+aSQSCv1nnAkCZUw5Z9+3zw=="
+      },
+      "Microsoft.CodeAnalysis.Common": {
+        "type": "CentralTransitive",
+        "requested": "[4.14.0, )",
+        "resolved": "4.14.0",
+        "contentHash": "PC3tuwZYnC+idaPuoC/AZpEdwrtX7qFpmnrfQkgobGIWiYmGi5MCRtl5mx6QrfMGQpK78X2lfIEoZDLg/qnuHg==",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.Analyzers": "3.11.0"
+        }
+      },
+      "Microsoft.CodeAnalysis.CSharp": {
+        "type": "CentralTransitive",
+        "requested": "[4.14.0, )",
+        "resolved": "4.14.0",
+        "contentHash": "568a6wcTivauIhbeWcCwfWwIn7UV7MeHEBvFB2uzGIpM2OhJ4eM/FZ8KS0yhPoNxnSpjGzz7x7CIjTxhslojQA==",
+        "dependencies": {
+          "Microsoft.CodeAnalysis.Analyzers": "3.11.0",
+          "Microsoft.CodeAnalysis.Common": "[4.14.0]"
+        }
       }
     }
   }

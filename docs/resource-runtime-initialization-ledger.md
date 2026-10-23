@@ -237,3 +237,27 @@ attempt quantity, the other roadmap obligations, and runtime premises bound to
 the chosen evidence/API policy. Missing callbacks, cold state, constructor/helper
 attempts or referent provenance keep that result Unknown. Private components,
 warmed measurements and a smaller surviving graph do not satisfy this condition.
+
+## Declared-premise route and bounded getter follow-up
+
+The user selected explicit reported runtime assumptions on 2026-10-22. The
+[conditional task-byte model](resource-task-runtime-premises.md) therefore uses
+declared transitive initialization and referent budgets instead of claiming that
+this source ledger establishes their values. Source-derived closure remains a
+separate strengthening, not a prerequisite silently assumed by that model.
+
+Two additional pinned files were retrieved and their byte counts, SHA-256 values
+and Git blob identities independently rechecked:
+
+| Source | Bytes | SHA-256 |
+| --- | --- | --- |
+| [Native loader allocator inline definitions](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/loaderallocator.inl) | 5392 | `337a856d3ecb67cdb637a86e00e34818a623f93ae583f39161c49d15b53b6e51` |
+| [LoaderAllocator.cs](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/System.Private.CoreLib/src/System/Reflection/LoaderAllocator.cs) | 2870 | `cbb24b7e0a3b32620b8c905ff15cfa5e9d07adae6e971ae8ca63bde952cd43e1` |
+
+The getter selects null or reads the existing weak handle. Its body does not
+establish when the referent was created or the helper's effects. The managed
+constructor allocates an initial reference array and scout; setup can abandon
+candidates before publication. Later growth, native helpers, generated binding,
+cleanup and finalization retries remain outside this bounded source audit. The
+conditional runtime budgets explicitly include those transitive costs and
+attempts rather than treating the getter as proof of root-entry preexistence.

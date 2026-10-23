@@ -101,6 +101,11 @@ internal sealed class NativeTaskEmittedFaultSiteTests
     [TestCase("framework")]
     [TestCase("callbacks")]
     [TestCase("source-bodies")]
+    [TestCase("invalid-source-token")]
+    [TestCase("duplicate-source-token")]
+    [TestCase("invalid-forwarder-token")]
+    [TestCase("invalid-forwarder-target-token")]
+    [TestCase("source-forwarder-target-mismatch")]
     [TestCase("missing-later-body")]
     [TestCase("duplicate-body")]
     [TestCase("foreign-body")]
@@ -117,6 +122,8 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         Assert.That(Check(target).Sites!.Value, Has.Length.GreaterThan(1));
         var projection = target.ForkJoinProjection!;
         var shapes = projection.Carriers!.Shapes!;
+        var sourceInventory = shapes.SourceBodies!.Inventory!;
+        var callbacks = shapes.CallbackActivations!.Activations!;
         var inventory = Inventory(target);
         var bodies = inventory.Bodies;
         var later = bodies[1];
@@ -149,6 +156,40 @@ internal sealed class NativeTaskEmittedFaultSiteTests
                 break;
             case "source-bodies":
                 shapes = shapes with { SourceBodies = null };
+                break;
+            case "invalid-source-token":
+                shapes = shapes with
+                {
+                    SourceBodies = new(sourceInventory with
+                    { MethodTokens = sourceInventory.MethodTokens.SetItem(1, 0x0a000001) }, null)
+                };
+                break;
+            case "duplicate-source-token":
+                shapes = shapes with
+                {
+                    SourceBodies = new(sourceInventory with
+                    { MethodTokens = sourceInventory.MethodTokens.SetItem(1, sourceInventory.MethodTokens[0]) }, null)
+                };
+                break;
+            case "invalid-forwarder-token":
+                shapes = shapes with
+                {
+                    CallbackActivations = new(callbacks with
+                    { Forwarders = callbacks.Forwarders.SetItem(1, callbacks.Forwarders[1] with { MethodToken = 0x0a000001 }) }, null)
+                };
+                break;
+            case "invalid-forwarder-target-token":
+                shapes = shapes with
+                {
+                    CallbackActivations = new(callbacks with
+                    { Forwarders = callbacks.Forwarders.SetItem(1, callbacks.Forwarders[1] with { ChildMethodToken = 0x0a000001 }) }, null)
+                };
+                break;
+            case "source-forwarder-target-mismatch":
+                shapes = shapes with
+                {
+                    SourceBodies = new(sourceInventory with { MethodTokens = sourceInventory.MethodTokens.RemoveAt(1) }, null)
+                };
                 break;
             case "missing-later-body":
                 changed = inventory with { Bodies = bodies.RemoveAt(1) };
@@ -189,6 +230,9 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         target = WithShapes(target, shapes);
         var rejected = Check(target);
         Assert.That(rejected.UnknownReason, Is.Not.Null.And.Not.Empty, mutation);
+        if (mutation is "invalid-source-token" or "duplicate-source-token" or "invalid-forwarder-token" or
+            "invalid-forwarder-target-token" or "source-forwarder-target-mismatch")
+        { Assert.That(rejected.UnknownReason, Is.EqualTo("TaskEmittedFaultBodyCoverageInvalid"), mutation); }
         Assert.That(rejected.Sites, Is.Null, mutation);
         Assert.That(rejected.RequiredCompilerModel, Is.Null, mutation);
         var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, Layout(),
@@ -262,6 +306,36 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         { Assert.That(instruction.Faults, Is.EqualTo(ExpectedFaults(instruction.OpCode)), "IL offset " + instruction.Offset); }
         foreach (var opcode in new[] { 0xd6, 0x5b, 0x5c, 0x5d, 0x5e, 0x8d, 0x8e, 0x94, 0x9e })
         { Assert.That(independent.Any(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode == opcode), Is.True, "Missing emitted opcode " + opcode); }
+    }
+
+    [Test]
+    public void ScannerPreservesWideLocalSlotsFromActualCompilerEmission()
+    {
+        const int lastLocal = byte.MaxValue + 1;
+        var declarations = string.Concat(Enumerable.Range(0, lastLocal + 1).Select(static index =>
+            "int local" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "=0;"));
+        // Debug emission retains all initialized locals, forcing the final
+        // local's read and write to use the unsigned 16-bit slot encoding.
+        var code = CompileProbe(OptimizationLevel.Debug,
+            "public static int Probe(int n){" + declarations + "local256=n;return local256;}");
+        var independent = DecodeIndependently(code);
+        var expected = independent.Where(static instruction => instruction is null ?
+            throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode is 0xfe0c or 0xfe0e)
+            .Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
+                (instruction.Offset, instruction.OpCode, instruction.NextOffset,
+                    Operand: (int)BinaryPrimitives.ReadUInt16LittleEndian(code.AsSpan(instruction.Offset + 2, 2)))).ToArray();
+        Assert.That(expected.Any(static instruction => instruction.OpCode == 0xfe0c && instruction.Operand == lastLocal), Is.True,
+            "The emitted fixture must load local slot 256 with the full ldloc encoding.");
+        Assert.That(expected.Any(static instruction => instruction.OpCode == 0xfe0e && instruction.Operand == lastLocal), Is.True,
+            "The emitted fixture must store local slot 256 with the full stloc encoding.");
+        Assert.That(expected.All(static instruction => instruction.NextOffset == instruction.Offset + 4), Is.True,
+            "Each full local instruction must consume its two-byte opcode and two-byte operand.");
+        var scan = CompilerTaskPrimitiveIlScanner.Scan(code, TestContext.CurrentContext.CancellationToken);
+        Assert.That(scan.UnknownReason, Is.Null);
+        Assert.That(scan.Instructions!.Value.Where(static instruction => instruction is null ?
+            throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode is 0xfe0c or 0xfe0e)
+            .Select(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
+                (instruction.Offset, instruction.OpCode, instruction.NextOffset, instruction.Operand)), Is.EqualTo(expected));
     }
 
     [TestCase("public static int Probe(int n)=>System.Math.Abs(n);", "TaskEmittedFaultBodyCallUnsupported")]

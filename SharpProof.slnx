@@ -49,6 +49,9 @@
     <Project Path="src/SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj" />
     <Project Path="src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj" />
     <Project Path="src/SharpProof.Worker/SharpProof.Worker.csproj" />
+    <Project Path="src/SharpProof.Reporting/SharpProof.Reporting.csproj" />
+    <Project Path="src/SharpProof.Templates/SharpProof.Templates.csproj" />
+    <Project Path="src/SharpProof.DeveloperExperience.Tests/SharpProof.DeveloperExperience.Tests.csproj" />
     <Project Path="src/SharpProof.Tool/SharpProof.Tool.csproj" />
     <Project Path="src/SharpProof.Tool.Tests/SharpProof.Tool.Tests.csproj" />
   </Folder>

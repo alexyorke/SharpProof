@@ -38,4 +38,9 @@
     <Compile Include="..\..\eng\shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Tool" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="SharpProof.Reporting" /></ItemGroup>
 </Project>

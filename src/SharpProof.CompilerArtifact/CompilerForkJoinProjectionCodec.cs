@@ -9,7 +9,7 @@ namespace SharpProof.CompilerArtifact;
 // authenticates source provenance; runtime premises are checked separately.
 internal static partial class CompilerForkJoinProjectionCodec
 {
-    internal const int Version = 12;
+    internal const int Version = 13;
     internal const int MaximumPayloadBytes = 1024 * 1024;
 
     internal static byte[] Encode(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root, CancellationToken cancellation)
@@ -29,6 +29,8 @@ internal static partial class CompilerForkJoinProjectionCodec
             writer.WriteBoolean("configuredAwait", projection.ConfiguredAwait);
             writer.WritePropertyName("carriers");
             WriteCarriers(writer, projection.Carriers, cancellation);
+            writer.WritePropertyName("runtimePremises");
+            WriteRuntimePremises(writer, projection.RuntimePremises, projection, cancellation);
             writer.WriteStartArray("inputs");
             foreach (var name in projection.RootParameterNames)
             { cancellation.ThrowIfCancellationRequested(); writer.WriteStringValue(name); }
@@ -98,7 +100,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             root.Parameters.Length <= ResourceExpression.MaximumNodes, "Fork-join root ownership is invalid.");
         using var document = JsonDocument.Parse(payload, new JsonDocumentOptions { MaxDepth = ResourceExpression.MaximumDepth });
         var value = document.RootElement;
-        Properties(value, ["version", "root", "framework", "configuredAwait", "carriers", "inputs", "children"]);
+        Properties(value, ["version", "root", "framework", "configuredAwait", "carriers", "runtimePremises", "inputs", "children"]);
         Require(Integer(value.GetProperty("version")) == Version && Text(value.GetProperty("root")) == root.CallableId,
             "Fork-join projection version or root identity is invalid.");
         var framework = Text(value.GetProperty("framework"));
@@ -157,12 +159,13 @@ internal static partial class CompilerForkJoinProjectionCodec
             }
             children.Add(new(body, cost, arguments.MoveToImmutable()));
         }
-        return new(root.CallableId, framework, names.MoveToImmutable(), children.MoveToImmutable())
+        var projection = new CompilerForkJoinProjection(root.CallableId, framework, names.MoveToImmutable(), children.MoveToImmutable())
         {
             ConfiguredAwait = configuredAwait.GetBoolean(),
             Carriers = ReadCarriers(value.GetProperty("carriers"), root.CallableId, framework,
             encodedChildren.GetArrayLength(), configuredAwait.GetBoolean(), cancellation)
         };
+        return projection with { RuntimePremises = ReadRuntimePremises(value.GetProperty("runtimePremises"), projection, cancellation) };
     }
 
     private static void Properties(JsonElement value, string[] expected)

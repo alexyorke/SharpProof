@@ -10,10 +10,12 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | --- | --- |
 | [Getting started](getting-started.md) | Package references, first contract, profiles, and verifier policies |
 | [Project templates](../templates/README.md) | Portable/verified class libraries with version-authoritative local installation |
+| [Developer tools](developer-experience.md) | Optional packaged templates, project setup checks, evidence comparison, NUnit regression export, and companion scaffolding |
+| [Developer experience checklist](developer-experience-plan.md) | Seven implemented areas, validation commands, retained evidence scope, and remaining CI/release decisions |
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
-| [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest SDK discovery and scoped explanation of stored evidence |
+| [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest installation, SDK discovery, project setup checks, and stored-evidence commands |
 | [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
 | [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
 | [Consumer performance](consumer-performance.md) | Comparable build/runtime allocation measurements, quality evidence and explicit budgets |

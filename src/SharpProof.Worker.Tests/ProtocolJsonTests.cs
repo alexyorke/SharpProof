@@ -129,6 +129,184 @@ internal sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void OptionalDeveloperMetadataIsOmittedWithoutChangingClaimAuthority()
+    {
+        var response = CreateResponse(CreateManifest());
+        var json = WorkerProtocolJson.SerializeResponse(response);
+        var node = JsonNode.Parse(json)!["claimResults"]![0]!.AsObject();
+        Assert.That(node.ContainsKey("presentation"), Is.False);
+        Assert.That(node.ContainsKey("diagnostic"), Is.False);
+
+        response = response with
+        {
+            ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+            {
+                Presentation = new WorkerCallablePresentation
+                {
+                    Name = "Subject.Identity",
+                    ParameterNames = ["value"]
+                }
+            })
+        };
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+        Assert.That(response.Manifest.Hash, Is.EqualTo(CreateManifest().Hash));
+        Assert.That(response.ClaimResults[0].Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(response.ClaimResults[0].ProofCore, Is.Empty);
+        Assert.That(response.ClaimResults[0].Model, Is.Empty);
+    }
+
+    [Test]
+    public void UnknownDeveloperMetadataStrictlyRoundTripsAndRetainsParameterOrder()
+    {
+        var response = SetUnknown(CreateResponse(CreateManifest()), WorkerClaimReason.UnsupportedBody);
+        response = response with
+        {
+            CallableResults = response.CallableResults.ReplaceAt(0, response.CallableResults[0] with
+            {
+                Coverage = WorkerCallableCoverage.Incomplete,
+                Reason = WorkerCallableCoverageReason.SemanticUnknown
+            }),
+            ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+            {
+                Presentation = new WorkerCallablePresentation
+                {
+                    Name = "Subject.Identity",
+                    ParameterNames = ["z", "a"]
+                },
+                Diagnostic = new WorkerDiagnosticContext
+                {
+                    Code = "UnsupportedBody",
+                    Location = response.Manifest.Claims[0].Location
+                }
+            })
+        };
+        var json = WorkerProtocolJson.SerializeResponse(response);
+        var roundTrip = WorkerProtocolJson.DeserializeResponse(json)!;
+        Assert.That(ValidateForRequest(roundTrip).IsValid, Is.True);
+        Assert.That(WorkerProtocolJson.SerializeResponse(roundTrip), Is.EqualTo(json));
+        Assert.That(roundTrip.ClaimResults[0].Presentation!.ParameterNames, Is.EqualTo(ImmutableArray.Create("z", "a")));
+        Assert.That(roundTrip.ClaimResults[0].Diagnostic!.Stage, Is.EqualTo("CompilerLowering"));
+        Assert.That(roundTrip.ClaimResults[0].Diagnostic!.Code, Is.EqualTo("UnsupportedBody"));
+        Assert.That(roundTrip.ClaimResults[0].Diagnostic!.Location, Is.EqualTo(response.Manifest.Claims[0].Location));
+        Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(response.Manifest.Hash));
+        Assert.That(roundTrip.ClaimResults[0].Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(roundTrip.ClaimResults[0].Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase(" ")]
+    [TestCase("label\nnext")]
+    [TestCase("label\rnext")]
+    [TestCase("label\tnext")]
+    [TestCase("label\0next")]
+    [TestCase("label\u2028next")]
+    [TestCase("label\u2029next")]
+    public void DeveloperPresentationRejectsBlankAndMultilineLabels(string? label)
+    {
+        Assert.That(WorkerProtocolJson.IsPresentationValid(new WorkerCallablePresentation
+        {
+            Name = label!,
+            ParameterNames = []
+        }), Is.False);
+        Assert.That(WorkerProtocolJson.IsPresentationValid(new WorkerCallablePresentation
+        {
+            Name = "Subject.Identity",
+            ParameterNames = [label!]
+        }), Is.False);
+    }
+
+    [Test]
+    public void DeveloperPresentationPreservesNullEmptyAndMalformedArrayDistinctions()
+    {
+        var response = CreateResponse(CreateManifest());
+        response = response with
+        {
+            ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+            {
+                Presentation = new WorkerCallablePresentation
+                {
+                    Name = "Subject.Identity",
+                    ParameterNames = default
+                }
+            })
+        };
+        var root = JsonNode.Parse(WorkerProtocolJson.SerializeResponse(response))!;
+        var presentation = root["claimResults"]![0]!["presentation"]!.AsObject();
+        Assert.That(presentation["parameterNames"], Is.Null);
+        var nullArray = WorkerProtocolJson.DeserializeResponse(root.ToJsonString())!;
+        Assert.That(nullArray.ClaimResults[0].Presentation!.ParameterNames.IsDefault, Is.True);
+        AssertErrorCode(WorkerProtocolJson.Validate(nullArray), ["response.claim_presentation"]);
+
+        presentation["parameterNames"] = new JsonArray();
+        var emptyArray = WorkerProtocolJson.DeserializeResponse(root.ToJsonString())!;
+        Assert.That(emptyArray.ClaimResults[0].Presentation!.ParameterNames.IsDefault, Is.False);
+        Assert.That(WorkerProtocolJson.Validate(emptyArray).IsValid, Is.True);
+
+        presentation["parameterNames"] = new JsonArray((JsonNode?)null);
+        var nullElement = WorkerProtocolJson.DeserializeResponse(root.ToJsonString())!;
+        AssertErrorCode(WorkerProtocolJson.Validate(nullElement), ["response.claim_presentation"]);
+
+        presentation["parameterNames"] = "value";
+        Assert.Throws<JsonException>((Action)(() => WorkerProtocolJson.DeserializeResponse(root.ToJsonString())));
+        presentation.Remove("parameterNames");
+        Assert.Throws<JsonException>((Action)(() => WorkerProtocolJson.DeserializeResponse(root.ToJsonString())));
+    }
+
+    [TestCase(WorkerClaimOutcome.Proven)]
+    [TestCase(WorkerClaimOutcome.Refuted)]
+    public void DeveloperDiagnosticRequiresAnUnknownClaim(WorkerClaimOutcome outcome)
+    {
+        var response = CreateResponse(CreateManifest());
+        response = response with
+        {
+            ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
+            {
+                Outcome = outcome,
+                Diagnostic = new WorkerDiagnosticContext
+                {
+                    Code = "UnsupportedBody",
+                    Location = response.Manifest.Claims[0].Location
+                }
+            })
+        };
+        AssertErrorCode(WorkerProtocolJson.Validate(response), ["response.claim_diagnostic"]);
+    }
+
+    [Test]
+    public void DeveloperDiagnosticRejectsMalformedStageCodeAndLocation()
+    {
+        var diagnostic = new WorkerDiagnosticContext
+        {
+            Code = "UnsupportedBody",
+            Location = CreateManifest().Claims[0].Location
+        };
+        Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(null), Is.True);
+        Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic), Is.True);
+        Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic with { Code = new string('A', 128) }), Is.True);
+        Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(diagnostic with { Code = "Lowering.Code_09" }), Is.True);
+        var invalid = new[]
+        {
+            diagnostic with { Stage = null! },
+            diagnostic with { Stage = "compilerLowering" },
+            diagnostic with { Code = null! },
+            diagnostic with { Code = string.Empty },
+            diagnostic with { Code = "Unsupported Body" },
+            diagnostic with { Code = "UnsupportedBody\n" },
+            diagnostic with { Code = new string('A', 129) },
+            diagnostic with { Location = null! },
+            diagnostic with { Location = new WorkerSourceLocation() },
+            diagnostic with { Location = diagnostic.Location with { Start = -1 } },
+            diagnostic with { Location = diagnostic.Location with { Length = -1 } },
+            diagnostic with { Location = diagnostic.Location with { Line = 0 } },
+            diagnostic with { Location = diagnostic.Location with { Column = 0 } }
+        };
+        foreach (var item in invalid)
+        {
+            Assert.That(WorkerProtocolJson.IsDiagnosticContextValid(item), Is.False);
+        }
+    }
+    [Test]
     public void DefaultResponseArraysCannotBeCached()
     {
         var manifest = CreateTwoCallableManifest();
@@ -432,8 +610,8 @@ internal sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("43"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(66));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("45"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(68));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(6));
             Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
             Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));
@@ -548,14 +726,14 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("43"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("45"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
                 roundTrip.Manifest.Callables[0].Assumptions
                     .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
                 Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
-            Assert.That(roundTrip.Compilation.SyntaxTrees, Is.Empty);
+            Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(artifact.Compilation.SyntaxTrees.Length));
             Assert.That(ArtifactDigest.Compute((Encoding.UTF8.GetBytes(json)).ToImmutableArray()), Does.Match("^[0-9a-f]{64}$"));
             Assert.That(WorkerProtocolJson.ManifestsEqual(
                 roundTrip.Manifest, manifest), Is.True);
@@ -1223,6 +1401,12 @@ internal sealed class ProtocolJsonTests
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!["claims"]![0]!.AsObject()), "claimId"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["callableResults"]![0]!.AsObject()), "coverage"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!.AsObject()), "outcome"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["presentation"]!.AsObject()), "name"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["presentation"]!.AsObject()), "parameterNames"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "stage"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "code"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "location"),
+            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!["location"]!.AsObject()), "path"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["effectWitness"]!.AsObject()), "kind"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["model"]![0]!.AsObject()), "variable"),
             (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!.AsObject()), "cacheStatus"),
@@ -2674,6 +2858,16 @@ internal sealed class ProtocolJsonTests
         {
             claim = claim with
             {
+                Presentation = new WorkerCallablePresentation
+                {
+                    Name = "Subject.Identity",
+                    ParameterNames = ["value"]
+                },
+                Diagnostic = new WorkerDiagnosticContext
+                {
+                    Code = "UnsupportedBody",
+                    Location = response.Manifest.Claims[0].Location
+                },
                 EffectWitness = CreateEffectWitness(
             response.Manifest.Claims[0].Location)
             };
