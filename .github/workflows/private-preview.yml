@@ -100,24 +100,46 @@ jobs:
       contents: read
       actions: read
     steps:
+      - uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4
+        with:
+          version: v29.9.2
+          daemon-config: '{"features":{"containerd-snapshotter":true}}'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.approved-source.outputs.source_commit }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Require checkout to equal the approved immutable source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SHARPPROOF_SOURCE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          origin="$(git remote get-url origin)"
+          [[ "$origin" == https://github.com/alexyorke/SharpProof-preview || "$origin" == https://github.com/alexyorke/SharpProof-preview.git ]]
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "$SHARPPROOF_SOURCE_COMMIT" ]]; then
+            echo 'Checkout differs from the approved source; qualification stopped before preparation.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           path: artifacts/private-release-orchestration
           persist-credentials: false
-      - uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4
+      - name: Require an immutable qualified core-package identity
+        shell: bash
+        env:
+          QUALIFIED_ARTIFACT_ID: ${{ needs.qualified-packages.outputs.package_artifact_id }}
+        run: '[[ "$QUALIFIED_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          version: v29.9.2
-          daemon-config: '{"features":{"containerd-snapshotter":true}}'
-      - uses: ./.github/actions/prepare-qualified-packages
+          artifact-ids: ${{ needs.qualified-packages.outputs.package_artifact_id }}
+          path: nupkgs
+          merge-multiple: true
+      - name: Build the canonical source toolchain without shared caches
         id: prepared
-        with:
-          artifact-id: ${{ needs.qualified-packages.outputs.package_artifact_id }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/artifacts/private-release-orchestration/eng/scripts/Prepare-SharpProofPrivatePreview.sh"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.qualified-packages.outputs.tool_artifact_id }}

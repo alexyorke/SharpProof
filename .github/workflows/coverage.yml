@@ -193,6 +193,7 @@ jobs:
   native-windows-tool:
     name: native Windows installed-tool coverage
     needs: coverage-shard
+    if: ${{ !cancelled() && needs.coverage-shard.outputs.windows-tool-input-id != '' && needs.coverage-shard.outputs.windows-tool-input-attempt-number != '' }}
     runs-on: windows-latest
     outputs:
       artifact-id: ${{ steps.native-evidence.outputs.artifact-id }}

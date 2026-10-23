@@ -363,6 +363,8 @@ function Invoke-RepositoryGates {
         'Private preview source and publication policy regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewArtifactRegression.ps1' `
         'Private preview artifact regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewCheckoutRegression.ps1' `
+        'Private preview immutable checkout regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewImageRegression.ps1' `
         'Private preview image identity regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewPromotionReceiptRegression.ps1' `
