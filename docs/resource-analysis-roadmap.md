@@ -108,13 +108,29 @@ an optional strengthening of this conditional model. It is not claimed here.
 - [x] Preserve the original dirty checkout using an isolated branch/worktree.
 - [x] First milestone: 1184 analyzer tests plus docs/layout/container gates passed.
 - [x] Open and attach the draft merge request for this branch.
-- [ ] Keep this document current after each verified implementation phase.
-- [ ] Run focused checks before the relevant broader gate; record exact pushed
+- [x] Keep this document current after each verified implementation phase.
+- [x] Run focused checks before the relevant broader gate; record exact pushed
   commit and CI status after each delivery checkpoint.
-- [ ] Final requirement-by-requirement audit of phases A-F and the actual
+- [x] Final requirement-by-requirement audit of phases A-F and the actual
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
+
+### Implementation merged; supplementary boundary qualification pending
+
+[MR #334](https://github.com/alexyorke/SharpProof/pull/334) merged on
+2026-10-23 as master commit `7f7cac39503f23890e9cff35bac85f9339c19779`.
+The required A-F implementation and the bounded final scope audit are complete
+under the explicit reported-runtime-assumption policy. The qualified upstream
+head passed canonical CI and the unchanged 100% changed-TCB floor, as recorded
+below.
+
+The extra 26 boundary cases completed in this chat were not part of that merge.
+They are preserved on `codex/resource-boundary-followups`, created from that
+current master, together with this ledger. Its implementation and test source
+matches the verified local integration described below; it changes no production
+proof rules. Supplementary MR publication and exact-head hosted qualification
+remain. The original merge and the supplementary delivery are tracked separately.
 
 ### Integrated qualification and final delivery pending
 
