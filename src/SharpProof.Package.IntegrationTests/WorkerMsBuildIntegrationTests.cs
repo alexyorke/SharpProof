@@ -2271,29 +2271,82 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var first = await BuildOkAsync(project.BuildAsync(verify: true, []));
+        _ = await BuildOkAsync(project.BuildAsync(verify: true, []));
+        var firstRequest = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
         var firstResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
+        var firstArtifact = await AssertPublicationBindingAsync(
+            firstRequest, firstResponse);
+        var firstCompilation = CompilerManifestArtifactJson.Deserialize(
+            System.Text.Encoding.UTF8.GetString(firstArtifact.Bytes.AsSpan()),
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
-        var changed = await BuildOkAsync(project.BuildAsync(
+        _ = await BuildOkAsync(project.BuildAsync(
             verify: true, [("LangVersion", "13.0"), ("Nullable", "annotations"), ("CheckForOverflowUnderflow", "true"), ("Optimize", "false"), ("AllowUnsafeBlocks", "true"), ("Deterministic", "false"), ("PlatformTarget", "x64")]));
         var changedRequest = WorkerProtocolJson.DeserializeRequest(
             await File.ReadAllTextAsync(project.RequestPath))!;
         var changedResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
-        _ = await AssertPublicationBindingAsync(
+        var changedArtifact = await AssertPublicationBindingAsync(
             changedRequest, changedResponse);
+        var changedCompilation = CompilerManifestArtifactJson.Deserialize(
+            System.Text.Encoding.UTF8.GetString(changedArtifact.Bytes.AsSpan()),
+            cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                changedResponse.InputHash,
-                Is.EqualTo(firstResponse.InputHash));
-            Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+                JsonSerializer.Serialize(changedCompilation.Compilation.Options, WorkerProtocolJson.Options),
+                Is.Not.EqualTo(JsonSerializer.Serialize(firstCompilation.Compilation.Options, WorkerProtocolJson.Options)),
+                "The retained compiler options must reflect the changed compilation.");
+            Assert.That(changedCompilation.Compilation.SyntaxTrees, Is.Not.Empty);
+            Assert.That(changedCompilation.Compilation.References, Is.Not.Empty);
+            Assert.That(changedRequest.CompilerManifest.Sha256, Is.Not.EqualTo(firstRequest.CompilerManifest.Sha256));
+            Assert.That(changedResponse.InputHash, Is.Not.EqualTo(firstResponse.InputHash),
+                "The complete worker response cache binds the full compiler snapshot bytes.");
+            Assert.That(firstResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(changedArtifact.ManifestHash, Is.EqualTo(firstArtifact.ManifestHash));
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.Manifest, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.Manifest, WorkerProtocolJson.Options)),
+                "All callable and claim identities must remain stable.");
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.Callables, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.Callables, WorkerProtocolJson.Options)),
+                "The selected callable IR must remain equivalent.");
+            Assert.That(
+                JsonSerializer.Serialize(changedCompilation.ReachableSource, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstCompilation.ReachableSource, WorkerProtocolJson.Options)),
+                "Reachable source IR must remain equivalent.");
+            Assert.That(SemanticPayload(changedResponse), Is.EqualTo(SemanticPayload(firstResponse)));
+            Assert.That(firstResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(changedResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(firstResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(changedResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 File.GetLastWriteTimeUtc(project.ResultPath),
                 Is.GreaterThan(firstWrite));
+        }
+
+        _ = await BuildOkAsync(project.RunVerificationTargetAsync(
+            [("_SharpProofCompilerManifestPath", project.CopyCompilerManifestForInvocation())]));
+        var replayRequest = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        var replayResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var replayArtifact = await AssertPublicationBindingAsync(replayRequest, replayResponse);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(replayArtifact.Bytes, Is.EqualTo(changedArtifact.Bytes));
+            Assert.That(replayRequest.CompilerManifest.Sha256, Is.EqualTo(changedRequest.CompilerManifest.Sha256));
+            Assert.That(replayResponse.InputHash, Is.EqualTo(changedResponse.InputHash));
+            Assert.That(replayResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(replayResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(replayResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(SemanticPayload(replayResponse), Is.EqualTo(SemanticPayload(changedResponse)));
         }
     }
 

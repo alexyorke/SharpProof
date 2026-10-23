@@ -10,6 +10,7 @@
       "src\\SharpProof.ContractForGenerator.Tests\\SharpProof.ContractForGenerator.Tests.csproj",
       "src\\SharpProof.Contracts.Tests\\SharpProof.Contracts.Tests.csproj",
       "src\\SharpProof.Dataflow.Tests\\SharpProof.Dataflow.Tests.csproj",
+      "src\\SharpProof.DeveloperExperience.Tests\\SharpProof.DeveloperExperience.Tests.csproj",
       "src\\SharpProof.Effects.Tests\\SharpProof.Effects.Tests.csproj",
       "src\\SharpProof.Frontend.Tests\\SharpProof.Frontend.Tests.csproj",
       "src\\SharpProof.Ir.Tests\\SharpProof.Ir.Tests.csproj",

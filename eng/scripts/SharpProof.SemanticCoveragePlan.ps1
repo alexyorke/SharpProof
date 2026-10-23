@@ -10,6 +10,17 @@ function Get-SharpProofSemanticCoverageShards {
 function Get-SharpProofSemanticCoverageTasks {
     param([string]$RepositoryRoot)
     $projects = (Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw | ConvertFrom-Json).solution.projects
+    [xml]$solution = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'SharpProof.slnx') -Raw
+    $solutionTests = @($solution.SelectNodes('//Project') | ForEach-Object { ([string]$_.Path).Replace('\', '/') } |
+            Where-Object { $_ -cmatch '\.(Tests|UnitTests|IntegrationTests|PerformanceTests)\.csproj$' } |
+            Sort-Object -CaseSensitive)
+    $collectedTests = @(@($projects | ForEach-Object { ([string]$_).Replace('\', '/') }) + @(
+            'src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj',
+            'src/SharpProof.Package.IntegrationTests/SharpProof.Package.IntegrationTests.csproj') |
+            Sort-Object -CaseSensitive)
+    if (($solutionTests -join "`n") -cne ($collectedTests -join "`n")) {
+        throw 'The coverage plan must retain every solution test project exactly once across the semantic filter and dedicated Worker/package collectors.'
+    }
     $remaining = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     foreach ($project in $projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension(([string]$project).Replace('\', '/')).ToLowerInvariant()

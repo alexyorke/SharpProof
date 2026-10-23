@@ -6,4 +6,20 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
     <PackageReference Include="System.Composition.AttributedModel" PrivateAssets="all" />
   </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_EDITOR_INPUTS</DefineConstants>
+    <IsPackable Condition="'$(SharpProofDeveloperPackages)' == 'true'">true</IsPackable>
+    <PackageId>SharpProof.CodeFixes</PackageId>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <IncludeSymbols>false</IncludeSymbols>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>$(SharpProofPublisher)</Authors>
+    <Description>Optional SharpProof editor fixes and companion scaffolding.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+  </ItemGroup>
 </Project>

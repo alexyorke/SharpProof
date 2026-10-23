@@ -99,4 +99,8 @@
       <Compile Include="$(_SharpProofAttributesPayloadIdentitySource)" />
     </ItemGroup>
   </Target>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Tool" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+  </ItemGroup>
 </Project>

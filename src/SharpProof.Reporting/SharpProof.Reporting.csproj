@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <ProjectReference Include="../SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Tool" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+  </ItemGroup>
+</Project>

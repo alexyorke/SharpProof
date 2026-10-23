@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Alex Yorke",
+  "classifications": ["SharpProof", "Library", "Verification"],
+  "identity": "SharpProof.Starter",
+  "name": "SharpProof verified library",
+  "shortName": "sharpproof",
+  "sourceName": "SharpProofStarter",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "verification": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [{ "choice": "portable" }, { "choice": "container" }],
+      "defaultValue": "portable",
+      "description": "Portable editor analysis or strict verification in the canonical Linux amd64 container."
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": ["portable/**", "container/**", "**/bin/**", "**/obj/**", ".template.config/**"],
+      "rename": { "global.json.template": "global.json" }
+    },
+    {
+      "source": "./portable/",
+      "target": "./",
+      "condition": "(verification == \"portable\")",
+      "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj" }
+    },
+    {
+      "source": "./container/",
+      "target": "./",
+      "condition": "(verification == \"container\")",
+      "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj", "compose.yaml.template": "compose.yaml", "Directory.Build.props.template": "Directory.Build.props" }
+    }
+  ]
+}

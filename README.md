@@ -68,6 +68,8 @@ Start with the [single-reference setup](docs/getting-started.md#first-use-in-thr
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 
+The [developer tools guide](docs/developer-experience.md) covers the optional .NET tool, packaged project templates, setup checks, evidence comparison, NUnit regression export, and editor scaffolding. These matching preview packages require a configured feed; this checkout does not imply public package availability.
+
 ## Learn by doing
 
 From the repository root, with Docker Compose v2 and Linux containers:

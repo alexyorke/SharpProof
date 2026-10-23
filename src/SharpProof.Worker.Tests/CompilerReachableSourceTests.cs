@@ -3,6 +3,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
@@ -127,8 +128,21 @@ public sealed class CompilerReachableSourceTests
         var first = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         var changed = CompilerTotalCallableArtifactTests.CreateArtifact(
             source.Replace("\"first\"", "\"considerably-longer\"", StringComparison.Ordinal));
-        Assert.That(CompilerManifestArtifactJson.SerializeProducerValidated(changed, cancellationToken: TestContext.CurrentContext.CancellationToken),
-            Is.EqualTo(CompilerManifestArtifactJson.SerializeProducerValidated(first, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+        Assert.That(JsonSerializer.Serialize(changed.Manifest, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(first.Manifest, WorkerProtocolJson.SharedOptions)));
+        Assert.That(JsonSerializer.Serialize(changed.Callables, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(first.Callables, WorkerProtocolJson.SharedOptions)));
+        Assert.That(JsonSerializer.Serialize(changed.ReachableSource, WorkerProtocolJson.SharedOptions),
+            Is.EqualTo(JsonSerializer.Serialize(first.ReachableSource, WorkerProtocolJson.SharedOptions)));
+        var originalSnapshot = first.Compilation.SyntaxTrees.Single();
+        var changedSnapshot = changed.Compilation.SyntaxTrees.Single();
+        Assert.That(changedSnapshot.Path, Is.EqualTo(originalSnapshot.Path));
+        Assert.That(changedSnapshot.Sha256, Is.Not.EqualTo(originalSnapshot.Sha256));
+        Assert.That(changedSnapshot.TextLength, Is.GreaterThan(originalSnapshot.TextLength));
+        var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(
+            CompilerManifestArtifactJson.SerializeProducerValidated(changed, TestContext.CurrentContext.CancellationToken),
+            out _, TestContext.CurrentContext.CancellationToken);
+        Assert.That(roundTrip.Compilation.SyntaxTrees.Single().Sha256, Is.EqualTo(changedSnapshot.Sha256));
     }
 
     [Test]

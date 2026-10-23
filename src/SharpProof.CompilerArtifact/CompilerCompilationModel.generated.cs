@@ -19,11 +19,8 @@ internal static class CompilerReferenceLimits
 internal sealed record CompilerCompilationSnapshot
 {
     public string ProjectDirectory { get; init; } = string.Empty;
-    [JsonIgnore]
     public string AssemblyName { get; init; } = string.Empty;
-    [JsonIgnore]
     public string AssemblyIdentity { get; init; } = string.Empty;
-    [JsonIgnore]
     public string TargetFramework { get; init; } = string.Empty;
     [JsonIgnore]
     public string CompilerVersion { get; init; } = string.Empty;
@@ -39,11 +36,8 @@ internal sealed record CompilerCompilationSnapshot
     public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
     [JsonIgnore]
     public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
-    [JsonIgnore]
     public CompilerCompilationOptionsSnapshot Options { get; init; } = new();
-    [JsonIgnore]
     public ImmutableArray<CompilerSyntaxTreeSnapshot> SyntaxTrees { get; init; } = [];
-    [JsonIgnore]
     public ImmutableArray<CompilerReferenceSnapshot> References { get; init; } = [];
     [JsonIgnore]
     public ImmutableArray<CompilerAdditionalFileSnapshot> AdditionalFiles { get; init; } = [];
