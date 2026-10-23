@@ -109,6 +109,29 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Reference-alias witness ownership controls
+
+Four replay controls execute the same owned object/array program and alter only
+an alias-assignment observation. The valid observation retains a 56-byte output
+graph with zero auxiliary storage. A substituted null, Boolean or integer must
+not become an owned field receiver, even when the scalar observation carries
+the declared reference type. Each altered case must return
+`MemoryReplayFieldStoreUnsupported` with no lifetime bounds.
+
+The inconsistent scalar records are adversarial witness inputs, not executed
+values or accepted source types. The valid program is interpreted to normal
+completion before replay validation. Production admission, runtime assumptions
+and wire identities are unchanged.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-memory-receiver-witness-format.log`). All 229 memory trace,
+replay and related graph tests passed with zero build warnings or errors
+(`artifacts/resource-memory-receiver-witness-tests.log`). Quality/API and
+documentation checks passed (`artifacts/resource-memory-receiver-witness-lint.log`
+and `artifacts/resource-memory-receiver-witness-docs.log`). Full task-runtime
+bytes, the pending runtime proof policy, coverage closure and final audit remain
+open.
+
 ### Hosted composition-budget coverage
 
 Checkpoint `4cb72a04754e1f477886f2eca077030da39d86f1` completed all fifteen
@@ -124,8 +147,8 @@ Evidence is retained in
 `artifacts/resource-4cb7-coverage-evidence/coverage/SharpProof.coverage.json`.
 Merge `8ede82520587a75d70185802fa4442361c52dd8d` has verified parents master
 `fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `4cb72a047`.
-Canonical CI (39890853984) and package consumers (39890853824) remain active at
-this observation. Full task-runtime bytes, the pending runtime proof policy,
+Full canonical CI (39890853984) and package consumers (39890853824) passed for
+that exact checkpoint. Full task-runtime bytes, the pending runtime proof policy,
 coverage closure and final audit remain open.
 
 ### Late memory-trace aggregation budget controls

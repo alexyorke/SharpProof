@@ -349,6 +349,58 @@ public sealed class ResourceMemoryReplayTests
         }
     }
 
+    [TestCase("valid")]
+    [TestCase("null")]
+    [TestCase("boolean")]
+    [TestCase("integer")]
+    public void ReferenceAliasObservationsCannotForgeAnOwnedFieldReceiver(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
+        factory.RegisterClosedClassReferenceType(node, null);
+        factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, IrFieldSites.Prefix + "child", array, false);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", node);
+        var child = factory.CreateVariable("child", array);
+        var alias = factory.CreateVariable("alias", node);
+        builder.Allocate(entry, factory.CreateOperation(), node, root);
+        builder.Allocate(entry, factory.CreateOperation(), array, child, factory.Integer(1));
+        var assigned = builder.Assign(entry, factory.CreateOperation(), alias, factory.Variable(root));
+        builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field,
+            factory.Cast(factory.ObjectType, factory.Variable(alias)), field, factory.Variable(child));
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(alias));
+        var check = MutatedReplay(builder.Build(), (instruction, value) =>
+        {
+            ArgumentNullException.ThrowIfNull(instruction);
+            if (!ReferenceEquals(instruction, assigned))
+            { return value; }
+            // Scalar observations deliberately violate the declared type/kind
+            // relation. They are adversarial witness data, not executed values.
+            return mutation switch
+            {
+                "valid" => value,
+                "null" => factory.CreateNullValue(node),
+                "boolean" => new IrValue(node, IrValueKind.Boolean, true),
+                "integer" => new IrValue(node, IrValueKind.Integer, factory.CreateIntegerValue(1).Payload),
+                _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+            };
+        });
+        if (mutation == "valid")
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(56, 56, 0, 0, 56, 56)));
+        }
+        else
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayFieldStoreUnsupported"));
+        }
+    }
+
     [TestCase("missing")]
     [TestCase("type")]
     [TestCase("borrowed")]
