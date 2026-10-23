@@ -35,6 +35,12 @@ internal static class QueryRuntimeChecks
                 [System.Diagnostics.CodeAnalysis.DisallowNull]public T Required{get{Reads++;return Stored;}set{Interlocked.Increment(ref Writes);Observed=value;if(QueryTrace.Failure!=null)throw QueryTrace.Failure;if(value is null)throw QueryTrace.ContractFailure;Stored=value;}}
                 [System.Diagnostics.CodeAnalysis.AllowNull]public T this[int index]{get{Reads++;return Stored;}set{Interlocked.Increment(ref Writes);Observed=value;if(QueryTrace.Failure!=null)throw QueryTrace.Failure;}}
             }
+            public static class CollectionInputTrace{public static int Created,Adds,Helpers;public static Exception? Failure;}
+            public sealed class CollectionInputBag<T>:IEnumerable<T>{
+                public readonly List<T> Items=new List<T>();public CollectionInputBag(){Interlocked.Increment(ref CollectionInputTrace.Created);}
+                public void Add([System.Diagnostics.CodeAnalysis.AllowNull]T value){Interlocked.Increment(ref CollectionInputTrace.Adds);if(CollectionInputTrace.Failure!=null)throw CollectionInputTrace.Failure;Items.Add(value!);}
+                public IEnumerator<T> GetEnumerator()=>Items.GetEnumerator();System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
+            }
             public static class RequiredTrace{public static int Calls;}
             public delegate T RequiredAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
             public static partial class PartialInputProbe{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryProbe.RequireInput(value);}
@@ -88,6 +94,15 @@ internal static class QueryRuntimeChecks
                 public static int InputDeconstruct(InputWriteCell<int> cell,int value){(cell.Required,cell.Field)=(value,value);return cell.Stored;}
                 public static async Task<int> InputOptionalTask(InputWriteCell<int> cell,Task gate){await gate;cell.Optional=default;return cell.Stored;}
                 public static async ValueTask<int> InputRequiredValueTask(InputWriteCell<int> cell,int value,Task gate){await gate;cell.Required=value;return value;}
+                [return:System.Diagnostics.CodeAnalysis.MaybeNull]static T CollectionMaybe<T>(T value){Interlocked.Increment(ref CollectionInputTrace.Helpers);if(QueryTrace.Failure!=null)throw QueryTrace.Failure;return default;}
+                static T CollectionSeed<T>(T value,params CollectionInputBag<T> items)=>value;
+                public static CollectionInputBag<int> CollectionOptional(int value)=>[CollectionMaybe(value)];
+                public static CollectionInputBag<int> CollectionDefault(int value)=>[default,value];
+                public static CollectionInputBag<string?> CollectionSpread(IEnumerable<string?> values)=>[..values];
+                public static CollectionInputBag<int[]> CollectionArray(int[]? values)=>[values];
+                public static int CollectionPacked(int value)=>CollectionSeed(value,CollectionMaybe(value));
+                public static async Task<CollectionInputBag<int>> CollectionOptionalTask(Task<int> input){var value=await input;return[CollectionMaybe(value)];}
+                public static async ValueTask<CollectionInputBag<int>> CollectionOptionalValueTask(ValueTask<int> input){var value=await input;return[CollectionMaybe(value)];}
                 public static int RequiredLocal(int value){var local=value;return RequireInput(local);}
                 public static int RequiredChoice(int left,int right,bool choose){var local=choose?left:right;return RequireInput(local);}
                 public static int[] RequiredUnrelated(int value,int other){var local=value;return new[]{RequireInput(local),other};}
@@ -398,7 +413,26 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> CollectionInputContracts(CancellationToken cancellationToken){
+                    CollectionInputTrace.Created=CollectionInputTrace.Adds=CollectionInputTrace.Helpers=0;var optional=QueryProbe.CollectionOptional(7);var defaults=QueryProbe.CollectionDefault(7);if(optional.Items.Count!=1||optional.Items[0]!=0||defaults.Items.Count!=2||defaults.Items[0]!=0||defaults.Items[1]!=7||QueryProbe.CollectionPacked(7)!=7||CollectionInputTrace.Created!=3||CollectionInputTrace.Adds!=4||CollectionInputTrace.Helpers!=2)return false;
+                    QueryTrace.Value="";var spread=QueryProbe.CollectionSpread(QueryTrace.Source(new string?[]{null,"value"}));if(spread.Items.Count!=2||spread.Items[0]!=null||spread.Items[1]!="value"||QueryTrace.Value!="open;dispose;")return false;
+                    var failure=new InvalidOperationException("collection input");using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    foreach(var outcome in new[]{"Value","Fault","Cancel","HelperFault","AddFault"}){
+                        CollectionInputTrace.Created=CollectionInputTrace.Adds=CollectionInputTrace.Helpers=0;CollectionInputTrace.Failure=outcome=="AddFault"?failure:null;QueryTrace.Failure=outcome=="HelperFault"?failure:null;var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        try{var task=QueryProbe.CollectionOptionalTask(gate.Task);var valueTask=QueryProbe.CollectionOptionalValueTask(new ValueTask<int>(gate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted||CollectionInputTrace.Created!=0||CollectionInputTrace.Adds!=0||CollectionInputTrace.Helpers!=0)return false;
+                            if(outcome is "Value" or "HelperFault" or "AddFault")gate.SetResult(7);else if(outcome=="Fault")gate.SetException(failure);else gate.SetCanceled(canceled.Token);
+                            foreach(var pending in new[]{task,valueTask}){
+                                try{var result=await pending.WaitAsync(cancellationToken);if(outcome!="Value"||result.Items.Count!=1||result.Items[0]!=0)return false;}
+                                catch(InvalidOperationException error)when(outcome is "Fault" or "HelperFault" or "AddFault"&&ReferenceEquals(error,failure)){}
+                                catch(OperationCanceledException error)when(outcome=="Cancel"&&error.CancellationToken==canceled.Token){}
+                            }
+                            if(CollectionInputTrace.Helpers!=(outcome is "Value" or "HelperFault" or "AddFault"?2:0)||CollectionInputTrace.Adds!=(outcome is "Value" or "AddFault"?2:0)||outcome is "Value" or "AddFault"&&CollectionInputTrace.Created!=2||outcome is "Fault" or "Cancel"&&CollectionInputTrace.Created!=0)return false;
+                        }finally{QueryTrace.Failure=null;CollectionInputTrace.Failure=null;}
+                    }
+                    return true;
+                }
                 static async Task<bool> MemberInputContracts(CancellationToken cancellationToken){
+                    if(!await CollectionInputContracts(cancellationToken))return false;
                     var cell=new InputWriteCell<int>(17);QueryTrace.IndexCalls=0;
                     if(QueryProbe.InputOptional(cell)!=17||cell.Observed!=0||QueryProbe.InputAssignment(cell)!=0||QueryProbe.InputField(cell)!=0||cell.Field!=0||QueryProbe.InputIndexer(cell)!=17||QueryTrace.IndexCalls!=1||cell.Receivers!=1||cell.Reads!=0||cell.Writes!=3)return false;
                     if(QueryProbe.InputRequired(cell,7)!=7||cell.Stored!=7||QueryProbe.InputChoice(cell,11,13,false)!=13||QueryProbe.InputDeconstruct(cell,19)!=19||cell.Stored!=19||cell.Field!=19||cell.Writes!=6)return false;
@@ -795,7 +829,16 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> CollectionInputContracts(string text,CancellationToken cancellationToken){
+                    var uri=new Uri("https://example.invalid/collection-input");var optional=QueryProbe.CollectionOptional(uri);var defaults=QueryProbe.CollectionDefault(uri);if(optional.Items.Count!=1||optional.Items[0]!=null||defaults.Items.Count!=2||defaults.Items[0]!=null||!ReferenceEquals(defaults.Items[1],uri)||!ReferenceEquals(QueryProbe.CollectionPacked(uri),uri))return false;
+                    decimal? number=23m;var values=QueryProbe.CollectionDefault(number);if(values.Items[0]!=null||values.Items[1]!=number||QueryProbe.CollectionPacked(number)!=number)return false;
+                    Uri?[] input={null,uri};var spread=QueryProbe.CollectionSpread(input);if(spread.Items[0]!=null||!ReferenceEquals(spread.Items[1],uri))return false;
+                    Uri[]? missing=null;var array=QueryProbe.CollectionArray(missing);if(array.Items.Count!=1||array.Items[0]!=null)return false;
+                    var gate=new TaskCompletionSource<Uri>(TaskCreationOptions.RunContinuationsAsynchronously);var task=QueryProbe.CollectionOptionalTask(gate.Task);var valueTask=QueryProbe.CollectionOptionalValueTask(new ValueTask<Uri>(gate.Task)).AsTask();if(task.IsCompleted||valueTask.IsCompleted)return false;gate.SetResult(uri);foreach(var pending in new[]{task,valueTask}){var result=await pending.WaitAsync(cancellationToken);if(result.Items.Count!=1||result.Items[0]!=null)return false;}
+                    return true;
+                }
                 static async Task<bool> MemberInputContracts(string text,CancellationToken cancellationToken){
+                    if(!await CollectionInputContracts(text,cancellationToken))return false;
                     var cell=new InputWriteCell<string>(text);QueryTrace.IndexCalls=0;
                     if(!ReferenceEquals(QueryProbe.InputOptional(cell),text)||cell.Observed!=null||QueryProbe.InputAssignment(cell)!=null||QueryProbe.InputField(cell)!=null||cell.Field!=null||!ReferenceEquals(QueryProbe.InputIndexer(cell),text)||QueryTrace.IndexCalls!=1||cell.Receivers!=1||cell.Reads!=0||cell.Writes!=3)return false;
                     decimal? number=23m;var numeric=new InputWriteCell<decimal?>(number);if(QueryProbe.InputRequired(numeric,number)!=number||QueryProbe.InputChoice(numeric,number,number,false)!=number||QueryProbe.InputDeconstruct(numeric,number)!=number||numeric.Stored!=number||numeric.Field!=number)return false;

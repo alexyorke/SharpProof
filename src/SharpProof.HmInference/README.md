@@ -928,6 +928,25 @@ storage and physical nullable values keep their existing representation. Source,
 metadata, guard, suppression, receiver-isolation and C# 8/9/13 CLI/package checks
 cover these rules. Applied fixes verify null results, identity, receiver/index
 counts, writes, suspension, exact setter/await faults and cancellation.
+Explicit collection elements now honor `AllowNull` on their selected Add input
+without making the collection owner's payload nullable. Maybe-null results,
+contextual defaults, arrays and physical nullable values retain their payload
+relationships. Spreads retain the enumeration element's nullability, as required
+by the compiler's spread conversion. Generic call results now follow generalized
+candidate flow, including the nullable result inferred through packed params
+collections. Contextual defaults are inferred
+from the accepting input; explicit numeric endpoints and Add/builder/protocol
+selection remain checked. Regression fixtures record the pinned compiler's absent
+ordinary `DisallowNull` argument warnings for unconstrained collection-expression
+inputs and spreads. Explicit Add calls retain diagnostic-driven precondition forwarding.
+Compiler hosts that warn on the annotated Add input trigger a fresh inference
+pass with an optional collection element domain. This follows actual diagnostics
+and retains unannotated owners on hosts that accept them. CLI and package fixtures
+verify both host behaviors.
+Source/metadata fixtures and applied IDE fixes verify null/default items, identity,
+constructor/Add/helper counts, spread disposal, Task/ValueTask suspension, exact
+helper/Add/await faults and cancellation. C# 13 CLI/package fixtures verify the new
+signatures; earlier-language consumers retain their existing feature boundaries.
 Remaining indirect-storage flow still needs work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction

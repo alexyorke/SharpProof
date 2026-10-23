@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.HmInference;
 
@@ -9,6 +10,82 @@ public static partial class Inference
 {
     private sealed partial class Session
     {
+        private readonly HashSet<(TextSpan Collection, TextSpan Element)> optionalCollectionCandidates = [];
+
+        private MethodResult? RefineCollectionInputs(Compilation compilation, MethodDeclarationSyntax original, MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
+            if (optionalCollectionCandidates.Count == 0)
+            { return null; }
+            var diagnostics = compilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
+            {
+                if (diagnostic is null)
+                { throw new ArgumentNullException(nameof(diagnostic)); }
+                return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
+                    && diagnostic.Id == "CS8604" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+            }).ToArray();
+            if (diagnostics.Length == 0)
+            { return null; }
+            var before = original.DescendantNodes().OfType<CollectionExpressionSyntax>().ToArray();
+            var after = candidate.DescendantNodes().OfType<CollectionExpressionSyntax>().ToArray();
+            if (before.Length != after.Length)
+            { return null; }
+            var next = new HashSet<TextSpan>(nullableCollectionInputs);
+            for (var i = 0; i < before.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (before[i].Elements.Count != after[i].Elements.Count)
+                { continue; }
+                for (var j = 0; j < before[i].Elements.Count; j++)
+                {
+                    if (before[i].Elements[j] is not ExpressionElementSyntax source || after[i].Elements[j] is not ExpressionElementSyntax changed
+                        || !optionalCollectionCandidates.Contains((before[i].Span, source.Expression.Span)))
+                    { continue; }
+                    if (diagnostics.Any(diagnostic =>
+                    {
+                        if (diagnostic is null)
+                        { throw new ArgumentNullException(nameof(diagnostic)); }
+                        return diagnostic.Location.SourceSpan == changed.Expression.Span || diagnostic.Location.SourceSpan == StorageExpression(changed.Expression).Span;
+                    }))
+                    { next.Add(before[i].Span); }
+                }
+            }
+            return next.Count == nullableCollectionInputs.Count ? null : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: next).Analyze(original, pins);
+        }
+
+        private HmType OptionalCollectionElement(HmType collection, HmType element)
+        {
+            if (collection is null)
+            { throw new ArgumentNullException(nameof(collection)); }
+            if (element is null)
+            { throw new ArgumentNullException(nameof(element)); }
+            element = element.Root;
+            if (element.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference or CSharpTypes.NullableValue)
+            { return collection; }
+            var optional = new HmType(CSharpTypes.NullableParameter, element);
+            defaultValueAnnotations.Add(optional);
+            return Rewrite(collection);
+
+            HmType Rewrite(HmType node)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                node = node.Root;
+                if (node == element)
+                { return optional; }
+                if (node.Arguments.Length == 0)
+                { return node; }
+                return node.WithArguments(node.Arguments.Select(Rewrite).ToArray());
+            }
+        }
+
         private string CollectionTypeName(ITypeSymbol type, int position)
         {
             if (type is null)
@@ -82,7 +159,27 @@ public static partial class Inference
                 ?? throw new InferenceException("Unresolved collection Add invocation.");
         }
 
-        private void BindCollectionAdd(ICollectionExpressionOperation operation, ITypeSymbol source, HmType value, ExpressionSyntax syntax, HmType collection, int? bindingPosition = null)
+        private static bool AllowsNullCollectionInput(IParameterSymbol parameter, ITypeSymbol source, ITypeSymbol target)
+        {
+            if (parameter is null)
+            { throw new ArgumentNullException(nameof(parameter)); }
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (!SymbolEqualityComparer.Default.Equals(source, target) || !SymbolEqualityComparer.Default.Equals(parameter.Type, target))
+            { return false; }
+            var allow = false;
+            var disallow = false;
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                allow |= attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.AllowNullAttribute";
+                disallow |= attribute.AttributeClass?.ToDisplayString() == "System.Diagnostics.CodeAnalysis.DisallowNullAttribute";
+            }
+            return allow && !disallow;
+        }
+
+        private void BindCollectionAdd(ICollectionExpressionOperation operation, ITypeSymbol source, HmType value, ExpressionSyntax syntax, HmType collection, int? bindingPosition = null, IInvocationOperation? selectedCall = null)
         {
             if (operation is null)
             { throw new ArgumentNullException(nameof(operation)); }
@@ -94,7 +191,7 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(syntax)); }
             if (collection is null)
             { throw new ArgumentNullException(nameof(collection)); }
-            var call = CollectionAddCall(operation, syntax, bindingPosition);
+            var call = selectedCall ?? CollectionAddCall(operation, syntax, bindingPosition);
             if (call is null)
             { return; }
             var add = call.TargetMethod;
@@ -124,7 +221,12 @@ public static partial class Inference
                     { if (item is null) { throw new ArgumentNullException(nameof(item)); } return (source, value, syntax); }, bindingPosition ?? operation.Syntax.SpanStart);
                 }
                 else
-                { BindConvertedArgument(source, parameter.Type, value, expected); }
+                {
+                    if (AllowsNullCollectionInput(parameter, source, parameter.Type))
+                    { UnifyDeconstructionReceiver(ConversionCore(expected), ConversionCore(value)); }
+                    else
+                    { BindConvertedArgument(source, parameter.Type, value, expected); }
+                }
             }
             foreach (var parameter in definition.TypeParameters)
             { ImportConstraints(parameter, mapping[parameter], mapping, add.TypeArguments[parameter.Ordinal]); }
@@ -139,10 +241,22 @@ public static partial class Inference
             var shape = CSharpTypes.Erase(original);
             if (ConversionCore(shape).IsVariable)
             { HmType.Unify(shape, CSharpTypes.Rigid(original)); }
-            if (expected is not null)
-            { UnifyDeconstructionReceiver(expected, shape); }
-            ImportConstructedConstraints(original, shape);
+            var optionalInput = nullableCollectionInputs.Contains(operation.Syntax.Span);
+            if (!optionalInput)
+            {
+                if (expected is not null)
+                { UnifyDeconstructionReceiver(expected, shape); }
+                ImportConstructedConstraints(original, shape);
+            }
             var element = CollectionElement(original, shape, position);
+            if (optionalInput)
+            {
+                shape = OptionalCollectionElement(shape, element.Shape);
+                if (expected is not null)
+                { UnifyDeconstructionReceiver(expected, shape); }
+                ImportConstructedConstraints(original, shape);
+                element = CollectionElement(original, shape, position);
+            }
             if (operation.ConstructMethod is { IsStatic: true } builder)
             {
                 var mapping = ReceiverMapping(builder, null);
@@ -156,6 +270,38 @@ public static partial class Inference
                 foreach (var parameter in builder.OriginalDefinition.TypeParameters)
                 { ImportConstraints(parameter, mapping[parameter], mapping, builder.TypeArguments[parameter.Ordinal]); }
             }
+            bool AllowsElement(IInvocationOperation? call, ITypeSymbol source)
+            {
+                if (source is null)
+                { throw new ArgumentNullException(nameof(source)); }
+                return call is not null && call.Arguments.Any(argument =>
+                {
+                    if (argument is null)
+                    { throw new ArgumentNullException(nameof(argument)); }
+                    return argument.ArgumentKind != ArgumentKind.DefaultValue && argument.Parameter is { } parameter
+                        && !(call.TargetMethod.IsStatic && call.TargetMethod.IsExtensionMethod && parameter.Ordinal == 0)
+                        && AllowsNullCollectionInput(parameter, source, element.Type);
+                });
+            }
+            void BindElement(ITypeSymbol source, HmType value, ExpressionSyntax syntax, IInvocationOperation? selectedCall = null)
+            {
+                if (source is null)
+                { throw new ArgumentNullException(nameof(source)); }
+                if (value is null)
+                { throw new ArgumentNullException(nameof(value)); }
+                if (syntax is null)
+                { throw new ArgumentNullException(nameof(syntax)); }
+                var call = selectedCall ?? CollectionAddCall(operation, syntax, position);
+                if (AllowsElement(call, source))
+                {
+                    if (operation.Syntax is CollectionExpressionSyntax collectionSyntax && value.Root.Name is CSharpTypes.NullableParameter or CSharpTypes.NullableReference)
+                    { optionalCollectionCandidates.Add((collectionSyntax.Span, syntax.Span)); }
+                    UnifyDeconstructionReceiver(ConversionCore(element.Shape), ConversionCore(value));
+                }
+                else
+                { BindConvertedArgument(source, element.Type, value, element.Shape); }
+                BindCollectionAdd(operation, source, value, syntax, shape, position, call);
+            }
             foreach (var item in operation.Elements)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -163,26 +309,30 @@ public static partial class Inference
                 {
                     var source = spread.Operand.Type ?? throw new InferenceException("Unresolved spread source.");
                     var values = CollectionElement(source, BoundExpression(spread.Operand), spread.Syntax.SpanStart);
-                    BindConvertedArgument(values.Type, element.Type, values.Shape, element.Shape);
                     if (operation.ConstructMethod is { MethodKind: MethodKind.Constructor })
-                    { BindCollectionAdd(operation, values.Type, values.Shape, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(values.Type, spread.Syntax.SpanStart) + ")!"), shape, position); }
+                    {
+                        BindConvertedArgument(values.Type, element.Type, values.Shape, element.Shape);
+                        BindCollectionAdd(operation, values.Type, values.Shape, SyntaxFactory.ParseExpression("default(" + CollectionTypeName(values.Type, spread.Syntax.SpanStart) + ")!"), shape, position);
+                    }
+                    else
+                    { BindConvertedArgument(values.Type, element.Type, values.Shape, element.Shape); }
                 }
                 else
                 {
                     if (elementSource is not null)
                     {
                         var resolved = elementSource(item);
-                        BindConvertedArgument(resolved.Type, element.Type, resolved.Shape, element.Shape);
-                        BindCollectionAdd(operation, resolved.Type, resolved.Shape, resolved.Syntax, shape, position);
+                        BindElement(resolved.Type, resolved.Shape, resolved.Syntax);
                     }
                     else
                     {
                         var syntax = (ExpressionSyntax)item.Syntax;
                         var info = model.GetTypeInfo(syntax, cancellationToken);
                         var source = (IsTargetedInterpolation(syntax) ? info.ConvertedType : info.Type) ?? item.Type ?? element.Type;
-                        var value = BoundExpression(item);
-                        BindConvertedArgument(source, element.Type, value, element.Shape);
-                        BindCollectionAdd(operation, source, value, syntax, shape, position);
+                        var call = CollectionAddCall(operation, syntax, position);
+                        var value = AllowsElement(call, source) && StorageExpression(syntax).IsKind(SyntaxKind.DefaultLiteralExpression)
+                            ? StoredValueShape(syntax, source) ?? BoundExpression(item) : BoundExpression(item);
+                        BindElement(source, value, syntax, call);
                     }
                 }
             }

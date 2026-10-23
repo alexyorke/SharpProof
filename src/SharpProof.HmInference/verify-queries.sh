@@ -41,6 +41,7 @@ public void ObserveRef([System.Diagnostics.CodeAnalysis.AllowNull]ref readonly T
 }
 public sealed class PriorityInputCell<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Maybe{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}[System.Diagnostics.CodeAnalysis.NotNull]public T Required{[return:System.Diagnostics.CodeAnalysis.MaybeNull]get=>default!;}}
 public sealed class MemberInputCell<T>{public T Stored=default!;[System.Diagnostics.CodeAnalysis.AllowNull]public T Field=default!;[System.Diagnostics.CodeAnalysis.AllowNull]public T Optional{get=>Stored;set=>Stored=value!;}[System.Diagnostics.CodeAnalysis.DisallowNull]public T Required{get=>Stored;set=>Stored=value;}[System.Diagnostics.CodeAnalysis.AllowNull]public T this[int index]{get=>Stored;set=>Stored=value!;}}
+public sealed class OptionalCollectionBag<T>:IEnumerable<T>{public void Add([System.Diagnostics.CodeAnalysis.AllowNull]T value){}public IEnumerator<T> GetEnumerator()=>throw new Exception();System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();}
 public delegate T RequiredInputAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
 #if ANNOTATED_REF
 public static partial class ForwardInputPartial{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryConsumer.RequiredForwardHelper(value);}
@@ -61,6 +62,16 @@ public static class QueryConsumer{
   public static int[]? AllowMemberArray(MemberInputCell<int[]> cell,int[]? value){cell.Field=value;return cell.Field;}
   public static int RequireMemberStore(MemberInputCell<int> cell,int value){cell.Required=value;return value;}
   public static async ValueTask<int> RequireMemberAwait(MemberInputCell<int> cell,int value,Task gate){await gate;cell.Required=value;return value;}
+#if READONLY_REF
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull]static T CollectionMaybeInput<T>(T value)=>default;
+  static T CollectionSeedInput<T>(T value,params OptionalCollectionBag<T> items)=>value;
+  public static OptionalCollectionBag<int> OptionalCollectionMaybe(int value)=>[CollectionMaybeInput(value)];
+  public static OptionalCollectionBag<int> OptionalCollectionDefault(int value)=>[default,value];
+  public static OptionalCollectionBag<int[]?> OptionalCollectionArray(int[]? values)=>[values];
+  public static OptionalCollectionBag<string?> OptionalCollectionSpread(IEnumerable<string?> values)=>[..values];
+  public static int OptionalCollectionPacked(int value)=>CollectionSeedInput(value,CollectionMaybeInput(value));
+  public static async Task<OptionalCollectionBag<int>> OptionalCollectionAwait(Task<int> input){var value=await input;return[CollectionMaybeInput(value)];}
+#endif
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -285,6 +296,17 @@ EOF
   grep -Fq 'T1[]? AllowMemberArray<T1>(global::MemberInputCell<T1[]> cell, T1[]? value)' "$log"
   grep -Fq 'T1 RequireMemberStore<T1>(global::MemberInputCell<T1> cell, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> RequireMemberAwait<T1>(global::MemberInputCell<T1> cell, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value, global::System.Threading.Tasks.Task gate)' "$log"
+  if [ "$language" = 13 ]; then
+    collection_input=T1
+    if [ "$#" -eq 3 ]; then collection_input='T1?'; fi
+    grep -Fq "global::OptionalCollectionBag<$collection_input> OptionalCollectionMaybe<T1>(T1 value)" "$log"
+    grep -Fq "global::OptionalCollectionBag<$collection_input> OptionalCollectionDefault<T1>(T1 value)" "$log"
+    collection_array='T1[]?'
+    grep -Fq "global::OptionalCollectionBag<$collection_array> OptionalCollectionArray<T1>(T1[]? values)" "$log"
+    grep -Fq 'global::OptionalCollectionBag<T1?> OptionalCollectionSpread<T1>(global::System.Collections.Generic.IEnumerable<T1?> values) where T1 : class' "$log"
+    grep -Fq 'T1? OptionalCollectionPacked<T1>(T1 value)' "$log"
+    grep -Fq "global::System.Threading.Tasks.Task<global::OptionalCollectionBag<$collection_input>> OptionalCollectionAwait<T1>(global::System.Threading.Tasks.Task<T1> input)" "$log"
+  fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredDelegateForward<T1>(global::RequiredInputAction<T1> require, [global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
@@ -443,3 +465,48 @@ EOF
   fi
   if [ "$#" -eq 1 ]; then printf 'PASS CliQueriesCSharp%s\n' "$language"; fi
 done
+
+# This fixture starts with a warning, then applies the emitted signature
+# and requires a clean warnings-as-errors build.
+if [ "$#" -eq 3 ]; then
+  array_fixture=$(mktemp -d /tmp/hm-collection-array-input.XXXXXX)
+  cp global.json "$array_fixture/global.json"
+  cat > "$array_fixture/.editorconfig" << 'EOF'
+root=true
+[*.cs]
+dotnet_diagnostic.HM0001.severity=warning
+EOF
+  cat > "$array_fixture/ArrayInput.csproj" << EOF
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>13</LangVersion><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><WarningsNotAsErrors>HM0001;CS8604</WarningsNotAsErrors><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup><ItemGroup><PackageReference Include="SharpProof.HmInference" Version="$3" PrivateAssets="all" /></ItemGroup></Project>
+EOF
+  cat > "$array_fixture/Support.cs" << 'EOF'
+using System;using System.Collections;using System.Collections.Generic;
+public sealed class ArrayInputBag<T>:IEnumerable<T>{public void Add([System.Diagnostics.CodeAnalysis.AllowNull]T value){}public IEnumerator<T> GetEnumerator()=>throw new Exception();IEnumerator IEnumerable.GetEnumerator()=>GetEnumerator();}
+EOF
+  cat > "$array_fixture/Methods.cs" << 'EOF'
+public static class ArrayInputConsumer{public static ArrayInputBag<int[]> M(int[]? values)=>[values];}
+EOF
+  NUGET_PACKAGES="$array_fixture/packages" dotnet restore "$array_fixture/ArrayInput.csproj" --source "$2" > "$array_fixture/restore.log" 2>&1 || {
+    tail -30 "$array_fixture/restore.log"
+    exit 1
+  }
+  NUGET_PACKAGES="$array_fixture/packages" dotnet build "$array_fixture/ArrayInput.csproj" --no-restore > "$array_fixture/before.log" 2>&1 || {
+    tail -35 "$array_fixture/before.log"
+    exit 1
+  }
+  cp "$array_fixture/before.log" /workspace/SharpProof/artifacts/hm-inference/package-collection-array-before.txt
+  grep -Fq 'warning CS8604' "$array_fixture/before.log"
+  grep -Fq 'global::ArrayInputBag<T1[]?> M<T1>(T1[]? values)' "$array_fixture/before.log"
+  cat > "$array_fixture/Methods.cs" << 'EOF'
+public static class ArrayInputConsumer{public static global::ArrayInputBag<T1[]?> M<T1>(T1[]? values)=>[values];}
+EOF
+  NUGET_PACKAGES="$array_fixture/packages" dotnet build "$array_fixture/ArrayInput.csproj" --no-restore -p:WarningsNotAsErrors=HM0001 > "$array_fixture/after.log" 2>&1 || {
+    tail -35 "$array_fixture/after.log"
+    exit 1
+  }
+  cp "$array_fixture/after.log" /workspace/SharpProof/artifacts/hm-inference/package-collection-array-after.txt
+  if grep -Eq 'CS8604|CS8032|AD0001' "$array_fixture/after.log"; then
+    tail -35 "$array_fixture/after.log"
+    exit 1
+  fi
+fi

@@ -99,12 +99,13 @@ public static partial class Inference
     }
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
-        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null)
+        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<TextSpan, NullableFlowState> nullableReadFlow = nullableReadFlow ?? [];
         private readonly List<Dictionary<TextSpan, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
+        private readonly HashSet<TextSpan> nullableCollectionInputs = nullableCollectionInputs ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -388,6 +389,8 @@ public static partial class Inference
                 changedCompilation = ReplaceCandidate(changed);
             }
             var postconditionMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
+            if (RefineCollectionInputs(changedCompilation, method, postconditionMethod, pins) is { } refinedCollection)
+            { return refinedCollection; }
             if (RefineNullablePostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
             { return refinedPostconditions; }
 
