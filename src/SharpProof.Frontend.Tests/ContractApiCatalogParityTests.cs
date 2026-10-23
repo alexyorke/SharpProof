@@ -69,8 +69,12 @@ public sealed class ContractApiCatalogParityTests
                         Is.EqualTo(ContractApiSelectionFeature.None));
                     break;
                 case ContractApiAttributeCategory.InputModel:
-                    Assert.That(usage!.ValidOn, Is.EqualTo(AttributeTargets.Parameter));
-                    Assert.That(usage.AllowMultiple, Is.False);
+                    var isParameterModel = descriptor.MetadataName == ContractApiCatalog.ResourceBooleanInput;
+                    var isDeploymentModel = descriptor.MetadataName == ContractApiCatalog.ResourceTaskDeployment;
+                    var isQuantityModel = descriptor.MetadataName == ContractApiCatalog.ResourceTaskRuntimeUpperBound;
+                    Assert.That(isParameterModel || isDeploymentModel || isQuantityModel, Is.True, descriptor.MetadataName);
+                    Assert.That(usage!.ValidOn, Is.EqualTo(isParameterModel ? AttributeTargets.Parameter : AttributeTargets.Method));
+                    Assert.That(usage.AllowMultiple, Is.EqualTo(isQuantityModel));
                     Assert.That(descriptor.Selection, Is.EqualTo(ContractApiSelectionFeature.None));
                     break;
                 case ContractApiAttributeCategory.Closed:

@@ -116,12 +116,28 @@ an optional strengthening of this conditional model. It is not claimed here.
 
 ## Current checkpoint
 
+### Hosted integration corrections at published head 93b13694e
+
+Documentation and toolchain security passed. Hosted project tests exposed two
+expectations outside the focused resource suites: the final compilation seal
+still expected protocol 43, and catalog parity assumed every input model was a
+parameter-only attribute. The tests now use the owning protocol constant and
+check the parameter model plus both method-level runtime declarations explicitly.
+A new roadmap spelling finding was corrected. These fixes change tests and prose.
+
+Self-application failed while downloading the pinned PowerShell archive for its
+container image: the remote connection was reset. The next exact-head run must
+qualify that job as well. Coverage run 39920742037 stopped because its analyzer
+and project shards inherited the two test failures; it produced no merged
+coverage report. The previous 98.23% result is still only historical evidence.
+The unchanged 100% floor remains required; no coverage improvement is claimed.
+
 ### Final local delivery checks passed
 
 All 1741 selected worker tests passed on the combined production implementation
 and final test changes (`artifacts/resource-runtime-final-worker-tests.log`). The
 five additional controls exercise a real task comparison-budget boundary,
-16/17-record accounting evidence limits with bound metadata, and a nonconstant
+16/17-record accounting evidence limits with bound metadata, and a variable-dependent
 negated scalar return through the cumulative retained-memory envelope. Their
 coverage effect is unmeasured until the next merged hosted report.
 
