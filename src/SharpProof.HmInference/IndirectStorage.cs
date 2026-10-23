@@ -25,22 +25,60 @@ public static partial class Inference
                 || !model.ClassifyConversion(source, target).IsIdentity)
             { return null; }
             ITypeSymbol? declaredType;
-            IEnumerable<AttributeData> attributes;
+            var attributes = new List<AttributeData>();
+            IEnumerable<IArgumentOperation>? arguments = null;
+            Dictionary<int, HmType>? argumentValues = null;
+            IInvocationOperation? relationalCall = null;
+            var preferNotNull = false;
             switch (model.GetOperation(source, cancellationToken))
             {
                 case IInvocationOperation invocation:
                     declaredType = invocation.TargetMethod.OriginalDefinition.ReturnType;
-                    attributes = invocation.TargetMethod.GetReturnTypeAttributes();
+                    attributes.AddRange(invocation.TargetMethod.GetReturnTypeAttributes());
+                    arguments = invocation.Arguments;
+                    relationalCall = invocation;
+                    var guaranteed = new Dictionary<int, HmType>();
+                    foreach (var argument in invocation.Arguments)
+                    {
+                        if (argument.Parameter is not { } parameter)
+                        { continue; }
+                        var created = argument.Value;
+                        if (created is IConversionOperation conversion && !conversion.Conversion.IsUserDefined
+                            && (conversion.Conversion.IsReference || conversion.Conversion.IsIdentity))
+                        { created = conversion.Operand; }
+                        if ((created is IObjectCreationOperation or IArrayCreationOperation)
+                            && created.Type is { IsReferenceType: true } type)
+                        { guaranteed[parameter.Ordinal] = CSharpTypes.Rigid(type); }
+                        else if (created.ConstantValue.HasValue && created.ConstantValue.Value is not null
+                            && created.Type is { } constantType)
+                        { guaranteed[parameter.Ordinal] = CSharpTypes.Rigid(constantType); }
+                    }
+                    if (guaranteed.Count != 0)
+                    { argumentValues = guaranteed; }
                     break;
                 case IPropertyReferenceOperation property:
                     declaredType = property.Property.OriginalDefinition.Type;
-                    attributes = property.Property.GetAttributes();
-                    if (property.Property.GetMethod is { } getter)
-                    { attributes = attributes.Concat(getter.GetReturnTypeAttributes()); }
+                    preferNotNull = true;
+                    var propertyFlowContract = false;
+                    foreach (var attribute in property.Property.GetAttributes())
+                    {
+                        if (attribute is null)
+                        { throw new InvalidOperationException("Unexpected null property attribute."); }
+                        var name = attribute.AttributeClass?.ToDisplayString();
+                        if (name == "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute")
+                        { continue; }
+                        propertyFlowContract |= name is "System.Diagnostics.CodeAnalysis.MaybeNullAttribute"
+                            or "System.Diagnostics.CodeAnalysis.NotNullAttribute";
+                        attributes.Add(attribute);
+                    }
+                    // A source property's flow contract takes precedence over
+                    // attributes on its getter return, matching normal reads.
+                    if (!propertyFlowContract && property.Property.GetMethod is { } getter)
+                    { attributes.AddRange(getter.GetReturnTypeAttributes()); }
                     break;
                 case IFieldReferenceOperation field:
                     declaredType = field.Field.OriginalDefinition.Type;
-                    attributes = field.Field.GetAttributes();
+                    attributes.AddRange(field.Field.GetAttributes());
                     break;
                 default:
                     return null;
@@ -48,21 +86,61 @@ public static partial class Inference
             if (declaredType is not ITypeParameterSymbol
                 { HasValueTypeConstraint: false, HasUnmanagedTypeConstraint: false })
             { return null; }
-            var nullableDeclaration = declaredType.NullableAnnotation == NullableAnnotation.Annotated;
-            var maybeNull = false;
-            var strongerContract = false;
-            foreach (var attribute in attributes)
+            var value = CSharpTypes.Erase(target);
+            if (relationalCall is not null)
             {
-                if (attribute is null)
-                { throw new InvalidOperationException("Unexpected null return attribute."); }
-                var name = attribute.AttributeClass?.ToDisplayString();
-                maybeNull |= name == "System.Diagnostics.CodeAnalysis.MaybeNullAttribute";
-                strongerContract |= name is "System.Diagnostics.CodeAnalysis.NotNullAttribute"
-                    or "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute";
+                // Reuse already bound argument shapes for relational return
+                // contracts. A return T guarded by the same T input can remain
+                // a bare variable; an annotated input still carries its mark.
+                var mapped = new Dictionary<int, HmType>();
+                if (argumentValues is not null)
+                {
+                    foreach (var entry in argumentValues)
+                    { mapped.Add(entry.Key, entry.Value); }
+                }
+                foreach (var attribute in attributes)
+                {
+                    if (attribute is null)
+                    { throw new InvalidOperationException("Unexpected null return attribute."); }
+                    if (attribute.AttributeClass?.ToDisplayString() != "System.Diagnostics.CodeAnalysis.NotNullIfNotNullAttribute"
+                        || attribute.ConstructorArguments.Length != 1
+                        || attribute.ConstructorArguments[0].Value is not string guardName)
+                    { continue; }
+                    foreach (var argument in relationalCall.Arguments)
+                    {
+                        var syntax = argument.Syntax as ArgumentSyntax
+                            ?? argument.Syntax.Ancestors().OfType<ArgumentSyntax>().FirstOrDefault();
+                        if (argument.Parameter is not { } parameter || parameter.Name != guardName
+                            || syntax is null)
+                        { continue; }
+                        var expression = StorageExpression(syntax.Expression);
+                        if (expression is PostfixUnaryExpressionSyntax suppression
+                            && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                        { expression = StorageExpression(suppression.Operand); }
+                        if (expression is not IdentifierNameSyntax identifier
+                            || model.GetSymbolInfo(identifier, cancellationToken).Symbol is not { } symbol
+                            || !environment.TryGetValue(symbol, out var actual)
+                            || defaultStores?.ContainsKey(symbol) == true)
+                        { continue; }
+                        if (nullableReadFlow.TryGetValue(identifier.Span, out var flow)
+                            && flow == NullableFlowState.MaybeNull
+                            && model.GetTypeInfo(identifier, cancellationToken).Type is { } readType)
+                        { actual = ApplyMaybeNullContract(readType, actual); }
+                        mapped[parameter.Ordinal] = actual;
+                        if (SymbolEqualityComparer.Default.Equals(parameter.OriginalDefinition.Type, declaredType))
+                        { value = actual; }
+                    }
+                }
+                if (mapped.Count != 0)
+                { argumentValues = mapped; }
             }
-            if ((!nullableDeclaration && !maybeNull) || strongerContract)
-            { return null; }
-            return ApplyMaybeNullContract(target, CSharpTypes.Erase(target));
+            if (declaredType.NullableAnnotation == NullableAnnotation.Annotated)
+            { value = ApplyMaybeNullContract(target, value); }
+            value = ApplyNullabilityContract(target, value, attributes, forStorage: false,
+                arguments: arguments, argumentValues: argumentValues, preferNotNull: preferNotNull,
+                allowBareRelational: true);
+            return HasDefaultValueAnnotation(value) ? value : null;
         }
+
     }
 }

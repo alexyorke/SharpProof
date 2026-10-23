@@ -16,9 +16,14 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(operation)); }
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
-            var result = ApplyNullabilityContract(operation.TargetMethod.ReturnType, value, operation.TargetMethod.GetReturnTypeAttributes(), forStorage, operation.Arguments, argumentValues);
+            var indirectAliasStore = operation.Syntax is ExpressionSyntax callSyntax && IsIndirectAliasStore(callSyntax);
+            var result = ApplyNullabilityContract(operation.TargetMethod.ReturnType, value,
+                operation.TargetMethod.GetReturnTypeAttributes(), forStorage, out var conditionalProved,
+                operation.Arguments, argumentValues, allowBareRelational: indirectAliasStore);
             if (forStorage || operation.Syntax is not ExpressionSyntax syntax)
             { return result; }
+            if (indirectAliasStore && conditionalProved && result.Root.IsVariable && !HasDefaultValueAnnotation(result))
+            { conditionalGuaranteedCalls.Add(syntax.Span); }
             // A return occurrence can be nullable independently of its input variables.
             result = ApplyInvocationAnnotations(syntax, result);
             if (nullableReadFlow.TryGetValue(syntax.Span, out var state) && state == NullableFlowState.MaybeNull)
@@ -28,6 +33,20 @@ public static partial class Inference
         }
 
         private readonly Dictionary<TextSpan, HmType> invocationResultShapes = [];
+        private readonly HashSet<TextSpan> conditionalGuaranteedCalls = [];
+
+        private bool IsIndirectAliasStore(ExpressionSyntax expression)
+        {
+            if (expression is null)
+            { throw new ArgumentNullException(nameof(expression)); }
+            while (expression.Parent is ParenthesizedExpressionSyntax parentheses)
+            { expression = parentheses; }
+            return expression.Parent is AssignmentExpressionSyntax assignment
+                && assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                && assignment.Right == expression
+                && model.GetSymbolInfo(StorageExpression(assignment.Left), cancellationToken).Symbol
+                    is ILocalSymbol { RefKind: not RefKind.None };
+        }
         private readonly List<(TextSpan Call, int Argument, int Parameter, string Path, string TypePath)> nullableReceiverCandidates = [];
 
         private void ApplyNullableReceiverInputs(HmType[] parameters)
@@ -84,7 +103,7 @@ public static partial class Inference
                 if (diagnostic is null)
                 { throw new ArgumentNullException(nameof(diagnostic)); }
                 return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
-                    && diagnostic.Id is ("CS8603" or "CS8604" or "CS8620") && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+                    && diagnostic.Id is ("CS8603" or "CS8604" or "CS8619" or "CS8620") && diagnostic.Location.SourceTree == candidate.SyntaxTree;
             }).ToArray();
             if (warnings.Length == 0)
             { return null; }
@@ -112,10 +131,11 @@ public static partial class Inference
                     {
                         if (warning is null)
                         { throw new ArgumentNullException(nameof(warning)); }
-                        if (warning.Id == "CS8603")
+                        if (warning.Id is "CS8603" or "CS8619")
                         {
                             return candidateModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter: { } lambdaParameter }
-                            && IsLambdaReturnWarning(lambdaParameter.Type, expression, input.TypePath, warning);
+                            && IsLambdaReturnWarning(lambdaParameter.Type, expression, input.TypePath, warning,
+                                candidateModel, compilation, cancellationToken);
                         }
                         return (warning.Location.SourceSpan == expression.Span
                                 || warning.Location.SourceSpan == StorageExpression(expression).Span)
@@ -132,7 +152,8 @@ public static partial class Inference
 
         private static readonly char[] ReceiverTypePathSeparators = ['/'];
 
-        private static bool IsLambdaReturnWarning(ITypeSymbol formal, ExpressionSyntax expression, string typePath, Diagnostic warning)
+        private static bool IsLambdaReturnWarning(ITypeSymbol formal, ExpressionSyntax expression, string typePath, Diagnostic warning,
+            SemanticModel candidateModel, Compilation compilation, CancellationToken cancellationToken)
         {
             if (formal is null)
             { throw new ArgumentNullException(nameof(formal)); }
@@ -142,8 +163,13 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(typePath)); }
             if (warning is null)
             { throw new ArgumentNullException(nameof(warning)); }
+            if (candidateModel is null)
+            { throw new ArgumentNullException(nameof(candidateModel)); }
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
             if (formal is not INamedTypeSymbol { TypeKind: TypeKind.Delegate, IsGenericType: true } delegateType
-                || delegateType.OriginalDefinition.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } invoke)
+                || delegateType.OriginalDefinition.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } invoke
+                || delegateType.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } constructedInvoke)
             { return false; }
             while (expression is ParenthesizedExpressionSyntax parentheses)
             { expression = parentheses.Expression; }
@@ -151,33 +177,70 @@ public static partial class Inference
                 || lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null })
             { return false; }
             var steps = typePath.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries);
-            if (steps.Length is < 1 or > 2 || !int.TryParse(steps[0], System.Globalization.NumberStyles.None,
+            if (steps.Length < 1 || !int.TryParse(steps[0], System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture, out var returnIndex))
             { return false; }
             if (returnIndex >= delegateType.TypeArguments.Length)
             { return false; }
-            var declaredReturn = invoke.ReturnType;
-            var direct = declaredReturn is ITypeParameterSymbol directParameter
-                && directParameter.Ordinal == returnIndex
-                && SymbolEqualityComparer.Default.Equals(directParameter.ContainingSymbol, delegateType.OriginalDefinition);
+            var templatePaths = new List<string>();
+            void FindTemplatePaths(ITypeSymbol node, string path)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                if (node is ITypeParameterSymbol parameter)
+                {
+                    if (parameter.Ordinal == returnIndex
+                        && SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, delegateType.OriginalDefinition))
+                    { templatePaths.Add(path); }
+                    return;
+                }
+                if (node is IArrayTypeSymbol array)
+                { FindTemplatePaths(array.ElementType, path + "/0"); return; }
+                if (node is not INamedTypeSymbol named)
+                { return; }
+                var arguments = named.IsTupleType ? named.TupleElements.Select(element =>
+                {
+                    if (element is null)
+                    { throw new ArgumentNullException(nameof(element)); }
+                    return element.Type;
+                }).ToArray() : named.TypeArguments.ToArray();
+                for (var index = 0; index < arguments.Length; index++)
+                { FindTemplatePaths(arguments[index], path + "/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+            }
+            FindTemplatePaths(invoke.ReturnType, "");
+            if (templatePaths.Count == 0)
+            { return false; }
+            ITypeSymbol expectedReturn = constructedInvoke.ReturnType;
             if (lambda.AsyncKeyword.RawKind != 0)
             {
-                var task = direct && steps.Length == 2 && steps[1] == "0"
-                    ? delegateType.TypeArguments[returnIndex] as INamedTypeSymbol
-                    : !direct && steps.Length == 1 && declaredReturn is INamedTypeSymbol declaredTask
-                        && declaredTask.TypeArguments.Length == 1
-                        && declaredTask.TypeArguments[0] is ITypeParameterSymbol payload
-                        && payload.Ordinal == returnIndex
-                        && SymbolEqualityComparer.Default.Equals(payload.ContainingSymbol, delegateType.OriginalDefinition)
-                        && delegateType.DelegateInvokeMethod?.ReturnType is INamedTypeSymbol constructedTask
-                        && SymbolEqualityComparer.Default.Equals(constructedTask.OriginalDefinition, declaredTask.OriginalDefinition)
-                        && SymbolEqualityComparer.Default.Equals(constructedTask.TypeArguments[0], delegateType.TypeArguments[returnIndex])
-                        ? constructedTask : null;
-                if (task is null || task.OriginalDefinition.MetadataName is not ("Task`1" or "ValueTask`1")
+                if (expectedReturn is not INamedTypeSymbol task
+                    || task.OriginalDefinition.MetadataName is not ("Task`1" or "ValueTask`1")
                     || task.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks")
                 { return false; }
+                expectedReturn = task.TypeArguments[0];
             }
-            else if (!direct || steps.Length != 1)
+            var returnPaths = new List<string>();
+            foreach (var templatePath in templatePaths)
+            {
+                if (templatePath is null)
+                { throw new InvalidOperationException("Missing delegate return template path."); }
+                var returnPath = templatePath;
+                for (var depth = 1; depth < steps.Length; depth++)
+                { returnPath += "/" + steps[depth]; }
+                if (lambda.AsyncKeyword.RawKind != 0)
+                {
+                    if (returnPath == "/0")
+                    { returnPath = ""; }
+                    else if (returnPath.StartsWith("/0/", StringComparison.Ordinal))
+                    { returnPath = returnPath.Substring(2); }
+                    else
+                    { continue; }
+                }
+                returnPaths.Add(returnPath);
+            }
+            if (returnPaths.Count == 0)
             { return false; }
             var body = lambda switch
             {
@@ -186,21 +249,34 @@ public static partial class Inference
                 _ => null
             };
             if (body is ExpressionSyntax returned)
-            { return HasReturnSpan(returned); }
+            { return HasReturnWarning(returned); }
             return body is BlockSyntax block && block.DescendantNodes(node =>
             {
                 if (node is null)
                 { throw new ArgumentNullException(nameof(node)); }
                 return node is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax);
-            }).OfType<ReturnStatementSyntax>().Any(statement => { if (statement is null) { throw new ArgumentNullException(nameof(statement)); } return statement.Expression is { } value && HasReturnSpan(value); });
+            }).OfType<ReturnStatementSyntax>().Any(statement => { if (statement is null) { throw new ArgumentNullException(nameof(statement)); } return statement.Expression is { } value && HasReturnWarning(value); });
 
-            bool HasReturnSpan(ExpressionSyntax returned)
+            bool HasReturnWarning(ExpressionSyntax returned)
             {
                 if (returned is null)
                 { throw new ArgumentNullException(nameof(returned)); }
                 while (returned is ParenthesizedExpressionSyntax wrapped)
                 { returned = wrapped.Expression; }
-                return returned.Span == warning.Location.SourceSpan;
+                if (returned.Span != warning.Location.SourceSpan)
+                { return false; }
+                if (warning.Id == "CS8603")
+                { return returnPaths.Contains(""); }
+                if (warning.Id != "CS8619" || candidateModel.GetTypeInfo(returned, cancellationToken).Type is not { } actualReturn)
+                { return false; }
+                foreach (var returnPath in returnPaths)
+                {
+                    if (returnPath is null)
+                    { throw new InvalidOperationException("Missing delegate return path."); }
+                    if (returnPath.Length != 0 && HasAnnotatedReceiverLeaf(expectedReturn, actualReturn, returnPath, compilation))
+                    { return true; }
+                }
+                return false;
             }
         }
 
@@ -382,7 +458,22 @@ public static partial class Inference
         }
 
         private HmType ApplyNullabilityContract(ITypeSymbol returnType, HmType value, IEnumerable<AttributeData> attributes, bool forStorage,
-            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null, bool preferNotNull = false)
+            IEnumerable<IArgumentOperation>? arguments = null, IReadOnlyDictionary<int, HmType>? argumentValues = null,
+            bool preferNotNull = false, bool allowBareRelational = false)
+        {
+            if (returnType is null)
+            { throw new ArgumentNullException(nameof(returnType)); }
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+            if (attributes is null)
+            { throw new ArgumentNullException(nameof(attributes)); }
+            return ApplyNullabilityContract(returnType, value, attributes, forStorage, out _, arguments, argumentValues,
+                preferNotNull, allowBareRelational);
+        }
+
+        private HmType ApplyNullabilityContract(ITypeSymbol returnType, HmType value, IEnumerable<AttributeData> attributes, bool forStorage,
+            out bool conditionalNotNull, IEnumerable<IArgumentOperation>? arguments = null,
+            IReadOnlyDictionary<int, HmType>? argumentValues = null, bool preferNotNull = false, bool allowBareRelational = false)
         {
             if (returnType is null)
             { throw new ArgumentNullException(nameof(returnType)); }
@@ -390,12 +481,12 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(attributes)); }
             if (value is null)
             { throw new ArgumentNullException(nameof(value)); }
+            conditionalNotNull = false;
             if (forStorage || returnType.SpecialType == SpecialType.System_Void)
             { return value; }
             var maybeNull = false;
             var notNull = false;
             var conditional = false;
-            var conditionalNotNull = false;
             foreach (var attribute in attributes)
             {
                 var name = attribute.AttributeClass?.ToDisplayString();
@@ -407,7 +498,12 @@ public static partial class Inference
                     conditional = true;
                     foreach (var argument in arguments ?? [])
                     {
-                        if (argument.Parameter?.Name == parameterName && ConditionalReturnGuard(argument, argumentValues))
+                        if (argument.Parameter?.Name == parameterName
+                            && (ConditionalReturnGuard(argument, argumentValues)
+                                || allowBareRelational && argumentValues is not null && argument.Parameter is { } guardParameter
+                                && argumentValues.TryGetValue(guardParameter.Ordinal, out var guardValue)
+                                && guardValue.Root.IsVariable
+                                && ReferenceEquals(ConversionCore(value), guardValue.Root)))
                         { conditionalNotNull = true; }
                     }
                 }
@@ -772,6 +868,14 @@ public static partial class Inference
                 // Only an annotated read introduces optionality beyond that domain.
                 if (state == NullableFlowState.MaybeNull && info.Nullability.Annotation == NullableAnnotation.NotAnnotated)
                 { state = NullableFlowState.NotNull; }
+                // A conditional contract already discharged by inference can
+                // still appear MaybeNull in the candidate's Roslyn flow state.
+                // Keep the proved bare result instead of adding optionality.
+                if (state == NullableFlowState.MaybeNull && conditionalGuaranteedCalls.Contains(before[i].Span)
+                    && invocationResultShapes.TryGetValue(before[i].Span, out var inferredCall)
+                    && !HasDefaultValueAnnotation(inferredCall)
+                    && inferredCall.Root.IsVariable)
+                { state = NullableFlowState.NotNull; }
                 // Roslyn can expose the pre-flow annotation of a direct conditional
                 // operand even when its joined expression retains unannotated T.
                 SyntaxNode branch = after[i];
@@ -895,7 +999,10 @@ public static partial class Inference
                 return argument.Value.ConstantValue.HasValue ? argument.Value.ConstantValue.Value is not null
                     : declared.IsValueType && declared is not INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
             }
-            if (argument.Value.Syntax is ExpressionSyntax syntax && StorageExpression(syntax) is PostfixUnaryExpressionSyntax suppression
+            var sourceArgument = argument.Syntax as ArgumentSyntax
+                ?? argument.Syntax.Ancestors().OfType<ArgumentSyntax>().FirstOrDefault();
+            if ((sourceArgument?.Expression ?? argument.Syntax as ExpressionSyntax ?? argument.Value.Syntax as ExpressionSyntax) is { } syntax
+                && StorageExpression(syntax) is PostfixUnaryExpressionSyntax suppression
                 && suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             { return true; }
             if (argument.Value.ConstantValue.HasValue)

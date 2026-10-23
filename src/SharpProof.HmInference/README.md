@@ -986,9 +986,18 @@ result parameter and the lambda's own return expressions. Expression and block
 lambdas, anonymous delegates, custom result-parameter ordering and Task/ValueTask
 lambda payloads have source and applied-fix runtime checks. Suppressed returns,
 explicit result types and nested-function returns preserve their boundaries.
+Nested list, array and tuple results now map nullable return leaves back to the
+corresponding receiver parameters, including repeated result parameters and async
+list results. Independent tuple siblings retain their own contracts.
 Indirect ref-alias stores now discover nullable generic helper and member results
 before body inference, including generic owners, delegates, declared T? returns,
-MaybeNull fields and properties. Resolved field/array/ref-property paths retain
+MaybeNull fields and properties. Property flow attributes take precedence over
+getter return attributes. Imported metadata follows the emitted getter contract;
+the compiler can relocate property attributes during emit. Conditional return
+contracts distinguish inactive guards,
+boxed nullable defaults and user conversions from proven nonnull arguments;
+matching generic input/return contracts preserve bare generic storage when valid.
+Resolved field/array/ref-property paths retain
 nullable storage while fill inputs and independent siblings remain separate.
 Checks cover chained aliases, earlier copies, metadata contracts, runtime effects,
 physical nullable values and async suspension, faults and cancellation. C# 8/9/13

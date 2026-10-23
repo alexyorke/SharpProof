@@ -24,6 +24,9 @@ public sealed class LambdaReceiver<T>{public T Run(T seed,Func<T> action)=>actio
 public sealed class IndirectReceiver<T>{public T Value;public IndirectReceiver(T value){Value=value;}}
 public sealed class IndirectSource<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read(T fill)=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;}
 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T IndirectRead<T>(T fill);
+public sealed class LambdaListReceiver<T>{public List<T> Run(T seed,Func<List<T>> action)=>action();public Task<List<T>> RunAsync(T seed,Func<Task<List<T>>> action)=>action();}
+public sealed class LambdaTupleReceiver<T,U>{public (T value,U tag) Run(T seed,Func<(T value,U tag)> action)=>action();}
+public sealed class IndirectPrioritySource<T>{[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property{[return:System.Diagnostics.CodeAnalysis.NotNull]get=>default!;}}
 public sealed class CompoundInheritedInput<T>:List<T>{}
 public sealed class CompoundReceiver<T>{public T[] Join(T[] first,T[] second)=>first;public IEnumerable<T> Enumerate(T seed,IEnumerable<T> values)=>values;}
 public sealed class MemberContractCell<T>{
@@ -106,6 +109,13 @@ public static class QueryConsumer{
   public static int IndirectDelegateMaybe(IndirectReceiver<int> receiver,IndirectRead<int> read,int fill){ref var alias=ref receiver.Value;alias=read(fill);return receiver.Value;}
   public static int IndirectPropertyMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Property;return receiver.Value;}
   public static int IndirectMemberMaybe(IndirectReceiver<int> receiver,IndirectSource<int> source){ref var alias=ref receiver.Value;alias=source.Field;return receiver.Value;}
+  static List<T> LambdaValues<T>(T first,T second)=>new List<T>{first,second};
+  public static List<int> LambdaListReturn(LambdaListReceiver<int> receiver,int value)=>receiver.Run(value,()=>LambdaValues(value,GenericResultMaybe(value)));
+  public static async Task<List<int>> LambdaListAsyncReturn(LambdaListReceiver<int> receiver,int value)=>await receiver.RunAsync(value,async()=>{await Task.Yield();return LambdaValues(value,GenericResultMaybe(value));});
+  public static (int value,string tag) LambdaTupleReturn(LambdaTupleReceiver<int,string> receiver,int value,string tag)=>receiver.Run(value,()=> (GenericResultMaybe(value),tag));
+  [return:System.Diagnostics.CodeAnalysis.MaybeNull][return:System.Diagnostics.CodeAnalysis.NotNullIfNotNull("hint")]static T NullableStoreGuard<T>(T value,object? hint){if(hint is null)return default;if(value is null)throw new InvalidOperationException();return value;}
+  public static int IndirectInactiveGuard(IndirectReceiver<int> receiver,int fill){ref var alias=ref receiver.Value;alias=NullableStoreGuard(fill,null);return receiver.Value;}
+  public static int IndirectPriorityMaybe(IndirectReceiver<int> receiver,IndirectPrioritySource<int> source){ref var alias=ref receiver.Value;alias=source.Property;return receiver.Value;}
   static CompoundInheritedInput<T> CompoundValues<T>(T first,T second)=>new CompoundInheritedInput<T>{first,second};
   public static IEnumerable<int> CompoundInherited(CompoundReceiver<int> receiver,int value)=>receiver.Enumerate(value,CompoundValues(value,GenericResultMaybe(value)));
   public static int[] CompoundInstance(CompoundReceiver<int> receiver,int value)=>receiver.Join(new[]{value},new[]{GenericResultMaybe(value)});
@@ -414,6 +424,19 @@ EOF
     grep -Fq 'T1? IndirectDelegateMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectRead<T1> read, T1 fill)' "$log"
     grep -Fq 'T1? IndirectPropertyMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectSource<T1> source)' "$log"
     grep -Fq 'T1? IndirectMemberMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectSource<T1> source)' "$log"
+  fi
+  if [ "$language" = 8 ]; then
+    grep -Fq 'global::System.Collections.Generic.List<T1> LambdaListReturn<T1>(global::LambdaListReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1>> LambdaListAsyncReturn<T1>(global::LambdaListReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq '(T1 value, T2 tag) LambdaTupleReturn<T1, T2>(global::LambdaTupleReceiver<T1, T2> receiver, T1 value, T2 tag) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectInactiveGuard<T1>(global::IndirectReceiver<T1> receiver, T1 fill) where T1 : struct' "$log"
+    grep -Fq 'T1 IndirectPriorityMaybe<T1>(global::IndirectReceiver<T1> receiver, global::IndirectPrioritySource<T1> source) where T1 : struct' "$log"
+  else
+    grep -Fq 'global::System.Collections.Generic.List<T1?> LambdaListReturn<T1>(global::LambdaListReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> LambdaListAsyncReturn<T1>(global::LambdaListReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq '(T1? value, T2 tag) LambdaTupleReturn<T1, T2>(global::LambdaTupleReceiver<T1?, T2> receiver, T1 value, T2 tag)' "$log"
+    grep -Fq 'T1? IndirectInactiveGuard<T1>(global::IndirectReceiver<T1?> receiver, T1 fill)' "$log"
+    grep -Fq 'T1? IndirectPriorityMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectPrioritySource<T1> source)' "$log"
   fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"

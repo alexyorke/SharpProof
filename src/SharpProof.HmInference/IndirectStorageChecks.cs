@@ -25,9 +25,12 @@ internal static class IndirectStorageChecks
                 public T Value;public U Other;
                 public IndirectPair(T value,U other){Value=value;Other=other;}
             }
+            public sealed class HintMarker{}
+            public readonly struct HintInput{public static implicit operator HintMarker?(HintInput value)=>null;}
             public sealed class IndirectSource<T>{
                 [return:MaybeNull]public T Read(T value)=>default;
                 [MaybeNull]public T Property=>default;
+                [MaybeNull]public T Priority{[return:NotNull]get=>default!;}
                 [MaybeNull]public T Field=default!;
             }
             [return:MaybeNull]public delegate T IndirectReader<T>(T value);
@@ -41,6 +44,7 @@ internal static class IndirectStorageChecks
                 public static int Owner(IndirectBox<int> box,IndirectSource<int> source,int fill){ref var alias=ref box.Value;alias=source.Read(fill);return box.Value;}
                 public static int Delegate(IndirectBox<int> box,IndirectReader<int> read,int fill){ref var alias=ref box.Value;alias=read(fill);return box.Value;}
                 public static int SourceProperty(IndirectBox<int> box,IndirectSource<int> source){ref var alias=ref box.Value;alias=source.Property;return box.Value;}
+                public static int PriorityProperty(IndirectBox<int> box,IndirectSource<int> source){ref var alias=ref box.Value;alias=source.Priority;return box.Value;}
                 public static int SourceField(IndirectBox<int> box,IndirectSource<int> source){ref var alias=ref box.Value;alias=source.Field;return box.Value;}
                 public static int OptionalStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Optional(fill);return box.Value;}
                 public static int Copy(IndirectBox<int> box,int fill){var copy=box.Value;ref var alias=ref box.Value;alias=Maybe(fill);return copy;}
@@ -50,7 +54,20 @@ internal static class IndirectStorageChecks
                 public static int Typed(IndirectBox<int> box,int fill){ref int alias=ref box.Value;alias=Maybe(fill);return box.Value;}
                 [return:MaybeNull][return:NotNullIfNotNull(nameof(value))]
                 public static T Guarded<T>(T value)=>value;
-                public static int GuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(fill);return box.Value;}
+                [return:MaybeNull][return:NotNullIfNotNull("hint")]
+                public static T Conditional<T>(T value,object? hint){if(hint is null)return default!;if(value is null)throw new InvalidOperationException();return value;}
+                [return:MaybeNull][return:NotNullIfNotNull("hint")]
+                public static T ConditionalHint<T>(T value,HintMarker? hint){if(hint is null)return default!;if(value is null)throw new InvalidOperationException();return value;}
+                public static int ConditionalStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Conditional(fill,null);return box.Value;}
+                public static int ConditionalDefault(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Conditional(fill,default(object?));return box.Value;}
+                public static int ConditionalConstant(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Conditional(fill,"ready");return box.Value;}
+                public static int ConditionalNew(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Conditional(fill,new object());return box.Value;}
+                public static int ConditionalNullableNew(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Conditional(fill,new int?());return box.Value;}
+                public static int ConditionalUserConversion(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=ConditionalHint(fill,new HintInput());return box.Value;}
+                public static int UnknownGuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(fill);return box.Value;}
+                public static int ModifiedGuardedStore(IndirectBox<int> box,int fill){fill=default;ref var alias=ref box.Value;alias=Guarded(fill);return box.Value;}
+                public static int NullableGuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(Maybe(fill));return box.Value;}
+                public static int GuardedStore(IndirectBox<int> box,int fill){ref var alias=ref box.Value;alias=Guarded(fill!);return box.Value;}
             }
             public static class OriginalIndirectRunner{
                 public static async Task<bool> Run(CancellationToken token){
@@ -63,7 +80,18 @@ internal static class IndirectStorageChecks
                     var delegated=new IndirectBox<int>(7,11);IndirectReader<int> reader=IndirectProbe.Maybe;
                     if(IndirectProbe.Delegate(delegated,reader,9)!=0||delegated.Value!=0)return false;
                     var sourceProperty=new IndirectBox<int>(7,11);if(IndirectProbe.SourceProperty(sourceProperty,source)!=0||sourceProperty.Value!=0)return false;
+                    var priority=new IndirectBox<int>(7,11);if(IndirectProbe.PriorityProperty(priority,source)!=0||priority.Value!=0)return false;
                     var sourceField=new IndirectBox<int>(7,11);if(IndirectProbe.SourceField(sourceField,source)!=0||sourceField.Value!=0)return false;
+                    var conditional=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalStore(conditional,9)!=0||conditional.Value!=0)return false;
+                    var conditionalDefault=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalDefault(conditionalDefault,9)!=0||conditionalDefault.Value!=0)return false;
+                    var conditionalNullable=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalNullableNew(conditionalNullable,9)!=0||conditionalNullable.Value!=0)return false;
+                    var conditionalUser=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalUserConversion(conditionalUser,9)!=0||conditionalUser.Value!=0)return false;
+                    var unknownGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.UnknownGuardedStore(unknownGuarded,9)!=9||unknownGuarded.Value!=9)return false;
+                    var modifiedGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.ModifiedGuardedStore(modifiedGuarded,9)!=0||modifiedGuarded.Value!=0)return false;
+                    var nullableGuarded=new IndirectBox<int>(7,11);if(IndirectProbe.NullableGuardedStore(nullableGuarded,9)!=0||nullableGuarded.Value!=0)return false;
+                    var guarded=new IndirectBox<int>(7,11);if(IndirectProbe.GuardedStore(guarded,9)!=9||guarded.Value!=9)return false;
+                    var conditionalConstant=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalConstant(conditionalConstant,9)!=9||conditionalConstant.Value!=9)return false;
+                    var conditionalNew=new IndirectBox<int>(7,11);if(IndirectProbe.ConditionalNew(conditionalNew,9)!=9||conditionalNew.Value!=9)return false;
                     var optionalStore=new IndirectBox<int>(7,11);if(IndirectProbe.OptionalStore(optionalStore,9)!=0||optionalStore.Value!=0)return false;
                     var copy=new IndirectBox<int>(7,11);if(IndirectProbe.Copy(copy,9)!=7||copy.Value!=0)return false;
                     var sibling=new IndirectPair<int,int>(7,11);if(IndirectProbe.Sibling(sibling,9)!=11||sibling.Value!=0||sibling.Other!=11)return false;
@@ -97,7 +125,15 @@ internal static class IndirectStorageChecks
                     var delegated=new IndirectBox<object?>(value,other);IndirectReader<object> reader=IndirectProbe.Maybe;
                     if(IndirectProbe.Delegate(delegated,reader,value)!=null||delegated.Value!=null)return false;
                     var sourceProperty=new IndirectBox<object?>(value,other);if(IndirectProbe.SourceProperty(sourceProperty,source)!=null||sourceProperty.Value!=null)return false;
+                    var priority=new IndirectBox<object?>(value,other);if(IndirectProbe.PriorityProperty(priority,source)!=null||priority.Value!=null)return false;
                     var sourceField=new IndirectBox<object?>(value,other);if(IndirectProbe.SourceField(sourceField,source)!=null||sourceField.Value!=null)return false;
+                    var conditional=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalStore(conditional,value)!=null||conditional.Value!=null)return false;
+                    var conditionalDefault=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalDefault(conditionalDefault,value)!=null||conditionalDefault.Value!=null)return false;
+                    var conditionalNullable=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalNullableNew(conditionalNullable,value)!=null||conditionalNullable.Value!=null)return false;
+                    var conditionalUser=new IndirectBox<object?>(value,other);if(IndirectProbe.ConditionalUserConversion(conditionalUser,value)!=null||conditionalUser.Value!=null)return false;
+                    var unknownGuarded=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.UnknownGuardedStore(unknownGuarded,value),value)||!ReferenceEquals(unknownGuarded.Value,value))return false;
+                    var nullableGuarded=new IndirectBox<object?>(value,other);if(IndirectProbe.NullableGuardedStore(nullableGuarded,value)!=null||nullableGuarded.Value!=null)return false;
+                    var guarded=new IndirectBox<object>(value,other);if(!ReferenceEquals(IndirectProbe.GuardedStore(guarded,value),value)||!ReferenceEquals(guarded.Value,value))return false;
                     var optionalStore=new IndirectBox<object?>(value,other);if(IndirectProbe.OptionalStore(optionalStore,value)!=null||optionalStore.Value!=null)return false;
                     var copy=new IndirectBox<object?>(value,other);if(!ReferenceEquals(IndirectProbe.Copy(copy,value),value)||copy.Value!=null)return false;
                     var sibling=new IndirectPair<object?,Uri>(value,new Uri("https://example.invalid/sibling"));
@@ -139,7 +175,15 @@ internal static class IndirectStorageChecks
             ["Owner"] = "T1? Owner<T1>(global::IndirectBox<T1?> box, global::IndirectSource<T1> source, T1 fill)",
             ["Delegate"] = "T1? Delegate<T1>(global::IndirectBox<T1?> box, global::IndirectReader<T1> read, T1 fill)",
             ["SourceProperty"] = "T1? SourceProperty<T1>(global::IndirectBox<T1?> box, global::IndirectSource<T1> source)",
+            ["PriorityProperty"] = "T1? PriorityProperty<T1>(global::IndirectBox<T1?> box, global::IndirectSource<T1> source)",
             ["SourceField"] = "T1? SourceField<T1>(global::IndirectBox<T1?> box, global::IndirectSource<T1> source)",
+            ["ConditionalStore"] = "T1? ConditionalStore<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["ConditionalDefault"] = "T1? ConditionalDefault<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["ConditionalNullableNew"] = "T1? ConditionalNullableNew<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["ConditionalUserConversion"] = "T1? ConditionalUserConversion<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["UnknownGuardedStore"] = "T1 UnknownGuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)",
+            ["NullableGuardedStore"] = "T1? NullableGuardedStore<T1>(global::IndirectBox<T1?> box, T1 fill)",
+            ["GuardedStore"] = "T1 GuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)",
             ["OptionalStore"] = "T1? OptionalStore<T1>(global::IndirectBox<T1?> box, T1 fill)",
             ["Copy"] = "T1? Copy<T1>(global::IndirectBox<T1?> box, T1 fill)",
             ["Sibling"] = "T2 Sibling<T1, T2>(global::IndirectPair<T1?, T2> box, T1 fill)",
@@ -149,7 +193,8 @@ internal static class IndirectStorageChecks
             .Where(result =>
             {
                 ArgumentNullException.ThrowIfNull(result);
-                return expected.ContainsKey(result.Method) || result.Method is "Typed" or "GuardedStore";
+                return expected.ContainsKey(result.Method) || result.Method is "Typed" or "ModifiedGuardedStore"
+                    or "ConditionalConstant" or "ConditionalNew";
             })
             .ToDictionary(result =>
             {
@@ -162,9 +207,15 @@ internal static class IndirectStorageChecks
             { throw new InvalidOperationException("Indirect " + name + ": expected " + signature + "; got " + (result?.Status ?? "absent") + ": " + (result?.Signature ?? result?.Message)); }
             Program.Log.Info("PASS IndirectMaybe" + name);
         }
-        if (results["Typed"].Signature?.Contains("?>", StringComparison.Ordinal) == true
-            || results["GuardedStore"].Signature?.Contains("?>", StringComparison.Ordinal) == true)
-        { throw new InvalidOperationException("Typed ref or NotNullIfNotNull storage widened."); }
+        foreach (var control in new[] { "Typed", "ConditionalConstant", "ConditionalNew" })
+        {
+            if (results[control].Signature?.Contains("?>", StringComparison.Ordinal) == true)
+            { throw new InvalidOperationException("Indirect nonnullable control widened: " + control); }
+        }
+        if (!results.TryGetValue("ModifiedGuardedStore", out var modified)
+            || modified.Status == "Suggestion" && modified.Signature ==
+                "T1 ModifiedGuardedStore<T1>(global::IndirectBox<T1> box, T1 fill)")
+        { throw new InvalidOperationException("Indirect modified guard retained an unsound bare T storage signature."); }
         CheckMetadata(cancellationToken);
         var provider = new HmSignatureCodeFixProvider();
         var context = new FixAllContext(document, provider, FixAllScope.Project, "HM.GeneralizeSignature",
@@ -193,7 +244,10 @@ internal static class IndirectStorageChecks
         var library = CSharpSyntaxTree.ParseText("""
             #nullable enable
             using System.Diagnostics.CodeAnalysis;
-            public sealed class ImportedSource<T>{[return:MaybeNull]public T Read(T value)=>default;}
+            public sealed class ImportedSource<T>{
+                [return:MaybeNull]public T Read(T value)=>default;
+                [MaybeNull]public T Priority{[return:NotNull]get=>default!;}
+            }
             """, cancellationToken: cancellationToken);
         using var image = new MemoryStream();
         var emitted = Program.Compile([library]).WithAssemblyName("IndirectContracts").Emit(image, cancellationToken: cancellationToken);
@@ -206,17 +260,49 @@ internal static class IndirectStorageChecks
                 public static int M(ImportedBox<int> box,ImportedSource<int> source,int fill){
                     ref var alias=ref box.Value;alias=source.Read(fill);return box.Value;
                 }
+                public static int M2(ImportedBox<int> box,ImportedSource<int> source){
+                    ref var alias=ref box.Value;alias=source.Priority;return box.Value;
+                }
             }
             """, cancellationToken: cancellationToken);
         var compilation = Program.Compile([site]).AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
-        var result = Program.Results(compilation, cancellationToken).Single(candidate =>
+        // Emission places both property and getter contracts on the getter
+        // return. Roslyn then accepts a bare-T generic storage consumer.
+        var native = CSharpSyntaxTree.ParseText("""
+            #nullable enable
+            public static class NativeImportedUse{
+                public static T Bare<T>(ImportedBox<T> box,ImportedSource<T> source){
+                    ref var alias=ref box.Value;alias=source.Priority;return box.Value;
+                }
+            }
+            """, cancellationToken: cancellationToken);
+        var nativeDiagnostics = compilation.AddSyntaxTrees(native).GetDiagnostics(cancellationToken)
+            .Where(diagnostic =>
+            {
+                ArgumentNullException.ThrowIfNull(diagnostic);
+                return diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning;
+            }).ToArray();
+        if (nativeDiagnostics.Length != 0)
+        { throw new InvalidOperationException("Indirect imported native generic consumer: " + nativeDiagnostics[0]); }
+        var results = Program.Results(compilation, cancellationToken).Where(candidate =>
         {
             ArgumentNullException.ThrowIfNull(candidate);
-            return candidate.Method == "M";
-        });
-        const string expected = "T1? M<T1>(global::ImportedBox<T1?> box, global::ImportedSource<T1> source, T1 fill)";
-        if (result.Status != "Suggestion" || result.Signature != expected)
-        { throw new InvalidOperationException("Indirect imported contract: expected " + expected + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
+            return candidate.Method is "M" or "M2";
+        }).ToDictionary(candidate =>
+        {
+            ArgumentNullException.ThrowIfNull(candidate);
+            return candidate.Method;
+        }, StringComparer.Ordinal);
+        var expected = new Dictionary<string, string>
+        {
+            ["M"] = "T1? M<T1>(global::ImportedBox<T1?> box, global::ImportedSource<T1> source, T1 fill)",
+            ["M2"] = "T1 M2<T1>(global::ImportedBox<T1> box, global::ImportedSource<T1> source)"
+        };
+        foreach (var (name, signature) in expected)
+        {
+            if (!results.TryGetValue(name, out var result) || result.Status != "Suggestion" || result.Signature != signature)
+            { throw new InvalidOperationException("Indirect imported " + name + ": expected " + signature + "; got " + (result?.Status ?? "absent") + ": " + (result?.Signature ?? result?.Message)); }
+        }
         Program.Log.Info("PASS IndirectMaybeImportedOwnerContract");
     }
 
