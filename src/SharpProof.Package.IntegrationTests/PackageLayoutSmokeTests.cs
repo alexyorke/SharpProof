@@ -24,9 +24,87 @@ public sealed class PackageLayoutSmokeTests
     private static ImmutableDictionary<string, string>
         s_sharedCompilationServerIds = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
+    private static readonly string[] s_nativeResourceMetricNames = ["LoopBodyEntries", "ArrayAllocations", "AllocatedElements"];
+    private static readonly int[] s_resourcePerformanceInputSizes = [0, 16, 128];
+
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
+    }
+
+    [TestCase("contracts", TestName = "ConsumerContractPerformanceWorkflow")]
+    [TestCase("resources", TestName = "ConsumerResourcePerformanceWorkflow")]
+    [Platform("Linux")]
+    public async Task ConsumerPerformancePreservesProofQualityAndComparableMeasurements(string workload)
+    {
+        ArgumentNullException.ThrowIfNull(workload);
+        var feed = await PackagedProductFeed.GetAsync();
+        var repository = TestRepository.FindRoot();
+        using var directory = new TempDirectory("SharpProof.Performance.Test-");
+        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", feed.Source, "-Iterations", "1", "-Workload", workload, "-InputSizes", "0,16,128", "-RuntimeRepetitions", "3", "-OutputDirectory", directory.FullName]);
+        Assert.That(result.ExitCode, Is.Zero, result.Output);
+        var reports = Directory.GetFiles(directory.FullName, "measurements.json", SearchOption.AllDirectories);
+        Assert.That(reports, Has.Length.EqualTo(1), result.Output);
+        var reportText = await File.ReadAllTextAsync(reports.Single(), TestContext.CurrentContext.CancellationToken);
+        var evidenceDirectory = Path.Combine(repository, "artifacts", "consumer-performance-validation");
+        Directory.CreateDirectory(evidenceDirectory);
+        var evidencePath = Path.Combine(evidenceDirectory, workload + "-" + Guid.NewGuid().ToString("N") + ".json");
+        await File.WriteAllTextAsync(evidencePath, reportText, TestContext.CurrentContext.CancellationToken);
+        TestContext.AddTestAttachment(evidencePath);
+        using var report = JsonDocument.Parse(reportText);
+        var root = report.RootElement;
+        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
+        Assert.That(root.GetProperty("completed").GetBoolean(), Is.True);
+        Assert.That(root.GetProperty("workload").GetString(), Is.EqualTo(workload));
+        var measurements = root.GetProperty("measurements").EnumerateArray().ToArray();
+        Assert.That(measurements, Has.Length.EqualTo(15));
+        foreach (var measurement in measurements.Where(row => row.GetProperty("variant").GetString() == "verified" && row.GetProperty("scenario").GetString() != "restore"))
+        {
+            Assert.That(measurement.GetProperty("claims").GetInt32(), Is.EqualTo(8));
+            Assert.That(measurement.GetProperty("proven").GetInt32(), Is.EqualTo(8));
+            Assert.That(measurement.GetProperty("incomplete").GetInt32(), Is.Zero);
+        }
+        var runtime = root.GetProperty("runtimeMeasurements").EnumerateArray().ToArray();
+        if (workload == "contracts")
+        { Assert.That(runtime, Is.Empty); return; }
+        Assert.That(runtime, Has.Length.EqualTo(3));
+        Assert.That(runtime.Select(row => row.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Measurement must be an object.", nameof(row)) : row.GetProperty("sourceSha256").GetString()).Distinct().Count(), Is.EqualTo(1));
+        foreach (var measurement in runtime)
+        {
+            Assert.That(measurement.GetProperty("processElapsedMilliseconds").GetInt64(), Is.GreaterThanOrEqualTo(0));
+            var samples = measurement.GetProperty("samples").EnumerateArray().ToArray();
+            Assert.That(samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("inputSize").GetInt32()), Is.EqualTo(s_resourcePerformanceInputSizes));
+            var allocated = samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("allocatedBytes").GetInt64()).ToArray();
+            Assert.That(allocated[0], Is.GreaterThan(0));
+            Assert.That(allocated[1], Is.GreaterThan(allocated[0]));
+            Assert.That(allocated[2], Is.GreaterThan(allocated[1]));
+            foreach (var sample in samples)
+            {
+                Assert.That(sample.GetProperty("repetitions").GetInt32(), Is.EqualTo(3));
+                Assert.That(sample.GetProperty("checksum").GetInt64(), Is.EqualTo(sample.GetProperty("inputSize").GetInt32() == 0 ? 0 : 48));
+                Assert.That(sample.GetProperty("stopwatchFrequency").GetInt64(), Is.GreaterThan(0));
+                Assert.That(sample.GetProperty("kernelElapsedTicks").GetInt64(), Is.GreaterThanOrEqualTo(0));
+            }
+        }
+        var comparisons = root.GetProperty("runtimeComparisons").EnumerateArray().ToArray();
+        Assert.That(comparisons, Has.Length.EqualTo(9));
+        foreach (var comparison in comparisons)
+        {
+            Assert.That(comparison.GetProperty("allocatedDeltaBytes").GetInt64(), Is.Zero);
+            Assert.That(comparison.GetProperty("kernelMilliseconds").GetDouble(), Is.GreaterThanOrEqualTo(0));
+        }
+    }
+
+    [TestCase("0,0")]
+    [TestCase("0,1001")]
+    [Platform("Linux")]
+    public async Task ConsumerPerformanceRejectsInvalidScalesBeforeLoadingPackages(string sizes)
+    {
+        ArgumentNullException.ThrowIfNull(sizes);
+        var repository = TestRepository.FindRoot();
+        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", Path.Combine(repository, "missing-performance-packages"), "-Workload", "resources", "-InputSizes", sizes]);
+        Assert.That(result.ExitCode, Is.Not.Zero);
+        Assert.That(result.Output, Does.Contain("Input sizes must be distinct integers"));
     }
 
     private static readonly ImmutableArray<byte> PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -3559,5 +3637,858 @@ public sealed class PackageLayoutSmokeTests
         string Output)
     {
         public string Output { get; init; } = Output ?? throw new System.ArgumentNullException(nameof(Output));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageProvesLogicalSourceStackContracts(bool recursive)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var attributes = recursive
+            ? "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,1,nameof(n),1)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,24,nameof(n),24)]"
+            : "[ResourceUpperBound(ResourceMetric.SourceActivationDepth,2)] [ResourceUpperBound(ResourceMetric.SourceStackBytes,48)]";
+        var body = recursive ? "if(n<=0) return; Target(n-1);" : "Leaf(n);";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " + attributes +
+            " public static void Target(int n) { " + body + " } private static void Leaf(int value) {} }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(2));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            var bound = claim.GetProperty("resourceBound");
+            JsonAssert.Equal(bound, "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.StackCostModel);
+            Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+            Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
+        }
+    }
+    [Test]
+    public async Task MainPackagePreservesUnprovedTaskBoundAsUnknown()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries,100)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int count) {for(int i=0;i<count;i++){}} }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Unknown");
+        var bound = claim.GetProperty("resourceBound");
+        Assert.That(bound.GetProperty("unknownReason").GetString(), Is.Not.Null.And.Not.Empty);
+        Assert.That(bound.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    [TestCase(false, "ArrayAllocations", 4, 1)]
+    [TestCase(true, "ArrayAllocations", 4, 1)]
+    [TestCase(false, "AllocatedElements", 8, 2)]
+    [TestCase(true, "AllocatedElements", 8, 2)]
+    public async Task MainPackagePublishesConditionalTaskSourceScope(bool configuredAwait,
+        string metric = "LoopBodyEntries", int constant = 3, int coefficient = 1)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var scope = metric == "LoopBodyEntries" ? "joined-isolated-source-callbacks" : "joined-isolated-source-allocation-prefixes";
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + "," + constant + ",nameof(n)," + coefficient + ")] public static " + (configuredAwait ? "async " : "") +
+            "Task Target(int n) => " + (configuredAwait ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configuredAwait ? ".ConfigureAwait(false)" : "") + "; static void Child(int count) {for(int i=0;i<count;i++){" + (metric == "LoopBodyEntries" ? "" : "var data=new int[2];") + "}} }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", scope);
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Does.Contain("n"));
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(n)");
+        JsonAssert.Equal(bound.GetProperty("metadataAssumptions")[0], "runtimeModel", configuredAwait
+            ? "configured-task-join-source-at-most-once-v1" : "task-join-source-at-most-once-v1");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(scope));
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", scope);
+    }
+
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
+    public async Task MainPackagePublishesConditionalTaskLifetimeScope(int metric, bool configured)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},1000)] public static " + (configured ? "async " : "") +
+            "Task Target(int n) => " + (configured ? "await " : "") + "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3)))" +
+            (configured ? ".ConfigureAwait(false)" : "") + "; static void Child(int n) {for(int i=0;i<n;i++){}} }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", "joined-isolated-normal-completion");
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(1)");
+        Assert.That(bound.GetProperty("metadataAssumptions").GetArrayLength(), Is.EqualTo(3));
+        var storage = bound.GetProperty("metadataAssumptions").EnumerateArray().Single(item =>
+            item.GetProperty("witnessIdentifier").GetString() == "bcl.task.run-action.when-all-array.normal-owned-storage");
+        JsonAssert.Equal(storage, "runtimeModel", configured ? "configured-task-join-normal-owned-storage-v1" : "task-join-normal-owned-storage-v1");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("joined-isolated-normal-completion"));
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "executionScope", "joined-isolated-normal-completion");
+    }
+
+    [Test]
+    public async Task MainPackagePreservesTaskCumulativePrefixAsUnknown()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; using System.Threading.Tasks; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,1000)] public static Task Target(int n) => Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))); static void Child(int n) {} }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true"]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Unknown");
+        JsonAssert.Equal(claim.GetProperty("resourceBound"), "unknownReason", "TaskRuntimeFaultFrameCompositionUnproved");
+        Assert.That(claim.GetProperty("proofCore").GetArrayLength(), Is.Zero);
+        Assert.That(claim.GetProperty("resourceBound").GetProperty("metadataAssumptions").GetArrayLength(), Is.Zero);
+        Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackagePublishesCompleteDeclaredTaskRuntimePremises(bool configured)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        const string deploymentHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        const string deploymentEvidence = "package fixture deployment assertion; not measured";
+        const string quantityEvidence = "package fixture caller-declared upper bound; not measured";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
+            using SharpProof.Attributes;
+            using System.Threading.Tasks;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.AllocatedBytes,1000000)]
+                [ResourceTaskDeployment(ResourceTaskDeploymentProfile.CoreClr8032LinuxX64OrdinaryJitStockClosed,
+                    "{{deploymentHash}}","{{deploymentEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.RawTraceArrayAttemptsPerFaultEpisode,2L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.RawTracePayloadBytesPerArrayAttempt,5L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverArrayAttemptsPerFaultEpisode,3L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverSlotsPerArrayAttempt,7L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.FaultConstructionBytesPerFaultEpisode,11L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.ResolverReferentBytesPerFaultEpisode,13L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.SchedulingBytesPerChildStartAttempt,17L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.JoinBytesPerJoinAttempt,19L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.AwaitBytesPerConfiguredAwait,23L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.InitializationBytesPerInvocation,29L,"{{quantityEvidence}}")]
+                [ResourceTaskRuntimeUpperBound(ResourceTaskRuntimeQuantity.TotalFaultEpisodesPerInvocation,31L,"{{quantityEvidence}}")]
+                public static {{(configured ? "async " : "")}}Task Target(int n) =>
+                    {{(configured ? "await " : "")}}Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(3))){{(configured ? ".ConfigureAwait(false)" : "")}};
+                static void Child(int n) { var values=new int[3]; }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "executionScope", "joined-isolated-cumulative-runtime-premises");
+        JsonAssert.Equal(bound, "costModel", "coreclr-8.0.32-x64-source-storage-v1:cumulative-bytes-v1");
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+        Assert.That(bound.GetProperty("unknownReason").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(bound.GetProperty("observedLowerBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(bound.GetProperty("evaluatedUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(claim.GetProperty("model").GetArrayLength(), Is.Zero);
+        var runtimeRecordCount = 0;
+        foreach (var token in claim.GetProperty("proofCore").EnumerateArray())
+        {
+            if (token.GetString()?.StartsWith("resource-runtime-premise-record:", StringComparison.Ordinal) != true)
+            { continue; }
+            Assert.That(token.GetString(), Does.Match("^resource-runtime-premise-record:[0-9a-f]{64}$"));
+            runtimeRecordCount++;
+        }
+        Assert.That(runtimeRecordCount, Is.EqualTo(1));
+        Assert.That(claim.GetProperty("proofCore").EnumerateArray().Count(static token =>
+            token.GetString() == "resource-task-runtime-model:task-join-declared-runtime-allocation-prefixes-v1"), Is.EqualTo(1));
+        var premises = bound.GetProperty("runtimePremises");
+        JsonAssert.Equal(premises, "model", "declared-task-runtime-premises-v1");
+        JsonAssert.Equal(premises, "profile", "CoreClr8032LinuxX64OrdinaryJitStockClosed");
+        JsonAssert.Equal(premises, "rootCallableId", "M:Subject.Target(System.Int32)~System.Threading.Tasks.Task");
+        JsonAssert.Equal(premises, "deploymentManifestSha256", deploymentHash);
+        JsonAssert.Equal(premises, "deploymentEvidence", deploymentEvidence);
+        Assert.That(premises.GetProperty("compilerIdentity").GetString(), Does.Contain("Microsoft.CodeAnalysis.CSharp"));
+        foreach (var field in new[] { "profileCatalogSha256", "moduleSha256", "referenceSha256", "declarationSha256" })
+        { Assert.That(premises.GetProperty(field).GetString(), Does.Match("^[0-9a-f]{64}$"), field); }
+        var expectedQuantities = new (string Name, long Value, string Unit)[]
+        {
+            ("RawTraceArrayAttemptsPerFaultEpisode", 2, "allocation-attempts"),
+            ("RawTracePayloadBytesPerArrayAttempt", 5, "payload-bytes"),
+            ("ResolverArrayAttemptsPerFaultEpisode", 3, "allocation-attempts"),
+            ("ResolverSlotsPerArrayAttempt", 7, "reference-slots"),
+            ("FaultConstructionBytesPerFaultEpisode", 11, "managed-instance-bytes"),
+            ("ResolverReferentBytesPerFaultEpisode", 13, "managed-instance-bytes"),
+            ("SchedulingBytesPerChildStartAttempt", 17, "managed-instance-bytes"),
+            ("JoinBytesPerJoinAttempt", 19, "managed-instance-bytes"),
+            ("AwaitBytesPerConfiguredAwait", 23, "managed-instance-bytes"),
+            ("InitializationBytesPerInvocation", 29, "managed-instance-bytes"),
+            ("TotalFaultEpisodesPerInvocation", 31, "fault-episodes")
+        };
+        var quantities = premises.GetProperty("quantities");
+        Assert.That(quantities.GetArrayLength(), Is.EqualTo(11));
+        var declaredIds = new HashSet<string>(StringComparer.Ordinal);
+        var deploymentId = premises.GetProperty("deploymentAssumptionId").GetString()!;
+        Assert.That(deploymentId, Does.Match("^resource-runtime-deployment-v1:[0-9a-f]{64}$"));
+        declaredIds.Add(deploymentId);
+        for (var index = 0; index < expectedQuantities.Length; index++)
+        {
+            var quantity = quantities[index];
+            JsonAssert.Equal(quantity, "quantity", expectedQuantities[index].Name);
+            JsonAssert.Equal(quantity, "upperBound", expectedQuantities[index].Value);
+            JsonAssert.Equal(quantity, "unit", expectedQuantities[index].Unit);
+            JsonAssert.Equal(quantity, "evidence", quantityEvidence);
+            Assert.That(quantity.GetProperty("scope").GetString(), Does.StartWith("per-"));
+            var id = quantity.GetProperty("assumptionId").GetString()!;
+            Assert.That(id, Does.Match("^resource-runtime-quantity-v1:[0-9a-f]{64}$"));
+            Assert.That(declaredIds.Add(id), Is.True);
+        }
+        var usedUserIds = new HashSet<string>(StringComparer.Ordinal);
+        var usedTrustedIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var assumption in claim.GetProperty("assumptions").EnumerateArray())
+        {
+            if (!assumption.GetProperty("used").GetBoolean())
+            { continue; }
+            var kind = assumption.GetProperty("kind").GetString();
+            if (kind == "UserAssume")
+            { usedUserIds.Add(assumption.GetProperty("id").GetString()!); }
+            else if (kind == "TrustedBoundary")
+            { usedTrustedIds.Add(assumption.GetProperty("id").GetString()!); }
+        }
+        Assert.That(usedUserIds, Has.Count.EqualTo(12));
+        Assert.That(usedUserIds, Is.EquivalentTo(declaredIds));
+        var dependencies = bound.GetProperty("metadataAssumptions").EnumerateArray().ToArray();
+        Assert.That(dependencies, Has.Length.EqualTo(2));
+        Assert.That(usedTrustedIds, Has.Count.EqualTo(2));
+        var witnesses = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var dependency in dependencies)
+        {
+            witnesses.Add(dependency.GetProperty("witnessIdentifier").GetString()!);
+            Assert.That(usedTrustedIds, Does.Contain(dependency.GetProperty("assumptionId").GetString()));
+            Assert.That(dependency.GetProperty("catalogSha256").GetString(), Does.Match("^[0-9a-fA-F]{64}$"));
+            Assert.That(dependency.GetProperty("referenceSha256").GetString(), Does.Match("^[0-9a-fA-F]{64}$"));
+            Assert.That(dependency.GetProperty("evidenceSource").GetString(), Does.StartWith("https://github.com/dotnet/runtime/"));
+            if (dependency.GetProperty("witnessIdentifier").GetString() == "bcl.task.run-action.when-all-array")
+            {
+                JsonAssert.Equal(dependency, "runtimeModel", configured ? "configured-task-join-source-at-most-once-v1" : "task-join-source-at-most-once-v1");
+                JsonAssert.Equal(dependency, "referenceAssembly", premises.GetProperty("referenceAssembly").GetString());
+                JsonAssert.Equal(dependency, "referenceSha256", premises.GetProperty("referenceSha256").GetString());
+            }
+        }
+        Assert.That(witnesses, Does.Contain("bcl.task.run-action.when-all-array"));
+        Assert.That(witnesses, Does.Contain("runtime-layout.coreclr-x64"));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        var published = row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound");
+        JsonAssert.Equal(published, "executionScope", "joined-isolated-cumulative-runtime-premises");
+        JsonAssert.Equal(published.GetProperty("runtimePremises"), "declarationSha256", premises.GetProperty("declarationSha256").GetString());
+        Assert.That(published.GetProperty("runtimePremises").GetProperty("quantities").GetArrayLength(), Is.EqualTo(11));
+    }
+
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
+    public async Task MainPackagePublishesParametricMemoryEnvelopes(int metric, bool crossBlock)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var method = !crossBlock ? "public static int[] Target(int n) => new int[n];" : metric == 5
+            ? "public static int Target(int n) {var value=new int[n]; return value.Length;}"
+            : "public static int[] Target(int n,bool flag) {var value=new int[n]; if(flag) return value; return null;}";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] " + method + " }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        Assert.That(bound.GetProperty("inferredUpperBound").GetString(), Does.Contain("n"));
+        JsonAssert.Equal(bound.GetProperty("asymptotic"), "upperBound", "O(n)");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic"), "upperBound", "O(n)");
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public async Task MainPackageRetainsNestedRootFrameIncludingDeferredDelegateCache(int factoryKind)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var expectedBytes = factoryKind is 3 or 4 ? "88" : factoryKind == 6 ? "128" : "96";
+        var source = factoryKind switch
+        {
+            0 => "using SharpProof.Attributes; public static class Subject { " +
+                "static System.Func<System.Func<int>> Make(int value) => () => () => value; " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int>> Target() => Make(3); }",
+            1 => "using SharpProof.Attributes; public sealed class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target(int value) => () => () => value; }",
+            2 => "using SharpProof.Attributes; public sealed class Subject { " +
+                "System.Func<System.Func<int>> Make(int value) => () => () => value; " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public System.Func<System.Func<int>> Target() => this.Make(3); }",
+            3 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,88)] public static System.Func<int,System.Func<int>> Target(int value) => item => () => value+item; }",
+            4 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,88)] public static System.Func<System.Func<int>> Target(int value) => () => {int item=value; return () => item;}; }",
+            5 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,96)] public static System.Func<System.Func<int,System.Func<int>>> Target(int value) => () => item => () => value+item; }",
+            6 => "using SharpProof.Attributes; public static class Subject { " +
+                "[ResourceUpperBound(ResourceMetric.RetainedBytes,128)] public static System.Func<int,System.Func<int>> Target(int value) {var values=new int[2]; return item => () => value+item+values.Length;} }",
+            _ => throw new ArgumentOutOfRangeException(nameof(factoryKind))
+        };
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, source, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain("Proven=1"));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        var resourceReason = "result unavailable";
+        if (File.Exists(workspace.ResultPath))
+        {
+            using var diagnostic = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+            var diagnosticClaim = diagnostic.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+            resourceReason = diagnosticClaim.GetProperty("resourceBound").GetProperty("unknownReason").ToString();
+        }
+        Assert.That(build.ExitCode, Is.Zero, "Resource reason: " + resourceReason + Environment.NewLine + build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        JsonAssert.Equal(claim.GetProperty("resourceBound"), "inferredUpperBound", expectedBytes);
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound"), "inferredUpperBound", expectedBytes);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackagePublishesConditionalExpectedCosts(bool elements)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var metric = elements ? "AllocatedElements" : "LoopBodyEntries";
+        var coefficient = elements ? 7 : 1;
+        var body = elements
+            ? "for(int i=0;i<n;i++) { if(selected) {var a=new int[7];} else {var b=new int[2];} }"
+            : "if(selected) { for(int i=0;i<n;i++) {} }";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n)," + coefficient + ")] public static void Target(int n,[ResourceBooleanInput(1,3)] bool selected) { " + body + " } }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var bound = claim.GetProperty("resourceBound");
+        var expected = bound.GetProperty("expected");
+        JsonAssert.Equal(expected, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Expected);
+        JsonAssert.Equal(expected, "inputName", "selected");
+        Assert.That(expected.GetProperty("trueWeight").GetInt32(), Is.EqualTo(1));
+        Assert.That(expected.GetProperty("falseWeight").GetInt32(), Is.EqualTo(3));
+        Assert.That(expected.GetProperty("unknownReason").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        Assert.That(expected.GetProperty("upperBound").GetString(), Is.Not.EqualTo(bound.GetProperty("inferredUpperBound").GetString()));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("expected"),
+            "upperBound", expected.GetProperty("upperBound").GetString()!);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackagePublishesCheckedCreditAccounting(bool elements)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var metric = elements ? "AllocatedElements" : "LoopBodyEntries";
+        var spending = elements ? "var a=new int[2];" : "";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",0,nameof(n),2)] public static void Target(int n,bool flush) { " +
+            "int credit=0; for(int i=0;i<n;i++) { credit++; if(flush) { while(credit>0) { " + spending + " credit--; } } } } }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var accounting = claim.GetProperty("resourceBound").GetProperty("accounting").EnumerateArray().Single();
+        JsonAssert.Equal(accounting, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Accounting);
+        JsonAssert.Equal(accounting, "initialCredit", "0");
+        JsonAssert.Equal(accounting, "depositPerIteration", "1");
+        JsonAssert.Equal(accounting, "maximumSpend", "max(0, n)");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("accounting")[0],
+            "maximumSpend", "max(0, n)");
+    }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task MainPackagePublishesCheckedLowerBoundsAndAdmittedTightness(int kind)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var dependent = kind == 1;
+        var inner = dependent ? "i" : "n";
+        var metric = kind == 2 ? "AllocatedElements" : "LoopBodyEntries";
+        var body = kind == 2 ? "var a=new int[n];" : "for(int i=0;i<n;i++) { for(int j=0;j<" + inner + ";j++) {} }";
+        var expectedLower = kind == 0 ? "Omega(n^2)" : "Omega(n)";
+        var expectedTight = kind == 0 ? "Theta(n^2)" : "Theta(n)";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { " +
+            "[ResourceUpperBound(ResourceMetric." + metric + ",long.MaxValue)] public static void Target(int n) { " + body + " } }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var lower = claim.GetProperty("resourceBound").GetProperty("asymptotic").GetProperty("lower");
+        JsonAssert.Equal(lower, "model", SharpProof.Worker.Protocol.WorkerResourceModels.NormalDomain);
+        JsonAssert.Equal(lower, "lowerBound", expectedLower);
+        if (dependent)
+        {
+            Assert.That(lower.GetProperty("tightBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            JsonAssert.Equal(lower, "tightUnknownReason", "ResourceTightnessUnproved");
+        }
+        else
+        { JsonAssert.Equal(lower, "tightBound", expectedTight); }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic").GetProperty("lower"),
+            "lowerBound", expectedLower);
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageReportsModeledAsymptoticUpperBoundsWithoutTightness(bool multipleInputs)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var body = multipleInputs ? "for(int i=0;i<n;i++) {} for(int j=0;j<m;j++) {}" :
+            "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId,
+            "public static class Subject { public static void Target(int n,int m) { " + body + " } }", "all", ["SP0060"]);
+        await WriteUtf8Async(Path.Combine(workspace.ConsumerDirectory, ".editorconfig"), "root = true\n[*.cs]\ndotnet_diagnostic.SP0060.severity = warning\n");
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofVerify=false"]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SP0060"));
+        Assert.That(build.Output, Does.Contain("asymptotic upper bounds of the unbounded formula extension"));
+        Assert.That(build.Output, Does.Contain(multipleInputs ? "loops Unknown" : "loops O(n^2) [n=NonNegativeScalar(n)]"));
+        Assert.That(build.Output, Does.Not.Contain("Theta("));
+    }
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public async Task MainPackagePublishesNativeAsymptoticUpperEvidence(int kind)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        var multipleInputs = kind == 1;
+        var body = multipleInputs ? "for(int i=0;i<n;i++) {} for(int j=0;j<m;j++) {}" :
+            "for(int i=0;i<n;i++) { for(int j=0;j<n;j++) {} }";
+        if (kind == 2)
+        { body = "for(int i=0;i<text.Length;i++) {}"; }
+        var parameters = kind == 2 ? "string text" : "int n,int m";
+        var bound = kind == 2 ? "0," + JsonSerializer.Serialize("text.Length") + ",1" : "long.MaxValue";
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, "using SharpProof.Attributes; public static class Subject { [ResourceUpperBound(ResourceMetric.LoopBodyEntries," + bound +
+            ")] public static void Target(" + parameters + ") { " + body + " } }", "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath, TestContext.CurrentContext.CancellationToken));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Proven");
+        var growth = claim.GetProperty("resourceBound").GetProperty("asymptotic");
+        JsonAssert.Equal(growth, "model", SharpProof.Worker.Protocol.WorkerResourceModels.Asymptotic);
+        if (multipleInputs)
+        {
+            JsonAssert.Equal(growth, "unknownReason", "AsymptoticMultipleInputs");
+            Assert.That(growth.GetProperty("upperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(growth.GetProperty("polynomialDegree").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(growth.GetProperty("inputOrdinal").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        }
+        else
+        {
+            JsonAssert.Equal(growth, "upperBound", kind == 2 ? "O(n)" : "O(n^2)");
+            Assert.That(growth.GetProperty("polynomialDegree").GetInt32(), Is.EqualTo(kind == 2 ? 1 : 2));
+            Assert.That(growth.GetProperty("logarithmicDegree").GetInt32(), Is.Zero);
+            Assert.That(growth.GetProperty("inputOrdinal").GetInt32(), Is.Zero);
+            JsonAssert.Equal(growth, "inputName", kind == 2 ? "text" : "n");
+            JsonAssert.Equal(growth, "inputKind", kind == 2 ? "StringLength" : "NonNegativeScalar");
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath, TestContext.CurrentContext.CancellationToken));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Proven");
+        JsonAssert.Equal(row.GetProperty("properties").GetProperty("result").GetProperty("resourceBound").GetProperty("asymptotic"),
+            "model", SharpProof.Worker.Protocol.WorkerResourceModels.Asymptotic);
+    }
+    [Test]
+    public async Task MainPackageProvesNativeResourceBoundsAndPublishesMetricEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, "n", 1)]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0, "n", 1)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 0, "n", 3)]
+                public static void Allocate(int n) { for(int i=0;i<n;i++) { var buffer=new int[3]; } }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            JsonAssert.Equal(claim.GetProperty("resourceBound"), "costModel", SharpProof.Worker.Protocol.WorkerResourceModels.CostModel);
+            Assert.That(claim.GetProperty("resourceBound").GetProperty("inferredUpperBound").GetString(), Is.Not.Null.And.Not.Empty);
+        }
+        Assert.That(claims.Select(claim => claim.ValueKind == JsonValueKind.Undefined ? throw new ArgumentException("Value must be initialized.", nameof(claim)) : claim.GetProperty("resourceBound").GetProperty("metric").GetString()),
+            Is.EquivalentTo(s_nativeResourceMetricNames));
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Proven"), Is.EqualTo(3));
+    }
+    [Test]
+    public async Task MainPackageRefutesNumericResourceBoundsWithConcreteMetricEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 1)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 2)]
+                public static void Allocate() { var first=new int[1]; var second=new int[2]; }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(2));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Refuted");
+            var evidence = claim.GetProperty("resourceBound");
+            var arrays = evidence.GetProperty("metric").GetString() == "ArrayAllocations";
+            JsonAssert.Equal(evidence, "observedLowerBound", arrays ? "2" : "3");
+            JsonAssert.Equal(evidence, "evaluatedUpperBound", arrays ? "1" : "2");
+            Assert.That(evidence.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            JsonAssert.Equal(claim.GetProperty("effectWitness"), "kind", "resource-bound-exceeded");
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(row => row.GetProperty("ruleId").GetString() == "SharpProof.Refuted"), Is.EqualTo(2));
+    }
+    [Test]
+    public async Task MainPackageRefutesLoopEntryBoundsWithConcreteWorkEvidence()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 2)]
+                public static void Target() { for(int i=0;i<3;i++) {} }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", "Refuted");
+        var evidence = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(evidence, "metric", "LoopBodyEntries");
+        JsonAssert.Equal(evidence, "observedLowerBound", "3");
+        JsonAssert.Equal(evidence, "evaluatedUpperBound", "2");
+        JsonAssert.Equal(claim.GetProperty("effectWitness"), "effects", "None");
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof.Refuted");
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("LoopBodyEntries observed prefix: 3 > 2"));
+    }
+    [Test]
+    public async Task MainPackageProvesReviewedMetadataCostsWithExplicitAssumptionProvenance()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0)]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, 0)]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]
+                public static void Target(int n) { int value=System.Math.Max(n,0); }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("SP0048"));
+        Assert.That(build.Output, Does.Contain("Proven=3"));
+        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(advisory.ExitCode, Is.Zero, advisory.Output);
+        Assert.That(advisory.Output, Does.Contain("Proven=3"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", "Proven");
+            var metadata = claim.GetProperty("resourceBound").GetProperty("metadataAssumptions").EnumerateArray().Single();
+            JsonAssert.Equal(metadata, "witnessIdentifier", "bcl.math.max.int32-int32");
+            JsonAssert.Equal(metadata, "runtimeModel", "net8.0.32");
+            Assert.That(metadata.GetProperty("referenceSha256").GetString(), Has.Length.EqualTo(64));
+            Assert.That(metadata.GetProperty("catalogSha256").GetString(), Has.Length.EqualTo(64));
+            Assert.That(metadata.GetProperty("evidenceSource").GetString(), Does.Contain("b9a49e4a6d3a444a3685e318c74a7892d01873f7"));
+            Assert.That(claim.GetProperty("assumptions").EnumerateArray().Any(item =>
+                item.GetProperty("id").GetString() == metadata.GetProperty("assumptionId").GetString() && item.GetProperty("used").GetBoolean()), Is.True);
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Count(item => item.GetProperty("message").GetProperty("text").GetString()!.Contains("conditional resource metadata", StringComparison.Ordinal)), Is.EqualTo(3));
+    }
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task MainPackageChecksComposedCounterRanks(bool violates)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        int countLimit = violates ? 6 : 7;
+        int elementLimit = violates ? 17 : 18;
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.LoopBodyEntries, {{countLimit}})]
+                [ResourceUpperBound(ResourceMetric.ArrayAllocations, {{countLimit}})]
+                [ResourceUpperBound(ResourceMetric.AllocatedElements, {{elementLimit}})]
+                public static void Target() {
+                    int left=5,right=4;
+                    while(left>0||right>0) {
+                        if(left>0) { var a=new int[2]; left-=2; }
+                        else { var b=new int[3]; right--; }
+                    }
+                }
+            }
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var build = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        if (violates)
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("SharpProof Refuted"));
+        }
+        else
+        { Assert.That(build.ExitCode, Is.Zero, build.Output); }
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claims = result.RootElement.GetProperty("claimResults").EnumerateArray().ToArray();
+        Assert.That(claims, Has.Length.EqualTo(3));
+        foreach (var claim in claims)
+        {
+            JsonAssert.Equal(claim, "outcome", violates ? "Refuted" : "Proven");
+            var evidence = claim.GetProperty("resourceBound");
+            var cost = evidence.GetProperty("metric").GetString() == "AllocatedElements" ? "18" : "7";
+            if (violates)
+            {
+                JsonAssert.Equal(evidence, "observedLowerBound", cost);
+                JsonAssert.Equal(evidence, "evaluatedUpperBound", cost == "18" ? "17" : "6");
+                Assert.That(evidence.GetProperty("inferredUpperBound").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            }
+            else
+            { JsonAssert.Equal(evidence, "inferredUpperBound", cost); }
+        }
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        int resourceResults = 0;
+        foreach (var row in sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray())
+        {
+            if (row.GetProperty("ruleId").GetString() == (violates ? "SharpProof.Refuted" : "SharpProof.Proven"))
+            {
+                Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain(violates ? "observed prefix:" : "upper bound:"));
+                resourceResults++;
+            }
+        }
+        Assert.That(resourceResults, Is.EqualTo(3));
+    }
+    [TestCase(false, 0)]
+    [TestCase(true, 0)]
+    [TestCase(false, 1)]
+    [TestCase(true, 1)]
+    [TestCase(false, 2)]
+    [TestCase(true, 2)]
+    [TestCase(false, 3)]
+    [TestCase(true, 3)]
+    [TestCase(false, 4)]
+    [TestCase(true, 4)]
+    [TestCase(false, 5)]
+    [TestCase(true, 5)]
+    [TestCase(false, 6)]
+    [TestCase(true, 6)]
+    [TestCase(false, 7)]
+    [TestCase(false, 8)]
+    [TestCase(false, 9, TestName = "MainPackageLifetimeFixedLocalPeak")]
+    [TestCase(false, 10, TestName = "MainPackageLifetimeFixedLocalRetained")]
+    [TestCase(true, 7, TestName = "MainPackageLifetimeCompletedPeakViolation")]
+    [TestCase(true, 8, TestName = "MainPackageLifetimeCompletedRetainedViolation")]
+    [TestCase(true, 10, TestName = "MainPackageLifetimeFixedLocalRetainedViolation")]
+    [TestCase(false, 11, TestName = "MainPackageOwnedObjectGraphRetainedProof")]
+    [TestCase(true, 11, TestName = "MainPackageOwnedObjectGraphRetainedViolation")]
+    [TestCase(false, 12, TestName = "MainPackageOwnedObjectGraphAuxiliaryProof")]
+    [TestCase(true, 12, TestName = "MainPackageOwnedObjectGraphAuxiliaryViolation")]
+    [TestCase(false, 13, TestName = "MainPackageOwnedFieldReadRetainedProof")]
+    [TestCase(true, 13, TestName = "MainPackageOwnedFieldReadRetainedViolation")]
+    [TestCase(false, 14, TestName = "MainPackageOwnedFieldReadAuxiliaryProof")]
+    [TestCase(true, 14, TestName = "MainPackageOwnedFieldReadAuxiliaryViolation")]
+    [TestCase(false, 15, TestName = "MainPackageStringLifetimeRetainedProof")]
+    [TestCase(true, 15, TestName = "MainPackageStringLifetimeRetainedViolation")]
+    [TestCase(false, 16, TestName = "MainPackageStringLifetimeGuardPeakProof")]
+    [TestCase(true, 16, TestName = "MainPackageStringLifetimeGuardPeakViolation")]
+    [TestCase(false, 17, TestName = "MainPackageDefaultFieldAuxiliaryProof")]
+    [TestCase(true, 17, TestName = "MainPackageDefaultFieldAuxiliaryViolation")]
+    [TestCase(false, 18, TestName = "MainPackageScalarFieldRetainedProof")]
+    [TestCase(true, 18, TestName = "MainPackageScalarFieldRetainedViolation")]
+    [TestCase(false, 19, TestName = "MainPackageConstructorRetainedProof")]
+    [TestCase(true, 19, TestName = "MainPackageConstructorRetainedViolation")]
+    [TestCase(false, 20, TestName = "MainPackageConstructorAuxiliaryProof")]
+    [TestCase(true, 20, TestName = "MainPackageConstructorAuxiliaryViolation")]
+    [TestCase(false, 21, TestName = "MainPackageStaticDelegateRetainedProof")]
+    [TestCase(true, 21, TestName = "MainPackageStaticDelegateRetainedViolation")]
+    [TestCase(false, 22, TestName = "MainPackageStaticDelegateAuxiliaryProof")]
+    [TestCase(true, 22, TestName = "MainPackageStaticDelegateAuxiliaryViolation")]
+    [TestCase(false, 23, TestName = "MainPackageBoxRetainedProof")]
+    [TestCase(true, 23, TestName = "MainPackageBoxRetainedViolation")]
+    [TestCase(false, 24, TestName = "MainPackageInstanceDelegateRetainedProof")]
+    [TestCase(true, 24, TestName = "MainPackageInstanceDelegateRetainedViolation")]
+    [TestCase(false, 25, TestName = "MainPackageInstanceDelegateChildProof")]
+    [TestCase(true, 25, TestName = "MainPackageInstanceDelegateChildViolation")]
+    [TestCase(false, 26, TestName = "MainPackageInstanceDelegateAuxiliaryProof")]
+    [TestCase(true, 26, TestName = "MainPackageInstanceDelegateAuxiliaryViolation")]
+    [TestCase(false, 27, TestName = "MainPackageClosureFrameRetainedProof")]
+    [TestCase(true, 27, TestName = "MainPackageClosureFrameRetainedViolation")]
+    [TestCase(false, 28, TestName = "MainPackageClosureOwnedGraphProof")]
+    [TestCase(true, 28, TestName = "MainPackageClosureOwnedGraphViolation")]
+    [TestCase(false, 29, TestName = "MainPackageClosureSharedGraphProof")]
+    [TestCase(true, 29, TestName = "MainPackageClosureSharedGraphViolation")]
+    [TestCase(false, 30, TestName = "MainPackageLocalClosureArrayProof")]
+    [TestCase(true, 30, TestName = "MainPackageLocalClosureArrayViolation")]
+    public async Task MainPackageChecksLayoutBoundBytesWithExplicitAssumptionProvenance(bool violates, int allocationKind)
+    {
+        var upper = allocationKind switch { 27 => 88, 28 => 144, 29 => 152, 24 => 88, 25 => 120, 26 => 32, 21 or 22 => 64, 23 => 24, 19 => 32, 20 => 24, 17 => 24, 18 => 40, 15 => 32, 16 => 48, 13 => 32, 14 => 64, 11 => 56, 12 => 32, 9 => 0, 10 => 32, 7 => 32, 8 => 40, 1 or 4 or 5 => 64, 6 => 88, 2 => 72, 3 => 32, _ => 120 };
+        var boundLimit = violates ? allocationKind switch { 27 => 87, 28 => 143, 29 => 151, 24 => 87, 25 => 119, 26 => 31, 21 or 22 => 63, 23 => 23, 19 => 31, 20 => 23, 17 => 23, 18 => 39, 15 => 31, 16 => 47, 13 => 31, 14 => 63, 11 => 55, 12 => 31, 7 or 10 => 31, 8 => 39, 1 or 4 => 50, 5 => 63, 6 => 87, 2 => 48, 3 => 31, _ => 80 } : upper;
+        var body = allocationKind switch { 30 => "int[] captured=new int[1]; return () => captured.Length;", 27 => "return () => n;", 28 => "var root=new ClosureBox(); return ClosureFactory.Make(root);", 29 => "var root=new ClosureBox(); return ClosureFactory.Share(root,root);", 24 => "var root=new Callback(); return new System.Action(root.Work);", 25 => "var root=new Callback(); root.Child=new int[1]; return new System.Action(root.Work);", 26 => "var dead=new int[1]; var root=new Callback(); return new System.Action(root.Work);", 21 => "return new System.Action(Callbacks.Run);", 22 => "object first=new System.Action(Callbacks.Run); object second=new System.Action(Callbacks.Run); if(first==second) return null; return second;", 23 => "return (object)long.MaxValue;", 19 or 20 => "var root=new Node(); return new int[root.Count];", 17 => "var root=new Node(); return root.Child;", 18 => "var root=new Node(); root.Count=3; return new int[root.Count];", 15 => "return new string('x',3);", 16 => "object first=new string('x',1); object second=new string('x',1); if(first==second) return null; return null;", 13 => "var root=new Node(); root.Child=new int[1]; return root.Child;", 14 => "var root=new Node(); root.Child=new int[1]; var saved=root.Child; root.Child=new int[3]; return saved;", 11 => "var root=new Node(); root.Child=new int[1]; return root;", 12 => "var root=new Node(); root.Child=new int[1]; root.Child=new int[3]; return root;", 9 or 10 => "var size=1; return new int[size];", 7 or 8 => "var dead=new int[1]; return new int[3];", 1 or 4 => "var item=new Cell();", 2 => "for(int i=0;i<3;i++) { object value=i; }", 3 => "var value=new string('x', 3);", 5 => "return new System.Action(Callbacks.Run);", 6 => "return () => n;", _ => "for(int i=0;i<3;i++) { var a=new int[3]; }" };
+        var declarations = allocationKind switch { 28 or 29 => "public class ClosureBox { public int[] Child=new int[1]; public int Read() => Child.Length; } public static class ClosureFactory { public static System.Func<int> Make(ClosureBox value) => () => value.Read(); public static System.Func<int> Share(ClosureBox first,ClosureBox second) => () => first.Read()+second.Read(); }", 24 or 25 or 26 => "public class Callback { public int[] Child; public void Work() {} }", 19 or 20 => "public class Node { public int Count; public Node() { if(Count==0) Count=2; } }", 18 => "public class Node { public int Count; }", 11 or 12 or 13 or 14 or 17 => "public class Node { public int[] Child; }", 1 => "public class Cell { public Cell() { var data=new int[3]; } }", 4 => "public class Cell { public int[] data=new int[3]; }", 5 or 21 or 22 => "public static class Callbacks { public static void Run() {} }", _ => string.Empty };
+        var expected = violates ? "Refuted" : "Proven";
+        var parameters = allocationKind is 6 or 27 ? "int n" : string.Empty;
+        var returnType = allocationKind switch { 15 or 16 or 21 or 22 or 23 or 24 or 25 or 26 => "object", 11 or 12 => "Node", 7 or 8 or 9 or 10 or 13 or 14 or 17 or 18 or 19 or 20 => "int[]", 5 => "System.Action", 6 or 27 or 28 or 29 or 30 => "System.Func<int>", _ => "void" };
+        var metric = allocationKind switch { 7 or 9 or 12 or 14 or 16 or 17 or 20 or 22 or 26 => "PeakAuxiliaryBytes", 8 or 10 or 11 or 13 or 15 or 18 or 19 or 21 or 23 or 24 or 25 or 27 or 28 or 29 or 30 => "RetainedBytes", _ => "AllocatedBytes" };
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteAnalyzerConsumer(feed.Version, PackagedProductFeed.MainPackageId, $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ResourceUpperBound(ResourceMetric.{{metric}}, {{boundLimit}})]
+                public static {{returnType}} Target({{parameters}}) { {{body}} }
+            }
+            {{declarations}}
+            """, "all", []);
+        _ = await BuildOkAsync(RestoreConsumerAsync(workspace, feed));
+        var strict = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-p:PlatformTarget=x64", "-p:SharpProofProfile=strict", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
+        Assert.That(strict.Output, Does.Contain("SP0048"));
+        Assert.That(strict.Output, Does.Contain(expected + "=1"));
+        var advisory = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=x64", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true", "-p:SharpProofVerifySarifFile=" + workspace.SarifPath]);
+        Assert.That(advisory.ExitCode, violates ? Is.Not.Zero : Is.Zero, advisory.Output);
+        if (violates)
+        { Assert.That(advisory.Output, Does.Contain("SP0051")); }
+        Assert.That(advisory.Output, Does.Contain(expected + "=1"));
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var claim = result.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(claim, "outcome", expected);
+        var bound = claim.GetProperty("resourceBound");
+        JsonAssert.Equal(bound, "metric", metric);
+        if (violates)
+        {
+            JsonAssert.Equal(bound, "observedLowerBound", upper.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            JsonAssert.Equal(bound, "evaluatedUpperBound", boundLimit.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        else
+        { JsonAssert.Equal(bound, "inferredUpperBound", upper.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+        JsonAssert.Equal(bound, "costModel", allocationKind >= 7 ? SharpProof.Worker.Protocol.WorkerResourceModels.LifetimeCostModel : SharpProof.Worker.Protocol.WorkerResourceModels.AllocationCostModel);
+        var dependency = bound.GetProperty("metadataAssumptions").EnumerateArray().Single();
+        JsonAssert.Equal(dependency, "witnessIdentifier", "runtime-layout.coreclr-x64");
+        JsonAssert.Equal(dependency, "runtimeModel", SharpProof.Worker.Protocol.WorkerResourceModels.AllocationLayout);
+        Assert.That(dependency.GetProperty("referenceSha256").GetString(), Has.Length.EqualTo(64));
+        Assert.That(dependency.GetProperty("catalogSha256").GetString(), Has.Length.EqualTo(64));
+        Assert.That(claim.GetProperty("assumptions").EnumerateArray().Any(item =>
+            item.GetProperty("id").GetString() == dependency.GetProperty("assumptionId").GetString() && item.GetProperty("used").GetBoolean()), Is.True);
+        using var sarif = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.SarifPath));
+        var row = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(item => item.GetProperty("ruleId").GetString() == "SharpProof." + expected);
+        Assert.That(row.GetProperty("message").GetProperty("text").GetString(), Does.Contain("conditional resource metadata"));
+        var incompatible = await RunDotNetAsync(workspace.ConsumerDirectory, ["build", workspace.ConsumerProject, "-c", "Release", "--no-restore", "--nologo", "/nodeReuse:false", "-t:Rebuild", "-p:PlatformTarget=AnyCPU", "-p:SharpProofProfile=advisory", "-p:SharpProofVerify=true"]);
+        Assert.That(incompatible.ExitCode, Is.Zero, incompatible.Output);
+        using var unknown = JsonDocument.Parse(await File.ReadAllTextAsync(workspace.ResultPath));
+        var rejected = unknown.RootElement.GetProperty("claimResults").EnumerateArray().Single();
+        JsonAssert.Equal(rejected, "outcome", "Unknown");
+        JsonAssert.Equal(rejected.GetProperty("resourceBound"), "unknownReason", "ResourceLayoutAssumptionsNotBound");
     }
 }

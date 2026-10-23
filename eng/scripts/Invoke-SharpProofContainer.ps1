@@ -11,6 +11,8 @@ param(
 
     [string]$PackageSource = '',
 
+    [string]$ConsumerHarness = '',
+
     [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
 
     [ValidateRange(0, 3)][int]$PackagePartition = 0,
@@ -113,6 +115,12 @@ Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
     throw '-ReuseTestHarness is supported only for package-tests.'
 }
+if ($PSBoundParameters.ContainsKey('ConsumerHarness') -and $Command -ne 'package-consumers') {
+    throw '-ConsumerHarness is supported only for package-consumers.'
+}
+if ($PSBoundParameters.ContainsKey('ConsumerHarness') -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
+    throw '-ConsumerHarness requires an explicit prebuilt harness directory.'
+}
 $fastBuildArguments = if ($Fast) {
     , [Collections.Immutable.ImmutableArray]::Create[string]('-p:RunAnalyzersDuringBuild=false')
 }
@@ -124,7 +132,7 @@ else {
 # solution can build projects in parallel, so individual projects must not
 # race to write its bin/obj directories.
 if ($Command -notin @('doctor', 'contract', 'layout', 'restore', 'dependency-audit', 'format-check', 'lint', 'package-partition-gate', 'package-reproducibility', 'coverage-shard', 'coverage-gate') -and
-    -not $NoBuild -and -not $Fast) {
+    -not $NoBuild -and -not $Fast -and [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
     $defensiveAnalyzerProject = Join-Path $repositoryRoot `
         'src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj'
     Invoke-SharpProofRequiredDotnet @(
@@ -258,11 +266,12 @@ function Invoke-SolutionTests([string]$SolutionPath) {
 
 function Invoke-SharpProofSolutionBuild(
     [string]$BuildConfiguration,
-    [string[]]$AdditionalBuildArguments = @()) {
-    Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
+    [string[]]$AdditionalBuildArguments = @(),
+    [string]$BuildTarget = 'SharpProof.slnx') {
+    Invoke-SharpProofRequiredDotnet @('restore', $BuildTarget, '--locked-mode')
     $buildArgumentBuilder = [System.Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
     $buildArgumentBuilder.AddRange([string[]]@(
-            'build', 'SharpProof.slnx', '--configuration', $BuildConfiguration,
+            'build', $BuildTarget, '--configuration', $BuildConfiguration,
             '--no-restore'))
     if ($null -ne $AdditionalBuildArguments) {
         $buildArgumentBuilder.AddRange($AdditionalBuildArguments)
@@ -344,6 +353,16 @@ function Invoke-RepositoryGates {
         'Embedded symbol package regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
         'Release SBOM and attestation policy regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofConsumerHarness.ps1' `
+        'Consumer harness identity and result regressions failed.'
+    & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofConsumerHarnessLifecycle.sh')
+    if ($LASTEXITCODE -ne 0) { throw 'Consumer harness filesystem lifecycle regressions failed.' }
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofSemanticBuildPlan.ps1' `
+        'Semantic build plan regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageBuildPlan.ps1' `
+        'Package build plan regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperReproductionPlan.ps1' `
+        'Developer reproduction plan regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPublicApiGovernance.ps1' `
         'Public API governance controls failed.'
 }
@@ -601,17 +620,24 @@ switch ($Command) {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw 'package-consumers requires -PackageSource.'
         }
-        Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
-        $consumerArguments = (New-ContainerArgumentBuilder -Values ([ordered]@{
-                    Configuration = $Configuration
-                    PackageSource = $PackageSource
-                }).AsReadOnly()).ToImmutable()
+        if ([string]::IsNullOrWhiteSpace($ConsumerHarness)) {
+            Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
+        }
+        $consumerArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
+                Configuration = $Configuration
+                PackageSource = $PackageSource
+            }).AsReadOnly()
+        if (-not [string]::IsNullOrWhiteSpace($ConsumerHarness)) {
+            $consumerArgumentBuilder['ConsumerHarness'] = $ConsumerHarness
+        }
+        $consumerArguments = $consumerArgumentBuilder.ToImmutable()
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package consumer validation failed.' $consumerArguments
         $toolchain = Get-Content -LiteralPath (Join-Path `
                 $repositoryRoot 'eng/container/toolchain.json') -Raw |
             ConvertFrom-Json
         $minimumConsumerArgumentBuilder = $consumerArguments.ToBuilder()
+        [void]$minimumConsumerArgumentBuilder.Remove('ConsumerHarness')
         $minimumConsumerArgumentBuilder['ConsumerSdkVersion'] =
         [string]$toolchain.dotnet.minimumSdkVersion
         $minimumConsumerArgumentBuilder['FrameworkConsumersOnly'] = $true
@@ -870,20 +896,45 @@ switch ($Command) {
         [IO.Directory]::CreateDirectory($diagnostics) | Out-Null
         Write-Host "Pack diagnostics: $diagnostics"
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
-        Invoke-SharpProofSolutionBuild `
-            -BuildConfiguration 'Release' `
-            -AdditionalBuildArguments @(
-            '/p:GeneratePackageOnBuild=false',
-            "-bl:$(Join-Path $diagnostics 'build.binlog');ProjectImports=None",
-            $repositoryCommitProperty)
-        Invoke-SharpProofRequiredDotnet @(
-            'pack', 'SharpProof.slnx', '--configuration', 'Release',
-            '--output', $output, '--no-build', '--no-restore',
-            '/p:GeneratePackageOnBuild=false',
-            "-bl:$(Join-Path $diagnostics 'pack.binlog');ProjectImports=None",
-            $repositoryCommitProperty)
+        . (Join-Path $PSScriptRoot 'SharpProof.PackageBuildPlan.ps1')
+        $packageBuildProjects = Get-SharpProofPackageBuildProjects `
+            -RepositoryRoot $repositoryRoot -IncludeConsumerHarness
+        $packageBuildFilter = Join-Path $repositoryRoot (
+            '.sharpproof-package-build-' + [Guid]::NewGuid().ToString('N') + '.slnf')
+        try {
+            # The package catalog defines roots; MSBuild retains their full
+            # product, analyzer and generator closure. The parallel canonical
+            # build continues to verify every source and test project.
+            ([ordered]@{
+                solution = ([ordered]@{
+                        path     = 'SharpProof.slnx'
+                        projects = $packageBuildProjects
+                    }).AsReadOnly()
+            }).AsReadOnly() | ConvertTo-Json -Depth 4 |
+                Set-Content -LiteralPath $packageBuildFilter -Encoding utf8NoBOM
+            Invoke-SharpProofSolutionBuild `
+                -BuildConfiguration 'Release' -BuildTarget $packageBuildFilter `
+                -AdditionalBuildArguments @(
+                '/p:GeneratePackageOnBuild=false',
+                "-bl:$(Join-Path $diagnostics 'build.binlog');ProjectImports=None",
+                $repositoryCommitProperty)
+            Invoke-SharpProofRequiredDotnet @(
+                'pack', $packageBuildFilter, '--configuration', 'Release',
+                '--output', $output, '--no-build', '--no-restore',
+                '/p:GeneratePackageOnBuild=false',
+                "-bl:$(Join-Path $diagnostics 'pack.binlog');ProjectImports=None",
+                $repositoryCommitProperty)
+        }
+        finally {
+            if (Test-Path -LiteralPath $packageBuildFilter) {
+                Remove-Item -LiteralPath $packageBuildFilter -Force
+            }
+        }
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageConsumers.ps1' `
             'Package graph validation failed.' `
         ([ordered]@{ PackageSource = $output; ValidatePackageSourceOnly = $true }).AsReadOnly()
+        Invoke-RequiredScript 'eng/scripts/Export-SharpProofConsumerHarness.ps1' `
+            'Consumer harness export failed.' `
+        ([ordered]@{ PackageSource = $output; Configuration = 'Release' }).AsReadOnly()
     }
 }

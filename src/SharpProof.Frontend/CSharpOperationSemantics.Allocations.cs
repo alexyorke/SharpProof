@@ -2,6 +2,20 @@ namespace SharpProof.Frontend;
 
 internal static partial class CSharpOperationSemantics
 {
+    internal static bool IsRepeatedCharacterStringCreation(IObjectCreationOperation creation)
+    {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
+        return creation is
+        {
+            Type.SpecialType: SpecialType.System_String, Initializer: null,
+            Constructor: { DeclaringSyntaxReferences.IsEmpty: true, Parameters.Length: 2 }, Arguments.Length: 2
+        } &&
+            creation.Constructor.Parameters[0] is { Type.SpecialType: SpecialType.System_Char, RefKind: RefKind.None } &&
+            creation.Constructor.Parameters[1] is { Type.SpecialType: SpecialType.System_Int32, RefKind: RefKind.None } &&
+            creation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == 0)
+                .Value.ConstantValue is { HasValue: true, Value: char character } && !char.IsSurrogate(character);
+    }
+
     internal static bool IsSupportedArrayCreation(IArrayCreationOperation creation)
     {
         creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
@@ -128,6 +142,12 @@ internal static partial class CSharpOperationSemantics
     // constructor, and the constructor chains to no other constructor.
     internal static bool IsPlainConstructor(IMethodSymbol constructor, CancellationToken cancellationToken)
     {
+        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
+        return IsDirectObjectConstructor(constructor, false, cancellationToken);
+    }
+
+    internal static bool IsDirectObjectConstructor(IMethodSymbol constructor, bool includeInitializers, CancellationToken cancellationToken)
+    {
         if (constructor is not { MethodKind: MethodKind.Constructor, IsStatic: false } ||
             constructor.ContainingType is not
             {
@@ -145,7 +165,7 @@ internal static partial class CSharpOperationSemantics
         foreach (var reference in type.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration ||
-                declaration.ParameterList != null || declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
+                declaration.ParameterList != null || !includeInitializers && declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
                 {
                     Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field => !IsStatic(field.Modifiers) &&
                         field.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),

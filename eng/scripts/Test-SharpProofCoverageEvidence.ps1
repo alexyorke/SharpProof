@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param()
 
+& pwsh -NoLogo -NoProfile -File (Join-Path $PSScriptRoot 'Test-SharpProofPackageCoveragePreparation.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Package coverage preparation regressions failed.' }
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')

@@ -35,11 +35,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal bool AllowObjectWidening { get; init; }
     internal bool AllowOpaqueCalls { get; init; }
     internal bool ShadowCallSkeleton { get; init; }
+    internal RootParameterClosurePlan? RootClosure { get; init; }
+    internal IrTerm? RootClosureFrame { get; init; }
+    internal ImmutableArray<IrMemberId> RootClosureFields { get; init; } = [];
 
     // Element reads are approximations when the program also writes elements
     // or calls opaque code; otherwise a read is a pure function of the array.
     internal bool ApproximateElementReads { get; init; }
     internal bool PinElementReads { get; init; }
+    internal Func<IMethodSymbol, bool>? DelegateBinding { get; init; }
 
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; init; }
@@ -276,6 +280,25 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return Capture(operation, list); }
         if (depth < 256 && DictionaryBody(operation, block, depth) is { } dictionary)
         { return Capture(operation, dictionary); }
+        if (depth < 256 && operation is IObjectCreationOperation stringCreation &&
+            CSharpOperationSemantics.IsRepeatedCharacterStringCreation(stringCreation))
+        {
+            var arguments = new IrTerm[2];
+            foreach (var argument in stringCreation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+            {
+                var lowered = LowerBodyValue(argument.Value, block, depth + 1);
+                if (!lowered.Classification.IsExact)
+                { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+                var pinned = Pin(argument.Value, lowered);
+                arguments[argument.Parameter!.Ordinal] = pinned.Value;
+                block = pinned.Continuation;
+            }
+            var target = _context.Temporary(_factory.StringType);
+            var character = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
+            var fill = _factory.Integer(_context.Type(character.Type), (char)character.ConstantValue.Value!);
+            _builder!.Allocate(block, _context.Site(operation), _factory.StringType, target, arguments[1], [fill]);
+            return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && HashSetBody(operation, block, depth) is { } hashSet)
         { return Capture(operation, hashSet); }
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
@@ -306,6 +329,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             block = ExceptionConstructorRuntimeEffects(exceptionCreation, values, allocated.Continuation);
             return new(allocated.Value, block, allocated.Classification);
         }
+        if (depth < 256 && operation is IDelegateCreationOperation capturedDelegate && RootClosure?.Matches(capturedDelegate) == true)
+        { return RootClosureFrame is { } frame ? AllocateCapturedDelegate(operation, frame, block) : AllocateValue(operation, block); }
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
             CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
         {
@@ -329,6 +354,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     mayCheckNull = _factory.Variable(choice);
                 }
                 block = ApplyRule(operation, CSharpOperationSemantics.DelegateReceiver(_factory, receiver.Value, mayCheckNull), receiver.Continuation).Continuation;
+                if (DelegateBinding?.Invoke(((IMethodReferenceOperation)delegateCreation.Target).Method) == true)
+                { return AllocateCapturedDelegate(operation, receiver.Value, block); }
             }
             return erased
                 ? new(_factory.Null(_context.Type(operation.Type)), block, FrontendSubsetClassification.Exact)
@@ -629,6 +656,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     {
                         var mutation = _builder!.Assign(right.Continuation, _context.Site(operation), target, _context.BridgeValue(right.Value, _factory.GetVariableInfo(target).Type));
                         _builder.Write(right.Continuation, mutation.Operation, IrWriteRegion.Local);
+                        if (assignment.Target is ILocalReferenceOperation local && RootClosure is { } closure && RootClosureFrame is { } frame)
+                        {
+                            var slot = closure.Captures.IndexOf(local.Local, 0, closure.Captures.Length, SymbolEqualityComparer.Default);
+                            if (slot >= 0)
+                            {
+                                var field = RootClosureFields[slot];
+                                var value = _context.BridgeValue(right.Value, _factory.GetMemberInfo(field).ReturnType);
+                                _builder.FieldStore(right.Continuation, _context.FreshWriteSite(operation), IrWriteRegion.Field,
+                                    _factory.Cast(_factory.ObjectType, frame), field, value);
+                            }
+                        }
                     }
                     return right;
                 }
@@ -679,13 +717,34 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return new(_factory.Variable(pinned), value.Continuation, value.Classification);
     }
 
+    private TotalBodyValue AllocateCapturedDelegate(IOperation operation, IrTerm receiver, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var type = _context.Type(operation.Type);
+        var target = _context.Temporary(type);
+        _builder!.Allocate(block, _context.InstanceDelegateAllocationSite(operation), type, target);
+        var field = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType,
+            IrDelegateCaptureSite.TargetFieldName, _factory.ObjectType, false);
+        _builder.FieldStore(block, _context.FreshWriteSite(operation), IrWriteRegion.Field,
+            AsObject(_factory.Variable(target)), field, AsObject(receiver));
+        return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
+    }
+
     internal TotalBodyValue AllocateValue(IOperation operation, IrBlockId block)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var type = _context.Type(operation.Type);
         var target = _context.Temporary(type);
-        _builder!.Allocate(block, _context.Site(operation), type, target);
+        var site = operation is IDelegateCreationOperation
+        {
+            Target: IMethodReferenceOperation { Instance: null, Method.IsStatic: true }
+        } creation && CSharpOperationSemantics.IsExplicitDelegateCreation(creation) &&
+            DelegateBinding?.Invoke(((IMethodReferenceOperation)creation.Target).Method) == true
+            ? _context.StaticDelegateAllocationSite(operation) : _context.Site(operation);
+        _builder!.Allocate(block, site, type, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
     }
 
@@ -1279,6 +1338,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     // A scalar or reference instance field of a class: its reads and stores
     // are modeled through an object-typed receiver.
+    internal bool StoreInitializer(IFieldSymbol field, IrTerm receiver, IOperation initializer, IrTerm value, IrBlockId block,
+        bool zeroInitialization = false)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        initializer = RepositoryParameterGuard.NotNull(initializer, nameof(initializer));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (FieldMember(field) is not { } member || _factory.GetMemberInfo(member).ReturnType != value.Type)
+        { return false; }
+        var site = zeroInitialization ? _context.FreshWriteSite(initializer) : _context.Site(initializer);
+        _builder!.FieldStore(block, site, IrWriteRegion.Field, AsObject(receiver), member, value);
+        return true;
+    }
+
     private IFieldSymbol BoundField(IFieldSymbol field)
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));

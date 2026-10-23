@@ -29,6 +29,12 @@ internal static class CompilerEffectClaimArtifactCodec
         {
             throw new InvalidDataException("Compiler effect-claim evidence is invalid.");
         }
+        if (value.ContractKind == WorkerEffectContractKind.ResourceUpperBound &&
+            (value.Outcome != WorkerClaimOutcome.Unknown || value.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary ||
+             value.Reason is not (WorkerClaimReason.EffectSummaryIncomplete or WorkerClaimReason.UnsupportedContract)))
+        { throw new InvalidDataException("A compiler resource declaration cannot carry a proof verdict or trusted cost summary."); }
+        if (value.ContractKind == WorkerEffectContractKind.ResourceUpperBound && value.EvidenceSha256 != ComputeSha256(value))
+        { throw new InvalidDataException("Resource claim evidence digest is invalid."); }
     }
 
     private static bool HasValidConstraint(
@@ -37,7 +43,8 @@ internal static class CompilerEffectClaimArtifactCodec
     {
         if (constraint is not { } value ||
             !WorkerProtocolJson.HasKnownEffects(value.AllowedEffects, value.AllowedCapabilities) ||
-            !HasCanonicalStrings(value.AllowedExceptionTypes))
+            !HasCanonicalStrings(value.AllowedExceptionTypes) ||
+            !WorkerProtocolMetadata.HasValidResourceConstraint(kind, value.ResourceUpperBound))
         {
             return false;
         }
@@ -81,6 +88,11 @@ internal static class CompilerEffectClaimArtifactCodec
             .Add(constraint.AllowedCapabilities);
         foreach (var type in constraint.AllowedExceptionTypes.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), StringComparer.Ordinal))
         { hash.Add(type); }
+        if (constraint.ResourceUpperBound is { } resource)
+        {
+            hash.Add(resource.Metric).Add(resource.CostModel).Add(resource.ExpressionModel)
+                .Add(Convert.ToBase64String(resource.UpperBound));
+        }
         return hash.Add(value.Evidence).Finish();
     }
 }

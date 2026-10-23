@@ -65,6 +65,8 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             }
             if (certified)
             { _factory.RegisterClosedSealedReferenceType(mapped); }
+            if (type.TypeKind == TypeKind.Delegate)
+            { _factory.RegisterDelegateReferenceType(mapped); }
             if (_classTypesChecked.Add(type))
             {
                 RegisterClassChain(type);

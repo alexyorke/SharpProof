@@ -19,6 +19,25 @@ internal static class CompilerTotalCallableLowerer
             , static item => item.Tree, static item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
         context.ModelReceiver();
+        if (target.Method.IsAsync)
+        {
+            // An owned scalar entry for resource projection only. This does not
+            // admit an async functional body or bypass any source contract.
+            var runtimeAssumptions = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+                target.Entry.CallableId, target.Entry.Assumptions, cancellationToken);
+            if (ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) is not { ConfiguredAwait: true } ||
+                !target.Claims.IsEmpty || target.EffectClaims.IsEmpty ||
+                target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                    !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
+                runtimeAssumptions is null ||
+                target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
+                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary &&
+                    !(assumption.Kind == WorkerAssumptionKind.UserAssume && runtimeAssumptions.Contains(assumption.Id))))
+            { return null; }
+            return new(target.Entry.CallableId, context.Factory,
+                [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
+                    new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], []);
+        }
         var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -52,7 +71,11 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
+        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
+        {
+            CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
+        };
         context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
@@ -68,7 +91,10 @@ internal static class CompilerTotalCallableLowerer
         { return null; }
         var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToImmutableArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
-        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) :
+            assumption.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(assumption.Id)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
             binding.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) != assumptions.Length)
         { return null; }

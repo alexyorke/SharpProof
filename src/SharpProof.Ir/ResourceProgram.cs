@@ -1,0 +1,207 @@
+using System.Numerics;
+
+namespace SharpProof.Ir;
+
+internal enum ResourceProgramKind { Zero, AllocateArray, Sequence, Choice, Repeat, MetadataBoundary, MetadataCall, AllocateManaged, Activation, UpperEnvelope, CreditLoop, BooleanDistribution }
+internal enum ResourceLoopKind { IncreasingAdd, IncreasingMultiply, DecreasingSubtract, DecreasingDivide }
+internal enum ResourceRepeatKind { Loop, TailRecurrence }
+
+// Typed source variables, not a producer-supplied byte count or JIT frame size.
+internal sealed class ResourceActivationShape
+{
+    internal const int MaximumVariables = 256;
+    internal ImmutableArray<ResourceStorageKind> Variables { get; }
+    internal bool HasReceiver { get; }
+    internal bool HasResult { get; }
+
+    internal ResourceActivationShape(ImmutableArray<ResourceStorageKind> variables, bool hasReceiver, bool hasResult)
+    {
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
+        if (variables.Length > MaximumVariables || variables.Any(static storage =>
+            storage is not (ResourceStorageKind.Byte or ResourceStorageKind.Word16 or ResourceStorageKind.Word32 or ResourceStorageKind.Word64 or ResourceStorageKind.Reference)))
+        { throw new ArgumentException("Activation variables require supported primitive/reference storage.", nameof(variables)); }
+        Variables = variables;
+        HasReceiver = hasReceiver;
+        HasResult = hasResult;
+    }
+}
+
+// A closed resource semantics. Lowering must preserve every allocating operation
+// and reject writes/aliases to a repeated region's controlling scalar. A repeat
+// carries the actual initialization, strict guard and update, never a trip count.
+internal sealed class ResourceLoopRank
+{
+    internal ResourceLoopKind Kind { get; }
+    internal ResourceExpression Initial { get; }
+    internal ResourceExpression Limit { get; }
+    internal ResourceExpression LowerInitial { get; }
+    internal ResourceExpression LowerLimit { get; }
+    internal BigInteger Step { get; }
+    internal int CounterWidth { get; }
+    internal bool CheckedStep { get; }
+
+    internal ResourceLoopRank(ResourceLoopKind kind, ResourceExpression initial,
+        ResourceExpression limit, BigInteger step, int counterWidth, bool checkedStep,
+        ResourceExpression? lowerInitial = null, ResourceExpression? lowerLimit = null)
+    {
+        Initial = ArgumentNullGuard.NotNull(initial, nameof(initial));
+        Limit = ArgumentNullGuard.NotNull(limit, nameof(limit));
+        LowerInitial = lowerInitial ?? ResourceExpression.Zero;
+        LowerLimit = lowerLimit ?? ResourceExpression.Zero;
+        Kind = kind;
+        Step = step;
+        CounterWidth = counterWidth;
+        CheckedStep = checkedStep;
+    }
+}
+
+// Each outer entry deposits a fixed positive amount. A guarded unit-step drain
+// spends one credit per continuing entry; no other write may affect the credit.
+internal sealed class ResourceCreditShape(BigInteger initial, BigInteger deposit, int counterWidth, bool checkedDeposit)
+{
+    internal BigInteger Initial { get; } = initial;
+    internal BigInteger Deposit { get; } = deposit;
+    internal int CounterWidth { get; } = counterWidth;
+    internal bool CheckedDeposit { get; } = checkedDeposit;
+}
+
+internal sealed class ResourceProgram
+{
+    internal const int ModelVersion = 8;
+    internal ResourceProgramKind Kind { get; }
+    internal ResourceExpression? Length { get; }
+    internal ResourceExpression? LowerLength { get; }
+    internal ResourceLoopRank? Rank { get; }
+    internal ResourceMetadataReference? Metadata { get; }
+    internal ResourceAllocationShape? Allocation { get; }
+    internal ResourceActivationShape? Activation { get; }
+    internal ResourceCreditShape? Credit { get; }
+    internal ResourceBooleanDistribution? Distribution { get; }
+    internal ResourceRepeatKind RepeatKind { get; }
+    internal ImmutableArray<ResourceProgram> Children { get; }
+    internal int NodeCount { get; }
+    internal int Depth { get; }
+    internal static ResourceProgram Zero { get; } = new(ResourceProgramKind.Zero, null, null, default, []);
+    internal static ResourceProgram MetadataBoundary { get; } = new(ResourceProgramKind.MetadataBoundary, null, null, default, []);
+
+    private ResourceProgram(ResourceProgramKind kind, ResourceExpression? length, ResourceLoopRank? rank,
+        ResourceRepeatKind repeatKind, ImmutableArray<ResourceProgram> children, ResourceMetadataReference? metadata = null, ResourceAllocationShape? allocation = null,
+        ResourceActivationShape? activation = null, ResourceExpression? lowerLength = null, ResourceCreditShape? credit = null,
+        ResourceBooleanDistribution? distribution = null)
+    {
+        if (children.IsDefault)
+        { throw new ArgumentException("Children must be initialized.", nameof(children)); }
+        Kind = kind;
+        Length = length;
+        LowerLength = lowerLength;
+        Rank = rank;
+        Metadata = metadata;
+        Allocation = allocation;
+        Activation = activation;
+        Credit = credit;
+        Distribution = distribution;
+        RepeatKind = repeatKind;
+        Children = children;
+        var nodes = 1 + (credit is null ? 0 : 2) + (length?.NodeCount ?? allocation?.Extent.NodeCount ?? 0) + (lowerLength?.NodeCount ?? 0) + (allocation?.Fields.Length ?? 0) + (activation?.Variables.Length ?? 0) + (rank is null ? 0 : rank.Initial.NodeCount + rank.Limit.NodeCount + rank.LowerInitial.NodeCount + rank.LowerLimit.NodeCount);
+        var depth = 1 + Math.Max(length?.Depth ?? allocation?.Extent.Depth ?? 0, rank is null ? 0 : Math.Max(rank.Initial.Depth, rank.Limit.Depth));
+        depth = Math.Max(depth, 1 + Math.Max(lowerLength?.Depth ?? 0, rank is null ? 0 : Math.Max(rank.LowerInitial.Depth, rank.LowerLimit.Depth)));
+        foreach (var child in children)
+        {
+            if (child is null)
+            { throw new ArgumentException("Children cannot contain null.", nameof(children)); }
+            nodes += child.NodeCount;
+            depth = Math.Max(depth, 1 + child.Depth);
+        }
+        if (nodes > ResourceExpression.MaximumNodes || depth > ResourceExpression.MaximumDepth ||
+            rank is not null && rank.Step.ToByteArray().Length > 8192 ||
+            credit is not null && (credit.Initial.ToByteArray().Length > 8192 || credit.Deposit.ToByteArray().Length > 8192))
+        { throw new ResourceExpressionLimitException(); }
+        NodeCount = nodes;
+        Depth = depth;
+    }
+
+    internal static ResourceProgram MetadataCall(ResourceMetadataReference metadata)
+    {
+        metadata = ArgumentNullGuard.NotNull(metadata, nameof(metadata));
+        return new(ResourceProgramKind.MetadataCall, null, null, default, [], metadata);
+    }
+
+    internal static ResourceProgram Array(ResourceExpression length, ResourceExpression? lowerLength = null)
+    {
+        length = ArgumentNullGuard.NotNull(length, nameof(length));
+        return new(ResourceProgramKind.AllocateArray, length, null, default, [], lowerLength: lowerLength ?? ResourceExpression.Zero);
+    }
+
+    internal static ResourceProgram TypedArray(ResourceAllocationShape allocation, ResourceExpression? lowerLength = null)
+    {
+        allocation = ArgumentNullGuard.NotNull(allocation, nameof(allocation));
+        if (allocation.Kind != ResourceAllocationKind.Array)
+        { throw new ArgumentException("An array program requires an array storage shape.", nameof(allocation)); }
+        return new(ResourceProgramKind.AllocateArray, allocation.Extent, null, default, [], allocation: allocation, lowerLength: lowerLength ?? ResourceExpression.Zero);
+    }
+
+    internal static ResourceProgram Managed(ResourceAllocationShape allocation)
+    {
+        allocation = ArgumentNullGuard.NotNull(allocation, nameof(allocation));
+        if (allocation.Kind is ResourceAllocationKind.Unspecified or ResourceAllocationKind.Array ||
+            !Enum.IsDefined(typeof(ResourceAllocationKind), allocation.Kind))
+        { throw new ArgumentException("A managed allocation requires a supported non-array shape.", nameof(allocation)); }
+        return new(ResourceProgramKind.AllocateManaged, null, null, default, [], allocation: allocation);
+    }
+
+    internal static ResourceProgram Sequence(ResourceProgram left, ResourceProgram right)
+    {
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
+        if (left.Kind == ResourceProgramKind.Zero)
+        { return right; }
+        if (right.Kind == ResourceProgramKind.Zero)
+        { return left; }
+        return new(ResourceProgramKind.Sequence, null, null, default, [left, right]);
+    }
+
+    internal static ResourceProgram Choice(ResourceProgram left, ResourceProgram right)
+    {
+        left = ArgumentNullGuard.NotNull(left, nameof(left));
+        right = ArgumentNullGuard.NotNull(right, nameof(right));
+        if (ReferenceEquals(left, right))
+        { return left; }
+        return new(ResourceProgramKind.Choice, null, null, default, [left, right]);
+    }
+
+    internal static ResourceProgram Repeat(ResourceLoopRank rank, ResourceRepeatKind kind, ResourceProgram body)
+    {
+        rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        return new(ResourceProgramKind.Repeat, null, rank, kind, [body]);
+    }
+
+    internal static ResourceProgram Activate(ResourceActivationShape? shape, ResourceProgram body)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        return new(ResourceProgramKind.Activation, null, null, default, [body], activation: shape);
+    }
+
+    internal static ResourceProgram UpperEnvelope(ResourceProgram body)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        return new(ResourceProgramKind.UpperEnvelope, null, null, default, [body]);
+    }
+
+    internal static ResourceProgram CreditLoop(ResourceLoopRank rank, ResourceCreditShape credit, ResourceProgram prefix, ResourceProgram drain)
+    {
+        rank = ArgumentNullGuard.NotNull(rank, nameof(rank));
+        credit = ArgumentNullGuard.NotNull(credit, nameof(credit));
+        prefix = ArgumentNullGuard.NotNull(prefix, nameof(prefix));
+        drain = ArgumentNullGuard.NotNull(drain, nameof(drain));
+        return new(ResourceProgramKind.CreditLoop, null, rank, default, [prefix, drain], credit: credit);
+    }
+
+    internal static ResourceProgram WithDistribution(ResourceBooleanDistribution distribution, ResourceProgram whenFalse, ResourceProgram whenTrue)
+    {
+        distribution = ArgumentNullGuard.NotNull(distribution, nameof(distribution));
+        whenFalse = ArgumentNullGuard.NotNull(whenFalse, nameof(whenFalse));
+        whenTrue = ArgumentNullGuard.NotNull(whenTrue, nameof(whenTrue));
+        return new(ResourceProgramKind.BooleanDistribution, null, null, default, [whenFalse, whenTrue], distribution: distribution);
+    }
+}

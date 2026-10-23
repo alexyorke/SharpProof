@@ -14,6 +14,29 @@ namespace SharpProof.Attributes.Test;
     Justification = "NUnit instantiates test fixtures through reflection.")]
 internal sealed class ContractApiTests
 {
+    [TestCase(1, 3)]
+    [TestCase(0, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1000000, 1000000)]
+    public void BooleanInputModelPreservesDeclaredWeights(int trueWeight, int falseWeight)
+    {
+        var model = new ResourceBooleanInputAttribute(trueWeight, falseWeight);
+        Assert.That(model.TrueWeight, Is.EqualTo(trueWeight));
+        Assert.That(model.FalseWeight, Is.EqualTo(falseWeight));
+    }
+
+    [TestCase(-1, 1, "trueWeight")]
+    [TestCase(1000001, 1, "trueWeight")]
+    [TestCase(1, -1, "falseWeight")]
+    [TestCase(1, 1000001, "falseWeight")]
+    [TestCase(0, 0, "falseWeight")]
+    public void BooleanInputModelRejectsInvalidOrEmptyDistributions(int trueWeight, int falseWeight, string parameter)
+    {
+        System.ArgumentNullException.ThrowIfNull(parameter);
+        Action construct = () => { _ = new ResourceBooleanInputAttribute(trueWeight, falseWeight); };
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(construct)!.ParamName, Is.EqualTo(parameter));
+    }
+
     [TestCase(nameof(Contract.Requires))]
     [TestCase(nameof(Contract.Ensures))]
     [TestCase(nameof(Contract.Assume))]
@@ -251,4 +274,43 @@ internal sealed class ContractApiTests
         }
     }
 
+    [TestCase(ResourceMetric.LoopBodyEntries)]
+    [TestCase(ResourceMetric.ArrayAllocations)]
+    [TestCase(ResourceMetric.AllocatedElements)]
+    [TestCase(ResourceMetric.AllocatedBytes)]
+    [TestCase(ResourceMetric.PeakAuxiliaryBytes)]
+    [TestCase(ResourceMetric.RetainedBytes)]
+    public void ResourceContractsPreserveDeclaredConstantAndLinearTerms(ResourceMetric metric)
+    {
+        var constant = new ResourceUpperBoundAttribute(metric, 3);
+        Assert.That(constant.Metric, Is.EqualTo(metric));
+        Assert.That(constant.Constant, Is.EqualTo(3));
+        Assert.That(constant.SizeParameter, Is.Null);
+        Assert.That(constant.Coefficient, Is.Zero);
+        var linear = new ResourceUpperBoundAttribute(metric, 2, "values.Length", 4);
+        Assert.That(linear.Metric, Is.EqualTo(metric));
+        Assert.That(linear.Constant, Is.EqualTo(2));
+        Assert.That(linear.SizeParameter, Is.EqualTo("values.Length"));
+        Assert.That(linear.Coefficient, Is.EqualTo(4));
+    }
+
+    [TestCase(0, 0, 0)]
+    [TestCase(99, 0, 0)]
+    [TestCase(1, -1, 0)]
+    [TestCase(1, 0, -1)]
+    public void ResourceContractsRejectUndefinedMetricsAndNegativeTerms(int metric, long constant, long coefficient)
+    {
+        Action construct = () => _ = new ResourceUpperBoundAttribute((ResourceMetric)metric, constant, coefficient: coefficient);
+        Assert.Throws<ArgumentOutOfRangeException>(construct);
+    }
+
+    [TestCase(null, 1)]
+    [TestCase("", 1)]
+    [TestCase(" ", 1)]
+    [TestCase("n", 0)]
+    public void ResourceContractsRequireASizeExactlyWhenTheCoefficientIsPositive(string? size, long coefficient)
+    {
+        Action construct = () => _ = new ResourceUpperBoundAttribute(ResourceMetric.ArrayAllocations, 0, size, coefficient);
+        Assert.Throws<ArgumentException>(construct);
+    }
 }

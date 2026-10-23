@@ -7,6 +7,61 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 internal sealed class IrTotalExecutionTests
 {
+    [TestCase(0, 100, IrProgramExecutionStatus.Returned, 0)]
+    [TestCase(3, 100, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(-1, 100, IrProgramExecutionStatus.Exception, 0)]
+    [TestCase(100, 4, IrProgramExecutionStatus.StepLimit, 0)]
+    public void RepeatedStringReplayObservesOnlySuccessfulFreshStorage(int count, int steps, IrProgramExecutionStatus expected, int allocations)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("text", factory.StringType);
+        builder.Allocate(entry, factory.CreateOperation(), factory.StringType, target, factory.Integer(count),
+            [factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x')]);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var observed = new List<int>();
+        var general = 0;
+        var options = new IrProgramReplayOptions(_ => null)
+        {
+            StringAllocationPrefixObserver = (instruction, characters, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                Assert.That(approximation, Is.False);
+                observed.Add(characters);
+            },
+            AllocationObserver = instruction =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                general++;
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, steps, options);
+        Assert.That(result.Status, Is.EqualTo(expected));
+        Assert.That(observed, Has.Count.EqualTo(allocations));
+        Assert.That(general, Is.EqualTo(allocations));
+        if (count < 0)
+        { Assert.That(result.Exception!.Kind, Is.EqualTo(IrExceptionKind.ArgumentOutOfRange)); }
+        if (expected == IrProgramExecutionStatus.Returned)
+        { Assert.That(result.ReturnValue!.Payload, Is.EqualTo(new string('x', count))); }
+    }
+
+    [TestCase(0)]
+    [TestCase(2)]
+    [TestCase(3)]
+    public void RepeatedStringAllocationRejectsInvalidFillPayload(int kind)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("text", factory.StringType);
+        var character = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), kind == 3 ? 0xD800 : 'x');
+        ImmutableArray<IrTerm> fill = kind == 0 ? [] : kind == 2 ? [character, character] : [character];
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            builder.Allocate(entry, factory.CreateOperation(), factory.StringType, target, factory.Integer(3), fill);
+        }));
+    }
     [Test]
     public void AssignmentObservationsRetainApproximationStateAtEachCheckpoint()
     {
@@ -696,4 +751,71 @@ internal sealed class IrTotalExecutionTests
     }
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private test exception only checks exact runtime-type admission.")]
     private sealed class DerivedRangeException : ArgumentOutOfRangeException { }
+    [TestCase(0, false, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(3, false, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(3, true, 16, IrProgramExecutionStatus.Returned, 1)]
+    [TestCase(-1, false, 16, IrProgramExecutionStatus.Exception, 0)]
+    [TestCase(100, false, 4, IrProgramExecutionStatus.StepLimit, 0)]
+    public void QuantitativeArrayEventsRequireSuccessfulAllocation(int length, bool approximate, int steps,
+        IrProgramExecutionStatus expected, int count)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var block = builder.CreateBlock();
+        var size = factory.CreateVariable("size", factory.IntegerType);
+        if (approximate)
+        { builder.Havoc(block, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, size); }
+        else
+        { builder.Assign(block, factory.CreateOperation(), size, factory.Integer(length)); }
+        var arrayType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var array = factory.CreateVariable("array", arrayType);
+        builder.Allocate(block, factory.CreateOperation(), arrayType, array, factory.Variable(size));
+        builder.Return(block, factory.CreateOperation());
+        var observed = new List<(int Length, bool Approximation)>();
+        var options = new IrProgramReplayOptions(_ => factory.CreateIntegerValue(length))
+        {
+            ArrayAllocationPrefixObserver = (instruction, elements, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                observed.Add((elements, approximation));
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, steps, options);
+        Assert.That(result.Status, Is.EqualTo(expected));
+        Assert.That(observed, Has.Count.EqualTo(count));
+        if (count == 1)
+        { Assert.That(observed.Single(), Is.EqualTo((length, approximate))); }
+    }
+    [TestCase(true, true, false, 1)]
+    [TestCase(true, false, false, 0)]
+    [TestCase(false, true, false, 0)]
+    [TestCase(true, true, true, 1)]
+    public void SourceLoopEventsRequireAMarkedTrueEdge(bool marked, bool condition, bool approximation, int expected)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var exit = builder.CreateBlock();
+        var guard = factory.CreateVariable("guard", factory.BooleanType);
+        if (approximation)
+        { builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, guard); }
+        else
+        { builder.Assign(entry, factory.CreateOperation(), guard, factory.Boolean(condition)); }
+        builder.Branch(entry, factory.CreateOperation(marked ? IrSourceLoopEntry.GuardMarker : "ordinary-if"), factory.Variable(guard), exit, exit);
+        builder.Return(exit, factory.CreateOperation());
+        var observed = new List<bool>();
+        var options = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(condition))
+        {
+            SourceLoopEntryObserver = (instruction, consumed) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                observed.Add(consumed);
+            }
+        };
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 16, options);
+        Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(observed, Has.Count.EqualTo(expected));
+        if (expected == 1)
+        { Assert.That(observed.Single(), Is.EqualTo(approximation)); }
+    }
 }

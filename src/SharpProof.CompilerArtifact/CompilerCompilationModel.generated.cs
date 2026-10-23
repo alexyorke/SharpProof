@@ -22,6 +22,7 @@ internal sealed record CompilerCompilationSnapshot
     public string AssemblyName { get; init; } = string.Empty;
     public string AssemblyIdentity { get; init; } = string.Empty;
     public string TargetFramework { get; init; } = string.Empty;
+    public string ResourceTargetPlatform { get; init; } = string.Empty;
     [JsonIgnore]
     public string CompilerVersion { get; init; } = string.Empty;
     [JsonIgnore]
@@ -39,6 +40,7 @@ internal sealed record CompilerCompilationSnapshot
     public CompilerCompilationOptionsSnapshot Options { get; init; } = new();
     public ImmutableArray<CompilerSyntaxTreeSnapshot> SyntaxTrees { get; init; } = [];
     public ImmutableArray<CompilerReferenceSnapshot> References { get; init; } = [];
+    public ImmutableArray<CompilerReferenceSnapshot> ResourceMetadataReferences { get; init; } = [];
     [JsonIgnore]
     public ImmutableArray<CompilerAdditionalFileSnapshot> AdditionalFiles { get; init; } = [];
 }

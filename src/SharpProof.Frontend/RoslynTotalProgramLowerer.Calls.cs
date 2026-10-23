@@ -1,3 +1,5 @@
+using SharpProof.Frontend.Host;
+
 namespace SharpProof.Frontend;
 
 internal sealed partial class RoslynTotalProgramLowerer
@@ -93,31 +95,92 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     // `new C(arguments)` evaluates the arguments, allocates the object and
-    // runs the constructor, which a plain constructor does exactly as written.
+    // runs instance initializers, the constructor body, then object initializers.
+    // A body CFG does not contain the separate field/property initializers.
     // Any other declared class constructor runs as an unknown call after its
     // preconditions.
     private TotalBodyValue? InlineSourceConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
     {
-        if (_preserveSourceCall != null || creation.Initializer != null || creation.Constructor is not { } constructor ||
-            !CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken) &&
+        if (_preserveSourceCall != null || creation.Constructor is not { } constructor ||
+            !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) &&
                 !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
+        { return null; }
+        foreach (var initializer in creation.Initializer?.Initializers ?? [])
+        {
+            SpendRegion();
+            if (initializer is not ISimpleAssignmentOperation
+                {
+                    IsRef: false, Target: IFieldReferenceOperation
+                    { Field.IsStatic: false, Instance: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ImplicitReceiver } }
+                })
+            { return null; }
+        }
+        if (!TryConstructionInitializers(constructor, out var initializers))
         { return null; }
         IrTerm? created = null;
         IrBlockId Allocate(IrBlockId current)
         {
             RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
+            var allocatedType = _context.Type(creation.Type);
+            var initializeDefaults = false;
+            if (CSharpOperationSemantics.CompleteObjectStorage(creation.Type, _cancellationToken) is { } storage &&
+                _context.Factory.TryGetClosedClassReferenceBase(allocatedType, out var parent) && !parent.HasValue)
+            {
+                _context.Factory.RegisterObjectStorageType(allocatedType, storage);
+                initializeDefaults = true;
+            }
             var allocated = _expressions.AllocateValue(creation, current);
             created = allocated.Value;
-            return allocated.Continuation;
+            current = allocated.Continuation;
+            // CLR zero initialization precedes source initializers and constructor
+            // execution. Materialize each certified slot with its scoped field ID.
+            if (initializeDefaults && creation.Type is INamedTypeSymbol owner)
+            {
+                foreach (var member in owner.GetMembers())
+                {
+                    if (member is not IFieldSymbol { IsStatic: false, IsConst: false } field)
+                    { continue; }
+                    SpendRegion();
+                    var value = CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Type(field.Type));
+                    if (!_expressions.StoreInitializer(field, created, creation, value, current, zeroInitialization: true))
+                    { throw new RegionIncompleteException(); }
+                }
+            }
+            foreach (var (field, initializer) in initializers)
+            {
+                SpendRegion();
+                var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
+                if (!lowered.Classification.IsExact ||
+                    !_expressions.StoreInitializer(field, created, initializer, lowered.Value, lowered.Continuation))
+                { throw new RegionIncompleteException(); }
+                current = lowered.Continuation;
+            }
+            return current;
+        }
+        TotalBodyValue Complete(IrBlockId current)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
+            foreach (var initializer in creation.Initializer?.Initializers ?? [])
+            {
+                SpendRegion();
+                var assignment = (ISimpleAssignmentOperation)initializer;
+                var field = (IFieldReferenceOperation)assignment.Target;
+                var lowered = _expressions.LowerBodyValue(assignment.Value, current, depth + 1);
+                if (!lowered.Classification.IsExact ||
+                    !_expressions.StoreInitializer(field.Field, created!, assignment.Value, lowered.Value, lowered.Continuation))
+                { throw new RegionIncompleteException(); }
+                current = lowered.Continuation;
+            }
+            return new(created!, current, FrontendSubsetClassification.Exact);
         }
         if (constructor.IsImplicitlyDeclared)
         {
             if (!creation.Arguments.IsEmpty || _calls == null || !_calls.HasNoTypeInitialization(constructor.ContainingType))
             { return null; }
             block = Allocate(block);
-            return new(created!, block, FrontendSubsetClassification.Exact);
+            return Complete(block);
         }
-        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate) is not { } body)
+        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate, constructedReceiver: () => created) is not { } body)
         { return null; }
         if (created == null)
         {
@@ -126,9 +189,119 @@ internal sealed partial class RoslynTotalProgramLowerer
             _builder.Havoc(body.Continuation, _context.Site(creation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
             created = _context.Factory.Variable(unknown);
         }
-        return new(created, body.Continuation, body.Classification);
+        return body.Classification.IsExact ? Complete(body.Continuation) : new(created, body.Continuation, body.Classification);
     }
 
+    private bool TryConstructionInitializers(IMethodSymbol constructor, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
+        initializers = [];
+        if (CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken) ||
+            !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken))
+        { return true; }
+        var type = constructor.ContainingType;
+        if (_calls is not { } calls || _context.Compilation is not { } compilation || type.IsGenericType ||
+            type.DeclaringSyntaxReferences.Length != 1 ||
+            type.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration)
+        { return false; }
+        var model = CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
+        return TryConsumeConstructionInitializerValues(type, Harvest(), _cancellationToken, out initializers);
+
+        IEnumerable<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> Harvest()
+        {
+            foreach (var member in declaration.Members)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                if (!calls.Spend())
+                { throw new ConstructionInitializerHarvestRejectedException(); }
+                if (member is Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field &&
+                    !field.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword) || modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ConstKeyword)))
+                {
+                    foreach (var variable in field.Declaration.Variables)
+                    {
+                        if (!calls.Spend())
+                        { throw new ConstructionInitializerHarvestRejectedException(); }
+                        if (variable.Initializer == null)
+                        { continue; }
+                        yield return (true, model.GetOperation(variable.Initializer, _cancellationToken), null);
+                    }
+                }
+                else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax { Initializer: { } value } property &&
+                    !property.Modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)))
+                {
+                    var symbol = model.GetDeclaredSymbol(property, _cancellationToken) as IPropertySymbol;
+                    var operation = symbol == null ? null : model.GetOperation(value, _cancellationToken);
+                    yield return (false, operation, symbol);
+                }
+                else if (member is Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax)
+                { throw new ConstructionInitializerHarvestRejectedException(); }
+            }
+        }
+    }
+
+    internal static bool TryConstructionInitializerValues(INamedTypeSymbol type,
+        ImmutableArray<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> candidates,
+        CancellationToken cancellationToken, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
+        return TryConsumeConstructionInitializerValues(type, candidates, cancellationToken, out initializers);
+    }
+
+    // Consume one compiler candidate at a time, validating before MoveNext can
+    // spend on or query another declaration. Publish only the complete inventory.
+    internal static bool TryConsumeConstructionInitializerValues(INamedTypeSymbol type,
+        IEnumerable<(bool IsField, IOperation? Operation, IPropertySymbol? Property)> candidates,
+        CancellationToken cancellationToken, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        candidates = RepositoryParameterGuard.NotNull(candidates, nameof(candidates));
+        cancellationToken.ThrowIfCancellationRequested();
+        initializers = [];
+        var values = ImmutableArray.CreateBuilder<(IFieldSymbol Field, IOperation Value)>();
+        try
+        {
+            foreach (var candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryConstructionInitializerValue(type, candidate, cancellationToken, out var initializer))
+                { return false; }
+                values.Add(initializer);
+            }
+        }
+        catch (ConstructionInitializerHarvestRejectedException)
+        { return false; }
+        initializers = values.ToImmutable();
+        return true;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032", Justification = "Private initializer-harvest control flow.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1064", Justification = "Private harvest rejection is caught by the atomic initializer consumer.")]
+    private sealed class ConstructionInitializerHarvestRejectedException : Exception;
+
+    private static bool TryConstructionInitializerValue(INamedTypeSymbol type,
+        (bool IsField, IOperation? Operation, IPropertySymbol? Property) candidate,
+        CancellationToken cancellationToken, out (IFieldSymbol Field, IOperation Value) value)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        cancellationToken.ThrowIfCancellationRequested();
+        value = default;
+        if (candidate.IsField)
+        {
+            if (candidate.Operation is not IFieldInitializerOperation { InitializedFields.Length: 1 } initializer)
+            { return false; }
+            value = (initializer.InitializedFields[0], initializer.Value);
+        }
+        else
+        {
+            if (candidate.Property is not { } symbol || candidate.Operation is not IPropertyInitializerOperation initializer ||
+                type.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(field => field is null ? throw new ArgumentNullException(nameof(field)) :
+                    SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, symbol)) is not { } backing)
+            { return false; }
+            value = (backing, initializer.Value);
+        }
+        return true;
+    }
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -149,11 +322,11 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
-        Func<IrBlockId, IrBlockId>? prelude = null)
+        Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null)
     {
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null) &&
+        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null, constructorInitializers: constructedReceiver != null) &&
             !(_expressions.AllowOpaqueCalls &&
-                _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true)))
+                _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true, constructorInitializers: constructedReceiver != null)))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
@@ -177,7 +350,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         // The callee's `this` is the receiver as evaluated before the
         // arguments; an unmodeled caller `this` is unknown.
-        if (callee.Receiver is { } self)
+        // Construction binds its fresh receiver after argument evaluation and
+        // allocation below; it has no caller receiver to approximate here.
+        if (constructedReceiver == null && callee.Receiver is { } self)
         {
             if ((receiver ?? _context.ReceiverValue()) is { } value)
             { _builder.Assign(block, site, self.Entry, Bridge(value, _context.Factory.GetVariableInfo(self.Entry).Type)); }
@@ -212,6 +387,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(marker, block, value.Classification); }
             argumentBuffer[parameter.Ordinal] = Bridge(value.Value,
                 _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
+            if (constructedReceiver != null)
+            {
+                var pinned = _context.Temporary(argumentBuffer[parameter.Ordinal].Type);
+                _builder.Assign(block, site, pinned, argumentBuffer[parameter.Ordinal]);
+                argumentBuffer[parameter.Ordinal] = _context.Factory.Variable(pinned);
+            }
         }
         if (assigned != null)
         {
@@ -228,6 +409,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
         if (prelude != null)
         { block = prelude(block); }
+        if (constructedReceiver?.Invoke() is { } freshReceiver && callee.Receiver is { } constructorReceiver)
+        { _builder.Assign(block, site, constructorReceiver.Entry, Bridge(freshReceiver, _context.Factory.GetVariableInfo(constructorReceiver.Entry).Type)); }
         ImmutableArray<TotalShadowCallHop> callAncestry = [];
         if (_captureShadowCallAncestry)
         {

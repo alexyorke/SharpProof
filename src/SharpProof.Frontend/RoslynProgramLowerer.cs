@@ -109,7 +109,8 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         var compilation = graph.OriginalOperation.SemanticModel!.Compilation;
         var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,
             cancellationToken, resolveScalarModel, prepareMetadata, opaqueCalls: opaqueCalls,
-            opaqueEffects: opaqueEffects, approximateElementReads: approximateElementReads, pinElementReads: pinElementReads);
+            opaqueEffects: opaqueEffects, approximateElementReads: approximateElementReads, pinElementReads: pinElementReads,
+            captureResourceLoopEntries: context.CaptureResourceLoopEntries);
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls).Lower(graph);
     }
 }

@@ -6288,6 +6288,7 @@ internal sealed partial class WorkerTests
         private readonly TempDirectory _temporary;
         private readonly ImmutableArray<string>.Builder _additionalReferencePaths = ImmutableArray.CreateBuilder<string>();
         private bool _useNetCoreReferencePack;
+        private int? _referencePackMajor;
 
         private TestProject(TempDirectory temporary, ImmutableArray<string> sourcePaths)
         {
@@ -6350,8 +6351,9 @@ internal sealed partial class WorkerTests
             }
         }
 
-        internal void UseNetCoreReferencePack()
+        internal void UseNetCoreReferencePack(int? major = null)
         {
+            _referencePackMajor = major;
             _useNetCoreReferencePack = true;
         }
 
@@ -6448,7 +6450,7 @@ internal sealed partial class WorkerTests
         }
 
         private static ImmutableArray<MetadataReference>
-            CreateNetCoreReferencePack()
+            CreateNetCoreReferencePack(int? major = null)
         {
             var runtimeDirectory = Path.GetDirectoryName(
                 typeof(object).Assembly.Location) ??
@@ -6467,7 +6469,7 @@ internal sealed partial class WorkerTests
                 .Select(Path.GetFileName)
                 .Where(static value => value != null)
                 .Select(static value => Version.Parse(value!))
-                .Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Major == Environment.Version.Major))
+                .Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Major == (major ?? Environment.Version.Major)))
                 .OrderByDescending(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value))
                 .First();
             var references = Directory.GetFiles(
@@ -6502,7 +6504,7 @@ internal sealed partial class WorkerTests
                     effectiveParseOptions,
                     path)));
             var references = (_useNetCoreReferencePack
-                    ? NetCoreReferencePack
+                    ? _referencePackMajor is { } major ? CreateNetCoreReferencePack(major) : NetCoreReferencePack
                     : DefaultReferences)
                 .AddRange(_additionalReferencePaths.ToImmutable().Select(static path =>
                     path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));

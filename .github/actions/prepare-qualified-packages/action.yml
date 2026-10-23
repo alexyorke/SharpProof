@@ -12,6 +12,11 @@ inputs:
     required: false
     default: "true"
 
+outputs:
+  windows-native-path:
+    description: Same-job native payload directory verified by the prepared toolchain.
+    value: ${{ steps.windows-native.outputs.path }}
+
 runs:
   using: composite
   steps:

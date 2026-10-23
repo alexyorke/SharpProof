@@ -1,0 +1,269 @@
+namespace SharpProof.Worker;
+
+internal sealed record NativeTaskCallbackActivationCheck(int? WrapperActivationsUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => WrapperActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
+}
+
+internal sealed record NativeTaskOwnedSourceFrameCheck(int? FramesPerPassUpper, string? UnknownReason)
+{
+    internal string? RequiredSourceCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+    internal string? RequiredCallbackCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.CallbackActivationModel;
+    internal string? RequiredRuntimeModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.OwnedSourceFrameModel;
+}
+
+internal sealed record NativeTaskDirectSourceFrameCheck(int? FramesPerPassUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+    internal string? RequiredRuntimeModel => FramesPerPassUpper is null ? null : NativeTaskCarrierStorageVerifier.DirectSourceFrameModel;
+}
+
+internal sealed record NativeTaskSourceBodyCheck(int? DirectSourceActivationsUpper, string? UnknownReason)
+{
+    internal string? RequiredCompilerModel => DirectSourceActivationsUpper is null ? null : NativeTaskCarrierStorageVerifier.SourceBodyModel;
+}
+
+internal sealed record NativeTaskCarrierStorageCheck(ResourceExpression? DirectUpper,
+    ImmutableArray<ResourceStorageKind> AsyncBoxStateFields, string? UnknownReason)
+{
+    public ImmutableArray<ResourceStorageKind> AsyncBoxStateFields { get; init; } = AsyncBoxStateFields.IsDefault
+        ? throw new ArgumentException("State fields must be initialized.", nameof(AsyncBoxStateFields)) : AsyncBoxStateFields;
+}
+
+// Conditional compiler-owned carriers only. Runtime Task/async-box objects,
+// execution-context effects and lifetime composition are separate obligations.
+internal static class NativeTaskCarrierStorageVerifier
+{
+    internal const string Model = WorkerResourceModels.TaskCompilerCarrierModel;
+    internal const int MaximumCallbacks = 64;
+    internal const string CallbackActivationModel = "owned-emitted-callback-forwarders-v1";
+    internal const string SourceBodyModel = "owned-emitted-call-free-source-bodies-v1";
+
+    internal const string OwnedSourceFrameModel = "coreclr8-x64-owned-callback-source-unwind-frames-v1";
+
+    // Same ordinary-JIT/unwind premise as the direct-source component. The
+    // checked forwarder has no handlers and calls its owned child once, so its
+    // active invocation adds at most one frame; inlining/tail calls can remove
+    // it. This counts only the owned source and wrapper in one completed pass
+    // for one active callback, not other tasks or helper/framework frames.
+    internal static NativeTaskOwnedSourceFrameCheck CheckOwnedSourceFrames(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = CheckDirectSourceFrames(shapes, projection, root, layout, cancellation);
+        if (source.FramesPerPassUpper is not { } count)
+        { return new(null, source.UnknownReason); }
+        // Direct-source admission already checked the complete forwarder map.
+        // Both terms are derived bounded counts, not caller-supplied caps.
+        return new(count + shapes.CallbackActivations!.Activations!.WrapperActivationsUpper, null);
+    }
+
+    internal const string DirectSourceFrameModel = "coreclr8-x64-direct-source-unwind-frame-v1";
+
+    // Conditional on ordinary execution of the exact emitted module by the
+    // pinned standard JIT/unwind ABI, without rewriting or external reentry.
+    // One active call-free, handler-free source invocation contributes at most
+    // one direct source frame in one completed unwind pass. Inlining can remove
+    // it. OSR's unwind records include the inherited Tier0 saves/stack, so they
+    // unwind the continuation and inherited area to the original caller.
+    // Helper/framework frames, repeated/failed passes and trace allocation are
+    // separate obligations. This result has no root byte-proof authority.
+    internal static NativeTaskDirectSourceFrameCheck CheckDirectSourceFrames(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        var source = CheckSourceBodies(shapes, projection, root, layout, cancellation);
+        return source.DirectSourceActivationsUpper is { } count ? new(count, null) : new(null, source.UnknownReason);
+    }
+
+    // One entered source body, with no source callees. Runtime helper frames,
+    // initialization, external reentry and unwind behavior are separate premises.
+    internal static NativeTaskSourceBodyCheck CheckSourceBodies(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var callbacks = CheckCallbackActivations(shapes, projection, root, layout, cancellation);
+        if (callbacks.WrapperActivationsUpper is null)
+        { return new(null, callbacks.UnknownReason); }
+        var capture = shapes.SourceBodies;
+        if (capture is null)
+        { return new(null, "TaskSourceBodyEvidenceUnavailable"); }
+        if (capture.Inventory is not { } inventory)
+        {
+            return new(null, !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskSourceBodyEvidenceInvalid");
+        }
+        if (capture.UnknownReason is not null || inventory.RootCallableId != root.CallableId || inventory.ModuleSha256 != shapes.ModuleSha256 ||
+            inventory.MethodTokens.IsDefault || inventory.MethodTokens.Length is < 1 or > 16)
+        { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        var methods = new HashSet<int>();
+        foreach (var token in inventory.MethodTokens)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (!MethodToken(token) || !methods.Add(token))
+            { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        }
+        if (!methods.SetEquals(shapes.CallbackActivations!.Activations!.Forwarders.Select(static forwarder =>
+            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)))
+        { return new(null, "TaskSourceBodyEvidenceInvalid"); }
+        return new(1, null);
+    }
+
+    internal static NativeTaskCallbackActivationCheck CheckCallbackActivations(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var carriers = Check(shapes, projection, root, layout, cancellation);
+        if (carriers.UnknownReason is { } reason)
+        { return new(null, reason); }
+        var capture = shapes.CallbackActivations;
+        if (capture is null)
+        { return new(null, "TaskCallbackActivationEvidenceUnavailable"); }
+        if (capture.Activations is not { } activations)
+        {
+            return new(null, !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskCallbackActivationEvidenceInvalid");
+        }
+        if (capture.UnknownReason is not null || activations.RootCallableId != root.CallableId ||
+            activations.ModuleSha256 != shapes.ModuleSha256 || activations.Forwarders.IsDefault ||
+            activations.Forwarders.Length != shapes.MatchedCallbacks)
+        { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+        var methods = new HashSet<int>();
+        var children = new HashSet<int>();
+        foreach (var forwarder in activations.Forwarders)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (forwarder is null || !MethodToken(forwarder.MethodToken) || !MethodToken(forwarder.ChildMethodToken) ||
+                !methods.Add(forwarder.MethodToken))
+            { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+            children.Add(forwarder.ChildMethodToken);
+        }
+        if (children.Count > projection.Children.Length || methods.Overlaps(children))
+        { return new(null, "TaskCallbackActivationEvidenceInvalid"); }
+        return new(activations.WrapperActivationsUpper, null);
+    }
+
+    private static bool MethodToken(int token)
+    { return token >> 24 == 6 && (token & 0x00ffffff) != 0; }
+
+    // This binds a collector fact to its source carriers. It does not establish
+    // a physical CLR frame count or a bound on runtime exception allocations.
+    internal static string? CheckExceptionBoundary(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var carriers = Check(shapes, projection, root, layout, cancellation);
+        if (carriers.UnknownReason is { } reason)
+        { return reason; }
+        var capture = shapes.RootExceptionBoundary;
+        if (capture is null)
+        { return "TaskRootExceptionBoundaryUnavailable"; }
+        if (capture.Boundary is not { } boundary)
+        {
+            return !string.IsNullOrWhiteSpace(capture.UnknownReason) && capture.UnknownReason.Length <= 512
+                ? capture.UnknownReason : "TaskRootExceptionBoundaryInvalid";
+        }
+        if (capture.UnknownReason is not null || !projection.ConfiguredAwait || shapes.StateMachine is null ||
+            boundary.RootCallableId != root.CallableId || boundary.ModuleSha256 != shapes.ModuleSha256 ||
+            boundary.StateMachineMetadataName != shapes.StateMachine.MetadataName ||
+            boundary.MethodToken >> 24 != 6 || (boundary.MethodToken & 0x00ffffff) == 0 ||
+            boundary.TryOffset < 0 || boundary.TryOffset >= 4096 || boundary.TryLength <= 0 ||
+            boundary.TryLength > 4096 - boundary.TryOffset)
+        { return "TaskRootExceptionBoundaryInvalid"; }
+        return null;
+    }
+
+    internal static NativeTaskCarrierStorageCheck Check(CompilerTaskCarrierShapes shapes,
+        CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root,
+        ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        shapes = ArgumentNullGuard.NotNull(shapes, nameof(shapes));
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        root = ArgumentNullGuard.NotNull(root, nameof(root));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        cancellation.ThrowIfCancellationRequested();
+        if (!NativeForkJoinSourceCostVerifier.Check(projection, root, cancellation).HasSourceCosts ||
+            shapes.RootCallableId != root.CallableId || !WorkerProtocolJson.IsSha256(shapes.ModuleSha256) ||
+            string.IsNullOrWhiteSpace(shapes.CompilerIdentity) || shapes.CompilerIdentity.Length > 512 ||
+            shapes.MatchedCallbacks < projection.Children.Length || shapes.MatchedCallbacks > MaximumCallbacks ||
+            shapes.CallbackFrames.IsDefault || shapes.CallbackFrames.Length > shapes.MatchedCallbacks ||
+            (shapes.StateMachine != null) != projection.ConfiguredAwait)
+        { return Unknown("TaskCompilerCarrierOwnershipUnproved"); }
+        var remaining = ResourceExpression.MaximumNodes;
+        foreach (var frame in shapes.CallbackFrames)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (frame == null || frame.IsValueType || !Valid(frame, ref remaining, cancellation))
+            { return Unknown("TaskCompilerCarrierShapeUnsupported"); }
+        }
+        if (shapes.StateMachine is { } machine && !Valid(machine, ref remaining, cancellation))
+        { return Unknown("TaskCompilerCarrierShapeUnsupported"); }
+        // Every extent and field count below is a bounded constant. Validation
+        // above admits only layout-supported fields; after the array establishes
+        // context compatibility, the remaining fixed shapes cannot fail layout
+        // or expression budgets.
+        // One source params array and at most one delegate per emitted callback.
+        // Shared frames/caches are deliberately overcounted.
+        var array = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Reference,
+            ResourceExpression.Literal(projection.Children.Length)), layout, cancellation);
+        if (array.Bounds == null)
+        { return Unknown(array.UnknownReason ?? "TaskCompilerCarrierLayoutUnproved"); }
+        var delegates = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Delegate(), layout, cancellation);
+        var upper = ResourceExpression.Add(array.Bounds.Upper, ResourceExpression.Multiply(delegates.Bounds!.Upper,
+            ResourceExpression.Literal(shapes.MatchedCallbacks)));
+        foreach (var frame in shapes.CallbackFrames)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(frame.Fields), layout, cancellation);
+            upper = ResourceExpression.Add(upper, bound.Bounds!.Upper);
+        }
+        ImmutableArray<ResourceStorageKind> stateFields = [];
+        if (shapes.StateMachine is { } state)
+        {
+            if (state.IsValueType)
+            { stateFields = state.Fields; }
+            else
+            {
+                var bound = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Object(state.Fields), layout, cancellation);
+                upper = ResourceExpression.Add(upper, bound.Bounds!.Upper);
+                stateFields = [ResourceStorageKind.Reference];
+            }
+        }
+        return new(upper, stateFields, null);
+    }
+
+    private static bool Valid(CompilerTaskCarrierType type, ref int remaining, CancellationToken cancellation)
+    {
+        type = ArgumentNullGuard.NotNull(type, nameof(type));
+        if (string.IsNullOrWhiteSpace(type.MetadataName) || type.MetadataName.Length > 4096 ||
+            type.Fields.IsDefault || type.Fields.Length > ResourceAllocationShape.MaximumFields)
+        { return false; }
+        remaining -= type.Fields.Length + 1;
+        if (remaining < 0)
+        { return false; }
+        foreach (var field in type.Fields)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (field is not (ResourceStorageKind.Byte or ResourceStorageKind.Word16 or ResourceStorageKind.Word32 or
+                ResourceStorageKind.Word64 or ResourceStorageKind.Reference or ResourceStorageKind.NativeInteger))
+            { return false; }
+        }
+        return true;
+    }
+
+    private static NativeTaskCarrierStorageCheck Unknown(string reason)
+    {
+        reason = ArgumentNullGuard.NotNull(reason, nameof(reason));
+        return new(null, [], reason);
+    }
+}

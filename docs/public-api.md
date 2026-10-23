@@ -21,6 +21,7 @@ Implementation assemblies add no supported application API.
 | `AllowedCapabilitiesAttribute` | Constructor, method, property | `SharpProofCapability capabilities`; exposes `Capabilities` |
 | `AllowedExceptionsAttribute` | Constructor, method, property | `params Type[] exceptionTypes`; exposes `ExceptionTypes`; repeatable |
 | `EffectContractAttribute` | Constructor, method, property | `SharpProofEffect effects` plus named properties below; repeatable |
+| `ResourceUpperBoundAttribute` | Method | `ResourceMetric metric, long constant, string? sizeParameter = null, long coefficient = 0`; repeatable native cumulative bounds; see [resource bounds](resource-bounds.md#native-resource-contracts) |
 | `SharpProofSuppressAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason`; repeatable |
 | `SharpProofTrustedAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason` |
 

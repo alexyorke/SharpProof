@@ -18,7 +18,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest installation, SDK discovery, project setup checks, and stored-evidence commands |
 | [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
 | [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
-| [Consumer performance](consumer-performance.md) | Comparable build measurements, quality evidence and explicit budgets |
+| [Consumer performance](consumer-performance.md) | Comparable build/runtime allocation measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
 | [Configuration](configuration.md) | Consumer MSBuild properties, selection, IDE behavior, budgets, cache, and report paths |
@@ -26,6 +26,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Public API](public-api.md) | Contract clauses, closed attributes, effect declarations, trust controls |
 | [Language reference](language-reference.md) | Construct-by-construct model, support boundaries, and regression evidence |
 | [Diagnostic examples](diagnostic-examples.md) | Portable analyzer diagnostics and worker reporting |
+| [Static resource bounds](resource-bounds.md) | Opt-in proven loop counts, cumulative array allocations, and explicit Unknown results |
 | [Coverage and limits](coverage-and-limits.md) | Modeled operations, conservative boundaries, regression coverage |
 | [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
 | [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |

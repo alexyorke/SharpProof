@@ -78,7 +78,7 @@ RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh \
 COPY eng/container/Install-ScriptTools.ps1 /opt/sharpproof/Install-ScriptTools.ps1
 # Moving archive mirrors remove superseded packages. Use an immutable Ubuntu
 # snapshot and retain the reviewed archive checksum instead of resolving indexes.
-ADD --checksum=sha256:778edae086bc8f34d80f36f301bc8fb3eff2d906c146dfb533ea6840b6d64e00 https://snapshot.ubuntu.com/ubuntu/20261019T000000Z/pool/main/x/xz-utils/xz-utils_5.6.1+really5.4.5-1ubuntu0.3_amd64.deb /tmp/xz-utils.deb
+ADD --checksum=sha256:18ef3c30308990626cfbda8b6336ef6ef5a412d1991bdad0cdaa226fd2041ffe https://snapshot.ubuntu.com/ubuntu/20261022T000000Z/pool/main/x/xz-utils/xz-utils_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb /tmp/xz-utils.deb
 RUN dpkg --install /tmp/xz-utils.deb && rm /tmp/xz-utils.deb
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Install-ScriptTools.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json

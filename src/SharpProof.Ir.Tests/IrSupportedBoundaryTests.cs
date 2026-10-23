@@ -6,6 +6,90 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 public sealed class IrSupportedBoundaryTests
 {
+    [Test]
+    public void ClosureFramesKeepImmutableScopedStorageCertificates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        Assert.That(factory.TryGetClosureFrameType(type, out _), Is.False);
+        factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
+        Assert.That(factory.TryGetClosureFrameType(type, out var fields), Is.True);
+        Assert.That(fields, Is.EqualTo(new[] { ResourceStorageKind.Word32, ResourceStorageKind.Reference }));
+        Assert.That(factory.CreateReferenceValue(type, new object()).Type, Is.EqualTo(type));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word64]); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterDelegateReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedSealedReferenceType(type); }));
+        var other = new IrFactory(IrExecutionSemantics.Total);
+        Assert.Throws<ArgumentException>((Action)(() => { other.RegisterClosureFrameType(type, [ResourceStorageKind.Word32]); }));
+        Assert.Throws<ArgumentException>((Action)(() => { other.TryGetClosureFrameType(type, out _); }));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ClosureFramesRejectUnsupportedOrContradictoryStorage(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
+        if (kind == 4)
+        { factory.RegisterDelegateReferenceType(type); }
+        if (kind == 5)
+        { factory.RegisterClosedSealedReferenceType(type); }
+        if (kind == 6)
+        { factory.RegisterClosedClassReferenceType(type, null); }
+        var fields = kind == 1 ? ImmutableArray<ResourceStorageKind>.Empty :
+            kind == 2 ? ImmutableArray.Create(ResourceStorageKind.Unspecified) : ImmutableArray.Create(ResourceStorageKind.Word32);
+        Assert.Throws(kind == 2 ? Is.TypeOf<ArgumentOutOfRangeException>() : Is.TypeOf<ArgumentException>(),
+            (Action)(() => { factory.RegisterClosureFrameType(kind == 3 ? factory.ObjectType : type, fields); }));
+    }
+    [Test]
+    public void DelegateCertificatesAreScopedAndExcludeClassAndInterfaceCertificates()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
+        Assert.That(factory.IsDelegateReferenceType(type), Is.False);
+        factory.RegisterDelegateReferenceType(type);
+        factory.RegisterDelegateReferenceType(type);
+        Assert.That(factory.IsDelegateReferenceType(type), Is.True);
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
+        var other = new IrFactory(IrExecutionSemantics.Total);
+        Assert.Throws<ArgumentException>((Action)(() => { other.RegisterDelegateReferenceType(type); }));
+        Assert.Throws<ArgumentException>((Action)(() => { other.IsDelegateReferenceType(type); }));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void InvalidDelegateCertificatesAreRejected(int kind)
+    {
+        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var nominal = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Reference");
+        if (kind == 5)
+        { factory.RegisterInterfaceReferenceType(nominal); }
+        if (kind == 6)
+        { factory.RegisterClosedClassReferenceType(nominal, null); }
+        var type = kind switch
+        {
+            1 => factory.ObjectType,
+            2 => factory.StringType,
+            3 => factory.IntegerType,
+            4 => factory.GetOrCreateSequenceType(factory.IntegerType),
+            _ => nominal
+        };
+        Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterDelegateReferenceType(type); }));
+    }
     [TestCase(-1, 0)]
     [TestCase(0, -1)]
     [TestCase(0, 1)]

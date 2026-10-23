@@ -68,6 +68,15 @@ public sealed class ContractApiCatalogParityTests
                         descriptor.Selection,
                         Is.EqualTo(ContractApiSelectionFeature.None));
                     break;
+                case ContractApiAttributeCategory.InputModel:
+                    var isParameterModel = descriptor.MetadataName == ContractApiCatalog.ResourceBooleanInput;
+                    var isDeploymentModel = descriptor.MetadataName == ContractApiCatalog.ResourceTaskDeployment;
+                    var isQuantityModel = descriptor.MetadataName == ContractApiCatalog.ResourceTaskRuntimeUpperBound;
+                    Assert.That(isParameterModel || isDeploymentModel || isQuantityModel, Is.True, descriptor.MetadataName);
+                    Assert.That(usage!.ValidOn, Is.EqualTo(isParameterModel ? AttributeTargets.Parameter : AttributeTargets.Method));
+                    Assert.That(usage.AllowMultiple, Is.EqualTo(isQuantityModel));
+                    Assert.That(descriptor.Selection, Is.EqualTo(ContractApiSelectionFeature.None));
+                    break;
                 case ContractApiAttributeCategory.Closed:
                     Assert.That(
                         usage!.ValidOn,
@@ -80,9 +89,9 @@ public sealed class ContractApiCatalogParityTests
                 case ContractApiAttributeCategory.Effect:
                     Assert.That(
                         usage!.ValidOn,
-                        Is.EqualTo(AttributeTargets.Method |
-                            AttributeTargets.Constructor |
-                            AttributeTargets.Property));
+                        Is.EqualTo(descriptor.MetadataName == ContractApiCatalog.ResourceUpperBound
+                            ? AttributeTargets.Method
+                            : AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property));
                     Assert.That(
                         descriptor.Selection,
                         Is.EqualTo(ContractApiSelectionFeature.Effects));

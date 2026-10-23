@@ -115,8 +115,48 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _ordinaryExceptionalExit = exceptionalExit;
         _builder.ExceptionalExit(exceptionalExit, structural);
+        var closure = RootParameterClosurePlan.TryCreate(_context.Target, _context.Compilation, _cancellationToken);
+        IrTerm? rootClosureFrame = null;
+        ImmutableArray<IrMemberId> rootClosureFields = [];
+        if (closure != null)
+        {
+            var frameType = _context.Factory.GetOrCreateReferenceType(_context.Factory.CreateIdentity(), "root-parameter-closure-frame");
+            _context.Factory.RegisterClosureFrameType(frameType, closure.Fields);
+            var frame = _context.Temporary(frameType);
+            _builder.Allocate(entry, _context.Factory.CreateOperation(closure.HasLocals ? IrClosureFrameSite.LocalDescription : IrClosureFrameSite.Description), frameType, frame);
+            var fields = ImmutableArray.CreateBuilder<IrMemberId>();
+            for (var slot = 0; slot < closure.Captures.Length; slot++)
+            {
+                SpendRegion();
+                var capture = closure.Captures[slot];
+                IrTerm captured = capture is IParameterSymbol parameter
+                    ? _context.Factory.Variable(_context.Parameters[parameter.Ordinal].Current)
+                    : CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Type(((ILocalSymbol)capture).Type));
+                if (closure.Fields[slot] == ResourceStorageKind.Reference)
+                { captured = _context.Factory.Cast(_context.Factory.ObjectType, captured); }
+                var member = _context.Factory.GetOrCreateMember(_context.Factory.CreateIdentity(), _context.Factory.ObjectType,
+                    IrClosureFrameSite.FieldName(slot), captured.Type, false);
+                fields.Add(member);
+                _builder.FieldStore(entry, _context.FreshWriteSite(graph.OriginalOperation), IrWriteRegion.Field,
+                    _context.Factory.Cast(_context.Factory.ObjectType, _context.Factory.Variable(frame)), member, captured);
+            }
+            for (var slot = closure.Captures.Length; slot < closure.Fields.Length; slot++)
+            {
+                SpendRegion();
+                var cache = _context.Factory.GetOrCreateMember(_context.Factory.CreateIdentity(), _context.Factory.ObjectType,
+                    IrClosureFrameSite.FieldName(slot), _context.Factory.ObjectType, false);
+                _builder.FieldStore(entry, _context.FreshWriteSite(graph.OriginalOperation), IrWriteRegion.Field,
+                    _context.Factory.Cast(_context.Factory.ObjectType, _context.Factory.Variable(frame)), cache,
+                    _context.Factory.Null(_context.Factory.ObjectType));
+            }
+            rootClosureFrame = _context.Factory.Variable(frame);
+            rootClosureFields = fields.ToImmutable();
+        }
         _expressions = new(_context, _builder, exceptionalExit)
         {
+            RootClosure = closure,
+            RootClosureFrame = rootClosureFrame,
+            RootClosureFields = rootClosureFields,
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
             SourceGetter = InlineSourceGetter,
@@ -129,6 +169,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
+            DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,
             ExceptionTarget = _frame == null ? null : (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (_frame.Search(kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target)))
         };
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
@@ -193,6 +234,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             {
                 var value = Condition(condition, block);
                 var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
+                site = ResourceLoopSite(condition, site);
                 _builder.Branch(value.Continuation, site, value.Value,
                     _blocks[whenTrue ? conditional : fallThrough], _blocks[whenTrue ? fallThrough : conditional]);
             }

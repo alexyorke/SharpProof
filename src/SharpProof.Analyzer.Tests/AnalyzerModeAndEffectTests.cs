@@ -1407,8 +1407,10 @@ public sealed class AnalyzerModeAndEffectTests
             informational.Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.DefaultSeverity)),
             Is.All.EqualTo(DiagnosticSeverity.Info));
         Assert.That(
-            descriptors.Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.IsEnabledByDefault)),
+            descriptors.Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id != "SP0060")
+                .Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.IsEnabledByDefault)),
             Is.All.True);
+        Assert.That(descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id == "SP0060").IsEnabledByDefault, Is.False);
         Assert.That(
             descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id == "SP0027"))
                 .DefaultSeverity,

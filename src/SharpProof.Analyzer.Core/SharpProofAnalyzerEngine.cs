@@ -97,6 +97,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        ResourceBoundsDiagnostics.Register(context);
+
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
                 context.Compilation,

@@ -10,18 +10,18 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "14";
+    public const string Current = "45";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 16;
+    public const int Current = 68;
 }
 
 internal static class WorkerManifestVersions
 {
-    public const int Current = 5;
+    public const int Current = 6;
 }
 
 internal static class WorkerLauncherDefaults
@@ -153,9 +153,194 @@ internal enum WorkerEffectContractKind
     AllowedCapabilities = 3,
     DoesNotThrow = 4,
     AllowedExceptions = 5,
-    EffectContract = 6
+    EffectContract = 6,
+    ResourceUpperBound = 7
 }
 
+internal enum WorkerResourceMetric
+{
+    Unspecified = 0,
+    LoopBodyEntries = 1,
+    ArrayAllocations = 2,
+    AllocatedElements = 3,
+    AllocatedBytes = 4,
+    PeakAuxiliaryBytes = 5,
+    RetainedBytes = 6,
+    SourceActivationDepth = 7,
+    SourceStackBytes = 8
+}
+
+internal static class WorkerResourceModels
+{
+    public const string CallableScope = "callable-source";
+    public const string TaskJoinScope = "joined-isolated-source-callbacks";
+    public const string TaskSourceAllocationScope = "joined-isolated-source-allocation-prefixes";
+    public const string TaskStorageScope = "joined-isolated-normal-completion";
+    public const string TaskRuntimeScope = "joined-isolated-cumulative-runtime-premises";
+    public const string TaskRuntimeCostModel = "task-join-declared-runtime-allocation-prefixes-v1";
+    public const string TaskStorageModel = "task-join-normal-owned-storage-v1";
+    public const string ConfiguredTaskStorageModel = "configured-task-join-normal-owned-storage-v1";
+    public const string TaskCompilerCarrierModel = "emitted-task-compiler-carriers-v1";
+    public const string TaskJoinModel = "task-join-source-at-most-once-v1";
+    public const string ConfiguredTaskJoinModel = "configured-task-join-source-at-most-once-v1";
+    public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
+    public const int Expression = 1;
+    public const int Program = 8;
+    public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
+    public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
+    public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
+    public const string LifetimeCostModel = AllocationLayout + ":finite-owned-strong-reachability-v1:normal-completion";
+    public const int MaximumExpressionBytes = 1024 * 1024;
+    public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
+    public const string NormalDomain = "unbounded-scalar-counter-extension-v1:ideal-primitive-allocation";
+    public const string Accounting = "nonnegative-credit-potential-v1:unit-spend";
+    public const string Expected = "entry-bernoulli-boolean-v1:conditional-marginal-upper";
+    public const int MaximumAsymptoticDegree = 4096;
+}
+
+internal sealed record WorkerResourceConstraint
+{
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; init; }
+    [JsonRequired]
+    public string CostModel { get; init; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; init; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public byte[] UpperBound { get; init; } = [];
+}
+
+internal sealed record WorkerResourceAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Asymptotic;
+    [JsonRequired]
+    public string? UpperBound { get; init; }
+    [JsonRequired]
+    public int? PolynomialDegree { get; init; }
+    [JsonRequired]
+    public int? LogarithmicDegree { get; init; }
+    [JsonRequired]
+    public bool? IsZero { get; init; }
+    [JsonRequired]
+    public int? InputOrdinal { get; init; }
+    [JsonRequired]
+    public string? InputKind { get; init; }
+    [JsonRequired]
+    public string? InputName { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+    [JsonRequired]
+    public WorkerResourceLowerAsymptoticEvidence? Lower { get; init; }
+}
+
+internal sealed record WorkerResourceLowerAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.NormalDomain;
+    [JsonRequired]
+    public string? InferredBound { get; init; }
+    [JsonRequired]
+    public string? LowerBound { get; init; }
+    [JsonRequired]
+    public string? TightBound { get; init; }
+    [JsonRequired]
+    public string? TightUnknownReason { get; init; }
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Growth { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+}
+
+internal sealed record WorkerResourceBoundEvidence
+{
+    [JsonRequired]
+    public string ExecutionScope { get; init; } = WorkerResourceModels.CallableScope;
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; init; }
+    [JsonRequired]
+    public string CostModel { get; init; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; init; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public int ProgramModel { get; init; } = WorkerResourceModels.Program;
+    [JsonRequired]
+    public string DeclaredBoundSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string? InferredUpperBound { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+    [JsonRequired]
+    public string? ObservedLowerBound { get; init; }
+    [JsonRequired]
+    public string? EvaluatedUpperBound { get; init; }
+    [JsonRequired]
+    public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; init; } = [];
+    [JsonRequired]
+    public WorkerResourceTaskRuntimePremiseEvidence? RuntimePremises { get; init; }
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Asymptotic { get; init; }
+    [JsonRequired]
+    public WorkerResourceAccountingEvidence[] Accounting { get; init; } = [];
+    [JsonRequired]
+    public WorkerResourceExpectedEvidence? Expected { get; init; }
+}
+
+internal sealed record WorkerResourceExpectedEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Expected;
+    [JsonRequired]
+    public int? InputOrdinal { get; init; }
+    [JsonRequired]
+    public string? InputName { get; init; }
+    [JsonRequired]
+    public int? TrueWeight { get; init; }
+    [JsonRequired]
+    public int? FalseWeight { get; init; }
+    [JsonRequired]
+    public string? FalseUpperBound { get; init; }
+    [JsonRequired]
+    public string? TrueUpperBound { get; init; }
+    [JsonRequired]
+    public string? UpperBound { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+}
+
+internal sealed record WorkerResourceAccountingEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Accounting;
+    [JsonRequired]
+    public string InitialCredit { get; init; } = string.Empty;
+    [JsonRequired]
+    public string DepositPerIteration { get; init; } = string.Empty;
+    [JsonRequired]
+    public int CounterWidth { get; init; }
+    [JsonRequired]
+    public bool CheckedDeposit { get; init; }
+    [JsonRequired]
+    public string MaximumSpend { get; init; } = string.Empty;
+}
+
+internal sealed record WorkerResourceMetadataAssumption
+{
+    [JsonRequired]
+    public string AssumptionId { get; init; } = string.Empty;
+    [JsonRequired]
+    public string WitnessIdentifier { get; init; } = string.Empty;
+    [JsonRequired]
+    public string CatalogSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceAssembly { get; init; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string RuntimeModel { get; init; } = string.Empty;
+    [JsonRequired]
+    public string EvidenceSource { get; init; } = string.Empty;
+}
 internal sealed record WorkerSourceLocation
 {
     [JsonRequired]
@@ -204,6 +389,8 @@ internal sealed record WorkerClaimManifestEntry
     public WorkerClaimEvidence Evidence { get; init; }
     [JsonRequired]
     public WorkerEffectContractKind EffectContractKind { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceConstraint? ResourceUpperBound { get; init; }
     [JsonRequired]
     public WorkerSourceLocation Location { get; init; } = new();
 }
@@ -411,6 +598,8 @@ internal sealed record WorkerClaimResult
     public WorkerEffectEvidenceCertainty EffectCertainty { get; init; }
     [JsonRequired]
     public WorkerEffectViolationWitness? EffectWitness { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceBoundEvidence? ResourceBound { get; init; }
     [JsonRequired]
     public WorkerVacuityKind Vacuity { get; init; }
     [JsonRequired]
@@ -557,7 +746,8 @@ internal static class WorkerProtocolMetadata
         WorkerClaimEvidence.ReturnAttribute, WorkerClaimEvidence.Attribute,
         WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
         WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
-        WorkerEffectContractKind.EffectContract,
+        WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
+        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements, WorkerResourceMetric.AllocatedBytes, WorkerResourceMetric.PeakAuxiliaryBytes, WorkerResourceMetric.RetainedBytes, WorkerResourceMetric.SourceActivationDepth, WorkerResourceMetric.SourceStackBytes,
         WorkerRunStatus.Unspecified, WorkerRunStatus.Complete, WorkerRunStatus.TimedOut, WorkerRunStatus.Canceled, WorkerRunStatus.Failed,
         WorkerCallableCoverage.Unspecified, WorkerCallableCoverage.Complete, WorkerCallableCoverage.Incomplete,
         WorkerClaimOutcome.Unspecified, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown,
@@ -613,7 +803,8 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedCapabilities)
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.DoesNotThrow)
             or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedExceptions)
-            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract);
+            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract)
+            or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.ResourceUpperBound);
     internal static bool MatchesCallableCoverage(WorkerCallableCoverage coverage, WorkerCallableCoverageReason reason) =>
         coverage switch
         {
@@ -759,7 +950,22 @@ internal static class WorkerProtocolMetadata
         new("callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
         new("callable_assumption_usage", static value => (WorkerProtocolJson.EmptyIfDefault(value.Assumptions)).All(static item => item != null && !item.Used)),
     ];
+    internal static bool ResourceConstraintsEqual(WorkerResourceConstraint? left, WorkerResourceConstraint? right)
+    {
+        return ReferenceEquals(left, right) || left is not null && right is not null &&
+            left.Metric == right.Metric && left.CostModel == right.CostModel && left.ExpressionModel == right.ExpressionModel &&
+            left.UpperBound is not null && right.UpperBound is not null && left.UpperBound.SequenceEqual(right.UpperBound);
+    }
+    internal static bool HasValidResourceConstraint(WorkerEffectContractKind kind, WorkerResourceConstraint? constraint)
+    {
+        if (kind != WorkerEffectContractKind.ResourceUpperBound)
+        { return constraint is null; }
+        return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
+            constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : constraint.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
+            constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
+    }
     internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimManifestEntry>> ManifestClaimRules = [
+        new("claim_resource_constraint", static value => HasValidResourceConstraint(value.EffectContractKind, value.ResourceUpperBound)),
         new("claim_ordinal", static value => value.Ordinal >= 0),
         new("claim_kind", static value => WorkerProtocolJson.IsDefined(value.Kind, WorkerClaimKind.Unspecified)),
         new("claim_evidence", static value => WorkerProtocolJson.IsDefined(value.Evidence, WorkerClaimEvidence.Unspecified)),

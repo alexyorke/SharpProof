@@ -21,7 +21,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
     Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
     bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
-    bool approximateElementReads = false, bool pinElementReads = false)
+    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false)
 {
     private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly ImmutableHashSet<IMethodSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -37,12 +37,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
     bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
-    bool approximateElementReads = false, bool pinElementReads = false)
+    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false)
     {
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
         return new(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata,
-            opaqueCalls, opaqueEffects, approximateElementReads, pinElementReads);
+            opaqueCalls, opaqueEffects, approximateElementReads, pinElementReads, captureResourceLoopEntries);
     }
 
     internal bool MetadataRequiresEnabled => prepareMetadata != null;
@@ -54,6 +54,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // Element reads are assigned where they occur, so later stores cannot
     // change them.
     internal bool PinElementReads { get; } = pinElementReads;
+    internal bool CaptureResourceLoopEntries { get; } = captureResourceLoopEntries;
     internal bool PrepareMetadata(TotalLoweringContext frame, TotalIlBody body)
     { body = RepositoryParameterGuard.NotNull(body, nameof(body)); frame = RepositoryParameterGuard.NotNull(frame, nameof(frame)); return prepareMetadata?.Invoke(frame, body) ?? true; }
 
@@ -183,10 +184,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // With `contractOnly`, a callee already being inlined (a recursive call)
     // gets a frame for its preconditions and no body; so does an iterator
     // without preconditions, whose body runs only as it is enumerated, and a
-    // class constructor that chains, initializes fields or has a base class.
+    // class constructor whose body is not admitted. constructorInitializers is
+    // set only by a caller that explicitly lowers instance initializers.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
-        bool assigned = false, bool contractOnly = false)
+        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -212,7 +214,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 MethodKind.LocalFunction) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
-                ? instance != null || !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken) &&
+                ? instance != null || !CSharpOperationSemantics.IsDirectObjectConstructor(method, constructorInitializers, cancellationToken) &&
                     !(contractOnly && method.ContainingType.TypeKind == TypeKind.Class)
                 : method.MethodKind == MethodKind.LocalFunction ? instance != null : method.IsStatic != (instance == null)) ||
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
@@ -395,7 +397,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             }
         }
         frame.RefreshSourceBindingTypes();
-        if (instance != null)
+        if (instance != null || constructorInitializers && method.MethodKind == MethodKind.Constructor)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))
         { frame = null; return false; }
@@ -498,6 +500,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not LocalFunctionStatementSyntax declaration ||
             body.SemanticModel is not { } model || declaration.SyntaxTree != model.SyntaxTree ||
             model.GetOperation(declaration, cancellationToken) is not { } callee || Captures(callee, target, cancellationToken, visited);
+    }
+
+    internal bool CanBindDelegate(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return !method.IsExtern && method.DeclaringSyntaxReferences.Length == 1 &&
+            _compilation.ContainsSyntaxTree(method.DeclaringSyntaxReferences[0].SyntaxTree) &&
+            HasNoTypeInitialization(method.ContainingType);
     }
 
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)

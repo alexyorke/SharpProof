@@ -777,7 +777,7 @@ internal static partial class PortableIrGraphCodec
                 var (id, kind, name) = builtIns[index];
                 var row = Required(_graph.Types[index], "type row");
                 Require(
-                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && row.ImplementedInterfaces is null &&
+                    row.Kind == kind && row.Name == name && row.Element == -1 && !row.ClosedSealedReference && row.ClosedClassBase == null && !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields is null && row.ObjectStorageFields is null && row.ImplementedInterfaces is null &&
                     row.Width == _factory.GetTypeInfo(id).Width && row.Signed == _factory.GetTypeInfo(id).Signed,
                     "Portable IR built-in type metadata is invalid.");
                 _types[index] = id;
@@ -806,6 +806,19 @@ internal static partial class PortableIrGraphCodec
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
             Require(!row.ClosedSealedReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference,
                 "Only Total nominal reference types may carry closed sealed certificates.");
+            Require(!row.DelegateReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+                !row.InterfaceReference && row.ClosedClassBase == null,
+                "Only Total nominal delegates may carry delegate certificates.");
+            Require(row.ClosureFrameFields is null || !row.ClosureFrameFields.Value.IsDefault && _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+                !row.InterfaceReference && !row.DelegateReference && !row.ClosedSealedReference && row.ClosedClassBase == null &&
+                row.ImplementedInterfaces is null && row.ClosureFrameFields.Value.Length is > 0 and <= ResourceAllocationShape.MaximumFields &&
+                row.ClosureFrameFields.Value.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
+                "Only Total nominal closure frames may carry valid storage fields.");
+            Require(row.ObjectStorageFields is null || !row.ObjectStorageFields.Value.IsDefault && _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+                !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields is null &&
+                row.ClosedClassBase == -1 && row.ObjectStorageFields.Value.Length <= ResourceAllocationShape.MaximumFields &&
+                row.ObjectStorageFields.Value.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
+                "Only Total direct nominal classes may carry complete object storage.");
             Require(row.Element >= -1, "Portable IR type metadata is invalid.");
             var decodedType = row.Kind switch
             {
@@ -821,6 +834,10 @@ internal static partial class PortableIrGraphCodec
             var info = _factory.GetTypeInfo(_types[index]);
             if (row.ClosedSealedReference)
             { _factory.RegisterClosedSealedReferenceType(_types[index]); }
+            if (row.ClosureFrameFields is not null)
+            { _factory.RegisterClosureFrameType(_types[index], row.ClosureFrameFields.Value); }
+            if (row.DelegateReference)
+            { _factory.RegisterDelegateReferenceType(_types[index]); }
             if (row.InterfaceReference)
             {
                 Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !row.ClosedSealedReference && row.ClosedClassBase == null,
@@ -836,6 +853,8 @@ internal static partial class PortableIrGraphCodec
                     "A class certificate requires a certified base.");
                 _factory.RegisterClosedClassReferenceType(_types[index], parent);
             }
+            if (row.ObjectStorageFields is { } storage)
+            { _factory.RegisterObjectStorageType(_types[index], storage); }
             if (row.ImplementedInterfaces is { } implementedInterfaces)
             {
                 Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !implementedInterfaces.IsDefault && implementedInterfaces.Length is > 0 and <= 128,

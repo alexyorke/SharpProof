@@ -24,7 +24,7 @@ internal sealed class DeveloperMetadataCoverageTests
         """;
 
     [Test]
-    public void CompilerArtifact32RetainsSourceAndReferenceSnapshotsForExport()
+    public void CompilerArtifactRetainsSourceAndReferenceSnapshotsForExport()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(IdentitySource);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
@@ -32,9 +32,8 @@ internal sealed class DeveloperMetadataCoverageTests
         var roundTrip = CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations,
             TestContext.CurrentContext.CancellationToken);
         var root = JsonNode.Parse(json)!;
-        Assert.That(root["schemaVersion"]!.GetValue<int>(), Is.EqualTo(32));
-        Assert.That(root["protocolVersion"]!.GetValue<string>(), Is.EqualTo("14"));
-        Assert.That(WorkerCacheVersions.Current, Is.EqualTo(16));
+        Assert.That(root["schemaVersion"]!.GetValue<int>(), Is.EqualTo(CompilerManifestArtifactVersions.Current));
+        Assert.That(root["protocolVersion"]!.GetValue<string>(), Is.EqualTo(WorkerProtocolVersions.Current));
         Assert.That(root["compilation"]!["syntaxTrees"]!.AsArray(), Has.Count.EqualTo(1));
         Assert.That(root["compilation"]!["references"]!.AsArray(), Is.Not.Empty);
         Assert.That(Path.GetFileName(roundTrip.Compilation.SyntaxTrees.Single().Path), Is.EqualTo("Subject.cs"));

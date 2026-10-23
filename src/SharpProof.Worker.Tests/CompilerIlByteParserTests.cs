@@ -14,6 +14,45 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerIlByteParserTests
 {
+    private static readonly ImmutableArray<(ImmutableArray<byte> Bytes, string Code, long Operand)> MetadataCases =
+    [
+        ([0x7b, 0x01, 0x00, 0x00, 0x04], "Ldfld", 0x04000001),
+        ([0x8d, 0x01, 0x00, 0x00, 0x02], "Newarr", 0x02000001),
+        ([0xd0, 0x01, 0x00, 0x00, 0x02], "Ldtoken", 0x02000001),
+        ([0x29, 0x01, 0x00, 0x00, 0x11], "Calli", 0x11000001),
+        ([0x72, 0x01, 0x00, 0x00, 0x70], "Ldstr", 0x70000001),
+        ([0x22, 0x00, 0x00, 0x80, 0x3f], "Ldc_r4", 0x3f800000),
+        ([0x23, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f], "Ldc_r8", 0x3ff0000000000000L),
+        ([0xfe, 0x16, 0x01, 0x00, 0x00, 0x02], "Constrained", 0x02000001)
+    ];
+
+    [Test]
+    public void MetadataOperandsAreLexicalFactsWithoutWideningScalarAdmission()
+    {
+        foreach (var example in MetadataCases)
+        {
+            var cursor = 0;
+            Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(example.Bytes.AsSpan(), ref cursor, out var instruction), Is.True);
+            Assert.That(cursor, Is.EqualTo(example.Bytes.Length));
+            Assert.That(instruction.Offset, Is.Zero);
+            Assert.That(instruction.RawCode, Is.EqualTo(example.Code));
+            Assert.That(instruction.Operand, Is.EqualTo(example.Operand));
+            Assert.That(instruction.TargetByteOffset, Is.EqualTo(-1));
+            cursor = 0;
+            Assert.That(CompilerScalarIlDecoder.TryReadInstruction(example.Bytes.AsSpan(), ref cursor, out _), Is.False);
+        }
+    }
+
+    [Test]
+    public void TruncatedMetadataOperandCannotProduceAnInstruction()
+    {
+        ImmutableArray<byte> code = [0x7b, 0x01];
+        var cursor = 0;
+        Assert.Throws<BadImageFormatException>((Action)(() =>
+            CompilerScalarIlDecoder.TryReadMetadataInstruction(code.AsSpan(), ref cursor, out _)));
+        Assert.That(cursor, Is.EqualTo(1));
+    }
+
     private static readonly ImmutableArray<(ImmutableArray<byte> Bytes, string Code, long Operand, int Cursor, int Target)> ScalarCases =
     [
         ([0x00], "Nop", 0, 1, -1),

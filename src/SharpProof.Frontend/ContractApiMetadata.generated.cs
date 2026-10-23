@@ -23,6 +23,7 @@ internal enum ContractApiClauseRole
 internal enum ContractApiAttributeCategory
 {
     Companion,
+    InputModel,
     Closed,
     Effect,
     Control,
@@ -72,6 +73,10 @@ internal static class ContractApiCatalog
     internal const string ContractFor = AttributesNamespace + ".ContractForAttribute";
     internal const string EnforcePure = AttributesNamespace + ".EnforcePureAttribute";
     internal const string ZeroAllocations = AttributesNamespace + ".ZeroAllocationsAttribute";
+    internal const string ResourceUpperBound = AttributesNamespace + ".ResourceUpperBoundAttribute";
+    internal const string ResourceBooleanInput = AttributesNamespace + ".ResourceBooleanInputAttribute";
+    internal const string ResourceTaskDeployment = AttributesNamespace + ".ResourceTaskDeploymentAttribute";
+    internal const string ResourceTaskRuntimeUpperBound = AttributesNamespace + ".ResourceTaskRuntimeUpperBoundAttribute";
     internal const string AllowedCapabilities = AttributesNamespace + ".AllowedCapabilitiesAttribute";
     internal const string DoesNotThrow = AttributesNamespace + ".DoesNotThrowAttribute";
     internal const string AllowedExceptions = AttributesNamespace + ".AllowedExceptionsAttribute";
@@ -121,6 +126,26 @@ internal static class ContractApiCatalog
             new(
                 ZeroAllocations,
                 "ZeroAllocationsAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                ResourceBooleanInput,
+                "ResourceBooleanInputAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceTaskDeployment,
+                "ResourceTaskDeploymentAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceTaskRuntimeUpperBound,
+                "ResourceTaskRuntimeUpperBoundAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceUpperBound,
+                "ResourceUpperBoundAttribute",
                 ContractApiAttributeCategory.Effect,
                 ContractApiSelectionFeature.Effects),
             new(
@@ -217,6 +242,10 @@ internal static partial class ContractApiMetadata
         ContractApiCatalog.EnforcePure;
     internal const string ZeroAllocations =
         ContractApiCatalog.ZeroAllocations;
+    internal const string ResourceUpperBound = ContractApiCatalog.ResourceUpperBound;
+    internal const string ResourceBooleanInput = ContractApiCatalog.ResourceBooleanInput;
+    internal const string ResourceTaskDeployment = ContractApiCatalog.ResourceTaskDeployment;
+    internal const string ResourceTaskRuntimeUpperBound = ContractApiCatalog.ResourceTaskRuntimeUpperBound;
     internal const string AllowedCapabilities =
         ContractApiCatalog.AllowedCapabilities;
     internal const string DoesNotThrow =

@@ -121,6 +121,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             OpaqueEffects = _calls?.OpaqueEffects,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
+            DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,
             ExceptionTarget = (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                 ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site)))
         };
@@ -278,6 +279,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             var fall = RegionConditionalTarget(source, branch, site);
             var conditional = RegionConditionalTarget(source, conditionalBranch, site);
             var whenTrue = source.ConditionKind == ControlFlowConditionKind.WhenTrue;
+            site = ResourceLoopSite(condition, site);
             _builder.Branch(value.Continuation, site, value.Value, whenTrue ? conditional : fall, whenTrue ? fall : conditional);
         }
         else if (branch?.Semantics == ControlFlowBranchSemantics.Return)

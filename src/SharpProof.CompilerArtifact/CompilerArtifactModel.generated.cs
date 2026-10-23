@@ -14,7 +14,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 32;
+    internal const int Current = 56;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -61,6 +61,9 @@ internal sealed record CompilerCallablePreparation(
     internal CompilerCompilationSnapshot Compilation { get; init; } = new();
     internal CompilerTotalCallablePreparation? Total { get; init; }
     internal CompilerTotalEntryPreparation? TotalEntry { get; init; }
+    internal ResourceProgram? ResourceProgram { get; init; }
+    internal string? ResourceUnknownReason { get; init; }
+    internal CompilerForkJoinProjection? ForkJoinProjection { get; init; }
 }
 
 internal sealed record CompilerTotalEntryPreparation(string CallableId, IrFactory Factory,
@@ -215,6 +218,12 @@ internal sealed record CompilerCallableArtifact
     public CompilerTotalCallableArtifact? Total { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerTotalCallableArtifact? TotalEntry { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public byte[]? ResourceProgram { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ResourceUnknownReason { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public byte[]? ForkJoinProjection { get; init; }
 }
 
 internal sealed record CompilerEffectClaimArtifact
@@ -235,6 +244,8 @@ internal sealed record CompilerEffectConstraintArtifact
     public WorkerEffectCapabilitySet AllowedCapabilities { get; init; }
     [JsonConverter(typeof(PortableIrArrayJsonConverter))]
     public ImmutableArray<string> AllowedExceptionTypes { get; init; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceConstraint? ResourceUpperBound { get; init; }
 }
 
 internal enum CompilerOutputKind
@@ -397,7 +408,7 @@ internal readonly struct CompilerEffectConstraintRule(
 internal static class CompilerEffectEvidenceCatalog
 {
     internal const string EvidenceDomain = "SharpProof.CompilerEffectClaimEvidence";
-    internal const int EvidenceVersion = 10;
+    internal const int EvidenceVersion = 11;
     internal static readonly ImmutableArray<WorkerClaimReason> UnknownReasons = [
         WorkerClaimReason.UnsupportedContract,
         WorkerClaimReason.CounterexampleNotReplayable,
@@ -441,6 +452,7 @@ internal static class CompilerEffectEvidenceCatalog
     internal static readonly ImmutableArray<CompilerEffectConstraintRule> ConstraintRules = [
         new(WorkerEffectContractKind.EnforcePure, true, true, true),
         new(WorkerEffectContractKind.ZeroAllocations, true, true, true),
+        new(WorkerEffectContractKind.ResourceUpperBound, true, true, true),
         new(WorkerEffectContractKind.AllowedCapabilities, true, false, true),
         new(WorkerEffectContractKind.DoesNotThrow, true, true, true),
         new(WorkerEffectContractKind.AllowedExceptions, true, true, false),

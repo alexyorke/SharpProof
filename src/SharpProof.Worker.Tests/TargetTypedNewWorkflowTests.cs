@@ -4,8 +4,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 // A target-typed `new(arguments)` is the same construction as
-// `new Box(arguments)`: the native verifier decides both alike, and a
-// violated constructor precondition never yields a proof.
+// `new Box(arguments)`: the native verifier decides both alike. A failed
+// callee precondition is evidence, never an assumption making proofs vacuous.
 [TestFixture]
 public sealed class TargetTypedNewWorkflowTests
 {
@@ -22,8 +22,14 @@ public sealed class TargetTypedNewWorkflowTests
         var actual = await Verify(targetTyped, result);
         var expected = await Verify(explicitly, result);
         Assert.That(actual, Is.EqualTo(expected));
+        Assert.That(actual.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         if (result < 0)
-        { Assert.That(actual.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven)); }
+        {
+            var falseTargetTyped = await Verify(targetTyped, result + 1);
+            var falseExplicit = await Verify(explicitly, result + 1);
+            Assert.That(falseTargetTyped, Is.EqualTo(falseExplicit));
+            Assert.That(falseTargetTyped.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        }
     }
 
     private static async Task<(WorkerClaimOutcome Outcome, string Reason)> Verify(string body, int result)

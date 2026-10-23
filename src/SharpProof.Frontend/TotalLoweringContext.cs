@@ -118,6 +118,7 @@ internal sealed partial class TotalLoweringContext
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
     internal bool CaptureShadowCallAncestry { get; init; }
+    internal bool CaptureResourceLoopEntries { get; init; }
     internal object Origin { get; } = new();
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
@@ -327,6 +328,18 @@ internal sealed partial class TotalLoweringContext
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return Factory.CreateOperation(IrWriteSites.FreshPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
+    internal OperationId StaticDelegateAllocationSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation(IrStaticDelegateAllocationSite.Description, Span(operation.Syntax));
+    }
+
+    internal OperationId InstanceDelegateAllocationSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation(IrDelegateCaptureSite.Description, Span(operation.Syntax));
     }
 
     // A static field read is a read of ambient state.

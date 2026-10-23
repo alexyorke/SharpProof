@@ -610,9 +610,13 @@ internal sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("14"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(16));
-            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(5));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("45"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(68));
+            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(6));
+            Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
+            Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));
+            Assert.That(WorkerResourceModels.AllocationLayout, Is.EqualTo(SharpProof.Ir.ResourceRuntimeLayout.ModelId));
+            Assert.That(WorkerResourceModels.LifetimeCostModel, Is.EqualTo(WorkerResourceModels.AllocationLayout + ":" + SharpProof.Ir.ResourceMemoryTrace.ModelId + ":normal-completion"));
             Assert.That(
                 document.RootElement.EnumerateObject()
                     .Select(static property => ((property.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) ? throw new System.ArgumentException("Value must be initialized.", nameof(property)) : (property.Name))),
@@ -722,7 +726,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("14"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("45"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -808,8 +812,8 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 forward.Hash,
                 Is.EqualTo(
-                    "7a4cca2b446b003e604399ab019a0e3c" +
-                    "5ecf3f6908e60020840074e9982d9f77"));
+                    "9fe651b6cd960c84008824d7bbc9d1ce4" +
+                    "95088c6d9b0413a0a19763123a25886"));
         }
     }
 

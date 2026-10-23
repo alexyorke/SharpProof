@@ -9,6 +9,21 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerBinaryIdentityTests
 {
     [Test]
+    public void WorkerIdentityChangesWhenTheLifetimeInterpreterModuleChanges()
+    {
+        using var workspace = new TempDirectory("SharpProof.InterpreterIdentity.");
+        var worker = Path.Combine(workspace.FullName, "SharpProof.Worker.dll");
+        var interpreter = Path.Combine(workspace.FullName, "SharpProof.Ir.dll");
+        File.WriteAllBytes(worker, [1, 2, 3]);
+        File.WriteAllBytes(interpreter, [4, 5, 6]);
+        var original = WorkerBinaryIdentity.ComputeSha256(worker);
+        File.WriteAllBytes(Path.Combine(workspace.FullName, "Unrelated.dll"), [7]);
+        Assert.That(WorkerBinaryIdentity.ComputeSha256(worker), Is.EqualTo(original));
+        File.WriteAllBytes(interpreter, [4, 5, 7]);
+        Assert.That(WorkerBinaryIdentity.ComputeSha256(worker), Is.Not.EqualTo(original));
+    }
+
+    [Test]
     public void WorkerIdentityIncludesThePinnedNativeLibraryDigest()
     {
         var worker = typeof(SharpProofWorker).Assembly.Location;

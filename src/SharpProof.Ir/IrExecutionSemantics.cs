@@ -125,15 +125,33 @@ internal sealed class IrProgramReplayOptions(Func<IrHavocRequest, IrValue?> havo
     // certify completion of a specific framework synchronization operation.
     internal Func<IrLockInstruction, IrValue, bool?>? ConcreteLockCompletionProvider { get; init; }
 
+    internal Action<IrInstruction, IrValue?, bool>? CompletedInstructionObserver { get; init; }
     public Action<IrAssignInstruction, IrValue, bool>? AssignmentObserver { get; init; }
     public Action<IrAllocationInstruction>? AllocationObserver { get; init; }
     public Action<IrWriteInstruction>? WriteObserver { get; init; }
     public Action<IrLockInstruction>? LockObserver { get; init; }
     public Action<IrAllocationInstruction, bool>? AllocationPrefixObserver { get; init; }
+    internal Action<IrAllocationInstruction, int, bool>? ArrayAllocationPrefixObserver { get; init; }
+    internal Action<IrAllocationInstruction, int, bool>? StringAllocationPrefixObserver { get; init; }
+    internal Action<IrBranchInstruction, bool>? SourceLoopEntryObserver { get; init; }
     public Action<IrWriteInstruction, bool>? WritePrefixObserver { get; init; }
     internal Action<IrWriteInstruction, bool>? NonFreshWritePrefixObserver { get; init; }
     public Action<IrLockInstruction, bool>? LockPrefixObserver { get; init; }
 
     public Func<IrHavocRequest, IrValue?> HavocValueProvider { get; } =
         ArgumentNullGuard.NotNull(havocValueProvider, nameof(havocValueProvider));
+}
+
+// Compiler-owned source semantics, not a user diagnostic label. Only a true
+// edge of an admitted, top-tested source loop guard denotes one body entry.
+internal static class IrSourceLoopEntry
+{
+    internal const string GuardMarker = "SharpProof:source-loop-guard:v1";
+
+    internal static bool IsGuard(IrFactory factory, OperationId operation)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        return factory.GetOperationInfo(operation).Description is { } description && factory.GetString(description) == GuardMarker;
+    }
 }

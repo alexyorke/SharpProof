@@ -377,7 +377,9 @@ internal sealed partial class ClaimManifestBuilder(
         var selectedSubset = !(analyzerContractsSelected || analyzerEffectsSelected) ||
             (seed.Method.IsAbstract || seed.Method.IsExtern) && analyzerEffectsSelected && !analyzerContractsSelected &&
                 _effectSession.ResolveEffectContract(seed.Method).Kind == EffectContractResolutionKind.Valid ||
-            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration);
+            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration) ||
+            analyzerEffectsSelected && seed.Method.IsAsync &&
+                ResourceForkJoinPlan.TryCreate(seed.Method, _compilation, cancellationToken) is { ConfiguredAwait: true };
         var supported =
             seed.Declaration is
                 MethodDeclarationSyntax or
@@ -393,6 +395,61 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
+        if (effects.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+            seed.Declaration is MethodDeclarationSyntax resourceDeclaration && seed.Model is { } resourceModel)
+        {
+            var body = resourceDeclaration.Body is { } block ? resourceModel.GetOperation(block, cancellationToken) :
+                resourceDeclaration.ExpressionBody is { } arrow ? resourceModel.GetOperation(arrow.Expression, cancellationToken) : null;
+            var resource = ResourceBoundsAnalysis.Analyze(target, body, cancellationToken);
+            var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
+            var taskPlan = ResourceForkJoinPlan.TryCreate(target, _compilation, cancellationToken);
+            if (taskPlan != null)
+            {
+                metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
+                    taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
+                if (effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                    claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+                {
+                    metadataIds.Add(ResourceTaskStorageCatalog.AssumptionId(callableId,
+                        taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
+                }
+            }
+            if (resource.Bounds is { } bounds)
+            { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }
+            var requiresLifetimeLayout = effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes);
+            var requiresCumulativeLayout = (resource.Bounds != null || taskPlan != null) && effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes);
+            if (requiresLifetimeLayout || requiresCumulativeLayout)
+            {
+                metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
+                    _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString()));
+            }
+            if (taskPlan != null && requiresCumulativeLayout)
+            {
+                var runtime = CompilerTaskRuntimePremiseCollector.Parse(target, callableId, cancellationToken);
+                if (runtime.Declarations is { } declarations)
+                {
+                    var runtimeIds = declarations.Quantities.Select(declaration => declaration is null
+                        ? throw new ArgumentNullException(nameof(declaration))
+                        : ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration))
+                        .Prepend(ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations));
+                    assumptions = assumptions.AddRange(runtimeIds.Select(static id => new WorkerAssumptionEvidence
+                    {
+                        Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
+                        Kind = WorkerAssumptionKind.UserAssume,
+                        Used = false
+                    }));
+                }
+            }
+            assumptions = assumptions.AddRange(metadataIds.Select(static id => new WorkerAssumptionEvidence
+            {
+                Id = id is null ? throw new ArgumentNullException(nameof(id)) : id,
+                Kind = WorkerAssumptionKind.TrustedBoundary,
+                Used = false
+            }));
+        }
         var features = selected.ToImmutableHashSet().ToBuilder();
         if (!postconditions.IsDefaultOrEmpty)
         {
@@ -432,6 +489,17 @@ internal sealed partial class ClaimManifestBuilder(
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
             entry, postconditions, effects, supported);
+    }
+
+    private static void CollectResourceAssumptions(ResourceProgram program, string callableId, SortedSet<string> ids)
+    {
+        program = ArgumentNullGuard.NotNull(program, nameof(program));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        ids = ArgumentNullGuard.NotNull(ids, nameof(ids));
+        if (program.Metadata is { } reference)
+        { ids.Add(ResourceMetadataCatalog.AssumptionId(callableId, reference)); }
+        foreach (var child in program.Children)
+        { CollectResourceAssumptions(child, callableId, ids); }
     }
 
     private ImmutableArray<ManifestClaim> CreatePostconditions(
@@ -722,9 +790,10 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             EffectContractKind =
                 CompilerEffectEvaluationWireMappings.ToWorker(
                     evaluation.Kind),
+            ResourceUpperBound = CreateResourceConstraint(evaluation.Constraint, cancellationToken),
             Location = ToSourceLocation(location)
         };
-        var evidence = CreateEffectEvidence(claimId, evaluation, isSupported);
+        var evidence = CreateEffectEvidence(claimId, evaluation, isSupported, cancellationToken);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
         return new ManifestEffectClaim(entry, evidence, evaluation.Reason != EffectEvaluationReason.UnsupportedContract);
     }
@@ -732,7 +801,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
     private static CompilerEffectClaimArtifact CreateEffectEvidence(
         string claimId,
         EffectClaimDeclaration evaluation,
-        bool isSupported)
+        bool isSupported, CancellationToken cancellationToken)
     {
         claimId = RepositoryParameterGuard.NotNull(claimId, nameof(claimId));
         evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
@@ -753,6 +822,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     evaluation.Certainty),
             Constraint = new CompilerEffectConstraintArtifact
             {
+                ResourceUpperBound = CreateResourceConstraint(evaluation.Constraint, cancellationToken),
                 AllowedEffects = ToWorkerEffects(evaluation.Constraint.Effects),
                 AllowedCapabilities = ToWorkerCapabilities(evaluation.Constraint.Capabilities),
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
@@ -772,6 +842,17 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
             };
         }
         return evidence;
+    }
+
+    private static WorkerResourceConstraint? CreateResourceConstraint(EffectClaimConstraint constraint, CancellationToken cancellationToken)
+    {
+        constraint = ArgumentNullGuard.NotNull(constraint, nameof(constraint));
+        return constraint.ResourceUpperBound is { } resource ? new WorkerResourceConstraint
+        {
+            Metric = (WorkerResourceMetric)resource.Metric,
+            CostModel = resource.Metric == ResourceCostMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : resource.Metric is ResourceCostMetric.PeakAuxiliaryBytes or ResourceCostMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : resource.Metric is ResourceCostMetric.SourceActivationDepth or ResourceCostMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel,
+            UpperBound = ResourceExpressionCodec.Encode(resource.Upper, cancellationToken)
+        } : null;
     }
 
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
@@ -911,6 +992,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "ContractFor" or
                     "EnforcePure" or
                     "ZeroAllocations" or
+                    "ResourceUpperBound" or
                     "AllowedCapabilities" or
                     "DoesNotThrow" or
                     "AllowedExceptions" or
@@ -923,6 +1005,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "ContractForAttribute" or
                     "EnforcePureAttribute" or
                     "ZeroAllocationsAttribute" or
+                    "ResourceUpperBoundAttribute" or
                     "AllowedCapabilitiesAttribute" or
                     "DoesNotThrowAttribute" or
                     "AllowedExceptionsAttribute" or

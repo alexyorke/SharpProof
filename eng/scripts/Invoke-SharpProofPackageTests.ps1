@@ -929,6 +929,10 @@ try {
         [bool]$shard.Exclusive
         $environmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
         $environmentBuilder.Add('SHARPPROOF_PACKAGE_SOURCE', $feed)
+        # Consumer workspaces use distinct compiler pipes. Bound their lifetime
+        # to each compilation instead of retaining one idle server per workspace
+        # across the package campaign, including uninstrumented runs.
+        $environmentBuilder.Add('UseSharedCompilation', 'false')
         $isolatedOutput = ''
         if ($coverageEnabled) {
             $isolatedOutput = New-SharpProofIsolatedTestOutput `

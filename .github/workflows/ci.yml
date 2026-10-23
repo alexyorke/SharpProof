@@ -23,10 +23,35 @@ jobs:
   repository-quality:
     uses: ./.github/workflows/quality.yml
 
+  # Enforce the full solution and every build analyzer once. Test partitions
+  # build their own dependency closures in parallel with this required lane.
+  canonical-build:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Build the complete Release solution with analyzers
+        run: docker compose run --rm tooling build -Configuration Release -Target SharpProof.slnx
+
+      - name: Report runner telemetry
+        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
+        uses: ./.github/actions/runner-telemetry
+        with:
+          mode: report
+
   # The Remaining cohort saturates a four-CPU runner, so it runs as three parts on
   # separate runners: "worker-a" and "worker-b" reuse the coverage halves;
-  # "projects" runs every other Remaining task. Every part builds the full
-  # solution with analyzers; build-and-test reconciles all three receipts.
+  # "projects" runs every other Remaining task. Every part builds only its test
+  # dependency closure; build-and-test requires the analyzer lane and reconciles
+  # all three unchanged test receipts.
   canonical-main:
     name: canonical-main (${{ matrix.part }})
     outputs:
@@ -55,14 +80,15 @@ jobs:
         with:
           download-packages: "false"
 
-      # This job is the critical path, so the package phase and the
-      # source-only repository gates run in canonical-package, in parallel.
+      # Package tests and source-only repository gates run in canonical-package.
+      # -Fast skips analyzers only here; canonical-build enforces all of them.
       - name: Run the ${{ matrix.part }} part of the non-Gates semantic PR phases
         run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling pr
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
+          -Configuration Release -Fast
           -SemanticCohort Remaining -TaskGroup ${{ matrix.task-group }}
           -TestResultsDirectory artifacts/canonical-remaining
-          -SkipPackageTests -SkipRepositoryGates
+          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 
       - name: Upload container gate evidence
         if: always()
@@ -91,6 +117,10 @@ jobs:
   canonical-package-partition:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    env:
+      # Match the constrained coverage envelope and leave room for runner services.
+      SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
+      SHARPPROOF_TMPFS_SIZE: 4g
     strategy:
       fail-fast: false
       matrix:
@@ -120,14 +150,40 @@ jobs:
 
       # The package phase of pr, with the same Release configuration and
       # canonical filter. -Fast skips analyzers in this build only;
-      # canonical-main's full solution build enforces them.
+      # canonical-build's full solution build enforces them.
       - name: Run the PR package phase
         if: ${{ !cancelled() && steps.tooling.outcome == 'success' }}
         run: >-
-          docker compose run --rm -e GITHUB_RUN_ID tooling package-tests
+          docker compose run
+          --name "${COMPOSE_PROJECT_NAME}-canonical-package-${{ matrix.partition }}"
+          -e GITHUB_RUN_ID tooling package-tests
           -Configuration Release -Fast
           -PackagePartitionCount 4 -PackagePartition ${{ matrix.partition }}
           -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Record package container termination
+        if: always()
+        run: |
+          task_container="${COMPOSE_PROJECT_NAME}-canonical-package-${{ matrix.partition }}"
+          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
+          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
+          mkdir -p "$state_dir"
+          if docker inspect --format \
+            '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
+            "$task_container" > "${state_dir}/canonical-package.json"; then
+            cat "${state_dir}/canonical-package.json"
+          else
+            printf '{"available":false}\n' > "${state_dir}/canonical-package.json"
+          fi
+
+      - name: Upload package container termination
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canonical-package-container-${{ matrix.partition }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sharpproof-container-state/*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload package phase and repository gate evidence
         if: always()
@@ -217,7 +273,7 @@ jobs:
         with:
           download-packages: "false"
 
-      # -Fast skips analyzers in this build only; canonical-main's full
+      # -Fast skips analyzers in this build only; canonical-build's full
       # solution build, required through build-and-test, enforces them.
       - name: Run the ${{ matrix.part }} part of the canonical Gates cohort
         run: >-
@@ -248,7 +304,6 @@ jobs:
           name: ${{ github.job }}-${{ matrix.part }}
 
   self-application:
-    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -265,7 +320,6 @@ jobs:
         run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Sources
 
   self-application-samples:
-    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -280,7 +334,6 @@ jobs:
         run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Samples
 
   api-coverage:
-    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -348,7 +401,6 @@ jobs:
   # jobs, rather than in the package job that every consumer job waits for.
   # Release qualification requires this workflow's exact-commit success on master.
   formatting:
-    needs: repository-quality
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
@@ -404,7 +456,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}
-          path: artifacts/reproducibility/report.json
+          path: artifacts/reproducibility/
           if-no-files-found: error
 
       - name: Report runner telemetry
@@ -415,11 +467,12 @@ jobs:
 
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-package, canonical-gates, self-application, self-application-samples, api-coverage, formatting, package-reproducibility, repository-quality]
+    needs: [canonical-build, canonical-main, canonical-package, canonical-gates, self-application, self-application-samples, api-coverage, formatting, package-reproducibility, repository-quality]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful canonical cohorts and self-application
         env:
+          SHARPPROOF_BUILD_RESULT: ${{ needs.canonical-build.result }}
           SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
           SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
           SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
@@ -430,6 +483,10 @@ jobs:
           SHARPPROOF_REPRODUCIBILITY_RESULT: ${{ needs.package-reproducibility.result }}
           SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
         run: |
+          if [[ "$SHARPPROOF_BUILD_RESULT" != success ]]; then
+            echo "Full solution build and analyzers did not succeed: $SHARPPROOF_BUILD_RESULT" >&2
+            exit 1
+          fi
           if [[ "$SHARPPROOF_SAMPLES_RESULT" != success || "$SHARPPROOF_API_RESULT" != success || "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
             echo "Samples, API coverage, or formatting did not succeed." >&2
             exit 1

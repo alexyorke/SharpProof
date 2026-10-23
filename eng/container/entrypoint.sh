@@ -189,6 +189,32 @@ else
     -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
 fi
 mkdir -p "${task_root}/artifacts"
+# Consumer qualification imports only its explicit immutable harness input.
+# Ordinary compiler outputs remain private to each task workspace.
+if [[ "${command_name}" == package-consumers ]]; then
+  consumer_harness=""
+  previous_argument=""
+  for argument in "$@"; do
+    if [[ "${previous_argument,,}" == -consumerharness ]]; then
+      consumer_harness="${argument}"
+      break
+    fi
+    previous_argument="${argument}"
+  done
+  if [[ -n "${consumer_harness}" ]]; then
+    if [[ "${consumer_harness}" != artifacts/consumer-harness ]]; then
+      echo "Consumer harness must use the explicit artifacts/consumer-harness input." >&2
+      exit 2
+    fi
+    harness_source="${repo_root}/artifacts/consumer-harness"
+    if [[ ! -d "${harness_source}" || -L "${harness_source}" ]] ||
+      [[ -n "$(find "${harness_source}" -type l -print -quit)" ]]; then
+      echo "Consumer harness input must be a directory without symbolic links." >&2
+      exit 2
+    fi
+    cp -a -- "${harness_source}" "${task_root}/artifacts/consumer-harness"
+  fi
+fi
 # The optional tool feed is an explicit input to its following qualification
 # task. Copy only its release archives and known identity sidecars; keep all
 # other ignored artifact output outside the private workspace snapshot.
@@ -260,6 +286,15 @@ set -e
 # Aggregate gates consume downloaded evidence owned by the runner. Export only
 # their new results, preserving the authenticated inputs and their ownership.
 case "${command_name}" in
+  package-consumers)
+    if [[ -n "${consumer_harness:-}" ]]; then
+      # The harness is an authenticated, runner-owned input. Export only the
+      # new qualification evidence, never overwrite the downloaded payload.
+      result_paths=(package-consumers/harness-results)
+    else
+      result_paths=(.)
+    fi
+    ;;
   package-partition-gate)
     result_paths=()
     ;;

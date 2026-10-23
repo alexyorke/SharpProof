@@ -2,6 +2,56 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
+function Get-SharpProofDeveloperPackageBuildPlan {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$OutputDirectory,
+        [Parameter(Mandatory)][string]$RepositoryCommit,
+        [Parameter(Mandatory)][string]$ConsumerImage
+    )
+    if ($Name -cnotin @('Tool', 'CodeFixes', 'Templates')) { throw 'Unsupported developer reproduction package.' }
+    if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { throw 'Developer reproduction requires a package output directory.' }
+    if ($RepositoryCommit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Developer reproduction requires the exact source commit.' }
+    if ($ConsumerImage -cnotmatch '\Aghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}\z') {
+        throw 'Developer reproduction requires an explicit fixture consumer-image digest.'
+    }
+    $project = "src/SharpProof.$Name/SharpProof.$Name.csproj"
+    $properties = [string[]]@('-p:ContinuousIntegrationBuild=true', '-p:GeneratePackageOnBuild=false',
+        '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true',
+        "-p:RepositoryCommit=$RepositoryCommit", "-p:SourceRevisionId=$RepositoryCommit", "-p:SharpProofConsumerImage=$ConsumerImage")
+    $plan = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    # The product package graph does not build every optional developer root.
+    # Prepare each root in its own exact-commit clone before packing its output.
+    foreach ($phase in @('restore', 'build', 'pack')) {
+        $arguments = switch ($phase) {
+            'restore' { [string[]]@('restore', $project, '--locked-mode', '-p:Configuration=Release') + $properties }
+            'build' { [string[]]@('build', $project, '-c', 'Release', '--no-restore') + $properties }
+            'pack' { [string[]]@('pack', $project, '-c', 'Release', '--no-build', '--no-restore', '-o', $OutputDirectory) + $properties }
+        }
+        $plan.Add(([ordered]@{
+                    Phase     = $phase
+                    Arguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]$arguments)
+                }).AsReadOnly())
+    }
+    return , ($plan.ToImmutable())
+}
+
+function Get-SharpProofReproductionDiagnosticText {
+    param([AllowEmptyString()][string]$Text, [switch]$Tail)
+    # Feed URLs may carry user information or query credentials. Keep them out
+    # of both retained phase logs and the bounded diagnostic shown by CI.
+    $redacted = [regex]::Replace($Text, '(?i)\b(?:https?|ssh)://\S+', '[redacted URL]')
+    $redacted = [regex]::Replace($redacted,
+        '(?im)^.*\b(?:authorization|password|passwd|access[_-]?token|api[_-]?key|client[_-]?secret|token|sig(?:nature)?)\b\s*(?:=|:).*$',
+        '[redacted credential line]')
+    if (-not $Tail) { return $redacted }
+    $lines = @([regex]::Split($redacted, '\r?\n') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Last 20)
+    if ($lines.Count -eq 0) { return 'No diagnostic output was captured.' }
+    $summary = $lines -join "`n"
+    if ($summary.Length -gt 4000) { $summary = $summary.Substring($summary.Length - 4000) }
+    return $summary
+}
+
 function Get-SharpProofDeveloperPackageSnapshot {
     param(
         [Parameter(Mandatory)][string]$PackageSource,
@@ -77,4 +127,4 @@ function Compare-SharpProofDeveloperPackageSnapshots {
         }).AsReadOnly()
 }
 
-Export-ModuleMember -Function Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots
+Export-ModuleMember -Function Get-SharpProofDeveloperPackageBuildPlan, Get-SharpProofReproductionDiagnosticText, Get-SharpProofDeveloperPackageSnapshot, Compare-SharpProofDeveloperPackageSnapshots

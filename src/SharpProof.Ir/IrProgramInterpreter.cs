@@ -137,7 +137,22 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
                 steps++;
 
                 state.Transfer = false;
+                state.CompletedValue = null;
                 var result = instruction.Execute(ref state);
+                if (replayOptions?.CompletedInstructionObserver is { } completed &&
+                    (result == null || result.Status == IrProgramExecutionStatus.Returned))
+                {
+                    IrValue? produced = result?.ReturnValue ?? state.CompletedValue;
+                    var target = instruction switch
+                    {
+                        IrAssignInstruction assigned => (IrVarId?)assigned.Target,
+                        IrAllocationInstruction allocated => allocated.Target,
+                        _ => null
+                    };
+                    if (target is { } written)
+                    { state.Values.Current.TryGetValue(written, out produced); }
+                    completed(instruction, produced, state.Values.ConsumedApproximation);
+                }
                 if (result != null)
                 {
                     return result;
@@ -165,6 +180,7 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         internal int Steps;
         internal IrThrowInstruction? PendingException;
         internal bool Transfer;
+        internal IrValue? CompletedValue;
     }
 
     // Original cases 4
@@ -453,13 +469,25 @@ internal sealed partial class IrAllocationInstruction
             { return IrProgramInterpreter.FromEvaluation(size, this, state.Values, state.Steps); }
             // Compare as BigInteger: a narrowing cast would wrap or throw on huge lengths.
             var requestedLength = size.Value!.IntegerNumericValue;
+            var isString = state.Interpreter._factory.GetTypeInfo(this.AllocatedType).Kind == IrTypeKind.String;
             if (requestedLength < 0)
-            { return IrProgramInterpreter.FromEvaluation(IrEvaluationResult.FromException(IrExceptionKind.Overflow, "An array length was negative."), this, state.Values, state.Steps); }
+            { return IrProgramInterpreter.FromEvaluation(IrEvaluationResult.FromException(isString ? IrExceptionKind.ArgumentOutOfRange : IrExceptionKind.Overflow, "An allocation length was negative."), this, state.Values, state.Steps); }
             // This bounds concrete replay work, never the symbolic input domain.
             if (requestedLength > state.MaximumSteps - state.Steps)
             { return IrProgramInterpreter.Result(IrProgramExecutionStatus.StepLimit, null, state.Values, state.Steps); }
             var count = (int)requestedLength;
             state.Steps += count;
+            if (isString)
+            {
+                var fill = (IrIntegerTerm)this.InitialValues[0];
+                state.Values[this.Target!.Value] = state.Interpreter._factory.CreateStringValue(new string((char)(int)fill.Value, count));
+                if (count == 0)
+                { return null; }
+                state.ReplayOptions?.StringAllocationPrefixObserver?.Invoke(this, count, state.Values.ConsumedApproximation);
+                state.ReplayOptions?.AllocationObserver?.Invoke(this);
+                state.ReplayOptions?.AllocationPrefixObserver?.Invoke(this, state.Values.ConsumedApproximation);
+                return null;
+            }
             var element = state.Interpreter._factory.GetTypeInfo(this.AllocatedType).ElementType
                 ?? throw new InvalidOperationException("An allocation of a non-array type was replayed.");
             var info = state.Interpreter._factory.GetTypeInfo(element);
@@ -478,6 +506,7 @@ internal sealed partial class IrAllocationInstruction
             var createdArray = state.Interpreter._factory.CreateSequenceValue(this.AllocatedType, elements);
             state.Values[this.Target!.Value] = createdArray;
             state.Values.Heap.RegisterFreshArray(createdArray);
+            state.ReplayOptions?.ArrayAllocationPrefixObserver?.Invoke(this, count, state.Values.ConsumedApproximation);
         }
         else if (this.Target is { } allocatedTarget)
         {
@@ -535,6 +564,7 @@ internal sealed partial class IrWriteInstruction
             var element = state.Interpreter.Evaluate(storedElement, state.Values, state.CancellationToken);
             if (element.Status != IrEvaluationStatus.Value)
             { return IrProgramInterpreter.FromEvaluation(element, this, state.Values, state.Steps); }
+            state.CompletedValue = element.Value;
             // The lowering guards the store, so an invalid one is not C#.
             if (this.Field is { } keyedField && position != null && target.Value!.Kind == IrValueKind.Reference)
             { state.Values.Heap.StoreKeyedField(target.Value, keyedField, position.Value!, element.Value!); }
@@ -751,6 +781,10 @@ internal sealed partial class IrBranchInstruction
             return IrProgramInterpreter.FromEvaluation(condition, this, state.Values, state.Steps);
         }
 
+        if (conditionValue && state.ReplayOptions?.SourceLoopEntryObserver is { } observe &&
+            IrSourceLoopEntry.IsGuard(state.Interpreter._factory, this.Operation))
+        { observe(this, state.Values.ConsumedApproximation); }
+        state.CompletedValue = condition.Value;
         state.Current = conditionValue ? this.WhenTrue : this.WhenFalse;
         state.Transfer = true;
         return null;

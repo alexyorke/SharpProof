@@ -23,11 +23,11 @@ block: b2 cfg:1
   i11 op4 Assign v19:int[width=32,signed=True] = v4 source=total-instance-delegate-allocation.cs:tokens["x"]#2
   i12 op5 Branch (v19 == 0) ? b6 : b7 source=total-instance-delegate-allocation.cs:tokens["10","/","x"]#1
 block: b3 cfg:2
-  i44 op19 Assign v26:int[width=32,signed=True] = 7 source=total-instance-delegate-allocation.cs:tokens["7"]#1
-  i45 op18 Assign v6:int[width=32,signed=True] = v26 source=total-instance-delegate-allocation.cs:tokens["7"]#1
-  i46 op18 Return v6 source=total-instance-delegate-allocation.cs:tokens["7"]#1
+  i45 op20 Assign v26:int[width=32,signed=True] = 7 source=total-instance-delegate-allocation.cs:tokens["7"]#1
+  i46 op19 Assign v6:int[width=32,signed=True] = v26 source=total-instance-delegate-allocation.cs:tokens["7"]#1
+  i47 op19 Return v6 source=total-instance-delegate-allocation.cs:tokens["7"]#1
 block: b4 cfg:3
-  i47 op0 Return void source=none
+  i48 op0 Return void source=none
 block: b5 exceptional:exit
   i4 op0 ExceptionalExit source=none
 block: b6 throw
@@ -66,11 +66,12 @@ block: b16 throw
 block: b17 normal
   i37 op13 Assign v23:GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver[width=0,signed=False] = v16 source=total-instance-delegate-allocation.cs:tokens["new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
   i38 op14 Allocate t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action -> v24:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] source=total-instance-delegate-allocation.cs:tokens["new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
-  i39 op15 Assign v8:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] = v24 source=total-instance-delegate-allocation.cs:tokens["action","=","new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
-  i40 op15 Write Local source=total-instance-delegate-allocation.cs:tokens["action","=","new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
-  i41 op17 Assign v25:int[width=32,signed=True] = v4 source=total-instance-delegate-allocation.cs:tokens["x"]#3
-  i42 op16 Assign v6:int[width=32,signed=True] = v25 source=total-instance-delegate-allocation.cs:tokens["x"]#3
-  i43 op16 Return v6 source=total-instance-delegate-allocation.cs:tokens["x"]#3
+  i39 op15 Write Field (("object"#t3)v24).m0 = (("object"#t3)v16) source=total-instance-delegate-allocation.cs:tokens["new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
+  i40 op16 Assign v8:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action[width=0,signed=False] = v24 source=total-instance-delegate-allocation.cs:tokens["action","=","new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
+  i41 op16 Write Local source=total-instance-delegate-allocation.cs:tokens["action","=","new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
+  i42 op18 Assign v25:int[width=32,signed=True] = v4 source=total-instance-delegate-allocation.cs:tokens["x"]#3
+  i43 op17 Assign v6:int[width=32,signed=True] = v25 source=total-instance-delegate-allocation.cs:tokens["x"]#3
+  i44 op17 Return v6 source=total-instance-delegate-allocation.cs:tokens["x"]#3
 block: b18 catch:entry
   i34 op12 Assign v7:int[width=32,signed=True] = 2 source=total-instance-delegate-allocation.cs:tokens["new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
   i35 op12 Goto b3 source=total-instance-delegate-allocation.cs:tokens["new","System",".","Action","(","Pass","(","receiver",",","10","/","x",")",".","Sink",")"]#1
@@ -104,7 +105,7 @@ term: ir26 Binary type=t0:bool width=0 signed=False value=(v16 == (("GoldenLower
 term: ir27 Binary type=t0:bool width=0 signed=False value=((v16 == (("GoldenLowering, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null::Receiver"#t4)null)) && v22)
 term: ir28 Integer type=t1:int width=32 signed=True bits=2 value=2
 term: ir30 Variable type=t5:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Action width=0 signed=False value=v24
-term: ir31 Variable type=t1:int width=32 signed=True value=v25
-term: ir32 Variable type=t1:int width=32 signed=True value=v6
-term: ir33 Integer type=t1:int width=32 signed=True bits=7 value=7
-term: ir34 Variable type=t1:int width=32 signed=True value=v26
+term: ir33 Variable type=t1:int width=32 signed=True value=v25
+term: ir34 Variable type=t1:int width=32 signed=True value=v6
+term: ir35 Integer type=t1:int width=32 signed=True bits=7 value=7
+term: ir36 Variable type=t1:int width=32 signed=True value=v26

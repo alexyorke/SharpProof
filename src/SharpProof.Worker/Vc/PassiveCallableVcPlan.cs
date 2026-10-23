@@ -272,6 +272,35 @@ internal sealed class PassiveCallableVcPlan
             allocationPrefixObserver, writePrefixObserver, lockPrefixObserver)), cancellationToken);
     }
 
+    internal IrProgramExecutionResult ReplayResources(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Action<IrAllocationInstruction, int, bool> observer, Action<IrAllocationInstruction, int, bool> stringObserver, Action<IrAllocationInstruction, bool> managedObserver, Action<IrBranchInstruction, bool> loopObserver, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(observer);
+        ArgumentNullException.ThrowIfNull(loopObserver);
+        ArgumentNullException.ThrowIfNull(managedObserver);
+        ArgumentNullException.ThrowIfNull(stringObserver);
+        return ReplayWithOptions(inputs, initial =>
+        {
+            ArgumentNullException.ThrowIfNull(initial);
+            return ReplayOptions(initial: initial, arrayAllocationPrefixObserver: observer,
+                stringAllocationPrefixObserver: stringObserver, allocationPrefixObserver: managedObserver,
+                sourceLoopEntryObserver: loopObserver);
+        }, cancellationToken);
+    }
+
+    internal IrProgramExecutionResult ReplayMemory(ImmutableDictionary<IrVarId, IrValue> inputs,
+        Action<IrInstruction, IrValue?, bool> observer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(observer);
+        return ReplayWithOptions(inputs, initial =>
+        {
+            ArgumentNullException.ThrowIfNull(initial);
+            return ReplayOptions(initial: initial, completedInstructionObserver: observer);
+        }, cancellationToken);
+    }
+
     // Purity witness replay has a receiver-ownership policy of its own;
     // general effect replay continues to observe every successful store.
     internal IrProgramExecutionResult ReplayPurityEffects(ImmutableDictionary<IrVarId, IrValue> inputs,
@@ -311,7 +340,11 @@ internal sealed class PassiveCallableVcPlan
         Action<IrWriteInstruction, bool>? writePrefixObserver = null,
         Action<IrLockInstruction, bool>? lockPrefixObserver = null,
         Action<IrAssignInstruction, IrValue, bool>? assignmentObserver = null,
-        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null)
+        Action<IrWriteInstruction, bool>? nonFreshWritePrefixObserver = null,
+        Action<IrAllocationInstruction, int, bool>? arrayAllocationPrefixObserver = null,
+        Action<IrAllocationInstruction, int, bool>? stringAllocationPrefixObserver = null,
+        Action<IrBranchInstruction, bool>? sourceLoopEntryObserver = null,
+        Action<IrInstruction, IrValue?, bool>? completedInstructionObserver = null)
     {
         return new(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
@@ -338,7 +371,11 @@ internal sealed class PassiveCallableVcPlan
             WritePrefixObserver = writePrefixObserver,
             LockPrefixObserver = lockPrefixObserver,
             AssignmentObserver = assignmentObserver,
-            NonFreshWritePrefixObserver = nonFreshWritePrefixObserver
+            NonFreshWritePrefixObserver = nonFreshWritePrefixObserver,
+            ArrayAllocationPrefixObserver = arrayAllocationPrefixObserver,
+            StringAllocationPrefixObserver = stringAllocationPrefixObserver,
+            SourceLoopEntryObserver = sourceLoopEntryObserver,
+            CompletedInstructionObserver = completedInstructionObserver
         };
     }
 

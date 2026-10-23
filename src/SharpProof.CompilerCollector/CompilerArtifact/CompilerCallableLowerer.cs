@@ -7,6 +7,7 @@ namespace SharpProof.CompilerArtifact;
 internal sealed class CompilerCallableLowerer
 {
     private readonly CSharpCompilation _compilation;
+    private readonly CompilerTaskCarrierCollector _taskCarriers;
     private readonly ImmutableArray<CompilerSyntaxTreeSnapshot>? _capturedTrees;
     private readonly ImmutableArray<CompilerReferenceSnapshot>? _capturedReferences;
     private readonly ContractBinder _contracts;
@@ -34,6 +35,7 @@ internal sealed class CompilerCallableLowerer
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
+        _taskCarriers = new(compilation);
         _capturedTrees = capturedTrees is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedTrees)) : capturedTrees;
         _capturedReferences = capturedReferences is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedReferences)) : capturedReferences;
         _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
@@ -53,10 +55,72 @@ internal sealed class CompilerCallableLowerer
                 [.. total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
+        ResourceProgram? resourceProgram = null;
+        string? resourceUnknown = null;
+        CompilerForkJoinProjection? forkJoin = null;
+        if (target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
+        {
+            if (total is null || total.IsBodyAbstraction)
+            {
+                resourceUnknown = "ResourceOwnerUnavailable";
+                if (entry != null && ResourceForkJoinPlan.TryCreate(target.Method, _compilation, cancellationToken) != null)
+                { forkJoin = CompilerForkJoinResourceLowering.Lower(target.Method, _compilation, target.Entry.CallableId, cancellationToken).Projection; }
+            }
+            else if (target.Declaration is not MethodDeclarationSyntax declaration || target.SemanticModel is null || target.Method.MethodKind != MethodKind.Ordinary)
+            { resourceUnknown = "UnsupportedResourceCallable"; }
+            else
+            {
+                var body = declaration.Body is { } block ? target.SemanticModel.GetOperation(block, cancellationToken) :
+                    declaration.ExpressionBody is { } arrow ? target.SemanticModel.GetOperation(arrow.Expression, cancellationToken) : null;
+                var resource = ResourceBoundsAnalysis.Analyze(target.Method, body, cancellationToken);
+                resourceProgram = resource.Bounds?.Program;
+                resourceUnknown = resource.UnknownReason;
+            }
+        }
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+        {
+            var carriers = _taskCarriers.Capture(target.Method, target.Entry.CallableId, cancellationToken);
+            if (carriers.Shapes is { } shapes)
+            {
+                carriers = carriers with
+                {
+                    Shapes = shapes with
+                    {
+                        RootExceptionBoundary = _taskCarriers.CaptureExceptionBoundary(target.Method, target.Entry.CallableId, cancellationToken),
+                        CallbackActivations = _taskCarriers.CaptureCallbackActivations(target.Method, target.Entry.CallableId, cancellationToken),
+                        SourceBodies = _taskCarriers.CaptureSourceBodies(target.Method, target.Entry.CallableId, cancellationToken),
+                        EmittedFaultBodies = target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes)
+                            ? _taskCarriers.CaptureEmittedFaultBodies(target.Method, target.Entry.CallableId, cancellationToken) : null
+                    }
+                };
+            }
+            forkJoin = forkJoin with { Carriers = carriers };
+        }
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+        {
+            var declarations = CompilerTaskRuntimePremiseCollector.Parse(target.Method, target.Entry.CallableId, cancellationToken);
+            if (declarations.UnknownReason != "TaskRuntimePremisesNotDeclared")
+            {
+                var capture = forkJoin.Carriers?.Shapes is { } shapes
+                    ? CompilerTaskRuntimePremiseCollector.Capture(target.Method, target.Entry.CallableId, shapes.ModuleSha256,
+                        shapes.CompilerIdentity, forkJoin.FrameworkAssemblyIdentity, cancellationToken)
+                    : new CompilerTaskRuntimePremiseCapture(null, declarations.UnknownReason ?? "TaskRuntimeCompilerOwnershipUnavailable");
+                forkJoin = forkJoin with { RuntimePremises = capture };
+            }
+        }
+        if (forkJoin is { ConfiguredAwait: true })
+        { reason = WorkerClaimReason.None; }
         return new(target.Entry, reason)
         {
             Total = total,
             TotalEntry = entry,
+            ResourceProgram = resourceProgram,
+            ResourceUnknownReason = resourceUnknown,
+            ForkJoinProjection = forkJoin,
             Diagnostic = diagnostic,
             Presentation = new WorkerCallablePresentation
             {
@@ -84,10 +148,13 @@ internal sealed class CompilerCallableLowerer
         var contracts = binding.Contracts ?? throw new InvalidOperationException(
             "A successful contract binding must carry its contracts.");
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
+        var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
+            target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
         if (contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)) !=
                 assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.Precondition)) ||
             contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) !=
-                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)) ||
+                assumptions.Count(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) :
+                    evidence.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(evidence.Id)) ||
             !HasManifestParity(target, contracts))
         {
             return WorkerClaimReason.UnsupportedContract;

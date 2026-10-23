@@ -52,6 +52,13 @@ internal sealed record PortableIrType
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ImmutableArray<int>? ImplementedInterfaces { get; init; }
 
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DelegateReference { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<ResourceStorageKind>? ClosureFrameFields { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<ResourceStorageKind>? ObjectStorageFields { get; init; }
+
     [System.Text.Json.Serialization.JsonConstructor]
     public PortableIrType() { }
 
@@ -431,6 +438,9 @@ internal static partial class PortableIrGraphCodec
                 ClosedSealedReference = _factory.IsClosedSealedReferenceType(id),
                 ClosedClassBase = _factory.TryGetClosedClassReferenceBase(id, out var parent) ? parent.HasValue ? TypeIndex(parent.Value) : -1 : null,
                 InterfaceReference = _factory.IsInterfaceReferenceType(id),
+                DelegateReference = _factory.IsDelegateReferenceType(id),
+                ClosureFrameFields = _factory.TryGetClosureFrameType(id, out var captures) ? captures.ToImmutableArray() : null,
+                ObjectStorageFields = _factory.TryGetObjectStorageType(id, out var storage) ? storage.ToImmutableArray() : null,
                 ImplementedInterfaces = _factory.GetImplementedReferenceInterfaces(id) is { Length: > 0 } interfaces ? interfaces.Select(TypeIndex).OrderBy(index => index).ToImmutableArray() : null
             };
         }

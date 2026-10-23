@@ -39,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.SemanticBuildPlan.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Import-Module (Join-Path `
@@ -133,60 +134,6 @@ if ($coverageEnabled) {
         Set-Content -LiteralPath $partitionFilter -Encoding utf8NoBOM
     $semanticSolutionFilter = $partitionFilter
 }
-
-if (-not $NoBuild) {
-    $semanticBuildProjectBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
-    if ($ArchitectureOnly) {
-        $semanticBuildProjectBuilder.Add('src\SharpProof.Architecture.Tests\SharpProof.Architecture.Tests.csproj')
-    }
-    elseif ($SemanticCohort -eq 'All') {
-        foreach ($project in $semanticSolution.solution.projects) { $semanticBuildProjectBuilder.Add([string]$project) }
-        $semanticBuildProjectBuilder.Add('src\SharpProof.Worker.Tests\SharpProof.Worker.Tests.csproj')
-    }
-    else {
-        $semanticBuildProjectBuilder.AddRange($semanticProjects)
-        if ($SemanticCohort -ne 'Gates') {
-            $semanticBuildProjectBuilder.Add('src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj')
-        }
-    }
-    $semanticBuildProjects = $semanticBuildProjectBuilder.ToImmutable()
-    $semanticBuildFilter = Join-Path $repositoryRoot (
-        '.sharpproof-semantic-build-' +
-        [Guid]::NewGuid().ToString('N') + '.slnf')
-    try {
-        ([ordered]@{
-            solution = ([ordered]@{
-                    path     = 'SharpProof.slnx'
-                    projects = $semanticBuildProjects
-                }).AsReadOnly()
-        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
-            Set-Content `
-                -LiteralPath $semanticBuildFilter `
-                -Encoding utf8NoBOM
-        Invoke-SharpProofRequiredDotnet `
-            -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
-            -TimeoutSeconds $TimeoutSeconds `
-            -Quiet:$Quiet
-        $buildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
-        $buildArgumentBuilder.AddRange([string[]]@(
-                'build', $semanticBuildFilter,
-                '-c', $Configuration, '--no-restore'))
-        if ($Fast) {
-            $buildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
-        }
-        Invoke-SharpProofRequiredDotnet `
-            -Arguments ([string[]]@($buildArgumentBuilder.ToImmutable())) `
-            -TimeoutSeconds $TimeoutSeconds `
-            -Quiet:$Quiet
-    }
-    finally {
-        if (Test-Path -LiteralPath $semanticBuildFilter) {
-            Remove-Item -LiteralPath $semanticBuildFilter -Force
-        }
-    }
-}
-
-& (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
 
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
@@ -533,6 +480,50 @@ if ($TaskGroup -ne 'All') {
         throw "Task group '$TaskGroup' selected no tasks."
     }
 }
+# TaskGroup selection must precede restore/build so each runner compiles only
+# the test roots it will execute. MSBuild retains their complete dependencies.
+$semanticBuildProjects = Get-SharpProofSemanticBuildProjects `
+    -Tasks ($taskBuilder.ToImmutable()) -RepositoryRoot $repositoryRoot `
+    -SemanticSolutionFilter $semanticSolutionFilter -SemanticProjects $semanticProjects
+if (-not $NoBuild) {
+    $semanticBuildFilter = Join-Path $repositoryRoot (
+        '.sharpproof-semantic-build-' +
+        [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        ([ordered]@{
+            solution = ([ordered]@{
+                    path     = 'SharpProof.slnx'
+                    projects = $semanticBuildProjects
+                }).AsReadOnly()
+        }).AsReadOnly() | ConvertTo-Json -Depth 4 |
+            Set-Content `
+                -LiteralPath $semanticBuildFilter `
+                -Encoding utf8NoBOM
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
+        $buildArgumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+        $buildArgumentBuilder.AddRange([string[]]@(
+                'build', $semanticBuildFilter,
+                '-c', $Configuration, '--no-restore'))
+        if ($Fast) {
+            $buildArgumentBuilder.Add('-p:RunAnalyzersDuringBuild=false')
+        }
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments ([string[]]@($buildArgumentBuilder.ToImmutable())) `
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
+    }
+    finally {
+        if (Test-Path -LiteralPath $semanticBuildFilter) {
+            Remove-Item -LiteralPath $semanticBuildFilter -Force
+        }
+    }
+}
+
+& (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
+
 $estimatedTaskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 foreach ($task in $taskBuilder) {
     $properties = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, object]([StringComparer]::OrdinalIgnoreCase)
@@ -752,6 +743,7 @@ finally {
             architectureOnly         = [bool]$ArchitectureOnly
             semanticCohort           = $SemanticCohort
             taskGroup                = $TaskGroup
+            buildProjects            = $semanticBuildProjects
             parallelism              = $parallelism
             totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
             tasks                    = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($timingSnapshot | Sort-Object { $_.name }))

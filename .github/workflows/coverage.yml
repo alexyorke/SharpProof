@@ -21,6 +21,10 @@ concurrency:
 env:
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+  # Public Linux runners have 16 GB RAM. Keep the container and its charged
+  # scratch below that host capacity so Docker enforces the resource boundary.
+  SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
+  SHARPPROOF_TMPFS_SIZE: 4g
 
 # Fifteen shards retain the complete selection: split corpus workflows and
 # Worker A4 fixtures, isolate Analyzer and the Attributes/Fuzz console tail,
@@ -82,6 +86,8 @@ jobs:
           - package-1
           - package-2
           - package-3
+    env:
+      SHARPPROOF_COVERAGE_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,9 +100,38 @@ jobs:
 
       - name: Collect ${{ matrix.shard }} coverage shard
         run: >-
-          docker compose run --rm -e GITHUB_RUN_ID
+          docker compose run
+          --name "${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
+          -e GITHUB_RUN_ID
           tooling coverage-shard -Configuration Release
-          -CoveragePhase ${{ matrix.shard }}
+          -CoveragePhase "$SHARPPROOF_COVERAGE_SHARD"
+
+      # Retain the exact task container until Docker's terminal state is saved.
+      # This records Docker evidence without adding host process-memory probes.
+      - name: Record coverage container termination
+        if: always()
+        run: |
+          task_container="${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
+          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
+          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
+          state_file="${state_dir}/${SHARPPROOF_COVERAGE_SHARD}.json"
+          mkdir -p "$state_dir"
+          if docker inspect --format \
+            '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
+            "$task_container" > "$state_file"; then
+            cat "$state_file"
+          else
+            printf '{"available":false}\n' > "$state_file"
+          fi
+
+      - name: Upload coverage container termination
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-container-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sharpproof-container-state/*.json
+          if-no-files-found: error
+          retention-days: 30
 
       # One artifact per shard holds artifacts/coverage/<shard> and the
       # shard's uniquely named timing profiles under artifacts/timings.

@@ -6,7 +6,7 @@ namespace SharpProof.CompilerArtifact;
 
 // The callable payload is the admission reason, the compiler's effect claims
 // and the Total programs; the worker verifies only those programs.
-internal static class CompilerLoweredArtifact
+internal static partial class CompilerLoweredArtifact
 {
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
@@ -20,6 +20,7 @@ internal static class CompilerLoweredArtifact
     {
         cancellationToken.ThrowIfCancellationRequested();
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        var resource = EncodeResource(preparation, cancellationToken);
         return new CompilerCallableArtifact
         {
             Presentation = preparation.Presentation,
@@ -27,6 +28,10 @@ internal static class CompilerLoweredArtifact
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
             EffectClaims = preparation.EffectClaims,
+            ResourceProgram = resource.Program,
+            ResourceUnknownReason = resource.Unknown,
+            ForkJoinProjection = preparation.ForkJoinProjection is { } forkJoin
+                ? CompilerForkJoinProjectionCodec.Encode(forkJoin, preparation.TotalEntry ?? throw new InvalidDataException("Fork-join root entry is missing."), cancellationToken) : null,
             Total = CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken),
             TotalEntry = CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken)
         };
@@ -115,6 +120,17 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
 
+        var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
+        var resource = DecodeResource(artifact, entry, claims, total, cancellationToken);
+        var totalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken);
+        CompilerForkJoinProjection? forkJoin = null;
+        if (artifact.ForkJoinProjection is { } payload)
+        {
+            if (total != null || totalEntry == null || !claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
+            { throw new InvalidDataException("Fork-join projection has no owning resource entry."); }
+            forkJoin = CompilerForkJoinProjectionCodec.Decode(payload, totalEntry, cancellationToken);
+        }
         return new CompilerCallablePreparation(entry, artifact.FailureReason)
         {
             Presentation = WorkerProtocolJson.IsPresentationValid(artifact.Presentation) ? artifact.Presentation :
@@ -123,8 +139,11 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("Invalid callable diagnostic metadata."),
             EffectClaims = DecodeEffects(artifact, claims, cancellationToken),
             Compilation = compilation,
-            Total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken),
-            TotalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken)
+            Total = total,
+            ResourceProgram = resource.Program,
+            ResourceUnknownReason = resource.Unknown,
+            ForkJoinProjection = forkJoin,
+            TotalEntry = totalEntry
         };
     }
 
@@ -162,7 +181,8 @@ internal static class CompilerLoweredArtifact
             cancellationToken.ThrowIfCancellationRequested();
             var evidence = artifact.EffectClaims[index];
             CompilerEffectClaimArtifactCodec.Validate(evidence);
-            if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
+            if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind ||
+                !WorkerProtocolMetadata.ResourceConstraintsEqual(evidence.Constraint.ResourceUpperBound, expected[index].ResourceUpperBound))
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
             }

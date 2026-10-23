@@ -73,6 +73,47 @@ internal static class CompilerManifestArtifactProducer
                 return artifact.AttachEffectEvidence(item);
             })];
         }
+        // Preserve only reference evidence actually needed by resource metadata
+        // leaves. General compiler reference snapshots remain build-time data.
+        var resourceAssemblies = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var callable in callables)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var pending = new Stack<ResourceProgram>();
+            if (callable.ResourceProgram is { } payload)
+            { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
+            if (callable.ForkJoinProjection is { } forkPayload)
+            {
+                var entry = discovery.Manifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+                    candidate.CallableId == callable.CallableId);
+                var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
+                    ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
+                var projection = CompilerForkJoinProjectionCodec.Decode(forkPayload, root, cancellationToken);
+                resourceAssemblies.Add(projection.FrameworkAssemblyIdentity);
+                foreach (var child in projection.Children)
+                { pending.Push(child.Cost); }
+            }
+            while (pending.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var program = pending.Pop();
+                if (program.Metadata is { } reference)
+                { resourceAssemblies.Add(reference.AssemblyIdentity); }
+                foreach (var child in program.Children)
+                { pending.Push(child); }
+            }
+        }
+        if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+        {
+            snapshot = snapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
+            resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
+        }
+        snapshot = snapshot with
+        {
+            ResourceMetadataReferences = snapshot.References.Where(reference =>
+            reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
+        };
         var artifact = new CompilerManifestArtifact
         {
             SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
@@ -106,7 +147,11 @@ internal static class CompilerManifestArtifactProducer
             var claim = claims[index];
             evidence.Add(claim.Evidence);
         }
-        return artifact with { EffectClaims = evidence.ToImmutable() };
+        artifact = artifact with { EffectClaims = evidence.ToImmutable() };
+        if (artifact.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+            artifact.ResourceProgram is null && artifact.ResourceUnknownReason is null)
+        { artifact = artifact with { ResourceUnknownReason = "CompilationOrBodyUnavailable" }; }
+        return artifact;
     }
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(
