@@ -469,6 +469,7 @@ public sealed class NativeTaskCarrierStorageTests
     [TestCase("Child(n);", "TaskSourceBodyCallUnsupported")]
     [TestCase("new object();", "TaskSourceBodyInstructionUnsupported")]
     [TestCase("var a=new byte[n];", "TaskSourceBodyArrayTypeUnsupported")]
+    [TestCase("var a=new byte[n]; n=System.Math.Abs(n);", "TaskSourceBodyArrayTypeUnsupported")]
     [TestCase("var a=new object[n];", "TaskSourceBodyArrayTypeUnsupported")]
     [TestCase("try {n/=n;} catch(System.Exception) {}", "TaskSourceBodyHandlingUnsupported")]
     public void SourceBodyInventoryRejectsUnsupportedEmittedOperations(string body, string expected)
@@ -769,6 +770,53 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(capture.Activations.WrapperActivationsUpper, Is.EqualTo(1));
     }
 
+    [TestCase(OptimizationLevel.Debug, false)]
+    [TestCase(OptimizationLevel.Release, false)]
+    [TestCase(OptimizationLevel.Debug, true)]
+    [TestCase(OptimizationLevel.Release, true)]
+    public void OverloadCallbacksRetainCarriersButRequireEveryForwardTargetToBeOwned(
+        OptimizationLevel optimization, bool foreignTarget)
+    {
+        var source = "using System.Threading.Tasks; public static class C {public static Task Root(int n) => " +
+            "Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(n))); public static Task Root(string value) => " +
+            "Task.Run(()=>" + (foreignTarget ? "Other" : "Child") + "(0)); static void Child(int n) {} static void Other(int n) {} }";
+        var initial = TestCompilation.Create("OverloadCallback", [("Subject.cs", source)]);
+        var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single(candidate =>
+            candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+            candidate.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
+        var collector = new CompilerTaskCarrierCollector(compilation);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var carriers = collector.Capture(method, "root", cancellation);
+        Assert.That(carriers.UnknownReason, Is.Null);
+        Assert.That(carriers.Shapes!.MatchedCallbacks, Is.EqualTo(3));
+        var callbacks = collector.CaptureCallbackActivations(method, "root", cancellation);
+        var bodies = collector.CaptureSourceBodies(method, "root", cancellation);
+        if (foreignTarget)
+        {
+            Assert.That(callbacks.Activations, Is.Null);
+            Assert.That(callbacks.UnknownReason, Is.EqualTo("TaskCallbackForwarderCallUnsupported"));
+            Assert.That(bodies.Inventory, Is.Null);
+            Assert.That(bodies.UnknownReason, Is.EqualTo(callbacks.UnknownReason));
+        }
+        else
+        {
+            Assert.That(callbacks.UnknownReason, Is.Null);
+            Assert.That(callbacks.Activations!.Forwarders, Has.Length.EqualTo(3));
+            Assert.That(callbacks.Activations.Forwarders.Select(static forwarder =>
+                forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken).Distinct().ToArray(),
+                Has.Length.EqualTo(1));
+            Assert.That(bodies.UnknownReason, Is.Null);
+            Assert.That(bodies.Inventory!.MethodTokens, Has.Length.EqualTo(1));
+        }
+        var repeated = collector.Capture(method, "root", cancellation);
+        Assert.That(repeated.UnknownReason, Is.Null);
+        Assert.That(repeated.Shapes!.ModuleSha256, Is.EqualTo(carriers.Shapes.ModuleSha256));
+        Assert.That(repeated.Shapes.MatchedCallbacks, Is.EqualTo(carriers.Shapes.MatchedCallbacks),
+            "An unsupported overload forwarder must preserve the separate carrier inventory.");
+    }
+
     [TestCase("public static void Probe() {Child(3);}", null)]
     [TestCase("public static void Probe() {}", "TaskCallbackForwarderBodyUnsupported")]
     [TestCase("public static void Probe() {Child(3);Child(4);}", "TaskCallbackForwarderCallUnsupported")]
@@ -989,6 +1037,26 @@ public sealed class NativeTaskCarrierStorageTests
                 "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
                 "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
                 (location == "after" ? statement : "") + "builder.SetResult(); }";
+            Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
+                Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundarySourceEscape"), location);
+        }
+    }
+
+    [TestCase("var observed=this.Number;", "Ldfld")]
+    [TestCase("this.Number=7;", "Stfld")]
+    [TestCase("ref int observed=ref this.Number;", "Ldflda")]
+    public void InheritedFieldsDoNotBecomeOwnedThroughADirectThisReceiver(string statement, string rawCode)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        ArgumentNullException.ThrowIfNull(rawCode);
+        foreach (var location in new[] { "try", "handler", "after" })
+        {
+            var declaration = "public class Base {public int Number;} public sealed class Derived : Base {public void Probe() { " +
+                "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+                (location == "try" ? statement : "") +
+                "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+                "} catch(Exception e) { " + (location == "handler" ? statement : "") + "builder.SetException(e); } " +
+                (location == "after" ? statement : "") + "builder.SetResult(); }}";
             Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: rawCode),
                 Is.EqualTo(location == "try" ? null : "TaskRootExceptionBoundarySourceEscape"), location);
         }
@@ -1945,15 +2013,15 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(InstanceFields(reader, box), Is.EqualTo(new[] { ("StateMachine", (byte)0x13) }));
     }
 
-    [TestCase(2, false, 2176L)]
-    [TestCase(3, false, 3432L)]
-    [TestCase(4, false, 4424L)]
-    [TestCase(5, false, 6328L)]
-    [TestCase(8, false, 9760L)]
-    [TestCase(9, false, 13704L)]
-    [TestCase(16, false, 23672L)]
-    [TestCase(2, true, 2544L)]
-    [TestCase(16, true, 24040L)]
+    [TestCase(2, false, 2304L)]
+    [TestCase(3, false, 3624L)]
+    [TestCase(4, false, 4680L)]
+    [TestCase(5, false, 6648L)]
+    [TestCase(8, false, 10272L)]
+    [TestCase(9, false, 14280L)]
+    [TestCase(16, false, 24696L)]
+    [TestCase(2, true, 2736L)]
+    [TestCase(16, true, 25128L)]
     public void FaultCarrierPrefixesIncludeGrowthAndLosingPublicationCandidates(int count, bool configured, long expected)
     {
         var (projection, root) = FaultProjection(count, configured);

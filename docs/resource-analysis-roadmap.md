@@ -109,6 +109,86 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Parallel implementation and verification checkpoint
+
+Ten Sol agents completed bounded implementation, test and evidence assignments.
+This checkpoint records the integrated changes; combined qualification is pending.
+
+- Complete emitted primitive bodies now flow from the compiler through nested
+  codec 12 to native ownership and fault-site checks. The actual task
+  `AllocatedBytes` consumer reports unresolved helper selection or runtime
+  composition without numeric bounds. See the [design and remaining
+  obligations](resource-emitted-fault-sites-design.md).
+- Private fault bookkeeping includes context dispatch instances under model v3.
+  This does not close physical frame, retry or public root-byte obligations.
+- Expected count verification forwards bound metadata provenance. The reviewed
+  metadata catalog remains count-only; byte-cost requests remain Unknown.
+- Literal array/string replay requires observed lengths to equal the IR literal.
+  Six corrected regression cases failed before repair; all 251 memory tests
+  passed afterward (`artifacts/resource-literal-extent-green-tests.log`).
+- Recursive controls, including an independent execution oracle, passed all 262
+  analyzer resource tests in an isolated HEAD-production snapshot. This does not
+  certify the combined emitted-body changes.
+- New worker controls cover emitted inventories, context dispatch storage,
+  contract admission, compiler ownership, budget exhaustion and violation
+  boundaries. Their combined run passed all but the corrected enum fixture
+  described below; a fully passing run is still required.
+- All 15 lengths and SHA-256 values in the [initialization evidence
+  ledger](resource-runtime-initialization-ledger.md) were independently rechecked.
+  All 18 initial closure sources were then retrieved at the pinned revision.
+  Their sizes, SHA-256 hashes and Git blob identities were independently checked;
+  transitive allocation/callback closure and finite attempt counts remain open.
+
+Response cache is 66; nested codec is 12. Protocol 43, manifest 6 and outer
+artifact 55 remain unchanged. Combined formatting, including the scanner failure-order repair and regression,
+completed with zero further changes. Layout passed (2865 source files, 59
+projects, 151 pinned common files). Lint/API passed after correcting document
+spelling; documentation automation and lifecycle regressions passed. The first
+combined worker attempt stopped before tests with nine record-guard and two
+method-body style errors. These are repaired. The retry compiled production code, then stopped at five
+test-fixture errors (two ambiguous delegates and three string guards). Those
+are corrected and formatted with zero changes; the next combined run is pending.
+The next attempt built with zero warnings/errors and ran 1646 tests: 1645 passed,
+one failed because the undefined-enum fixture was rejected during sealing before
+native admission. That control now explicitly asserts the earlier canonical
+rejection. Combined verification after preserving the remote CI commit is pending.
+
+Published predecessor `91010618e` passed canonical CI (39901948390) and package
+consumers (39901948430). Coverage run 39901948405 passed all 15 shards but failed its coverage job
+(120248107644): 7153/7287 changed trusted lines (98.16%), 134 uncovered.
+Its aggregate artifact identifies merge `234b7afa4`, whose parents are master
+`fe2a05235` and published head `91010618e`. One prior gap closed in the local
+signature-prefix collector; the other 134 remain. The new integrated changes
+are absent from all three runs.
+The remote branch advanced with non-overlapping CI tooling commit `bbdc67921`
+during local verification. It will be preserved and the resulting state checked
+before pushing this integration.
+
+Full task-runtime bytes, the runtime proof-policy decision, required coverage
+closure and the final phase-by-phase audit remain open. The merge request stays
+draft.
+
+### Noncanonical recursive progress controls
+
+Three source controls exercise tail-call arguments outside the admitted positive
+constant-step family: a constant zero argument, subtracting zero, and subtracting
+the rank from itself. All must return `UnprovedRecursiveProgress` without a
+numeric allocation bound. Some of these programs terminate; Unknown records
+the unsupported proof shape rather than asserting that execution never terminates. The unchanged
+rank case can recurse without progress for positive inputs. Each case allocates
+before the tail call, so returning a caller/prefix-only bound would be incorrect.
+
+Formatting copied zero changes
+(`artifacts/resource-recursive-progress-shapes-format.log`). The analyzer resource
+selection is running before delivery. These tests change no production admission
+or compatibility identities; response cache remains 65.
+
+Published predecessor `d9cb2e515` passed canonical CI (39899979536) and package
+consumers (39899979552). The signature controls and hosted coverage checkpoint
+were published as `91010618e`. Its own qualification remains required. The
+proof-policy decision, full task-runtime byte model, coverage closure and final
+audit remain open.
+
 ### Recursive-control hosted coverage checkpoint
 
 Published head `d9cb2e515` passed canonical CI (39899979536). Coverage run

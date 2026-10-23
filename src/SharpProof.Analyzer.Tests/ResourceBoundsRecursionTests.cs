@@ -73,6 +73,9 @@ public sealed partial class ResourceBoundsTests
     }
 
     [TestCase("if(n<0)return; var a = new int[2]; Root(n-1);", "RecursiveCostUnknown")]
+    [TestCase("if(n<=0)return; var a = new int[2]; Root(0);", "UnprovedRecursiveProgress")]
+    [TestCase("if(n<=0)return; var a = new int[2]; Root(n-0);", "UnprovedRecursiveProgress")]
+    [TestCase("if(n<=0)return; var a = new int[2]; Root(n-n);", "UnprovedRecursiveProgress")]
     [TestCase("if(n<=0)return; var a = new int[2]; Root(n+1);", "UnprovedRecursiveProgress")]
     [TestCase("if(n<=0)return; var a = new int[2]; Root(n/1);", "UnprovedRecursiveProgress")]
     [TestCase("if(n<=0)return; Root(n-1); Root(n-1);", "RecursiveCostUnknown")]
@@ -88,8 +91,30 @@ public sealed partial class ResourceBoundsTests
     }
 
     [Test]
-    public void RecursiveAllocationBoundsMatchIndependentSmallExecutions()
+    public void UnknownCallerRankSizeDiscardsTheWholeRecurrenceBound()
     {
+        var result = AnalyzeSource("""
+            public static class C {
+                public static void Root(int n) { Leaf(n+1, new int[3]); }
+                static void Leaf(int n, int[] data) {
+                    if(n<=0)return;
+                    var a = new int[data.Length];
+                    Leaf(n-1, data);
+                }
+            }
+            """);
+        Assert.That(result.Proven, Is.False);
+        Assert.That(result.UnknownReason, Is.EqualTo("UnprovedRecursiveProgress"));
+        Assert.That(result.Bounds, Is.Null, "Caller argument allocations may not survive an unknown recurrence count.");
+    }
+
+    [TestCase(1, false)]
+    [TestCase(3, false)]
+    [TestCase(2, true)]
+    [TestCase(3, true)]
+    public void RecursiveAllocationBoundsMatchIndependentSmallExecutions(int amount, bool divide)
+    {
+        var progress = divide ? $"n/{amount}" : $"n-{amount}";
         for (int size = -2; size <= 16; size++)
         {
             int arrays = 0, elements = 0;
@@ -100,10 +125,10 @@ public sealed partial class ResourceBoundsTests
                 var allocated = new int[2];
                 arrays++;
                 elements += allocated.Length;
-                Execute(remaining - 1);
+                Execute(divide ? remaining / amount : remaining - amount);
             }
             Execute(size);
-            var result = AnalyzeSource($"public static class C {{ public static void Root() {{ Leaf({size}); }} static void Leaf(int n) {{ if(n<=0)return; var a = new int[2]; Leaf(n-1); }} }}");
+            var result = AnalyzeSource($"public static class C {{ public static void Root() {{ Leaf({size}); }} static void Leaf(int n) {{ if(n<=0)return; var a = new int[2]; Leaf({progress}); }} }}");
             Assert.That(result.Proven, Is.True, result.UnknownReason);
             Assert.That(result.Bounds!.Arrays.Constant, Is.EqualTo(new System.Numerics.BigInteger(arrays)));
             Assert.That(result.Bounds.Elements.Constant, Is.EqualTo(new System.Numerics.BigInteger(elements)));

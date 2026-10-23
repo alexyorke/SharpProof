@@ -165,6 +165,69 @@ public sealed class ResourceMemoryReplayTests
         Assert.That(incompatible.UnknownReason, Is.EqualTo("IncompatibleResourceRuntimeLayout"));
     }
 
+    [TestCase(false, 0)]
+    [TestCase(false, 1)]
+    [TestCase(false, 33)]
+    [TestCase(true, 0)]
+    [TestCase(true, 1)]
+    [TestCase(true, 33)]
+    public void AllocationObservationsCannotReplaceLiteralExtentsOnVoidReturns(bool text, int observedLength)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = text ? factory.StringType : factory.GetOrCreateSequenceType(factory.IntegerType);
+        var target = factory.CreateVariable("value", type);
+        var character = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x');
+        var allocation = builder.Allocate(entry, factory.CreateOperation(), type, target,
+            factory.Integer(17), text ? [character] : []);
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        var bytes = text ? 56 : 96;
+        Assert.That(Replay(program, Layout).Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, bytes, bytes, 0, 0)));
+        Assert.That(ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken).Bounds,
+            Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, bytes, bytes, 0, 0)));
+
+        // The real interpreter returns normally with no reference result. A
+        // substituted allocation observation must not change its numeric costs.
+        var forged = text ? factory.CreateStringValue(new string('x', observedLength)) :
+            factory.CreateSequenceValue(type, Enumerable.Repeat(factory.CreateIntegerValue(0), observedLength));
+        var check = MutatedReplay(program, (instruction, value) =>
+        {
+            ArgumentNullException.ThrowIfNull(instruction);
+            return ReferenceEquals(instruction, allocation) ? forged : value;
+        });
+        Assert.That(check.Bounds, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo(text ? "MemoryReplayStringAllocationUnsupported" : "MemoryReplayAllocationUnsupported"));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void GenuineInputDependentAllocationExtentsRemainReplayable(bool text, bool expression)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var type = text ? factory.StringType : factory.GetOrCreateSequenceType(factory.IntegerType);
+        var target = factory.CreateVariable("value", type);
+        var input = factory.CreateVariable("length", factory.IntegerType);
+        IrTerm extent = factory.Variable(input);
+        if (expression)
+        { extent = factory.Binary(IrBinaryOperator.Add, extent, factory.Integer(1)); }
+        var character = factory.Integer(factory.GetOrCreateIntegerType(16, signed: false), 'x');
+        builder.Allocate(entry, factory.CreateOperation(), type, target, extent, text ? [character] : []);
+        builder.Return(entry, factory.CreateOperation());
+        var program = builder.Build();
+        var inputs = ImmutableDictionary<IrVarId, IrValue>.Empty.Add(input, factory.CreateIntegerValue(expression ? 16 : 17));
+        var bytes = text ? 56 : 96;
+        var check = Replay(program, Layout, inputs);
+        Assert.That(check.Verified, Is.True, check.UnknownReason);
+        Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(bytes, bytes, bytes, bytes, 0, 0)));
+        Assert.That(ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken).Bounds, Is.Null);
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]

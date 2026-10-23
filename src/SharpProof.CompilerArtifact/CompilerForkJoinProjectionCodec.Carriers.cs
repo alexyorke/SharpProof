@@ -42,6 +42,8 @@ internal static partial class CompilerForkJoinProjectionCodec
             WriteCallbackActivations(writer, shapes.CallbackActivations, cancellation);
             writer.WritePropertyName("bodies");
             WriteSourceBodies(writer, shapes.SourceBodies, cancellation);
+            writer.WritePropertyName("faultBodies");
+            WriteEmittedFaultBodies(writer, shapes.EmittedFaultBodies, cancellation);
             writer.WriteEndObject();
         }
         writer.WriteEndObject();
@@ -62,10 +64,11 @@ internal static partial class CompilerForkJoinProjectionCodec
         writer.WriteEndObject();
     }
 
-    private static CompilerTaskCarrierCapture? ReadCarriers(JsonElement value, string owner, int children,
+    private static CompilerTaskCarrierCapture? ReadCarriers(JsonElement value, string owner, string framework, int children,
         bool configured, CancellationToken cancellation)
     {
         owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+        framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
         cancellation.ThrowIfCancellationRequested();
         if (value.ValueKind == JsonValueKind.Null)
         { return null; }
@@ -80,7 +83,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             Require(!string.IsNullOrWhiteSpace(reason) && reason.Length <= 512, "Carrier Unknown reason is too long.");
             return new(null, reason);
         }
-        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary", "activations", "bodies"]);
+        Properties(shapes, ["root", "module", "compiler", "callbacks", "frames", "state", "boundary", "activations", "bodies", "faultBodies"]);
         Require(Text(shapes.GetProperty("root")) == owner, "Carrier root is unowned.");
         var module = Text(shapes.GetProperty("module"));
         Require(WorkerProtocolJson.IsSha256(module), "Carrier module hash is invalid.");
@@ -104,11 +107,15 @@ internal static partial class CompilerForkJoinProjectionCodec
         Require((encodedState.ValueKind != JsonValueKind.Null) == configured, "Carrier state-machine kind is inconsistent.");
         var state = configured ? ReadCarrierType(encodedState, ref remaining, cancellation) : null;
         var activations = ReadCallbackActivations(shapes.GetProperty("activations"), owner, module, callbacks, children, cancellation);
-        return new(new(owner, module, compiler, callbacks, frames.MoveToImmutable(), state)
+        var result = new CompilerTaskCarrierShapes(owner, module, compiler, callbacks, frames.MoveToImmutable(), state)
         {
             RootExceptionBoundary = ReadBoundary(shapes.GetProperty("boundary"), owner, module, state, cancellation),
             CallbackActivations = activations,
             SourceBodies = ReadSourceBodies(shapes.GetProperty("bodies"), owner, module, activations?.Activations, cancellation)
+        };
+        return new(result with
+        {
+            EmittedFaultBodies = ReadEmittedFaultBodies(shapes.GetProperty("faultBodies"), result, framework, cancellation)
         }, null);
     }
 

@@ -16,13 +16,19 @@ public sealed class NativeResourceAllocationTests
             ResourceRuntimeLayout.TargetArchitecture, ResourceRuntimeLayout.PointerBytes);
     }
 
-    private static CompilerTotalCallablePreparation Owner()
+    private static CompilerTotalCallablePreparation Owner(bool hasSize = false)
     {
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation("return"));
-        return new("owned", builder.Build(), [], null, []);
+        System.Collections.Immutable.ImmutableArray<CompilerTotalParameter> parameters = [];
+        if (hasSize)
+        {
+            var type = factory.GetOrCreateIntegerType(32, true);
+            parameters = [new(factory.CreateVariable("entry", type), factory.CreateVariable("current", type), factory.CreateVariable("old", type))];
+        }
+        return new("owned", builder.Build(), parameters, null, []);
     }
 
     private static ResourceProgram Array(ResourceStorageKind storage, int length)
@@ -30,12 +36,12 @@ public sealed class NativeResourceAllocationTests
         return ResourceProgram.TypedArray(ResourceAllocationShape.Array(storage, ResourceExpression.Literal(length)));
     }
 
-    private static NativeResourceAllocationCheck Check(ResourceProgram program)
+    private static NativeResourceAllocationCheck Check(ResourceProgram program, bool hasSize = false)
     {
         ArgumentNullException.ThrowIfNull(program);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var decoded = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, cancellation), cancellation);
-        return NativeResourceAllocationVerifier.Verify(decoded, "owned", Owner(), Layout(), cancellation);
+        return NativeResourceAllocationVerifier.Verify(decoded, "owned", Owner(hasSize), Layout(), cancellation);
     }
 
     [TestCase((int)ResourceStorageKind.Byte, 0, 24)]
@@ -110,6 +116,54 @@ public sealed class NativeResourceAllocationTests
         var result = Check(ResourceProgram.Sequence(Array(ResourceStorageKind.Byte, 1), ResourceProgram.MetadataBoundary));
         Assert.That(result.ConditionalUpperBound, Is.Null);
         Assert.That(result.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void LayoutExpressionBudgetHasASupportedNeighborAndNoPartialByteBound(bool exhausted)
+    {
+        var extent = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var reductions = ResourceExpression.MaximumDepth - (exhausted ? 3 : 4);
+        for (var index = 0; index < reductions; index++)
+        { extent = ResourceExpression.Difference(extent, 1); }
+        var program = ResourceProgram.TypedArray(ResourceAllocationShape.Array(ResourceStorageKind.Word64, extent));
+        var result = Check(program, hasSize: true);
+        if (exhausted)
+        {
+            Assert.That(result.ConditionalUpperBound, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("ResourceLayoutBudgetExceeded"));
+        }
+        else
+        {
+            Assert.That(result.UnknownReason, Is.Null);
+            var length = 256 - reductions;
+            Assert.That(result.ConditionalUpperBound!.Evaluate(_ => 256, TestContext.CurrentContext.CancellationToken),
+                Is.EqualTo(new BigInteger(24 + 8 * length)));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ByteCompositionBudgetDoesNotPublishAPartialAllocationPrefix(bool exhausted)
+    {
+        var extent = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var allocation = ResourceProgram.TypedArray(ResourceAllocationShape.Array(ResourceStorageKind.Word64, extent));
+        var count = ResourceExpression.MaximumDepth - (exhausted ? 2 : 3);
+        var program = allocation;
+        for (var index = 1; index < count; index++)
+        { program = ResourceProgram.Sequence(program, allocation); }
+        var result = Check(program, hasSize: true);
+        if (exhausted)
+        {
+            Assert.That(result.ConditionalUpperBound, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("ResourceAllocationProofBudgetExceeded"));
+        }
+        else
+        {
+            Assert.That(result.UnknownReason, Is.Null);
+            Assert.That(result.ConditionalUpperBound!.Evaluate(_ => 7, TestContext.CurrentContext.CancellationToken),
+                Is.EqualTo(new BigInteger(80 * count)));
+        }
     }
 
     [TestCase(0)]

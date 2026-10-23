@@ -5,8 +5,16 @@ internal sealed record NativeTaskSchedulerExceptionInstanceCheck(ResourceExpress
     internal string? RequiredRuntimeModel => InstanceUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.SchedulerExceptionInstanceModel;
 }
 
+internal sealed record NativeTaskContextDispatchInstanceCheck(ResourceExpression? InstanceUpper, string? UnknownReason)
+{
+    internal string? RequiredRuntimeModel => InstanceUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.ContextDispatchInstanceModel;
+}
+
 internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? BookkeepingUpper, string? UnknownReason)
 {
+    internal string? RequiredRuntimeModel => BookkeepingUpper is null ? null : ResourceTaskFaultCarrierCatalog.Model;
+    internal ResourceExpression? ContextDispatchInstanceUpper { get; init; }
+    internal string? RequiredContextDispatchInstanceModel => ContextDispatchInstanceUpper is null ? null : NativeTaskFaultCarrierStorageVerifier.ContextDispatchInstanceModel;
     internal int? TaskTraceCaptureCountUpper { get; init; }
     internal int? TaskNonEmptyTraceCaptureCountUpper { get; init; }
     internal int? TaskTraceRestoreCountUpper { get; init; }
@@ -26,6 +34,23 @@ internal sealed record NativeTaskFaultCarrierCheck(ResourceExpression? Bookkeepi
 // separately before any root cumulative byte proof can be published.
 internal static class NativeTaskFaultCarrierStorageVerifier
 {
+    internal const string ContextDispatchInstanceModel = "task-join-context-dispatch-instances-v1";
+    internal const string ContextDispatchSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/ExecutionContext.cs";
+
+    // Instance candidates in the existing context-wrapper capture domain only.
+    // Capture allocates its dispatch before collecting the trace state, so its
+    // candidate is counted even if construction fails. Restore copies arrays
+    // without creating another dispatch. Those arrays, initialization, external
+    // context-change callbacks and helper failures remain separate obligations.
+    // The owning bookkeeping result includes this component exactly once; it
+    // does not establish a root allocation verdict or a new runtime premise.
+    internal static NativeTaskContextDispatchInstanceCheck CheckContextDispatchInstances(CompilerForkJoinProjection projection,
+        CompilerTotalEntryPreparation root, ResourceRuntimeLayoutContext layout, CancellationToken cancellation)
+    {
+        var carriers = Check(projection, root, layout, cancellation);
+        return new(carriers.ContextDispatchInstanceUpper, carriers.UnknownReason);
+    }
+
     internal const string SchedulerExceptionInstanceModel = "task-join-scheduler-exception-instances-v1";
     internal const string SchedulerExceptionSource = "https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/TaskSchedulerException.cs";
 
@@ -90,6 +115,9 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         total = ResourceExpression.Add(total, ResourceExpression.Multiply(joinList, ResourceExpression.Literal(count)));
         if (projection.ConfiguredAwait)
         { total = ResourceExpression.Add(total, ResourceExpression.Add(fixedRecord, ListBytes(1))); }
+        var contextCaptures = count + (projection.ConfiguredAwait ? 1 : 0);
+        var contextInstances = ResourceExpression.Multiply(dispatch, ResourceExpression.Literal(contextCaptures));
+        total = ResourceExpression.Add(total, contextInstances);
         // Each task-owned AddException site can capture one dispatch state.
         // WhenAll forwards existing dispatches. A configured root restores the
         // first fault once and records it once in its own async box. Queue wrappers
@@ -102,14 +130,15 @@ internal static class NativeTaskFaultCarrierStorageVerifier
         // below; externally induced context-change callback work is not included.
         return new(total, null)
         {
+            ContextDispatchInstanceUpper = contextInstances,
             TaskTraceCaptureCountUpper = count * faultsPerChild + (projection.ConfiguredAwait ? 1 : 0),
             TaskNonEmptyTraceCaptureCountUpper = count + (projection.ConfiguredAwait ? 1 : 0),
             TaskTraceRestoreCountUpper = projection.ConfiguredAwait ? 1 : 0,
             // Each child enters at most one RunInternal/RunFromThreadPoolDispatchLoop
             // wrapper. A configured root can resume its single await once through
             // the async box's corresponding wrapper. Each catches/rethrows once.
-            ContextTraceCaptureCountUpper = count + (projection.ConfiguredAwait ? 1 : 0),
-            ContextTraceRestoreCountUpper = count + (projection.ConfiguredAwait ? 1 : 0)
+            ContextTraceCaptureCountUpper = contextCaptures,
+            ContextTraceRestoreCountUpper = contextCaptures
         };
 
         ResourceExpression ObjectBytes(ImmutableArray<ResourceStorageKind> fields)

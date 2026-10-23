@@ -111,6 +111,7 @@ internal sealed class ResourceMemoryReplay
                 case IrAllocationInstruction textAllocation when textAllocation.AllocatedType == factory.StringType:
                     if (textAllocation.Target is not { } textTarget || value is not { Kind: IrValueKind.String } ||
                         value.Type != factory.StringType || IrValue.HasUnknownStringIdentity(value) ||
+                        textAllocation.Length is IrIntegerTerm textExtent && textExtent.Integer.NumericValue != value.String.Length ||
                         textAllocation.InitialValues.Length != 1 || textAllocation.InitialValues[0] is not IrIntegerTerm)
                     { return Unknown("MemoryReplayStringAllocationUnsupported"); }
                     actualValues[textTarget] = value;
@@ -194,7 +195,9 @@ internal sealed class ResourceMemoryReplay
                     break;
                 case IrAllocationInstruction allocation:
                     if (allocation.Target is not { } target || value is not { Kind: IrValueKind.Sequence } ||
-                        allocation.AllocatedType != value.Type || !allocation.InitialValues.IsEmpty ||
+                        allocation.AllocatedType != value.Type ||
+                        allocation.Length is IrIntegerTerm extent && extent.Integer.NumericValue != value.Elements.Length ||
+                        !allocation.InitialValues.IsEmpty ||
                         factory.GetTypeInfo(value.Type).ElementType is not { } element || Find(value, identities) != 0)
                     { return Unknown("MemoryReplayAllocationUnsupported"); }
                     var type = factory.GetTypeInfo(element);

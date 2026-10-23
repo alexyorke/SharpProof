@@ -189,7 +189,8 @@ internal sealed partial class NativeResourceContractTests
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
             new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ForkJoinResourceMetricUnsupported"));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo(metric == "AllocatedBytes" ?
+            "TaskStorageLayoutPremiseNotBound" : "ForkJoinResourceMetricUnsupported"));
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
         Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
     }

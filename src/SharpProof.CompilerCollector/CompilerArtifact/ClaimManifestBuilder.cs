@@ -403,7 +403,8 @@ internal sealed partial class ClaimManifestBuilder(
                 resourceDeclaration.ExpressionBody is { } arrow ? resourceModel.GetOperation(arrow.Expression, cancellationToken) : null;
             var resource = ResourceBoundsAnalysis.Analyze(target, body, cancellationToken);
             var metadataIds = new SortedSet<string>(StringComparer.Ordinal);
-            if (ResourceForkJoinPlan.TryCreate(target, _compilation, cancellationToken) is { } taskPlan)
+            var taskPlan = ResourceForkJoinPlan.TryCreate(target, _compilation, cancellationToken);
+            if (taskPlan != null)
             {
                 metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
                     taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
@@ -418,7 +419,7 @@ internal sealed partial class ClaimManifestBuilder(
             { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }
             var requiresLifetimeLayout = effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
                 claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes);
-            var requiresCumulativeLayout = resource.Bounds != null && effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            var requiresCumulativeLayout = (resource.Bounds != null || taskPlan != null) && effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
                 claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes);
             if (requiresLifetimeLayout || requiresCumulativeLayout)
             {

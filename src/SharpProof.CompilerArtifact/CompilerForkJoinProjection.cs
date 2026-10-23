@@ -51,6 +51,7 @@ internal sealed record CompilerTaskCarrierShapes(string RootCallableId, string M
     internal CompilerTaskRootExceptionBoundaryCapture? RootExceptionBoundary { get; init; }
     internal CompilerTaskCallbackActivationCapture? CallbackActivations { get; init; }
     internal CompilerTaskSourceBodyCapture? SourceBodies { get; init; }
+    internal CompilerTaskEmittedFaultBodyCapture? EmittedFaultBodies { get; init; }
     public string RootCallableId { get; init; } = RepositoryParameterGuard.NotNull(RootCallableId, nameof(RootCallableId));
     public string ModuleSha256 { get; init; } = RepositoryParameterGuard.NotNull(ModuleSha256, nameof(ModuleSha256));
     public string CompilerIdentity { get; init; } = RepositoryParameterGuard.NotNull(CompilerIdentity, nameof(CompilerIdentity));

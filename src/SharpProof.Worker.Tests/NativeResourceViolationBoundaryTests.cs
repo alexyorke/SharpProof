@@ -172,6 +172,36 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(await FindBoundaryViolation(target, ResourceExpression.Zero), Is.Null);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ByteViolationsCannotCrossAnAllocationWithoutAnOwnedIdentity(bool discarded)
+    {
+        var first = discarded ? "new object();" : "var first=new object();";
+        var source = Source("[ResourceUpperBound(ResourceMetric.AllocatedBytes,23)]", first + "var later=new int[1];");
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(discarded ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Refuted));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        if (discarded)
+        {
+            Assert.That(result.ResourceBound.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+            Assert.That(result.EffectWitness, Is.Null);
+        }
+        else
+        {
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.EqualTo("24"));
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("23"));
+            Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+            var location = result.EffectWitness!.Location;
+            Assert.That(source.Substring(location.Start, location.Length), Does.Contain("new object()"));
+        }
+    }
+
     [Test]
     public async Task LifetimeSearchDoesNotUseAnUnprovedParametricMemoryEnvelope()
     {
@@ -179,6 +209,45 @@ internal sealed partial class NativeResourceContractTests
             "[ResourceUpperBound(ResourceMetric.RetainedBytes,0)] public static int[] Target(int n) => new int[n]; }",
             reviewedRuntime: true, x64: true));
         Assert.That(await FindBoundaryViolation(target, ResourceExpression.Zero), Is.Null);
+    }
+
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
+    public async Task LifetimeViolationsRequireCompletionWithinTheReplayAnalysisBudget(int metric, bool exhausted)
+    {
+        // The source bound is exact for either extent. Only completed concrete
+        // executions can turn its failed comparison into a lifetime violation.
+        var extent = exhausted ? PassiveCallableVcBuilder.MaximumSteps + 1 : 1;
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},0)] public static int[] Target() " +
+            $"{{var temporary=new int[{extent}]; return new int[1];}} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var layout = new NativeResourceLayoutBinding(target).Bind();
+        Assert.That(layout, Is.Not.Null);
+        Assert.That(ResourceMemoryProgram.Evaluate(target.Total!.Program, layout!,
+            TestContext.CurrentContext.CancellationToken).Verified, Is.True);
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(exhausted ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Refuted));
+        Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
+        if (exhausted)
+        {
+            Assert.That(result.ResourceBound.UnknownReason, Is.EqualTo("ResourceBoundComparisonUnproved"));
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+            Assert.That(result.EffectWitness, Is.Null);
+        }
+        else
+        {
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.EqualTo("32"));
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("0"));
+            Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+            Assert.That(result.EffectWitness!.Detail, Does.Contain("completed execution"));
+        }
     }
 
     [Test]

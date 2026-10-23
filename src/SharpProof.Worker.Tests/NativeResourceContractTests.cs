@@ -228,6 +228,148 @@ internal sealed partial class NativeResourceContractTests
         Action serialize = () => Read(artifact);
         Rejects(serialize);
     }
+
+    [TestCase("unspecified-metric")]
+    [TestCase("undefined-metric")]
+    [TestCase("cost-model")]
+    [TestCase("metric-cost-model")]
+    [TestCase("expression-model")]
+    public void ResourceClaimsRejectUnsupportedMetricAndModels(string corruption)
+    {
+        ArgumentNullException.ThrowIfNull(corruption);
+        var preparation = Prepare(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)]", "var a=new int[3];"));
+        var claim = preparation.EffectClaims.Single();
+        var control = NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
+        Assert.That(control.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), control.ResourceBound?.UnknownReason);
+        Assert.That(control.ResourceBound!.InferredUpperBound, Is.EqualTo("3"));
+        var constraint = claim.Constraint.ResourceUpperBound!;
+        constraint = corruption switch
+        {
+            "unspecified-metric" => constraint with { Metric = WorkerResourceMetric.Unspecified },
+            "undefined-metric" => constraint with { Metric = (WorkerResourceMetric)999 },
+            "cost-model" => constraint with { CostModel = "unreviewed-cost-model" },
+            "metric-cost-model" => constraint with { CostModel = WorkerResourceModels.AllocationCostModel },
+            "expression-model" => constraint with { ExpressionModel = WorkerResourceModels.Expression + 1 },
+            _ => throw new ArgumentOutOfRangeException(nameof(corruption))
+        };
+        claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = constraint } };
+        if (corruption == "undefined-metric")
+        {
+            Action seal = () => CompilerEffectClaimArtifactCodec.Seal(claim);
+            Assert.Throws<ArgumentOutOfRangeException>(seal);
+            return;
+        }
+        CompilerEffectClaimArtifactCodec.Seal(claim);
+        preparation = preparation with { EffectClaims = [claim] };
+        Action verify = () => NativeResourceContractVerifier.Verify(preparation, claim, TestContext.CurrentContext.CancellationToken);
+        Assert.Throws<InvalidDataException>(verify);
+    }
+
+    [TestCase("PeakAuxiliaryBytes")]
+    [TestCase("RetainedBytes")]
+    public async Task LifetimeContractsRequireByteStorageEvenWhenSourceElementCostsAreVerified(string metric)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var artifact = CreateArtifact("using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound(ResourceMetric.{metric},31,nameof(n),4)] public static int[] Target(int n) => new int[n]; }}",
+            reviewedRuntime: true, x64: true);
+        var preparation = Read(artifact);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var control = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), cancellation)).Single();
+        Assert.That(control.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), control.ResourceBound?.UnknownReason);
+        Assert.That(control.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+        var activation = preparation.ResourceProgram!;
+        Assert.That(activation.Kind, Is.EqualTo(ResourceProgramKind.Activation));
+        var array = activation.Children.Single();
+        Assert.That(array.Kind, Is.EqualTo(ResourceProgramKind.AllocateArray));
+        var untyped = ResourceProgram.Activate(activation.Activation, ResourceProgram.Array(array.Length!, array.LowerLength));
+        artifact = artifact with
+        {
+            Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with
+            {
+                ResourceProgram = ResourceProgramCodec.Encode(untyped, cancellation)
+            })
+        };
+        preparation = Read(artifact);
+        var sourceCosts = NativeResourceProgramVerifier.Verify(preparation.ResourceProgram!, preparation.Entry.CallableId,
+            preparation.Total!, cancellation);
+        Assert.That(sourceCosts.Verified, Is.True, sourceCosts.UnknownReason);
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), cancellation)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("MissingResourceAllocationStorage"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+        Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.Asymptotic, Is.Null);
+        Assert.That(result.ResourceBound.Expected, Is.Null);
+        Assert.That(result.ResourceBound.Accounting, Is.Empty);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.EffectWitness, Is.Null);
+        Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ComparisonBudgetIsConservativeForLargeOwnedDeclaredBounds(bool directComparisonFirst)
+    {
+        var artifact = CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0, nameof(n), 1)]",
+            "for(int i=0;i<n;i++) {}"));
+        var preparation = Read(artifact);
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var claim = artifact.Callables.Single().EffectClaims.Single();
+        var input = ResourceExpressionCodec.DecodeForCallable(claim.Constraint.ResourceUpperBound!.UpperBound,
+            preparation.Entry.CallableId, preparation.Total!, cancellation);
+        var alternatives = Enumerable.Range(1, 1024).Select(offset => ResourceExpression.Difference(input, offset)).ToArray();
+        while (alternatives.Length > 1)
+        {
+            var combined = new ResourceExpression[alternatives.Length / 2];
+            for (var index = 0; index < combined.Length; index++)
+            { combined[index] = ResourceExpression.Max(alternatives[index * 2], alternatives[index * 2 + 1]); }
+            alternatives = combined;
+        }
+        // Both orders declare the same valid upper bound. A direct comparison
+        // can finish early; exhausting the bounded search must publish Unknown.
+        var limit = directComparisonFirst ? ResourceExpression.Max(input, alternatives[0]) :
+            ResourceExpression.Max(alternatives[0], input);
+        var constraint = claim.Constraint.ResourceUpperBound! with { UpperBound = ResourceExpressionCodec.Encode(limit, cancellation) };
+        claim = claim with { Constraint = claim.Constraint with { ResourceUpperBound = constraint } };
+        CompilerEffectClaimArtifactCodec.Seal(claim);
+        artifact = artifact with
+        {
+            Callables = artifact.Callables.SetItem(0, artifact.Callables.Single() with { EffectClaims = [claim] }),
+            Manifest = artifact.Manifest with
+            {
+                Claims = artifact.Manifest.Claims.SetItem(0, artifact.Manifest.Claims.Single() with { ResourceUpperBound = constraint })
+            }
+        };
+        WorkerProtocolJson.SealManifest(artifact.Manifest);
+        preparation = Read(artifact);
+        var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), cancellation)).Single();
+        if (directComparisonFirst)
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+            Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("max(0, n)"));
+        }
+        else
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceProofBudgetExceeded"));
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.Asymptotic, Is.Null);
+            Assert.That(result.ResourceBound.Expected, Is.Null);
+            Assert.That(result.ResourceBound.Accounting, Is.Empty);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.EffectWitness, Is.Null);
+        }
+    }
+
     [TestCase("missing-entry", "ResourceEntryUnavailable")]
     [TestCase("abstract-entry", "ResourceEntryUnavailable")]
     [TestCase("incomplete-entry", "ResourceEntryUnavailable")]

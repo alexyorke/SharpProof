@@ -243,6 +243,41 @@ internal sealed partial class NativeResourceContractTests
         { Assert.That(result.ResourceBound.InferredUpperBound, Is.EqualTo("0")); }
     }
 
+    [TestCase(5, false)]
+    [TestCase(6, false)]
+    [TestCase(5, true)]
+    [TestCase(6, true)]
+    public async Task UnaryReturnGuardsPreserveTheBoundaryBetweenOwnedAndBorrowedArrays(int metric, bool borrowed)
+    {
+        var extraParameter = borrowed ? ",int[] input" : "";
+        var selected = borrowed ? "input" : "value";
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound((ResourceMetric){metric},31,nameof(n),4)] public static int[] Target(int n,bool skip{extraParameter}) " +
+            $"{{var value=new int[n]; if(!skip) return {selected}; return null;}} }}";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(borrowed ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven),
+            result.ResourceBound?.UnknownReason);
+        Assert.That(result.ResourceBound!.ObservedLowerBound, Is.Null);
+        Assert.That(result.EffectWitness, Is.Null);
+        if (borrowed)
+        {
+            Assert.That(result.ResourceBound.UnknownReason, Is.Not.Null.And.Not.Empty);
+            Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.Null);
+            Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+            Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+        }
+        else
+        {
+            Assert.That(result.ResourceBound.UnknownReason, Is.Null);
+            Assert.That(result.ResourceBound.InferredUpperBound, Does.Contain("n"));
+            Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
+            Assert.That(result.ProofCore, Does.Contain("resource-memory-envelope:" + NativeResourceMemoryEnvelope.ModelId));
+        }
+    }
+
     [TestCase("bypass")]
     [TestCase("redefinition")]
     [TestCase("cycle")]

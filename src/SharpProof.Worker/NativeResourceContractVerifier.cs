@@ -179,7 +179,7 @@ internal static class NativeResourceContractVerifier
                 ResourceBound = result.ResourceBound! with
                 {
                     Expected = NativeResourceExpectedVerifier.Project(NativeResourceExpectedVerifier.Verify(
-                target.ResourceProgram, (ResourceCostMetric)constraint.Metric, target.Entry.CallableId, owner, expectedLayout, cancellation))
+                target.ResourceProgram, (ResourceCostMetric)constraint.Metric, target.Entry.CallableId, owner, expectedLayout, metadata.Bind, cancellation))
                 }
             };
             if (result.ResourceBound!.Expected!.UnknownReason is null)
@@ -218,6 +218,16 @@ internal static class NativeResourceContractVerifier
 
         WorkerClaimResult VerifyTaskJoin()
         {
+            if (constraint.Metric == WorkerResourceMetric.AllocatedBytes)
+            {
+                if (NativeResourceTaskBinding.Bind(target, cancellation) is null)
+                { return Unknown("ForkJoinRuntimePremiseNotBound", WorkerClaimReason.UnsupportedBody); }
+                var faultLayout = new NativeResourceLayoutBinding(target);
+                if (faultLayout.Bind() is not { } faultContext)
+                { return Unknown("TaskStorageLayoutPremiseNotBound", WorkerClaimReason.UnsupportedBody); }
+                var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, faultContext, cancellation);
+                return Unknown(routes.UnknownReason ?? "TaskRuntimeFaultFrameCompositionUnproved", WorkerClaimReason.UnsupportedBody);
+            }
             var lifetime = constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes;
             var sourceAllocation = constraint.Metric is WorkerResourceMetric.ArrayAllocations or WorkerResourceMetric.AllocatedElements;
             if (constraint.Metric != WorkerResourceMetric.LoopBodyEntries && !sourceAllocation && !lifetime)

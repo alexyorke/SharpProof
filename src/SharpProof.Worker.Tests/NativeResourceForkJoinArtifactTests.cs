@@ -98,7 +98,7 @@ internal sealed partial class NativeResourceContractTests
                 TestContext.CurrentContext.CancellationToken)).Single();
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo(metric == "AllocatedBytes" ?
-                "ForkJoinResourceMetricUnsupported" : "ForkJoinLifetimeBoundComparisonUnproved"));
+                "TaskRuntimeFaultFrameCompositionUnproved" : "ForkJoinLifetimeBoundComparisonUnproved"));
         }
     }
 

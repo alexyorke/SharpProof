@@ -9,7 +9,7 @@ namespace SharpProof.CompilerArtifact;
 // authenticates source provenance; runtime premises are checked separately.
 internal static partial class CompilerForkJoinProjectionCodec
 {
-    internal const int Version = 11;
+    internal const int Version = 12;
     internal const int MaximumPayloadBytes = 1024 * 1024;
 
     internal static byte[] Encode(CompilerForkJoinProjection projection, CompilerTotalEntryPreparation root, CancellationToken cancellation)
@@ -160,7 +160,7 @@ internal static partial class CompilerForkJoinProjectionCodec
         return new(root.CallableId, framework, names.MoveToImmutable(), children.MoveToImmutable())
         {
             ConfiguredAwait = configuredAwait.GetBoolean(),
-            Carriers = ReadCarriers(value.GetProperty("carriers"), root.CallableId,
+            Carriers = ReadCarriers(value.GetProperty("carriers"), root.CallableId, framework,
             encodedChildren.GetArrayLength(), configuredAwait.GetBoolean(), cancellation)
         };
     }

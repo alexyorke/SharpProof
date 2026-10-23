@@ -44,7 +44,7 @@ internal sealed record ResourceTraceBufferCheck(ResourceExpression? CumulativeUp
 // None of these components establishes a root allocation verdict.
 internal static class ResourceTaskFaultCarrierCatalog
 {
-    internal const string Model = "task-join-fixed-fault-carriers-v2";
+    internal const string Model = "task-join-fixed-fault-carriers-v3";
     internal const string RawTraceBufferModel = "closed-raw-exception-trace-buffers-v1";
     internal const string ResolverTraceBufferModel = "closed-exception-resolver-buffers-v1";
     internal const string TraceBufferModel = "closed-exception-trace-buffer-composition-v1";

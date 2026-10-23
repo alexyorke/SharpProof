@@ -52,10 +52,60 @@ internal sealed class CompilerTaskCarrierCollector
         { return new(null, "TaskSourceBodyEmissionInvalid"); }
     }
 
+    internal CompilerTaskEmittedFaultBodyCapture CaptureEmittedFaultBodies(IMethodSymbol method, string callableId, CancellationToken cancellation)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
+        cancellation.ThrowIfCancellationRequested();
+        var source = CaptureSourceBodies(method, callableId, cancellation);
+        if (source.Inventory is not { } inventory)
+        { return new(null, source.UnknownReason); }
+        var carriers = Capture(method, callableId, cancellation);
+        if (carriers.Shapes is not { } shapes)
+        { return new(null, carriers.UnknownReason); }
+        var plan = ResourceForkJoinPlan.TryCreate(method, _compilation, cancellation);
+        if (plan is null)
+        { return new(null, "TaskEmittedFaultBodyEvidenceInvalid"); }
+        try
+        {
+            using var stream = new MemoryStream(_image!, false);
+            using var image = new PEReader(stream);
+            var metadata = image.GetMetadataReader();
+            var framework = _compilation.GetSpecialType(SpecialType.System_Int32).ContainingAssembly.Identity;
+            var bodies = ImmutableArray.CreateBuilder<CompilerTaskEmittedFaultBody>();
+            foreach (var token in inventory.MethodTokens)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var definition = metadata.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(token));
+                var body = image.GetMethodBody(definition.RelativeVirtualAddress);
+                if (ValidateSourceBody(metadata, body, framework, cancellation) is { } failure)
+                { return new(null, failure); }
+                ImmutableArray<byte> code = [.. body.GetILBytes()!];
+                var scan = CompilerTaskPrimitiveIlScanner.Scan(code, cancellation);
+                if (scan.Instructions is not { } instructions)
+                { return new(null, scan.UnknownReason); }
+                var operands = ImmutableArray.CreateBuilder<CompilerTaskEmittedArrayTypeOperand>();
+                foreach (var instruction in instructions)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    if (instruction.OpCode == 0x8d)
+                    {
+                        operands.Add(new(instruction.Offset, instruction.Operand,
+                            CompilerTaskEmittedArrayElementKind.FrameworkInt32, framework.ToString()));
+                    }
+                }
+                bodies.Add(new(token, code, WorkerProtocolJson.ComputeSha256(code), operands.ToImmutable()));
+            }
+            return new(new(callableId, inventory.ModuleSha256, shapes.CompilerIdentity,
+                plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), bodies.ToImmutable()), null);
+        }
+        catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or InvalidOperationException or OverflowException)
+        { return new(null, "TaskEmittedFaultBodyEmissionInvalid"); }
+    }
+
     // No source calls, constructors, fields, casts, unboxing or handlers. This
-    // emitted-body fact still requires a separately reviewed runtime helper and
-    // unwind model before it can establish physical trace frames or byte costs.
-    // It inspects compiler-emitted IL; it is not an independent IL verifier.
+    // emitted-body fact still needs a reviewed runtime helper/unwind model.
+    // The shared lexical scan is not an independent IL verifier.
     internal static string? ValidateSourceBody(MetadataReader metadata, MethodBodyBlock body,
         AssemblyIdentity framework, CancellationToken cancellation)
     {
@@ -65,145 +115,22 @@ internal sealed class CompilerTaskCarrierCollector
         cancellation.ThrowIfCancellationRequested();
         if (!body.ExceptionRegions.IsEmpty)
         { return "TaskSourceBodyHandlingUnsupported"; }
-        var code = body.GetILBytes();
-        if (code is null || code.Length is 0 or > 4096)
+        var bytes = body.GetILBytes();
+        if (bytes is null)
         { return "TaskSourceBodyInstructionUnsupported"; }
-        var cursor = 0;
-        var last = "";
         try
         {
-            while (cursor < code.Length)
+            var scan = CompilerTaskPrimitiveIlScanner.Scan([.. bytes], cancellation, token =>
+                FrameworkType(metadata, MetadataTokens.EntityHandle(token), "System", "Int32", framework)
+                    ? null : "TaskSourceBodyArrayTypeUnsupported");
+            if (scan.Instructions is not null)
+            { return null; }
+            return scan.UnknownReason switch
             {
-                cancellation.ThrowIfCancellationRequested();
-                if (!CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction))
-                { return "TaskSourceBodyInstructionUnsupported"; }
-                last = instruction.RawCode;
-                switch (last)
-                {
-                    case "Call":
-                    case "Callvirt":
-                    case "Calli":
-                        return "TaskSourceBodyCallUnsupported";
-                    case "Newarr":
-                        if (!FrameworkType(metadata, MetadataTokens.EntityHandle(checked((int)instruction.Operand)), "System", "Int32", framework))
-                        { return "TaskSourceBodyArrayTypeUnsupported"; }
-                        break;
-                    case "Nop":
-                    case "Ret":
-                    case "Dup":
-                    case "Pop":
-                    case "Ldnull":
-                    case "Ldarg":
-                    case "Ldarg_s":
-                    case "Ldarg_0":
-                    case "Ldarg_1":
-                    case "Ldarg_2":
-                    case "Ldarg_3":
-                    case "Ldloc":
-                    case "Ldloc_s":
-                    case "Ldloc_0":
-                    case "Ldloc_1":
-                    case "Ldloc_2":
-                    case "Ldloc_3":
-                    case "Stloc":
-                    case "Stloc_s":
-                    case "Stloc_0":
-                    case "Stloc_1":
-                    case "Stloc_2":
-                    case "Stloc_3":
-                    case "Starg":
-                    case "Starg_s":
-                    case "Ldc_i4":
-                    case "Ldc_i4_s":
-                    case "Ldc_i4_m1":
-                    case "Ldc_i4_0":
-                    case "Ldc_i4_1":
-                    case "Ldc_i4_2":
-                    case "Ldc_i4_3":
-                    case "Ldc_i4_4":
-                    case "Ldc_i4_5":
-                    case "Ldc_i4_6":
-                    case "Ldc_i4_7":
-                    case "Ldc_i4_8":
-                    case "Add":
-                    case "Add_ovf":
-                    case "Add_ovf_un":
-                    case "Sub":
-                    case "Sub_ovf":
-                    case "Sub_ovf_un":
-                    case "Mul":
-                    case "Mul_ovf":
-                    case "Mul_ovf_un":
-                    case "Div":
-                    case "Div_un":
-                    case "Rem":
-                    case "Rem_un":
-                    case "Neg":
-                    case "Not":
-                    case "And":
-                    case "Or":
-                    case "Xor":
-                    case "Shl":
-                    case "Shr":
-                    case "Shr_un":
-                    case "Conv_i1":
-                    case "Conv_u1":
-                    case "Conv_i2":
-                    case "Conv_u2":
-                    case "Conv_i4":
-                    case "Conv_u4":
-                    case "Conv_ovf_i1":
-                    case "Conv_ovf_u1":
-                    case "Conv_ovf_i2":
-                    case "Conv_ovf_u2":
-                    case "Conv_ovf_i4":
-                    case "Conv_ovf_u4":
-                    case "Conv_ovf_i1_un":
-                    case "Conv_ovf_u1_un":
-                    case "Conv_ovf_i2_un":
-                    case "Conv_ovf_u2_un":
-                    case "Conv_ovf_i4_un":
-                    case "Conv_ovf_u4_un":
-                    case "Ceq":
-                    case "Clt":
-                    case "Clt_un":
-                    case "Cgt":
-                    case "Cgt_un":
-                    case "Br":
-                    case "Br_s":
-                    case "Brfalse":
-                    case "Brfalse_s":
-                    case "Brtrue":
-                    case "Brtrue_s":
-                    case "Beq":
-                    case "Beq_s":
-                    case "Bne_un":
-                    case "Bne_un_s":
-                    case "Bge":
-                    case "Bge_s":
-                    case "Bge_un":
-                    case "Bge_un_s":
-                    case "Bgt":
-                    case "Bgt_s":
-                    case "Bgt_un":
-                    case "Bgt_un_s":
-                    case "Ble":
-                    case "Ble_s":
-                    case "Ble_un":
-                    case "Ble_un_s":
-                    case "Blt":
-                    case "Blt_s":
-                    case "Blt_un":
-                    case "Blt_un_s":
-                    case "Ldlen":
-                    case "Ldelem_i4":
-                    case "Stelem_i4":
-                        break;
-                    default:
-                        return "TaskSourceBodyInstructionUnsupported";
-                }
-            }
-            return last == "Ret" ? null : "TaskSourceBodyInstructionUnsupported";
+                "TaskSourceBodyArrayTypeUnsupported" => "TaskSourceBodyArrayTypeUnsupported",
+                "TaskEmittedFaultBodyCallUnsupported" => "TaskSourceBodyCallUnsupported",
+                _ => "TaskSourceBodyInstructionUnsupported"
+            };
         }
         catch (Exception exception) when (exception is BadImageFormatException or ArgumentException or OverflowException)
         { return "TaskSourceBodyInstructionUnsupported"; }

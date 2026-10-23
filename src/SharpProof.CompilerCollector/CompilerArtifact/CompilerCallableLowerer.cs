@@ -89,7 +89,10 @@ internal sealed class CompilerCallableLowerer
                     {
                         RootExceptionBoundary = _taskCarriers.CaptureExceptionBoundary(target.Method, target.Entry.CallableId, cancellationToken),
                         CallbackActivations = _taskCarriers.CaptureCallbackActivations(target.Method, target.Entry.CallableId, cancellationToken),
-                        SourceBodies = _taskCarriers.CaptureSourceBodies(target.Method, target.Entry.CallableId, cancellationToken)
+                        SourceBodies = _taskCarriers.CaptureSourceBodies(target.Method, target.Entry.CallableId, cancellationToken),
+                        EmittedFaultBodies = target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes)
+                            ? _taskCarriers.CaptureEmittedFaultBodies(target.Method, target.Entry.CallableId, cancellationToken) : null
                     }
                 };
             }

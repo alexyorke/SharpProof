@@ -11,18 +11,38 @@ internal sealed partial class NativeResourceContractTests
 {
     private static readonly string[] BooleanCaseMetadataWitnesses = ["bcl.math.min.int32-int32", "bcl.math.max.int32-int32"];
 
-    [Test]
-    public async Task BooleanCasesPreserveMetadataDependenciesFromBothBranches()
+    [TestCase("LoopBodyEntries", 0, 0, 0, 0)]
+    [TestCase("ArrayAllocations", 1, 1, 1, 1)]
+    [TestCase("AllocatedElements", 1, 3, 2, 3)]
+    public async Task BooleanCasesPreserveMetadataDependenciesThroughConditionalCostDerivation(string metric,
+        int falseUpper, int trueUpper, int expectedUpper, int worstUpper)
     {
-        const string source = "using SharpProof.Attributes; public static class C { " +
-            "[ResourceUpperBound(ResourceMetric.AllocatedElements,0)] public static void Target(int n," +
-            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {int value=System.Math.Max(n,0);} " +
-            "else {int value=System.Math.Min(n,0);}} }";
-        var target = Read(CreateArtifact(source, reviewedRuntime: true));
+        ArgumentNullException.ThrowIfNull(metric);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound(ResourceMetric.{metric},{worstUpper})] public static void Target(int n," +
+            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {int value=System.Math.Max(n,0); var a=new long[3];} " +
+            "else {int value=System.Math.Min(n,0); var a=new byte[1];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var token = TestContext.CurrentContext.CancellationToken;
+        var unbound = NativeResourceExpectedVerifier.Verify(target.ResourceProgram!,
+            (ResourceCostMetric)Enum.Parse<WorkerResourceMetric>(metric), target.Entry.CallableId, target.Total!, null, token);
+        Assert.That(unbound.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+        Assert.That(unbound.ExpectedUpper, Is.Null);
+        var unboundBytes = NativeResourceAllocationVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId,
+            target.Total!, new("CoreCLR", "8.0.32", "x64", 8), token);
+        Assert.That(unboundBytes.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+        Assert.That(unboundBytes.ConditionalUpperBound, Is.Null);
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
-            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+            new WorkerBudgets(), token)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
+        var expected = result.ResourceBound!.Expected!;
+        Assert.That(expected.UnknownReason, Is.Null);
+        Assert.That(expected.FalseUpperBound, Is.EqualTo(falseUpper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(expected.TrueUpperBound, Is.EqualTo(trueUpper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(expected.UpperBound, Is.EqualTo(expectedUpper.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Assert.That(result.ProofCore, Does.Contain("resource-input-model:" + WorkerResourceModels.Expected));
         var dependencies = result.ResourceBound!.MetadataAssumptions;
+        Assert.That(dependencies, Has.Length.EqualTo(2));
         Assert.That(dependencies.Select(static dependency => dependency is null ? throw new ArgumentNullException(nameof(dependency)) :
             dependency.WitnessIdentifier), Is.EquivalentTo(BooleanCaseMetadataWitnesses));
         foreach (var dependency in dependencies)
@@ -30,6 +50,74 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
                 assumption.Id == dependency.AssumptionId).Used, Is.True);
         }
+    }
+
+    [Test]
+    public async Task CountMetadataCannotAuthorizeByteCostsOrProbabilityEvidence()
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,48)] public static void Target(int n," +
+            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {int value=System.Math.Max(n,0); var a=new long[3];} " +
+            "else {int value=System.Math.Min(n,0); var a=new byte[1];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var token = TestContext.CurrentContext.CancellationToken;
+        var metadata = new NativeResourceMetadataBinding(target);
+        var counts = NativeResourceProgramVerifier.Verify(target.ResourceProgram!, target.Entry.CallableId, target.Total!, metadata.Bind, token);
+        Assert.That(counts.Verified, Is.True, counts.UnknownReason);
+        var expected = NativeResourceExpectedVerifier.Verify(target.ResourceProgram!, ResourceCostMetric.AllocatedBytes,
+            target.Entry.CallableId, target.Total!, new("CoreCLR", "8.0.32", "x64", 8), metadata.Bind, token);
+        Assert.That(expected.UnknownReason, Is.EqualTo("ResourceExpectedConditionalCostUnproved"));
+        Assert.That(expected.Distribution, Is.Null);
+        Assert.That(expected.FalseUpper, Is.Null);
+        Assert.That(expected.TrueUpper, Is.Null);
+        Assert.That(expected.ExpectedUpper, Is.Null);
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), token)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.Expected, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
+    }
+
+    [TestCase("AllocatedElements", false)]
+    [TestCase("AllocatedElements", true)]
+    [TestCase("AllocatedBytes", false)]
+    [TestCase("AllocatedBytes", true)]
+    public async Task ConditionalCostsRequireOwnedMetadataDeclarationsAndReferenceEvidence(string metric, bool invalidReference)
+    {
+        ArgumentNullException.ThrowIfNull(metric);
+        var source = "using SharpProof.Attributes; public static class C { " +
+            $"[ResourceUpperBound(ResourceMetric.{metric},48)] public static void Target(int n," +
+            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {int value=System.Math.Max(n,0); var a=new long[3];} " +
+            "else {int value=System.Math.Min(n,0); var a=new byte[1];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        if (invalidReference)
+        {
+            var reference = target.Compilation.ResourceMetadataReferences[0];
+            target = target with
+            {
+                Compilation = target.Compilation with
+                {
+                    ResourceMetadataReferences =
+                target.Compilation.ResourceMetadataReferences.SetItem(0, reference with
+                {
+                    Modules =
+                    reference.Modules.SetItem(0, reference.Modules[0] with { Sha256 = "invalid" })
+                })
+                }
+            };
+        }
+        else
+        { target = target with { Entry = target.Entry with { Assumptions = [] } }; }
+        var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
+            new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(result.ResourceBound!.UnknownReason, Is.EqualTo("ResourceMetadataAssumptionsNotBound"));
+        Assert.That(result.ResourceBound.InferredUpperBound, Is.Null);
+        Assert.That(result.ResourceBound.Expected, Is.Null);
+        Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
+        Assert.That(result.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);
     }
 
     [TestCase("!selected", 7, 2, 6)]
@@ -108,6 +196,71 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(check.UnknownReason, Is.EqualTo("ResourceExpectedMetricUnsupported"));
         Assert.That(check.Distribution, Is.Null);
         Assert.That(check.ExpectedUpper, Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ExpectedBytesRequireACompatibleLayoutWithoutPartialProbabilityEvidence(bool incompatible)
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedBytes,48)] public static void Target(" +
+            "[ResourceBooleanInput(1,3)] bool selected) {if(selected) {var a=new long[3];} else {var a=new byte[1];}} }";
+        var target = Read(CreateArtifact(source, reviewedRuntime: true, x64: true));
+        var check = NativeResourceExpectedVerifier.Verify(target.ResourceProgram!, ResourceCostMetric.AllocatedBytes,
+            target.Entry.CallableId, target.Total!, incompatible ? new("CoreCLR", "8.0.32", "arm64", 8) : null,
+            TestContext.CurrentContext.CancellationToken);
+        Assert.That(check.UnknownReason, Is.EqualTo("ResourceExpectedConditionalCostUnproved"));
+        Assert.That(check.Distribution, Is.Null);
+        Assert.That(check.FalseUpper, Is.Null);
+        Assert.That(check.TrueUpper, Is.Null);
+        Assert.That(check.ExpectedUpper, Is.Null);
+        var projected = NativeResourceExpectedVerifier.Project(check);
+        Assert.That(projected.UnknownReason, Is.EqualTo(check.UnknownReason));
+        Assert.That(projected.UpperBound, Is.Null);
+        Assert.That(projected.InputOrdinal, Is.Null);
+        Assert.That(projected.TrueWeight, Is.Null);
+        Assert.That(projected.FalseWeight, Is.Null);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ExpectedCompositionBudgetPreservesWorstCaseCostsWithoutPartialProbabilityEvidence(bool exhausted)
+    {
+        const string source = "using SharpProof.Attributes; public static class C { " +
+            "[ResourceUpperBound(ResourceMetric.AllocatedElements,0)] public static void Target(int n," +
+            "[ResourceBooleanInput(1,3)] bool selected) {} }";
+        var target = Read(CreateArtifact(source));
+        var no = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var yes = no;
+        var reductions = ResourceExpression.MaximumDepth - (exhausted ? 3 : 4);
+        for (var index = 0; index < reductions; index++)
+        {
+            no = ResourceExpression.Difference(no, 1);
+            yes = ResourceExpression.Difference(yes, 2);
+        }
+        var program = ResourceProgram.WithDistribution(target.ResourceProgram!.Distribution!,
+            ResourceProgram.Array(no), ResourceProgram.Array(yes));
+        var token = TestContext.CurrentContext.CancellationToken;
+        program = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, token), token);
+        var worst = NativeResourceProgramVerifier.Verify(program, target.Entry.CallableId, target.Total!, token);
+        Assert.That(worst.Verified, Is.True, worst.UnknownReason);
+        Assert.That(worst.Cost!.Elements.Evaluate(_ => 300, token), Is.EqualTo(new BigInteger(300 - reductions)));
+        var check = NativeResourceExpectedVerifier.Verify(program, ResourceCostMetric.AllocatedElements,
+            target.Entry.CallableId, target.Total!, null, token);
+        if (exhausted)
+        {
+            Assert.That(check.UnknownReason, Is.EqualTo("ResourceExpectedProofBudgetExceeded"));
+            Assert.That(check.Distribution, Is.Null);
+            Assert.That(check.FalseUpper, Is.Null);
+            Assert.That(check.TrueUpper, Is.Null);
+            Assert.That(check.ExpectedUpper, Is.Null);
+        }
+        else
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            var weighted = 3 * (300 - reductions) + 300 - 2 * reductions;
+            Assert.That(check.ExpectedUpper!.Evaluate(_ => 300, token), Is.EqualTo(new BigInteger((weighted + 3) / 4)));
+        }
     }
 
     [TestCase(0, 1)]

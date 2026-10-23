@@ -38,6 +38,56 @@ public sealed class NativeResourceStackTests
         AssertBound(ResourceProgram.Activate(frame, ResourceProgram.Repeat(rank, ResourceRepeatKind.TailRecurrence, ResourceProgram.Zero)), depth, bytes);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void StackReuseRequiresAProvedCreditBudget(bool overflow)
+    {
+        var rank = new ResourceLoopRank(ResourceLoopKind.IncreasingAdd, ResourceExpression.Zero,
+            ResourceExpression.Literal(3), 1, 32, false);
+        var credit = new ResourceCreditShape(0, overflow ? int.MaxValue : 1, 32, false);
+        var prefix = ResourceProgram.Activate(Leaf, ResourceProgram.Zero);
+        var drain = ResourceProgram.Activate(Leaf, prefix);
+        var program = ResourceProgram.Activate(Root, ResourceProgram.CreditLoop(rank, credit, prefix, drain));
+        if (overflow)
+        {
+            var token = TestContext.CurrentContext.CancellationToken;
+            program = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, token), token);
+            var check = NativeResourceStackVerifier.Derive(program, token);
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ResourceCreditMayOverflow"));
+        }
+        else
+        { AssertBound(program, 3, 64); }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void StackCompositionBudgetCannotPublishOnlyDepthOrAPartialRetainedChain(bool exhausted)
+    {
+        var initial = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "n", int.MaxValue));
+        var reductions = ResourceExpression.MaximumDepth - (exhausted ? 4 : 5);
+        for (var index = 0; index < reductions; index++)
+        { initial = ResourceExpression.Difference(initial, 1); }
+        var rank = new ResourceLoopRank(ResourceLoopKind.DecreasingSubtract, initial, ResourceExpression.Zero, 2, 32, false);
+        var program = ResourceProgram.Activate(Root, ResourceProgram.Repeat(rank, ResourceRepeatKind.TailRecurrence,
+            ResourceProgram.Activate(Leaf, ResourceProgram.Zero)));
+        var token = TestContext.CurrentContext.CancellationToken;
+        program = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(program, token), token);
+        var check = NativeResourceStackVerifier.Derive(program, token);
+        if (exhausted)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ResourceStackProofBudgetExceeded"));
+        }
+        else
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            var count = (256 - reductions + 1) / 2;
+            Assert.That(check.Bounds!.Depth.Evaluate(_ => 256, token), Is.EqualTo(new System.Numerics.BigInteger(count + 2)));
+            Assert.That(check.Bounds.StorageBytes.Evaluate(_ => 256, token), Is.EqualTo(new System.Numerics.BigInteger(32 * (count + 1) + 16)));
+        }
+    }
+
     [TestCase(0, "ResourceStackRootActivationMissing")]
     [TestCase(1, "ResourceStackFrameStorageUnavailable")]
     [TestCase(2, "ResourceStackCallSemanticsUnsupported")]
