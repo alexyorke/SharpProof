@@ -109,6 +109,25 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Field-store repair coverage checkpoint
+
+Published head `443b5b0e6` completed all 15 coverage shards successfully in run
+39898289211. Aggregate job 120237107068 failed the unchanged 100% changed-TCB
+floor: 7,152/7,287 lines, 98.15%, with 135 uncovered lines. The retained complete
+report is
+`artifacts/resource-443b-coverage-evidence/coverage/SharpProof.coverage.json`.
+Verified merge `9cfcd9d79e83e885e89d856dba0498810eaa8840` has the recorded
+master base and `443b5b0e6` as parents. The field-store repair changed the source
+coverage universe; this is not an unchanged-source gap comparison.
+
+Canonical CI (39898289224) and package consumers (39898289225) remain live at
+this checkpoint. The local recursive argument controls (`9c06e95a1`) are not
+measured by this report. The runtime proof-policy decision is still awaiting
+human input: explicit reported runtime assumptions versus derivation from a
+closed program entrypoint. No caller-stack or cold-initialization premise has
+been chosen on the user's behalf. Full runtime-byte composition, coverage
+closure and final audit remain open.
+
 ### Recursive non-rank argument admission controls
 
 Four source-level controls exercise the admitted tail recurrence with an integer
