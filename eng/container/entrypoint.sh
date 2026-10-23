@@ -285,6 +285,15 @@ set -e
 # Aggregate gates consume downloaded evidence owned by the runner. Export only
 # their new results, preserving the authenticated inputs and their ownership.
 case "${command_name}" in
+  package-consumers)
+    if [[ -n "${consumer_harness:-}" ]]; then
+      # The harness is an authenticated, runner-owned input. Export only the
+      # new qualification evidence, never overwrite the downloaded payload.
+      result_paths=(package-consumers/harness-results)
+    else
+      result_paths=(.)
+    fi
+    ;;
   package-partition-gate)
     result_paths=()
     ;;

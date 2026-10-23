@@ -1000,14 +1000,11 @@ try {
             Copy-Item -LiteralPath $trx.FullName -Destination (Join-Path $receiptRoot ($trx.Directory.Name + '-' + $trx.Name))
         }
         Assert-SharpProofPackagePartitionReceipt -Root $receiptRoot -Expected $partitionCases
-        $partitionPlan = Get-SharpProofPackagePartitionPlan
         ([ordered]@{
-            schemaVersion = 2; count = 4; index = $PackagePartition
-            assignmentVersion     = $partitionPlan.algorithm
-            durationCatalogSha256 = $partitionPlan.catalogSha256
-            commit                = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+            schemaVersion = 1; count = 4; index = $PackagePartition
+            commit   = (& git -C $repositoryRoot rev-parse HEAD).Trim()
             runId = [string]$env:GITHUB_RUN_ID; filter = $TestFilter
-            selected              = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
+            selected = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
         }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partitionEvidence 'package-partition.json') -Encoding utf8NoBOM
     }
     $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()

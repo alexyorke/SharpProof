@@ -143,7 +143,7 @@ jobs:
         run: >-
           docker compose run --rm tooling dev -lc
           'pwsh -NoLogo -NoProfile -File eng/scripts/Measure-SharpProofConsumerPerformance.ps1
-          -PackageSource nupkgs -Iterations 1'
+          -PackageSource nupkgs -Iterations 1 -OutputDirectory /tmp/sharpproof-consumer-performance'
 
       - name: Validate read-only doctor regressions
         run: >-

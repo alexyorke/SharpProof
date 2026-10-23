@@ -355,6 +355,8 @@ function Invoke-RepositoryGates {
         'Release SBOM and attestation policy regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofConsumerHarness.ps1' `
         'Consumer harness identity and result regressions failed.'
+    & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofConsumerHarnessLifecycle.sh')
+    if ($LASTEXITCODE -ne 0) { throw 'Consumer harness filesystem lifecycle regressions failed.' }
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofSemanticBuildPlan.ps1' `
         'Semantic build plan regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofPackageBuildPlan.ps1' `
