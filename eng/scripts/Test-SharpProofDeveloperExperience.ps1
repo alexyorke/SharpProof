@@ -11,13 +11,12 @@ Set-StrictMode -Version Latest
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
 Assert-SharpProofContainer 'Developer-experience qualification requires the canonical container.'
-if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$') {
+if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof(?:-preview)?@sha256:[a-f0-9]{64}$') {
     throw 'Supply the exact qualified consumer-image digest.'
 }
-[xml]$versionProps = Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/Versions.props') -Raw
-$prefix = [string]$versionProps.Project.PropertyGroup.SharpProofVersionPrefix
-$version = ([string]$versionProps.Project.PropertyGroup.SharpProofPackageVersion).Replace('$(SharpProofVersionPrefix)', $prefix)
+$version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $repositoryRoot
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -cnotmatch '^[a-f0-9]{40}$') { throw 'Developer-experience qualification requires a Git source identity.' }
 $runId = [Guid]::NewGuid().ToString('N')
@@ -31,6 +30,7 @@ $status = 'failed'
 $toolPackageMode = if ([string]::IsNullOrWhiteSpace($ToolPackageSource)) { 'packed-in-run' } else { 'qualified-artifact' }
 $qualifiedToolSha256 = $null
 $fixtureRoot = $null
+$consumerInputNames = @('Native.csproj', 'Counter.cs', 'compose.yaml', 'Directory.Build.props', 'global.json', 'NuGet.config', '.config/dotnet-tools.json', '.github/workflows/sharpproof.yml', 'README.md', '.gitignore')
 $previousDeveloperNugetPackages = $env:NUGET_PACKAGES
 function Run([string]$Name, [string]$Executable, [string[]]$Arguments, [int]$Expected = 0) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -71,6 +71,39 @@ function Save-Reports([string]$Source, [string]$Phase) {
         if (Test-Path -LiteralPath $report -PathType Leaf) { Copy-Item -LiteralPath $report -Destination $destination -Force }
         elseif ($name -ne 'result.sarif') { throw "Required verification evidence is missing: $name." }
     }
+}
+function Get-TemplateSnapshot([string]$Directory) {
+    return (@(Get-ChildItem -LiteralPath $Directory -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
+                [IO.Path]::GetRelativePath($Directory, $_.FullName) + "`t" + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            }) -join "`n")
+}
+function Assert-InitializerPlan([string]$Phase, [string]$Directory, [bool]$Apply, [bool]$ExpectUnchanged) {
+    $plan = Get-Content -LiteralPath (Join-Path $evidenceRoot "$Phase.log") -Raw | ConvertFrom-Json
+    $files = @($plan.generatedFiles)
+    if ($plan.command -cne 'init' -or $plan.exitCode -ne 0 -or $files.Count -lt 3) { throw 'The initializer did not return the expected file plan.' }
+    $prefix = [IO.Path]::GetFullPath($Directory) + [IO.Path]::DirectorySeparatorChar
+    foreach ($file in $files) {
+        if (-not ([IO.Path]::GetFullPath([string]$file.path)).StartsWith($prefix, [StringComparison]::Ordinal) -or
+            [bool]$file.written -ne ($Apply -and [bool]$file.changed) -or ($ExpectUnchanged -and [bool]$file.changed)) {
+            throw 'Initializer planning escaped the generated template, wrote during preview, or failed to remain idempotent.'
+        }
+    }
+}
+function Test-TemplateInitializer([string]$Variant, [string]$Directory, [string]$Project, [string]$ToolPath) {
+    $arguments = @('init', '--project', $Project, '--verification', $Variant, '--format', 'json')
+    if ($Variant -ceq 'container') { $arguments += @('--consumer-image', $ConsumerImage) }
+    $original = Get-TemplateSnapshot $Directory
+    Run "init-preview-$Variant" $ToolPath $arguments
+    Assert-InitializerPlan "init-preview-$Variant" $Directory $false $false
+    if ((Get-TemplateSnapshot $Directory) -cne $original) { throw 'Initializer preview changed generated template files.' }
+    Run "init-apply-$Variant" $ToolPath @($arguments + '--apply')
+    Assert-InitializerPlan "init-apply-$Variant" $Directory $true $false
+    $initialized = Get-TemplateSnapshot $Directory
+    Run "init-repeat-preview-$Variant" $ToolPath $arguments
+    Assert-InitializerPlan "init-repeat-preview-$Variant" $Directory $false $true
+    Run "init-reapply-$Variant" $ToolPath @($arguments + '--apply')
+    Assert-InitializerPlan "init-reapply-$Variant" $Directory $true $true
+    if ((Get-TemplateSnapshot $Directory) -cne $initialized) { throw 'Reapplying initialization changed an already initialized template.' }
 }
 try {
     # The caller builds the solution, including the internal analyzer, first.
@@ -123,14 +156,34 @@ try {
         '-ConsumerImage', $ConsumerImage, '-RepositoryCommit', $sourceCommit)
     $editorArchive = [IO.Compression.ZipFile]::OpenRead((Join-Path $feed "SharpProof.CodeFixes.$version.nupkg"))
     try {
-        if (@($editorArchive.Entries | Where-Object FullName -CEQ 'analyzers/dotnet/cs/SharpProof.CodeFixes.dll').Count -ne 1) {
-            throw 'The optional editor package does not contain its code-fix assembly.'
+        foreach ($asset in @('analyzers/dotnet/cs/SharpProof.CodeFixes.dll', 'analyzers/dotnet/cs/SharpProof.EditorSuggestions.dll', 'buildTransitive/SharpProof.CodeFixes.props')) {
+            if (@($editorArchive.Entries | Where-Object FullName -CEQ $asset).Count -ne 1) {
+                throw "The optional editor package must contain exactly one $asset."
+            }
+        }
+        $markerEntry = $editorArchive.GetEntry('buildTransitive/SharpProof.CodeFixes.props')
+        $markerReader = [IO.StreamReader]::new($markerEntry.Open())
+        try { [xml]$marker = $markerReader.ReadToEnd() }
+        finally { $markerReader.Dispose() }
+        $defaults = $marker.SelectNodes('/Project/PropertyGroup/SharpProofEditorSuggestions')
+        $visible = $marker.SelectNodes('/Project/ItemGroup/CompilerVisibleProperty[@Include="SharpProofEditorSuggestions"]')
+        if ($defaults.Count -ne 1 -or $defaults[0].InnerText -cne 'true' -or $visible.Count -ne 1) {
+            throw 'The optional editor package must enable and expose its suggestion marker exactly once.'
         }
         if (@($editorArchive.Entries | Where-Object FullName -Like '*Microsoft.CodeAnalysis*.dll').Count -ne 0) {
             throw 'Editor-host Roslyn assemblies must not be bundled into the analyzer package.'
         }
     }
     finally { $editorArchive.Dispose() }
+    foreach ($id in @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) {
+        $coreArchive = [IO.Compression.ZipFile]::OpenRead((Join-Path $feed "$id.$version.nupkg"))
+        try {
+            if (@($coreArchive.Entries | Where-Object { [IO.Path]::GetFileName($_.FullName) -in @('SharpProof.EditorSuggestions.dll', 'SharpProof.CodeFixes.props') }).Count -ne 0) {
+                throw 'Core packages must not ship the optional suggestion analyzer or its enabling marker.'
+            }
+        }
+        finally { $coreArchive.Dispose() }
+    }
     if ($PackOnly) { $status = 'passed'; return }
     $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) "sharpproof-dx-$runId"
     [void][IO.Directory]::CreateDirectory($fixtureRoot)
@@ -154,8 +207,9 @@ try {
         $project = Join-Path $destination "$name.csproj"
         [xml]$generatedProject = Get-Content -LiteralPath $project -Raw
         $references = @($generatedProject.Project.ItemGroup.PackageReference)
-        if ($references.Count -ne 1 -or $references[0].Include -cne 'SharpProof' -or $references[0].Version -cne $version) {
-            throw 'The starter must reference the exact qualified SharpProof facade package.'
+        if ($references.Count -ne 2 -or @($references | Where-Object { $_.Include -ceq 'SharpProof' -and $_.Version -ceq $version }).Count -ne 1 -or
+            @($references | Where-Object { $_.Include -ceq 'SharpProof.CodeFixes' -and $_.Version -ceq $version -and $_.PrivateAssets -ceq 'all' }).Count -ne 1) {
+            throw 'The starter must reference the exact qualified facade and optional default editor package.'
         }
         $expectedVerification = if ($variant -eq 'container') { 'true' } else { 'false' }
         $expectedProfile = if ($variant -eq 'container') { 'strict' } else { 'advisory' }
@@ -165,6 +219,7 @@ try {
             $generatedProject.Project.PropertyGroup.LangVersion -cne '13.0') {
             throw 'The template selected the wrong verification policy or compiler configuration.'
         }
+        Test-TemplateInitializer $variant $destination $project $tool
         Run "build-$variant" 'dotnet' @('build', $project, '-c', 'Release', '--configfile', $nugetConfig)
         Run "evaluate-$variant" 'dotnet' @('msbuild', $project, '-nologo', '-getProperty:SharpProofVerify,SharpProofProfile,TargetFramework,LangVersion')
         $evaluated = Get-Content -LiteralPath (Join-Path $evidenceRoot "evaluate-$variant.log") -Raw | ConvertFrom-Json
@@ -209,11 +264,11 @@ try {
     Copy-Item -LiteralPath $exportRoot -Destination (Join-Path $evidenceRoot 'exported-regression') -Recurse
     $testProject = Join-Path $exportRoot 'SharpProof.Regression.csproj'
     $beforeResults = Join-Path $evidenceRoot 'regression-before'
-    Run 'regression-fails-before-fix' 'dotnet' @('test', $testProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $beforeResults) 1
+    Run 'regression-fails-before-fix' 'dotnet' @('test', $testProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $beforeResults, "-p:RestoreConfigFile=$nugetConfig") 1
     Assert-RegressionResult $beforeResults 'Failed'
     [IO.File]::WriteAllText($sourcePath, $original, [Text.UTF8Encoding]::new($false))
     $afterResults = Join-Path $evidenceRoot 'regression-after'
-    Run 'regression-passes-after-fix' 'dotnet' @('test', $testProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $afterResults)
+    Run 'regression-passes-after-fix' 'dotnet' @('test', $testProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $afterResults, "-p:RestoreConfigFile=$nugetConfig")
     Assert-RegressionResult $afterResults 'Passed'
     Run 'verify-fixed-consumer' 'dotnet' @('build', $nativeProject, '-c', 'Release', '--no-restore')
     Save-Reports $resultRoot 'fixed'
@@ -244,15 +299,20 @@ try {
     [xml]$standardTestXml = Get-Content -LiteralPath $standardTestProject -Raw
     if ($standardTestXml.Project.PropertyGroup.TargetFramework -cne 'net8.0') { throw 'A netstandard library needs a runnable NUnit host.' }
     $standardResults = Join-Path $evidenceRoot 'regression-standard'
-    Run 'standard-library-test-fails' 'dotnet' @('test', $standardTestProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $standardResults) 1
+    Run 'standard-library-test-fails' 'dotnet' @('test', $standardTestProject, '-c', 'Release', '--logger', 'trx', '--results-directory', $standardResults, "-p:RestoreConfigFile=$nugetConfig") 1
     Assert-RegressionResult $standardResults 'Failed'
+    Run 'workspace-template' 'pwsh' @('-NoLogo', '-NoProfile', '-File', (Join-Path $PSScriptRoot 'Test-SharpProofWorkspaceTemplates.ps1'),
+        '-PackagePath', (Join-Path $feed "SharpProof.Templates.$version.nupkg"), '-PackageVersion', $version,
+        '-ConsumerImage', $ConsumerImage, '-SourceRevision', $sourceCommit, '-NuGetConfig', $nugetConfig, '-OutputDirectory', (Join-Path $evidenceRoot 'workspace'))
     Run 'doctor-missing-project' $tool @('doctor', '--project', (Join-Path $fixtureRoot 'missing.csproj')) 2
     Run 'export-existing-directory' $tool @('export-test', '--project', $nativeProject, '--result', $resultPath, '--claim', $claim, '--output', $exportRoot) 2
     # Export only fixture source and reports, never compiler intermediates or tool caches.
     $retained = Join-Path $evidenceRoot 'consumer'
     [void][IO.Directory]::CreateDirectory($retained)
-    foreach ($name in @('Native.csproj', 'Counter.cs', 'compose.yaml', 'Directory.Build.props', 'global.json')) {
-        Copy-Item -LiteralPath (Join-Path $native $name) -Destination $retained
+    foreach ($name in $consumerInputNames) {
+        $destination = Join-Path $retained $name
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
+        Copy-Item -LiteralPath (Join-Path $native $name) -Destination $destination
     }
     Copy-Item -LiteralPath $resultRoot -Destination (Join-Path $retained 'evidence') -Recurse
     $status = 'passed'
@@ -264,9 +324,13 @@ finally {
         $nativeFixture = Join-Path $fixtureRoot 'Native'
         $retainedFixture = Join-Path $evidenceRoot 'consumer'
         [void][IO.Directory]::CreateDirectory($retainedFixture)
-        foreach ($name in @('Native.csproj', 'Counter.cs', 'compose.yaml', 'Directory.Build.props', 'global.json')) {
+        foreach ($name in $consumerInputNames) {
             $fixtureInput = Join-Path $nativeFixture $name
-            if (Test-Path -LiteralPath $fixtureInput -PathType Leaf) { Copy-Item -LiteralPath $fixtureInput -Destination $retainedFixture -Force }
+            if (Test-Path -LiteralPath $fixtureInput -PathType Leaf) {
+                $destination = Join-Path $retainedFixture $name
+                [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
+                Copy-Item -LiteralPath $fixtureInput -Destination $destination -Force
+            }
         }
         $reports = Join-Path $nativeFixture 'artifacts/sharpproof'
         if (Test-Path -LiteralPath $reports -PathType Container) {

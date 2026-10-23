@@ -111,7 +111,7 @@ public sealed class CompanionCoverageTests
     [Test]
     public async Task RefactoringAndRepairDeclineWhenGeneratedSourceCannotCompile()
     {
-        const string source = "public class Outer<T> { public class Nested { } } public class Api { private class Hidden { } private Outer<Hidden>.Nested Read() => throw new System.NotImplementedException(); }";
+        const string source = "public class System { } public interface Api { int Read(); }";
         using var workspace = new AdhocWorkspace();
         var document = CreateDocument(workspace, source);
         Assert.That(await CompilerErrorsAsync(document), Is.Empty);

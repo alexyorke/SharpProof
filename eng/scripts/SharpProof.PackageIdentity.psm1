@@ -1,5 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
 
 New-Variable -Scope Script -Name SharpProofPackageIds -Option ReadOnly -Value (
     [System.Collections.Immutable.ImmutableArray]::CreateRange[string](
@@ -101,7 +102,7 @@ function Get-SharpProofPackageIdentity {
         $repositoryCommit = $repository.GetAttribute('commit')
         if ($RequireRepository -and
             ($repositoryType -ne 'git' -or
-            $repositoryUrl -ne 'https://github.com/alexyorke/SharpProof' -or
+            $repositoryUrl -cne (Get-SharpProofExpectedRepositoryUrl) -or
             $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$')) {
             throw "Package '$Path' has invalid repository metadata."
         }

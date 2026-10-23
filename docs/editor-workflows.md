@@ -2,11 +2,27 @@
 
 SharpProof's portable analyzer provides editor diagnostics when the editor's Roslyn host meets the [support boundary](preview-support.md). Native verification runs at build time, not on every keystroke. Automated Roslyn workspace tests cover code-fix behavior; this is not certification of every IDE/version or extension combination.
 
+The next private preview requires real Windows x64 acceptance in a stable .NET
+10-capable Visual Studio, VS Code with the Microsoft C# extension, and Rider. All
+three remain unqualified until the exact candidate passes the
+[interactive acceptance runbook](editor-acceptance.md). Record actual editor/compiler
+versions and retained action previews; a command-line SDK does not qualify an IDE.
+
 ## Safe fixes
 
 The packaged SP0024 code fix can correct the type argument of `Contract.Result<T>()` to the enclosing method's return type inside an `Ensures` clause, when it can identify the actual SharpProof contract API. Preview the diff and rebuild. It does not establish the postcondition's truth. Fix All uses the same eligible change across its selected scope. It must not add assumptions, weaken a predicate, or move contract clauses to manufacture success.
 
 The code-fix assembly is a design-time payload so command-line compilation does not acquire Roslyn Workspaces dependencies. If an editor offers no fix, check the actual diagnostic and editor compiler-host compatibility. A supported command-line SDK alone does not establish the editor's Roslyn version.
+
+The optional matching `SharpProof.CodeFixes` package also supplies the informational
+SPED0001 suggestion, **Generate SharpProof contract companion**. It exposes the action
+through diagnostic UI as well as the existing refactoring. Reference the package with
+`PrivateAssets="all"`; removing it removes this optional suggestion. Generation and
+missing-member repair have no Fix All, retain throwing placeholders, and decline
+ambiguous/incompatible or source-generated edits. They do not infer valid contracts.
+The diagnostic suggestion also declines cross-file partial types; the existing
+explicit refactoring can handle compatible cross-file partials. Missing a suggestion
+on an ineligible shape is different from an eligible action failing to load.
 
 ## Repository tasks
 

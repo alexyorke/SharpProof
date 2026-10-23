@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <DefineConstants>$(DefineConstants);SHARPPROOF_EDITOR_INPUTS;SHARPPROOF_EDITOR_SUGGESTIONS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+    <Compile Include="../SharpProof.CodeFixes/CompanionEligibility.cs" Link="CompanionEligibility.cs" />
+    <Compile Include="../SharpProof.CodeFixes/CompanionSuggestionContract.cs" Link="CompanionSuggestionContract.cs" />
+    <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

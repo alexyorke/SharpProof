@@ -9,6 +9,12 @@
   "preferNameDirectory": true,
   "tags": { "language": "C#", "type": "project" },
   "symbols": {
+    "editor": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "description": "Include the matching optional SharpProof.CodeFixes editor package."
+    },
     "verification": {
       "type": "parameter",
       "datatype": "choice",
@@ -21,20 +27,34 @@
     {
       "source": "./",
       "target": "./",
-      "exclude": ["portable/**", "container/**", "**/bin/**", "**/obj/**", ".template.config/**"],
+      "exclude": ["portable/**", "container/**", "portable-editor/**", "container-editor/**", "workspace/**", "**/bin/**", "**/obj/**", ".template.config/**"],
       "rename": { "global.json.template": "global.json" }
     },
     {
       "source": "./portable/",
       "target": "./",
       "condition": "(verification == \"portable\")",
+      "modifiers": [{ "condition": "(editor)", "exclude": ["SharpProofStarter.csproj.template"] }],
       "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj" }
     },
     {
       "source": "./container/",
       "target": "./",
       "condition": "(verification == \"container\")",
+      "modifiers": [{ "condition": "(editor)", "exclude": ["SharpProofStarter.csproj.template"] }],
       "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj", "compose.yaml.template": "compose.yaml", "Directory.Build.props.template": "Directory.Build.props" }
+    },
+    {
+      "source": "./portable-editor/",
+      "target": "./",
+      "condition": "(verification == \"portable\" && editor)",
+      "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj" }
+    },
+    {
+      "source": "./container-editor/",
+      "target": "./",
+      "condition": "(verification == \"container\" && editor)",
+      "rename": { "SharpProofStarter.csproj.template": "SharpProofStarter.csproj" }
     }
   ]
 }

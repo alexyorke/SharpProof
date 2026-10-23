@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -40,7 +41,8 @@ public sealed class NUnitExportCoverageTests
             Assert.That(project.Descendants("TargetFramework").Single().Value, Is.EqualTo(testFramework));
             Assert.That(project.Descendants("IsTestProject").Single().Value, Is.EqualTo("true"));
             Assert.That(project.Descendants("ManagePackageVersionsCentrally").Single().Value, Is.EqualTo("false"));
-            Assert.That(reference.Attribute("Include")!.Value, Is.EqualTo(fixture.ProjectPath));
+            Assert.That(reference.Attribute("Include")!.Value, Is.EqualTo("../Consumer/Consumer.csproj"));
+            Assert.That(Path.GetFullPath(Path.Combine(fixture.OutputPath, reference.Attribute("Include")!.Value)), Is.EqualTo(fixture.ProjectPath));
             Assert.That(reference.Attribute("AdditionalProperties")!.Value, Is.EqualTo("SharpProofProfile=advisory;SharpProofVerify=false"));
             Assert.That(project.Descendants("PackageReference").Select(static item =>
                 (item ?? throw new ArgumentNullException(nameof(item))).Attribute("Include")!.Value),
@@ -78,6 +80,26 @@ public sealed class NUnitExportCoverageTests
         Assert.That(generated, Does.Contain("global::@Api.@Run()").And.Not.Contain("_argument"));
         AssertNoCompilerErrors(fixture.Compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Assert).Assembly.Location))
             .AddSyntaxTrees(CSharpSyntaxTree.ParseText(generated)));
+    }
+
+    [Test]
+    public async Task ProjectReferencesTreatMsBuildMetacharactersAsLiteralPathCharacters()
+    {
+        using var fixture = new ExportFixture(projectDirectoryName: "Consumer;With%3B$(Missing)@(Items)' spaces");
+        await fixture.ExportAsync(TestContext.CurrentContext.CancellationToken);
+        var projectPath = Path.Combine(fixture.OutputPath, "SharpProof.Regression.csproj");
+        var project = XDocument.Load(projectPath);
+        var include = project.Descendants("ProjectReference").Single().Attribute("Include")!.Value;
+        Assert.That(include, Is.EqualTo("../Consumer%3BWith%253B%24%28Missing%29%40%28Items%29%27 spaces/Consumer.csproj"));
+        var evaluation = await ToolProcess.RunAsync("dotnet", fixture.Root, TestContext.CurrentContext.CancellationToken,
+            "msbuild", projectPath, "-nologo", "-getItem:ProjectReference");
+        Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
+        using var document = JsonDocument.Parse(evaluation.Output);
+        var references = document.RootElement.GetProperty("Items").GetProperty("ProjectReference");
+        Assert.That(references.GetArrayLength(), Is.EqualTo(1));
+        Assert.That(references[0].GetProperty("FullPath").GetString(), Is.EqualTo(fixture.ProjectPath));
+        Assert.That(references[0].GetProperty("Identity").GetString(),
+            Is.EqualTo(Path.GetRelativePath(fixture.OutputPath, fixture.ProjectPath).Replace(Path.DirectorySeparatorChar, '/')));
     }
 
     [TestCase("directory")]
@@ -432,7 +454,7 @@ public sealed class NUnitExportCoverageTests
     internal sealed class ExportFixture : IDisposable
     {
         private static readonly Lazy<ImmutableArray<CompilerReferenceSnapshot>> ReferenceSnapshots = new(CaptureReferences);
-        internal string Root { get; } = Path.Combine(Path.GetTempPath(), "sharpproof-nunit-export-" + Guid.NewGuid().ToString("N"));
+        internal string Root { get; }
         internal string ProjectPath { get; }
         internal string SourcePath { get; }
         internal string OutputPath { get; set; }
@@ -456,12 +478,15 @@ public sealed class NUnitExportCoverageTests
             set => Response.ClaimResults = [value ?? throw new ArgumentNullException(nameof(value))];
         }
 
-        internal ExportFixture(string source = DefaultSource, string targetFramework = "net8.0", string methodName = "Run")
+        internal ExportFixture(string source = DefaultSource, string targetFramework = "net8.0", string methodName = "Run",
+            string? root = null, string projectDirectoryName = "Consumer")
         {
             ArgumentException.ThrowIfNullOrEmpty(source);
             ArgumentException.ThrowIfNullOrEmpty(targetFramework);
             ArgumentException.ThrowIfNullOrEmpty(methodName);
-            var directory = Path.Combine(Root, "Consumer");
+            ArgumentException.ThrowIfNullOrEmpty(projectDirectoryName);
+            Root = root ?? Path.Combine(Path.GetTempPath(), "sharpproof-nunit-export-" + Guid.NewGuid().ToString("N"));
+            var directory = Path.Combine(Root, projectDirectoryName);
             Directory.CreateDirectory(directory);
             ProjectPath = Path.Combine(directory, "Consumer.csproj");
             SourcePath = Path.Combine(directory, "Api.cs");

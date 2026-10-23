@@ -148,6 +148,21 @@ A companion cannot target itself. Point it at the distinct interface or class wh
 
 Companion relationships must be acyclic. Remove the reported cycle; otherwise the relationship cannot provide an effective contract source.
 
+## Optional editor diagnostics
+
+The matching optional `SharpProof.CodeFixes` package supplies SPED0001 at Info severity
+by default: **Generate SharpProof contract companion**. It is authoring assistance,
+not a failed proof or an inferred contract. Omitting that package omits the suggestion.
+
+The suggestion admits eligible source class/interface/record declarations with
+ordinary methods and no companion, while declining generated source and cross-file
+partial candidates. The existing explicit refactoring can still handle compatible
+cross-file partials. Applying the action previews ordinary attributed source with
+reviewable signatures and throwing placeholders; no assumptions or clauses are guessed.
+Companion generation/repair has no Fix All. See the
+[editor guide](editor-workflows.md) and pending
+[interactive qualification](editor-acceptance.md).
+
 ## Worker reporting
 
 The launcher reports each claim's typed outcome, reason, and vacuity. The verifier policy decides whether incomplete selected analysis is allowed, warned, or rejected; assumption policy separately governs declared user assumptions and trusted boundaries. Infrastructure failures remain failures.

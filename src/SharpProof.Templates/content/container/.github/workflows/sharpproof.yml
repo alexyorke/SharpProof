@@ -1,17 +1,31 @@
 name: SharpProof
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      initialize-baseline:
+        description: Initialize the first baseline on the default branch
+        type: boolean
+        default: false
 permissions:
   contents: read
+  actions: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - run: docker compose pull verify
-      - run: docker compose run --rm verify build SharpProofStarter.csproj
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: sharpproof-evidence
-          path: artifacts/sharpproof/
-          if-no-files-found: error
+    if: ${{ github.event_name != 'push' || github.ref_name == github.event.repository.default_branch }}
+    uses: alexyorke/SharpProof/.github/workflows/sharpproof-consumer.yml@__SHARPPROOF_SOURCE_REVISION__
+    with:
+      project: SharpProofStarter.csproj
+      image: __SHARPPROOF_CONSUMER_IMAGE__
+      workflow-revision: __SHARPPROOF_SOURCE_REVISION__
+      caller-workflow: .github/workflows/sharpproof.yml
+      compose-file: compose.yaml
+      service: verify
+      mode: report
+      initialize-baseline: ${{ github.event_name == 'workflow_dispatch' && inputs.initialize-baseline || false }}
+      registry-username: ${{ github.actor }}
+      package-feed-url: https://nuget.pkg.github.com/alexyorke/index.json
+    secrets:
+      container-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}
+      package-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}

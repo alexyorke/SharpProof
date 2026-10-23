@@ -1,0 +1,5 @@
+**/bin/
+**/obj/
+artifacts/
+.sharpproof-obj/
+.sharpproof-bin/

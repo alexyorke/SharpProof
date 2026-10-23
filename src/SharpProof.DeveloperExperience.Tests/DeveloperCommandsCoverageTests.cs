@@ -242,10 +242,15 @@ internal sealed class DeveloperCommandsCoverageTests
         Assert.That(Directory.Exists(destination), Is.False);
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task RecordedScalarRefutationExportsThroughValidatedTransportOnlyWhileSourceStillMatches(bool changeSource)
+    [TestCase(false, "default")]
+    [TestCase(true, "default")]
+    [TestCase(false, "json")]
+    [TestCase(false, "markdown")]
+    [TestCase(false, "workspace-json")]
+    [TestCase(false, "workspace-invalid-xml")]
+    public async Task RecordedScalarRefutationExportsThroughValidatedTransportOnlyWhileSourceStillMatches(bool changeSource, string format)
     {
+        ArgumentNullException.ThrowIfNull(format);
         using var export = new NUnitExportCoverageTests.ExportFixture();
         using var recorded = new StoredEvidenceFixture(includeMetadata: false);
         var span = export.Claim.Location;
@@ -288,25 +293,50 @@ internal sealed class DeveloperCommandsCoverageTests
         if (changeSource)
         { await File.AppendAllTextAsync(export.SourcePath, "\n// Source changed after the recorded verification.\n", TestContext.CurrentContext.CancellationToken); }
 
-        var run = await RunAsync("export-test", "--project", export.ProjectPath, "--result", recorded.ResultPath,
-            "--claim", claim.ClaimId, "--output", export.OutputPath);
-        if (changeSource)
+        var workspace = format.StartsWith("workspace-", StringComparison.Ordinal);
+        var malformedWorkspace = format == "workspace-invalid-xml";
+        if (workspace)
+        {
+            WorkspaceExportTests.Configure(export);
+            if (malformedWorkspace)
+            { await File.WriteAllTextAsync(Path.Combine(export.Root, "Directory.Build.props"), "<broken", TestContext.CurrentContext.CancellationToken); }
+        }
+        var arguments = new List<string>
+        {
+            "export-test", "--project", export.ProjectPath, "--result", recorded.ResultPath,
+            "--claim", claim.ClaimId, "--output", export.OutputPath
+        };
+        if (workspace)
+        { arguments.AddRange(["--workspace", export.Root, "--format", "json"]); }
+        else if (format != "default")
+        { arguments.AddRange(["--format", format]); }
+        var run = await RunAsync([.. arguments]);
+        if (changeSource || malformedWorkspace)
         {
             Assert.That(run.ExitCode, Is.EqualTo(2));
             Assert.That(run.Output, Is.Empty);
-            Assert.That(run.Error, Does.Contain("Source changed since verification"));
+            Assert.That(run.Error, Does.Contain(malformedWorkspace ? "Workspace Directory.Build.props must be valid XML." : "Source changed since verification"));
             Assert.That(Directory.Exists(export.OutputPath), Is.False);
         }
         else
         {
             Assert.That(run.ExitCode, Is.Zero, run.Error);
             Assert.That(run.Error, Is.Empty);
-            Assert.That(run.Output, Does.Contain("NUnit regression project exported.").And.Contain("Consumer code was not executed."));
+            Assert.That(run.Output, Does.Contain("NUnit regression project exported").And.Contain("Consumer code was not executed"));
+            if (format == "json" || workspace)
+            {
+                using var document = JsonDocument.Parse(run.Output);
+                Assert.That(document.RootElement.GetProperty("command").GetString(), Is.EqualTo("export-test"));
+                Assert.That(document.RootElement.GetProperty("exitCode").GetInt32(), Is.Zero);
+                Assert.That(document.RootElement.GetProperty("generatedFiles").GetArrayLength(), Is.EqualTo(workspace ? 3 : 2));
+            }
+            else if (format == "markdown")
+            { Assert.That(run.Output, Does.Contain("## Generated files")); }
             var generated = await File.ReadAllTextAsync(Path.Combine(export.OutputPath, "Regression.cs"), TestContext.CurrentContext.CancellationToken);
             var project = XDocument.Load(Path.Combine(export.OutputPath, "SharpProof.Regression.csproj"));
             Assert.That(generated, Does.Contain("global::@Api.@Run(_argument0)").And.Contain("_sharpProofResult")
                 .And.Contain("The original postcondition must hold.").And.Not.Contain("Contract.Result"));
-            Assert.That(project.Descendants("ProjectReference").Single().Attribute("Include")!.Value, Is.EqualTo(export.ProjectPath));
+            Assert.That(project.Descendants("ProjectReference").Single().Attribute("Include")!.Value, Is.EqualTo(Path.GetRelativePath(export.OutputPath, export.ProjectPath).Replace(Path.DirectorySeparatorChar, '/')));
             var compilation = export.Compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Assert).Assembly.Location))
                 .AddSyntaxTrees(CSharpSyntaxTree.ParseText(generated));
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>

@@ -7,6 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $sourceRoot = Join-Path $repositoryRoot 'src/SharpProof.Templates/content'
 $destinationRoot = [IO.Path]::GetFullPath($Destination).TrimEnd([IO.Path]::DirectorySeparatorChar)
@@ -29,7 +30,7 @@ Assert-ArtifactPath $resolvedNuspec
 if ($resolvedNuspec -ceq $destinationRoot -or $resolvedNuspec.StartsWith($destinationRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal)) {
     throw 'The generated nuspec must stay outside the prepared template content.'
 }
-if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$') {
+if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof(?:-preview)?@sha256:[a-f0-9]{64}$') {
     throw 'SharpProofConsumerImage must identify the qualified consumer image by immutable GHCR digest.'
 }
 $sdk = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'global.json') -Raw | ConvertFrom-Json).sdk.version
@@ -39,6 +40,7 @@ $nuspec.package.metadata.version = $PackageVersion
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[a-f0-9]{40}$') { throw 'Template packaging requires a Git source identity.' }
 $nuspec.package.metadata.repository.SetAttribute('commit', $commit)
+$nuspec.package.metadata.repository.SetAttribute('url', (Get-SharpProofExpectedRepositoryUrl))
 function Add-PackageFile([string]$Source, [string]$Target) {
     $entry = $nuspec.CreateElement('file')
     $entry.SetAttribute('src', $Source)
@@ -51,7 +53,8 @@ foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Force |
     $target = Join-Path $destinationRoot $relative
     [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
     $text = [IO.File]::ReadAllText($file.FullName).Replace('__SHARPPROOF_VERSION__', $PackageVersion).
-    Replace('__SHARPPROOF_SDK__', [string]$sdk).Replace('__SHARPPROOF_CONSUMER_IMAGE__', $ConsumerImage)
+    Replace('__SHARPPROOF_SDK__', [string]$sdk).Replace('__SHARPPROOF_CONSUMER_IMAGE__', $ConsumerImage).
+    Replace('__SHARPPROOF_SOURCE_REVISION__', $commit)
     [IO.File]::WriteAllText($target, $text, [Text.UTF8Encoding]::new($false))
     $relativeDirectory = [IO.Path]::GetDirectoryName($relative).Replace('\', '/')
     Add-PackageFile $target ('content/' + $relativeDirectory)

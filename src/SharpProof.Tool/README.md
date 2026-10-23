@@ -1,15 +1,27 @@
-# Optional SharpProof diagnostics tool
+# Optional SharpProof developer tool
 
 The normal `SharpProof` PackageReference already enables build verification. This
-tool is optional and does not add a package reference to your application.
-Install the matching version from your configured feed; public package availability
-is not implied by this checkout. Create a tool manifest only if the repository does
-not already contain one. Teammates restore it with `dotnet tool restore`.
+tool is optional. Its read-only commands inspect setup and stored evidence; `init`
+can apply a reviewed setup plan, and `export-test` writes a new regression project.
+Neither command runs verification or executes consumer code.
+
+Install the matching version from your configured feed. The official
+`1.0.0-preview.1` path is the private `alexyorke/SharpProof-preview` release, with
+NuGet source `https://nuget.pkg.github.com/alexyorke/index.json` and initial owner-only
+access. Configure the named `SharpProofPreview` source and read-only credentials
+through your credential provider or process environment; do not commit credentials.
+Publication and real-editor qualification are pending, and public CI validation
+versions are distinct from official private-preview artifacts.
+
+Generated templates already pin the matching local tool: use `dotnet tool restore`.
+For an existing project, create a manifest only if one does not already exist, then
+install the matching tool. Teammates restore that manifest with `dotnet tool restore`.
 
 ```sh
 dotnet new tool-manifest
 dotnet tool install SharpProof.Tool --version 1.0.0-preview.1
 dotnet sharpproof doctor
+dotnet sharpproof doctor --json
 dotnet sharpproof explain obj/Debug/net10.0/SharpProof/result.json
 dotnet sharpproof explain path/to/result.json --file src/Example.cs --line 12 --json
 ```
@@ -36,6 +48,33 @@ proven. Invalid syntax, malformed/missing evidence, and failed SDK discovery exi
 Results can contain private paths, contracts, and counterexample values; review
 them before sharing. This tool never rewrites results or runs verification.
 
+Initialize a supported existing SDK-style project with a preview-first plan:
+
+```sh
+dotnet sharpproof init --project MyLibrary.csproj --verification portable
+dotnet sharpproof init --project MyLibrary.csproj --verification portable --apply
+```
+
+Portable is the default; omit `--apply` to leave files unchanged. The plan pins
+the public facade, private editor reference, and local tool to the installed tool's
+version and configures the credential-free private feed. It may reuse ancestor
+NuGet/tool/central-version files, so review every listed path. Conflicting versions,
+ambiguous imports/settings, inline feed credentials, or linked targets are rejected.
+Initialization does not restore, build, pull images, or rewrite the selected SDK.
+
+Container setup uses the following syntax:
+
+```text
+dotnet sharpproof init --project MyLibrary.csproj --verification container --consumer-image <qualified-image> [--apply]
+```
+
+Supply the exact SHA-256 reference from the private receipt, such as
+`ghcr.io/alexyorke/sharpproof-preview@sha256:<64-lowercase-hex-digits>`; a compatible
+existing pinned Compose file may supply it instead. Canonical
+`ghcr.io/alexyorke/sharpproof@sha256:<digest>` references remain accepted for compatible
+existing setups. Mutable tags and other registries are not accepted. Preview the
+Compose/output-isolation/evidence plan before applying it.
+
 Project-aware setup checks are available with
 `dotnet sharpproof doctor --project MyLibrary.csproj --verification portable`.
 Use `--verification container` for the starter's canonical container configuration.
@@ -47,6 +86,19 @@ to use the same container-owned assets, package feeds, and SDK as the consumer b
 It evaluates a trusted project's MSBuild imports without invoking build targets and
 does not restore, build, pull images, or run verification. Exit 1 means a setup check
 failed; it does not replace the SDK-only `doctor [--json]` mode.
+
+Named-option `init`, `doctor --project`, `explain --result`, `compare`, and `export-test`
+accept `--format text|json|markdown`, defaulting to text:
+
+```sh
+dotnet sharpproof doctor --project MyLibrary.csproj --format json
+dotnet sharpproof explain --result artifacts/sharpproof/result.json --format markdown
+```
+
+JSON/Markdown output is one document on stdout, including setup/regression status 1.
+Invalid arguments or evidence return 2 with stderr only and empty stdout. Legacy
+`doctor [--json]` and positional `explain <result.json> ... [--json]` retain their
+existing JSON syntax and scope; their options do not change to `--format`.
 
 The commands below require a complete matching evidence set: the result plus sibling
 `request.json` and `compiler-manifest.json`. Override companion paths with `--request`
@@ -70,12 +122,32 @@ on a public synchronous static method without type parameters. It requires match
 source/reference hashes, supported scalar expressions, and source recorded with C# 13
 or earlier. It writes source without executing consumer code or enabling runtime
 contracts. Keep the test project outside the consumer's source tree, and run it in a
-canonical container workspace exposing both project paths. A container export needs a
-writable mounted parent and a new output child, and export/test must retain the same
-absolute project-reference paths. See the
-[developer tools guide](../../docs/developer-experience.md) for supported frameworks,
-export limits, and the expected failing-then-passing regression workflow.
+canonical container workspace exposing both project paths. All exports now use a
+relative `ProjectReference`; preserve the directory relationship when moving them.
+The output must be new and outside the consumer project directory, its parent must
+exist, and cross-filesystem-root references are rejected.
+
+For the generated `sharpproof-workspace` layout, export from its root through the
+existing service:
+
+```sh
+docker compose run --rm verify tool run dotnet-sharpproof -- export-test --project src/app/MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --workspace . --output tests/MyLibrary.Regression
+docker compose run --rm verify test tests/MyLibrary.Regression/SharpProof.Regression.csproj
+```
+
+Workspace mode requires the project, new output, and remapped source inputs inside the
+root, with the compatible pinned Linux amd64 Compose service and isolated outputs.
+It emits a regression README using that service, without copying credentials or
+creating another image/Compose definition. Move the whole workspace together;
+captured input hashes still apply while exporting. The generated assertion should
+fail before the implementation fix and pass afterward, followed by a fresh strict
+consumer build. See the
+[developer tools guide](https://github.com/alexyorke/SharpProof/blob/master/docs/developer-experience.md)
+for supported frameworks, exact layout, and export limits.
 
 For these evidence commands, exit 0 means processing completed, and exit 2 means invalid
 arguments/evidence or unsupported export. Cancellation exits 130. Stored evidence does
 not establish current source freshness or authenticate an arbitrary worker binary.
+The private preview's publication, signed receipt, and Visual Studio stable/VS Code
+C#/Rider Windows x64 interactive acceptance remain pending. Installation or a successful
+diagnostic command does not establish any of those release/host results.

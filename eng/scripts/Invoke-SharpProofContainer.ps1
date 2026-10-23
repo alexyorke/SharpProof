@@ -353,6 +353,10 @@ function Invoke-RepositoryGates {
         'Embedded symbol package regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
         'Release SBOM and attestation policy regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseConfiguration.ps1' `
+        'Release configuration regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofFuzzCampaignRegression.ps1' `
+        'Fuzz campaign budget and evidence regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofConsumerHarness.ps1' `
         'Consumer harness identity and result regressions failed.'
     & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofConsumerHarnessLifecycle.sh')

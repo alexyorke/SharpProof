@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "sharpproof.tool": {
+      "version": "__SHARPPROOF_VERSION__",
+      "commands": ["dotnet-sharpproof"],
+      "rollForward": false
+    }
+  }
+}

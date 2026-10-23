@@ -50,6 +50,7 @@ signedness
 sigstore
 slnx
 spcf
+spki
 sshfs
 syft
 tmpfs
