@@ -109,6 +109,53 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Replay reference-assignment identity repair
+
+A new replay control reproduced an incorrect lifetime result without a field
+store. The valid program keeps a 32-byte array alive through an alias while a
+40-byte array is allocated, then compares the alias and returns. Its peak and
+cumulative source-owned storage are both 72 bytes. Replacing only the alias
+observation with null or a scalar of the declared reference type was accepted
+and incorrectly reduced the reported peak to 40 bytes. Both failures are
+retained in `artifacts/resource-alias-observation-numeric-red.log`; the valid
+control passed in the same run.
+
+Replay now validates observation kinds and checks reference-assignment identity
+against IR reference flow before changing live roots. Allocations, aliases and
+reference-field stores maintain an independent identity map. The shared
+reference resolver preserves supported reference casts and recorded field reads;
+fresh owned fields can resolve their initial null value. Inconsistent values
+return `MemoryReplayValueUnsupported` instead of publishing a storage envelope.
+The earlier receiver-observation controls now reject at assignment, before the
+field-store guard.
+
+All 236 memory trace/replay/graph tests passed, including the reproduction and
+explicit cast/field-read preservation controls
+(`artifacts/resource-alias-observation-preservation-tests.log`). The earlier
+corrected selection passed 232 tests
+(`artifacts/resource-alias-observation-green-tests.log`). Formatting copied zero
+changes (`artifacts/resource-alias-observation-final-format.log`). All 1,058
+native-resource/protocol worker tests passed
+(`artifacts/resource-alias-observation-worker-tests.log`), and the acceptance
+contract/defaults test passed
+(`artifacts/resource-alias-observation-acceptance-tests.log`). Lint and
+documentation checks passed; final prose is checked again before commit.
+
+The preceding published head `f8f4863f6` passed canonical CI (39893627722) and
+package consumers (39893627719). All 15 coverage shards passed (39893627629),
+but the aggregate gate failed the unchanged 100% changed-TCB floor:
+7,124/7,257 lines, 98.17%, with 133 uncovered lines. The retained report is
+`artifacts/resource-f8f4-coverage-evidence/coverage/SharpProof.coverage.json`.
+Its merge commit `ab747ed60a257fcb8da9bfe9230d986eaee7d9d0` has the recorded
+master base and `f8f4863f6` as parents. These results precede this production
+repair and do not qualify the next head.
+
+Response cache 64 invalidates older replay results. Defaults tests, the acceptance
+contract and living compatibility documentation are coordinated. Protocol 43,
+manifest 6, nested projection 11 and outer artifact 55 are unchanged. The runtime
+proof-policy choice, full task-runtime byte model, coverage closure and final
+audit remain open.
+
 ### Reference-alias witness ownership controls
 
 Four replay controls execute the same owned object/array program and alter only

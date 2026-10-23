@@ -496,8 +496,8 @@ internal static class ResourceMemoryProgram
         }
     }
 
-    private static bool TryReference(IrTerm term, IrFactory factory, Dictionary<IrVarId, int> values, out int identity, int depth = 0,
-        Dictionary<(int Receiver, IrMemberId Field), int>? fields = null)
+    internal static bool TryReference(IrTerm term, IrFactory factory, Dictionary<IrVarId, int> values, out int identity, int depth = 0,
+        Dictionary<(int Receiver, IrMemberId Field), int>? fields = null, HashSet<int>? ownedObjects = null, bool referenceCasts = false)
     {
         term = ArgumentNullGuard.NotNull(term, nameof(term));
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -505,14 +505,22 @@ internal static class ResourceMemoryProgram
         identity = 0;
         if (depth > 32)
         { return false; }
-        if (term is IrCastTerm cast && (cast.Type == factory.ObjectType || cast.Type == cast.Operand.Type))
-        { return TryReference(cast.Operand, factory, values, out identity, depth + 1, fields); }
+        if (term is IrCastTerm cast && (cast.Type == factory.ObjectType || cast.Type == cast.Operand.Type ||
+            referenceCasts && factory.GetTypeInfo(cast.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String &&
+            factory.GetTypeInfo(cast.Operand.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+        { return TryReference(cast.Operand, factory, values, out identity, depth + 1, fields, ownedObjects, referenceCasts); }
         if (term is IrStringTerm text && factory.GetString(text.Value).Length == 0)
         { identity = EmptyStringIdentity; return true; }
         if (fields != null && term is IrOpaqueTerm { Receiver: { } owner, Arguments.IsEmpty: true } read &&
             IrFieldSites.IsFieldRead(factory, term) &&
-            TryReference(owner, factory, values, out var receiver, depth + 1, fields) && receiver != 0)
-        { return fields.TryGetValue((receiver, read.Member), out identity); }
+            TryReference(owner, factory, values, out var receiver, depth + 1, fields, ownedObjects, referenceCasts) && receiver != 0)
+        {
+            if (fields.TryGetValue((receiver, read.Member), out identity))
+            { return true; }
+            // A freshly owned object has null reference fields until a store.
+            var member = factory.GetMemberInfo(read.Member);
+            return ownedObjects != null && ownedObjects.Contains(receiver) && !member.IsStatic && member.ParameterTypes.IsEmpty;
+        }
         return term is IrNullTerm || term is IrVariableTerm variable && values.TryGetValue(variable.Variable, out identity);
     }
 

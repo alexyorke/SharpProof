@@ -349,6 +349,101 @@ public sealed class ResourceMemoryReplayTests
         }
     }
 
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void ReferenceCastsAndStoredFieldAliasesKeepTheirExpectedIdentity(bool fieldRead, bool corrupt)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
+        factory.RegisterClosedClassReferenceType(node, null);
+        factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", node);
+        builder.Allocate(entry, factory.CreateOperation(), node, root);
+        var resultType = fieldRead ? array : node;
+        var alias = factory.CreateVariable("alias", resultType);
+        IrTerm source;
+        if (fieldRead)
+        {
+            var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, IrFieldSites.Prefix + "child", array, false);
+            var child = factory.CreateVariable("child", array);
+            builder.Allocate(entry, factory.CreateOperation(), array, child, factory.Integer(1));
+            var receiver = factory.Cast(factory.ObjectType, factory.Variable(root));
+            builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field, receiver, field, factory.Variable(child));
+            source = factory.PureOpaque(field, receiver);
+        }
+        else
+        {
+            var view = factory.CreateVariable("view", factory.ObjectType);
+            builder.Assign(entry, factory.CreateOperation(), view, factory.Cast(factory.ObjectType, factory.Variable(root)));
+            source = factory.Cast(node, factory.Variable(view));
+        }
+        var assigned = builder.Assign(entry, factory.CreateOperation(), alias, source);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(alias));
+        var check = MutatedReplay(builder.Build(), (instruction, value) =>
+        {
+            ArgumentNullException.ThrowIfNull(instruction);
+            return corrupt && ReferenceEquals(instruction, assigned) ? factory.CreateNullValue(resultType) : value;
+        });
+        if (corrupt)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayValueUnsupported"));
+        }
+        else
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Bounds, Is.EqualTo(fieldRead ? new ResourceMemoryBounds(56, 56, 24, 24, 32, 32) :
+                new ResourceMemoryBounds(24, 24, 0, 0, 24, 24)));
+        }
+    }
+
+    [TestCase("valid")]
+    [TestCase("null")]
+    [TestCase("scalar")]
+    public void AliasObservationsCannotReducePeakStorageBeforeAReferenceComparison(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var array = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var root = factory.CreateVariable("root", array);
+        var alias = factory.CreateVariable("alias", array);
+        var temporary = factory.CreateVariable("temporary", array);
+        var comparison = factory.CreateVariable("comparison", factory.BooleanType);
+        builder.Allocate(entry, factory.CreateOperation(), array, root, factory.Integer(1));
+        var assigned = builder.Assign(entry, factory.CreateOperation(), alias, factory.Variable(root));
+        builder.Allocate(entry, factory.CreateOperation(), array, temporary, factory.Integer(3));
+        builder.Assign(entry, factory.CreateOperation(), comparison,
+            factory.Binary(IrBinaryOperator.Equal, factory.Variable(alias), factory.Null(array)));
+        builder.Return(entry, factory.CreateOperation());
+        var check = MutatedReplay(builder.Build(), (instruction, value) =>
+        {
+            ArgumentNullException.ThrowIfNull(instruction);
+            if (!ReferenceEquals(instruction, assigned))
+            { return value; }
+            return mutation switch
+            {
+                "valid" => value,
+                "null" => factory.CreateNullValue(array),
+                "scalar" => new IrValue(array, IrValueKind.Boolean, true),
+                _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+            };
+        });
+        if (mutation == "valid")
+        { Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(72, 72, 72, 72, 0, 0))); }
+        else
+        {
+            Assert.That(check.Bounds?.PeakAuxiliaryUpper, Is.Null);
+            Assert.That(check.UnknownReason, Is.Not.Null.And.Not.Empty);
+        }
+    }
+
     [TestCase("valid")]
     [TestCase("null")]
     [TestCase("boolean")]
@@ -397,7 +492,7 @@ public sealed class ResourceMemoryReplayTests
         else
         {
             Assert.That(check.Bounds, Is.Null);
-            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayFieldStoreUnsupported"));
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayValueUnsupported"));
         }
     }
 

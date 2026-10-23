@@ -90,6 +90,8 @@ internal sealed class ResourceMemoryReplay
         var identities = new List<IrValue>();
         var slots = new Dictionary<IrVarId, int>();
         var actualValues = new Dictionary<IrVarId, IrValue>();
+        var referenceValues = new Dictionary<IrVarId, int>();
+        var referenceFields = new Dictionary<(int Receiver, IrMemberId Field), int>();
         var objects = new HashSet<int>();
         var fieldSlots = new Dictionary<IrMemberId, int>();
         var pendingCaptures = new Dictionary<int, IrMemberId>();
@@ -117,6 +119,7 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown(textFootprint.UnknownReason ?? "MemoryReplayStringAllocationUnsupported"); }
                     if (value.String.Length == 0)
                     {
+                        referenceValues[textTarget] = ResourceMemoryProgram.EmptyStringIdentity;
                         events.Add(new(ResourceMemoryEventKind.BindRoot, 0, Slot(textTarget, slots), ResourceMemoryProgram.EmptyStringIdentity));
                         liveRoots.Add(textTarget);
                         break;
@@ -124,6 +127,7 @@ internal sealed class ResourceMemoryReplay
                     if (Find(value, identities) != 0)
                     { return Unknown("MemoryReplayStringAllocationUnsupported"); }
                     identities.Add(value);
+                    referenceValues[textTarget] = identities.Count;
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(textTarget, slots), 0, textLower, textUpper));
                     liveRoots.Add(textTarget);
                     break;
@@ -171,6 +175,7 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown(objectFootprint.UnknownReason ?? "MemoryReplayAllocationUnsupported"); }
                     identities.Add(value);
                     actualValues[objectTarget] = value;
+                    referenceValues[objectTarget] = identities.Count;
                     objects.Add(identities.Count);
                     if (capturedField is { } requiredCapture)
                     { pendingCaptures.Add(identities.Count, requiredCapture); }
@@ -209,21 +214,28 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown(footprint.UnknownReason ?? "MemoryReplayAllocationUnsupported"); }
                     identities.Add(value);
                     actualValues[target] = value;
+                    referenceValues[target] = identities.Count;
                     events.Add(new(ResourceMemoryEventKind.Allocate, identities.Count, Slot(target, slots), 0, lower, upper));
                     liveRoots.Add(target);
                     break;
                 case IrAssignInstruction assigned:
                     if (value == null || value.Type != factory.GetVariableInfo(assigned.Target).Type)
                     { return Unknown("MemoryReplayValueUnsupported"); }
-                    actualValues[assigned.Target] = value;
+                    if (!ObservedKindMatches(factory.GetTypeInfo(value.Type).Kind, value.Kind))
+                    { return Unknown("MemoryReplayValueUnsupported"); }
                     if (value.Kind is IrValueKind.Sequence or IrValueKind.Reference or IrValueKind.String or IrValueKind.Null)
                     {
                         var identity = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
                         if (value.Kind != IrValueKind.Null && identity == 0)
                         { return Unknown("MemoryReplayBorrowedReference"); }
+                        if (!ResourceMemoryProgram.TryReference(assigned.Value, factory, referenceValues, out var expected,
+                            fields: referenceFields, ownedObjects: objects, referenceCasts: true) || identity != expected)
+                        { return Unknown("MemoryReplayValueUnsupported"); }
+                        referenceValues[assigned.Target] = identity;
                         events.Add(new(ResourceMemoryEventKind.BindRoot, 0, Slot(assigned.Target, slots), identity));
                         liveRoots.Add(assigned.Target);
                     }
+                    actualValues[assigned.Target] = value;
                     break;
                 case IrWriteInstruction { IsFieldStore: true, IsStore: true, Index: null, Length: null } stored:
                     if (stored.Target == null || stored.Field is not { } field || value == null ||
@@ -252,6 +264,7 @@ internal sealed class ResourceMemoryReplay
                         }
                         if (!fieldSlots.TryGetValue(field, out var fieldSlot))
                         { fieldSlot = fieldSlots.Count; fieldSlots.Add(field, fieldSlot); }
+                        referenceFields[(receiver, field)] = child;
                         events.Add(new(ResourceMemoryEventKind.StoreReference, receiver, fieldSlot, child));
                     }
                     break;
@@ -281,6 +294,19 @@ internal sealed class ResourceMemoryReplay
             { return Unknown("MemoryReplayBudgetExceeded"); }
         }
         return Unknown("MemoryReplayIncomplete");
+    }
+
+    private static bool ObservedKindMatches(IrTypeKind type, IrValueKind value)
+    {
+        return type switch
+        {
+            IrTypeKind.Boolean => value == IrValueKind.Boolean,
+            IrTypeKind.Integer => value == IrValueKind.Integer,
+            IrTypeKind.String => value is IrValueKind.String or IrValueKind.Null,
+            IrTypeKind.Sequence => value is IrValueKind.Sequence or IrValueKind.Null,
+            IrTypeKind.Reference => value is IrValueKind.Reference or IrValueKind.Sequence or IrValueKind.String or IrValueKind.Null,
+            _ => false
+        };
     }
 
     private static IrValue? ActualReference(IrTerm term, IrFactory factory, Dictionary<IrVarId, IrValue> values, int depth)
