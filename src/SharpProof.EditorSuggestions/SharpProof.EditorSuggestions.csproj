@@ -12,5 +12,6 @@
     <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
   </ItemGroup>
 </Project>

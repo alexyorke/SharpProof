@@ -1,3 +1,5 @@
+extern alias EditorSuggestionsAssembly;
+
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -13,7 +15,8 @@ using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 using SharpProof.CodeFixes;
-using CompanionSuggestionAnalyzer = SharpProof.EditorSuggestions.CompanionSuggestionAnalyzer;
+using CompanionSuggestionAnalyzer = EditorSuggestionsAssembly::SharpProof.EditorSuggestions.CompanionSuggestionAnalyzer;
+using SuggestionInputValidation = EditorSuggestionsAssembly::SharpProof.Internal.CodeFixInputValidation;
 
 namespace SharpProof.DeveloperExperience.Tests;
 
@@ -23,6 +26,7 @@ public sealed class CompanionSuggestionTests
     [TestCase("public interface Api { int Read(int value); }")]
     [TestCase("public static class Api { public static int Read(int value) => value; }")]
     [TestCase("#nullable enable\npublic interface Api<T> where T : class? { T? Read(ref int receiver); U? Echo<U>(in U value) where U : class?; }")]
+    [TestCase("public interface Api<T> where T : System.IDisposable { T Read(); }")]
     public async Task SuggestionGeneratesASeparateCompanionAndClearsTheDiagnostic(string source)
     {
         ArgumentException.ThrowIfNullOrEmpty(source);
@@ -65,6 +69,8 @@ public sealed class CompanionSuggestionTests
     [TestCase("public class Outer { public interface Api { void Read(); } }")]
     [TestCase("public interface Api<T> { T Echo<T>(T value); }")]
     [TestCase("public unsafe interface Api { int* Read(); }")]
+    [TestCase("public interface Api<T> where T : allows ref struct { void Read(); }")]
+    [TestCase("public interface Api { void Read([System.Diagnostics.CodeAnalysis.UnscopedRef] out int value); }")]
     [TestCase("#nullable enable\npublic interface Api { string? Read();\n#nullable disable\nstring Other(); }")]
     [TestCase("public interface Api { void Read(); } public static class ApiContracts { }")]
     [TestCase("public interface Api { void Read(); } [SharpProof.Attributes.ContractFor(typeof(Api))] public static class Existing { }")]
@@ -216,6 +222,18 @@ public sealed class CompanionSuggestionTests
             Assert.That(rule.DefaultSeverity, Is.EqualTo(DiagnosticSeverity.Info));
             Assert.That(new SharpProofAnalyzer().SupportedDiagnostics.Select(static descriptor =>
                 (descriptor ?? throw new ArgumentNullException(nameof(descriptor))).Id), Does.Not.Contain("SPED0001"));
+        }
+    }
+
+    [Test]
+    public void AnalyzerInputGuardsIdentifyTheMissingArgument()
+    {
+        var missingContext = Assert.Throws<ArgumentNullException>(new Action(() => new CompanionSuggestionAnalyzer().Initialize(null!)));
+        var invalidName = Assert.Throws<ArgumentException>(new Action(() => SuggestionInputValidation.Require(new object(), " ")));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(missingContext!.ParamName, Is.EqualTo("context"));
+            Assert.That(invalidName!.ParamName, Is.EqualTo("parameterName"));
         }
     }
 

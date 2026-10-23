@@ -1,6 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
+# A forced dependency reload removes helper commands already imported by callers.
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 
 New-Variable -Scope Script -Name SharpProofPackageIds -Option ReadOnly -Value (
     [System.Collections.Immutable.ImmutableArray]::CreateRange[string](

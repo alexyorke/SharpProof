@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Assert-SharpProofContainer 'Release configuration regressions require the canonical Linux container.'
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 
 $environmentNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
         'SHARPPROOF_CI_PACKAGE_VERSION', 'SHARPPROOF_PRIVATE_PREVIEW',
@@ -71,6 +71,99 @@ try {
     [IO.File]::WriteAllText($versionPath, $versionFixture, [Text.UTF8Encoding]::new($false))
     Assert-ReleaseFixtureValue -Actual (Get-SharpProofEffectivePackageVersion -RepositoryRoot $fixture) `
         -Expected '2.3.4-preview.9' -Name 'first XML values across repeated properties and groups'
+    # Fresh processes reproduce the real root/dependency imports, rather than
+    # inheriting helper bindings from this test's already imported module.
+    $compositionProbe = {
+        param([string]$ModuleRoot, [string]$VersionRoot, [string]$Order)
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        $releaseModule = Join-Path $ModuleRoot 'SharpProof.ReleaseConfiguration.psm1'
+        $packageModule = Join-Path $ModuleRoot 'SharpProof.PackageIdentity.psm1'
+        $developerModule = Join-Path $ModuleRoot 'SharpProof.DeveloperPackageReproduction.psm1'
+        switch ($Order) {
+            'release-first' {
+                Import-Module $releaseModule
+                Import-Module $developerModule -Force
+            }
+            'dependency-first' {
+                Import-Module $developerModule -Force
+                Import-Module $releaseModule
+            }
+            'repeat-parents' {
+                Import-Module $releaseModule
+                Import-Module $packageModule
+                Import-Module $developerModule -Force
+                Import-Module $packageModule
+                Import-Module $developerModule -Force
+                Import-Module $releaseModule
+            }
+            'copied-dependency' {
+                Import-Module $releaseModule
+                Import-Module $developerModule -Force
+                $replica = Join-Path $VersionRoot 'copied-modules'
+                [IO.Directory]::CreateDirectory($replica) | Out-Null
+                foreach ($modulePath in @($releaseModule, $packageModule)) {
+                    Copy-Item -LiteralPath $modulePath -Destination $replica
+                }
+                # Reproducibility inspects package identities from each clone.
+                Import-Module (Join-Path $replica 'SharpProof.PackageIdentity.psm1') -Force
+            }
+            default { throw 'Unknown module composition fixture.' }
+        }
+        if ((Get-SharpProofEffectivePackageVersion -RepositoryRoot $VersionRoot) -cne '2.3.4-preview.9' -or
+            (Get-SharpProofExpectedRepositoryUrl) -cne 'https://github.com/alexyorke/SharpProof') {
+            throw 'Root release helpers were lost or changed after dependency imports.'
+        }
+        $feed = Join-Path $VersionRoot ('module-feed-' + $Order)
+        [IO.Directory]::CreateDirectory($feed) | Out-Null
+        function New-CompositionPackage([string]$Id, [string]$RepositoryUrl = 'https://github.com/alexyorke/SharpProof') {
+            $packagePath = Join-Path $feed ($Id + '.2.3.4-preview.9.nupkg')
+            [IO.File]::Delete($packagePath)
+            $archive = [IO.Compression.ZipFile]::Open($packagePath, [IO.Compression.ZipArchiveMode]::Create)
+            try {
+                $writer = [IO.StreamWriter]::new($archive.CreateEntry($Id + '.nuspec').Open())
+                try {
+                    $writer.Write('<package><metadata><id>' + $Id + '</id><version>2.3.4-preview.9</version><repository type="git" url="' +
+                        $RepositoryUrl + '" commit="' + ('a' * 40) + '" /></metadata></package>')
+                }
+                finally { $writer.Dispose() }
+                $payload = switch ($Id) {
+                    'SharpProof.Tool' { 'tools/net10.0/any/SharpProof.Tool.dll' }
+                    'SharpProof.CodeFixes' { 'analyzers/dotnet/cs/SharpProof.CodeFixes.dll' }
+                    'SharpProof.Templates' { 'content/container/compose.yaml.template' }
+                }
+                $writer = [IO.StreamWriter]::new($archive.CreateEntry($payload).Open())
+                try { $writer.Write('fixture') }
+                finally { $writer.Dispose() }
+            }
+            finally { $archive.Dispose() }
+        }
+        foreach ($id in @('SharpProof.Tool', 'SharpProof.CodeFixes', 'SharpProof.Templates')) { New-CompositionPackage $id }
+        $snapshot = Get-SharpProofDeveloperPackageSnapshot -PackageSource $feed -PackageVersion '2.3.4-preview.9' -RepositoryCommit ('a' * 40)
+        if ($snapshot.Archives.Count -ne 3 -or $snapshot.Payloads.Count -ne 6) {
+            throw 'Nested package/release helper calls lost their original composition.'
+        }
+        New-CompositionPackage 'SharpProof.Tool' -RepositoryUrl 'https://example.invalid/wrong'
+        $rejected = $false
+        try { $null = Get-SharpProofDeveloperPackageSnapshot -PackageSource $feed -PackageVersion '2.3.4-preview.9' -RepositoryCommit ('a' * 40) }
+        catch {
+            if (-not $_.Exception.Message.Contains('invalid repository metadata')) { throw }
+            $rejected = $true
+        }
+        if (-not $rejected) { throw 'Module composition weakened wrong-repository rejection.' }
+        if ((Get-SharpProofEffectivePackageVersion -RepositoryRoot $VersionRoot) -cne '2.3.4-preview.9') {
+            throw 'Nested identity validation removed the root version helper.'
+        }
+        Write-Output "Module composition passed: $Order"
+    }.ToString()
+    $compositionPath = Join-Path $fixture 'ReleaseModuleComposition.ps1'
+    [IO.File]::WriteAllText($compositionPath, $compositionProbe, [Text.UTF8Encoding]::new($false))
+    foreach ($compositionOrder in @('release-first', 'dependency-first', 'repeat-parents', 'copied-dependency')) {
+        $probeOutput = @(& pwsh -NoLogo -NoProfile -File $compositionPath -ModuleRoot $PSScriptRoot -VersionRoot $fixture -Order $compositionOrder 2>&1)
+        if ($LASTEXITCODE -ne 0) { throw ("Release module composition failed: $compositionOrder`n" + (($probeOutput | Select-Object -Last 12) -join "`n")) }
+        Write-Host ($probeOutput -join "`n")
+        $script:checks++
+    }
     foreach ($version in @('0.0.0-ci.42.1', '0.0.0-ci.9876543210.12')) {
         Set-ReleaseFixtureEnvironment -Values $emptyEnvironment.Add('SHARPPROOF_CI_PACKAGE_VERSION', $version)
         Assert-ReleaseFixtureValue -Actual (Get-SharpProofEffectivePackageVersion -RepositoryRoot $fixture) `

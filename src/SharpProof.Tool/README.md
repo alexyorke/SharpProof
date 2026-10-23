@@ -122,10 +122,12 @@ on a public synchronous static method without type parameters. It requires match
 source/reference hashes, supported scalar expressions, and source recorded with C# 13
 or earlier. It writes source without executing consumer code or enabling runtime
 contracts. Keep the test project outside the consumer's source tree, and run it in a
-canonical container workspace exposing both project paths. All exports now use a
-relative `ProjectReference`; preserve the directory relationship when moving them.
+canonical container workspace exposing both project paths. Exports use a relative
+`ProjectReference` where possible; preserve the directory relationship when moving
+them. Standalone Windows exports across drive roots retain the legacy absolute
+reference and do not gain that relocation behavior.
 The output must be new and outside the consumer project directory, its parent must
-exist, and cross-filesystem-root references are rejected.
+exist, and workspace mode requires contained paths with a relative project reference.
 
 For the generated `sharpproof-workspace` layout, export from its root through the
 existing service:

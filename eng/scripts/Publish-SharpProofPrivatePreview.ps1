@@ -7,6 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PrivatePreviewReleaseAssets.psm1') -Force
 & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1')
 $root = (Resolve-Path -LiteralPath $EvidenceDirectory).Path
 & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewEvidence.ps1') -EvidenceDirectory $root -ExpectedSourceCommit $env:SHARPPROOF_SOURCE_COMMIT -ExpectedWorkflowCommit $env:SHARPPROOF_CANDIDATE_WORKFLOW_COMMIT -ExpectedImageDigest $ExpectedImageDigest
@@ -115,6 +116,7 @@ try {
     & tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C $PromotionDirectory -cf $promotionBundle .
     if ($LASTEXITCODE -ne 0) { throw 'Cannot retain the authenticated promotion receipts.' }
     $assets = @($bundle, $promotionBundle, (Join-Path $root 'release-manifest.json'), (Join-Path $root 'release-manifest.sig'), (Join-Path $root 'SHA256SUMS'), (Join-Path $root 'packages.spdx.json')) + @($manifest.archives | ForEach-Object { Join-Path $root $_.fileName })
+    Assert-SharpProofPrivatePreviewReleaseAssetSizes -Paths $assets
     $existingTag = Read-PrivateJson 'https://api.github.com/repos/alexyorke/SharpProof-preview/git/ref/tags/v1.0.0-preview.1' -AllowMissing
     if ($null -ne $existingTag) {
         $target = $existingTag.object
@@ -181,6 +183,7 @@ try {
     # A rerun retains the original immutable release receipt. The new actual
     # execution audit remains in this run's private Actions artifact.
     $assets += $(if ($null -ne $release) { $originalFreshPath } else { $freshReceipt })
+    Assert-SharpProofPrivatePreviewReleaseAssetSizes -Paths $assets
     if ($null -eq $release) {
         & gh release create v1.0.0-preview.1 --repo alexyorke/SharpProof-preview --target $env:SHARPPROOF_SOURCE_COMMIT --prerelease --draft --title 'SharpProof 1.0.0-preview.1 private preview' --notes 'Private exact-source candidate; verify the pinned manifest signature before use.'
         if ($LASTEXITCODE -ne 0) { throw 'Cannot create private release receipt.' }

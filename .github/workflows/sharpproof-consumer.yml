@@ -60,32 +60,111 @@ permissions:
 
 jobs:
   authorize:
-    name: Require a trusted consumer event
+    name: Approve exact consumer and public helper commits
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      source-sha: ${{ steps.approve.outputs.source-sha }}
+      source-ref: ${{ steps.approve.outputs.source-ref }}
+      helper-sha: ${{ steps.approve.outputs.helper-sha }}
     steps:
-      - name: Reject fork and privileged-event secret access
+      - name: Authenticate event, run, and canonical public master ancestry
+        id: approve
         env:
+          GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
           INITIALIZE_BASELINE: ${{ inputs.initialize-baseline }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, re, urllib.error, urllib.request
           from pathlib import Path
+
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+
+          def api(route):
+              request = urllib.request.Request('https://api.github.com/' + route, headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'SharpProof-consumer-trust-gate'})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      data = response.read((8 << 20) + 1)
+              except urllib.error.HTTPError as error:
+                  raise SystemExit('GitHub trust metadata request failed: HTTP ' + str(error.code)) from None
+              require(len(data) <= 8 << 20, 'GitHub trust metadata exceeded its size limit.')
+              return json.loads(data)
+
+          def exact_sha(value):
+              return isinstance(value, str) and re.fullmatch('[0-9a-f]{40}', value) is not None
+
           event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
           name = os.environ['EVENT_NAME']
-          if name not in ('push', 'pull_request', 'workflow_dispatch'):
-              raise SystemExit('Only push, pull_request and explicit workflow_dispatch are supported; pull_request_target is forbidden.')
+          require(name in ('push', 'pull_request', 'workflow_dispatch'),
+                  'Only push, pull_request and explicit workflow_dispatch are supported; pull_request_target is forbidden.')
+          repository = os.environ['GITHUB_REPOSITORY']
+          require(re.fullmatch('[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository) is not None,
+                  'Invalid consumer repository identity.')
+          repository_id = os.environ['GITHUB_REPOSITORY_ID']
+          require(repository_id.isdecimal() and int(repository_id) > 0, 'Invalid consumer repository ID.')
+          repository_id = int(repository_id)
+          def same_repository(value):
+              return isinstance(value, dict) and value.get('full_name') == repository and value.get('id') == repository_id
+          require(same_repository(event.get('repository')), 'Event repository identity differs.')
+          revision = os.environ['REQUESTED_WORKFLOW_REVISION']
+          require(exact_sha(revision), 'Helper revision must be an exact lowercase commit SHA.')
           if name == 'pull_request':
-              pull = event['pull_request']
-              repository = os.environ['GITHUB_REPOSITORY']
-              if pull['head']['repo']['full_name'] != repository or pull['base']['repo']['full_name'] != repository:
-                  raise SystemExit('Fork PRs cannot receive private package/image credentials. Use a maintainer-reviewed same-repository branch.')
+              pull = event.get('pull_request') or {}
+              require(same_repository((pull.get('head') or {}).get('repo')) and
+                      same_repository((pull.get('base') or {}).get('repo')),
+                      'Fork PRs cannot receive private package/image credentials. Use a maintainer-reviewed same-repository branch.')
+          repo = api('repos/' + repository)
+          require(same_repository(repo), 'GitHub consumer repository authority differs.')
+          run_id, attempt = os.environ['GITHUB_RUN_ID'], os.environ['GITHUB_RUN_ATTEMPT']
+          require(run_id.isdecimal() and int(run_id) > 0 and attempt.isdecimal() and int(attempt) > 0,
+                  'Invalid current run or attempt identity.')
+          run = api('repos/' + repository + '/actions/runs/' + run_id)
+          require(run.get('id') == int(run_id) and run.get('run_attempt') == int(attempt) and
+                  run.get('event') == name and same_repository(run.get('repository')) and
+                  same_repository(run.get('head_repository')), 'Current run identity is not trusted.')
+          source_sha, branch = run.get('head_sha'), run.get('head_branch')
+          require(exact_sha(source_sha) and isinstance(branch, str) and branch and
+                  not any(ord(character) < 33 or ord(character) == 127 for character in branch),
+                  'Current run source identity is invalid.')
+          source_ref = 'refs/heads/' + branch
+          if name == 'pull_request':
+              require(pull['head'].get('sha') == source_sha and pull['head'].get('ref') == branch,
+                      'Pull-request head differs from the authenticated current run.')
+          else:
+              require(os.environ['GITHUB_SHA'] == source_sha and os.environ['GITHUB_REF'] == source_ref,
+                      'Current branch context differs from the authenticated current run.')
+              if name == 'push':
+                  require(event.get('after') == source_sha, 'Push source SHA differs from the current run.')
           if os.environ['INITIALIZE_BASELINE'] == 'true':
-              if os.environ['GITHUB_REF'] != 'refs/heads/' + event['repository']['default_branch']:
-                  raise SystemExit('Initial reviewed baseline must run on the repository default branch.')
-              if name != 'workflow_dispatch' or str(event.get('inputs', {}).get('initialize-baseline', '')).lower() != 'true':
-                  raise SystemExit('Initialization requires explicit reviewed workflow_dispatch initialize-baseline=true.')
+              require(name == 'workflow_dispatch' and source_ref == 'refs/heads/' + repo['default_branch'] and
+                      str((event.get('inputs') or {}).get('initialize-baseline', '')).lower() == 'true',
+                      'Initialization requires explicit reviewed workflow_dispatch on the repository default branch.')
+          provider = 'alexyorke/SharpProof'
+          provider_repo = api('repos/' + provider)
+          require(provider_repo.get('full_name') == provider and provider_repo.get('private') is False and
+                  provider_repo.get('default_branch') == 'master', 'Canonical helper repository authority differs.')
+          master = api('repos/' + provider + '/git/ref/heads/master').get('object') or {}
+          require(master.get('type') == 'commit' and exact_sha(master.get('sha')), 'Canonical public master is invalid.')
+          comparison = api('repos/' + provider + '/compare/' + revision + '...' + master['sha'])
+          approved_helper = (comparison.get('base_commit') or {}).get('sha')
+          require(comparison.get('status') in ('ahead', 'identical') and approved_helper == revision and
+                  (comparison.get('merge_base_commit') or {}).get('sha') == revision,
+                  'Helper revision must be an ancestor of canonical public master.')
+          expected_reference = provider + '/.github/workflows/sharpproof-consumer.yml@' + approved_helper
+          require(any(item.get('path') == expected_reference and item.get('sha') == approved_helper
+                      for item in run.get('referenced_workflows', [])),
+                  'Requested helper revision differs from this run reusable workflow pin.')
+          # Publish only authenticated API identities after all checks pass.
+          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8') as output:
+              output.write('source-sha=' + source_sha + '\nsource-ref=' + source_ref + '\nhelper-sha=' + approved_helper + '\n')
           PY
 
   verify:
@@ -101,26 +180,26 @@ jobs:
       COMPOSE_FILE_PATH: ${{ inputs.compose-file }}
       VERIFY_SERVICE: ${{ inputs.service }}
       EXPECTED_IMAGE: ${{ inputs.image }}
-      WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
+      WORKFLOW_REVISION: ${{ needs.authorize.outputs.helper-sha }}
       CALLER_WORKFLOW: ${{ inputs.caller-workflow }}
       EVIDENCE_DIRECTORY: ${{ inputs.evidence-directory }}
       REGISTRY_USERNAME: ${{ inputs.registry-username }}
       PACKAGE_FEED_URL: ${{ inputs.package-feed-url }}
       COMPARISON_MODE: ${{ inputs.mode }}
       INITIALIZE_BASELINE: ${{ inputs.initialize-baseline }}
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      SOURCE_REF: ${{ github.event_name == 'pull_request' && format('refs/heads/{0}', github.head_ref) || github.ref }}
+      SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
+      SOURCE_REF: ${{ needs.authorize.outputs.source-ref }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.authorize.outputs.source-sha }}
           path: consumer
           persist-credentials: false
       - name: Load the exact pinned baseline implementation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: alexyorke/SharpProof
-          ref: ${{ inputs.workflow-revision }}
+          ref: ${{ needs.authorize.outputs.helper-sha }}
           path: _sharpproof
           persist-credentials: false
       - name: Authenticate current run and comparison inputs

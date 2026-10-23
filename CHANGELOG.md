@@ -12,16 +12,19 @@ Entries describe repository changes, not package publication. Confirm available 
 - Add exact-base-SHA consumer CI comparison with report mode by default and an
   explicit enforcement mode. Baselines come from trusted successful source-bound
   runs; missing evidence requires initialization rather than a current-run fallback.
-- Make exported NUnit project references relative and add workspace export guidance
+- Make same-root NUnit project references relative and add workspace export guidance
   so a complete workspace can move between host paths. Export still checks captured
-  compiler inputs and supports the documented scalar postcondition subset only.
+  compiler inputs and supports the documented scalar postcondition subset only;
+  standalone cross-drive Windows exports retain the absolute-reference fallback.
 - Add optional analyzer-backed companion assistance alongside the existing
   refactoring. Preserve conservative action eligibility, ordinary editable source,
   and separate Result-type Fix All behavior.
 - Separate official private-preview version/package/image/evidence publication from
   public CI validation versions. Add source/workflow identity, offline signed manifest,
   symbol retention, private read-back/access receipts, and a three-editor Windows x64
-  acceptance runbook. All new release and interactive-editor evidence is pending.
+  acceptance runbook. Owner manual promotion on exact private main is the approval
+  boundary; a separate reviewer rule is optional. All new release and
+  interactive-editor evidence is pending.
 - Rebuild the nightly fuzz runner with the solution-build allowance (600 seconds),
   instead of the worker's per-project limit (300 seconds), and retain its build streams.
   Retained/rotating run budgets, seeds, case counts, and proof budgets are unchanged.

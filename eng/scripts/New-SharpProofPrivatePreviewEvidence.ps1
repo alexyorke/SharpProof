@@ -14,7 +14,7 @@ Set-StrictMode -Version Latest
 $repository = [IO.Path]::GetFullPath($env:SHARPPROOF_REPO_ROOT)
 Import-Module (Join-Path $repository 'eng/scripts/SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $repository 'eng/scripts/SharpProof.PackageIdentity.psm1') -Force
-Import-Module (Join-Path $repository 'eng/scripts/SharpProof.ReleaseConfiguration.psm1') -Force
+Import-Module (Join-Path $repository 'eng/scripts/SharpProof.ReleaseConfiguration.psm1')
 Assert-SharpProofContainer 'Private preview evidence must be built in the canonical container.'
 $source = $env:SHARPPROOF_SOURCE_COMMIT
 $workflow = $env:SHARPPROOF_WORKFLOW_COMMIT

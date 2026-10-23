@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $previousGh = Get-Item Function:\gh -ErrorAction SilentlyContinue
 $fixture = [pscustomobject]@{ Mode = 'valid' }
-$environmentNames = @('GITHUB_REPOSITORY', 'SHARPPROOF_PRIVATE_PREVIEW', 'SHARPPROOF_WORKFLOW_COMMIT', 'GITHUB_WORKFLOW_SHA', 'GITHUB_SHA', 'GITHUB_EVENT_NAME', 'GITHUB_WORKFLOW_REF', 'GITHUB_REF', 'GH_TOKEN')
+$environmentNames = @('GITHUB_REPOSITORY', 'SHARPPROOF_PRIVATE_PREVIEW', 'SHARPPROOF_WORKFLOW_COMMIT', 'GITHUB_WORKFLOW_SHA', 'GITHUB_SHA', 'GITHUB_EVENT_NAME', 'GITHUB_WORKFLOW_REF', 'GITHUB_REF', 'GITHUB_ACTOR', 'GITHUB_TRIGGERING_ACTOR', 'GH_TOKEN')
 $previousEnvironment = @{}
 foreach ($name in $environmentNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name) }
 $source = '1' * 40
@@ -41,8 +41,11 @@ $ghMock = {
         return ([ordered]@{ branch_policies = @(@{ name = $(if ($mode -ceq 'wrong-branch') { '*' } else { 'main' }); type = 'branch' }) } | ConvertTo-Json -Depth 5 -Compress)
     }
     if ($endpoint.EndsWith('/environments/private-preview-release')) {
-        $rules = if ($mode -ceq 'missing-reviewer') { @() } else { @(@{ type = 'required_reviewers'; reviewers = @(@{ type = 'User'; reviewer = @{ login = $(if ($mode -ceq 'wrong-reviewer') { 'other-user' } else { 'alexyorke' }) } }) }) }
-        return ([ordered]@{ protection_rules = $rules; deployment_branch_policy = @{ custom_branch_policies = $true } } | ConvertTo-Json -Depth 8 -Compress)
+        $rules = @(if ($mode -cne 'missing-reviewer') { @{ type = 'required_reviewers'; reviewers = @(@{ type = 'User'; reviewer = @{ login = $(if ($mode -ceq 'wrong-reviewer') { 'other-user' } else { 'alexyorke' }) } }) } })
+        if ($mode -ceq 'duplicate-reviewer-rule') { $rules += $rules[0] }
+        if ($mode -ceq 'team-reviewer') { $rules[0].reviewers[0].type = 'Team' }
+        if ($mode -ceq 'empty-reviewer-rule') { $rules[0].reviewers = @() }
+        return ([ordered]@{ protection_rules = $rules; deployment_branch_policy = $(if ($mode -ceq 'missing-branch-policy') { $null } else { @{ custom_branch_policies = $true } }) } | ConvertTo-Json -Depth 8 -Compress)
     }
     throw 'Unexpected fixture API endpoint; no real GitHub command is permitted.'
 }.GetNewClosure()
@@ -56,15 +59,23 @@ try {
     $env:GITHUB_EVENT_NAME = 'workflow_dispatch'
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main'
     $env:GITHUB_REF = 'refs/heads/main'
+    $env:GITHUB_ACTOR = 'alexyorke'
+    $env:GITHUB_TRIGGERING_ACTOR = 'alexyorke'
     $env:GH_TOKEN = 'fixture-only-token-no-network'
     $fixture.Mode = 'valid'
     & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1')
     $controls++
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview.yml@refs/heads/main'
-    & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json')
+    $approvedOutput = Join-Path $scratch 'approved-output.txt'
+    & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json') -GitHubOutputPath $approvedOutput
+    $controls++
+    if ([IO.File]::ReadAllText($approvedOutput) -cne "source_commit=$source`nworkflow_commit=$workflow`n") { throw 'Preflight did not emit exactly the two qualified immutable commit identities.' }
     $controls++
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main'
-    foreach ($mode in @('missing-reviewer', 'wrong-reviewer', 'wrong-branch', 'public-repository')) {
+    $fixture.Mode = 'missing-reviewer'
+    & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1')
+    $controls++
+    foreach ($mode in @('wrong-reviewer', 'duplicate-reviewer-rule', 'team-reviewer', 'empty-reviewer-rule', 'missing-branch-policy', 'wrong-branch', 'public-repository')) {
         $fixture.Mode = $mode
         Assert-PolicyRejection $mode { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
     }
@@ -72,11 +83,14 @@ try {
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview.yml@refs/heads/main'
     & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json')
     $controls++
+    $rejectedOutput = Join-Path $scratch 'rejected-output.txt'
     foreach ($mode in @('non-master-source', 'pending-source-gate', 'failed-source-gate', 'missing-nightly', 'pending-nightly', 'failed-nightly', 'pull-request-nightly')) {
         $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview.yml@refs/heads/main'
         $fixture.Mode = $mode
-        Assert-PolicyRejection $mode { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json') }
+        Assert-PolicyRejection $mode { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json') -GitHubOutputPath $rejectedOutput }
     }
+    if (Test-Path -LiteralPath $rejectedOutput) { throw 'Rejected source qualification emitted a trusted checkout identity.' }
+    $controls++
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main'
     $fixture.Mode = 'valid'
     $env:SHARPPROOF_WORKFLOW_COMMIT = '4' * 40
@@ -88,12 +102,27 @@ try {
     $env:GITHUB_EVENT_NAME = 'push'
     Assert-PolicyRejection 'non-manual publication' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
     $env:GITHUB_EVENT_NAME = 'workflow_dispatch'
+    foreach ($actor in @('', 'other-user')) {
+        $env:GITHUB_ACTOR = $actor
+        Assert-PolicyRejection 'missing or foreign original actor' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
+    }
+    $env:GITHUB_ACTOR = 'alexyorke'
+    foreach ($actor in @('', 'other-user')) {
+        $env:GITHUB_TRIGGERING_ACTOR = $actor
+        Assert-PolicyRejection 'missing or foreign rerun actor' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
+    }
+    $env:GITHUB_TRIGGERING_ACTOR = 'alexyorke'
+    $env:GITHUB_REF = 'refs/heads/other'
+    Assert-PolicyRejection 'off-main publication' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
+    $env:GITHUB_REF = 'refs/heads/main'
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/remote-caller.yml@refs/heads/main'
     Assert-PolicyRejection 'remote reusable caller identity' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
     Assert-PolicyRejection 'source qualification remote reusable caller identity' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewSource.ps1') -SourceCommit $source -WorkflowCommit $workflow -OutputPath (Join-Path $scratch 'source.json') }
     $env:GITHUB_WORKFLOW_REF = 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main'
     $env:GITHUB_REPOSITORY = 'alexyorke/SharpProof'
     Assert-PolicyRejection 'public caller' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
+    $env:GITHUB_REPOSITORY = 'other-user/SharpProof-preview'
+    Assert-PolicyRejection 'fork caller' { & (Join-Path $PSScriptRoot 'Test-SharpProofPrivatePreviewPublicationPolicy.ps1') }
     Write-Host "Private preview policy regressions passed: $controls controls. Mocked read-only API only; no real access, signing, or publication."
 }
 finally {

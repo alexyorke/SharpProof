@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $reproductionTimeoutSeconds = $CommandTimeoutSeconds
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 Assert-SharpProofContainer 'Run independent reproducibility builds in the canonical Linux amd64 container.'
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::X64) { throw 'Reproducibility qualification requires Linux amd64.' }
 if ($RequirePackageBytes -and $Scope -ne 'Full') { throw '-RequirePackageBytes requires -Scope Full.' }

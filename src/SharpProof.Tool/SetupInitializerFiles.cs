@@ -190,7 +190,7 @@ internal sealed class SetupInitializerFiles
     internal static string Serialize(XDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return (document.Declaration == null ? string.Empty : document.Declaration + "\n") + document.ToString(SaveOptions.DisableFormatting).TrimEnd('\r', '\n') + "\n";
+        return (document.Declaration?.ToString() ?? string.Empty) + document.ToString(SaveOptions.DisableFormatting).TrimEnd('\r', '\n') + "\n";
     }
 
     internal static string? AncestorFile(string directory, string name)

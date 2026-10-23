@@ -438,6 +438,7 @@ public enum SharpProofEffect : long
     <MicrosoftBuildFrameworkVersion>17.7.2</MicrosoftBuildFrameworkVersion>
     <MicrosoftBuildUtilitiesCoreVersion>17.7.2</MicrosoftBuildUtilitiesCoreVersion>
     <MicrosoftNETTestSdkVersion>18.8.1</MicrosoftNETTestSdkVersion>
+    <DotNetCoverageToolVersion>18.8.0</DotNetCoverageToolVersion>
     <MicrosoftNETFrameworkReferenceAssembliesnet472Version>1.0.3</MicrosoftNETFrameworkReferenceAssembliesnet472Version>
     <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>
     <NUnitVersion>4.6.1</NUnitVersion>

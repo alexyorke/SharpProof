@@ -65,7 +65,7 @@ jobs:
           ACCEPTANCE_ARTIFACT: ${{ inputs.editor_acceptance_artifact_id }}
           PROMOTION_PHASE: ${{ inputs.phase }}
         run: |
-          if ($env:GITHUB_REPOSITORY -cne 'alexyorke/SharpProof-preview' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or $env:GITHUB_REF -cne 'refs/heads/main' -or $env:GITHUB_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_REF -cne 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main') { throw 'Promotion requires the exact approved manual private main workflow.' }
+          if ($env:GITHUB_REPOSITORY -cne 'alexyorke/SharpProof-preview' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or $env:GITHUB_ACTOR -cne 'alexyorke' -or $env:GITHUB_TRIGGERING_ACTOR -cne 'alexyorke' -or $env:GITHUB_REF -cne 'refs/heads/main' -or $env:GITHUB_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_REF -cne 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main') { throw 'Promotion requires both pinned owner actors and the exact approved manual private main workflow.' }
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:CANDIDATE_ARTIFACT -Kind Candidate -ExpectedWorkflowCommit $env:SHARPPROOF_CANDIDATE_WORKFLOW_COMMIT -OutputDirectory artifacts/private-candidate -ReceiptPath artifacts/candidate-authentication.json
           ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:ACCEPTANCE_ARTIFACT -Kind Acceptance -ExpectedWorkflowCommit $env:SHARPPROOF_WORKFLOW_COMMIT -OutputDirectory artifacts/private-acceptance -ReceiptPath artifacts/acceptance-authentication.json
@@ -110,7 +110,7 @@ jobs:
         run: |
           $manifest = Get-Content artifacts/private-candidate/release-manifest.json -Raw | ConvertFrom-Json
           ./eng/scripts/Test-SharpProofPrivatePreviewImage.ps1 -ArchivePath artifacts/private-candidate/consumer-image.tar -BuildMetadataPath artifacts/private-candidate/consumer-image.json -ExpectedDigest $manifest.consumerImage.Split('@')[1] -ExpectedSourceCommit $env:SHARPPROOF_SOURCE_COMMIT -ImageReference "ghcr.io/alexyorke/sharpproof-preview:sha-$env:SHARPPROOF_SOURCE_COMMIT" -OutputPath artifacts/promoted-image-receipt.json -Load
-      - name: Require actual protected owner review before accessing the signing key
+      - name: Require owner manual approval and protected main environment before accessing the signing key
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh

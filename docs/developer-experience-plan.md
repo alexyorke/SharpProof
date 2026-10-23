@@ -56,7 +56,7 @@ do not qualify a real editor or publish the official private preview.
 | Existing-project init | Simple selected project directory, preview by default, explicit apply, portable default, qualified container image; multi-project topology comes from the workspace template | No-write preview, reviewed apply, conflicts/unsupported projects, idempotence, and build; Pending |
 | Report formats | Named developer commands offer text, JSON, and Markdown; legacy syntax remains | One machine document for success/status 1, stderr-only invalid-input errors, and syntax compatibility; Pending |
 | Consumer baseline CI | Exact PR base SHA, trusted workflow/source evidence, report default, explicit enforcement | Successful exact-base comparison and rejection of missing/wrong/stale/fork-controlled authority; Pending |
-| Relocatable regression | Relative project reference and workspace export using the existing Compose service | Move complete workspace, export with captured input validation, fail-before/pass-after, then fresh proof; Pending |
+| Relocatable regression | Same-root relative project reference and contained workspace export using the existing Compose service; standalone cross-drive exports retain an absolute reference | Move complete workspace, export with captured input validation, fail-before/pass-after, then fresh proof; Pending |
 | Optional diagnostic action | SPED0001 exposes conservative companion generation alongside refactoring | Loader/action tests plus all three actual Windows x64 editor sessions; Pending |
 
 The nightly fuzz runner rebuild separately uses the 600-second solution-build
@@ -139,7 +139,10 @@ collection is incomplete until its authenticated merge and coverage gate pass.
   separate `stage-registry` promotion; owner-only access evidence and fresh private
   feed/digest read-back precede `finalize` and the release tag. Preserve separate source,
   candidate-workflow, and promotion-workflow SHAs plus the later offline signature;
-  public CI validation versions are distinct. All current candidate, editor, access,
+  the owner's manual exact-main promotion is approval, with both owner actors and the
+  private environment/main-only policy checked. Independent reviewer approval is not
+  required; any configured reviewer rule must be owner-only.
+  Public CI validation versions are distinct. All current candidate, editor, access,
   signature, and publication results remain Pending in the receipt. Source approval
   requires all six latest allowed exact-master-SHA workflows, including nightly;
   a newer pending nightly blocks an older pass. Follow the

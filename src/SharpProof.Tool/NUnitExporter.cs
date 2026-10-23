@@ -230,10 +230,6 @@ internal static class NUnitExporter
         ArgumentException.ThrowIfNullOrEmpty(directory);
         ArgumentException.ThrowIfNullOrEmpty(projectPath);
         var relative = Path.GetRelativePath(directory, projectPath);
-        if (Path.IsPathRooted(relative))
-        {
-            throw new InvalidOperationException("The consumer and exported project must share a filesystem root for a portable ProjectReference.");
-        }
 
         return relative.Replace(Path.DirectorySeparatorChar, '/');
     }

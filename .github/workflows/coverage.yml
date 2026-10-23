@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  SHARPPROOF_CI_PACKAGE_VERSION: ${{ !startsWith(github.ref, 'refs/tags/v') && format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) || '' }}
+  # Coverage packages are private run inputs, including a manual tagged run.
+  SHARPPROOF_CI_PACKAGE_VERSION: ${{ format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) }}
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
   # Public Linux runners have 16 GB RAM. Keep the container and its charged
@@ -68,6 +69,8 @@ jobs:
       package-2-artifact-id: ${{ steps.shard-identity.outputs.package-2-artifact-id }}
       package-3-attempt: ${{ steps.shard-identity.outputs.package-3-attempt }}
       package-3-artifact-id: ${{ steps.shard-identity.outputs.package-3-artifact-id }}
+      windows-tool-input-id: ${{ steps.windows-tool-input.outputs.artifact-id }}
+      windows-tool-input-attempt-number: ${{ steps.windows-tool-identity.outputs.attempt }}
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +107,7 @@ jobs:
           docker compose run
           --name "${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
           -e GITHUB_RUN_ID
+          -e GITHUB_RUN_ATTEMPT
           tooling coverage-shard -Configuration Release
           -CoveragePhase "$SHARPPROOF_COVERAGE_SHARD"
 
@@ -162,6 +166,23 @@ jobs:
           echo "${SHARPPROOF_SHARD}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "${SHARPPROOF_SHARD}-artifact-id=${SHARPPROOF_ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
 
+      # The producer seals the already-built Tool before collection can
+      # instrument it. This separate artifact never changes a shard cohort.
+      - name: Upload canonical Windows installed-tool input
+        id: windows-tool-input
+        if: matrix.shard == 'semantic-extras'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-windows-tool-input-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/coverage-windows-input
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record canonical Windows input attempt
+        id: windows-tool-identity
+        if: matrix.shard == 'semantic-extras'
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
@@ -169,20 +190,94 @@ jobs:
           mode: report
           name: ${{ github.job }}-${{ matrix.shard }}
 
+  native-windows-tool:
+    name: native Windows installed-tool coverage
+    needs: coverage-shard
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.native-evidence.outputs.artifact-id }}
+      attempt: ${{ steps.native-identity.outputs.attempt }}
+    env:
+      SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
+      SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT: ${{ needs.coverage-shard.outputs.windows-tool-input-attempt-number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require exact canonical input
+        shell: pwsh
+        run: |
+          foreach ($identity in @($env:SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID, $env:SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT)) {
+            if ($identity -cnotmatch '\A[1-9][0-9]*\z') { throw 'Missing canonical installed-tool input identity.' }
+          }
+
+      - name: Select pinned consumer SDKs
+        id: consumer-sdks
+        shell: pwsh
+        run: |
+          $toolchain = Get-Content eng/container/toolchain.json -Raw | ConvertFrom-Json
+          if ($toolchain.dotnet.minimumSdkFrameworkImage -cnotmatch '\Amcr\.microsoft\.com/dotnet/sdk:(?<version>[0-9]+\.[0-9]+\.[0-9]+)-') {
+            throw 'Missing pinned framework SDK for the coverage collector.'
+          }
+          "framework-sdk=$($Matches.version)" >> $env:GITHUB_OUTPUT
+
+      # Setup only runtimes/SDKs. The Windows job never builds repository code.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          dotnet-version: ${{ steps.consumer-sdks.outputs.framework-sdk }}
+
+      - name: Download exact canonical installed-tool input
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/coverage-windows-input
+
+      - name: Exercise protected Windows DACL through the installed Tool
+        shell: pwsh
+        run: >-
+          ./eng/scripts/Test-SharpProofWindowsToolCoverage.ps1
+          -InputDirectory "$env:RUNNER_TEMP/coverage-windows-input"
+          -OutputDirectory "$env:RUNNER_TEMP/coverage-native-windows"
+
+      - name: Upload native Windows installed-tool evidence
+        id: native-evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-windows-tool-output-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/coverage-native-windows
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record successful native attempt
+        id: native-identity
+        shell: pwsh
+        run: '"attempt=$env:GITHUB_RUN_ATTEMPT" >> $env:GITHUB_OUTPUT'
+
   coverage-gate:
     name: coverage
+    permissions:
+      contents: read
+      actions: read
     # Keep the existing required-check identity and explicitly reject failed
     # or cancelled prerequisites; a skipped job can satisfy required checks.
     if: always()
-    needs: coverage-shard
+    needs: [coverage-shard, native-windows-tool]
     runs-on: ubuntu-latest
     steps:
       - name: Require every successful coverage shard
         env:
           SHARPPROOF_SHARD_RESULT: ${{ needs.coverage-shard.result }}
+          SHARPPROOF_NATIVE_RESULT: ${{ needs.native-windows-tool.result }}
         run: |
           if [[ "$SHARPPROOF_SHARD_RESULT" != success ]]; then
             echo "Coverage shards did not all succeed: $SHARPPROOF_SHARD_RESULT" >&2
+            exit 1
+          fi
+          if [[ "$SHARPPROOF_NATIVE_RESULT" != success ]]; then
+            echo "Native Windows installed-tool coverage did not succeed: $SHARPPROOF_NATIVE_RESULT" >&2
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -246,9 +341,38 @@ jobs:
           merge-multiple: true
           path: artifacts
 
+      # Independently download the immutable producer input as well as native
+      # output. A consumer receipt alone cannot authenticate its own package.
+      - name: Download exact native Tool producer authority
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
+          merge-multiple: true
+          path: artifacts/coverage-windows-input
+
+      - name: Download exact native Windows coverage supplement
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.native-windows-tool.outputs.artifact-id }}
+          merge-multiple: true
+          path: artifacts/coverage-native-windows
+
       - name: Merge and enforce container coverage
+        env:
+          SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
+          SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT: ${{ needs.coverage-shard.outputs.windows-tool-input-attempt-number }}
+          SHARPPROOF_WINDOWS_TOOL_OUTPUT_ARTIFACT_ID: ${{ needs.native-windows-tool.outputs.artifact-id }}
+          SHARPPROOF_WINDOWS_TOOL_OUTPUT_RUN_ATTEMPT: ${{ needs.native-windows-tool.outputs.attempt }}
+          SHARPPROOF_COVERAGE_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: >-
-          docker compose run --rm -e GITHUB_RUN_ID
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT
+          -e GITHUB_REPOSITORY -e GITHUB_TOKEN
+          -e SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID
+          -e SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT
+          -e SHARPPROOF_WINDOWS_TOOL_OUTPUT_ARTIFACT_ID
+          -e SHARPPROOF_WINDOWS_TOOL_OUTPUT_RUN_ATTEMPT
+          -e SHARPPROOF_COVERAGE_WORKFLOW_HEAD_SHA
           -e SHARPPROOF_COVERAGE_COMPARISON_REF
           tooling coverage-gate -Configuration Release
 
@@ -259,6 +383,8 @@ jobs:
           name: coverage-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             artifacts/coverage
+            artifacts/coverage-windows-input
+            artifacts/coverage-native-windows
             artifacts/timings/*-coverage.json
           if-no-files-found: error
           retention-days: 30

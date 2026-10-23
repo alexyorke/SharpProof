@@ -46,6 +46,18 @@ public sealed class CompanionCoverageTests
     }
 
     [Test]
+    public async Task RefactoringDeclinesOverloadsThatCollideAfterReceiverInsertion()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace,
+            "public class Api { public void Read(dynamic value) { } public static void Read(Api receiver, object value) { } }");
+        var compilation = (await document.Project.GetCompilationAsync())!;
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(await RefactoringsAsync(document), Is.Empty);
+    }
+
+    [Test]
     public async Task UnboundGenericTargetsDeclineAndHelperBoundariesRejectMissingInputs()
     {
         using var workspace = new AdhocWorkspace();

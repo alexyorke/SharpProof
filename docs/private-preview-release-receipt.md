@@ -25,7 +25,8 @@ source and public CI validation are separate from this official private release.
 | Private NuGet destination | `https://nuget.pkg.github.com/alexyorke/index.json` | Pending upload and read-back evidence |
 | Private image destination | `ghcr.io/alexyorke/sharpproof-preview@sha256:<digest>` | Pending manifest digest and read-back evidence |
 | Initial access policy | Owner only for repository, packages, images, symbols, and evidence | Pending independent access/visibility check |
-| Protected environment | `private-preview-release` | Pending required-reviewer/protection and run evidence |
+| Approval boundary | `owner-manual-main`; manual promotion on exact private main/workflow SHA, both actors `alexyorke` | Pending actual run/policy evidence |
+| Private environment | `private-preview-release`, explicit main-only deployment policy; reviewer rule optional and exactly owner-only if present | Pending policy and run evidence |
 
 The source SHA identifies compiled public source. The candidate workflow SHA identifies
 qualification; the promotion workflow SHA identifies the separate signing/publication
@@ -36,6 +37,9 @@ identity produced by public CI.
 Record actual account, environment, key-configuration, and access observations only
 in private evidence. Environment creation alone does not establish the required
 protection policy, a signature, or publication approval.
+The owner's manual promotion dispatch is approval. Without an optional reviewer rule,
+there is no separate GitHub review pause before secret access; no independent reviewer
+is required. Real editor, access, signature, and fresh-consumer gates remain required.
 
 ## Exact artifacts and signatures
 

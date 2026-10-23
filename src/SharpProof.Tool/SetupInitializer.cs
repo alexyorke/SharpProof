@@ -62,13 +62,35 @@ internal static class SetupInitializer
         get
         {
             var value = typeof(SetupInitializer).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-            var version = value?.Split('+')[0] ?? string.Empty;
-            if (!Version.TryParse(version.Split('-')[0], out _) || version.Any(static character =>
-                !char.IsAsciiLetterOrDigit(character) && character is not ('.' or '-')))
-            { throw new InvalidOperationException("The installed SharpProof tool has no usable package version."); }
-            return version;
+            return ResolvePackageVersion(value);
         }
     }
+    internal static string ResolvePackageVersion(string? informationalVersion)
+    {
+        if (string.IsNullOrEmpty(informationalVersion))
+        { throw new InvalidOperationException("The installed SharpProof tool has no usable package version."); }
+        var parts = informationalVersion.Split('+');
+        var version = parts[0];
+        var prerelease = version.IndexOf('-', StringComparison.Ordinal);
+        var core = prerelease < 0 ? version : version[..prerelease];
+        if (!Version.TryParse(core, out _) || version.Any(static character =>
+            !char.IsAsciiLetterOrDigit(character) && character is not ('.' or '-')) ||
+            prerelease >= 0 && !ValidIdentifiers(version[(prerelease + 1)..]) ||
+            parts.Length > 2 || parts.Length == 2 && !ValidIdentifiers(parts[1]))
+        { throw new InvalidOperationException("The installed SharpProof tool has no usable package version."); }
+        return version;
+    }
+
+    private static bool ValidIdentifiers(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return value.Length > 0 && value.Split('.').All(static identifier =>
+        {
+            ArgumentNullException.ThrowIfNull(identifier);
+            return identifier.Length > 0 && identifier.All(static character => char.IsAsciiLetterOrDigit(character) || character == '-');
+        });
+    }
+
 }
 
 internal sealed class SetupInitializationFile
@@ -98,4 +120,5 @@ internal sealed class SetupInitializationResult
 
     internal IReadOnlyList<SetupInitializationFile> Files { get; }
     internal string Message { get; }
+
 }

@@ -25,6 +25,16 @@ inspect the qualified PDBs to record their actual Source Link URLs and approved
 commit. Do not infer Source Link origin from package metadata. The manifest records
 the public source origin separately from the private orchestration identity.
 
+The pinned `owner-manual-main` policy makes the owner's manual promotion dispatch
+the approval boundary. Both `GITHUB_ACTOR` and `GITHUB_TRIGGERING_ACTOR` must be
+`alexyorke`, with the exact approved workflow SHA on private `main`. The private
+`private-preview-release` environment and its explicit main-only deployment policy
+remain required. A separate reviewer rule is optional; if configured, it must contain
+exactly the owner. Without that rule, GitHub provides no separate review pause before
+secret access. Real editor acceptance, exact candidate/source/workflow bindings,
+owner-only access evidence, signature checks, and fresh private consumer checks still
+gate the appropriate promotion phase.
+
 1. Run qualification for the exact source and workflow/toolchain. Required automated
    gates cover the six package IDs, symbols, native/package consumers, complete
    coverage, security, reproducibility, generated workspace/CI behavior, and both
@@ -55,8 +65,8 @@ the public source origin separately from the private orchestration identity.
    `editor_acceptance_artifact_id`, `source_commit`, `candidate_workflow_commit`, and
    `workflow_commit` (the executing promotion workflow SHA). Promotion verifies the
    original successful manual-main qualification run and immutable candidate bytes;
-   it never repacks or rebuilds them. The protected `private-preview-release`
-   environment and owner-only publication policy must pass before signing or upload.
+   it never repacks or rebuilds them. The owner-manual-main approval and private
+   environment/main-only publication policy must pass before signing or upload.
    Sign the frozen manifest with offline RSA 3072-bit/SHA-256 using
    `PRIVATE_PREVIEW_SIGNING_KEY` and verify against the pinned public key/SPKI
    fingerprint in `eng/release/private-preview/`. This phase publishes the exact

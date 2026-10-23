@@ -5,10 +5,13 @@ import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import stat
 import tempfile
+import textwrap
 import unittest
+from unittest import mock
 import zipfile
 
 import SharpProofConsumerBaseline as baseline
@@ -265,6 +268,146 @@ class ConsumerBaselineTests(unittest.TestCase):
             baseline.make_plan(*arguments, "pull_request", "b" * 40, "refs/heads/feature", False)
         with self.assertRaisesRegex(baseline.BaselineError, "Only push"):
             baseline.make_plan(*arguments, "pull_request_target", "b" * 40, "refs/heads/main", False)
+
+
+class ConsumerCheckoutTrustGateTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sharpproof-checkout-gate-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        workflow_path = Path(__file__).resolve().parents[2] / ".github/workflows/sharpproof-consumer.yml"
+        self.workflow = workflow_path.read_text(encoding="utf-8")
+        inline = self.workflow.split("          python3 - <<'PY'\n", 1)[1].split("          PY\n", 1)[0]
+        self.script = compile(textwrap.dedent(inline), str(workflow_path) + ":authorize", "exec")
+        self.repository = dict(id=12, full_name="consumer/Example", default_branch="main")
+        self.revision, self.source, self.master = "c" * 40, "b" * 40, "d" * 40
+        self.event = dict(repository=self.repository, number=17, pull_request=dict(
+            head=dict(repo=self.repository, sha=self.source, ref="feature"),
+            base=dict(repo=self.repository, sha="a" * 40, ref="main")))
+        self.run = dict(id=200, run_attempt=1, event="pull_request", repository=self.repository,
+                        head_repository=self.repository, head_sha=self.source, head_branch="feature",
+                        referenced_workflows=[dict(path=baseline.PROVIDER + "@" + self.revision, sha=self.revision)])
+        self.responses = {
+            "repos/consumer/Example": self.repository,
+            "repos/consumer/Example/actions/runs/200": self.run,
+            "repos/alexyorke/SharpProof": dict(id=34, full_name="alexyorke/SharpProof", private=False, default_branch="master"),
+            "repos/alexyorke/SharpProof/git/ref/heads/master": dict(object=dict(type="commit", sha=self.master)),
+            "repos/alexyorke/SharpProof/compare/" + self.revision + "..." + self.master:
+                dict(status="ahead", base_commit=dict(sha=self.revision), merge_base_commit=dict(sha=self.revision)),
+        }
+        self.environment = dict(GH_TOKEN="offline-fixture-token", EVENT_NAME="pull_request",
+                                REQUESTED_WORKFLOW_REVISION=self.revision, INITIALIZE_BASELINE="false",
+                                GITHUB_REPOSITORY="consumer/Example", GITHUB_REPOSITORY_ID="12",
+                                GITHUB_RUN_ID="200", GITHUB_RUN_ATTEMPT="1", GITHUB_SHA="e" * 40,
+                                GITHUB_REF="refs/pull/17/merge", GITHUB_EVENT_PATH=str(self.root / "event.json"),
+                                GITHUB_OUTPUT=str(self.root / "output"))
+        self.calls = []
+
+    def execute(self):
+        Path(self.environment["GITHUB_EVENT_PATH"]).write_text(json.dumps(self.event), encoding="utf-8")
+        Path(self.environment["GITHUB_OUTPUT"]).unlink(missing_ok=True)
+        def respond(request, timeout):
+            prefix = "https://api.github.com/"
+            self.assertTrue(request.full_url.startswith(prefix))
+            route = request.full_url.removeprefix(prefix)
+            self.calls.append(route)
+            self.assertEqual(30, timeout)
+            return io.BytesIO(json.dumps(self.responses[route]).encode("utf-8"))
+        with mock.patch.dict(os.environ, self.environment, clear=True), mock.patch("urllib.request.urlopen", side_effect=respond):
+            exec(self.script, {})
+        return Path(self.environment["GITHUB_OUTPUT"]).read_text(encoding="utf-8")
+
+    def assert_rejected_without_outputs(self):
+        with self.assertRaises(SystemExit):
+            self.execute()
+        self.assertFalse(Path(self.environment["GITHUB_OUTPUT"]).exists())
+
+    def test_checkout_refs_are_api_approved_outputs_after_public_master_ancestry(self):
+        self.assertEqual("source-sha=" + self.source + "\nsource-ref=refs/heads/feature\nhelper-sha=" + self.revision + "\n",
+                         self.execute())
+        self.assertIn("repos/alexyorke/SharpProof/compare/" + self.revision + "..." + self.master, self.calls)
+        self.assertIn("ref: ${{ needs.authorize.outputs.source-sha }}", self.workflow)
+        self.assertIn("ref: ${{ needs.authorize.outputs.helper-sha }}", self.workflow)
+        self.assertNotIn("ref: ${{ github.event.pull_request", self.workflow)
+        self.assertNotIn("ref: ${{ inputs.workflow-revision }}", self.workflow)
+
+    def test_fork_and_repository_identity_mismatches_fail_before_any_checkout(self):
+        for identity in (dict(self.repository, id=99), dict(self.repository, full_name="fork/Example")):
+            for endpoint in ("head", "base"):
+                with self.subTest(identity=identity, endpoint=endpoint):
+                    original = self.event["pull_request"][endpoint]["repo"]
+                    self.event["pull_request"][endpoint]["repo"] = identity
+                    self.assert_rejected_without_outputs()
+                    self.event["pull_request"][endpoint]["repo"] = original
+        self.event["repository"] = dict(self.repository, id=99)
+        self.assert_rejected_without_outputs()
+
+    def test_privileged_events_and_non_sha_helper_inputs_fail_without_api_access(self):
+        for name in ("pull_request_target", "workflow_run", "issue_comment"):
+            with self.subTest(name=name):
+                self.environment["EVENT_NAME"] = name
+                self.assert_rejected_without_outputs()
+        self.environment["EVENT_NAME"] = "pull_request"
+        for revision in ("master", "c" * 39, "C" * 40, self.revision + "\nhelper-sha=other"):
+            with self.subTest(revision=revision):
+                self.environment["REQUESTED_WORKFLOW_REVISION"] = revision
+                self.assert_rejected_without_outputs()
+        self.assertEqual([], self.calls)
+
+    def test_current_run_must_match_repo_event_attempt_and_pr_head(self):
+        original = copy.deepcopy(self.run)
+        for change in (dict(head_repository=dict(self.repository, id=99)), dict(run_attempt=2),
+                       dict(event="pull_request_target"), dict(head_sha="f" * 40),
+                       dict(head_branch="other"), dict(repository=dict(self.repository, full_name="other/Example"))):
+            with self.subTest(change=change):
+                self.run.update(change)
+                self.assert_rejected_without_outputs()
+                self.run.clear()
+                self.run.update(copy.deepcopy(original))
+
+    def test_non_public_provider_and_non_ancestor_or_mismatched_helper_pin_fail(self):
+        provider = self.responses["repos/alexyorke/SharpProof"]
+        provider["private"] = True
+        self.assert_rejected_without_outputs()
+        provider["private"] = False
+        compare = self.responses["repos/alexyorke/SharpProof/compare/" + self.revision + "..." + self.master]
+        original = copy.deepcopy(compare)
+        for change in (dict(status="behind"), dict(status="diverged"),
+                       dict(base_commit=dict(sha="f" * 40)), dict(merge_base_commit=dict(sha="f" * 40))):
+            with self.subTest(change=change):
+                compare.update(change)
+                self.assert_rejected_without_outputs()
+                compare.clear()
+                compare.update(copy.deepcopy(original))
+        self.run["referenced_workflows"] = []
+        self.assert_rejected_without_outputs()
+
+    def test_identical_public_master_and_reviewed_default_branch_initialization_succeed(self):
+        self.environment.update(EVENT_NAME="workflow_dispatch", INITIALIZE_BASELINE="true",
+                                GITHUB_SHA=self.source, GITHUB_REF="refs/heads/main")
+        self.event["inputs"] = {"initialize-baseline": "true"}
+        self.run.update(event="workflow_dispatch", head_branch="main")
+        self.responses["repos/alexyorke/SharpProof/git/ref/heads/master"]["object"]["sha"] = self.revision
+        self.responses["repos/alexyorke/SharpProof/compare/" + self.revision + "..." + self.revision] = dict(
+            status="identical", base_commit=dict(sha=self.revision), merge_base_commit=dict(sha=self.revision))
+        self.assertIn("source-ref=refs/heads/main\n", self.execute())
+        self.event["inputs"]["initialize-baseline"] = "false"
+        self.assert_rejected_without_outputs()
+        self.event["inputs"]["initialize-baseline"] = "true"
+        self.run["head_branch"] = "feature"
+        self.environment["GITHUB_REF"] = "refs/heads/feature"
+        self.assert_rejected_without_outputs()
+
+    def test_push_requires_exact_authenticated_branch_context_and_payload(self):
+        self.environment.update(EVENT_NAME="push", GITHUB_SHA=self.source, GITHUB_REF="refs/heads/main")
+        self.event["after"] = self.source
+        self.run.update(event="push", head_branch="main")
+        self.assertIn("source-ref=refs/heads/main\n", self.execute())
+        self.event["after"] = "f" * 40
+        self.assert_rejected_without_outputs()
+        self.event["after"] = self.source
+        self.environment["GITHUB_SHA"] = "e" * 40
+        self.assert_rejected_without_outputs()
 
 
 if __name__ == "__main__":

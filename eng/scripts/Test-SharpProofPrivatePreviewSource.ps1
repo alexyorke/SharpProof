@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory)][ValidatePattern('\A[a-f0-9]{40}\z')][string]$SourceCommit,
     [Parameter(Mandatory)][ValidatePattern('\A[a-f0-9]{40}\z')][string]$WorkflowCommit,
-    [Parameter(Mandatory)][string]$OutputPath
+    [Parameter(Mandatory)][string]$OutputPath,
+    [string]$GitHubOutputPath = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -46,4 +47,7 @@ $receipt = [ordered]@{
 $fullOutput = [IO.Path]::GetFullPath($OutputPath)
 [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($fullOutput))
 [IO.File]::WriteAllText($fullOutput, ($receipt | ConvertTo-Json -Depth 8) + "`n", [Text.UTF8Encoding]::new($false))
+if ($GitHubOutputPath) {
+    [IO.File]::AppendAllLines([IO.Path]::GetFullPath($GitHubOutputPath), [string[]]@("source_commit=$SourceCommit", "workflow_commit=$WorkflowCommit"), [Text.UTF8Encoding]::new($false))
+}
 Write-Host 'Approved source is on public master and all six exact-source workflows, including the latest nightly, passed; release repository remains private.'

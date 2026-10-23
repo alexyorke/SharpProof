@@ -23,8 +23,7 @@ env:
   SHARPPROOF_CI_PACKAGE_VERSION: ""
   SHARPPROOF_SOURCE_REPOSITORY: alexyorke/SharpProof
   SHARPPROOF_REPOSITORY_URL: https://github.com/alexyorke/SharpProof-preview
-  SHARPPROOF_SOURCE_COMMIT: ${{ inputs.source_commit }}
-  SHARPPROOF_WORKFLOW_COMMIT: ${{ inputs.workflow_commit }}
+  SHARPPROOF_WORKFLOW_COMMIT: ${{ github.workflow_sha }}
   COMPOSE_PROJECT_NAME: sharpproof-private-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
@@ -41,6 +40,7 @@ jobs:
           ref: ${{ github.workflow_sha }}
           fetch-depth: 0
       - name: Verify approved public source and private workflow identities
+        id: preflight
         env:
           GH_TOKEN: ${{ github.token }}
           APPROVED_SOURCE: ${{ inputs.source_commit }}
@@ -49,11 +49,11 @@ jobs:
         run: >-
           ./eng/scripts/Test-SharpProofPrivatePreviewSource.ps1
           -SourceCommit $env:APPROVED_SOURCE -WorkflowCommit $env:APPROVED_WORKFLOW
-          -OutputPath private-source-qualification.json
+          -OutputPath private-source-qualification.json -GitHubOutputPath $env:GITHUB_OUTPUT
       - name: Mirror the exact public source commit without changing its identity
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          SOURCE_COMMIT: ${{ steps.preflight.outputs.source_commit }}
         shell: bash
         run: |
           set -euo pipefail
@@ -74,6 +74,8 @@ jobs:
           path: private-source-qualification.json
           if-no-files-found: error
     outputs:
+      source_commit: ${{ steps.preflight.outputs.source_commit }}
+      workflow_commit: ${{ steps.preflight.outputs.workflow_commit }}
       source_receipt_id: ${{ steps.source-receipt.outputs.artifact-id }}
 
   qualified-packages:
@@ -81,8 +83,8 @@ jobs:
     uses: ./.github/workflows/package-consumers.yml
     with:
       private_preview: true
-      source_commit: ${{ inputs.source_commit }}
-      workflow_commit: ${{ inputs.workflow_commit }}
+      source_commit: ${{ needs.approved-source.outputs.source_commit }}
+      workflow_commit: ${{ github.workflow_sha }}
     permissions:
       contents: read
       packages: write
@@ -92,18 +94,20 @@ jobs:
   private-candidate:
     needs: [approved-source, qualified-packages]
     runs-on: ubuntu-latest
+    env:
+      SHARPPROOF_SOURCE_COMMIT: ${{ needs.approved-source.outputs.source_commit }}
     permissions:
       contents: read
       actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source_commit }}
+          ref: ${{ needs.approved-source.outputs.source_commit }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.workflow_commit }}
+          ref: ${{ github.workflow_sha }}
           path: artifacts/private-release-orchestration
           persist-credentials: false
       - uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4

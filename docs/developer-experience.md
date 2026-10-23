@@ -295,7 +295,9 @@ input validation at application boundaries; static contracts do not insert guard
 
 ## Export an NUnit regression
 
-Exports use a relative `ProjectReference`. Prefer a workspace with the library under
+Exports use a relative `ProjectReference` when the paths share a filesystem root.
+Standalone Windows exports across drive roots retain an absolute reference and do
+not gain the same relocation behavior. Prefer a workspace with the library under
 `src/` and regressions under `tests/`, with both inside the existing canonical Compose
 mount. For example, from its workspace root:
 
@@ -313,8 +315,8 @@ Workspace mode requires the finalized root Compose/output-isolation layout; link
 paths, out-of-root project/output/remapped source files, and cross-filesystem-root
 references are rejected. Multiple regression exports keep separate compiler outputs.
 
-Move the whole workspace together to preserve the relative reference. The generated
-test no longer embeds a host-specific absolute project path; source/reference hash
+Move the whole workspace together to preserve the relative reference. A workspace
+test does not embed a host-specific absolute project path; source/reference hash
 checks still apply while exporting. Rebinding captured inputs can still require the
 original build container even though the resulting test project can move.
 

@@ -4,6 +4,8 @@
   "publicKeySpkiSha256": "c1b532f27eb6c4f1ddd6da46c06118e7c2419fb2520c030cf3ac70b32139a646",
   "releaseRepository": "alexyorke/SharpProof-preview",
   "environment": "private-preview-release",
-  "requiredReviewer": "alexyorke",
+  "approvalPolicy": "owner-manual-main",
+  "requiredActor": "alexyorke",
+  "requiredBranch": "main",
   "transparencyLog": "disabled"
 }
