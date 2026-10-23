@@ -1089,6 +1089,38 @@ public sealed class NativeTaskCarrierStorageTests
         }
     }
 
+    [TestCase("before")]
+    [TestCase("try")]
+    [TestCase("handler")]
+    [TestCase("after")]
+    public void MatchingStackLocalInitializationRetainsBoundaryEvidence(string location)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        const string extra = "Cell observed=default;";
+        var declaration = "public struct Cell {public long Value;} public static void Probe() { " +
+            (location == "before" ? extra : "") +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            (location == "try" ? extra : "") +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) { " + (location == "handler" ? extra : "") + "builder.SetException(e); } " +
+            (location == "after" ? extra : "") + "builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"), Is.Null);
+    }
+
+    [TestCase("type")]
+    [TestCase("slot")]
+    public void LocalInitializationRejectsMismatchedTypeOrUnownedSlot(string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        const string declaration = "public struct Cell {public long Value;} public static void Probe() { " +
+            "System.Runtime.CompilerServices.AsyncTaskMethodBuilder builder=default; try { " +
+            "Task.WhenAll(Task.Run(Helper),Task.Run(Helper)).ConfigureAwait(false).GetAwaiter().GetResult(); " +
+            "} catch(Exception e) {builder.SetException(e);} builder.SetResult(); }";
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj"), Is.Null);
+        Assert.That(ValidateProbeBody(declaration, false, requiredRawCode: "Initobj", initializationMutation: mutation),
+            Is.EqualTo("TaskRootExceptionBoundaryInstructionUnsupported"));
+    }
+
     [TestCase("public static void Probe() {}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} finally {int.Parse(\"1\");}}", false, "TaskRootExceptionBoundaryHandlerUnsupported")]
     [TestCase("public static void Probe() {try {int.Parse(\"0\");} catch(InvalidOperationException) {}}", false, "TaskRootExceptionBoundaryCatchUnsupported")]
@@ -1134,7 +1166,7 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.Throws<OperationCanceledException>(check);
     }
 
-    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false, string? requiredRawCode = null, bool corruptFieldBranch = false)
+    private static string? ValidateProbeBody(string declaration, bool asyncBody, int children = 2, bool corruptCall = false, bool cancel = false, string? requiredRawCode = null, bool corruptFieldBranch = false, string? initializationMutation = null)
     {
         ArgumentNullException.ThrowIfNull(declaration);
         var source = "using System; using System.Threading.Tasks; public class C {" + declaration +
@@ -1150,6 +1182,8 @@ public sealed class NativeTaskCarrierStorageTests
         { CorruptProbeCall(bytes); }
         if (corruptFieldBranch)
         { CorruptProbeFieldBranch(bytes); }
+        if (initializationMutation is not null)
+        { CorruptProbeLocalInitialization(bytes, initializationMutation); }
         using var stream = new MemoryStream(bytes, false);
         using var image = new PEReader(stream);
         var metadata = image.GetMetadataReader();
@@ -1171,6 +1205,45 @@ public sealed class NativeTaskCarrierStorageTests
         return CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method,
             compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity, children,
             cancel ? cancellation.Token : TestContext.CurrentContext.CancellationToken);
+    }
+
+    private static void CorruptProbeLocalInitialization(byte[] bytes, string mutation)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(mutation);
+        using var image = new PEReader(new MemoryStream(bytes, false));
+        var metadata = image.GetMetadataReader();
+        var method = metadata.MethodDefinitions.Select(metadata.GetMethodDefinition)
+            .Single(value => metadata.GetString(value.Name) == "Probe");
+        var section = image.PEHeaders.SectionHeaders.Single(value => method.RelativeVirtualAddress >= value.VirtualAddress &&
+            method.RelativeVirtualAddress < value.VirtualAddress + value.SizeOfRawData);
+        var offset = section.PointerToRawData + method.RelativeVirtualAddress - section.VirtualAddress;
+        Assert.That(bytes[offset] & 3, Is.EqualTo(3));
+        var headerBytes = (bytes[offset + 1] >> 4) * 4;
+        var code = image.GetMethodBody(method.RelativeVirtualAddress).GetILBytes()!;
+        var cursor = 0;
+        var address = -1;
+        while (cursor < code.Length)
+        {
+            Assert.That(CompilerScalarIlDecoder.TryReadMetadataInstruction(code, ref cursor, out var instruction), Is.True);
+            if (instruction.RawCode == "Ldloca_s")
+            { address = instruction.Offset; }
+            if (instruction.RawCode != "Initobj")
+            { continue; }
+            Assert.That(address, Is.GreaterThanOrEqualTo(0));
+            if (mutation == "type")
+            {
+                var cell = metadata.TypeDefinitions.Single(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "Cell");
+                System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(
+                    bytes.AsSpan(offset + headerBytes + instruction.Offset + 2, 4), System.Reflection.Metadata.Ecma335.MetadataTokens.GetToken(cell));
+            }
+            else if (mutation == "slot")
+            { bytes[offset + headerBytes + address + 1] = byte.MaxValue; }
+            else
+            { throw new ArgumentOutOfRangeException(nameof(mutation)); }
+            return;
+        }
+        Assert.Fail("The fixture must contain a local initialization to mutate.");
     }
 
     private static void CorruptProbeFieldBranch(byte[] bytes)

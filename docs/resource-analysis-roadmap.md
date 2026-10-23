@@ -109,6 +109,49 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Local-initialization ownership controls
+
+The instruction policy's stack-local exemption is now tested directly. Four
+compiled fixtures initialize a matching local struct before the protected
+region, within it, in the handler or in the continuation. Two adversarial
+emitted-body controls replace the initialization type token or local-slot index.
+The unmodified source must retain evidence; each mutation must return explicit
+`TaskRootExceptionBoundaryInstructionUnsupported` with no boundary evidence.
+The mutated bodies are validation inputs, not executable-source claims.
+
+The first focused build caught a missing namespace qualification for the
+metadata-token test helper. Its failure is retained in
+`artifacts/resource-boundary-local-initialization-probe.log`; the corrected
+focused run passed all six controls with zero build warnings or errors
+(`artifacts/resource-boundary-local-initialization-corrected-probe.log`). The
+broader carrier/projection/protocol/native-resource selection passed all 1297
+tests with zero build warnings or errors
+(`artifacts/resource-boundary-local-initialization-tests.log`). The canonical
+formatter copied zero changes. Full quality/API and documentation checks passed
+(`artifacts/resource-boundary-local-initialization-lint.log` and
+`artifacts/resource-boundary-local-initialization-corrected-docs.log`).
+Production admission, model premises and wire
+identities are unchanged. The remaining runtime-byte obligations, pending
+runtime-model choice, coverage closure and final audit remain open.
+
+### Hosted instruction-policy coverage
+
+Checkpoint `1b5d0e3c3d6f2f92c4976c64e30034675f0e18fe` completed all fifteen
+coverage shards in run 39875844284. Aggregate job 120164166078 produced a
+complete report and failed the unchanged 100 percent floor: 7102/7257 changed
+trusted lines (97.86 percent), with 155 gaps. The instruction policy added
+untested rejection paths; the preceding complete report had 143 gaps. This is
+not coverage closure. The newer local-initialization controls are not measured
+by this report.
+
+Evidence is retained in
+`artifacts/resource-1b5d-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `3545eda9ce66fda639671fc04cccfc20b7d1b2a2` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `1b5d0e3c3`.
+Full canonical CI (39875844537) and package consumers (39875844357) passed for
+that exact checkpoint. The newer local-initialization controls still require
+their own exact-head hosted qualification.
+
 ### Explicit outside-instruction policy
 
 All five emitted controls reproduced the permissive non-call fallback: typed
