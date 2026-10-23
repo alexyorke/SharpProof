@@ -109,6 +109,24 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted branch-entry coverage
+
+Checkpoint `337e814cd6fc8a148149b3f3d361a323226c8163` completed all fifteen
+coverage shards in run 39880193676. Aggregate job 120179825483 produced a
+complete report and failed the unchanged 100 percent floor: 7105/7257 changed
+trusted lines (97.91 percent), with 152 gaps. The unchanged collector's incoming
+branch rejection at line 510 is now covered; the preceding report had 153 gaps.
+The detached certificate controls are newer and are not measured by this report.
+
+Evidence is retained in
+`artifacts/resource-337e-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `2072302e9e076da64d5048fe990086f25c982b3a` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `337e814cd`.
+Canonical CI (39880193904) and package consumers (39880193987) are still
+running. Earlier checkpoint `f9b1b473e` ended with cancelled canonical and
+package runs (39878413985 and 39878413968); those are not passing qualifications.
+This checkpoint does not close coverage or any remaining runtime-byte obligation.
+
 ### Detached certificate completeness controls
 
 Ten detached-program controls require explicit Unknown and no count, lower-count
