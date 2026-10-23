@@ -12,6 +12,8 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ResourceRoutingAnalyzerCoreCoverageTests
 {
+    private static readonly string[] ExpectedMethodNames = ["Bound", "WrongKind", "MissingBinding"];
+
     [Test]
     public void QuantitativeResourceClaimsAreNotDecidedByQualitativeAllocationSites()
     {
@@ -33,7 +35,7 @@ public sealed class ResourceRoutingAnalyzerCoreCoverageTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0060"]);
         var analyzer = new ResourceBindingBoundaryAnalyzer();
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null, analyzer: analyzer);
-        Assert.That(analyzer.Seen, Is.EquivalentTo(new[] { "Bound", "WrongKind", "MissingBinding" }));
+        Assert.That(analyzer.Seen, Is.EquivalentTo(ExpectedMethodNames));
         AnalyzerTestHost.AssertIds(diagnostics, "SP0060", 1);
         Assert.That(diagnostics[0].Properties["ResourceStatus"], Is.EqualTo("Proven"));
         Assert.That(diagnostics[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture), Does.Contain("Bound"));

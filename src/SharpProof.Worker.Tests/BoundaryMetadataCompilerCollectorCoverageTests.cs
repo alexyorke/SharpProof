@@ -36,7 +36,7 @@ public sealed class BoundaryMetadataCompilerCollectorCoverageTests
         instructions.Add(Token(instructions.Count, "Stfld", 0x04000001));
 
         var result = Invoke<bool>("OwnedBoundaryField", image.Metadata,
-            mutation == "nil-method" ? default(MethodDefinitionHandle) : image.Method,
+            mutation == "nil-method" ? default(MethodDefinitionHandle) : BoundaryImage.Method,
             instructions, instructions.Count - 1, new HashSet<int>(), TestContext.CurrentContext.CancellationToken);
 
         Assert.That(result, Is.False, "A rejected field write must not become owned bookkeeping.");
@@ -51,9 +51,9 @@ public sealed class BoundaryMetadataCompilerCollectorCoverageTests
             Token(0, "Ldarg_0"), Token(1, "Nop"), Token(2, "Ldfld", 0x04000001)
         };
 
-        Assert.That(Invoke<bool>("OwnedBoundaryField", image.Metadata, image.Method,
+        Assert.That(Invoke<bool>("OwnedBoundaryField", image.Metadata, BoundaryImage.Method,
             instructions, 2, new HashSet<int>(), TestContext.CurrentContext.CancellationToken), Is.True);
-        Assert.That(Invoke<bool>("OwnedBoundaryField", image.Metadata, image.Method,
+        Assert.That(Invoke<bool>("OwnedBoundaryField", image.Metadata, BoundaryImage.Method,
             instructions, 2, new HashSet<int> { 1 }, TestContext.CurrentContext.CancellationToken), Is.False,
             "A branch into the receiver prefix must invalidate ownership.");
     }
@@ -66,7 +66,7 @@ public sealed class BoundaryMetadataCompilerCollectorCoverageTests
         var instructions = new List<CompilerIlToken> { Token(0, "Ldfld", 0x04000001) };
 
         var error = Assert.Throws<TargetInvocationException>((Action)(() => Invoke<bool>("OwnedBoundaryField",
-            image.Metadata, image.Method, instructions, index, new HashSet<int>(), TestContext.CurrentContext.CancellationToken)));
+            image.Metadata, BoundaryImage.Method, instructions, index, new HashSet<int>(), TestContext.CurrentContext.CancellationToken)));
 
         Assert.That(error!.InnerException, Is.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(((ArgumentOutOfRangeException)error.InnerException!).ParamName, Is.EqualTo("index"));
@@ -187,7 +187,7 @@ public sealed class BoundaryMetadataCompilerCollectorCoverageTests
         private readonly MemoryStream _stream;
         internal PEReader Reader { get; }
         internal MetadataReader Metadata => Reader.GetMetadataReader();
-        internal MethodDefinitionHandle Method => MetadataTokens.MethodDefinitionHandle(1);
+        internal static MethodDefinitionHandle Method => MetadataTokens.MethodDefinitionHandle(1);
         internal MethodBodyBlock Body => Reader.GetMethodBody(Metadata.GetMethodDefinition(Method).RelativeVirtualAddress);
 
         internal BoundaryImage(FieldAttributes fieldAttributes = FieldAttributes.Public,

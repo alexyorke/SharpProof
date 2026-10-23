@@ -49,6 +49,7 @@ $report = [ordered]@{
     developerPayloadsEqual = $null; developerPayloadCount = 0; developerPackageBytesEqual = $null
     developerPayloadMismatches  = [Collections.Immutable.ImmutableArray[string]]::Empty
     developerArchiveComparisons = [Collections.Immutable.ImmutableArray[object]]::Empty
+    failure                     = $null
     developerScope              = 'Separate optional Tool, CodeFixes, and Templates product payloads including nuspecs and dependencies; SDK ZIP relationship/core-property metadata excluded from payload comparison. Raw archive hashes are reported separately. The explicit image digest is a fixture serialization input, never published-image authority.'
 }
 
@@ -103,8 +104,13 @@ function Invoke-ReproCommand([string]$Executable, [Nullable[Collections.Immutabl
         }
         $text = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         [IO.File]::WriteAllText((Join-Path $output "$LogName.log"), $text, [Text.UTF8Encoding]::new($false))
-        if ($timedOut) { throw "Reproducibility phase $LogName exceeded $reproductionTimeoutSeconds seconds; inspect its local log." }
-        if ($process.ExitCode -ne 0) { throw "Reproducibility phase $LogName failed with exit code $($process.ExitCode); inspect its local log." }
+        if ($timedOut -or $process.ExitCode -ne 0) {
+            $report.failure = ([ordered]@{
+                    phase = $LogName; exitCode = $process.ExitCode; timedOut = $timedOut; logFile = "$LogName.log"
+                }).AsReadOnly()
+            if ($timedOut) { throw "Reproducibility phase $LogName exceeded $reproductionTimeoutSeconds seconds; inspect its phase log." }
+            throw "Reproducibility phase $LogName failed with exit code $($process.ExitCode); inspect its phase log."
+        }
         return $text
     }
     finally { $process.Dispose() }
@@ -184,8 +190,10 @@ try {
                 $developerFeed = Join-Path $clone 'artifacts/developer-reproduction-packages'
                 foreach ($name in @('Tool', 'CodeFixes', 'Templates')) {
                     $developerArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                            'pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release', '--no-build', '--no-restore',
-                            '-o', $developerFeed, '-p:ContinuousIntegrationBuild=true', '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true',
+                            # Core package roots do not build the optional products.
+                            # Restore and build each product's own closure in both independent clones.
+                            'pack', "src/SharpProof.$name/SharpProof.$name.csproj", '-c', 'Release',
+                            '-o', $developerFeed, '-p:RestoreLockedMode=true', '-p:ContinuousIntegrationBuild=true', '-p:SharpProofDeveloperPackages=true', '-p:SharpProofPackTool=true',
                             "-p:RepositoryCommit=$commit", "-p:SourceRevisionId=$commit", "-p:SharpProofConsumerImage=$DeveloperConsumerImage"))
                     $null = Invoke-ReproCommand dotnet $developerArguments $clone "run-$index-developer-$name-pack"
                 }

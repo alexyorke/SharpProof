@@ -56,16 +56,17 @@ internal static class ResourcePrimitiveHelperSelection
         // InitJITHelpers1 either retains VC's worker binding or assigns the
         // portable entry. The selector's stress/logging branches only choose
         // DIRECT instead of VC, so no setting or warm-state assumption is needed.
-        var worker = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(
-            ResourcePrimitiveHCallKind.NewArrayWorker, layout, cancellation);
-        if (worker.DirectFramesUpper is not { } workerFrames)
-        { return new(null, [], worker.UnknownReason); }
-        var portable = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(
-            ResourcePrimitiveHCallKind.NewArrayValueFastPortable, layout, cancellation);
-        if (portable.DirectFramesUpper is not { } portableFrames)
-        { return new(null, [], portable.UnknownReason); }
-        return new(Math.Max(workerFrames, portableFrames),
-            [ResourcePrimitiveHCallKind.NewArrayWorker, ResourcePrimitiveHCallKind.NewArrayValueFastPortable], null);
+        ImmutableArray<ResourcePrimitiveHCallKind> selectedEntries =
+            [ResourcePrimitiveHCallKind.NewArrayWorker, ResourcePrimitiveHCallKind.NewArrayValueFastPortable];
+        var directFramesUpper = int.MinValue;
+        foreach (var entry in selectedEntries)
+        {
+            var check = ResourceTaskFaultCarrierCatalog.BoundDirectPrimitiveHCallFrames(entry, layout, cancellation);
+            if (check.DirectFramesUpper is not { } frames)
+            { return new(null, [], check.UnknownReason); }
+            directFramesUpper = Math.Max(directFramesUpper, frames);
+        }
+        return new(directFramesUpper, selectedEntries, null);
     }
 
     private static string Hash(string value)

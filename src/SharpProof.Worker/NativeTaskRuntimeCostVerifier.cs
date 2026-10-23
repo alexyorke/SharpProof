@@ -52,6 +52,19 @@ internal static class NativeTaskRuntimeCostVerifier
         var children = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, root, layout, cancellation);
         if (children.CumulativeUpper is not { } child)
         { return Unknown(children.UnknownReason ?? "TaskChildStorageUnproved"); }
+        return ComposeCosts(projection, child, direct, layout, inputs, cancellation);
+    }
+
+    private static NativeTaskRuntimeCostCheck ComposeCosts(CompilerForkJoinProjection projection,
+        ResourceExpression child, ResourceExpression direct, ResourceRuntimeLayoutContext layout,
+        NativeTaskRuntimeCostInputs inputs, CancellationToken cancellation)
+    {
+        projection = ArgumentNullGuard.NotNull(projection, nameof(projection));
+        child = ArgumentNullGuard.NotNull(child, nameof(child));
+        direct = ArgumentNullGuard.NotNull(direct, nameof(direct));
+        layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
+        inputs = ArgumentNullGuard.NotNull(inputs, nameof(inputs));
+        cancellation.ThrowIfCancellationRequested();
         try
         {
             var raw = ResourceRuntimeLayout.Bound(ResourceAllocationShape.Array(ResourceStorageKind.Byte,

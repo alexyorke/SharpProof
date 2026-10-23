@@ -107,16 +107,16 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
         var invocation = (IInvocationOperation)((IExpressionStatementOperation)source.Body.Operations.Single()).Operation;
         if (unbound)
         {
-            var argument = SemanticProjection.Wrap(invocation.Arguments.Single(),
+            var argument = ResourceAnalysisSemanticProjection.Wrap(invocation.Arguments.Single(),
                 ("get_Parameter", null));
-            invocation = SemanticProjection.Wrap(invocation, ("get_Arguments", ImmutableArray.Create(argument)));
+            invocation = ResourceAnalysisSemanticProjection.Wrap(invocation, ("get_Arguments", ImmutableArray.Create(argument)));
         }
         else
         {
             var method = invocation.TargetMethod;
             var repeated = ImmutableArray.Create(method.DeclaringSyntaxReferences[0], method.DeclaringSyntaxReferences[0]);
-            invocation = SemanticProjection.Wrap(invocation, ("get_TargetMethod",
-                SemanticProjection.Wrap(method, ("get_DeclaringSyntaxReferences", repeated))));
+            invocation = ResourceAnalysisSemanticProjection.Wrap(invocation, ("get_TargetMethod",
+                ResourceAnalysisSemanticProjection.Wrap(method, ("get_DeclaringSyntaxReferences", repeated))));
         }
         var analysis = Analysis(source.Compilation);
         var cost = Invoke<ResourceBoundsAnalysis.Cost>(analysis, "Call", invocation, 0);
@@ -136,16 +136,16 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
         var invocation = (IInvocationOperation)tail.Operation;
         var argument = invocation.Arguments.Single();
         if (corruption == "argument")
-        { argument = SemanticProjection.Wrap(argument, ("get_Parameter", null)); }
+        { argument = ResourceAnalysisSemanticProjection.Wrap(argument, ("get_Parameter", null)); }
         if (corruption == "width")
         {
             var progress = (IBinaryOperation)argument.Value;
-            argument = SemanticProjection.Wrap(argument, ("get_Value", SemanticProjection.Wrap(progress,
+            argument = ResourceAnalysisSemanticProjection.Wrap(argument, ("get_Value", ResourceAnalysisSemanticProjection.Wrap(progress,
                 ("get_Type", source.Compilation.GetSpecialType(SpecialType.System_Int64)))));
         }
-        invocation = SemanticProjection.Wrap(invocation, ("get_Arguments", ImmutableArray.Create(argument)));
-        tail = SemanticProjection.Wrap(tail, ("get_Operation", invocation));
-        var body = SemanticProjection.Wrap(source.Body, ("get_Operations", source.Body.Operations.SetItem(1, tail)));
+        invocation = ResourceAnalysisSemanticProjection.Wrap(invocation, ("get_Arguments", ImmutableArray.Create(argument)));
+        tail = ResourceAnalysisSemanticProjection.Wrap(tail, ("get_Operation", invocation));
+        var body = ResourceAnalysisSemanticProjection.Wrap(source.Body, ("get_Operations", source.Body.Operations.SetItem(1, tail)));
         var analysis = Analysis(source.Compilation);
         var cost = Invoke<ResourceBoundsAnalysis.Cost>(analysis, "CallableBodyCore", source.Method, body, corruption == "depth" ? 129 : 0);
         Assert.That(cost, Is.SameAs(ResourceBoundsAnalysis.Cost.Zero));
@@ -158,8 +158,8 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
         var source = Source("public static void Target(int n) { var a = new int[n]; }");
         var array = Array(source.Body);
         var size = NamedInput((IParameterReferenceOperation)array.DimensionSizes.Single(), new string('n', ResourceExpression.MaximumTextLength + 1));
-        var projected = SemanticProjection.Wrap(array, ("get_DimensionSizes", ImmutableArray.Create<IOperation>(size)));
-        var body = SemanticProjection.Wrap(source.Body, ("get_Operations", ImmutableArray.Create<IOperation>(projected)));
+        var projected = ResourceAnalysisSemanticProjection.Wrap(array, ("get_DimensionSizes", ImmutableArray.Create<IOperation>(size)));
+        var body = ResourceAnalysisSemanticProjection.Wrap(source.Body, ("get_Operations", ImmutableArray.Create<IOperation>(projected)));
         var result = Invoke<ResourceBoundsAnalysis.Result>(null, "AnalyzeCase", source.Method, body,
             TestContext.CurrentContext.CancellationToken, null, false);
         AssertUnknown(result, "AnalysisBudgetExceeded");
@@ -172,10 +172,11 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
         var loop = (IForLoopOperation)source.Body.Operations[0];
         var condition = (IBinaryOperation)loop.Condition!;
         var conditionInput = NamedInput((IParameterReferenceOperation)condition.RightOperand, new string('n', 9000));
-        loop = SemanticProjection.Wrap(loop, ("get_Condition", SemanticProjection.Wrap(condition, ("get_RightOperand", conditionInput))));
+        loop = ResourceAnalysisSemanticProjection.Wrap(loop,
+            ("get_Condition", ResourceAnalysisSemanticProjection.Wrap(condition, ("get_RightOperand", conditionInput))));
         var array = Array(source.Body);
         var arrayInput = NamedInput((IParameterReferenceOperation)array.DimensionSizes.Single(), new string('m', 9000));
-        array = SemanticProjection.Wrap(array, ("get_DimensionSizes", ImmutableArray.Create<IOperation>(arrayInput)));
+        array = ResourceAnalysisSemanticProjection.Wrap(array, ("get_DimensionSizes", ImmutableArray.Create<IOperation>(arrayInput)));
         var analysis = Analysis(source.Compilation);
         var result = Invoke<ResourceBoundsAnalysis.Cost>(analysis, "Sequence", new IOperation[] { loop, array }, 0);
         Assert.That(result, Is.SameAs(ResourceBoundsAnalysis.Cost.Zero));
@@ -212,7 +213,8 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
     {
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(name);
-        return SemanticProjection.Wrap(operation, ("get_Parameter", SemanticProjection.Wrap(operation.Parameter, ("get_Name", name))));
+        return ResourceAnalysisSemanticProjection.Wrap(operation,
+            ("get_Parameter", ResourceAnalysisSemanticProjection.Wrap(operation.Parameter, ("get_Name", name))));
     }
 
     private static IArrayCreationOperation Array(IBlockOperation body)
@@ -270,38 +272,39 @@ public sealed class ResourceAnalysisCompilerSemanticsCoverageTests
         public IBlockOperation Body { get; init; } = Body ?? throw new ArgumentNullException(nameof(Body));
     }
 
-    // A malformed detached compiler projection still delegates all unmodified
-    // facts to a real Roslyn binding, keeping admission failures narrowly scoped.
-    internal class SemanticProjection : DispatchProxy
+}
+
+// A malformed detached compiler projection still delegates all unmodified
+// facts to a real Roslyn binding, keeping admission failures narrowly scoped.
+public class ResourceAnalysisSemanticProjection : DispatchProxy
+{
+    private static readonly ConditionalWeakTable<ResourceAnalysisSemanticProjection, ProjectionState> States = new();
+
+    public ResourceAnalysisSemanticProjection()
     {
-        private static readonly ConditionalWeakTable<SemanticProjection, ProjectionState> States = new();
+    }
 
-        public SemanticProjection()
-        {
-        }
+    internal static T Wrap<T>(T target, params (string Name, object? Value)[] replacements) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(replacements);
+        var proxy = Create<T, ResourceAnalysisSemanticProjection>();
+        States.Add((ResourceAnalysisSemanticProjection)(object)proxy, new(target,
+            replacements.ToImmutableDictionary(static pair => pair.Name, static pair => pair.Value, StringComparer.Ordinal)));
+        return proxy;
+    }
 
-        internal static T Wrap<T>(T target, params (string Name, object? Value)[] replacements) where T : class
-        {
-            ArgumentNullException.ThrowIfNull(target);
-            ArgumentNullException.ThrowIfNull(replacements);
-            var proxy = Create<T, SemanticProjection>();
-            States.Add((SemanticProjection)(object)proxy, new(target,
-                replacements.ToImmutableDictionary(static pair => pair.Name, static pair => pair.Value, StringComparer.Ordinal)));
-            return proxy;
-        }
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+    {
+        ArgumentNullException.ThrowIfNull(targetMethod);
+        var state = States.GetValue(this, static _ => throw new InvalidOperationException("Compiler projection is uninitialized."));
+        return state.Replacements.TryGetValue(targetMethod.Name, out var value) ? value : targetMethod.Invoke(state.Target, args);
+    }
 
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            ArgumentNullException.ThrowIfNull(targetMethod);
-            var state = States.GetValue(this, static _ => throw new InvalidOperationException("Compiler projection is uninitialized."));
-            return state.Replacements.TryGetValue(targetMethod.Name, out var value) ? value : targetMethod.Invoke(state.Target, args);
-        }
-
-        private sealed record ProjectionState(object Target, ImmutableDictionary<string, object?> Replacements)
-        {
-            public object Target { get; init; } = Target ?? throw new ArgumentNullException(nameof(Target));
-            public ImmutableDictionary<string, object?> Replacements { get; init; } =
-                Replacements ?? throw new ArgumentNullException(nameof(Replacements));
-        }
+    private sealed record ProjectionState(object Target, ImmutableDictionary<string, object?> Replacements)
+    {
+        public object Target { get; init; } = Target ?? throw new ArgumentNullException(nameof(Target));
+        public ImmutableDictionary<string, object?> Replacements { get; init; } =
+            Replacements ?? throw new ArgumentNullException(nameof(Replacements));
     }
 }

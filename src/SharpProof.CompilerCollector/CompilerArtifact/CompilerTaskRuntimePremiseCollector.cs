@@ -30,8 +30,7 @@ internal static class CompilerTaskRuntimePremiseCollector
         foreach (var declaration in declarations.Quantities)
         {
             cancellation.ThrowIfCancellationRequested();
-            if (!expected.Add(ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration)))
-            { return null; }
+            expected.Add(ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration));
         }
         var remaining = new HashSet<string>(expected, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -45,7 +44,7 @@ internal static class CompilerTaskRuntimePremiseCollector
             if (assumption.Kind != WorkerAssumptionKind.UserAssume || !remaining.Remove(assumption.Id))
             { return null; }
         }
-        return remaining.Count == 0 ? expected.ToImmutable() : null;
+        return expected.Count == declarations.Quantities.Length + 1 && remaining.Count == 0 ? expected.ToImmutable() : null;
     }
 
     internal static CompilerTaskRuntimePremiseDeclarationCapture Parse(IMethodSymbol root, string callableId, CancellationToken cancellation)

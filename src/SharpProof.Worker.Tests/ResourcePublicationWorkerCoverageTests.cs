@@ -178,7 +178,7 @@ internal sealed partial class NativeResourceContractTests
         var result = NativeResourceContractVerifier.Verify(target, target.EffectClaims.Single(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.EqualTo(invalid == "unknown" ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven));
         var bindingTarget = invalid == "unbound-layout" ? target with
-            { Compilation = target.Compilation with { ResourceTargetPlatform = "X86" } } : target;
+        { Compilation = target.Compilation with { ResourceTargetPlatform = "X86" } } : target;
         var binding = new NativeResourceLayoutBinding(bindingTarget);
         Assert.That(binding.Bind(), invalid == "unbound-layout" ? Is.Null : Is.Not.Null);
         if (invalid == "missing-bound")

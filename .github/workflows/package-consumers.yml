@@ -425,6 +425,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/prepare-qualified-packages
+        id: prepared
         with:
           artifact-id: ${{ needs.package.outputs.package-artifact-id }}
       - name: Download the exact separately qualified CLI archive
@@ -436,12 +437,18 @@ jobs:
       - name: Build candidate consumer image
         id: consumer
         shell: bash
+        env:
+          WINDOWS_NATIVE_PATH: ${{ steps.prepared.outputs.windows-native-path }}
         run: |
           set -euo pipefail
+          test -n "${WINDOWS_NATIVE_PATH}"
+          test -f "${WINDOWS_NATIVE_PATH}/payload/win-x64/libz3.dll"
+          test -f "${WINDOWS_NATIVE_PATH}/payload/win-arm64/libz3.dll"
           prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' eng/Versions.props)"
           template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' eng/Versions.props)"
           version="${template//\$(SharpProofVersionPrefix)/$prefix}"
           docker buildx build --platform linux/amd64 --file eng/container/Dockerfile \
+            --build-context "windows-native=${WINDOWS_NATIVE_PATH}" \
             --target consumer --build-arg "SHARPPROOF_PACKAGE_VERSION=${version}" --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --provenance=false --load --metadata-file consumer-image.json \
             --tag "ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}" .
