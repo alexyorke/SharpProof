@@ -24,6 +24,31 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds.Elements.Text, Is.EqualTo(elements));
     }
 
+    [TestCase("public Cell():this(0) {var constructed=new int[7];} private Cell(int ignored) {}", false)]
+    [TestCase("public Cell():this(new int[2]) {var constructed=new int[7];} private Cell(int[] ignored) {}", false)]
+    [TestCase("public Cell():base() {var constructed=new int[7];}", true)]
+    public void ConstructorChainingPreservesItsAdmissionBoundaryAndDiscardsPartialCosts(string constructors, bool supported)
+    {
+        ArgumentNullException.ThrowIfNull(constructors);
+        var source = "public class Cell {public int[] Data=new int[5]; " + constructors + "} " +
+            "public static class Subject {public static void Root() {var prefix=new int[3]; " +
+            "var cell=new Cell(); var suffix=new int[11];}}";
+        var result = AnalyzeSource(source);
+        Assert.That(result.Proven, Is.EqualTo(supported));
+        if (supported)
+        {
+            Assert.That(result.UnknownReason, Is.Null);
+            Assert.That(result.Bounds!.LoopIterations.Text, Is.EqualTo("0"));
+            Assert.That(result.Bounds.Arrays.Text, Is.EqualTo("4"));
+            Assert.That(result.Bounds.Elements.Text, Is.EqualTo("26"));
+        }
+        else
+        {
+            Assert.That(result.Bounds, Is.Null);
+            Assert.That(result.UnknownReason, Is.EqualTo("UnsupportedManagedConstructor"));
+        }
+    }
+
     [TestCase("public class Base {} public class Cell : Base {}", "UnsupportedManagedConstructor")]
     [TestCase("public class Cell { static Cell() { var a=new int[3]; } }", "ConstructorTypeInitializationUnknown")]
     [TestCase("public class Cell { public Cell() { var cell=new Cell(); } }", "RecursiveConstructorCostUnknown")]

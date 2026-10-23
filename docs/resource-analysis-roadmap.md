@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Constructor-chain admission controls
+
+Three valid-source controls distinguish unsupported `this(...)` constructor
+chaining from the supported empty `base()` initializer. Both chained cases
+have allocation prefixes, field initializers, constructor bodies and suffixes;
+one also allocates a constructor argument. They must return explicit
+`UnsupportedManagedConstructor` with no partial bounds. The supported control
+must retain all four arrays and 26 elements across those phases.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-constructor-chain-format.log`). All 248 analyzer resource
+tests passed, including the three new controls, with zero build warnings or
+errors (`artifacts/resource-constructor-chain-tests.log`). Full quality/API and
+documentation checks passed (`artifacts/resource-constructor-chain-lint.log` and
+`artifacts/resource-constructor-chain-docs.log`). Production admission, runtime premises and wire
+identities are unchanged. The runtime-byte proof policy is pending user input;
+no dependent runtime assumptions or proof have been introduced. Coverage closure,
+the complete runtime-byte model and final audit remain open.
+
+The preceding `337e814cd` canonical and package runs (39880193904 and
+39880193987) subsequently ended cancelled. Their earlier running states in the
+historical checkpoint are not passing qualifications. Current `a92aec456` has
+its own active hosted runs and still requires exact-head qualification.
+
 ### Hosted branch-entry coverage
 
 Checkpoint `337e814cd6fc8a148149b3f3d361a323226c8163` completed all fifteen
