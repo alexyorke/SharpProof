@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Unclassified storage-expression controls
+
+Two malformed detached-input controls place an unclassified expression kind
+inside the first or later child's allocation extent. The expression codec must
+reject the record. The controls deliberately bypass construction and transport
+to check the internal composition guard as well. A separate valid one-byte
+array contributes a known 32-byte storage bound, while primitive count bounds
+remain independently derivable.
+
+Both placements must return `ForkJoinChildStorageOwnershipInvalid` with no
+cumulative, peak or retained storage bound. Earlier valid child storage must
+not survive malformed later input. These records are validator inputs, not
+executable source or accepted wire records; no root byte proof is established.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-unclassified-storage-format.log`). The complete fork/join
+projection suite passed all 126 tests with zero build warnings or errors
+(`artifacts/resource-unclassified-storage-tests.log`). Both malformed placements
+reached codec rejection and explicit Unknown with no storage fields. Quality/API
+and documentation checks passed (`artifacts/resource-unclassified-storage-lint.log`
+and `artifacts/resource-unclassified-storage-docs.log`). Production admission, runtime
+premises and wire identities are unchanged. The pending runtime proof policy,
+full task-runtime byte model, coverage closure and final audit remain open.
+
 ### Child-storage composition budget controls
 
 Two detached-cost controls compose sixteen constant-mapped children. Each child

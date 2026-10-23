@@ -102,6 +102,47 @@ internal sealed class NativeForkJoinProjectionTests
         var exception = Assert.Throws<System.Reflection.TargetInvocationException>(exhausted);
         Assert.That(exception!.InnerException, Is.TypeOf<ResourceExpressionLimitException>());
     }
+    [TestCase(0)]
+    [TestCase(1)]
+    public void UnclassifiedStorageExpressionsDiscardEveryChildStorageBound(int unsupportedAt)
+    {
+        var projection = Lower("");
+        var root = Root(projection);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var layout = Layout();
+        var constructor = typeof(ResourceExpression).GetConstructors(System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic).Single();
+        // Bypass construction and transport deliberately; this is not a source program.
+        var unsupported = (ResourceExpression)constructor.Invoke([(ResourceExpressionKind)999,
+            System.Numerics.BigInteger.Zero, null, ImmutableArray.Create(ResourceExpression.One), System.Numerics.BigInteger.One]);
+        Action decode = () => ResourceExpressionCodec.Decode(ResourceExpressionCodec.Encode(unsupported, token), token);
+        Assert.Throws<InvalidDataException>(decode);
+        var children = projection.Children;
+        for (var index = 0; index < children.Length; index++)
+        {
+            var child = children[index];
+            var allocation = index == unsupportedAt
+                ? ResourceProgram.Managed(ResourceAllocationShape.String(unsupported))
+                : ResourceProgram.TypedArray(ResourceAllocationShape.Array(ResourceStorageKind.Byte, ResourceExpression.One));
+            var cost = ResourceProgram.Activate(child.Cost.Activation, allocation);
+            var bytes = NativeResourceAllocationVerifier.Verify(cost, child.Owner.CallableId, child.Owner, layout, token);
+            Assert.That(bytes.ConditionalUpperBound, Is.Not.Null, bytes.UnknownReason);
+            if (index != unsupportedAt)
+            { Assert.That(bytes.ConditionalUpperBound!.Constant, Is.EqualTo(new System.Numerics.BigInteger(32))); }
+            children = children.SetItem(index, child with { Cost = cost });
+        }
+        projection = projection with { Children = children };
+        var work = NativeForkJoinSourceCostVerifier.Check(projection, root, token);
+        Assert.That(work.HasSourceCosts, Is.True, work.UnknownReason);
+        Assert.That(work.Upper!.Arrays.Constant, Is.EqualTo(System.Numerics.BigInteger.One));
+        Assert.That(work.Upper.Elements.Constant, Is.EqualTo(System.Numerics.BigInteger.One));
+        var check = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, root, layout, token);
+        Assert.That(check.CumulativeUpper, Is.Null);
+        Assert.That(check.PeakAuxiliaryUpper, Is.Null);
+        Assert.That(check.RetainedUpper, Is.Null);
+        Assert.That(check.UnknownReason, Is.EqualTo("ForkJoinChildStorageOwnershipInvalid"));
+    }
+
     [TestCase(32, true)]
     [TestCase(64, false)]
     public void ChildStorageBudgetDiscardsAllEarlierStoragePrefixes(int choices, bool fits)
