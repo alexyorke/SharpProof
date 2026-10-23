@@ -89,6 +89,78 @@ public sealed class NativeResourceStackTests
         AssertBound(analysis.Bounds!.Program, depth, bytes);
     }
 
+    [TestCase("class", true, 24)]
+    [TestCase("class", false, 32)]
+    [TestCase("struct", true, 24)]
+    [TestCase("struct", false, -1)]
+    public void ReceiverStorageAdmissionIsIndependentOfSourceAllocationCounts(string kind, bool isStatic, int expectedBytes)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        var source = "public " + kind + " C {public " + (isStatic ? "static " : "") +
+            "void Target() {var allocation=new byte[1];}}";
+        AssertSourceStackAdmission(AnalyzeStackSource(source), expectedBytes);
+    }
+
+    [TestCase(false, 255, 2064)]
+    [TestCase(false, 256, -1)]
+    [TestCase(true, 255, 2064)]
+    [TestCase(true, 256, -1)]
+    public void CompleteParameterAndLocalInventoriesCannotBeTruncated(bool parameters, int count, int expectedBytes)
+    {
+        var declarations = Enumerable.Range(0, count).Select(index => "int value" +
+            index.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        var signature = parameters ? string.Join(",", declarations) : "";
+        var locals = parameters ? "" : string.Join(";", declarations) + ";";
+        var source = "public static class C {public static void Target(" + signature + ") {" + locals +
+            "var allocation=new byte[1];}}";
+        AssertSourceStackAdmission(AnalyzeStackSource(source), expectedBytes);
+    }
+
+    [Test]
+    public void SourceTraversalBudgetCannotPublishAPartialActivationCertificate()
+    {
+        var source = "public static class C {public static void Target() {var allocation=new byte[1];" +
+            new string(';', 5000) + "}}";
+        var analysis = AnalyzeStackSource(source);
+        Assert.That(analysis.Proven, Is.False);
+        Assert.That(analysis.Bounds, Is.Null);
+        Assert.That(analysis.UnknownReason, Is.EqualTo("AnalysisBudgetExceeded"));
+    }
+
+    private static ResourceBoundsAnalysis.Result AnalyzeStackSource(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var compilation = TestCompilation.Create("StackAdmissionSourceControl", source);
+        TestCompilation.AssertNoErrors(compilation);
+        var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
+        var declaration = (MethodDeclarationSyntax)method.DeclaringSyntaxReferences.Single().GetSyntax(token);
+        var body = compilation.GetSemanticModel(declaration.SyntaxTree).GetOperation(declaration.Body!, token);
+        return ResourceBoundsAnalysis.Analyze(method, body, token);
+    }
+
+    private static void AssertSourceStackAdmission(ResourceBoundsAnalysis.Result analysis, int expectedBytes)
+    {
+        ArgumentNullException.ThrowIfNull(analysis);
+        Assert.That(analysis.Proven, Is.True, analysis.UnknownReason);
+        Assert.That(analysis.Bounds!.Arrays.Constant, Is.EqualTo(System.Numerics.BigInteger.One));
+        Assert.That(analysis.Bounds.Elements.Constant, Is.EqualTo(System.Numerics.BigInteger.One));
+        var token = TestContext.CurrentContext.CancellationToken;
+        var program = ResourceProgramCodec.Decode(ResourceProgramCodec.Encode(analysis.Bounds.Program, token), token);
+        var check = NativeResourceStackVerifier.Derive(program, token);
+        if (expectedBytes < 0)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("ResourceStackFrameStorageUnavailable"));
+        }
+        else
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Bounds!.Depth.Constant, Is.EqualTo(System.Numerics.BigInteger.One));
+            Assert.That(check.Bounds.StorageBytes.Constant, Is.EqualTo(new System.Numerics.BigInteger(expectedBytes)));
+        }
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(5)]

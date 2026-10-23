@@ -109,6 +109,60 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Hosted allocation-admission coverage
+
+Checkpoint `d56e85af0a592ce82c91e03a79068a85a90cf7b3` completed all fifteen
+coverage shards in run 39885664236. Aggregate job 120196470035 produced a
+complete report and failed the unchanged 100 percent floor: 7111/7257 changed
+trusted lines (97.99 percent), with 146 gaps. The rejection paths in unchanged
+`ResourceBoundsAnalysis.Allocations.cs` at lines 34, 70 and 132 are now covered:
+unsupported
+string extent, exhausted member-inventory budget, and constructor chaining.
+The preceding report had 149 gaps. The new source-stack controls are not
+measured by this report.
+
+Evidence is retained in
+`artifacts/resource-d56e-coverage-evidence/coverage/SharpProof.coverage.json`.
+Merge `4df31d9878a4e6c6c7a7be6e7851c39b9b85be7b` has verified parents master
+`fe2a05235ae423d1ce391293b4bcfb80c9b7356f` and checkpoint `d56e85af0`.
+Full canonical CI (39885664378) and package consumers (39885664461) passed for
+that exact checkpoint. Coverage closure,
+the pending runtime proof policy, complete task-runtime bytes and final audit
+remain open.
+
+### Source-stack admission and complete inventory controls
+
+Nine valid-source controls exercise the compiler's activation inventory and
+native stack kernel. Class receivers, static struct methods, and supported
+parameter/local inventories retain declared logical-source frame bounds.
+An instance struct receiver and inventories exceeding 256 slots must retain the
+independent one-array/one-element source bounds while returning explicit
+`ResourceStackFrameStorageUnavailable` with no stack bound. The inventory
+controls include the allocation's local slot: 255 integer slots plus that slot
+fit; 256 plus that slot do not. Supported 256-slot frames have a 2064-byte bound
+under the declared logical-source model. Every native stack check round-trips
+the compiler program through its codec.
+
+A source body with 5000 empty statements must exhaust the existing traversal
+budget and return `AnalysisBudgetExceeded` without a partial program. These are
+logical-source model controls, not CLR frame or root task-byte proofs.
+
+The canonical formatter copied zero changes
+(`artifacts/resource-source-stack-admission-format.log`). The first build stopped
+before tests because two test-helper lambdas lacked explicit parameter guards
+(`artifacts/resource-source-stack-admission-tests.log`). Generating declarations
+directly from numeric indices removes those lambdas without changing fixtures.
+The corrected formatter copied zero changes
+(`artifacts/resource-source-stack-admission-corrected-format.log`). The corrected
+stack/resource-contract selection passed all 751 tests, including the nine new
+controls, with zero build warnings or errors
+(`artifacts/resource-source-stack-admission-corrected-tests.log`). Quality/API and
+documentation checks passed
+(`artifacts/resource-source-stack-admission-corrected-lint.log` and
+`artifacts/resource-source-stack-admission-corrected-docs.log`). Production admission,
+runtime premises and wire identities are unchanged. The runtime-byte model,
+pending proof-policy choice, coverage closure and final audit remain open.
+
 ### Allocation admission and shared-budget controls
 
 Two valid-source controls use unsupported repeated-string extents: arithmetic
