@@ -160,6 +160,8 @@ RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || paramet
         System.ArgumentNullException.ThrowIfNull(target);
         var record = new WorkerClaimResult
         {
+            Presentation = target.Presentation,
+            Diagnostic = outcome == WorkerClaimOutcome.Unknown ? target.Diagnostic : null,
             ClaimId = claimId,
             Outcome = outcome,
             Reason = reason,

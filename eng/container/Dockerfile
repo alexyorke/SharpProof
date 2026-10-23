@@ -121,3 +121,16 @@ WORKDIR /workspace/SharpProof
 USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["dev"]
+
+FROM toolchain AS consumer
+ARG SHARPPROOF_PACKAGE_VERSION
+LABEL org.opencontainers.image.source="https://github.com/alexyorke/SharpProof" \
+      io.sharpproof.consumer.version="${SHARPPROOF_PACKAGE_VERSION}" \
+      io.sharpproof.platform="linux/amd64"
+USER root
+COPY --chmod=0755 eng/container/consumer-entrypoint.sh /usr/local/bin/sharpproof-consumer
+RUN test -n "${SHARPPROOF_PACKAGE_VERSION}" \
+    && install -d -o sharpproof -g sharpproof /workspace/consumer
+WORKDIR /workspace/consumer
+ENTRYPOINT ["/usr/local/bin/sharpproof-consumer"]
+CMD ["--info"]

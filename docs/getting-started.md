@@ -81,3 +81,5 @@ This explicit portable-only configuration requires SDK 9.0.300+/Roslyn 4.14+ and
 ## Next steps
 
 Use [Unknown reasons](unknown-reasons.md) to understand unsupported semantics or exhausted budgets before changing limits. `Assume` and trusted boundaries are assumptions, not fixes for a failing claim. Follow the [tutorial series](tutorials/README.md) for supported examples and [upgrades](upgrading.md) when changing versions.
+
+The optional [developer tools](developer-experience.md) add packaged project templates, configuration checks, evidence comparison, NUnit regression export, and companion scaffolding. They use matching preview packages from your configured feed; the standard single-reference setup above remains sufficient for build verification.

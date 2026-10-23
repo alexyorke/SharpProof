@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -78,7 +78,7 @@ if ($NoBuild -and $Command -notin $reusableTestCommands) {
         '-NoBuild is supported only for test commands that can reuse an ' +
         'existing build in the current container workspace.')
 }
-if ($Fast -and $Command -notin $reusableTestCommands) {
+if ($Fast -and $Command -notin @($reusableTestCommands + 'developer-experience')) {
     throw '-Fast is supported only for non-qualifying test commands.'
 }
 if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
@@ -817,6 +817,25 @@ switch ($Command) {
     }
     'dependency-audit' {
         Invoke-DependencyAudit
+    }
+    'developer-experience' {
+        if ($Fast) {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -AdditionalBuildArguments @('-p:RunAnalyzersDuringBuild=false')
+        }
+        else {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        }
+        if ($Fast) { Write-Host 'Development feedback only: analyzer qualification was disabled by -Fast.' }
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
+            'Developer-experience qualification failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource }
+        $developerEvidence = Join-Path $repositoryRoot 'artifacts/developer-experience'
+        [IO.File]::WriteAllText((Join-Path $developerEvidence 'qualification-mode.txt'),
+            $(if ($Fast) { "Development feedback; repository analyzers disabled.`n" } else { "Repository analyzers enabled.`n" }), [Text.UTF8Encoding]::new($false))
+    }
+    'developer-packages' {
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDeveloperExperience.ps1' `
+            'Developer package creation failed.' @{ ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE; PackageSource = $PackageSource; PackOnly = $true }
     }
     'pack-tool' {
         Invoke-RequiredScript 'eng/scripts/Pack-SharpProofTool.ps1' `

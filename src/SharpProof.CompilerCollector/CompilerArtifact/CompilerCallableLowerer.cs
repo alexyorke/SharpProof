@@ -44,15 +44,27 @@ internal sealed class CompilerCallableLowerer
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken).ToImmutableArray();
+        WorkerDiagnosticContext? diagnostic = null;
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
-            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken);
+            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken, detail => { if (detail is null) { throw new ArgumentNullException(nameof(detail)); } diagnostic = detail; });
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
                 [.. total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
-        return new(target.Entry, reason) { Total = total, TotalEntry = entry };
+        return new(target.Entry, reason)
+        {
+            Total = total,
+            TotalEntry = entry,
+            Diagnostic = diagnostic,
+            Presentation = new WorkerCallablePresentation
+            {
+                Name = target.Method.ContainingType.Name + "." + target.Method.Name,
+                ParameterNames = [.. target.Method.Parameters.Select(static parameter =>
+                    (parameter ?? throw new ArgumentNullException(nameof(parameter))).Name)]
+            }
+        };
     }
 
     private WorkerClaimReason Classify(ManifestCallableTarget target, bool hasTotal, CancellationToken cancellationToken)

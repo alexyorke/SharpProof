@@ -15,8 +15,12 @@ internal static class ToolApplication
         Usage:
           dotnet sharpproof doctor [--json]
           dotnet sharpproof explain <result.json> [--file <exact recorded path>] [--line <positive line>] [--json]
+          dotnet sharpproof doctor --project <csproj> [--verification portable|container]
+          dotnet sharpproof explain --result <result.json> [--claim <id>]
+          dotnet sharpproof compare --baseline <result.json> --current <result.json> [--fail-on-regression]
+          dotnet sharpproof export-test --project <csproj> --result <result.json> --claim <id> --output <new-directory>
           dotnet sharpproof --help
-        doctor discovers SDK/runtime information; it does not restore, build, evaluate projects, or load the solver.
+        doctor without --project discovers SDK/runtime information without evaluating projects. With --project it checks evaluated configuration and existing restore evidence. Neither mode restores, builds, or loads the solver.
         explain validates the stored worker protocol and explains recorded outcomes. It does not verify current source.
         File matching is ordinal against the exact recorded path; --line matches the recorded claim/callable start line.
         Install this tool optionally. A normal SharpProof PackageReference already enables build verification.
@@ -33,6 +37,12 @@ internal static class ToolApplication
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
+            if (args is ["compare", ..] or ["export-test", ..] ||
+                args is ["doctor", ..] && args is not (["doctor"] or ["doctor", "--json"]) ||
+                args is ["explain", var firstOption, ..] && firstOption.StartsWith("--", StringComparison.Ordinal))
+            {
+                return await DeveloperCommands.RunAsync([.. args], output, error, cancellationToken).ConfigureAwait(false);
+            }
             if (args.Length == 0 || args is ["--help"])
             {
                 await WriteLineAsync(output, Help, cancellationToken).ConfigureAwait(false);

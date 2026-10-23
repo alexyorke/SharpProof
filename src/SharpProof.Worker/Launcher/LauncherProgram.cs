@@ -401,8 +401,8 @@ internal static class Program
             " claim " + result.ClaimId + " for " + claim.CallableId + "." +
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
-                    ", ", result.Model.Select(static value =>
-                        value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable + " = " + value.Value))) + "."
+                    ", ", result.Model.Select(value =>
+                        value is null ? throw new System.ArgumentNullException(nameof(value)) : (LauncherPresentation.VariableName(result, value.Variable) + " = " + value.Value))) + "."
                 : string.Empty);
 
         // Keep this diagnostic on stderr so RunVerifier consumes it through

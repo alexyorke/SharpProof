@@ -173,7 +173,8 @@ function Assert-DockerfileAuthority {
             'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
             'FROM powershell AS api-inventory',
             'FROM ${DOTNET_SDK_IMAGE} AS windows-native',
-            'FROM ${DOTNET_SDK_IMAGE} AS toolchain'))
+            'FROM ${DOTNET_SDK_IMAGE} AS toolchain',
+            'FROM toolchain AS consumer'))
     if ($actualStages.Length -cne $expectedStages.Length) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
     }
@@ -290,6 +291,31 @@ function Assert-DockerfileAuthority {
         '^CMD ' `
         'CMD ["dev"]' `
         'dev default command'
+}
+
+function Assert-ConsumerAuthority {
+    param([Parameter(Mandatory)][string]$Content)
+
+    $lines = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($Content -split "`r?`n"))
+    $consumer = Get-DockerfileStageLines -Lines $lines -FromLine 'FROM toolchain AS consumer'
+    Assert-SingleMatchingLine $consumer '^ARG ' 'ARG SHARPPROOF_PACKAGE_VERSION' 'consumer version argument'
+    Assert-SingleMatchingLine $consumer '^LABEL ' `
+        'LABEL org.opencontainers.image.source="https://github.com/alexyorke/SharpProof" \' 'consumer source label'
+    Assert-SingleMatchingLine $consumer '^\s+io\.sharpproof\.consumer\.version=' `
+        '      io.sharpproof.consumer.version="${SHARPPROOF_PACKAGE_VERSION}" \' 'consumer version label'
+    Assert-SingleMatchingLine $consumer '^\s+io\.sharpproof\.platform=' `
+        '      io.sharpproof.platform="linux/amd64"' 'consumer platform label'
+    Assert-SingleMatchingLine $consumer '^USER ' 'USER root' 'consumer startup user'
+    Assert-SingleMatchingLine $consumer '^COPY ' `
+        'COPY --chmod=0755 eng/container/consumer-entrypoint.sh /usr/local/bin/sharpproof-consumer' 'consumer entrypoint source'
+    Assert-SingleMatchingLine $consumer '^RUN ' `
+        'RUN test -n "${SHARPPROOF_PACKAGE_VERSION}" \' 'consumer required version'
+    Assert-SingleMatchingLine $consumer '^\s+&& install ' `
+        '    && install -d -o sharpproof -g sharpproof /workspace/consumer' 'consumer workspace ownership'
+    Assert-SingleMatchingLine $consumer '^WORKDIR ' 'WORKDIR /workspace/consumer' 'consumer working directory'
+    Assert-SingleMatchingLine $consumer '^ENTRYPOINT ' `
+        'ENTRYPOINT ["/usr/local/bin/sharpproof-consumer"]' 'consumer entrypoint'
+    Assert-SingleMatchingLine $consumer '^CMD ' 'CMD ["--info"]' 'consumer default command'
 }
 
 function Assert-ComposeAuthority {
@@ -435,6 +461,7 @@ Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API in
 Assert-Exact $catalog.dotnet.apiInventoryPackUrl ('https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/{0}/microsoft.netcore.app.ref.{0}.nupkg' -f $catalog.dotnet.apiInventoryPackVersion) 'API inventory reference pack source'
 Assert-Exact $catalog.dotnet.testRuntimeVersion $catalog.dotnet.minimumSdkFrameworkVersion 'Test runtime from the minimum-framework SDK'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
+Assert-ConsumerAuthority -Content $dockerfile
 Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
 if ($AuthorityOnly) {
     Write-Host 'SharpProof container authority validation passed.'

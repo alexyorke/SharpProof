@@ -36,7 +36,7 @@ internal static class CompilerTotalCallableLowerer
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
         ManifestCallableTarget target, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
         ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Action<WorkerDiagnosticContext>? reportDiagnostic = null)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
@@ -97,6 +97,17 @@ internal static class CompilerTotalCallableLowerer
         if (lowering == null)
         { return null; }
         cancellationToken.ThrowIfCancellationRequested();
+        if (reportDiagnostic != null && !lowering.Abstentions.IsDefaultOrEmpty)
+        {
+            var abstention = lowering.Abstentions[0];
+            var source = context.Factory.GetOperationInfo(abstention.Operation).SourceSpan;
+            var tree = source == null ? null : documents.FirstOrDefault(pair => pair.Value == source.Document).Key;
+            if (source != null && tree != null)
+            {
+                var location = Location.Create(tree, new Microsoft.CodeAnalysis.Text.TextSpan(source.Start, source.Length));
+                reportDiagnostic(new WorkerDiagnosticContext { Code = abstention.Reason.ToString(), Location = CompilerSourceLocationProjection.Create(location) });
+            }
+        }
         var program = lowering.Program;
         var isBodyAbstraction = false;
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)

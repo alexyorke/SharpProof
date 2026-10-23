@@ -22,6 +22,8 @@ internal static class CompilerLoweredArtifact
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         return new CompilerCallableArtifact
         {
+            Presentation = preparation.Presentation,
+            Diagnostic = preparation.Diagnostic,
             CallableId = preparation.Entry.CallableId,
             FailureReason = preparation.FailureReason,
             EffectClaims = preparation.EffectClaims,
@@ -115,6 +117,10 @@ internal static class CompilerLoweredArtifact
 
         return new CompilerCallablePreparation(entry, artifact.FailureReason)
         {
+            Presentation = WorkerProtocolJson.IsPresentationValid(artifact.Presentation) ? artifact.Presentation :
+                throw new InvalidDataException("Invalid callable presentation metadata."),
+            Diagnostic = WorkerProtocolJson.IsDiagnosticContextValid(artifact.Diagnostic) ? artifact.Diagnostic :
+                throw new InvalidDataException("Invalid callable diagnostic metadata."),
             EffectClaims = DecodeEffects(artifact, claims, cancellationToken),
             Compilation = compilation,
             Total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken),

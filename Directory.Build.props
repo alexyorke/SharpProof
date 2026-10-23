@@ -7,6 +7,7 @@
   <PropertyGroup>
     <!-- Keep logical/assembly identities stable while adopting Arcade test filenames. -->
     <SharpProofProjectName>$(MSBuildProjectName)</SharpProofProjectName>
+    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.DeveloperExperience.Tests'">SharpProof.DeveloperExperience.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Tool.Tests'">SharpProof.Tool.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'ConsoleLoggingAnalyzer.Tests'">ConsoleLoggingAnalyzer.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Tests'">SharpProof.Analyzer.Test</SharpProofProjectName>

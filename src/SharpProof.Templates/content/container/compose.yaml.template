@@ -1,0 +1,16 @@
+services:
+  verify:
+    image: __SHARPPROOF_CONSUMER_IMAGE__
+    platform: linux/amd64
+    mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
+    cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
+    working_dir: /workspace/consumer
+    volumes:
+      - .:/workspace/consumer
+      - sharpproof-obj:/workspace/consumer/.sharpproof-obj
+      - sharpproof-bin:/workspace/consumer/.sharpproof-bin
+      - sharpproof-packages:/home/sharpproof/.nuget/packages
+volumes:
+  sharpproof-obj:
+  sharpproof-bin:
+  sharpproof-packages:

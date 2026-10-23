@@ -53,9 +53,9 @@
     "defaultMemoryMiB": 40960
   },
   "worker": {
-    "protocolVersion": 13,
+    "protocolVersion": 14,
     "manifestSchemaVersion": 5,
-    "compilerArtifactSchemaVersion": 31,
+    "compilerArtifactSchemaVersion": 32,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -71,7 +71,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 15,
+    "schemaVersion": 16,
     "enabledByDefault": true,
     "maximumMiB": 512
   },
@@ -495,6 +495,7 @@
           "src/SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJson.cs",
           "src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs",
+          "src/SharpProof.Worker.Protocol/WorkerDeveloperContext.cs",
           "src/SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs"
         ],
         "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."
