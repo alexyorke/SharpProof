@@ -112,8 +112,9 @@ assert_clean_exact_commit_source() {
   local untracked_path
   while IFS= read -r -d '' untracked_path; do
     case "${untracked_path}" in
-      nupkgs/*)
-        # Release commands receive the exact package-job artifacts here.
+      nupkgs/* | tool-nupkgs/packages.tsv | tool-nupkgs/packages.lock.json | tool-nupkgs/Test-SharpProofPublishedPackages.sh)
+        # Release commands receive the exact package-job archives and these
+        # three optional-tool identity sidecars. Other source remains forbidden.
         ;;
       *)
         echo "SharpProof ${command_name} requires clean exact-commit source; an untracked source path was found." >&2

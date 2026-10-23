@@ -632,6 +632,8 @@ if ($env:SHARPPROOF_CONTAINER -ceq '1') {
     }
     Assert-Exact (& shfmt --version) "v$($catalog.scriptTools.shfmt.version)" 'shfmt version'
     if ($LASTEXITCODE -ne 0) { throw 'The pinned shfmt is not installed.' }
+    & bash (Join-Path $PSScriptRoot 'Test-SharpProofContainerEntrypoint.sh')
+    if ($LASTEXITCODE -ne 0) { throw 'Container entrypoint input and clean-source regressions failed.' }
 }
 
 Write-Host 'SharpProof container contract validation passed.'
