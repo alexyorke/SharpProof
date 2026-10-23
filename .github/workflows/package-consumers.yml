@@ -573,15 +573,21 @@ jobs:
           docker compose run --rm tooling tool-consumer
           -PackageSource artifacts/tool-packages
       - name: Record the separate optional tool identity and hashes
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofPackageManifest.ps1
-          -PackageDirectory artifacts/tool-packages'
+        run: |
+          docker compose run --rm tooling dev -lc '
+            set -euo pipefail
+            test ! -e artifacts/qualified-tool-packages
+            mkdir -- artifacts/qualified-tool-packages
+            cp -- artifacts/tool-packages/*.nupkg artifacts/qualified-tool-packages/
+            cmp -- artifacts/tool-packages/*.nupkg artifacts/qualified-tool-packages/*.nupkg
+            pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofPackageManifest.ps1 \
+              -PackageDirectory artifacts/qualified-tool-packages
+          '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         id: tool-upload
         with:
           name: nuget-tool-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/tool-packages/*
+          path: artifacts/qualified-tool-packages/*
           if-no-files-found: error
       - name: Bind the successful tool qualification attempt
         id: tool-identity
@@ -667,6 +673,8 @@ jobs:
       - name: Authenticate the exact artifacts and generate the shipped-payload SBOM
         run: |
           set -euo pipefail
+          test ! -e artifacts/release-supply-chain
+          sudo install -d -o 1000 -g 1000 -- artifacts/release-supply-chain
           docker compose run --rm -e RELEASE_SOURCE_COMMIT="$GITHUB_SHA" tooling dev -lc '
             set -euo pipefail
             pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1
@@ -675,6 +683,7 @@ jobs:
             pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseEvidence.ps1 -PackageSource nupkgs -EvidenceDirectory artifacts/release-supply-chain -RepositoryCommit "$RELEASE_SOURCE_COMMIT"
             pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofToolReleaseEvidence.ps1 -PackageSource tool-nupkgs -OutputDirectory artifacts/release-supply-chain -RepositoryCommit "$RELEASE_SOURCE_COMMIT"
           '
+          sudo chown -- "$(id -u):$(id -g)" artifacts/release-supply-chain
 
       - name: Attest the qualified release artifacts and evidence
         id: release-provenance
