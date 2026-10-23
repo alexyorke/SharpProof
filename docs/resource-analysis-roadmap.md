@@ -108,15 +108,112 @@ an optional strengthening of this conditional model. It is not claimed here.
 - [x] Preserve the original dirty checkout using an isolated branch/worktree.
 - [x] First milestone: 1184 analyzer tests plus docs/layout/container gates passed.
 - [x] Open and attach the draft merge request for this branch.
-- [ ] Keep this document current after each verified implementation phase.
-- [ ] Run focused checks before the relevant broader gate; record exact pushed
+- [x] Keep this document current after each verified implementation phase.
+- [x] Run focused checks before the relevant broader gate; record exact pushed
   commit and CI status after each delivery checkpoint.
-- [ ] Final requirement-by-requirement audit of phases A-F and the actual
+- [x] Final requirement-by-requirement audit of phases A-F and the actual
   consumer workflow, with no unchecked required items, before marking complete.
 
 ## Current checkpoint
 
-### Boundary controls verified locally
+### Implementation merged; supplementary MR published
+
+[MR #334](https://github.com/alexyorke/SharpProof/pull/334) merged on
+2026-10-23 as master commit `7f7cac39503f23890e9cff35bac85f9339c19779`.
+The required A-F implementation and the bounded final scope audit are complete
+under the explicit reported-runtime-assumption policy. The qualified upstream
+head passed canonical CI and the unchanged 100% changed-TCB floor, as recorded
+below.
+
+The extra 26 boundary cases completed in this chat were not part of that merge.
+They are preserved on `codex/resource-boundary-followups`, created from that
+current master, together with this ledger. Its implementation and test source
+matches the verified local integration described below; it changes no production
+proof rules. [Supplementary MR #355](https://github.com/alexyorke/SharpProof/pull/355)
+contains those cases and this progress record. Its exact-commit checks are the
+authoritative hosted qualification status. All 2536 selected local tests,
+formatting, lint/API compatibility and layout passed (2978 source files,
+62 projects and 151 pinned common files). No required implementation work remains
+in phases A-F; delivery acceptance requires the MR checks to pass. The original
+merge and the supplementary delivery are tracked separately.
+
+### Historical integrated qualification checkpoint
+
+The latest qualified upstream feature head is `78bc5a24d`.
+[Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39936190992)
+passed, including package reproduction.
+[Coverage](https://github.com/alexyorke/SharpProof/actions/runs/39936190695)
+passed all fifteen shards and the unchanged 100% floor: 8454/8454 changed-TCB
+lines, with no uncovered lines. The report commit is
+`0178520098047ef98e3fd12cee541310db40a4a9`; its verified parents are master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature
+`78bc5a24ddd3ba12364fa0ce893a390fcd280fb0`. Production extraction changed the
+line universe from the historical 8329 lines; this is not a per-line mapping
+of the old 98 gaps.
+
+Local merge `2cecd8789` preserves the qualified upstream changes and the 26
+additional source/component cases in `b6fd68812`. Canonical container targeted
+checks with `-Fast` passed 1040 worker cases, 495 analyzer/resource cases,
+935 IR cases, 45 frontend/parity cases and 21 helper-selection cases.
+Five component reviews found no concrete soundness regression in the incoming
+production changes. Final repository checks, publication and hosted qualification
+of the combined commit remain. These local results do not substitute for that
+exact-commit qualification.
+
+The final bounded A-F audit found no material missing behavior within the stated
+admitted families. Its evidence uses real source, execution and packaged controls,
+independently of private-state corruption tests or the coverage percentage:
+
+- A-B: `ResourceBoundsLoopTests`, `ResourceBoundsCallTests` and
+  `ResourceBoundsRecursionTests`, with native phased-counter/source-call checks
+  and packaged phased-loop contracts.
+- C-D: native byte, lifetime, object/closure/boxing and logical stack controls;
+  `WorkerResourceContractConsumerTests` exercises real artifact-to-worker proof,
+  refutation, independent outcomes, provenance, cache and SARIF. Package layout
+  smoke tests cover shipped contracts and byte evidence.
+- E-F: packaged expected/accounting/tightness and task lifetime controls, all
+  eleven runtime quantities and twelve used caller assumptions, absent-premise
+  Unknown, evidence tamper/policy/cache checks, and the benchmark's matched
+  source/environment/output with measurements separated from proofs.
+
+The remaining gate is delivery qualification of the final pushed revision,
+tracked by the MR checks. No broader physical-frame or elapsed-time guarantee
+is inferred from these tests.
+
+### Historical measured qualification at feature head 17c2d6703
+
+[Canonical CI](https://github.com/alexyorke/SharpProof/actions/runs/39933180922)
+passed, including the repaired full package reproduction job. All fifteen
+[coverage shards](https://github.com/alexyorke/SharpProof/actions/runs/39933180738)
+passed, but the coverage gate remains below its unchanged 100% floor:
+8231/8329 changed-TCB lines (98.82%), leaving 98 gaps. The report covers merge
+`7e5c83bb58ea44e89f228e5ceab81292bf699643`, with verified parents master
+`70fba9efeefe8cb621cbf834998941985a5227ee` and feature
+`17c2d67036a0fd1ae1213e205bc93172cb788ad1`. The 102 controls closed 49
+of the preceding 147 gaps in the same comparison universe.
+
+Follow-up local verification passed twenty analyzer/SDK/source cases, nineteen
+frontend cases, ten IR representation/helper cases, twenty-five focused worker
+cases and two malformed-observation cases. The batch adds 26 cases, bringing
+these boundary fixtures to 128 cases across eleven files. The final analyzer
+selector-only correction was rerun with the canonical `-Fast` test command;
+the preceding normal build compiled all twenty cases without warnings. Formatting,
+lint/API compatibility and layout passed (2964 source files, 62 projects, 151
+pinned common files). These later tests have no measured coverage claim.
+Overall completion still requires the unchanged coverage floor
+and qualification of the final committed source. The exact remaining units are
+tracked in the [coverage audit](resource-coverage-admission-audit.md).
+
+A concurrent chat advanced the same MR to `78bc5a24d`, preserving this head via
+a merge. Five read-only component audits found no concrete soundness regression
+in the incoming production changes. Local merge `2cecd8789` preserves that
+commit and follow-up commit `b6fd68812`; combined verification is running.
+The incoming suite also includes private-state corruption and direct private
+helper tests. Those test defensive behavior only; they are not evidence that
+such states arise from admitted source programs. The older package workflow
+was cancelled on the newer push; its result is not reported as a pass.
+
+### Prior boundary-control checkpoint
 
 All 1852 selected worker cases passed after correcting two new fixture setups.
 The focused 39-case correction run established the actual emit-only diagnostic,
@@ -129,12 +226,10 @@ were corrected or removed rather than changing production code to fit them.
 
 Final formatting, lint/API compatibility and layout passed with the fixtures
 and complete audit links (2963 source files, 62 projects, 151 pinned common
-files). The 102 cases
-have no qualified coverage count yet. The 147-line baseline and its source audit
-remain explicit until a fresh report replaces them. Exact-head hosted
-qualification and the unchanged 100% floor still prevent overall completion.
+files). Their measured effect is now recorded above. The prior 147-line baseline
+remains historical evidence. The unchanged 100% floor prevents overall completion.
 
-### Fresh qualification and remaining coverage work
+### Previous qualification and package repair
 
 Published head `ca3b70301` is mergeable against master `70fba9efe`. Its hosted
 merge commit `1a583de04cb43b72af502e822682ea702810c873` has exactly those two
@@ -168,7 +263,7 @@ Further tests and their coverage effect remain unqualified until verification.
 The [coverage admission audit](resource-coverage-admission-audit.md) partitions
 all 147 units and separates invariant findings from unresolved reachability.
 
-### Current master integration in progress
+### Completed master integration
 
 Master advanced to `70fba9efe` while the resource branch was qualifying. GitHub
 reported merge conflicts, preventing canonical PR qualification of `46602a45f`.

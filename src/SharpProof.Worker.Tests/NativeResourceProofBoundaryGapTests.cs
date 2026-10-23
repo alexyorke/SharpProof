@@ -11,6 +11,48 @@ internal sealed partial class NativeResourceContractTests
 {
     [TestCase(false)]
     [TestCase(true)]
+    public void ProofBoundaryNullReferenceIdentityObservationCannotAuthorizeRetainedBytes(bool malformedObservation)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock();
+        var target = factory.CreateVariable("owned", factory.ObjectType);
+        var allocation = builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType, target);
+        builder.Return(entry, factory.CreateOperation(), factory.Variable(target));
+        var program = builder.Build();
+        var replay = new ResourceMemoryReplay(program);
+        var options = new IrProgramReplayOptions(static _ => null)
+        {
+            CompletedInstructionObserver = (instruction, value, approximation) =>
+            {
+                ArgumentNullException.ThrowIfNull(instruction);
+                // This deliberately malformed typed witness is accepted by the
+                // observation input API; it is not interpreter-produced data.
+                // The real return observation and execution remain unchanged.
+                var observed = malformedObservation && ReferenceEquals(instruction, allocation)
+                    ? new IrValue(factory.ObjectType, IrValueKind.Reference, null) : value;
+                replay.Observe(instruction, observed, approximation);
+            }
+        };
+        var cancellation = TestContext.CurrentContext.CancellationToken;
+        var execution = new IrProgramInterpreter(factory).Execute(program, null, 100, options, cancellation);
+        Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(execution.ReturnValue!.Reference, Is.Not.Null);
+        var check = replay.Complete(execution, new("CoreCLR", "8.0.32", "x64", 8), cancellation);
+        if (malformedObservation)
+        {
+            Assert.That(check.Bounds, Is.Null);
+            Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayBorrowedReference"));
+        }
+        else
+        {
+            Assert.That(check.UnknownReason, Is.Null);
+            Assert.That(check.Bounds, Is.EqualTo(new ResourceMemoryBounds(24, 24, 0, 0, 24, 24)));
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
     public async Task ProofBoundaryEmittedSitesRequireTheLaterChildSourceProof(bool configured)
     {
         var source = "using SharpProof.Attributes;using System.Threading.Tasks;public static class C{" +
