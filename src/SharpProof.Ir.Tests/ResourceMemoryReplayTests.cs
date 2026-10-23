@@ -545,6 +545,8 @@ public sealed class ResourceMemoryReplayTests
     [TestCase("type")]
     [TestCase("borrowed")]
     [TestCase("downcast")]
+    [TestCase("null")]
+    [TestCase("scalar")]
     [TestCase("valid")]
     public void FieldStoreObservationsNeedAnOwnedReceiverAndMatchingOwnedValue(string mutation)
     {
@@ -576,6 +578,8 @@ public sealed class ResourceMemoryReplayTests
                 "missing" => null,
                 "type" => factory.CreateBooleanValue(true),
                 "borrowed" => factory.CreateSequenceValue(array, [factory.CreateIntegerValue(1)]),
+                "null" => factory.CreateNullValue(array),
+                "scalar" => new IrValue(array, IrValueKind.Boolean, true),
                 _ => value
             };
         });

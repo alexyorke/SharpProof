@@ -243,7 +243,8 @@ internal sealed class ResourceMemoryReplay
                     { return Unknown("MemoryReplayFieldStoreUnsupported"); }
                     var receiver = Find(receiverValue, identities);
                     var member = factory.GetMemberInfo(field);
-                    if (!objects.Contains(receiver) || member.IsStatic || !member.ParameterTypes.IsEmpty || value.Type != member.ReturnType)
+                    if (!objects.Contains(receiver) || member.IsStatic || !member.ParameterTypes.IsEmpty || value.Type != member.ReturnType ||
+                        !ObservedKindMatches(factory.GetTypeInfo(member.ReturnType).Kind, value.Kind))
                     { return Unknown("MemoryReplayFieldStoreUnsupported"); }
                     var frameCapture = frames.Contains(receiver);
                     if ((frameCapture || IrClosureFrameSite.IsCaptureField(factory, field)) &&
@@ -254,6 +255,9 @@ internal sealed class ResourceMemoryReplay
                         var child = value.Kind == IrValueKind.Null ? 0 : Find(value, identities);
                         if (value.Kind != IrValueKind.Null && child == 0)
                         { return Unknown("MemoryReplayBorrowedReference"); }
+                        if (stored.Value == null || !ResourceMemoryProgram.TryReference(stored.Value, factory, referenceValues, out var expectedChild,
+                            fields: referenceFields, ownedObjects: objects, referenceCasts: true) || child != expectedChild)
+                        { return Unknown("MemoryReplayFieldStoreUnsupported"); }
                         if (frameCapture && child == receiver)
                         { return Unknown("MemoryReplayClosureCaptureUnsupported"); }
                         if (IrDelegateCaptureSite.IsTargetField(factory, field))

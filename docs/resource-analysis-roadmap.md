@@ -109,6 +109,35 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Field-store observation identity repair
+
+Two additional field-store observation controls reproduced missing identity
+validation. The real program stores an owned 32-byte array in a 24-byte object
+and returns the complete 56-byte graph. Replacing only the completed store's
+observation with null, or a scalar carrying the field's reference type, was
+accepted and produced a lifetime envelope. Both failures and five passing
+controls are retained in `artifacts/resource-field-store-identity-red.log`.
+
+Replay now checks the observation kind and resolves the IR value being stored
+against the independent reference map before recording a reference edge.
+An inconsistent kind or child identity returns
+`MemoryReplayFieldStoreUnsupported` without bounds. Existing borrowed-reference
+and closure/delegate capture checks remain in force. Response cache 65, protocol
+default tests, acceptance contract and current compatibility documentation are
+coordinated; protocol 43, manifest 6, nested projection 11 and outer artifact 55
+are unchanged.
+
+Formatting copied zero changes (`artifacts/resource-field-store-identity-format.log`).
+All 241 memory trace/replay/graph tests passed
+(`artifacts/resource-field-store-identity-tests.log`), including the reproduced
+store mutations and the three null-field support controls. All 1,059 native
+resource/protocol/defaults worker tests passed
+(`artifacts/resource-field-store-identity-worker-tests.log`). Lint/API and
+documentation gates passed. Hosted qualification for the preceding production
+repair `d48d6a218` remains live; no result is claimed for that run yet.
+The full runtime-byte model, proof-policy choice, changed-TCB coverage and final
+audit remain open.
+
 ### Null-field replay compatibility controls
 
 Three additional interpreter/replay controls check fields after the identity
