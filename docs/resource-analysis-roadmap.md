@@ -109,6 +109,30 @@ The cumulative-byte item remains open until all of these obligations are joined:
 
 ## Current checkpoint
 
+### Recursive non-rank argument admission controls
+
+Four source-level controls exercise the admitted tail recurrence with an integer
+width and array forwarded alongside its decreasing rank. The unchanged-argument
+case is compared with an independently executed recursive allocation counter:
+four allocating activations plus the caller array allocate nine arrays and 23 elements.
+Changing the width, replacing the array on each recursive call, or replacing a
+forwarded parameter with a constant must return `UnsupportedRecursiveArguments`
+without publishing the caller allocation or a recursive-prefix bound. Even a
+constant equal to the initial argument remains outside the forwarding rule.
+
+All 255 analyzer resource tests passed with zero build warnings or errors
+(`artifacts/resource-recursive-forwarding-corrected-tests.log`). The first build
+stopped before tests because the independent helper's allocation width lacked
+an explicit nonnegative guard (`artifacts/resource-recursive-forwarding-tests.log`);
+adding the guard fixed that test-helper defect. Both formatting runs copied
+zero changes (`artifacts/resource-recursive-forwarding-corrected-format.log`).
+Corrected lint/API checks passed; final documentation is checked before commit.
+This checkpoint adds tests only; response
+cache 65 and all other compatibility identities remain unchanged. The published
+head `443b5b0e6` includes the field-store repair and requires its own hosted
+qualification. Full task-runtime bytes, proof policy, coverage closure and final
+audit remain open.
+
 ### Published assignment-repair coverage checkpoint
 
 Coverage run 39896297981 completed all 15 shards successfully for published

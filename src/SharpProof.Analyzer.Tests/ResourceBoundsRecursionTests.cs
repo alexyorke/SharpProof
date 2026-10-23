@@ -35,6 +35,43 @@ public sealed partial class ResourceBoundsTests
         Assert.That(result.Bounds.Elements.Text, Is.EqualTo("15"));
     }
 
+    [TestCase("n-1, width, data", true)]
+    [TestCase("n-1, width+1, data", false)]
+    [TestCase("n-1, width, new int[3]", false)]
+    [TestCase("n-1, 2, data", false)]
+    public void TailRecurrencesRequireForwardedNonRankArguments(string arguments, bool supported)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        var result = AnalyzeSource("public static class C { public static void Root() { Leaf(4, 2, new int[3]); } " +
+            "static void Leaf(int n, int width, int[] data) { if(n<=0)return; var a=new int[width]; var b=new int[data.Length]; Leaf(" + arguments + "); } }");
+        if (!supported)
+        {
+            Assert.That(result.Proven, Is.False);
+            Assert.That(result.UnknownReason, Is.EqualTo("UnsupportedRecursiveArguments"));
+            Assert.That(result.Bounds, Is.Null, "Neither caller allocations nor a recursive prefix may become a partial bound.");
+            return;
+        }
+        int arrays = 1, elements = 3;
+        void Execute(int n, int width, int[] data)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentOutOfRangeException.ThrowIfNegative(width);
+            if (n <= 0)
+            { return; }
+            var first = new int[width];
+            var second = new int[data.Length];
+            arrays += 2;
+            elements += first.Length + second.Length;
+            Execute(n - 1, width, data);
+        }
+        Execute(4, 2, new int[3]);
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Constant, Is.EqualTo(new System.Numerics.BigInteger(arrays)));
+        Assert.That(result.Bounds.Elements.Constant, Is.EqualTo(new System.Numerics.BigInteger(elements)));
+        Assert.That(arrays, Is.EqualTo(9));
+        Assert.That(elements, Is.EqualTo(23));
+    }
+
     [TestCase("if(n<0)return; var a = new int[2]; Root(n-1);", "RecursiveCostUnknown")]
     [TestCase("if(n<=0)return; var a = new int[2]; Root(n+1);", "UnprovedRecursiveProgress")]
     [TestCase("if(n<=0)return; var a = new int[2]; Root(n/1);", "UnprovedRecursiveProgress")]
