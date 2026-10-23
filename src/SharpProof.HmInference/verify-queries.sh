@@ -17,6 +17,8 @@ EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Linq;using System.Collections.Generic;using System.Threading.Tasks;
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
+public delegate List<T> ReceiverPair<T>(T first,T second);
+public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second)=>new List<T>{first,second};}
 public sealed class MemberContractCell<T>{
   [System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;
   [System.Diagnostics.CodeAnalysis.MaybeNull]public T Value{get=>Field!;set=>Field=value!;}
@@ -81,6 +83,11 @@ public static class QueryConsumer{
   public static int[] GenericCallArray(int value)=>GenericResultArray(value,GenericResultMaybe(value));
   public static (bool tag,List<int> values) GenericCallTagged(bool tag,int value)=>GenericResultTagged(tag,value,GenericResultMaybe(value));
   public static async Task<List<int>> GenericCallAwaited(int value,Task gate)=>await GenericResultAwait(value,GenericResultMaybe(value),gate);
+  public static List<int> ReceiverList(ReceiverPair<int> pair,int value)=>pair(value,GenericResultMaybe(value));
+  public static List<int> ReceiverAlias(ReceiverPair<int> pair,int value){var local=pair;return local(value,GenericResultMaybe(value));}
+  public static List<int> ReceiverInstance(ReceiverBox<int> box,int value)=>box.Pair(value,GenericResultMaybe(value));
+  public static async Task<List<int>> ReceiverTask(ReceiverPair<int> pair,Task<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
+  public static async ValueTask<List<int>> ReceiverValueTask(ReceiverPair<int> pair,ValueTask<int> input){var value=await input;return pair(value,GenericResultMaybe(value));}
   public static int RequiredForward(int value)=>RequiredForwardHelper(value);
   public static int RequiredNamedForward(int value)=>RequiredForwardHelper(value:value);
   public static int RequiredDelegateForward(RequiredInputAction<int> require,int value)=>require(value);
@@ -321,11 +328,21 @@ EOF
     grep -Fq 'T1[] GenericCallArray<T1>(T1 value) where T1 : struct' "$log"
     grep -Fq '(T1 tag, global::System.Collections.Generic.List<T2> values) GenericCallTagged<T1, T2>(T1 tag, T2 value) where T2 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1>> GenericCallAwaited<T1, T2>(T1 value, T2 gate) where T1 : struct where T2 : global::System.Threading.Tasks.Task' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1> ReceiverList<T1>(global::ReceiverPair<T1> pair, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1> ReceiverAlias<T1>(global::ReceiverPair<T1> pair, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1> ReceiverInstance<T1>(global::ReceiverBox<T1> box, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1>> ReceiverTask<T1>(global::ReceiverPair<T1> pair, global::System.Threading.Tasks.Task<T1> input) where T1 : struct' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.List<T1>> ReceiverValueTask<T1>(global::ReceiverPair<T1> pair, global::System.Threading.Tasks.ValueTask<T1> input) where T1 : struct' "$log"
   else
     grep -Fq 'global::System.Collections.Generic.List<T1?> GenericCallList<T1>(T1 value)' "$log"
     grep -Fq 'T1?[] GenericCallArray<T1>(T1 value)' "$log"
     grep -Fq '(T1 tag, global::System.Collections.Generic.List<T2?> values) GenericCallTagged<T1, T2>(T1 tag, T2 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> GenericCallAwaited<T1, T2>(T1 value, T2 gate) where T2 : global::System.Threading.Tasks.Task' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1?> ReceiverList<T1>(global::ReceiverPair<T1?> pair, T1 value)' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1?> ReceiverAlias<T1>(global::ReceiverPair<T1?> pair, T1 value)' "$log"
+    grep -Fq 'global::System.Collections.Generic.List<T1?> ReceiverInstance<T1>(global::ReceiverBox<T1?> box, T1 value)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.Task<global::System.Collections.Generic.List<T1?>> ReceiverTask<T1>(global::ReceiverPair<T1?> pair, global::System.Threading.Tasks.Task<T1> input)' "$log"
+    grep -Fq 'global::System.Threading.Tasks.ValueTask<global::System.Collections.Generic.List<T1?>> ReceiverValueTask<T1>(global::ReceiverPair<T1?> pair, global::System.Threading.Tasks.ValueTask<T1> input)' "$log"
   fi
   grep -Fq 'T1 RequiredForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
   grep -Fq 'T1 RequiredNamedForward<T1>([global::System.Diagnostics.CodeAnalysis.DisallowNull] T1 value)' "$log"
@@ -525,7 +542,7 @@ EOF
     exit 1
   }
   cp "$array_fixture/after.log" /workspace/SharpProof/artifacts/hm-inference/package-collection-array-after.txt
-  if grep -Eq 'CS8604|CS8032|AD0001' "$array_fixture/after.log"; then
+  if grep -Eq 'HM0001|warning |CS8604|CS8032|AD0001' "$array_fixture/after.log" || ! grep -Fq '0 Warning(s)' "$array_fixture/after.log"; then
     tail -35 "$array_fixture/after.log"
     exit 1
   fi

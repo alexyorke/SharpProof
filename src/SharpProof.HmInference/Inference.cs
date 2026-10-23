@@ -99,7 +99,8 @@ public static partial class Inference
     }
 
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
-        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null, Dictionary<TextSpan, HashSet<string>>? nullableInvocationResults = null)
+        Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null, Dictionary<TextSpan, HashSet<string>>? nullableInvocationResults = null,
+        HashSet<(int Parameter, string Path)>? nullableReceiverInputs = null)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
@@ -107,6 +108,7 @@ public static partial class Inference
         private readonly List<Dictionary<TextSpan, NullableFlowState>> readFlowHistory = readFlowHistory ?? [];
         private readonly HashSet<TextSpan> nullableCollectionInputs = nullableCollectionInputs ?? [];
         private readonly Dictionary<TextSpan, HashSet<string>> nullableInvocationResults = nullableInvocationResults ?? [];
+        private readonly HashSet<(int Parameter, string Path)> nullableReceiverInputs = nullableReceiverInputs ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
@@ -157,6 +159,7 @@ public static partial class Inference
                 }
             }
 
+            ApplyNullableReceiverInputs(parameters);
             for (var i = 0; i < parameters.Length; i++)
             { ImportConstructedConstraints(symbol.Parameters[i].Type, parameters[i]); }
             currentMethod = symbol;
@@ -392,6 +395,8 @@ public static partial class Inference
             var postconditionMethod = changed.GetRoot(cancellationToken).GetAnnotatedNodes(candidateMarker).OfType<MethodDeclarationSyntax>().Single();
             if (RefineCollectionInputs(changedCompilation, method, postconditionMethod, pins) is { } refinedCollection)
             { return refinedCollection; }
+            if (RefineNullableReceiverInputs(changedCompilation, method, postconditionMethod, pins) is { } refinedReceiver)
+            { return refinedReceiver; }
             if (RefineInvocationResults(changedCompilation, method, postconditionMethod, pins) is { } refinedInvocations)
             { return refinedInvocations; }
             if (RefineNullablePostconditions(changedCompilation, method, postconditionMethod, pins) is { } refinedPostconditions)
@@ -1830,7 +1835,8 @@ public static partial class Inference
                     ? member.Expression : invocation.Expression;
                 var receiverValue = operation.Instance is IConditionalAccessInstanceOperation ? ConditionalReceiver().Value : Expression(receiver);
                 var signature = DelegateSignature(called.ContainingType, receiverValue);
-                BindArguments(operation, signature.Inputs, argumentValues);
+                BindArguments(operation, signature.Inputs, argumentValues,
+                    NullableReceiverInputObserver(invocation, called, receiverValue));
                 return ApplyReturnNullability(operation, signature.Output, forStorage, argumentValues);
             }
             if (SameMethodDefinition(called, currentMethod) && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod!.ContainingType)
@@ -1848,9 +1854,10 @@ public static partial class Inference
                 else if (operation.Instance is not IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } and not IConditionalAccessInstanceOperation)
                 { throw new InferenceException("Implicit instance calls are unsupported."); }
             }
+            HmType? mappedReceiver = null;
             var variables = operation.Instance is IConditionalAccessInstanceOperation
                 ? PatternOwnerMapping(called.ContainingType, ConditionalReceiver().Value, ConditionalReceiver().Type)
-                : ReceiverMapping(called, instanceReceiver);
+                : ReceiverMapping(called, instanceReceiver, out mappedReceiver);
             var definition = called.OriginalDefinition;
             var explicitArguments = invocation.Expression is GenericNameSyntax generic ? generic.TypeArgumentList.Arguments
                 : invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax name } ? name.TypeArgumentList.Arguments : default;
@@ -1867,13 +1874,15 @@ public static partial class Inference
                 }
 
                 return CSharpTypes.Rigid(p.Type, variables);
-            }).ToArray(), argumentValues);
+            }).ToArray(), argumentValues, mappedReceiver is null ? null
+                : NullableReceiverInputObserver(invocation, called, mappedReceiver));
             foreach (var parameter in definition.TypeParameters)
             { ImportConstraints(parameter, variables[parameter], variables, called.TypeArguments[parameter.Ordinal]); }
             return ApplyReturnNullability(operation, CSharpTypes.Rigid(definition.ReturnType, variables), forStorage, argumentValues);
         }
 
-        private void BindArguments(IInvocationOperation operation, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null)
+        private void BindArguments(IInvocationOperation operation, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null,
+            Action<IArgumentOperation, HmType, HmType>? observe = null)
         {
             if (operation is null)
             {
@@ -1885,10 +1894,11 @@ public static partial class Inference
                 throw new global::System.ArgumentNullException(nameof(parameters));
             }
 
-            BindArguments(operation.Arguments, parameters, argumentValues);
+            BindArguments(operation.Arguments, parameters, argumentValues, observe);
         }
 
-        private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null)
+        private void BindArguments(IEnumerable<IArgumentOperation> arguments, HmType[] parameters, Dictionary<int, HmType>? argumentValues = null,
+            Action<IArgumentOperation, HmType, HmType>? observe = null)
         {
             if (arguments is null)
             {
@@ -1948,6 +1958,7 @@ public static partial class Inference
                 else
                 {
                     var actual = BindNullableArgument(argument.Value, ApplyInputNullability(parameter, expected));
+                    observe?.Invoke(argument, expected, actual);
                     RecordDisallowNullArgument(argument, actual);
                     if (argumentValues is not null)
                     { argumentValues[parameter.Ordinal] = actual; }

@@ -28,6 +28,97 @@ public static partial class Inference
         }
 
         private readonly Dictionary<TextSpan, HmType> invocationResultShapes = [];
+        private readonly List<(TextSpan Call, int Argument, int Parameter, string Path)> nullableReceiverCandidates = [];
+
+        private void ApplyNullableReceiverInputs(HmType[] parameters)
+        {
+            if (parameters is null)
+            { throw new ArgumentNullException(nameof(parameters)); }
+            if (nullableReceiverInputs.Count == 0)
+            { return; }
+            HmType Rewrite(HmType node, int parameter, string path)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (parameter < 0)
+                { throw new ArgumentOutOfRangeException(nameof(parameter)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                node = node.Root;
+                if (nullableReceiverInputs.Contains((parameter, path)) && node.IsVariable)
+                {
+                    var optional = new HmType(CSharpTypes.NullableParameter, node);
+                    defaultValueAnnotations.Add(optional);
+                    return optional;
+                }
+                if (node.Arguments.Length == 0)
+                { return node; }
+                return node.WithArguments(node.Arguments.Select((argument, index) =>
+                {
+                    if (argument is null)
+                    { throw new ArgumentNullException(nameof(argument)); }
+                    if (index < 0)
+                    { throw new ArgumentOutOfRangeException(nameof(index)); }
+                    return Rewrite(argument, parameter, path + "/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }).ToArray());
+            }
+            for (var i = 0; i < parameters.Length; i++)
+            { parameters[i] = Rewrite(parameters[i], i, ""); }
+        }
+
+        private MethodResult? RefineNullableReceiverInputs(Compilation compilation, MethodDeclarationSyntax original,
+            MethodDeclarationSyntax candidate, HashSet<(int Parameter, string Path)> pins)
+        {
+            if (compilation is null)
+            { throw new ArgumentNullException(nameof(compilation)); }
+            if (original is null)
+            { throw new ArgumentNullException(nameof(original)); }
+            if (candidate is null)
+            { throw new ArgumentNullException(nameof(candidate)); }
+            if (pins is null)
+            { throw new ArgumentNullException(nameof(pins)); }
+            if (nullableReceiverCandidates.Count == 0)
+            { return null; }
+            var warnings = compilation.GetDiagnostics(cancellationToken).Where(diagnostic =>
+            {
+                if (diagnostic is null)
+                { throw new ArgumentNullException(nameof(diagnostic)); }
+                return !diagnostic.IsSuppressed && diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error
+                    && diagnostic.Id == "CS8604" && diagnostic.Location.SourceTree == candidate.SyntaxTree;
+            }).ToArray();
+            if (warnings.Length == 0)
+            { return null; }
+            var before = original.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+            var after = candidate.DescendantNodes().OfType<InvocationExpressionSyntax>().ToArray();
+            if (before.Length != after.Length)
+            { return null; }
+            var next = new HashSet<(int Parameter, string Path)>(nullableReceiverInputs);
+            foreach (var input in nullableReceiverCandidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var index = Array.FindIndex(before, call =>
+                {
+                    if (call is null)
+                    { throw new ArgumentNullException(nameof(call)); }
+                    return call.Span == input.Call;
+                });
+                if (index < 0 || input.Argument >= after[index].ArgumentList.Arguments.Count
+                    || !SyntaxFactory.AreEquivalent(before[index].Expression, after[index].Expression))
+                { continue; }
+                var expression = after[index].ArgumentList.Arguments[input.Argument].Expression;
+                if (!pins.Contains((input.Parameter, input.Path)) && warnings.Any(warning =>
+                {
+                    if (warning is null)
+                    { throw new ArgumentNullException(nameof(warning)); }
+                    return warning.Location.SourceSpan == expression.Span
+                        || warning.Location.SourceSpan == StorageExpression(expression).Span;
+                }))
+                { next.Add((input.Parameter, input.Path)); }
+            }
+            return next.Count == nullableReceiverInputs.Count ? null
+                : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: nullableCollectionInputs,
+                    nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: next).Analyze(original, pins);
+        }
 
         private HmType ApplyInvocationAnnotations(ExpressionSyntax syntax, HmType value)
         {
@@ -108,7 +199,9 @@ public static partial class Inference
                 foreach (var path in paths)
                 { changed |= retained.Add(path); }
             }
-            return !changed ? null : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: next).Analyze(original, pins);
+            return !changed ? null : new Session(model, cancellationToken, nullableReadFlow,
+                nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: next,
+                nullableReceiverInputs: nullableReceiverInputs).Analyze(original, pins);
 
             static void Collect(HmType actual, HmType inferred, string path, HashSet<string> paths)
             {
@@ -565,7 +658,8 @@ public static partial class Inference
             }))
             { return new(original.Identifier.ValueText, "Rejected", "Nullable postcondition flow refinement does not converge."); }
             readFlowHistory.Add(nullableReadFlow);
-            return new Session(model, cancellationToken, next, readFlowHistory, nullableCollectionInputs, nullableInvocationResults).Analyze(original, pins);
+            return new Session(model, cancellationToken, next, readFlowHistory, nullableCollectionInputs,
+                nullableInvocationResults, nullableReceiverInputs).Analyze(original, pins);
         }
 
         private static HmType ApplyInputNullability(IParameterSymbol parameter, HmType value)
@@ -985,7 +1079,9 @@ public static partial class Inference
             { return; }
             var template = HmType.Function(parameters, new("void"));
             var fresh = new HmScheme(template, template.FreeVariables()).Instantiate();
-            var probe = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults) { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
+            var probe = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs,
+                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs)
+            { currentMethod = currentMethod, storageLambdaInputs = new(SymbolEqualityComparer.Default) };
             probe.SetIteratorReturn(declaration, currentMethod);
             if (probe.iteratorReturn is null)
             { probe.SetAsyncReturn(currentMethod); }

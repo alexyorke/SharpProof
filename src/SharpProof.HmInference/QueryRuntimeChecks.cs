@@ -41,6 +41,8 @@ internal static class QueryRuntimeChecks
                 public void Add([System.Diagnostics.CodeAnalysis.AllowNull]T value){Interlocked.Increment(ref CollectionInputTrace.Adds);if(CollectionInputTrace.Failure!=null)throw CollectionInputTrace.Failure;Items.Add(value!);}
                 public IEnumerator<T> GetEnumerator()=>Items.GetEnumerator();System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()=>GetEnumerator();
             }
+            public delegate List<T> ReceiverPair<T>(T first,T second);
+            public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second){Interlocked.Increment(ref NestedResultTrace.Factories);if(NestedResultTrace.Failure!=null)throw NestedResultTrace.Failure;return new List<T>{first,second};}}
             public static class NestedResultTrace{public static int Helpers,Factories,Disposals;public static Exception? Failure;}
             public static class RequiredTrace{public static int Calls;}
             public delegate T RequiredAction<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value);
@@ -125,6 +127,11 @@ internal static class QueryRuntimeChecks
                 public static async Task<List<int>> GenericTask(Task<int> input){var value=await input;return NestedPair(value,NestedMaybe(value));}
                 public static async ValueTask<int[]> GenericValueTask(ValueTask<int> input){var value=await input;return NestedArrayPair(value,NestedMaybe(value));}
                 public static async Task<List<int>> GenericAwaited(int value,Task gate)=>await NestedAsyncPair(value,NestedMaybe(value),gate);
+                public static List<int> ReceiverList(ReceiverPair<int> pair,int value)=>pair(value,NestedMaybe(value));
+                public static List<int> ReceiverAlias(ReceiverPair<int> pair,int value){var local=pair;return local(value,NestedMaybe(value));}
+                public static List<int> ReceiverInstance(ReceiverBox<int> box,int value)=>box.Pair(value,NestedMaybe(value));
+                public static async Task<List<int>> ReceiverTask(ReceiverPair<int> pair,Task<int> input){var value=await input;return pair(value,NestedMaybe(value));}
+                public static async ValueTask<List<int>> ReceiverValueTask(ReceiverPair<int> pair,ValueTask<int> input){var value=await input;return pair(value,NestedMaybe(value));}
                 public static int RequiredLocal(int value){var local=value;return RequireInput(local);}
                 public static int RequiredChoice(int left,int right,bool choose){var local=choose?left:right;return RequireInput(local);}
                 public static int[] RequiredUnrelated(int value,int other){var local=value;return new[]{RequireInput(local),other};}
@@ -435,7 +442,18 @@ internal static class QueryRuntimeChecks
                     }
                     return true;
                 }
+                static async Task<bool> ReceiverInputContracts(CancellationToken cancellationToken){
+                    var calls=0;ReceiverPair<int> pair=(first,second)=>{calls++;return new List<int>{first,second};};
+                    var direct=QueryProbe.ReceiverList(pair,7);var alias=QueryProbe.ReceiverAlias(pair,7);var instance=QueryProbe.ReceiverInstance(new ReceiverBox<int>(),7);
+                    if(direct[0]!=7||direct[1]!=0||alias[0]!=7||alias[1]!=0||instance[0]!=7||instance[1]!=0||calls!=2)return false;
+                    var gate=new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);var pending=QueryProbe.ReceiverTask(pair,gate.Task);if(pending.IsCompleted||calls!=2)return false;gate.SetResult(7);var delayed=await pending.WaitAsync(cancellationToken);if(delayed[0]!=7||delayed[1]!=0||calls!=3)return false;
+                    var optional=await QueryProbe.ReceiverValueTask(pair,new ValueTask<int>(7));if(optional[0]!=7||optional[1]!=0||calls!=4)return false;
+                    var failure=new InvalidOperationException("receiver-fault");try{await QueryProbe.ReceiverTask(pair,Task.FromException<int>(failure));return false;}catch(InvalidOperationException caught){if(!ReferenceEquals(caught,failure)||calls!=4)return false;}
+                    using var cancelled=new CancellationTokenSource();cancelled.Cancel();try{await QueryProbe.ReceiverValueTask(pair,new ValueTask<int>(Task.FromCanceled<int>(cancelled.Token)));return false;}catch(OperationCanceledException caught){if(caught.CancellationToken!=cancelled.Token||calls!=4)return false;}
+                    return true;
+                }
                 static async Task<bool> NestedResultContracts(CancellationToken cancellationToken){
+                    if(!await ReceiverInputContracts(cancellationToken))return false;
                     NestedResultTrace.Helpers=NestedResultTrace.Factories=0;var list=QueryProbe.GenericList(7);var array=QueryProbe.GenericArray(7);var tuple=QueryProbe.GenericTuple(7);var tagged=QueryProbe.GenericTagged(true,7);var deep=QueryProbe.GenericDeep(7);var callback=QueryProbe.GenericCallback(7);
                     if(list.Count!=2||list[0]!=7||list[1]!=0||array.GetType()!=typeof(int[])||array[0]!=7||array[1]!=0||tuple!=(7,0)||!tagged.tag||tagged.values[0]!=7||tagged.values[1]!=0||deep.Count!=1||deep[0][0]!=7||deep[0][1]!=0||QueryProbe.GenericDefault(7)!=0||callback(13)!=7||callback.GetType()!=typeof(Func<int,int>)||NestedResultTrace.Helpers!=6||NestedResultTrace.Factories!=6)return false;
                     NestedResultTrace.Helpers=NestedResultTrace.Factories=NestedResultTrace.Disposals=0;var sequence=QueryProbe.GenericEnumerable(7);if(NestedResultTrace.Helpers!=1||NestedResultTrace.Factories!=0)return false;using(var iterator=sequence.GetEnumerator()){if(!iterator.MoveNext()||iterator.Current!=7||!iterator.MoveNext()||iterator.Current!=0||iterator.MoveNext())return false;}if(NestedResultTrace.Factories!=1||NestedResultTrace.Disposals!=1)return false;
@@ -873,7 +891,16 @@ internal static class QueryRuntimeChecks
                     if(!ReferenceEquals(await task.WaitAsync(cancellationToken),text)||await optional.WaitAsync(cancellationToken)!=null||QueryTrace.ContractCalls!=2)return false;
                     return true;
                 }
+                static async Task<bool> ReceiverInputContracts(string text,CancellationToken cancellationToken){
+                    var calls=0;ReceiverPair<string?> pair=(first,second)=>{calls++;return new List<string?>{first,second};};
+                    var direct=QueryProbe.ReceiverList(pair,text);var alias=QueryProbe.ReceiverAlias(pair,text);var instance=QueryProbe.ReceiverInstance(new ReceiverBox<string?>(),text);
+                    if(!ReferenceEquals(direct[0],text)||direct[1]!=null||!ReferenceEquals(alias[0],text)||alias[1]!=null||!ReferenceEquals(instance[0],text)||instance[1]!=null||calls!=2)return false;
+                    var gate=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);var pending=QueryProbe.ReceiverTask(pair,gate.Task);if(pending.IsCompleted||calls!=2)return false;gate.SetResult(text);var delayed=await pending.WaitAsync(cancellationToken);if(!ReferenceEquals(delayed[0],text)||delayed[1]!=null||calls!=3)return false;
+                    var optional=await QueryProbe.ReceiverValueTask(pair,new ValueTask<string>(text));if(!ReferenceEquals(optional[0],text)||optional[1]!=null||calls!=4)return false;
+                    return true;
+                }
                 static async Task<bool> NestedResultContracts(string text,CancellationToken cancellationToken){
+                    if(!await ReceiverInputContracts(text,cancellationToken))return false;
                     var uri=new Uri("https://example.invalid/nested-result");var list=QueryProbe.GenericList(uri);var array=QueryProbe.GenericArray(uri);var tuple=QueryProbe.GenericTuple(uri);var tagged=QueryProbe.GenericTagged(text,uri);var deep=QueryProbe.GenericDeep(uri);var callback=QueryProbe.GenericCallback(uri);var sequence=QueryProbe.GenericEnumerable(uri).ToArray();
                     if(!ReferenceEquals(list[0],uri)||list[1]!=null||array.GetType()!=typeof(Uri[])||!ReferenceEquals(array[0],uri)||array[1]!=null||!ReferenceEquals(tuple.first,uri)||tuple.second!=null||!ReferenceEquals(tagged.tag,text)||!ReferenceEquals(tagged.values[0],uri)||tagged.values[1]!=null||!ReferenceEquals(deep[0][0],uri)||deep[0][1]!=null||QueryProbe.GenericDefault(uri)!=null||!ReferenceEquals(callback(null),uri)||sequence.Length!=2||!ReferenceEquals(sequence[0],uri)||sequence[1]!=null)return false;
                     decimal? number=23m;var numeric=QueryProbe.GenericList(number);if(numeric[0]!=number||numeric[1]!=null)return false;

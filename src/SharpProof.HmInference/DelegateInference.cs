@@ -29,7 +29,9 @@ public static partial class Inference
                 copies.Add(type, copy);
                 return copy;
             }
-            var nested = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs, nullableInvocationResults: nullableInvocationResults) { currentMethod = currentMethod };
+            var nested = new Session(model, cancellationToken, nullableCollectionInputs: nullableCollectionInputs,
+                nullableInvocationResults: nullableInvocationResults, nullableReceiverInputs: nullableReceiverInputs)
+            { currentMethod = currentMethod };
             foreach (var entry in environment)
             { nested.environment.Add(entry.Key, Copy(entry.Value)); }
             if (currentFunction is not null)
@@ -198,6 +200,15 @@ public static partial class Inference
         {
             if (method is null)
             { throw new ArgumentNullException(nameof(method)); }
+            return ReceiverMapping(method, receiver, out _);
+        }
+
+        private Dictionary<ITypeParameterSymbol, HmType> ReceiverMapping(IMethodSymbol method, ExpressionSyntax? receiver,
+            out HmType? receiverShape)
+        {
+            receiverShape = null;
+            if (method is null)
+            { throw new ArgumentNullException(nameof(method)); }
             var owner = method.ContainingType;
             var mapping = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
             AddNamedArguments(owner, mapping);
@@ -208,6 +219,7 @@ public static partial class Inference
             if (model.GetTypeInfo(receiver, cancellationToken).Type is not INamedTypeSymbol { IsGenericType: true } declared)
             { Anchor(receiver); return mapping; }
             var shape = Expression(receiver).Root;
+            receiverShape = shape;
             if (shape.Name == CSharpTypes.NullableReference)
             { shape = shape.Arguments[0].Root; }
             var receiverVariables = new Dictionary<ITypeParameterSymbol, HmType>(SymbolEqualityComparer.Default);
@@ -229,6 +241,75 @@ public static partial class Inference
             if (!CSharpTypes.MapNamedArguments(ancestor, CSharpTypes.Rigid(ancestor, receiverVariables), mapping))
             { Anchor(receiver); }
             return mapping;
+        }
+        private Action<IArgumentOperation, HmType, HmType>? NullableReceiverInputObserver(
+            InvocationExpressionSyntax invocation, IMethodSymbol called, HmType receiver)
+        {
+            if (invocation is null)
+            { throw new ArgumentNullException(nameof(invocation)); }
+            if (called is null)
+            { throw new ArgumentNullException(nameof(called)); }
+            if (receiver is null)
+            { throw new ArgumentNullException(nameof(receiver)); }
+            if (currentMethod is null || currentFunction is null || called.MethodKind != MethodKind.DelegateInvoke
+                && invocation.Expression is not MemberAccessExpressionSyntax)
+            { return null; }
+            var receiverSyntax = called.MethodKind == MethodKind.DelegateInvoke
+                ? invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Invoke" } invoke
+                    ? invoke.Expression : invocation.Expression
+                : invocation.Expression is MemberAccessExpressionSyntax member
+                    ? member.Expression : invocation.Expression;
+            if (model.GetTypeInfo(receiverSyntax, cancellationToken).Type is not INamedTypeSymbol declared
+                || !SymbolEqualityComparer.Default.Equals(declared.OriginalDefinition, called.ContainingType.OriginalDefinition))
+            { return null; }
+            var shape = ConversionCore(receiver);
+            var offset = shape.NestedTypeName is null ? 0 : 1;
+            if (shape.Arguments.Length - offset != declared.TypeArguments.Length)
+            { return null; }
+            var origins = new List<(int Parameter, string Path)>();
+            void FindOrigin(HmType node, int parameter, string path)
+            {
+                if (node is null)
+                { throw new ArgumentNullException(nameof(node)); }
+                if (parameter < 0)
+                { throw new ArgumentOutOfRangeException(nameof(parameter)); }
+                if (path is null)
+                { throw new ArgumentNullException(nameof(path)); }
+                node = node.Root;
+                if (ReferenceEquals(node, shape))
+                { origins.Add((parameter, path)); return; }
+                for (var index = 0; index < node.Arguments.Length; index++)
+                { FindOrigin(node.Arguments[index], parameter, path + "/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+            }
+            for (var i = 0; i < currentMethod.Parameters.Length; i++)
+            { FindOrigin(currentFunction.Arguments[i], i, ""); }
+            if (origins.Count != 1)
+            { return null; }
+            var origin = origins[0];
+            return (argument, expected, actual) =>
+            {
+                if (argument is null)
+                { throw new ArgumentNullException(nameof(argument)); }
+                if (expected is null)
+                { throw new ArgumentNullException(nameof(expected)); }
+                if (actual is null)
+                { throw new ArgumentNullException(nameof(actual)); }
+                if (argument.Parameter is not { } parameter || argument.Syntax is not ArgumentSyntax syntax
+                    || called.OriginalDefinition.Parameters[parameter.Ordinal].Type is not ITypeParameterSymbol ownerParameter
+                    || !SymbolEqualityComparer.Default.Equals(ownerParameter.ContainingSymbol, called.ContainingType.OriginalDefinition))
+                { return; }
+                var slot = ownerParameter.Ordinal + offset;
+                if (slot >= shape.Arguments.Length || actual.Root.Name != CSharpTypes.NullableParameter
+                    || !ReferenceEquals(expected.Root, shape.Arguments[slot].Root)
+                    || !ReferenceEquals(actual.Root.Arguments[0].Root, expected.Root))
+                { return; }
+                var index = invocation.ArgumentList.Arguments.IndexOf(syntax);
+                if (index >= 0)
+                {
+                    nullableReceiverCandidates.Add((invocation.Span, index, origin.Parameter,
+                    origin.Path + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                }
+            };
         }
         private HmType MethodGroup(ExpressionSyntax expression, IMethodSymbol method, INamedTypeSymbol target)
         {

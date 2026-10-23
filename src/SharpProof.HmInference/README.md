@@ -959,7 +959,17 @@ array runtime types, selective tuple members, iterator laziness/disposal, helper
 exact faults and cancellation in original/reference/nullable-value domains.
 C# 8 uses representable value-domain bounds; C# 9/13 retain unconstrained nullable
 arguments. CLI/package fixtures check these language-specific signatures.
-Remaining indirect-storage flow still needs work.
+Nullable call inputs can also refine a generic receiver's payload independently
+of other inputs. For example, passing a maybe-null value to `Pair<T>` can suggest
+`Pair<T?>` while retaining a separate `T value` or `Task<T>` input. Refinement uses
+the candidate compiler's argument diagnostics and preserves caller-pinned slots.
+Source/metadata and applied-fix checks cover direct delegates, aliases, instance
+methods and Task/ValueTask suspension, faults and cancellation; C# 8/9/13 CLI and
+package checks enforce representable signatures. Nullable async coverage also
+includes configured awaits, custom awaiters, iterators and foreach elements.
+Receiver promotion currently requires a direct owner type-parameter formal and
+one traceable input origin. Compound formals, other nullable argument shapes and
+remaining indirect-storage flow still need work.
 
 Solution-scale benchmark inputs, quality checks, measurements and reproduction
 commands are documented in [PERFORMANCE.md](PERFORMANCE.md).

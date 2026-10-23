@@ -57,7 +57,9 @@ public static partial class Inference
                     { next.Add(before[i].Span); }
                 }
             }
-            return next.Count == nullableCollectionInputs.Count ? null : new Session(model, cancellationToken, nullableReadFlow, nullableCollectionInputs: next, nullableInvocationResults: nullableInvocationResults).Analyze(original, pins);
+            return next.Count == nullableCollectionInputs.Count ? null : new Session(model, cancellationToken, nullableReadFlow,
+                nullableCollectionInputs: next, nullableInvocationResults: nullableInvocationResults,
+                nullableReceiverInputs: nullableReceiverInputs).Analyze(original, pins);
         }
 
         private HmType OptionalCollectionElement(HmType collection, HmType element)
