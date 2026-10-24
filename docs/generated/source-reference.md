@@ -862,8 +862,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0001",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0001");
 
     internal static readonly DiagnosticDescriptor DuplicateCompanion = new(
         id: "SPCF0002",
@@ -873,8 +872,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0002",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0002");
 
     internal static readonly DiagnosticDescriptor InvalidCompanionType = new(
         id: "SPCF0003",
@@ -884,8 +882,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0003",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0003");
 
     internal static readonly DiagnosticDescriptor MissingMember = new(
         id: "SPCF0004",
@@ -895,8 +892,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0004",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0004");
 
     internal static readonly DiagnosticDescriptor SignatureMismatch = new(
         id: "SPCF0005",
@@ -906,8 +902,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0005",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0005");
 
     internal static readonly DiagnosticDescriptor AmbiguousMember = new(
         id: "SPCF0006",
@@ -917,8 +912,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0006",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0006");
 
     internal static readonly DiagnosticDescriptor BodyRequired = new(
         id: "SPCF0007",
@@ -928,8 +922,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0007",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0007");
 
     internal static readonly DiagnosticDescriptor InvalidClausePlacement = new(
         id: "SPCF0008",
@@ -939,8 +932,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Validates compiler-bound ContractFor companion declarations without textual signature reconstruction.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0008",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0008");
 
     internal static readonly DiagnosticDescriptor SelfTarget = new(
         id: "SPCF0009",
@@ -950,8 +942,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Rejects ContractFor relationships whose companion and target are the same type.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0009",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0009");
 
     internal static readonly DiagnosticDescriptor CyclicRelationship = new(
         id: "SPCF0010",
@@ -961,8 +952,7 @@ internal static class ContractForDiagnosticDescriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
-        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010",
-        customTags: ["CompilationEnd"]);
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010");
 
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         InvalidTarget,
