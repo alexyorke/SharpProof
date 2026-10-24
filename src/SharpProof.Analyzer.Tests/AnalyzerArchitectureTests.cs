@@ -248,7 +248,7 @@ public sealed class AnalyzerArchitectureTests
     {
         var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
             .SupportedDiagnostics, static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
-        var expected = ImmutableArray.Create("SP0025", "SP0050", "SPCF0001", "SPCF0002", "SPCF0003", "SPCF0004", "SPCF0005", "SPCF0006", "SPCF0007", "SPCF0008", "SPCF0009", "SPCF0010");
+        var expected = ImmutableArray.Create("SP0025", "SP0050");
 
         foreach (var id in expected)
         {
@@ -256,6 +256,11 @@ public sealed class AnalyzerArchitectureTests
                 descriptors[id].CustomTags,
                 Does.Contain(WellKnownDiagnosticTags.CompilationEnd),
                 id);
+        }
+        foreach (var descriptor in descriptors.Values.Where(static item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Id.StartsWith("SPCF", StringComparison.Ordinal)))
+        {
+            Assert.That(descriptor.CustomTags, Does.Not.Contain(WellKnownDiagnosticTags.CompilationEnd), descriptor.Id);
         }
     }
 

@@ -54,8 +54,23 @@ internal sealed partial class SharpProofAnalyzerEngine
         // Reconcile companions even when another configuration diagnostic
         // causes ordinary analysis to stop.  Configuration errors must not
         // hide independent malformed companion declarations.
-        context.RegisterCompilationEndAction(
-            ValidateContractForCompanions);
+        // IDEs request document semantic diagnostics independently of compilation
+        // end analysis. Match the whole compilation once, then report each result
+        // from the semantic callback for the document that owns its location.
+        var companionDiagnostics = new Lazy<ImmutableArray<Diagnostic>>(
+            () => GetContractForDiagnostics(context.Compilation, context.CancellationToken),
+            System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+        context.RegisterSemanticModelAction(semanticContext =>
+        {
+            semanticContext.CancellationToken.ThrowIfCancellationRequested();
+            foreach (var diagnostic in companionDiagnostics.Value)
+            {
+                if (diagnostic.Location.SourceTree == semanticContext.SemanticModel.SyntaxTree)
+                {
+                    semanticContext.ReportDiagnostic(diagnostic);
+                }
+            }
+        });
 
         // A contract API that is referenced but unreadable disables every
         // contract silently, which is indistinguishable from "nothing to
@@ -220,20 +235,15 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
     }
 
-    private static void ValidateContractForCompanions(
-        CompilationAnalysisContext context)
+    private static ImmutableArray<Diagnostic> GetContractForDiagnostics(
+        Compilation compilation, CancellationToken cancellationToken)
     {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         var candidates = ContractForValidationEngine.FindCandidates(
-            context.Compilation,
+            compilation,
             static _ => true,
-            context.CancellationToken);
-        foreach (var diagnostic in ContractForValidationEngine.Validate(
-                     context.Compilation,
-                     candidates,
-                     context.CancellationToken))
-        {
-            context.ReportDiagnostic(diagnostic);
-        }
+            cancellationToken);
+        return ContractForValidationEngine.Validate(compilation, candidates, cancellationToken);
     }
 
     private static AdvisoryActivation GetAdvisoryActivation(

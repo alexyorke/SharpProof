@@ -39,7 +39,13 @@ public sealed class CompanionRefactoringProvider : CodeRefactoringProvider
             .WithLeadingTrivia(SyntaxFactory.ParseLeadingTrivia(annotationsEnabled ? "#nullable enable\n" : "#nullable disable\n"))
             .NormalizeWhitespace()
             .WithAdditionalAnnotations(Formatter.Annotation);
-        var generatedDocument = context.Document.Project.AddDocument(target.Name + "Contracts.cs", compilation.GetText());
+        var name = target.Name + "Contracts.cs";
+        var directory = context.Document.FilePath is { } sourcePath ? System.IO.Path.GetDirectoryName(sourcePath) : null;
+        var path = directory == null ? null : System.IO.Path.Combine(directory, name);
+        if (path != null && context.Document.Project.Documents.Any(document =>
+            string.Equals((document ?? throw new ArgumentNullException(nameof(document))).FilePath, path, StringComparison.OrdinalIgnoreCase)))
+        { return; }
+        var generatedDocument = context.Document.Project.AddDocument(name, compilation.GetText(), context.Document.Folders, path);
         var tree = await generatedDocument.GetSyntaxTreeAsync(context.CancellationToken).ConfigureAwait(false);
         var generatedCompilation = await generatedDocument.Project.GetCompilationAsync(context.CancellationToken).ConfigureAwait(false);
         if (tree == null || generatedCompilation == null || generatedCompilation.GetDiagnostics(context.CancellationToken).Any(diagnostic =>
@@ -48,7 +54,7 @@ public sealed class CompanionRefactoringProvider : CodeRefactoringProvider
         context.RegisterRefactoring(CodeAction.Create("Generate SharpProof contract companion", async cancellationToken =>
         {
             var document = await Formatter.FormatAsync(generatedDocument, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return document.Project.Solution;
+            return document;
         }, nameof(CompanionRefactoringProvider)));
     }
 }
