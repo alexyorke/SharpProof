@@ -12,6 +12,17 @@ $version = '1.2.3-preview.7'
 $image = 'ghcr.io/alexyorke/sharpproof@sha256:' + ('b' * 64)
 $checks = 0
 
+# These fixed public package fixtures must not inherit a caller's real release context.
+$releaseFixtureEnvironmentNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        'SHARPPROOF_CI_PACKAGE_VERSION', 'SHARPPROOF_PRIVATE_PREVIEW',
+        'SHARPPROOF_REPOSITORY_URL', 'GITHUB_REPOSITORY',
+        'SHARPPROOF_SOURCE_REPOSITORY', 'SHARPPROOF_SOURCE_COMMIT', 'SHARPPROOF_WORKFLOW_COMMIT'))
+$releaseFixtureEnvironmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]()
+foreach ($name in $releaseFixtureEnvironmentNames) {
+    $releaseFixtureEnvironmentBuilder.Add($name, [Environment]::GetEnvironmentVariable($name, 'Process'))
+}
+$releaseFixtureEnvironment = $releaseFixtureEnvironmentBuilder.ToImmutable()
+
 function New-Package {
     param(
         [string]$Directory, [string]$Id, [string]$IdentityId = $Id,
@@ -68,7 +79,8 @@ function New-RecordFixture([string]$Name) {
     $scripts = Join-Path $root 'eng/scripts'
     [void][IO.Directory]::CreateDirectory($scripts)
     foreach ($file in @('Record-SharpProofDeveloperPackages.ps1', 'New-SharpProofPackageManifest.ps1',
-            'SharpProof.ContainerExecution.psm1', 'SharpProof.PackageIdentity.psm1', 'Test-SharpProofPublishedPackages.sh')) {
+            'SharpProof.ContainerExecution.psm1', 'SharpProof.PackageIdentity.psm1',
+            'SharpProof.ReleaseConfiguration.psm1', 'Test-SharpProofPublishedPackages.sh')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $scripts
     }
     [IO.File]::WriteAllText((Join-Path $root 'eng/Versions.props'), '<Project><PropertyGroup><SharpProofVersionPrefix>1.2.3</SharpProofVersionPrefix><SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.7</SharpProofPackageVersion></PropertyGroup></Project>')
@@ -84,6 +96,9 @@ function Get-Snapshot([string]$Directory) {
 }
 
 try {
+    foreach ($name in $releaseFixtureEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+    }
     $fixture = New-RecordFixture 'valid'
     Invoke-Record $fixture | Out-Null
     $manifest = Get-Content -LiteralPath (Join-Path $fixture.Output 'developer-release-manifest.json') -Raw | ConvertFrom-Json
@@ -168,6 +183,9 @@ try {
     Write-Host "Developer release regressions passed: $checks identity/image/hash/archive-policy and optional-payload controls. These fixture controls do not claim a published image, signed attestation, or full independent build reproduction."
 }
 finally {
+    foreach ($entry in $releaseFixtureEnvironment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
+    }
     $resolvedTemporary = [IO.Path]::GetFullPath($temporary)
     $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
     if (-not $resolvedTemporary.StartsWith($temporaryParent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal) -or

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>13.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SharpProofProfile>advisory</SharpProofProfile>
+    <SharpProofVerify>false</SharpProofVerify>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SharpProof" Version="__SHARPPROOF_VERSION__" />
+    <PackageReference Include="SharpProof.CodeFixes" Version="__SHARPPROOF_VERSION__" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

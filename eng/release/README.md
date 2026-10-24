@@ -1,6 +1,114 @@
 # Release process
 
-[package-consumers.yml](../../.github/workflows/package-consumers.yml) owns packing, consumer qualification, and tag publication.
+[package-consumers.yml](../../.github/workflows/package-consumers.yml) owns public CI
+package qualification and the future public release path. Official private-preview
+publication uses a separate private workflow and receipt.
+
+## Official private preview
+
+The initial official `1.0.0-preview.1` release is planned for the private
+`alexyorke/SharpProof-preview` repository, its GitHub NuGet feed at
+`https://nuget.pkg.github.com/alexyorke/index.json`, and
+`ghcr.io/alexyorke/sharpproof-preview`. Source stays public in `alexyorke/SharpProof`.
+Official archives, symbols, image, detailed evidence, and completed release receipts
+stay private, with owner-only initial access. Publication and access verification are
+pending; these destinations are policy, not evidence that an upload or account setup
+has succeeded.
+
+The manual, main-bound `.github/workflows/private-preview.yml` entrypoint only
+qualifies a candidate. It accepts `source_commit` and `workflow_commit`, both exact
+40-character SHAs. The source must be an approved public master commit; the workflow
+commit must equal the executing `github.workflow_sha` in the private repository.
+The source commit identifies unchanged public code mirrored into the private
+repository. Private package `RepositoryUrl` associates the package with that mirror;
+inspect the qualified PDBs to record their actual Source Link URLs and approved
+commit. Do not infer Source Link origin from package metadata. The manifest records
+the public source origin separately from the private orchestration identity.
+
+The pinned `owner-manual-main` policy makes the owner's manual promotion dispatch
+the approval boundary. Both `GITHUB_ACTOR` and `GITHUB_TRIGGERING_ACTOR` must be
+`alexyorke`, with the exact approved workflow SHA on private `main`. The private
+`private-preview-release` environment and its explicit main-only deployment policy
+remain required. A separate reviewer rule is optional; if configured, it must contain
+exactly the owner. Without that rule, GitHub provides no separate review pause before
+secret access. Real editor acceptance, exact candidate/source/workflow bindings,
+owner-only access evidence, signature checks, and fresh private consumer checks still
+gate the appropriate promotion phase.
+
+1. Run qualification for the exact source and workflow/toolchain. Required automated
+   gates cover the six package IDs, symbols, native/package consumers, complete
+   coverage, security, reproducibility, generated workspace/CI behavior, and both
+   generated Compose consumer layouts. Source approval requires the latest allowed
+   exact-master-SHA runs of `ci.yml`, `coverage.yml`, `toolchain-security.yml`,
+   `package-consumers.yml`, `docs-maintenance.yml`, and `nightly.yml` to succeed.
+   The first five require push runs; nightly accepts schedule/manual runs. A newer
+   pending or failed allowed run blocks approval even if an older run passed.
+   Retain the immutable
+   `private-preview-candidate-<run>-<attempt>` artifact and its numeric ID/API digest.
+   It contains the original packages/symbols, SBOM, `SHA256SUMS`, unsigned
+   `release-manifest.json`, image archive/metadata, and OCI receipt. Qualification
+   does not sign, publish registries, or create a release tag.
+2. Use those exact candidate archives as an isolated local feed for
+   [all three real editor sessions](../../docs/editor-acceptance.md). Verify the
+   artifact digest and unsigned manifest/package hashes first. Retain the actual
+   sessions as `editor-acceptance.json` with hashed attachments under `evidence/`.
+   Commit these only in the private mirror at
+   `private-preview-receipts/<candidateArtifactId>` and manually dispatch
+   `.github/workflows/private-preview-receipts.yml` on main with `receipt_directory`
+   set to that path. Its immutable `private-preview-acceptance-<run>-<attempt>`
+   artifact must originate from the current promotion workflow SHA, separately from
+   the frozen candidate workflow SHA. All editor observations remain Pending until
+   performed; use the [receipt contract](../../eng/scripts/SharpProof.PrivatePreviewPromotionReceipts.psm1)
+   rather than synthetic fixtures to describe actual acceptance.
+3. Dispatch the separate main-bound `.github/workflows/private-preview-promote.yml`
+   with `phase=stage-registry`, `candidate_artifact_id`,
+   `editor_acceptance_artifact_id`, `source_commit`, `candidate_workflow_commit`, and
+   `workflow_commit` (the executing promotion workflow SHA). Promotion verifies the
+   original successful manual-main qualification run and immutable candidate bytes;
+   it never repacks or rebuilds them. The owner-manual-main approval and private
+   environment/main-only publication policy must pass before signing or upload.
+   Sign the frozen manifest with offline RSA 3072-bit/SHA-256 using
+   `PRIVATE_PREVIEW_SIGNING_KEY` and verify against the pinned public key/SPKI
+   fingerprint in `eng/release/private-preview/`. This phase publishes the exact
+   packages and image to private registries, but creates no tag or GitHub release.
+4. Independently inspect actual granular access for the repository, all packages,
+   image, symbols, and evidence. Retain `access-acceptance.json` and its attachments
+   beside `editor-acceptance.json`, then rerun the receipt intake workflow. Dispatch
+   `phase=finalize` for the same candidate; `editor_acceptance_artifact_id` now identifies
+   that combined editor/access artifact. There is no separate access-artifact input.
+   Finalization requires fresh consumer
+   restore from the private feed and image pull by the published digest before
+   creating `v1.0.0-preview.1` and its private release assets. A successful candidate
+   or registry-stage run does not establish those read-back or finalization outcomes.
+   A finalization rerun preserves the original authenticated `fresh-consumer.json`
+   release asset while rerunning the remote consumer checks; its new execution audit
+   remains in that run's private Actions artifact.
+5. Complete the [private release receipt](../../docs/private-preview-release-receipt.md)
+   with candidate/editor/access/promotion run and immutable artifact IDs, hashes,
+   signature verification, exact read-back results, and any partial-publication
+   recovery decision. Keep credentials and signing material in secret references.
+
+The candidate manifest is unsigned qualification evidence. The later detached
+signature authenticates the same frozen release subjects; no public transparency-log
+submission is part of this private path. Source, candidate-workflow, and
+promotion-workflow SHAs are separate identities and must not be substituted for one
+another.
+
+The detached manifest signature is separate from NuGet author/repository signatures,
+Authenticode, and the Attributes assembly strong name. Record actual archive signing
+state rather than reporting public NuGet.org signature policy as private-feed evidence.
+Keep `.snupkg` files and matching PDBs available privately; do not assume a private
+symbol server or infer symbol availability from package upload success. Keep the SBOM
+scope explicit for core, optional-tool/editor/template, and image subjects.
+
+Public CI uses distinct `0.0.0-ci.<run>.<attempt>` validation versions through
+`SHARPPROOF_CI_PACKAGE_VERSION`; those binaries/evidence do not become official
+`1.0.0-preview.1` artifacts. Public source validation neither publishes the official
+preview nor replaces the private source/workflow-bound release gates. All official
+publication, signatures, editor sessions, and receipt fields remain pending until
+actual evidence is recorded.
+
+## Public CI and future public releases
 
 1. The package job runs `tooling pack -Configuration Release` in the canonical Linux amd64 container and uploads the packed three-package graph.
 2. Linux container and native Windows, macOS, and glibc Linux x64/ARM64 verifier consumers download those artifacts and run real proof and payload-integrity checks.
@@ -8,7 +116,10 @@
 4. A `v*` tag must exactly match `SharpProofPackageVersion` in [eng/Versions.props](../../eng/Versions.props).
 5. Publication depends on all required tag jobs and runs only in the canonical repository. It downloads the qualified package artifacts and signed evidence, verifies them before requesting feed credentials, and applies the destination feed's duplicate policy.
 
-`v1.0.0-preview.1` selects the private-preview environment/feed. Other matching release tags select nuget.org and NuGet OIDC login. Feed credentials stay in the configured secret/environment mechanism.
+The official `v1.0.0-preview.1` identity belongs to the private path above. Future
+approved public versions use matching release tags, nuget.org, and NuGet OIDC login;
+they require their own version/tag decision and public release qualification. Feed
+credentials stay in the configured secret/environment mechanism.
 
 Branch package checks do not run tag-only security or publication dependencies and do not publish. Do not report branch success as release qualification or public feed availability.
 
@@ -25,8 +136,9 @@ Release qualification includes all six native OS/architecture combinations: Wind
 ## Debugging packages and packing
 
 All first-party assemblies use deterministic builds and portable PDBs with
-commit-specific Source Link. The two `.snupkg` files contain matching PDBs
-for every shipped SharpProof assembly. Every PDB also embeds its source files,
+commit-specific Source Link. The two core `.snupkg` files contain matching PDBs
+for core-package assemblies; optional Tool/editor payloads retain their embedded
+PDBs and separate identity checks. Every PDB also embeds its source files,
 including linked and generated source, so source inspection works offline once
 the symbols are available. Package qualification rejects missing embedded source.
 Release optimization remains enabled; optimized locals and stepping can differ
@@ -105,11 +217,10 @@ does not claim to describe the tool's dependency closure. A separate reviewed
 tool dependency inventory/SBOM remains future work. Its original archive is
 verified against the same signer/source policy before public publication.
 
-The private-preview tag `v1.0.0-preview.1` still uses its private feed credentials.
-It generates/checks local evidence but skips public attestations and GitHub
-release assets. No private-preview package is newly exposed by these steps.
-The qualified optional tool is also pushed only to that private feed for this
-tag, using the existing private credentials.
+The official private-preview archives, symbols, receipt/signature, and image use the
+separate private workflow above. Its offline signature policy is distinct from the
+public Sigstore/NuGet.org policy in this section; public CI artifacts are validation
+outputs with different versions, not an alternative official preview download.
 
 Consumers can download the public GitHub release assets into one directory,
 run `sha256sum -c SHA256SUMS`, and verify a package's workflow provenance:
@@ -149,8 +260,9 @@ See the [official action requirements](https://github.com/actions/attest#usage).
 
 Maintainers must configure the NuGet trusted publisher for this repository,
 workflow and `nuget.org` environment, including permission/ownership for the new
-`SharpProof.Tool` package ID, set `NUGET_USER`, and maintain the private
-preview environment's existing feed URL/key. Tag protection, environment
+`SharpProof.Tool` package ID, and set `NUGET_USER`. The private-preview promotion path
+has its own protected environment, private registry credentials, and offline signing
+policy; public-feed configuration does not authorize that path. Tag protection, environment
 reviewers, organization action allowlists and release immutability are account
 settings; changing this workflow does not configure or verify those settings.
 No publication, trusted-publisher registration or signing credential setup is

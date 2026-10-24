@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$EvidenceDirectory,
-    [Parameter(Mandatory)][ValidatePattern('^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$')][string]$ConsumerImage,
+    [Parameter(Mandatory)][ValidatePattern('^ghcr\.io/alexyorke/sharpproof(?:-preview)?@sha256:[a-f0-9]{64}$')][string]$ConsumerImage,
+    [ValidateSet('consumer', 'workspace-consumer')][string]$ConsumerDirectory = 'consumer',
     [string]$LocalImage = '',
     [string]$BuildMetadataPath = ''
 )
@@ -17,24 +18,33 @@ if ($LocalImage -and $LocalImage -cnotmatch '^[a-z0-9][a-z0-9._/:-]*:[A-Za-z0-9_
     throw 'The local candidate must be an explicit tagged image reference.'
 }
 $evidenceRoot = (Resolve-Path -LiteralPath $EvidenceDirectory).Path
-$retainedRoot = Join-Path $evidenceRoot 'consumer'
+$retainedRoot = Join-Path $evidenceRoot $ConsumerDirectory
 $feed = Join-Path $evidenceRoot 'packages'
 if (-not (Test-Path -LiteralPath $retainedRoot -PathType Container) -or -not (Test-Path -LiteralPath $feed -PathType Container)) {
     throw 'Supply one developer-experience run containing retained consumer source and packages.'
 }
-$projects = @(Get-ChildItem -LiteralPath $retainedRoot -Filter '*.csproj' -File)
+$isWorkspace = Test-Path -LiteralPath (Join-Path $retainedRoot 'src/app') -PathType Container
+$appRoot = if ($isWorkspace) { Join-Path $retainedRoot 'src/app' } else { $retainedRoot }
+$projects = @(Get-ChildItem -LiteralPath $appRoot -Filter '*.csproj' -File)
 if ($projects.Count -ne 1) { throw 'Expected exactly one retained generated consumer project.' }
+$projectRelative = [IO.Path]::GetRelativePath($retainedRoot, $projects[0].FullName).Replace('\', '/')
 [xml]$project = Get-Content -LiteralPath $projects[0].FullName -Raw
 $references = @($project.Project.ItemGroup.PackageReference)
-if ($references.Count -ne 1 -or $references[0].Include -cne 'SharpProof' -or
+$facade = @($references | Where-Object Include -CEQ 'SharpProof')
+$editor = @($references | Where-Object Include -CEQ 'SharpProof.CodeFixes')
+if ($facade.Count -ne 1 -or $editor.Count -gt 1 -or $references.Count -ne (1 + $editor.Count) -or
     $project.Project.PropertyGroup.TargetFramework -cne 'net10.0' -or $project.Project.PropertyGroup.LangVersion -cne '13.0' -or
     $project.Project.PropertyGroup.SharpProofProfile -cne 'strict' -or $project.Project.PropertyGroup.SharpProofVerify -cne 'true') {
     throw 'The retained project is not the generated strict .NET 10/C# 13 consumer.'
 }
-$version = [string]$references[0].Version
+$version = [string]$facade[0].Version
+if ($editor.Count -eq 1 -and ($editor[0].Version -cne $version -or $editor[0].PrivateAssets -cne 'all')) { throw 'The optional editor reference must use the qualified version and private assets.' }
 $sourceCommit = $null
+$repositoryUrl = $null
 $packageHashes = [Collections.Generic.List[object]]::new()
-foreach ($id in @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) {
+$consumedIds = @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier', 'SharpProof.Tool')
+if ($editor.Count -eq 1) { $consumedIds += 'SharpProof.CodeFixes' }
+foreach ($id in $consumedIds) {
     $archivePath = Join-Path $feed "$id.$version.nupkg"
     $identity = Get-SharpProofPackageIdentity -Path $archivePath -RequireRepository -RequireSingleIdentity
     if ($identity.Id -cne $id -or $identity.Version -cne $version -or
@@ -42,6 +52,7 @@ foreach ($id in @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier'))
         throw 'Consumer feed identity, version, or source commits do not match.'
     }
     $sourceCommit = $identity.RepositoryCommit
+    $repositoryUrl = $identity.RepositoryUrl
     $packageHashes.Add([ordered]@{ id = $id; fileName = [IO.Path]::GetFileName($archivePath); sha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant() })
 }
 $developerRunPath = Join-Path $evidenceRoot 'run.json'
@@ -67,9 +78,21 @@ $output = Join-Path $evidenceRoot "compose-acceptance/$runId"
 $consumerRoot = Join-Path $output 'consumer'
 [void][IO.Directory]::CreateDirectory($consumerRoot)
 $inputHashes = [Collections.Generic.List[object]]::new()
-foreach ($name in @($projects[0].Name, 'Counter.cs', 'Directory.Build.props', 'global.json', 'compose.yaml')) {
+$counterRelative = if ($isWorkspace) { 'src/app/Counter.cs' } else { 'Counter.cs' }
+$inputNames = [Collections.Generic.List[string]]::new()
+$inputNames.AddRange([string[]]@($projectRelative, $counterRelative, 'Directory.Build.props', 'global.json', 'compose.yaml', 'NuGet.config', '.config/dotnet-tools.json'))
+if ($isWorkspace) {
+    foreach ($file in Get-ChildItem -LiteralPath (Join-Path $retainedRoot 'tests') -File -Recurse -Force) {
+        $relative = [IO.Path]::GetRelativePath($retainedRoot, $file.FullName).Replace('\', '/')
+        if ($relative -match '(^|/)(bin|obj|\.sharpproof-obj|\.sharpproof-bin)(/|$)') { continue }
+        if ($file.Extension -in @('.cs', '.csproj', '.md')) { $inputNames.Add($relative) }
+    }
+}
+foreach ($name in $inputNames) {
     $inputPath = Join-Path $retainedRoot $name
-    Copy-Item -LiteralPath $inputPath -Destination $consumerRoot
+    $copiedPath = Join-Path $consumerRoot $name
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($copiedPath))
+    Copy-Item -LiteralPath $inputPath -Destination $copiedPath
     $inputHashes.Add([ordered]@{ fileName = $name; sha256 = (Get-FileHash -LiteralPath $inputPath -Algorithm SHA256).Hash.ToLowerInvariant() })
 }
 $status = 'failed'
@@ -100,18 +123,23 @@ function Get-CanonicalTag([string]$Reference) {
     if ($tagSeparator -lt 1 -or $Reference.Contains('@')) { throw 'Buildx image names must identify explicit tagged images.' }
     return (Get-CanonicalRepository $Reference.Substring(0, $tagSeparator)) + $Reference.Substring($tagSeparator)
 }
-function Invoke-Docker([string]$Name, [string[]]$Arguments, [switch]$AllowFailure) {
+function Invoke-Docker([string]$Name, [string[]]$Arguments, [switch]$AllowFailure, [switch]$SensitiveOutput) {
     $log = Join-Path $output "$Name.log"
     $timer = [Diagnostics.Stopwatch]::StartNew()
-    & docker @Arguments *> $log
-    $observed = $LASTEXITCODE
+    if ($SensitiveOutput) {
+        $captured = @(& docker @Arguments 2>&1)
+        $observed = $LASTEXITCODE
+        $rawOutput = ($captured | ForEach-Object { [string]$_ }) -join "`n"
+        [IO.File]::WriteAllText($log, 'Resolved configuration parsed in memory; environment values are omitted.', [Text.UTF8Encoding]::new($false))
+    }
+    else { & docker @Arguments *> $log; $observed = $LASTEXITCODE; $rawOutput = [IO.File]::ReadAllText($log) }
     $timer.Stop()
     $commands.Add([ordered]@{ phase = $Name; exitCode = $observed; elapsedMilliseconds = $timer.ElapsedMilliseconds })
     if ($observed -ne 0 -and -not $AllowFailure) {
         Get-Content -LiteralPath $log -Tail 30 | Write-Host
         throw "Docker phase $Name failed with exit code $observed."
     }
-    return [pscustomobject]@{ ExitCode = $observed; Output = [IO.File]::ReadAllText($log) }
+    return [pscustomobject]@{ ExitCode = $observed; Output = $rawOutput }
 }
 try {
     [void](Invoke-Docker 'docker-version' @('version', '--format', '{{.Server.Os}}/{{.Server.Arch}}'))
@@ -126,7 +154,8 @@ try {
             if ($expectedConfigDigest -cnotmatch '^sha256:[a-f0-9]{64}$') { throw 'Buildx metadata contains an invalid image config digest.' }
         }
         $buildMetadataImageName = [string]$metadata.'image.name'
-        if ($manifestDigest -cnotmatch '^sha256:[a-f0-9]{64}$' -or $ConsumerImage -cne "ghcr.io/alexyorke/sharpproof@$manifestDigest" -or
+        $consumerRepository = $ConsumerImage.Split('@')[0]
+        if ($manifestDigest -cnotmatch '^sha256:[a-f0-9]{64}$' -or $ConsumerImage -cne "$consumerRepository@$manifestDigest" -or
             (Get-CanonicalTag $buildMetadataImageName) -cne (Get-CanonicalTag $LocalImage)) {
             throw 'Buildx metadata does not identify the exact candidate manifest and explicit local image tag.'
         }
@@ -157,7 +186,7 @@ try {
         }
     }
     if ($inspected.Os -cne 'linux' -or $inspected.Architecture -cne 'amd64' -or
-        $inspected.Config.Labels.'org.opencontainers.image.source' -cne 'https://github.com/alexyorke/SharpProof' -or
+        $inspected.Config.Labels.'org.opencontainers.image.source' -cne $repositoryUrl -or
         $imageRevision -cne $sourceCommit -or
         $inspected.Config.Labels.'io.sharpproof.consumer.version' -cne $version -or $inspected.Config.Labels.'io.sharpproof.platform' -cne 'linux/amd64' -or
         $inspected.Config.WorkingDir -cne '/workspace/consumer' -or $inspected.Config.User -cne 'root' -or
@@ -177,17 +206,19 @@ try {
     $projectName = 'sharpproof-template-' + $runId.Substring(0, 12)
     $composeArguments = @('compose', '--project-name', $projectName, '--project-directory', $consumerRoot,
         '--file', (Join-Path $consumerRoot 'compose.yaml'), '--file', $overridePath)
-    $resolved = (Invoke-Docker 'compose-config' @($composeArguments + @('config', '--format', 'json'))).Output | ConvertFrom-Json
+    $resolved = (Invoke-Docker 'compose-config' @($composeArguments + @('config', '--format', 'json')) -SensitiveOutput).Output | ConvertFrom-Json
     $service = $resolved.services.verify
     if ($service.image -cne $effectiveImage -or $service.platform -cne 'linux/amd64' -or $service.working_dir -cne '/workspace/consumer') {
         throw 'The resolved generated service changed its image, platform, or working directory.'
     }
-    foreach ($target in @('/workspace/consumer/.sharpproof-obj', '/workspace/consumer/.sharpproof-bin', '/home/sharpproof/.nuget/packages')) {
+    foreach ($target in @('/workspace/consumer/.sharpproof-obj', '/workspace/consumer/.sharpproof-bin', '/home/sharpproof/.nuget/packages', '/home/sharpproof/.dotnet')) {
         $mount = @($service.volumes | Where-Object target -CEQ $target)
         if ($mount.Count -ne 1 -or $mount[0].type -cne 'volume') { throw 'Generated consumer intermediates and package caches must remain private named volumes.' }
     }
-    [void](Invoke-Docker 'compose-restore' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'restore', $projects[0].Name, '--configfile', '/workspace/sharpproof-config/NuGet.config')))
-    [void](Invoke-Docker 'compose-build' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'build', $projects[0].Name, '-c', 'Release', '--no-restore')))
+    [void](Invoke-Docker 'compose-tool-restore' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'tool', 'restore', '--configfile', '/workspace/sharpproof-config/NuGet.config')))
+    [void](Invoke-Docker 'compose-restore' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'restore', $projectRelative, '--configfile', '/workspace/sharpproof-config/NuGet.config')))
+    [void](Invoke-Docker 'compose-build' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'build', $projectRelative, '-c', 'Release', '--no-restore')))
+    [void](Invoke-Docker 'compose-doctor' @($composeArguments + @('run', '--rm', '--no-deps', 'verify', 'tool', 'run', 'dotnet-sharpproof', '--', 'doctor', '--project', $projectRelative, '--verification', 'container')))
     $reportRoot = Join-Path $consumerRoot 'artifacts/sharpproof'
     foreach ($name in @('result.json', 'request.json', 'compiler-manifest.json', 'result.sarif')) {
         if (-not (Test-Path -LiteralPath (Join-Path $reportRoot $name) -PathType Leaf)) { throw "The generated service did not export $name." }
@@ -217,6 +248,7 @@ finally {
     }
     $summary = [ordered]@{
         schemaVersion = 1; status = $status; sourceCommit = $sourceCommit; packageVersion = $version
+        consumerDirectory = $ConsumerDirectory; project = $projectRelative; workspace = $isWorkspace
         consumerImage = $ConsumerImage; imageMode = $imageMode; effectiveImage = $effectiveImage; imageId = $imageId
         imageRevision = $imageRevision
         imageIdentityBinding = $imageIdentityBinding; localRepoDigest = $localRepoDigest; buildMetadataImageName = $buildMetadataImageName

@@ -11,43 +11,8 @@ internal static class CompanionScaffolding
 {
     internal static bool IsSupported(INamedTypeSymbol target)
     {
-        if (target == null)
-        { throw new ArgumentNullException(nameof(target)); }
-        if (target.ContainingType != null || target.TypeKind is not (TypeKind.Interface or TypeKind.Class) ||
-            target.IsUnboundGenericType || target.IsFileLocal || target.TypeParameters.Any(parameter =>
-                (parameter ?? throw new ArgumentNullException(nameof(parameter))).Name == target.Name + "Contracts"))
-        {
-            return false;
-        }
-        var requirePublic = target.DeclaredAccessibility == Accessibility.Public;
-        if (!SupportedConstraints(target.TypeParameters, requirePublic))
-        { return false; }
-        foreach (var method in target.GetMembers().OfType<IMethodSymbol>())
-        {
-            if (method.MethodKind != MethodKind.Ordinary || method.IsImplicitlyDeclared)
-            { continue; }
-            if (method.IsVararg || method.Name == target.Name + "Contracts" ||
-                method.TypeParameters.Any(parameter => (parameter ?? throw new ArgumentNullException(nameof(parameter))).AllowsRefLikeType ||
-                    target.TypeParameters.Any(outer => (outer ?? throw new ArgumentNullException(nameof(outer))).Name == parameter.Name)) ||
-                !SupportedConstraints(method.TypeParameters, requirePublic) || !CanExpose(method.ReturnType, requirePublic))
-            { return false; }
-            foreach (var parameter in method.Parameters)
-            {
-                if (!CanExpose(parameter.Type, requirePublic) || parameter.IsOptional != parameter.HasExplicitDefaultValue ||
-                    parameter.GetAttributes().Any(attribute =>
-                        (attribute ?? throw new ArgumentNullException(nameof(attribute))).AttributeClass is
-                        {
-                            MetadataName: "UnscopedRefAttribute", ContainingType: null,
-                            ContainingNamespace:
-                            {
-                                Name: "CodeAnalysis", ContainingNamespace:
-                                { Name: "Diagnostics", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } }
-                            }
-                        }))
-                { return false; }
-            }
-        }
-        return true;
+        global::SharpProof.Internal.CodeFixInputValidation.Require(target, nameof(target));
+        return CompanionEligibility.IsSupported(target);
     }
 
     internal static MethodDeclarationSyntax Method(IMethodSymbol target)
@@ -165,44 +130,16 @@ internal static class CompanionScaffolding
 
     internal static INamedTypeSymbol? ContractTarget(INamedTypeSymbol companion, Compilation compilation)
     {
-        if (companion == null)
-        { throw new ArgumentNullException(nameof(companion)); }
-        if (compilation == null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        var contractFor = compilation.GetTypeByMetadataName("SharpProof.Attributes.ContractForAttribute");
-        if (contractFor?.ContainingAssembly.Identity.Name != "SharpProof.Attributes")
-        { return null; }
-        var attributes = companion.GetAttributes().Where(attribute =>
-            SymbolEqualityComparer.Default.Equals((attribute ?? throw new ArgumentNullException(nameof(attribute))).AttributeClass, contractFor)).ToArray();
-        return attributes.Length == 1 && attributes[0].ConstructorArguments.Length == 1
-            ? attributes[0].ConstructorArguments[0].Value as INamedTypeSymbol : null;
+        global::SharpProof.Internal.CodeFixInputValidation.Require(companion, nameof(companion));
+        global::SharpProof.Internal.CodeFixInputValidation.Require(compilation, nameof(compilation));
+        return CompanionEligibility.ContractTarget(companion, compilation);
     }
 
     internal static ImmutableArray<INamedTypeSymbol> FindCompanions(INamedTypeSymbol target, Compilation compilation, CancellationToken cancellationToken)
     {
-        if (target == null)
-        { throw new ArgumentNullException(nameof(target)); }
-        if (compilation == null)
-        { throw new ArgumentNullException(nameof(compilation)); }
-        var companions = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
-        var contractFor = compilation.GetTypeByMetadataName("SharpProof.Attributes.ContractForAttribute");
-        if (contractFor?.ContainingAssembly.Identity.Name != "SharpProof.Attributes")
-        { return companions.ToImmutable(); }
-        var pending = new Stack<INamespaceOrTypeSymbol>();
-        pending.Push(compilation.Assembly.GlobalNamespace);
-        while (pending.Count != 0)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var current = pending.Pop();
-            foreach (var member in current.GetMembers().OfType<INamespaceOrTypeSymbol>())
-            { pending.Push(member); }
-            if (current is INamedTypeSymbol type && type.GetAttributes().Any(attribute =>
-                SymbolEqualityComparer.Default.Equals((attribute ?? throw new ArgumentNullException(nameof(attribute))).AttributeClass, contractFor) &&
-                attribute.ConstructorArguments.Length == 1 && attribute.ConstructorArguments[0].Value is INamedTypeSymbol contractTarget &&
-                SymbolEqualityComparer.Default.Equals(contractTarget.OriginalDefinition, target.OriginalDefinition)))
-            { companions.Add(type); }
-        }
-        return companions.ToImmutable();
+        global::SharpProof.Internal.CodeFixInputValidation.Require(target, nameof(target));
+        global::SharpProof.Internal.CodeFixInputValidation.Require(compilation, nameof(compilation));
+        return CompanionEligibility.FindCompanions(target, compilation, cancellationToken);
     }
 
     private static SyntaxList<TypeParameterConstraintClauseSyntax> PreserveNullableConstraints(
@@ -234,12 +171,6 @@ internal static class CompanionScaffolding
         return clauses;
     }
 
-    private static bool SupportedConstraints(ImmutableArray<ITypeParameterSymbol> parameters, bool requirePublic)
-    {
-        return parameters.All(parameter => !(parameter ?? throw new ArgumentNullException(nameof(parameter))).AllowsRefLikeType &&
-            parameter.ConstraintTypes.All(type => CanExpose(type ?? throw new ArgumentNullException(nameof(type)), requirePublic)));
-    }
-
     private static SyntaxTokenList ParameterModifiers(IParameterSymbol parameter)
     {
         global::SharpProof.Internal.CodeFixInputValidation.Require(parameter, nameof(parameter));
@@ -269,21 +200,4 @@ internal static class CompanionScaffolding
         return SyntaxFactory.TokenList(modifiers);
     }
 
-    private static bool CanExpose(ITypeSymbol type, bool requirePublic)
-    {
-        global::SharpProof.Internal.CodeFixInputValidation.Require(type, nameof(type));
-        if (type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer or TypeKind.Error)
-        { return false; }
-        if (type is IArrayTypeSymbol array)
-        { return CanExpose(array.ElementType, requirePublic); }
-        if (type is not INamedTypeSymbol named)
-        { return true; }
-        for (var current = named; current != null; current = current.ContainingType)
-        {
-            if (current.IsFileLocal || current.DeclaredAccessibility != Accessibility.Public &&
-                (requirePublic || current.DeclaredAccessibility is not (Accessibility.Internal or Accessibility.ProtectedOrInternal)))
-            { return false; }
-        }
-        return named.TypeArguments.All(argument => CanExpose(argument ?? throw new ArgumentNullException(nameof(argument)), requirePublic));
-    }
 }

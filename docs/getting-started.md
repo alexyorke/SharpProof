@@ -2,6 +2,13 @@
 
 Run `dotnet add package SharpProof` in an SDK-style C# project using your configured feed, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
 
+The official `1.0.0-preview.1` path is the private preview, with initial owner-only
+package/image access; source remains public. Public CI validation versions are
+distinct. Publication/access evidence is pending in the
+[private release receipt](private-preview-release-receipt.md). The
+[workspace template](developer-experience.md#install-and-start) supplies the matching
+tool manifest and credential-free private-feed configuration.
+
 Full verification requires .NET SDK 10.0.100+ with the .NET 10 runtime and a host/filesystem in the [support matrix](preview-support.md). Application target frameworks are separate from the compiler/worker host. Repository build/test/pack commands always run in the canonical Linux amd64 container.
 
 Targeting an older application framework does not require running the verifier on an old OS or SDK. [Legacy compatibility](legacy-compatibility.md) covers SDK-style Framework 4.6.1+, Standard/Core and modern .NET targets, the Windows MSBuild 18+ task-host path, and the limits of Visual Studio and old-Windows qualification.

@@ -13,5 +13,6 @@
     <ProjectReference Include="../SharpProof.Tool/SharpProof.Tool.csproj" />
     <ProjectReference Include="../SharpProof.Reporting/SharpProof.Reporting.csproj" Aliases="global,ReportingAssembly" />
     <ProjectReference Include="../SharpProof.CodeFixes/SharpProof.CodeFixes.csproj" />
+    <ProjectReference Include="../SharpProof.EditorSuggestions/SharpProof.EditorSuggestions.csproj" Aliases="EditorSuggestionsAssembly" />
   </ItemGroup>
 </Project>

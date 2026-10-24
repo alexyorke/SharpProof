@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 env:
+  SHARPPROOF_CI_PACKAGE_VERSION: ${{ github.repository == 'alexyorke/SharpProof' && !startsWith(github.ref, 'refs/tags/v') && format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) || '' }}
   COMPOSE_PROJECT_NAME: sharpproof-quality-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 

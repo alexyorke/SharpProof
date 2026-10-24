@@ -268,6 +268,11 @@ case "${command_name}" in
     if [[ -d "${repo_root}/artifacts/coverage" ]]; then
       cp -a "${repo_root}/artifacts/coverage" "${task_root}/artifacts/"
     fi
+    for native_input in coverage-windows-input coverage-native-windows; do
+      if [[ -d "${repo_root}/artifacts/${native_input}" ]]; then
+        cp -a "${repo_root}/artifacts/${native_input}" "${task_root}/artifacts/"
+      fi
+    done
     ;;
   package-partition-gate)
     if [[ -d "${repo_root}/artifacts/package-partitions" ]]; then
@@ -352,7 +357,7 @@ case "${command_name}" in
     result_paths=(canonical-cohorts/canonical-cohort-validation.json)
     ;;
   coverage-gate)
-    result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json)
+    result_paths=(coverage/coverage-authority.json coverage/SharpProof.coverage.json coverage/native-windows)
     ;;
   tool-consumer)
     result_paths=(.)

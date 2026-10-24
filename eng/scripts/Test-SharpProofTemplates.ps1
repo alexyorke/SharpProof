@@ -58,7 +58,8 @@ function Assert-TemplatePackage([string]$Path) {
             [void]$expectedPaths.Add($packageEntry)
             if (-not $entries.ContainsKey($packageEntry)) { throw "Template package is missing content: $packageEntry" }
             $expected = [IO.File]::ReadAllText($file.FullName).Replace('__SHARPPROOF_VERSION__', $PackageVersion).
-            Replace('__SHARPPROOF_SDK__', $sdkVersion).Replace('__SHARPPROOF_CONSUMER_IMAGE__', $ConsumerImage)
+            Replace('__SHARPPROOF_SDK__', $sdkVersion).Replace('__SHARPPROOF_CONSUMER_IMAGE__', $ConsumerImage).
+            Replace('__SHARPPROOF_SOURCE_REVISION__', $RepositoryCommit)
             if ((Read-ArchiveText $entries[$packageEntry]) -cne $expected -or $expected -cmatch '__SHARPPROOF_[A-Z_]+__') {
                 throw "Template package content differs from qualified inputs: $packageEntry"
             }

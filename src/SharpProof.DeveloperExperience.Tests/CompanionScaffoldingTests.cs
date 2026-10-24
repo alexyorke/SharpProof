@@ -176,6 +176,25 @@ public sealed class CompanionScaffoldingTests
     }
 
     [Test]
+    public async Task MissingMemberDiagnosticIsAvailableToDocumentSemanticAnalysis()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace,
+            "public interface Api { void Read(); void Write(); }",
+            "[SharpProof.Attributes.ContractFor(typeof(Api))] public static class ApiContracts { public static void Write(Api receiver) { throw new System.NotImplementedException(); } }");
+        var compilation = (await document.Project.GetCompilationAsync())!;
+        var tree = (await document.GetSyntaxTreeAsync())!;
+        var analyzer = compilation.WithAnalyzers([new SharpProofAnalyzer()]);
+        var diagnostics = await analyzer.GetAnalyzerSemanticDiagnosticsAsync(
+            compilation.GetSemanticModel(tree), null, TestContext.CurrentContext.CancellationToken);
+        var missing = diagnostics.Single(item => (item ?? throw new ArgumentNullException(nameof(item))).Id == "SPCF0004");
+        Assert.That(missing.Location.SourceTree, Is.SameAs(tree));
+        Assert.That(await MissingMemberFixesAsync(document, missing), Has.Length.EqualTo(1));
+        var all = await analyzer.GetAnalyzerDiagnosticsAsync();
+        Assert.That(all.Count(item => (item ?? throw new ArgumentNullException(nameof(item))).Id == "SPCF0004"), Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task MissingMemberFixUsesActualTargetDiagnosticAndUpdatesTheCompanionDocument()
     {
         const string source = "#nullable enable\npublic interface Api<T> where T : class { T? Read(ref int receiver); void Write(T value); }";

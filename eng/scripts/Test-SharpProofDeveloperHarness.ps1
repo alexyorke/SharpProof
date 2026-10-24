@@ -111,8 +111,8 @@ try {
     & git -C $sourceRoot -c commit.gpgsign=false -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'Developer harness fixture'
     if ($LASTEXITCODE -ne 0) { throw 'Cannot commit developer harness fixture source.' }
     $commit = (& git -C $sourceRoot rev-parse HEAD | Out-String).Trim()
-    [xml]$versions = Get-Content -LiteralPath (Join-Path $sourceRoot 'eng/Versions.props') -Raw
-    $version = $versions.SelectSingleNode('/Project/PropertyGroup/SharpProofPackageVersion').InnerText.Replace('$(SharpProofVersionPrefix)', $versions.SelectSingleNode('/Project/PropertyGroup/SharpProofVersionPrefix').InnerText)
+    Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
+    $version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $repositoryRoot
     foreach ($id in @('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) { New-DeveloperFixturePackage $core $id '.nupkg' }
     foreach ($id in @('SharpProof.Attributes', 'SharpProof.Verifier')) { New-DeveloperFixturePackage $core $id '.snupkg' }
     New-DeveloperFixturePackage $tool 'SharpProof.Tool' '.nupkg'

@@ -1,0 +1,31 @@
+name: SharpProof
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      initialize-baseline:
+        description: Initialize the first baseline on the default branch
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    if: ${{ github.event_name != 'push' || github.ref_name == github.event.repository.default_branch }}
+    uses: alexyorke/SharpProof/.github/workflows/sharpproof-consumer.yml@__SHARPPROOF_SOURCE_REVISION__
+    with:
+      project: src/app/SharpProofStarter.csproj
+      image: __SHARPPROOF_CONSUMER_IMAGE__
+      workflow-revision: __SHARPPROOF_SOURCE_REVISION__
+      caller-workflow: .github/workflows/sharpproof.yml
+      compose-file: compose.yaml
+      service: verify
+      mode: report
+      initialize-baseline: ${{ github.event_name == 'workflow_dispatch' && inputs.initialize-baseline || false }}
+      registry-username: ${{ github.actor }}
+      package-feed-url: https://nuget.pkg.github.com/alexyorke/index.json
+    secrets:
+      container-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}
+      package-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}

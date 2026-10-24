@@ -7,6 +7,24 @@ on:
       - "v*"
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      private_preview:
+        type: boolean
+        default: false
+      source_commit:
+        type: string
+        default: ""
+      workflow_commit:
+        type: string
+        default: ""
+    outputs:
+      package_artifact_id:
+        value: ${{ jobs.package-artifacts.outputs.package-artifact-id }}
+      tool_artifact_id:
+        value: ${{ jobs.optional-tool.outputs.tool-artifact-id }}
+      qualification_artifact_id:
+        value: ${{ jobs.private-qualification.outputs.artifact-id }}
 
 permissions:
   contents: read
@@ -18,8 +36,39 @@ concurrency:
 env:
   COMPOSE_PROJECT_NAME: sharpproof-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+  SHARPPROOF_PRIVATE_PREVIEW: ${{ inputs.private_preview && 'true' || 'false' }}
+  SHARPPROOF_CI_PACKAGE_VERSION: ${{ !inputs.private_preview && !startsWith(github.ref, 'refs/tags/v') && format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) || '' }}
+  SHARPPROOF_REPOSITORY_URL: ${{ inputs.private_preview && 'https://github.com/alexyorke/SharpProof-preview' || 'https://github.com/alexyorke/SharpProof' }}
+  SHARPPROOF_SOURCE_REPOSITORY: alexyorke/SharpProof
+  SHARPPROOF_SOURCE_COMMIT: ${{ inputs.private_preview && inputs.source_commit || github.sha }}
+  SHARPPROOF_WORKFLOW_COMMIT: ${{ inputs.private_preview && inputs.workflow_commit || github.workflow_sha }}
 
 jobs:
+  release-context:
+    name: Enforce public CI and private release boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject official preview archives in public runs and unauthorized private callers
+        env:
+          PRIVATE_PREVIEW: ${{ inputs.private_preview }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          WORKFLOW_COMMIT: ${{ inputs.workflow_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PRIVATE_PREVIEW" == true ]]; then
+            [[ "$GITHUB_REPOSITORY" == alexyorke/SharpProof-preview ]]
+            [[ "$SOURCE_COMMIT" =~ ^[a-f0-9]{40}$ && "$WORKFLOW_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+            [[ "$WORKFLOW_COMMIT" == "$GITHUB_WORKFLOW_SHA" && "$WORKFLOW_COMMIT" == "$GITHUB_SHA" ]]
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+            [[ "$GITHUB_WORKFLOW_REF" == alexyorke/SharpProof-preview/.github/workflows/private-preview.yml@refs/heads/main ]]
+          else
+            [[ "$GITHUB_REPOSITORY" != alexyorke/SharpProof-preview ]]
+            if [[ "$GITHUB_REF" == refs/tags/v1.0.0-preview.1 ]]; then
+              echo 'Official preview publication runs only in alexyorke/SharpProof-preview.' >&2
+              exit 1
+            fi
+          fi
   repository-quality:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/quality.yml
@@ -35,6 +84,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
       - name: Require exact-commit default-branch test and coverage success
         env:
@@ -51,6 +101,7 @@ jobs:
 
   package-artifacts:
     name: Produce exact container artifacts
+    needs: release-context
     outputs:
       package-artifact-id: ${{ steps.package-upload.outputs.artifact-id }}
       consumer-harness-artifact-id: ${{ steps.consumer-harness-upload.outputs.artifact-id }}
@@ -63,20 +114,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
 
       - name: Check the tag matches the checked-in package version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
-          prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' eng/Versions.props)"
-          template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' eng/Versions.props)"
-          version="${template//\$(SharpProofVersionPrefix)/$prefix}"
+          version="$(pwsh -NoLogo -NoProfile -Command 'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
           test "v${version}" = "${GITHUB_REF_NAME}"
 
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
+
+      - name: Require canonical consumer baseline regressions
+        shell: bash
+        run: bash ./eng/scripts/Test-SharpProofConsumerBaseline.sh
 
       # On pull requests and master, ci.yml's package-reproducibility job runs
       # the same format-check and the independent-path package reproduction
@@ -150,6 +204,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -217,6 +272,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
 
       - uses: ./.github/actions/prepare-qualified-packages
@@ -266,6 +322,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -308,6 +365,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -381,6 +439,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -404,6 +463,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -433,7 +493,7 @@ jobs:
   # retain their original release barriers and same-job image publication.
   developer-experience-candidate:
     name: Qualify developer candidate artifacts
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ !inputs.private_preview && !startsWith(github.ref, 'refs/tags/') }}
     needs: [package-artifacts, optional-tool]
     outputs:
       developer-artifact-id: ${{ steps.qualification.outputs.developer-artifact-id }}
@@ -448,6 +508,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
       - uses: ./.github/actions/qualify-developer-experience
         id: qualification
@@ -463,7 +524,7 @@ jobs:
     name: Developer tools, templates, and canonical consumer image
     needs: [repository-quality, release-qualification, security, package-artifacts, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool, provenance, developer-experience-candidate]
     if: >-
-      always() && needs.package.result == 'success' &&
+      always() && !inputs.private_preview && needs.package.result == 'success' &&
       needs.container-verifier.result == 'success' && needs.portable-consumers.result == 'success' &&
       needs.optional-tool.result == 'success' &&
       (!startsWith(github.ref, 'refs/tags/v') ||
@@ -521,6 +582,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
       - uses: ./.github/actions/qualify-developer-experience
         id: qualification
@@ -547,6 +609,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
       - uses: ./.github/actions/prepare-qualified-packages
         with:
@@ -593,6 +656,30 @@ jobs:
         id: tool-identity
         run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
+  private-qualification:
+    name: Require every private package and platform qualification
+    if: always() && inputs.private_preview
+    needs: [release-context, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool]
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-id: ${{ steps.receipt.outputs.artifact-id }}
+    steps:
+      - name: Reject any failed, cancelled, or skipped required qualification
+        env:
+          QUALIFICATION_RESULTS: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == alexyorke/SharpProof-preview ]]
+          printf '%s' "$QUALIFICATION_RESULTS" > private-package-qualification.json
+          jq -e 'length == 8 and all(.[]; .result == "success")' private-package-qualification.json > /dev/null
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: receipt
+        with:
+          name: private-package-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: private-package-qualification.json
+          if-no-files-found: error
+
   provenance:
     name: Attest qualified release packages
     if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
@@ -609,6 +696,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
       - uses: ./.github/actions/prepare-qualified-packages
         with:
@@ -763,7 +851,7 @@ jobs:
       - optional-tool
       - developer-experience
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'v1.0.0-preview.1' && 'nuget.private-preview' || 'nuget.org' }}
+    environment: nuget.org
     permissions:
       contents: write
       id-token: write
@@ -772,6 +860,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -832,13 +921,11 @@ jobs:
               --predicate-type https://slsa.dev/provenance/v1
           done
       - name: Reject public package versions with different bytes
-        if: github.ref_name != 'v1.0.0-preview.1'
         run: |
           bash nupkgs/Test-SharpProofPublishedPackages.sh preflight nupkgs
           bash tool-nupkgs/Test-SharpProofPublishedPackages.sh preflight tool-nupkgs
 
       - name: Exchange GitHub OIDC token for a temporary NuGet key
-        if: github.ref_name != 'v1.0.0-preview.1'
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
@@ -853,62 +940,41 @@ jobs:
 
       - name: Push packages and symbols
         env:
-          NUGET_API_KEY: >-
-            ${{ github.ref_name == 'v1.0.0-preview.1' &&
-                secrets.NUGET_PRIVATE_API_KEY ||
-                steps.nuget-login.outputs.NUGET_API_KEY }}
-          NUGET_SOURCE: >-
-            ${{ github.ref_name == 'v1.0.0-preview.1' &&
-                vars.NUGET_PRIVATE_SOURCE ||
-                'https://api.nuget.org/v3/index.json' }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_SOURCE: https://api.nuget.org/v3/index.json
         run: |
           set -euo pipefail
           test -n "${NUGET_SOURCE}"
           test -n "${NUGET_API_KEY}"
-          push_args=()
-          if [[ "$GITHUB_REF_NAME" != v1.0.0-preview.1 ]]; then
-            push_args+=(--skip-duplicate)
-          fi
+          push_args=(--skip-duplicate)
           dotnet nuget push "nupkgs/*.nupkg" \
             --source "${NUGET_SOURCE}" \
             --api-key "${NUGET_API_KEY}" \
             "${push_args[@]}"
 
       - name: Verify public feed package bytes after publication
-        if: github.ref_name != 'v1.0.0-preview.1'
         run: |
           bash nupkgs/Test-SharpProofPublishedPackages.sh published nupkgs
 
       - name: Push the separately qualified optional tool
         env:
-          NUGET_API_KEY: >-
-            ${{ github.ref_name == 'v1.0.0-preview.1' &&
-                secrets.NUGET_PRIVATE_API_KEY ||
-                steps.nuget-login.outputs.NUGET_API_KEY }}
-          NUGET_SOURCE: >-
-            ${{ github.ref_name == 'v1.0.0-preview.1' &&
-                vars.NUGET_PRIVATE_SOURCE ||
-                'https://api.nuget.org/v3/index.json' }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_SOURCE: https://api.nuget.org/v3/index.json
         run: |
           set -euo pipefail
           test -n "${NUGET_SOURCE}"
           test -n "${NUGET_API_KEY}"
           (cd tool-nupkgs && sha256sum --check --strict ../artifacts/release-supply-chain/TOOL-SHA256SUMS)
-          push_args=()
-          if [[ "$GITHUB_REF_NAME" != v1.0.0-preview.1 ]]; then
-            push_args+=(--skip-duplicate)
-          fi
+          push_args=(--skip-duplicate)
           dotnet nuget push "tool-nupkgs/*.nupkg" \
             --source "${NUGET_SOURCE}" \
             --api-key "${NUGET_API_KEY}" \
             "${push_args[@]}"
 
       - name: Verify the public optional tool after publication
-        if: github.ref_name != 'v1.0.0-preview.1'
         run: bash tool-nupkgs/Test-SharpProofPublishedPackages.sh published tool-nupkgs
 
       - name: Publish the same package bytes and signed evidence as GitHub release assets
-        if: github.ref_name != 'v1.0.0-preview.1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -939,7 +1005,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
     needs: [publish, developer-experience]
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'v1.0.0-preview.1' && 'nuget.private-preview' || 'nuget.org' }}
+    environment: nuget.org
     permissions:
       contents: read
       attestations: read
@@ -948,6 +1014,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -974,25 +1041,21 @@ jobs:
             ([.packages[].id] | sort) == ["SharpProof.CodeFixes", "SharpProof.Templates"]
           ' developer-nupkgs/developer-release-manifest.json > /dev/null
       - name: Reject public developer package versions with different content
-        if: github.ref_name != 'v1.0.0-preview.1'
         run: bash developer-nupkgs/Test-SharpProofPublishedPackages.sh preflight developer-nupkgs
       - uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
-        if: github.ref_name != 'v1.0.0-preview.1'
         id: nuget-login
         with:
           user: ${{ vars.NUGET_USER }}
       - name: Push the exact qualified developer archives
         env:
-          NUGET_API_KEY: ${{ github.ref_name == 'v1.0.0-preview.1' && secrets.NUGET_PRIVATE_API_KEY || steps.nuget-login.outputs.NUGET_API_KEY }}
-          NUGET_SOURCE: ${{ github.ref_name == 'v1.0.0-preview.1' && vars.NUGET_PRIVATE_SOURCE || 'https://api.nuget.org/v3/index.json' }}
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          NUGET_SOURCE: https://api.nuget.org/v3/index.json
         run: |
           set -euo pipefail
           test -n "$NUGET_API_KEY"
           test -n "$NUGET_SOURCE"
           (cd developer-nupkgs && sha256sum --check --strict SHA256SUMS)
-          push_args=()
-          if [[ "$GITHUB_REF_NAME" != v1.0.0-preview.1 ]]; then push_args+=(--skip-duplicate); fi
+          push_args=(--skip-duplicate)
           dotnet nuget push 'developer-nupkgs/*.nupkg' --source "$NUGET_SOURCE" --api-key "$NUGET_API_KEY" "${push_args[@]}"
       - name: Verify public package bytes after publication
-        if: github.ref_name != 'v1.0.0-preview.1'
         run: bash developer-nupkgs/Test-SharpProofPublishedPackages.sh published developer-nupkgs

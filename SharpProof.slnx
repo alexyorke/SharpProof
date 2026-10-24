@@ -14,6 +14,7 @@
     <Project Path="src/SharpProof.BuildTasks/SharpProof.BuildTasks.csproj" />
     <Project Path="src/SharpProof.CodeFixes.Tests/SharpProof.CodeFixes.Tests.csproj" />
     <Project Path="src/SharpProof.CodeFixes/SharpProof.CodeFixes.csproj" />
+    <Project Path="src/SharpProof.EditorSuggestions/SharpProof.EditorSuggestions.csproj" />
     <Project Path="src/SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj" />
     <Project Path="src/SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj" />
     <Project Path="src/SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj" />

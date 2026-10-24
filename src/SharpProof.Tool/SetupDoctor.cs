@@ -7,6 +7,7 @@ namespace SharpProof.Tool;
 
 internal static class SetupDoctor
 {
+    private static readonly string[] ComposeNames = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
     private static readonly SearchValues<char> DigestCharacters = SearchValues.Create("0123456789abcdef");
 
     internal delegate Task<(int ExitCode, string Output)> ProcessRunner(
@@ -157,7 +158,7 @@ internal static class SetupDoctor
                 {
                     var docker = await runProcess("docker", directory, cancellationToken, "info", "--format", "{{.OSType}}").ConfigureAwait(false);
                     Check(docker.ExitCode == 0 && docker.Output.Trim() == "linux", "Docker Linux engine", "Start Docker with Linux containers; the configured image must support linux/amd64.");
-                    var compose = await runProcess("docker", directory, cancellationToken, "compose", "config", "--format", "json").ConfigureAwait(false);
+                    var compose = await runProcess("docker", FindComposeDirectory(directory, cancellationToken), cancellationToken, "compose", "config", "--format", "json").ConfigureAwait(false);
                     if (compose.ExitCode != 0)
                     {
                         Check(false, "Consumer container configuration", "Generate/use the container starter's compose.yaml.");
@@ -202,11 +203,45 @@ internal static class SetupDoctor
         }
     }
 
+    internal static string FindComposeDirectory(string directory, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(directory);
+        directory = Path.GetFullPath(directory);
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string? candidate = null;
+        for (var current = new DirectoryInfo(directory); current != null; current = current.Parent)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (current.FullName != directory && string.Equals(current.FullName, home, StringComparison.OrdinalIgnoreCase))
+            { return directory; }
+            var composeFiles = ComposeNames.Count(name =>
+            {
+                ArgumentNullException.ThrowIfNull(name);
+                return File.Exists(Path.Combine(current.FullName, name));
+            });
+            if (composeFiles > 1)
+            { throw new InvalidOperationException("Multiple compose files make workspace inspection ambiguous."); }
+            if (composeFiles == 1)
+            {
+                candidate ??= current.FullName;
+                if (current.FullName == directory)
+                { return directory; }
+            }
+            var git = Path.Combine(current.FullName, ".git");
+            var workspace = File.Exists(Path.Combine(current.FullName, "Directory.Build.props")) &&
+                File.Exists(Path.Combine(current.FullName, ".config", "dotnet-tools.json"));
+            if (File.Exists(git) || Directory.Exists(git) || workspace ||
+                Directory.EnumerateFiles(current.FullName, "*.sln").Any() || Directory.EnumerateFiles(current.FullName, "*.slnx").Any())
+            { return candidate ?? directory; }
+        }
+        return directory;
+    }
     internal static bool IsPinnedConsumerImage(string image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        const string prefix = "ghcr.io/alexyorke/sharpproof@sha256:";
-        return image.Length == prefix.Length + 64 && image.StartsWith(prefix, StringComparison.Ordinal) &&
-            image.AsSpan(prefix.Length).IndexOfAnyExcept(DigestCharacters) < 0;
+        const string marker = "@sha256:";
+        var separator = image.IndexOf(marker, StringComparison.Ordinal);
+        return separator >= 0 && image[..separator] is "ghcr.io/alexyorke/sharpproof" or "ghcr.io/alexyorke/sharpproof-preview" &&
+            image.Length == separator + marker.Length + 64 && image.AsSpan(separator + marker.Length).IndexOfAnyExcept(DigestCharacters) < 0;
     }
 }

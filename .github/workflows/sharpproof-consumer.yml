@@ -1,0 +1,374 @@
+name: SharpProof consumer baseline
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Repository-relative project to verify.
+        required: true
+        type: string
+      image:
+        description: Qualified private preview image pinned by SHA-256.
+        required: true
+        type: string
+      workflow-revision:
+        description: Exact SharpProof commit, identical to this reusable workflow's uses pin.
+        required: true
+        type: string
+      caller-workflow:
+        description: Exact caller path, for example .github/workflows/sharpproof.yml.
+        required: true
+        type: string
+      compose-file:
+        default: compose.yaml
+        type: string
+      service:
+        default: verify
+        type: string
+      evidence-directory:
+        default: artifacts/sharpproof
+        type: string
+      registry-username:
+        required: true
+        type: string
+      package-feed-url:
+        default: https://nuget.pkg.github.com/alexyorke/index.json
+        type: string
+      mode:
+        description: report records regressions; enforce fails on regressions. Evidence errors always fail.
+        default: report
+        type: string
+      initialize-baseline:
+        description: Explicit reviewed workflow_dispatch initialization on the repository default branch.
+        default: false
+        type: boolean
+    secrets:
+      container-read-token:
+        description: Explicit read-only read:packages credential for the private preview image.
+        required: true
+      package-read-token:
+        description: Explicit read-only read:packages credential for the private SharpProofPreview feed.
+        required: true
+    outputs:
+      evidence-artifact-id:
+        description: Numeric artifact ID for this run's complete evidence.
+        value: ${{ jobs.verify.outputs.evidence-artifact-id }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  authorize:
+    name: Approve exact consumer and public helper commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source-sha: ${{ steps.approve.outputs.source-sha }}
+      source-ref: ${{ steps.approve.outputs.source-ref }}
+      helper-sha: ${{ steps.approve.outputs.helper-sha }}
+    steps:
+      - name: Authenticate event, run, and canonical public master ancestry
+        id: approve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_WORKFLOW_REVISION: ${{ inputs.workflow-revision }}
+          INITIALIZE_BASELINE: ${{ inputs.initialize-baseline }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.error, urllib.request
+          from pathlib import Path
+
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
+
+          def api(route):
+              request = urllib.request.Request('https://api.github.com/' + route, headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'SharpProof-consumer-trust-gate'})
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      data = response.read((8 << 20) + 1)
+              except urllib.error.HTTPError as error:
+                  raise SystemExit('GitHub trust metadata request failed: HTTP ' + str(error.code)) from None
+              require(len(data) <= 8 << 20, 'GitHub trust metadata exceeded its size limit.')
+              return json.loads(data)
+
+          def exact_sha(value):
+              return isinstance(value, str) and re.fullmatch('[0-9a-f]{40}', value) is not None
+
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          name = os.environ['EVENT_NAME']
+          require(name in ('push', 'pull_request', 'workflow_dispatch'),
+                  'Only push, pull_request and explicit workflow_dispatch are supported; pull_request_target is forbidden.')
+          repository = os.environ['GITHUB_REPOSITORY']
+          require(re.fullmatch('[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository) is not None,
+                  'Invalid consumer repository identity.')
+          repository_id = os.environ['GITHUB_REPOSITORY_ID']
+          require(repository_id.isdecimal() and int(repository_id) > 0, 'Invalid consumer repository ID.')
+          repository_id = int(repository_id)
+          def same_repository(value):
+              return isinstance(value, dict) and value.get('full_name') == repository and value.get('id') == repository_id
+          require(same_repository(event.get('repository')), 'Event repository identity differs.')
+          revision = os.environ['REQUESTED_WORKFLOW_REVISION']
+          require(exact_sha(revision), 'Helper revision must be an exact lowercase commit SHA.')
+          if name == 'pull_request':
+              pull = event.get('pull_request') or {}
+              require(same_repository((pull.get('head') or {}).get('repo')) and
+                      same_repository((pull.get('base') or {}).get('repo')),
+                      'Fork PRs cannot receive private package/image credentials. Use a maintainer-reviewed same-repository branch.')
+          repo = api('repos/' + repository)
+          require(same_repository(repo), 'GitHub consumer repository authority differs.')
+          run_id, attempt = os.environ['GITHUB_RUN_ID'], os.environ['GITHUB_RUN_ATTEMPT']
+          require(run_id.isdecimal() and int(run_id) > 0 and attempt.isdecimal() and int(attempt) > 0,
+                  'Invalid current run or attempt identity.')
+          run = api('repos/' + repository + '/actions/runs/' + run_id)
+          require(run.get('id') == int(run_id) and run.get('run_attempt') == int(attempt) and
+                  run.get('event') == name and same_repository(run.get('repository')) and
+                  same_repository(run.get('head_repository')), 'Current run identity is not trusted.')
+          source_sha, branch = run.get('head_sha'), run.get('head_branch')
+          require(exact_sha(source_sha) and isinstance(branch, str) and branch and
+                  not any(ord(character) < 33 or ord(character) == 127 for character in branch),
+                  'Current run source identity is invalid.')
+          source_ref = 'refs/heads/' + branch
+          if name == 'pull_request':
+              require(pull['head'].get('sha') == source_sha and pull['head'].get('ref') == branch,
+                      'Pull-request head differs from the authenticated current run.')
+          else:
+              require(os.environ['GITHUB_SHA'] == source_sha and os.environ['GITHUB_REF'] == source_ref,
+                      'Current branch context differs from the authenticated current run.')
+              if name == 'push':
+                  require(event.get('after') == source_sha, 'Push source SHA differs from the current run.')
+          if os.environ['INITIALIZE_BASELINE'] == 'true':
+              require(name == 'workflow_dispatch' and source_ref == 'refs/heads/' + repo['default_branch'] and
+                      str((event.get('inputs') or {}).get('initialize-baseline', '')).lower() == 'true',
+                      'Initialization requires explicit reviewed workflow_dispatch on the repository default branch.')
+          provider = 'alexyorke/SharpProof'
+          provider_repo = api('repos/' + provider)
+          require(provider_repo.get('full_name') == provider and provider_repo.get('private') is False and
+                  provider_repo.get('default_branch') == 'master', 'Canonical helper repository authority differs.')
+          master = api('repos/' + provider + '/git/ref/heads/master').get('object') or {}
+          require(master.get('type') == 'commit' and exact_sha(master.get('sha')), 'Canonical public master is invalid.')
+          comparison = api('repos/' + provider + '/compare/' + revision + '...' + master['sha'])
+          approved_helper = (comparison.get('base_commit') or {}).get('sha')
+          require(comparison.get('status') in ('ahead', 'identical') and approved_helper == revision and
+                  (comparison.get('merge_base_commit') or {}).get('sha') == revision,
+                  'Helper revision must be an ancestor of canonical public master.')
+          expected_reference = provider + '/.github/workflows/sharpproof-consumer.yml@' + approved_helper
+          require(any(item.get('path') == expected_reference and item.get('sha') == approved_helper
+                      for item in run.get('referenced_workflows', [])),
+                  'Requested helper revision differs from this run reusable workflow pin.')
+          # Publish only authenticated API identities after all checks pass.
+          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='utf-8') as output:
+              output.write('source-sha=' + source_sha + '\nsource-ref=' + source_ref + '\nhelper-sha=' + approved_helper + '\n')
+          PY
+
+  verify:
+    name: Verify and compare exact-base evidence
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      evidence-artifact-id: ${{ steps.retain.outputs.artifact-id }}
+    env:
+      COMPOSE_PROJECT_NAME: sharpproof-consumer-${{ github.run_id }}-${{ github.run_attempt }}
+      PROJECT: ${{ inputs.project }}
+      COMPOSE_FILE_PATH: ${{ inputs.compose-file }}
+      VERIFY_SERVICE: ${{ inputs.service }}
+      EXPECTED_IMAGE: ${{ inputs.image }}
+      WORKFLOW_REVISION: ${{ needs.authorize.outputs.helper-sha }}
+      CALLER_WORKFLOW: ${{ inputs.caller-workflow }}
+      EVIDENCE_DIRECTORY: ${{ inputs.evidence-directory }}
+      REGISTRY_USERNAME: ${{ inputs.registry-username }}
+      PACKAGE_FEED_URL: ${{ inputs.package-feed-url }}
+      COMPARISON_MODE: ${{ inputs.mode }}
+      INITIALIZE_BASELINE: ${{ inputs.initialize-baseline }}
+      SOURCE_SHA: ${{ needs.authorize.outputs.source-sha }}
+      SOURCE_REF: ${{ needs.authorize.outputs.source-ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize.outputs.source-sha }}
+          path: consumer
+          persist-credentials: false
+      - name: Load the exact pinned baseline implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: alexyorke/SharpProof
+          ref: ${{ needs.authorize.outputs.helper-sha }}
+          path: _sharpproof
+          persist-credentials: false
+      - name: Authenticate current run and comparison inputs
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          test "$COMPARISON_MODE" = report || test "$COMPARISON_MODE" = enforce
+          test "$PACKAGE_FEED_URL" = https://nuget.pkg.github.com/alexyorke/index.json
+          [[ "$REGISTRY_USERNAME" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]
+          extra=()
+          if [[ "$INITIALIZE_BASELINE" = true ]]; then extra+=(--initialize); fi
+          python3 _sharpproof/eng/scripts/SharpProofConsumerBaseline.py plan \
+            --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --revision "$WORKFLOW_REVISION" --workflow "$CALLER_WORKFLOW" --image "$EXPECTED_IMAGE" \
+            --project "$PROJECT" --compose-file "$COMPOSE_FILE_PATH" --service "$VERIFY_SERVICE" \
+            --evidence-directory "$EVIDENCE_DIRECTORY" --event-name "$EVENT_NAME" \
+            --source-sha "$SOURCE_SHA" --source-ref "$SOURCE_REF" --event-file "$GITHUB_EVENT_PATH" \
+            --output "$RUNNER_TEMP/consumer-baseline-plan.json" "${extra[@]}"
+      - name: Require the pinned canonical private image
+        working-directory: consumer
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE_PATH" config --format json > "$RUNNER_TEMP/consumer-compose.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          config = json.loads((Path(os.environ['RUNNER_TEMP']) / 'consumer-compose.json').read_text())
+          service = config['services'][os.environ['VERIFY_SERVICE']]
+          if service.get('image') != os.environ['EXPECTED_IMAGE'] or service.get('platform') != 'linux/amd64':
+              raise SystemExit('Verification requires the exact qualified private Linux amd64 image.')
+          if service.get('build') or service.get('entrypoint') or service.get('privileged'):
+              raise SystemExit('Consumer verification cannot rebuild or replace the canonical image entrypoint.')
+          PY
+      - name: Authenticate private image reads
+        env:
+          CONTAINER_READ_TOKEN: ${{ secrets.container-read-token }}
+        run: |
+          set -euo pipefail
+          test -n "$CONTAINER_READ_TOKEN"
+          printf '%s' "$CONTAINER_READ_TOKEN" | docker login ghcr.io --username "$REGISTRY_USERNAME" --password-stdin
+      - name: Pull the qualified private image
+        working-directory: consumer
+        run: docker compose -f "$COMPOSE_FILE_PATH" pull "$VERIFY_SERVICE"
+      - name: Require newly produced evidence rather than checked-in outputs
+        run: |
+          python3 _sharpproof/eng/scripts/SharpProofConsumerBaseline.py clean \
+            --plan "$RUNNER_TEMP/consumer-baseline-plan.json" --workspace "$GITHUB_WORKSPACE/consumer"
+      - name: Restore the pinned local tool
+        id: restore
+        working-directory: consumer
+        env:
+          PACKAGE_READ_TOKEN: ${{ secrets.package-read-token }}
+        run: |
+          set -euo pipefail
+          test -n "$PACKAGE_READ_TOKEN"
+          export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps \
+            -e NuGetPackageSourceCredentials_SharpProofPreview "$VERIFY_SERVICE" tool restore
+      - name: Build fresh complete proof evidence
+        id: build
+        continue-on-error: true
+        working-directory: consumer
+        env:
+          PACKAGE_READ_TOKEN: ${{ secrets.package-read-token }}
+        run: |
+          set -euo pipefail
+          export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps \
+            -e NuGetPackageSourceCredentials_SharpProofPreview "$VERIFY_SERVICE" build "$PROJECT" --configuration Release \
+            -p:SharpProofVerify=true \
+            "-p:SharpProofVerifyResultFile=/workspace/consumer/$EVIDENCE_DIRECTORY/result.json" \
+            "-p:SharpProofVerifyRequestFile=/workspace/consumer/$EVIDENCE_DIRECTORY/request.json" \
+            "-p:SharpProofCompilerManifestFile=/workspace/consumer/$EVIDENCE_DIRECTORY/compiler-manifest.json" \
+            "-p:SharpProofVerifySarifFile=/workspace/consumer/$EVIDENCE_DIRECTORY/result.sarif"
+      - name: Validate complete current evidence through the tool
+        id: current
+        if: always() && steps.restore.outcome == 'success' && steps.build.outcome != 'skipped'
+        working-directory: consumer
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps "$VERIFY_SERVICE" tool run dotnet-sharpproof -- compare \
+            --baseline "$EVIDENCE_DIRECTORY/result.json" --baseline-request "$EVIDENCE_DIRECTORY/request.json" \
+            --baseline-compiler-manifest "$EVIDENCE_DIRECTORY/compiler-manifest.json" \
+            --current "$EVIDENCE_DIRECTORY/result.json" --request "$EVIDENCE_DIRECTORY/request.json" \
+            --compiler-manifest "$EVIDENCE_DIRECTORY/compiler-manifest.json" --format markdown > "$RUNNER_TEMP/current-validation.md"
+      - name: Resolve and authenticate the exact base-commit baseline
+        id: baseline
+        if: steps.current.outcome == 'success' && !inputs.initialize-baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 _sharpproof/eng/scripts/SharpProofConsumerBaseline.py resolve \
+            --plan "$RUNNER_TEMP/consumer-baseline-plan.json" --destination "$GITHUB_WORKSPACE/consumer/.sharpproof-baseline"
+      - name: Compare validated evidence and write Markdown
+        id: compare
+        if: steps.current.outcome == 'success' && steps.baseline.outcome == 'success'
+        working-directory: consumer
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$COMPARISON_MODE" = enforce ]]; then flags+=(--fail-on-regression); fi
+          docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps "$VERIFY_SERVICE" tool run dotnet-sharpproof -- compare \
+            --baseline .sharpproof-baseline/result.json --baseline-request .sharpproof-baseline/request.json \
+            --baseline-compiler-manifest .sharpproof-baseline/compiler-manifest.json \
+            --current "$EVIDENCE_DIRECTORY/result.json" --request "$EVIDENCE_DIRECTORY/request.json" \
+            --compiler-manifest "$EVIDENCE_DIRECTORY/compiler-manifest.json" --format markdown "${flags[@]}" \
+            > "$RUNNER_TEMP/consumer-comparison.md"
+      - name: Record complete evidence and exact run identity
+        id: record
+        if: always() && steps.current.outcome == 'success'
+        run: |
+          python3 _sharpproof/eng/scripts/SharpProofConsumerBaseline.py record \
+            --plan "$RUNNER_TEMP/consumer-baseline-plan.json" --source "$GITHUB_WORKSPACE/consumer/$EVIDENCE_DIRECTORY" \
+            --destination "$RUNNER_TEMP/consumer-evidence"
+      - name: Validate the exact retained evidence snapshot through the tool
+        id: snapshot
+        if: always() && steps.record.outcome == 'success'
+        working-directory: consumer
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps \
+            -v "$RUNNER_TEMP/consumer-evidence:/workspace/sharpproof-upload:ro" "$VERIFY_SERVICE" tool run dotnet-sharpproof -- compare \
+            --baseline /workspace/sharpproof-upload/result.json --baseline-request /workspace/sharpproof-upload/request.json \
+            --baseline-compiler-manifest /workspace/sharpproof-upload/compiler-manifest.json \
+            --current /workspace/sharpproof-upload/result.json --request /workspace/sharpproof-upload/request.json \
+            --compiler-manifest /workspace/sharpproof-upload/compiler-manifest.json --format markdown \
+            > "$RUNNER_TEMP/snapshot-validation.md"
+      - name: Retain complete evidence
+        id: retain
+        if: always() && steps.snapshot.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.plan.outputs.artifact-name }}
+          path: ${{ runner.temp }}/consumer-evidence
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish comparison summary
+        if: always()
+        env:
+          SNAPSHOT_OUTCOME: ${{ steps.snapshot.outcome }}
+          RETAIN_OUTCOME: ${{ steps.retain.outcome }}
+        run: |
+          if [[ -s "$RUNNER_TEMP/consumer-comparison.md" ]]; then
+            cat "$RUNNER_TEMP/consumer-comparison.md" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$INITIALIZE_BASELINE" = true && "$SNAPSHOT_OUTCOME" = success && "$RETAIN_OUTCOME" = success ]]; then
+            printf '## Reviewed initial SharpProof baseline\n\nExact commit %s; complete evidence retained.\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '## SharpProof comparison unavailable\n\nNo current-evidence fallback baseline was created. Review the failed step; an initial baseline requires explicit reviewed workflow_dispatch initialize-baseline=true on the base branch.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve the consumer build and baseline policies
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          CURRENT_OUTCOME: ${{ steps.current.outcome }}
+          BASELINE_OUTCOME: ${{ steps.baseline.outcome }}
+          COMPARE_OUTCOME: ${{ steps.compare.outcome }}
+          SNAPSHOT_OUTCOME: ${{ steps.snapshot.outcome }}
+        run: |
+          set -euo pipefail
+          test "$BUILD_OUTCOME" = success
+          test "$CURRENT_OUTCOME" = success
+          test "$SNAPSHOT_OUTCOME" = success
+          if [[ "$INITIALIZE_BASELINE" != true ]]; then
+            test "$BASELINE_OUTCOME" = success
+            test "$COMPARE_OUTCOME" = success
+          fi
+      - name: Remove private registry session
+        if: always()
+        run: docker logout ghcr.io >/dev/null 2>&1 || true

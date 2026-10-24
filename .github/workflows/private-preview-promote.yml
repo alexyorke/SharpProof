@@ -1,0 +1,146 @@
+name: Promote private preview candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Stage registries without a tag, or finalize after actual access checks
+        type: choice
+        options: [stage-registry, finalize]
+        default: stage-registry
+        required: true
+      candidate_artifact_id:
+        description: Immutable private-preview-candidate artifact ID
+        type: string
+        required: true
+      editor_acceptance_artifact_id:
+        description: Immutable private acceptance artifact ID (include access receipt for finalize)
+        type: string
+        required: true
+      source_commit:
+        description: Original approved public source SHA
+        type: string
+        required: true
+      candidate_workflow_commit:
+        description: Original qualification workflow SHA
+        type: string
+        required: true
+      workflow_commit:
+        description: Exact current private promotion workflow SHA
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sharpproof-official-private-preview-1
+  cancel-in-progress: false
+
+env:
+  SHARPPROOF_PRIVATE_PREVIEW: "true"
+  SHARPPROOF_CI_PACKAGE_VERSION: ""
+  SHARPPROOF_SOURCE_REPOSITORY: alexyorke/SharpProof
+  SHARPPROOF_REPOSITORY_URL: https://github.com/alexyorke/SharpProof-preview
+  SHARPPROOF_SOURCE_COMMIT: ${{ inputs.source_commit }}
+  SHARPPROOF_CANDIDATE_WORKFLOW_COMMIT: ${{ inputs.candidate_workflow_commit }}
+  SHARPPROOF_WORKFLOW_COMMIT: ${{ inputs.workflow_commit }}
+
+jobs:
+  reviewable-candidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Authenticate frozen candidate and actual editor receipts without publication credentials
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT: ${{ inputs.candidate_artifact_id }}
+          ACCEPTANCE_ARTIFACT: ${{ inputs.editor_acceptance_artifact_id }}
+          PROMOTION_PHASE: ${{ inputs.phase }}
+        run: |
+          if ($env:GITHUB_REPOSITORY -cne 'alexyorke/SharpProof-preview' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or $env:GITHUB_ACTOR -cne 'alexyorke' -or $env:GITHUB_TRIGGERING_ACTOR -cne 'alexyorke' -or $env:GITHUB_REF -cne 'refs/heads/main' -or $env:GITHUB_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_SHA -cne $env:SHARPPROOF_WORKFLOW_COMMIT -or $env:GITHUB_WORKFLOW_REF -cne 'alexyorke/SharpProof-preview/.github/workflows/private-preview-promote.yml@refs/heads/main') { throw 'Promotion requires both pinned owner actors and the exact approved manual private main workflow.' }
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:CANDIDATE_ARTIFACT -Kind Candidate -ExpectedWorkflowCommit $env:SHARPPROOF_CANDIDATE_WORKFLOW_COMMIT -OutputDirectory artifacts/private-candidate -ReceiptPath artifacts/candidate-authentication.json
+          ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:ACCEPTANCE_ARTIFACT -Kind Acceptance -ExpectedWorkflowCommit $env:SHARPPROOF_WORKFLOW_COMMIT -OutputDirectory artifacts/private-acceptance -ReceiptPath artifacts/acceptance-authentication.json
+          ./eng/scripts/New-SharpProofPrivatePreviewPromotion.ps1 -CandidateDirectory artifacts/private-candidate -AcceptanceDirectory artifacts/private-acceptance -CandidateAuthenticationPath artifacts/candidate-authentication.json -AcceptanceAuthenticationPath artifacts/acceptance-authentication.json -OutputDirectory artifacts/private-promotion -Phase $env:PROMOTION_PHASE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-preview-promotion-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/private-promotion/
+          if-no-files-found: error
+
+  protected-promotion:
+    needs: reviewable-candidate
+    runs-on: ubuntu-latest
+    environment: private-preview-release
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4
+        with:
+          version: v29.9.2
+          daemon-config: '{"features":{"containerd-snapshotter":true}}'
+      - name: Reauthenticate the original immutable artifacts and all host gates
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_ARTIFACT: ${{ inputs.candidate_artifact_id }}
+          ACCEPTANCE_ARTIFACT: ${{ inputs.editor_acceptance_artifact_id }}
+          PROMOTION_PHASE: ${{ inputs.phase }}
+        run: |
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:CANDIDATE_ARTIFACT -Kind Candidate -ExpectedWorkflowCommit $env:SHARPPROOF_CANDIDATE_WORKFLOW_COMMIT -OutputDirectory artifacts/private-candidate -ReceiptPath artifacts/candidate-authentication.json
+          ./eng/scripts/Get-SharpProofPrivatePreviewArtifact.ps1 -ArtifactId $env:ACCEPTANCE_ARTIFACT -Kind Acceptance -ExpectedWorkflowCommit $env:SHARPPROOF_WORKFLOW_COMMIT -OutputDirectory artifacts/private-acceptance -ReceiptPath artifacts/acceptance-authentication.json
+          ./eng/scripts/New-SharpProofPrivatePreviewPromotion.ps1 -CandidateDirectory artifacts/private-candidate -AcceptanceDirectory artifacts/private-acceptance -CandidateAuthenticationPath artifacts/candidate-authentication.json -AcceptanceAuthenticationPath artifacts/acceptance-authentication.json -OutputDirectory artifacts/private-promotion -Phase $env:PROMOTION_PHASE
+      - name: Load and verify the exact original OCI image bytes without rebuilding
+        shell: pwsh
+        run: |
+          $manifest = Get-Content artifacts/private-candidate/release-manifest.json -Raw | ConvertFrom-Json
+          ./eng/scripts/Test-SharpProofPrivatePreviewImage.ps1 -ArchivePath artifacts/private-candidate/consumer-image.tar -BuildMetadataPath artifacts/private-candidate/consumer-image.json -ExpectedDigest $manifest.consumerImage.Split('@')[1] -ExpectedSourceCommit $env:SHARPPROOF_SOURCE_COMMIT -ImageReference "ghcr.io/alexyorke/sharpproof-preview:sha-$env:SHARPPROOF_SOURCE_COMMIT" -OutputPath artifacts/promoted-image-receipt.json -Load
+      - name: Require owner manual approval and protected main environment before accessing the signing key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: ./eng/scripts/Test-SharpProofPrivatePreviewPublicationPolicy.ps1
+      - name: Sign frozen candidate and bound promotion receipts with the protected key
+        env:
+          PRIVATE_PREVIEW_SIGNING_KEY: ${{ secrets.PRIVATE_PREVIEW_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          PROMOTION_PHASE: ${{ inputs.phase }}
+        shell: pwsh
+        run: >-
+          ./eng/scripts/Protect-SharpProofPrivatePreviewEvidence.ps1
+          -EvidenceDirectory artifacts/private-candidate -PromotionDirectory artifacts/private-promotion -Phase $env:PROMOTION_PHASE
+      - name: Publish exact registry bytes or finalize after fresh remote consumer qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_TOKEN: ${{ github.token }}
+          PROMOTION_PHASE: ${{ inputs.phase }}
+        shell: pwsh
+        run: |
+          $manifest = Get-Content artifacts/private-candidate/release-manifest.json -Raw | ConvertFrom-Json
+          ./eng/scripts/Publish-SharpProofPrivatePreview.ps1 -EvidenceDirectory artifacts/private-candidate -PromotionDirectory artifacts/private-promotion -Phase $env:PROMOTION_PHASE -ExpectedImageDigest $manifest.consumerImage.Split('@')[1]
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: private-preview-promotion-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/private-promotion/
+            artifacts/promoted-image-receipt.json
+            artifacts/private-fresh-consumer/
+            private-preview-publication.json
+          if-no-files-found: error
+          retention-days: 90

@@ -16,12 +16,16 @@ This document defines the current verifier's qualified host/filesystem boundary.
 | Visual Studio command-line build host | Windows x64 full-framework MSBuild 18+ with .NET 10 SDK/runtime | Verifier tasks use the out-of-process .NET task host; require a successful completed exact-artifact MSBuild.exe proof/refutation/downstream/clean qualification run |
 | Older Visual Studio command-line build host | MSBuild 17.14 with SDK 9.0.300 and Roslyn 4.14 | Explicit advisory-only operation; default strict verification is not supported on this host |
 | Repository build/test/pack/acceptance | Canonical Linux amd64 container only | Includes repository PowerShell commands |
-| IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
+| IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; required Visual Studio stable, VS Code/C#, and Rider Windows x64 private-preview sessions are all pending; design-time builds do not run proofs |
 | musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
 
 The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.319 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.402. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
 
 The consumer matrix is maintained in [package CI](../.github/workflows/package-consumers.yml). Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
+
+The [interactive editor acceptance runbook](editor-acceptance.md) records the additional
+private-preview evidence required for all three Windows x64 editors. This pending
+qualification does not alter the existing command-line host matrix.
 
 [Legacy compatibility](legacy-compatibility.md) separates application targets and deployment operating systems from build hosts. SDK-style targets from Framework 4.6.1 through modern .NET have package proof/refutation checks on a modern host. Windows `net48` downstream execution checks CLR 4 on the current hosted image; it does not qualify original Framework installations or old Windows VMs. The x64 MSBuild 18+ bridge and MSBuild 17.14 advisory-only matrix cover command-line hosts. Review successful completed exact-artifact CI runs for the source SHA and host version; job definitions alone are not outcomes. Full-framework ARM64 task hosting is implemented but is not separately qualified by these x64 Visual Studio jobs; native ARM64 Core MSBuild coverage is distinct. Interactive IDE behavior, classic non-SDK projects, `packages.config`, and Visual Studio 2019 or older remain unqualified.
 

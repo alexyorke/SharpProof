@@ -23,6 +23,11 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 
 The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
 
+The nightly fuzz runner rebuild uses the 600-second solution-build allowance. The
+worker's default per-project wall-time budget remains 300 seconds; these measure
+different boundaries. See [analysis limits](analysis-limits.md) before changing either
+value.
+
 [Documentation maintenance](documentation-maintenance.md) explains generation and update PRs. The [generated reference](generated/source-reference.md) preserves literal declarations; the authored guides explain their behavior and limitations.
 
 ## Parameters and test selection
@@ -106,6 +111,13 @@ Omit `--limit` or use zero for the full pinned method universe. Positive limits 
 [Invoke-SharpProofFuzzCampaign.ps1](../eng/scripts/Invoke-SharpProofFuzzCampaign.ps1) combines a UTC-day rotating seed with [retained seeds](../eng/fuzz/retained-seeds.json). The current contract requests 10,000 rotating cases; the retained manifest requests 1,000 per seed. The total campaign cap is 1,000,000. The runner is rebuilt from clean exact-commit source, and source identity is checked again after rebuilding and after the campaign.
 
 `tooling fuzz-nightly -Configuration Release` writes `artifacts/fuzz/nightly`. The script's advanced options are `-OutputDirectory`, `-RotatingSeed`, `-RotatingCases`, and `-RetainedCases`; zero case overrides use the configured budgets. Run advanced invocations in the persistent container. Output ownership is leased so overlapping writers cannot replace the same campaign. Each rotating/retained run produces `.stdout.json` and `.stderr.txt`; validated results feed `campaign.json`, including requested/observed counts, seeds, commit, and pass status. Missing, malformed, incomplete, or mismatched runner evidence fails the campaign.
+
+Runner compilation retains `runner-build.stdout.txt` and `runner-build.stderr.txt`
+under that output directory and uses the 600-second solution-build allowance. A failed
+build prints bounded stream tails; exit 124 identifies the configured build timeout.
+Retained invocations keep their 300-second limit and rotating invocations keep their
+1200-second limit. The build fix does not change the campaign's seeds, case counts,
+or worker proof budgets.
 
 For a bounded individual replay, the fuzz executable accepts `--cases` (default 1,000, range 1..1,000,000), `--seed` (signed 32-bit integer, default `0x5A17`), and `--max-parallelism` (default 4, range 1..4):
 

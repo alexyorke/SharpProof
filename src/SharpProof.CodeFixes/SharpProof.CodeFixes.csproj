@@ -5,6 +5,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
     <PackageReference Include="System.Composition.AttributedModel" PrivateAssets="all" />
+    <ProjectReference Include="../SharpProof.EditorSuggestions/SharpProof.EditorSuggestions.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" TreatAsPackageReference="false" />
   </ItemGroup>
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);SHARPPROOF_EDITOR_INPUTS</DefineConstants>
@@ -15,11 +16,23 @@
     <IncludeSymbols>false</IncludeSymbols>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>$(SharpProofPublisher)</Authors>
-    <Description>Optional SharpProof editor fixes and companion scaffolding.</Description>
+    <Description>Optional SharpProof companion suggestions, editor fixes, and scaffolding.</Description>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeEditorSuggestionsInPackage</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <None Include="buildTransitive/SharpProof.CodeFixes.props" Pack="true" PackagePath="buildTransitive" />
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
   </ItemGroup>
+  <Target Name="IncludeEditorSuggestionsInPackage">
+    <MSBuild Projects="../SharpProof.EditorSuggestions/SharpProof.EditorSuggestions.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_EditorSuggestionsTargetPath" />
+    </MSBuild>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_EditorSuggestionsTargetPath)" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
 </Project>

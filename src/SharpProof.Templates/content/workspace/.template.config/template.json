@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Alex Yorke",
+  "classifications": [
+    "SharpProof",
+    "Library",
+    "Workspace",
+    "Verification"
+  ],
+  "identity": "SharpProof.Workspace",
+  "name": "SharpProof verified workspace",
+  "shortName": "sharpproof-workspace",
+  "sourceName": "SharpProofStarter",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "editor": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "description": "Include the matching optional SharpProof.CodeFixes editor package."
+    },
+    "verification": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        {
+          "choice": "portable"
+        },
+        {
+          "choice": "container"
+        }
+      ],
+      "defaultValue": "portable",
+      "description": "Portable analysis or strict verification in the canonical Linux amd64 container."
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [
+        "portable/**",
+        "container/**",
+        "portable-editor/**",
+        "container-editor/**",
+        "**/bin/**",
+        "**/obj/**",
+        ".template.config/**"
+      ],
+      "rename": {
+        "global.json.template": "global.json",
+        "SharpProofStarter.slnx.template": "SharpProofStarter.slnx"
+      }
+    },
+    {
+      "source": "./portable/",
+      "target": "./",
+      "condition": "(verification == \"portable\")",
+      "modifiers": [
+        {
+          "condition": "(editor)",
+          "exclude": [
+            "src/app/SharpProofStarter.csproj.template"
+          ]
+        }
+      ],
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj"
+      }
+    },
+    {
+      "source": "./container/",
+      "target": "./",
+      "condition": "(verification == \"container\")",
+      "modifiers": [
+        {
+          "condition": "(editor)",
+          "exclude": [
+            "src/app/SharpProofStarter.csproj.template"
+          ]
+        }
+      ],
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj",
+        "compose.yaml.template": "compose.yaml"
+      }
+    },
+    {
+      "source": "./portable-editor/",
+      "target": "./",
+      "condition": "(verification == \"portable\" && editor)",
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj"
+      }
+    },
+    {
+      "source": "./container-editor/",
+      "target": "./",
+      "condition": "(verification == \"container\" && editor)",
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj"
+      }
+    }
+  ]
+}

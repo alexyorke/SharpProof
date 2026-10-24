@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <SharpProofEditorSuggestions Condition="'$(SharpProofEditorSuggestions)' == ''">true</SharpProofEditorSuggestions>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="SharpProofEditorSuggestions" />
+  </ItemGroup>
+</Project>

@@ -20,10 +20,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $reproductionTimeoutSeconds = $CommandTimeoutSeconds
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 Assert-SharpProofContainer 'Run independent reproducibility builds in the canonical Linux amd64 container.'
 if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [Runtime.InteropServices.Architecture]::X64) { throw 'Reproducibility qualification requires Linux amd64.' }
 if ($RequirePackageBytes -and $Scope -ne 'Full') { throw '-RequirePackageBytes requires -Scope Full.' }
-if ($IncludeDeveloperPackages -and ($Scope -ne 'Full' -or $DeveloperConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$')) {
+if ($IncludeDeveloperPackages -and ($Scope -ne 'Full' -or $DeveloperConsumerImage -cnotmatch '\Aghcr\.io/alexyorke/sharpproof(?:-preview)?@sha256:[a-f0-9]{64}\z')) {
     throw 'Optional package reproduction requires Full scope and an explicit fixture consumer-image digest.'
 }
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1') -Force
@@ -49,8 +50,7 @@ $temporary = Join-Path $parent ('sharpproof-repro-' + [guid]::NewGuid().ToString
 [IO.Directory]::CreateDirectory($temporary) | Out-Null
 $clones = [Collections.Immutable.ImmutableArray]::Create[string]((Join-Path $temporary 'a'), (Join-Path $temporary 'independent longer path/checkout-b'))
 $sdk = [string](Get-Content (Join-Path $repository 'global.json') -Raw | ConvertFrom-Json).sdk.version
-[xml]$versions = Get-Content -LiteralPath (Join-Path $repository 'eng/Versions.props') -Raw
-$packageVersion = ([string]$versions.Project.PropertyGroup.SharpProofPackageVersion).Replace('$(SharpProofVersionPrefix)', [string]$versions.Project.PropertyGroup.SharpProofVersionPrefix)
+$packageVersion = Get-SharpProofEffectivePackageVersion -RepositoryRoot $repository
 $sourceTree = (& git -C $repository rev-parse 'HEAD^{tree}').Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceTree -cnotmatch '\A[a-f0-9]{40}\z') { throw 'Cannot identify the exact source tree.' }
 $report = [ordered]@{

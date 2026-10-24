@@ -16,7 +16,13 @@ include_fragments = "full"
 include_verbatim = true
 
 # This normative attestation predicate type is a semantic identifier, not a dereferenceable webpage.
-exclude = ['^https://spdx\.dev/Document/v2\.3$']
+exclude = [
+  '^https://spdx\.dev/Document/v2\.3$',
+  # Private acceptance verifies these authenticated distribution endpoints.
+  # Public link checks must never receive private repository/feed credentials.
+  '^https://github\.com/alexyorke/SharpProof-preview/?$',
+  '^https://nuget\.pkg\.github\.com/alexyorke/index\.json$',
+]
 
 timeout = 30
 max_retries = 2

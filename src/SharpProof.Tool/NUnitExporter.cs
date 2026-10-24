@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,7 +14,50 @@ namespace SharpProof.Tool;
 
 internal static class NUnitExporter
 {
-    internal static async Task ExportAsync(string projectPath, EvidenceSet evidence, string claimId, string outputDirectory, CancellationToken cancellationToken)
+    private const string WorkspaceComposeShape = """
+        services:
+          verify:
+            image: __IMAGE__
+            platform: linux/amd64
+            mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
+            cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
+            working_dir: /workspace/consumer
+            environment:
+              - NuGetPackageSourceCredentials_SharpProofPreview
+            volumes:
+              - .:/workspace/consumer
+              - sharpproof-obj:/workspace/consumer/.sharpproof-obj
+              - sharpproof-bin:/workspace/consumer/.sharpproof-bin
+              - sharpproof-packages:/home/sharpproof/.nuget/packages
+              - sharpproof-dotnet:/home/sharpproof/.dotnet
+        volumes:
+          sharpproof-obj:
+          sharpproof-bin:
+          sharpproof-packages:
+          sharpproof-dotnet:
+        """;
+
+    private const string WorkspaceOutputProperties = """
+        <Project>
+          <PropertyGroup Condition="'$(SHARPPROOF_CONTAINER)' == '1'">
+            <SharpProofProjectOutputKey>$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectDirectory)'))/$(MSBuildProjectName)</SharpProofProjectOutputKey>
+            <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).sharpproof-obj/$(SharpProofProjectOutputKey)/</BaseIntermediateOutputPath>
+            <BaseOutputPath>$(MSBuildThisFileDirectory).sharpproof-bin/$(SharpProofProjectOutputKey)/</BaseOutputPath>
+          </PropertyGroup>
+        </Project>
+        """;
+
+    internal static Task ExportAsync(string projectPath, EvidenceSet evidence, string claimId, string outputDirectory, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(projectPath);
+        ArgumentNullException.ThrowIfNull(evidence);
+        ArgumentException.ThrowIfNullOrEmpty(claimId);
+        ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
+        return ExportAsync(projectPath, evidence, claimId, outputDirectory, workspaceDirectory: null, cancellationToken);
+    }
+
+    internal static async Task ExportAsync(string projectPath, EvidenceSet evidence, string claimId, string outputDirectory,
+        string? workspaceDirectory, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(projectPath);
         ArgumentNullException.ThrowIfNull(evidence);
@@ -32,6 +76,8 @@ internal static class NUnitExporter
             throw new IOException("Export requires a new output directory; existing files will not be overwritten.");
         }
 
+        var workspace = workspaceDirectory == null ? null : ValidateWorkspace(workspaceDirectory, projectPath, outputDirectory, cancellationToken);
+        var projectReference = RelativeProjectPath(outputDirectory, projectPath);
         var claim = evidence.Response.Manifest.Claims.SingleOrDefault(claim =>
         {
             global::SharpProof.Internal.InputValidation.Require(claim, nameof(claim));
@@ -62,7 +108,7 @@ internal static class NUnitExporter
             throw new InvalidOperationException("Export requires the matching single-target consumer project.");
         }
 
-        var compilation = Rehydrate(snapshot, directory, cancellationToken);
+        var compilation = Rehydrate(snapshot, directory, workspace, cancellationToken);
         var methods = compilation.SyntaxTrees.SelectMany(tree =>
         {
             global::SharpProof.Internal.InputValidation.Require(tree, nameof(tree));
@@ -142,7 +188,7 @@ internal static class NUnitExporter
             "net10.0" => "net10.0",
             _ => throw new InvalidOperationException("NUnit export currently supports net8.0/net9.0/net10.0 consumers and netstandard2.0/netstandard2.1 libraries. Other test runtimes are not qualified.")
         };
-        var testProject = new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("PropertyGroup", new XElement("TargetFramework", testFramework), new XElement("IsTestProject", "true"), new XElement("IsPackable", "false"), new XElement("ManagePackageVersionsCentrally", "false")), new XElement("ItemGroup", new XElement("ProjectReference", new XAttribute("Include", projectPath), new XAttribute("AdditionalProperties", "SharpProofProfile=advisory;SharpProofVerify=false")), Package("Microsoft.NET.Test.Sdk", ToolVersions.TestSdk), Package("NUnit", ToolVersions.NUnit), Package("NUnit3TestAdapter", ToolVersions.NUnitAdapter))));
+        var testProject = new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("PropertyGroup", new XElement("TargetFramework", testFramework), new XElement("IsTestProject", "true"), new XElement("IsPackable", "false"), new XElement("ManagePackageVersionsCentrally", "false")), new XElement("ItemGroup", new XElement("ProjectReference", new XAttribute("Include", EscapeMsBuildPath(projectReference)), new XAttribute("AdditionalProperties", "SharpProofProfile=advisory;SharpProofVerify=false")), Package("Microsoft.NET.Test.Sdk", ToolVersions.TestSdk), Package("NUnit", ToolVersions.NUnit), Package("NUnit3TestAdapter", ToolVersions.NUnitAdapter))));
         var parent = Path.GetDirectoryName(outputDirectory)!;
         if (!Directory.Exists(parent))
         {
@@ -155,6 +201,12 @@ internal static class NUnitExporter
         {
             await File.WriteAllTextAsync(Path.Combine(temporary, "Regression.cs"), source, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(temporary, "SharpProof.Regression.csproj"), testProject.ToString() + "\n", new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
+            if (workspace != null)
+            {
+                await File.WriteAllTextAsync(Path.Combine(temporary, "README.md"), WorkspaceReadme(workspace, outputDirectory),
+                    new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
+            }
+
             Directory.Move(temporary, outputDirectory);
         }
         finally
@@ -171,6 +223,118 @@ internal static class NUnitExporter
         global::SharpProof.Internal.InputValidation.Require(id, nameof(id));
         global::SharpProof.Internal.InputValidation.Require(version, nameof(version));
         return new("PackageReference", new XAttribute("Include", id), new XAttribute("Version", version));
+    }
+
+    private static string RelativeProjectPath(string directory, string projectPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(directory);
+        ArgumentException.ThrowIfNullOrEmpty(projectPath);
+        var relative = Path.GetRelativePath(directory, projectPath);
+
+        return relative.Replace(Path.DirectorySeparatorChar, '/');
+    }
+
+    private static string EscapeMsBuildPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        var escaped = new StringBuilder(path.Length);
+        foreach (var character in path)
+        {
+            if (character is '%' or '$' or '@' or '\'' or '(' or ')' or ';' or '?' or '*')
+            {
+                escaped.Append('%').Append(((int)character).ToString("X2", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                escaped.Append(character);
+            }
+        }
+
+        return escaped.ToString();
+    }
+
+    private static string ValidateWorkspace(string workspaceDirectory, string projectPath, string outputDirectory, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceDirectory);
+        ArgumentException.ThrowIfNullOrEmpty(projectPath);
+        ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(workspaceDirectory));
+        if (!Directory.Exists(root))
+        {
+            throw new ArgumentException("The export workspace must be an existing directory.", nameof(workspaceDirectory));
+        }
+
+        RequireWorkspacePath(root, projectPath);
+        RequireWorkspacePath(root, outputDirectory);
+        var compose = EvidenceSet.ReadBounded(Path.Combine(root, "compose.yaml"), 64 * 1024, cancellationToken);
+        var lines = compose.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Where(static line =>
+        {
+            ArgumentNullException.ThrowIfNull(line);
+            return !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith('#');
+        }).Select(static line => (line ?? throw new ArgumentNullException(nameof(line))).TrimEnd()).ToArray();
+        const string imagePrefix = "    image: ";
+        var imageLine = lines.FirstOrDefault(static line =>
+            (line ?? throw new ArgumentNullException(nameof(line))).StartsWith(imagePrefix, StringComparison.Ordinal));
+        if (imageLine == null || !SetupInitializer.IsPinnedConsumerImage(imageLine[imagePrefix.Length..]) ||
+            string.Join("\n", lines).Replace(imageLine, "    image: __IMAGE__", StringComparison.Ordinal) != WorkspaceComposeShape)
+        {
+            throw new InvalidDataException("Workspace compose.yaml must match the SharpProof workspace template's digest-pinned Linux amd64 verify service and isolated root mounts.");
+        }
+
+        var properties = EvidenceSet.ReadBounded(Path.Combine(root, "Directory.Build.props"), 64 * 1024, cancellationToken);
+        try
+        {
+            if (!XNode.DeepEquals(XDocument.Parse(properties).Root, XDocument.Parse(WorkspaceOutputProperties).Root))
+            {
+                throw new InvalidDataException("Workspace Directory.Build.props must match the SharpProof workspace template's isolated compiler output paths.");
+            }
+        }
+        catch (XmlException exception)
+        {
+            throw new InvalidDataException("Workspace Directory.Build.props must be valid XML.", exception);
+        }
+
+        return root;
+    }
+
+    private static void RequireWorkspacePath(string workspaceDirectory, string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(workspaceDirectory);
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        var relative = Path.GetRelativePath(workspaceDirectory, path);
+        if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The consumer project and regression output must both stay inside the export workspace.");
+        }
+
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        for (var current = path; ; current = Path.GetDirectoryName(current)!)
+        {
+            if (new FileInfo(current).LinkTarget != null)
+            {
+                throw new ArgumentException("Export workspace paths must not traverse symbolic links.");
+            }
+
+            if (current.Equals(workspaceDirectory, comparison))
+            {
+                break;
+            }
+        }
+    }
+
+    private static string WorkspaceReadme(string workspaceDirectory, string outputDirectory)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(workspaceDirectory);
+        ArgumentException.ThrowIfNullOrEmpty(outputDirectory);
+        var project = RelativeProjectPath(workspaceDirectory, Path.Combine(outputDirectory, "SharpProof.Regression.csproj"));
+        var powershellPath = "'" + project.Replace("'", "''", StringComparison.Ordinal) + "'";
+        var shellPath = "'" + project.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+        const string options = " -p:SharpProofProfile=advisory -p:SharpProofVerify=false";
+        return "# SharpProof regression\n\nThis test replays the captured input and is expected to fail until the implementation satisfies its original postcondition.\n\n" +
+            "Run from the workspace root containing compose.yaml. The workspace's verify service mounts the entire tree at /workspace/consumer and configures compiler output paths in its named volumes.\n\n" +
+            "PowerShell:\n\n```powershell\ndocker compose run --rm verify test " + powershellPath + options + "\n```\n\n" +
+            "Bash:\n\n```bash\ndocker compose run --rm verify test " + shellPath + options + "\n```\n\n" +
+            "Keep the consumer and regression directories together when moving this workspace; their ProjectReference and these commands use relative paths.\n";
     }
 
     internal static void RequireIndependentOutputDirectory(string projectPath, string outputDirectory)
@@ -202,7 +366,7 @@ internal static class NUnitExporter
         return type.SpecialType is SpecialType.System_Boolean or SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
     }
 
-    private static CSharpCompilation Rehydrate(CompilerCompilationSnapshot snapshot, string directory, CancellationToken cancellationToken)
+    private static CSharpCompilation Rehydrate(CompilerCompilationSnapshot snapshot, string directory, string? workspaceDirectory, CancellationToken cancellationToken)
     {
         global::SharpProof.Internal.InputValidation.Require(snapshot, nameof(snapshot));
         global::SharpProof.Internal.InputValidation.Require(directory, nameof(directory));
@@ -219,6 +383,11 @@ internal static class NUnitExporter
                 throw new InvalidDataException("The captured source metadata exceeds export limits.");
             }
             var path = Remap(tree.Path, snapshot.ProjectDirectory, directory);
+            if (workspaceDirectory != null)
+            {
+                RequireWorkspacePath(workspaceDirectory, path);
+            }
+
             if (new FileInfo(path).Length > 4L * tree.TextLength + 4)
             {
                 throw new InvalidDataException("Source size changed since verification: " + Path.GetFileName(path));

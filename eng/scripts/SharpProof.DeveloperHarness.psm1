@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.DeveloperPackageReproduction.psm1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 
@@ -87,12 +88,7 @@ function Get-DeveloperHarnessContext([string]$RepositoryRoot, [switch]$Producer)
     if ($LASTEXITCODE -ne 0 -or $sdk -cne $toolchain.dotnet.sdkVersion -or $sdk -cne $global.sdk.version) {
         throw 'Developer harness requires the exact catalog-pinned SDK.'
     }
-    [xml]$versions = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'eng/Versions.props') -Raw
-    $versionNode = $versions.SelectSingleNode('/Project/PropertyGroup/SharpProofPackageVersion')
-    $version = if ($null -eq $versionNode) { '' } else { [string]$versionNode.InnerText }
-    $prefixNode = $versions.SelectSingleNode('/Project/PropertyGroup/SharpProofVersionPrefix')
-    if ($null -ne $prefixNode) { $version = $version.Replace('$(SharpProofVersionPrefix)', [string]$prefixNode.InnerText) }
-    if ([string]::IsNullOrWhiteSpace($version) -or $version.Contains('$')) { throw 'Developer harness requires the exact source package version.' }
+    $version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $RepositoryRoot
     $inputs = foreach ($path in @('global.json', 'eng/container/toolchain.json', 'eng/Versions.props', 'Directory.Build.props', 'Directory.Build.targets', 'NuGet.config')) {
         [ordered]@{ path = $path; sha256 = Get-DeveloperHarnessHash -Path (Join-Path $RepositoryRoot $path) }
     }

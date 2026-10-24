@@ -107,9 +107,7 @@ runs:
         test -n "${WINDOWS_NATIVE_PATH}"
         test -f "${WINDOWS_NATIVE_PATH}/payload/win-x64/libz3.dll"
         test -f "${WINDOWS_NATIVE_PATH}/payload/win-arm64/libz3.dll"
-        prefix="$(sed -n 's:.*<SharpProofVersionPrefix>\(.*\)</SharpProofVersionPrefix>.*:\1:p' eng/Versions.props)"
-        template="$(sed -n 's:.*<SharpProofPackageVersion>\(.*\)</SharpProofPackageVersion>.*:\1:p' eng/Versions.props)"
-        version="${template//\$(SharpProofVersionPrefix)/$prefix}"
+        version="$(pwsh -NoLogo -NoProfile -Command 'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
         docker buildx build --platform linux/amd64 --file eng/container/Dockerfile \
           --build-context "windows-native=${WINDOWS_NATIVE_PATH}" \
           --target consumer --build-arg "SHARPPROOF_PACKAGE_VERSION=${version}" --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
@@ -147,6 +145,9 @@ runs:
         image="ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}"
         pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
           -EvidenceDirectory "${evidence}" -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
+          -LocalImage "${image}" -BuildMetadataPath consumer-image.json
+        pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
+          -EvidenceDirectory "${evidence}" -ConsumerDirectory workspace-consumer -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
           -LocalImage "${image}" -BuildMetadataPath consumer-image.json
     - name: Record exact optional editor and template archives
       shell: bash

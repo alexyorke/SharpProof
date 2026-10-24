@@ -11,7 +11,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Getting started](getting-started.md) | Package references, first contract, profiles, and verifier policies |
 | [Project templates](../templates/README.md) | Portable/verified class libraries with version-authoritative local installation |
 | [Developer tools](developer-experience.md) | Optional packaged templates, project setup checks, evidence comparison, NUnit regression export, and companion scaffolding |
-| [Developer experience checklist](developer-experience-plan.md) | Seven implemented areas, validation commands, retained evidence scope, and remaining CI/release decisions |
+| [Developer experience checklist](developer-experience-plan.md) | Existing foundation, six next improvements, validation scope, and pending editor/private-release evidence |
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
@@ -20,6 +20,8 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [NuGet audit coverage](nuget-architecture-audit.md) | Recommendation dispositions, stale premises, source evidence and qualification limits |
 | [Consumer performance](consumer-performance.md) | Comparable build/runtime allocation measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
+| [Interactive editor acceptance](editor-acceptance.md) | Required Windows x64 Visual Studio, VS Code/C#, and Rider sessions; all qualification evidence pending |
+| [Private preview release receipt](private-preview-release-receipt.md) | Separate source/workflow identities, private artifacts/signatures/symbols/access, and pending publication evidence |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
 | [Configuration](configuration.md) | Consumer MSBuild properties, selection, IDE behavior, budgets, cache, and report paths |
 | [Verification evidence](verification-results.md) | Find reports, join claims to selection, interpret proofs, replay, assumptions, vacuity, and cache records |

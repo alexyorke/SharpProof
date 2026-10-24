@@ -10,6 +10,17 @@ $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-facade-regression-'
 $commit = 'a' * 40
 $validDependency = '<dependencies><group targetFramework=".NETStandard2.0"><dependency id="SharpProof.Verifier" version="[1.2.3]" /></group></dependencies>'
 
+# These fixed public package fixtures must not inherit a caller's real release context.
+$releaseFixtureEnvironmentNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        'SHARPPROOF_CI_PACKAGE_VERSION', 'SHARPPROOF_PRIVATE_PREVIEW',
+        'SHARPPROOF_REPOSITORY_URL', 'GITHUB_REPOSITORY',
+        'SHARPPROOF_SOURCE_REPOSITORY', 'SHARPPROOF_SOURCE_COMMIT', 'SHARPPROOF_WORKFLOW_COMMIT'))
+$releaseFixtureEnvironmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]()
+foreach ($name in $releaseFixtureEnvironmentNames) {
+    $releaseFixtureEnvironmentBuilder.Add($name, [Environment]::GetEnvironmentVariable($name, 'Process'))
+}
+$releaseFixtureEnvironment = $releaseFixtureEnvironmentBuilder.ToImmutable()
+
 function Write-FixturePackage(
     [string]$Id = 'SharpProof', [string]$Version = '1.2.3', [string]$Extension = 'nupkg',
     [string]$RepositoryCommit = $commit, [string]$Dependency = $validDependency,
@@ -48,6 +59,9 @@ function Assert-FixtureFacade([string]$Path) {
 }
 
 try {
+    foreach ($name in $releaseFixtureEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+    }
     $facade = Write-FixturePackage
     Assert-FixtureFacade $facade
     foreach ($id in @('SharpProof.Attributes', 'SharpProof.Verifier')) {
@@ -94,6 +108,9 @@ try {
     Write-Output 'Metadata facade regressions passed: exact identity/dependency/provenance, 3 main + 2 symbol packages, duplicate/archive/payload/DTD rejection.'
 }
 finally {
+    foreach ($entry in $releaseFixtureEnvironment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
+    }
     $fullFixture = [IO.Path]::GetFullPath($fixture)
     $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
     if (-not $fullFixture.StartsWith($temporaryParent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::Ordinal) -or

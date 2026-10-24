@@ -372,6 +372,26 @@ function Invoke-RepositoryGates {
         'Embedded symbol package regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1' `
         'Release SBOM and attestation policy regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofReleaseConfiguration.ps1' `
+        'Release configuration regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofFuzzCampaignRegression.ps1' `
+        'Fuzz campaign budget and evidence regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewRegression.ps1' `
+        'Private preview envelope regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewPolicyRegression.ps1' `
+        'Private preview source and publication policy regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewArtifactRegression.ps1' `
+        'Private preview artifact regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewCheckoutRegression.ps1' `
+        'Private preview immutable checkout regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewImageRegression.ps1' `
+        'Private preview image identity regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewPromotionReceiptRegression.ps1' `
+        'Private preview promotion receipt regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofPrivatePreviewReleaseAssets.ps1' `
+        'Private preview release asset regressions failed.'
+    Invoke-RequiredScript 'eng/scripts/Test-SharpProofNativeToolCoverage.ps1' `
+        'Native Tool coverage evidence regressions failed.'
     Invoke-RequiredScript 'eng/scripts/Test-SharpProofConsumerHarness.ps1' `
         'Consumer harness identity and result regressions failed.'
     & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofConsumerHarnessLifecycle.sh')
@@ -1025,9 +1045,11 @@ switch ($Command) {
 
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
         $coverageArgumentBuilder = New-ContainerArgumentBuilder -Values ([ordered]@{
-                CoverageRoot  = $coverageRoot
-                ComparisonRef = $comparisonRef
-                SummaryPath   = $summaryPath
+                NativeToolProducerRoot = Join-Path $repositoryRoot 'artifacts/coverage-windows-input'
+                NativeToolConsumerRoot = Join-Path $repositoryRoot 'artifacts/coverage-native-windows'
+                CoverageRoot           = $coverageRoot
+                ComparisonRef          = $comparisonRef
+                SummaryPath            = $summaryPath
             }).AsReadOnly()
         if (-not [string]::IsNullOrWhiteSpace(
                 (& git status --porcelain))) {

@@ -43,6 +43,14 @@ public sealed class LinkedProductionCoverageTests
         Assert.That(result.RootElement.GetProperty("error").GetString(), Does.Contain(identity));
     }
 
+    [Test]
+    public async Task RejectsIncompleteNativeSupplement()
+    {
+        using var result = await RunAsync("partial-native");
+        Assert.That(result.RootElement.GetProperty("error").GetString(),
+            Does.Contain("both authenticated producer and consumer roots"));
+    }
+
     private static async Task<JsonDocument> RunAsync(string scenario)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
@@ -96,6 +104,10 @@ public sealed class LinkedProductionCoverageTests
                         documents=@((New-Document $ownB @(10)), (New-Document $shared @(10,30))) }
                 ) }
             $baseline = [pscustomobject]@{ projects = [pscustomobject]@{A=100;B=100} }
+            # AST blocks omit the script parameter binder. Model its empty optional
+            # native roots explicitly; incomplete supplied evidence must still fail.
+            $NativeToolProducerRoot = if ($env:SHARPPROOF_LINKED_SCENARIO -ceq 'partial-native') { 'producer' } else { '' }
+            $NativeToolConsumerRoot = ''
             $resolvedCoverageRoot = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N'))
             [void][IO.Directory]::CreateDirectory($resolvedCoverageRoot)
             try {

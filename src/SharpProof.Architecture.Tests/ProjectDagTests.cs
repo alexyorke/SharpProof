@@ -19,7 +19,7 @@ public sealed class ProjectDagTests
             new("SharpProof.Compiler.Semantics", ["SharpProof.Contracts", "SharpProof.Effects"]),
             new("SharpProof.Attributes", []),
             new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
-            new("SharpProof.CodeFixes", []),
+            new("SharpProof.CodeFixes", ["SharpProof.EditorSuggestions"]),
             new("SharpProof.CompilerArtifact", ["SharpProof.Ir", "SharpProof.Worker.Protocol"]),
             new("SharpProof.CompilerCollector", [
                 "SharpProof.Compiler.Semantics",
@@ -28,6 +28,7 @@ public sealed class ProjectDagTests
             new("SharpProof.ContractForGenerator", []),
             new("SharpProof.Contracts", ["SharpProof.Frontend"]),
             new("SharpProof.Dataflow", []),
+            new("SharpProof.EditorSuggestions", []),
             new("SharpProof.Effects", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
             new("SharpProof.Frontend", ["SharpProof.Attributes", "SharpProof.Ir"]),
             new("SharpProof.Fuzz", [
@@ -82,6 +83,7 @@ public sealed class ProjectDagTests
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
         "SharpProof.CodeFixes",
+        "SharpProof.EditorSuggestions",
         "SharpProof.Attributes",
         "SharpProof.Contracts",
         "SharpProof.CompilerCollector",
@@ -133,6 +135,21 @@ public sealed class ProjectDagTests
             }
         }
         Assert.That(seen, Is.EquivalentTo(AllowedReferences.Keys));
+    }
+
+    [Test]
+    public void EditorSuggestionsRemainABuildOnlyCodeFixDependency()
+    {
+        var project = XDocument.Load(ProjectPath("SharpProof.CodeFixes"));
+        var reference = project.Descendants("ProjectReference").Single(item =>
+            Path.GetFileNameWithoutExtension((string?)(item ?? throw new ArgumentNullException(nameof(item))).Attribute("Include")) == "SharpProof.EditorSuggestions");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That((string?)reference.Attribute("ReferenceOutputAssembly"), Is.EqualTo("false"));
+            Assert.That((string?)reference.Attribute("PrivateAssets"), Is.EqualTo("all"));
+            Assert.That((string?)reference.Attribute("TreatAsPackageReference"), Is.EqualTo("false"));
+            Assert.That(RuntimeClosure("SharpProof.CodeFixes"), Does.Not.Contain("SharpProof.EditorSuggestions"));
+        }
     }
 
     [TestCase("SharpProof.Worker")]
@@ -210,6 +227,8 @@ public sealed class ProjectDagTests
                 relative == "eng/logging/RepositoryLogger.cs";
             allowed |= item.Project == "SharpProof.Gates" &&
                 relative == "eng/scripts/SharpProof.SymbolPackageValidator.cs";
+            allowed |= item.Project == "SharpProof.EditorSuggestions" &&
+                relative is "src/SharpProof.CodeFixes/CompanionEligibility.cs" or "src/SharpProof.CodeFixes/CompanionSuggestionContract.cs";
             if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")
             {
                 allowed |= relative.StartsWith("eng/testing/", StringComparison.Ordinal) ||

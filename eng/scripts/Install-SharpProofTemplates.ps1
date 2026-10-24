@@ -7,11 +7,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 Assert-SharpProofContainer 'Install and validate repository templates in the canonical Linux amd64 container.'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-[xml]$release = Get-Content -LiteralPath (Join-Path $repository 'eng/Versions.props') -Raw
-$version = [string]$release.Project.PropertyGroup.SharpProofPackageVersion
-$version = $version.Replace('$(SharpProofVersionPrefix)', [string]$release.Project.PropertyGroup.SharpProofVersionPrefix)
+$version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $repository
 if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Unexpected release package version.' }
 if ($Verify -and -not $PackageSource) { throw '-Verify requires the exact packed -PackageSource.' }
 if ($PackageSource) { $PackageSource = (Resolve-Path -LiteralPath $PackageSource).Path }
