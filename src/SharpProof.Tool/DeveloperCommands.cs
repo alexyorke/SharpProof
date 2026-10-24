@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using SharpProof.Reporting;
 
@@ -15,23 +16,45 @@ internal static class DeveloperCommands
             cancellationToken.ThrowIfCancellationRequested();
             if (args.Length == 0 || args is ["--help"] or ["-h"])
             {
-                await output.WriteLineAsync(("SharpProof developer tools\n  doctor --project <csproj> [--verification portable|container]\n  explain --result <json> [--claim <id>]\n  compare --baseline <json> --current <json> [--fail-on-regression]\n  export-test --project <csproj> --result <json> --claim <id> --output <new-directory>\nEvidence paths: --request <json> --compiler-manifest <json>; comparison also accepts --baseline-request and --baseline-compiler-manifest. Exit codes: 0 success, 1 setup/regression failure, 2 invalid arguments/evidence.").AsMemory(), cancellationToken).ConfigureAwait(false);
+                await output.WriteLineAsync(("SharpProof developer tools\n  init --project <csproj> [--verification portable|container] [--apply] [--consumer-image <digest-pinned-image>]\n  doctor --project <csproj> [--verification portable|container]\n  explain --result <json> [--claim <id>]\n  compare --baseline <json> --current <json> [--fail-on-regression]\n  export-test --project <csproj> --result <json> --claim <id> --output <new-directory> [--workspace <root>]\nNamed commands accept --format text|json|markdown (default text). Init previews setup unless --apply is present. Evidence paths: --request <json> --compiler-manifest <json>; comparison also accepts --baseline-request and --baseline-compiler-manifest. Exit codes: 0 success, 1 setup/regression failure, 2 invalid arguments/evidence.").AsMemory(), cancellationToken).ConfigureAwait(false);
                 return 0;
             }
 
             var options = CommandOptions.Parse(args);
+            var format = CommandPresentationFormatter.ParseFormat(options.Get("format"));
+            using var rendered = new StringWriter(CultureInfo.InvariantCulture) { NewLine = output.NewLine };
+            CommandPresentation presentation;
+            int exitCode;
             switch (args[0])
             {
+                case "init":
+                    options.Allow("project", "verification", "apply", "consumer-image", "format");
+                    var initialized = await SetupInitializer.InitializeAsync(options.Required("project"), options.Get("verification") ?? "portable",
+                        options.Has("apply"), options.Get("consumer-image"), cancellationToken).ConfigureAwait(false);
+                    await rendered.WriteAsync(initialized.Message.AsMemory(), cancellationToken).ConfigureAwait(false);
+                    var generated = initialized.Files.Select(static file =>
+                    {
+                        ArgumentNullException.ThrowIfNull(file);
+                        return new CommandGeneratedFile(file.Path, file.Written, file.Changed);
+                    }).ToArray();
+                    exitCode = 0;
+                    presentation = CommandPresentation.CreateMessage("init", exitCode, rendered.ToString(),
+                        "Project setup plan; no restore, build, proof, or consumer execution.", generatedFiles: generated);
+                    break;
                 case "doctor":
-                    options.Allow("project", "verification");
-                    return await SetupDoctor.RunAsync(options.Required("project"), options.Get("verification"), output, cancellationToken).ConfigureAwait(false);
+                    options.Allow("project", "verification", "format");
+                    exitCode = await SetupDoctor.RunAsync(options.Required("project"), options.Get("verification"), rendered, cancellationToken).ConfigureAwait(false);
+                    presentation = CommandPresentation.CreateMessage("doctor", exitCode, rendered.ToString());
+                    break;
                 case "explain":
-                    options.Allow("result", "request", "compiler-manifest", "claim");
+                    options.Allow("result", "request", "compiler-manifest", "claim", "format");
                     var evidence = EvidenceSet.Load(options.Required("result"), options.Get("request"), options.Get("compiler-manifest"), cancellationToken);
-                    VerificationReport.Write(output, evidence.Response, options.Get("claim"));
-                    return 0;
+                    VerificationReport.Write(rendered, evidence.Response, options.Get("claim"));
+                    exitCode = 0;
+                    presentation = CommandPresentation.CreateExplain(evidence.Response, options.Get("claim"), exitCode, rendered.ToString());
+                    break;
                 case "compare":
-                    options.Allow("baseline", "current", "request", "compiler-manifest", "baseline-request", "baseline-compiler-manifest", "fail-on-regression");
+                    options.Allow("baseline", "current", "request", "compiler-manifest", "baseline-request", "baseline-compiler-manifest", "fail-on-regression", "format");
                     var baselinePath = options.Required("baseline");
                     var currentPath = options.Required("current");
                     var baseline = EvidenceSet.Load(baselinePath, options.Get("baseline-request"), options.Get("baseline-compiler-manifest"), cancellationToken);
@@ -46,50 +69,69 @@ internal static class DeveloperCommands
                     {
                         throw new InvalidDataException("Compare evidence using the same specification-pack selection and catalog.");
                     }
-
                     if (baseline.Request.VerifyPolicy != current.Request.VerifyPolicy || baseline.Request.AssumptionPolicy != current.Request.AssumptionPolicy)
                     {
                         throw new InvalidDataException("Compare evidence using the same verification and assumption policies.");
                     }
 
+                    var notes = new List<string>();
                     var baselineBudgets = baseline.Request.Budgets;
                     var currentBudgets = current.Request.Budgets;
                     if (baselineBudgets.QueryRlimit != currentBudgets.QueryRlimit || baselineBudgets.MethodRlimit != currentBudgets.MethodRlimit ||
                         baselineBudgets.MethodWallTimeMilliseconds != currentBudgets.MethodWallTimeMilliseconds || baselineBudgets.ProjectWallTimeMilliseconds != currentBudgets.ProjectWallTimeMilliseconds ||
                         baselineBudgets.MaxParallelism != currentBudgets.MaxParallelism || baselineBudgets.MaximumExpressionDepth != currentBudgets.MaximumExpressionDepth)
                     {
-                        await output.WriteLineAsync("NOTE Verification budgets differ; outcome changes may reflect different resource limits.".AsMemory(), cancellationToken).ConfigureAwait(false);
+                        notes.Add("NOTE Verification budgets differ; outcome changes may reflect different resource limits.");
                     }
                     if (baseline.Response.Summary.Versions != current.Response.Summary.Versions)
                     {
-                        await output.WriteLineAsync("NOTE Worker or API-spec versions differ; outcome changes may reflect changes in verification semantics.".AsMemory(), cancellationToken).ConfigureAwait(false);
+                        notes.Add("NOTE Worker or API-spec versions differ; outcome changes may reflect changes in verification semantics.");
                     }
 
                     var changes = VerificationComparison.Compare(baseline.Response, current.Response);
+                    foreach (var note in notes)
+                    {
+                        await rendered.WriteLineAsync(note.AsMemory(), cancellationToken).ConfigureAwait(false);
+                    }
                     foreach (var change in changes)
                     {
-                        await output.WriteLineAsync(($"{(change.IsRegression ? "REGRESSION" : "CHANGE")} {change.Kind}: {change.Identity}").AsMemory(), cancellationToken).ConfigureAwait(false);
+                        await rendered.WriteLineAsync(($"{(change.IsRegression ? "REGRESSION" : "CHANGE")} {change.Kind}: {change.Identity}").AsMemory(), cancellationToken).ConfigureAwait(false);
                     }
-
-                    await output.WriteLineAsync(($"{changes.Count} changes; {changes.Count(static change => { global::SharpProof.Internal.InputValidation.Require(change, nameof(change)); return change.IsRegression; })} regressions. Existing verifier policy still applies.").AsMemory(), cancellationToken).ConfigureAwait(false);
-                    return options.Has("fail-on-regression") && changes.Any(static change =>
+                    await rendered.WriteLineAsync(($"{changes.Count} changes; {changes.Count(static change => { global::SharpProof.Internal.InputValidation.Require(change, nameof(change)); return change.IsRegression; })} regressions. Existing verifier policy still applies.").AsMemory(), cancellationToken).ConfigureAwait(false);
+                    exitCode = options.Has("fail-on-regression") && changes.Any(static change =>
                     {
                         global::SharpProof.Internal.InputValidation.Require(change, nameof(change));
                         return change.IsRegression;
                     }) ? 1 : 0;
+                    presentation = CommandPresentation.CreateCompare(changes, notes, exitCode, rendered.ToString());
+                    break;
                 case "export-test":
-                    options.Allow("project", "result", "request", "compiler-manifest", "claim", "output");
+                    options.Allow("project", "result", "request", "compiler-manifest", "claim", "output", "workspace", "format");
                     var projectPath = options.Required("project");
                     var resultPath = options.Required("result");
                     var claimId = options.Required("claim");
                     var outputPath = options.Required("output");
                     var exported = EvidenceSet.Load(resultPath, options.Get("request"), options.Get("compiler-manifest"), cancellationToken);
-                    await NUnitExporter.ExportAsync(projectPath, exported, claimId, outputPath, cancellationToken).ConfigureAwait(false);
-                    await output.WriteLineAsync(("NUnit regression project exported. Consumer code was not executed. Run dotnet test in the canonical container.").AsMemory(), cancellationToken).ConfigureAwait(false);
-                    return 0;
+                    var workspacePath = options.Get("workspace");
+                    await NUnitExporter.ExportAsync(projectPath, exported, claimId, outputPath, workspacePath, cancellationToken).ConfigureAwait(false);
+                    await rendered.WriteLineAsync("NUnit regression project exported. Consumer code was not executed. Run dotnet test in the canonical container.".AsMemory(), cancellationToken).ConfigureAwait(false);
+                    var exportedFiles = new List<CommandGeneratedFile>
+                    {
+                        new(Path.GetFullPath(Path.Combine(outputPath, "Regression.cs"))),
+                        new(Path.GetFullPath(Path.Combine(outputPath, "SharpProof.Regression.csproj")))
+                    };
+                    if (workspacePath != null)
+                    { exportedFiles.Add(new(Path.GetFullPath(Path.Combine(outputPath, "README.md")))); }
+                    exitCode = 0;
+                    presentation = CommandPresentation.CreateMessage("export-test", exitCode, rendered.ToString(),
+                        "Generated from validated stored evidence; consumer code was not executed.", generatedFiles: exportedFiles);
+                    break;
                 default:
                     throw new ArgumentException("Unknown command. Run sharpproof --help.");
             }
+            cancellationToken.ThrowIfCancellationRequested();
+            await CommandPresentationFormatter.WriteAsync(output, presentation, format, cancellationToken).ConfigureAwait(false);
+            return exitCode;
         }
         catch (OperationCanceledException) { return 130; }
         catch (Exception exception) when (exception is ArgumentException or IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException or BadImageFormatException)
@@ -117,7 +159,7 @@ internal sealed class CommandOptions
 
             key = key[2..];
             var value = "true";
-            if (key != "fail-on-regression")
+            if (key is not ("fail-on-regression" or "apply"))
             {
                 if (++index == args.Length || args[index].StartsWith("--", StringComparison.Ordinal))
                 {

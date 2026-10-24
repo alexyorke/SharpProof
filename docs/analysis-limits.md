@@ -24,6 +24,12 @@ See [configuration](configuration.md) for activation, policy, cache-directory an
 
 Resource units are solver accounting, not elapsed milliseconds. Container CPU/memory quotas are separate outer limits.
 
+The nightly fuzz runner rebuild uses the 600-second solution-build allowance in
+[contract.json](../eng/acceptance/contract.json), rather than the worker's
+300000-millisecond (300-second) per-project default above. Retained runner invocations
+still use 300 seconds and rotating runs keep their separate 1200-second allowance;
+the rebuild fix does not change worker proof budgets, seeds, or case counts.
+
 `SharpProofSpecificationPacks` defaults to unset. A nonempty value selects embedded reviewed packs by semicolon-delimited ID. The current catalog contains `dotnet.scalar`; unknown, duplicate, or empty list entries are rejected. This is a semantic artifact input, not a solver budget.
 
 ## Validation bounds

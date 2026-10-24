@@ -22,5 +22,7 @@
          explicitly pin a reviewed version once one exists. -->
     <PackageValidationBaselineVersion Condition="'$(SharpProofPackageValidationBaselineVersion)' != ''">$(SharpProofPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
     <RepositoryCommit Condition="'$(RepositoryCommit)' == ''">$(GITHUB_SHA)</RepositoryCommit>
+    <RepositoryCommit Condition="'$(SHARPPROOF_PRIVATE_PREVIEW)' == 'true'">$(SHARPPROOF_SOURCE_COMMIT)</RepositoryCommit>
+    <SourceRevisionId Condition="'$(SHARPPROOF_PRIVATE_PREVIEW)' == 'true'">$(SHARPPROOF_SOURCE_COMMIT)</SourceRevisionId>
   </PropertyGroup>
 </Project>

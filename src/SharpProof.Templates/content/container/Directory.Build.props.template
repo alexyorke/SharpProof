@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup Condition="'$(SHARPPROOF_CONTAINER)' == '1'">
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).sharpproof-obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
-    <BaseOutputPath>$(MSBuildThisFileDirectory).sharpproof-bin/$(MSBuildProjectName)/</BaseOutputPath>
+    <SharpProofProjectOutputKey>$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectDirectory)'))/$(MSBuildProjectName)</SharpProofProjectOutputKey>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).sharpproof-obj/$(SharpProofProjectOutputKey)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).sharpproof-bin/$(SharpProofProjectOutputKey)/</BaseOutputPath>
   </PropertyGroup>
 </Project>

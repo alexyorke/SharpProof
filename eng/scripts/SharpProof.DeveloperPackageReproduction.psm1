@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1')
 
 function Get-SharpProofDeveloperPackageBuildPlan {
     param(

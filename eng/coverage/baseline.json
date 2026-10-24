@@ -34,6 +34,7 @@
     "SharpProof.ContractForGenerator": 100.0,
     "SharpProof.Contracts": 100.0,
     "SharpProof.Dataflow": 100.0,
+    "SharpProof.EditorSuggestions": 100.0,
     "SharpProof.Effects": 100.0,
     "SharpProof.Frontend": 100.0,
     "SharpProof.Fuzz": 100.0,

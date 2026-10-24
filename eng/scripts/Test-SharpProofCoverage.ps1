@@ -16,7 +16,13 @@ param(
     [switch]$ReportOnly,
 
     [Parameter()]
-    [switch]$IncludeWorkingTree
+    [switch]$IncludeWorkingTree,
+
+    [Parameter()]
+    [string]$NativeToolProducerRoot,
+
+    [Parameter()]
+    [string]$NativeToolConsumerRoot
 )
 
 Set-StrictMode -Version Latest
@@ -299,6 +305,25 @@ $expectedModuleIdentities = [Collections.Immutable.ImmutableArray]::CreateRange[
             } |
             Sort-Object))
 $expectedModuleIdentityText = $expectedModuleIdentities -join ','
+if ([string]::IsNullOrWhiteSpace($NativeToolProducerRoot) -ne
+    [string]::IsNullOrWhiteSpace($NativeToolConsumerRoot)) {
+    throw 'Native Tool coverage requires both authenticated producer and consumer roots.'
+}
+if (-not [string]::IsNullOrWhiteSpace($NativeToolProducerRoot)) {
+    Import-Module (Join-Path $PSScriptRoot 'SharpProof.NativeToolCoverage.psm1')
+    $nativeReport = Import-SharpProofNativeToolCoverage `
+        -RepositoryRoot $repositoryRoot -ProducerRoot $NativeToolProducerRoot `
+        -ConsumerRoot $NativeToolConsumerRoot -Authority $recomputedAuthority `
+        -DestinationRoot (Join-Path $resolvedCoverageRoot 'native-windows') `
+        -RunId $env:GITHUB_RUN_ID -WorkflowHeadSha $env:SHARPPROOF_COVERAGE_WORKFLOW_HEAD_SHA `
+        -ProducerArtifactId $env:SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID `
+        -ProducerAttempt $env:SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT `
+        -ConsumerArtifactId $env:SHARPPROOF_WINDOWS_TOOL_OUTPUT_ARTIFACT_ID `
+        -ConsumerAttempt $env:SHARPPROOF_WINDOWS_TOOL_OUTPUT_RUN_ATTEMPT
+    # The authenticated supplement enters the same PDB range and MAX merge as
+    # every Linux report; no denominator, project floor, or cohort is changed.
+    $reports = $reports.Add((Get-Item -LiteralPath $nativeReport))
+}
 $expectedAssemblyNames = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
     [StringComparer]::Ordinal)
 foreach ($module in $expectedAuthorityModules) {

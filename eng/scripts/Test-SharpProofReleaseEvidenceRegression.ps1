@@ -11,6 +11,17 @@ $commit = 'a' * 40
 $native = [Collections.Immutable.ImmutableArray]::CreateRange[byte]([Text.Encoding]::UTF8.GetBytes('fixture-native'))
 $nativeHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@($native))).ToLowerInvariant()
 
+# These fixed public package fixtures must not inherit a caller's real release context.
+$releaseFixtureEnvironmentNames = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+        'SHARPPROOF_CI_PACKAGE_VERSION', 'SHARPPROOF_PRIVATE_PREVIEW',
+        'SHARPPROOF_REPOSITORY_URL', 'GITHUB_REPOSITORY',
+        'SHARPPROOF_SOURCE_REPOSITORY', 'SHARPPROOF_SOURCE_COMMIT', 'SHARPPROOF_WORKFLOW_COMMIT'))
+$releaseFixtureEnvironmentBuilder = [Collections.Immutable.ImmutableDictionary]::CreateBuilder[string, string]()
+foreach ($name in $releaseFixtureEnvironmentNames) {
+    $releaseFixtureEnvironmentBuilder.Add($name, [Environment]::GetEnvironmentVariable($name, 'Process'))
+}
+$releaseFixtureEnvironment = $releaseFixtureEnvironmentBuilder.ToImmutable()
+
 function New-Package([string]$Id, [string]$Extension, [string]$Vendor = 'fixture-vendor', [string]$Directory = $source) {
     $path = Join-Path $Directory "$Id.1.0.0.$Extension"
     if ([IO.File]::Exists($path)) { [IO.File]::Delete($path) }
@@ -44,6 +55,9 @@ function Assert-Rejected([scriptblock]$Operation, [string]$Expected) {
 }
 
 try {
+    foreach ($name in $releaseFixtureEnvironmentNames) {
+        [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+    }
     foreach ($id in [Collections.Immutable.ImmutableArray]::Create[string]('SharpProof', 'SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'nupkg' }
     foreach ($id in [Collections.Immutable.ImmutableArray]::Create[string]('SharpProof.Attributes', 'SharpProof.Verifier')) { New-Package $id 'snupkg' }
     @{
@@ -100,5 +114,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Attestation policy regressions failed.' }
 }
 finally {
+    foreach ($entry in $releaseFixtureEnvironment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
+    }
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }

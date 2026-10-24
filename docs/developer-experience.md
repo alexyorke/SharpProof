@@ -8,6 +8,10 @@ availability on a public feed is not implied; use the matching packages from you
 configured feed or this checkout's qualified package artifacts.
 The [delivery checklist](developer-experience-plan.md) distinguishes implementation,
 workflow evidence, and the remaining CI and release decisions.
+Official `1.0.0-preview.1` binaries, symbols, image, and detailed release evidence use
+the private `alexyorke/SharpProof-preview` path; source remains public. Public CI uses
+distinct validation versions. The [private release receipt](private-preview-release-receipt.md)
+keeps actual publication and access evidence pending until verified.
 
 ## Install and start
 
@@ -26,6 +30,23 @@ verification. Its demonstration caller deliberately emits SP0027; change -1 to 0
 remove it. The [checkout project templates](../templates/README.md) remain available
 through their existing installation workflow.
 
+For a layout that keeps tools, CI, the application, and regressions together, use the
+workspace template instead:
+
+```sh
+dotnet new sharpproof-workspace -n MyLibrary -o MyLibrary --verification portable
+cd MyLibrary
+dotnet tool restore
+dotnet build src/app/MyLibrary.csproj
+```
+
+It generates `MyLibrary.slnx`, `src/app/MyLibrary.csproj`, `tests/`, the pinned SDK/local
+tool manifest, and a credential-free private-feed configuration at the root. C# stays
+pinned to 13 for export. Both templates include the matching private editor package
+by default; `--editor false` omits it. The core application reference remains the
+public `SharpProof` facade. Private-feed authentication is needed before installing
+the template package as well as when restoring the generated workspace.
+
 Choose `--verification container` when creating the project to generate strict
 verification, retained evidence, and a CI workflow. Run `docker compose pull verify`,
 `docker compose run --rm verify restore MyLibrary.csproj`, then
@@ -40,7 +61,8 @@ release step.
 
 The CLI executes on the .NET 10 runtime; installing or restoring a local tool also
 requires a .NET SDK. The template's pinned SDK and the consumer image provide both.
-In the consumer directory, create a manifest
+Both templates already pin the matching local tool, so use `dotnet tool restore`.
+For an existing project without that entry, create a manifest
 with `dotnet new tool-manifest` if one does not already exist, then run
 `dotnet tool install SharpProof.Tool --version <version>`. Use the same version as
 the consumer packages. Teammates use `dotnet tool restore`.
@@ -51,8 +73,11 @@ local feeds, and supply private-feed credentials through your usual secret mecha
 A local feed outside the project needs an explicit read-only bind mount. The generated
 CI workflow likewise needs registry/feed access configured before its restore/build
 steps. Keep credentials out of the committed configuration.
+Generated configuration names the private source `SharpProofPreview`; Compose forwards
+the process variable `NuGetPackageSourceCredentials_SharpProofPreview` without storing
+its value. Authenticate private GHCR reads through your Docker credential store.
 
-For the container starter, restore the local tool and inspect setup through the same
+For the single-project container starter, restore the local tool and inspect setup through the same
 service so evaluation uses its container-owned restore assets:
 
 ```sh
@@ -63,6 +88,71 @@ docker compose run --rm verify sharpproof doctor --project MyLibrary.csproj --ve
 These commands assume the matching tool is already recorded in the local manifest.
 Host explanation and comparison can read the retained reports; exporting a test can
 also require source and reference files that remain inside the build container.
+
+For the container workspace variant, run from its root with the nested app path:
+
+```sh
+docker compose pull verify
+docker compose run --rm verify tool restore
+docker compose run --rm verify restore src/app/MyLibrary.csproj
+docker compose run --rm verify build src/app/MyLibrary.csproj --no-restore
+docker compose run --rm verify tool run dotnet-sharpproof -- doctor --project src/app/MyLibrary.csproj --verification container
+docker compose run --rm verify tool run dotnet-sharpproof -- explain --result artifacts/sharpproof/result.json
+```
+
+## Initialize an existing project
+
+Use the matching local tool to preview configuration for a trusted existing C# project:
+
+```sh
+dotnet sharpproof init --project MyLibrary.csproj --verification portable
+```
+
+`init` defaults to portable mode and preview only. Review the proposed file plan, then
+repeat with `--apply` to write the supported configuration. Initialization does not
+establish a proof, install an SDK, authenticate a feed, or replace review of existing
+project policy. Keep secret values in your normal secret mechanism.
+
+The supported plan pins the facade, private CodeFixes reference, and local tool to the
+installed tool's version, selects the requested profile, and adds the credential-free
+`SharpProofPreview` source/mapping. It can reuse ancestor NuGet/tool/central-version
+configuration, so inspect every listed path. Container mode also plans Compose,
+isolated compiler outputs, and retained evidence paths. Conflicting versions/settings,
+ambiguous imports/configuration, inline preview credentials, and linked targets are
+rejected rather than silently replaced. No restore, build, or project-code execution
+is part of preview or apply.
+
+Initialization covers a simple existing project, not a new multi-project workspace.
+Its container Compose/output configuration is scoped to the selected project directory.
+Use the workspace template for an app-under-`src/` and regressions-under-`tests/`
+topology. A flat initialized project can use standalone regression export to a sibling;
+it cannot place a workspace export inside its own source root. Existing qualified
+workspaces can use `export-test --workspace` independently. Initializing a nested
+workspace project may decline inherited output properties or report-path conflicts
+that require manual integration.
+
+Container initialization uses `--verification container` and requires
+`--consumer-image ghcr.io/alexyorke/sharpproof-preview@sha256:<qualified-digest>` unless
+a compatible existing pinned Compose configuration supplies that image. Use the
+qualified immutable digest from the private release receipt; a version tag or an
+invented digest is not image authority. Preview the container plan before applying it.
+
+## Select a report format
+
+Named-option `doctor --project`, `explain --result`, `compare`, `export-test`, and
+`init` accept `--format text|json|markdown`; text is the default. For example:
+
+```sh
+dotnet sharpproof doctor --project src/MyLibrary/MyLibrary.csproj --format json
+dotnet sharpproof explain --result artifacts/sharpproof/result.json --format markdown
+dotnet sharpproof compare --baseline baseline/result.json --current artifacts/sharpproof/result.json --format json
+```
+
+JSON/Markdown reports are one document on stdout, including setup/regression status 1.
+Invalid arguments or evidence return 2, leave stdout empty, and write the error to
+stderr; cancellation returns 130. Exit 0 means command processing completed, not that
+every selected contract is Proven. Legacy `doctor [--json]` and positional
+`explain <result.json> ... [--json]` keep their existing syntax and stored-evidence scope.
 
 ## Inspect setup and evidence
 
@@ -126,36 +216,40 @@ establish one explicitly from the reviewed base branch; do not silently use the 
 Contract changes appear as removals and additions. Replacing a baseline is an explicit
 reviewed change. Existing Refuted build failures remain failures regardless of comparison.
 
-For a GitHub Actions Bash step, the following example consumes the starter workflow's
-`sharpproof-evidence` artifact. Supply the reviewed `BASELINE_RUN_ID`, expected
-`BASE_BRANCH` and `BASE_SHA`, and a read-only `GH_TOKEN` from CI secrets. Restore the
-matching local tool manifest first. Set `SHARPPROOF_REGRESSION_GATE=true` to enable gating.
+The generated `.github/workflows/sharpproof.yml` caller uses the
+[reusable consumer workflow](../.github/workflows/sharpproof-consumer.yml). Its `uses`
+pin and `workflow-revision` are the same qualified public source SHA; do not substitute
+a moving branch or the separate private release workflow SHA.
 
-```bash
-set -euo pipefail
-: "${BASELINE_RUN_ID:?Select a reviewed successful base-branch run}"
-: "${BASE_BRANCH:?Supply the expected base branch}"
-: "${BASE_SHA:?Supply the expected base commit}"
-baseline_metadata=$(gh run view "$BASELINE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-  --json conclusion,headBranch,headSha)
-test "$(jq -r .conclusion <<< "$baseline_metadata")" = success
-test "$(jq -r .headBranch <<< "$baseline_metadata")" = "$BASE_BRANCH"
-test "$(jq -r .headSha <<< "$baseline_metadata")" = "$BASE_SHA"
-gh run download "$BASELINE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-  --name sharpproof-evidence --dir baseline
-dotnet tool restore
-gate=()
-if [[ "${SHARPPROOF_REGRESSION_GATE:-false}" = true ]]; then
-  gate+=(--fail-on-regression)
-fi
-dotnet sharpproof compare --baseline baseline/result.json \
-  --current artifacts/sharpproof/result.json "${gate[@]}" \
-  | tee artifacts/sharpproof/comparison.txt
-```
+| Caller input | Meaning |
+| --- | --- |
+| `project` | Workspace-relative consumer project, such as `src/app/MyLibrary.csproj` |
+| `image` | Exact private-preview SHA-256 image reference from the qualified receipt |
+| `workflow-revision` | Qualified public source SHA, identical to the reusable workflow pin |
+| `caller-workflow` | Exact caller path, generated as `.github/workflows/sharpproof.yml` |
+| `registry-username` | Account authorized to read the private image/feed |
+| `compose-file`, `service`, `evidence-directory` | Defaults: `compose.yaml`, `verify`, `artifacts/sharpproof` |
+| `package-feed-url` | Defaults to the private GitHub NuGet feed |
+| `mode` | `report` by default; `enforce` adds the comparison regression gate |
+| `initialize-baseline` | Default false; explicit reviewed default-branch manual initialization only |
 
-The upload step retains the comparison alongside the current evidence even when the
-gate fails. A missing baseline is an explicit setup failure; this example never creates
-one from the current run.
+The required `container-read-token` and `package-read-token` secrets are explicit
+read-only package credentials; the generated caller maps `SHARPPROOF_PREVIEW_TOKEN`
+to them. Keep publisher/signing credentials out of consumer CI. Fork PRs and
+`pull_request_target` are rejected before credential-bearing work. Reports go to
+the Markdown job summary and retained evidence artifact, not PR comments.
+
+For a PR, baseline lookup requires the exact PR base SHA, same repository/caller,
+and a successful trusted base/default-branch run. It validates the numeric artifact
+identity, API archive digest, complete file receipt, and actual evidence. A missing,
+tampered, incompatible, or stale baseline fails; there is no fallback to the current
+run. Establish the first baseline only through a reviewed `workflow_dispatch` on the
+repository default branch with `initialize-baseline=true`.
+
+`report` records comparison regressions without failing solely for those regressions.
+`enforce` enables `--fail-on-regression`. Both still fail invalid evidence and the
+consumer's actual build/proof policy, including strict Refuted failures. Retain the
+workflow's numeric `evidence-artifact-id` with the comparison and source identities.
 
 ## Editor assistance
 
@@ -166,9 +260,22 @@ Use the package version matching the consumer packages, for example
 Select a supported top-level interface/class and choose **Generate SharpProof contract companion**.
 The preview adds ordinary editable source with explicit receivers, generic constraints,
 matching parameter types, and placeholder bodies. No contracts are guessed.
+The optional package also emits informational SPED0001 for eligible targets, exposing
+the same generation action through diagnostic UI when the editor loads it; the
+refactoring remains available. Installing the optional package enables this suggestion,
+and removing it removes that suggestion without changing verifier semantics.
+The package keeps its compiler-only suggestion analyzer separate from its Workspaces
+code-fix assembly. It supplies `SharpProofEditorSuggestions=true` and the corresponding
+compiler-visible property; an explicit `SharpProofEditorSuggestions=false` silences
+SPED0001.
+The suggestion admits eligible source class/interface/record types with ordinary
+methods and declines generated or cross-file partial candidates; the explicit
+refactoring can still handle compatible cross-file partials.
 SPCF0004 offers missing-member scaffolding when the target and missing names are unambiguous.
 Ambiguous companion repairs are declined, and companion repair has no Fix All. The
 existing Result-type correction retains its own Fix All support.
+All real-editor qualification is pending for the three required Windows x64 hosts;
+follow the [interactive acceptance runbook](editor-acceptance.md).
 
 ## Author a contract and inspect its result
 
@@ -188,6 +295,31 @@ input validation at application boundaries; static contracts do not insert guard
 
 ## Export an NUnit regression
 
+Exports use a relative `ProjectReference` when the paths share a filesystem root.
+Standalone Windows exports across drive roots retain an absolute reference and do
+not gain the same relocation behavior. Prefer a workspace with the library under
+`src/` and regressions under `tests/`, with both inside the existing canonical Compose
+mount. For example, from its workspace root:
+
+```sh
+docker compose run --rm verify tool run dotnet-sharpproof -- export-test --project src/app/MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output tests/MyLibrary.Regression --workspace .
+```
+
+`--workspace` requires the consumer and new output to be inside that root and a
+compatible existing pinned Linux amd64 `verify` service. The root must expose the
+workspace at `/workspace/consumer` with isolated compiler outputs/volumes. Export emits
+a regression README with commands using that existing service; it does not create
+another image definition, Compose file, or credential copy. Create the `tests` parent
+first if it does not exist, and keep the output child absent until export.
+Workspace mode requires the finalized root Compose/output-isolation layout; linked
+paths, out-of-root project/output/remapped source files, and cross-filesystem-root
+references are rejected. Multiple regression exports keep separate compiler outputs.
+
+Move the whole workspace together to preserve the relative reference. A workspace
+test does not embed a host-specific absolute project path; source/reference hash
+checks still apply while exporting. Rebinding captured inputs can still require the
+original build container even though the resulting test project can move.
+
 Run `dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regressions`.
 Use the matching single-target project. The output directory must not already exist,
 and its parent directory must exist. Export writes source without executing consumer code.
@@ -195,8 +327,9 @@ Keep the generated project outside the consumer's source tree so its test source
 included by the consumer's default compile glob. Run
 `dotnet test ../MyLibrary.Regressions/SharpProof.Regression.csproj` in a canonical
 container workspace that contains both projects. The starter's project-only Compose
-mount needs an extra writable parent mount for container export and test. Exported
-project references use absolute paths, so preserve the same mount paths for both steps.
+mount needs an extra writable parent mount for container export and test. Preserve
+the relative directory relationship between consumer and test; use workspace mode
+above for moving the complete layout between host paths.
 
 For the generated starter, create a writable sibling `Regressions` directory, then add
 this service override in `compose.override.yaml` (merge it with any existing override):

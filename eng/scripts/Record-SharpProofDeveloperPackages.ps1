@@ -2,16 +2,16 @@
 param(
     [Parameter(Mandatory)][string]$PackageSource,
     [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$RepositoryCommit,
-    [Parameter(Mandatory)][ValidatePattern('^ghcr\.io/alexyorke/sharpproof@sha256:[a-f0-9]{64}$')][string]$ConsumerImage
+    [Parameter(Mandatory)][ValidatePattern('^ghcr\.io/alexyorke/sharpproof(?:-preview)?@sha256:[a-f0-9]{64}$')][string]$ConsumerImage
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ReleaseConfiguration.psm1')
 Assert-SharpProofContainer 'Record developer packages in the canonical container.'
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-[xml]$versions = Get-Content -LiteralPath (Join-Path $repository 'eng/Versions.props') -Raw
-$version = ([string]$versions.Project.PropertyGroup.SharpProofPackageVersion).Replace('$(SharpProofVersionPrefix)', [string]$versions.Project.PropertyGroup.SharpProofVersionPrefix)
+$version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $repository
 $output = Join-Path $repository 'artifacts/developer-packages'
 [void][IO.Directory]::CreateDirectory($output)
 if (@(Get-ChildItem -LiteralPath $output -Force).Count -ne 0) { throw 'Developer release output must be empty.' }

@@ -16,7 +16,7 @@
   <Import Project="$(_SharpProofConsumerContractPath)" />
   <ItemGroup Condition="'$(_SharpProofProfileNormalized)' != 'off'">
     <!-- Workspace APIs are supplied by the IDE and are never loaded by command-line compiler hosts. -->
-    <Analyzer Include="$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" Condition="'$(DesignTimeBuild)' == 'true'">
+    <Analyzer Include="$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" Condition="'$(DesignTimeBuild)' == 'true' and '$(SharpProofEditorSuggestions)' != 'true'">
       <SharpProofAnalyzerRole>CodeFix</SharpProofAnalyzerRole>
     </Analyzer>
     <Analyzer Include="$(_SharpProofAnalyzerPath)">

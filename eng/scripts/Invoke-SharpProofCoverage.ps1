@@ -85,6 +85,17 @@ finally {
     Write-Host ('Coverage phase: name=initial-authority elapsedMilliseconds={0}' -f $coverageInitialAuthorityTimer.ElapsedMilliseconds)
 }
 
+# Export the exact uninstrumented Tool only for the authenticated CI bridge.
+# Local semantic-extras collection keeps its existing Linux-only behavior.
+if ($CoveragePhase -ceq 'semantic-extras' -and
+    -not [string]::IsNullOrWhiteSpace($env:GITHUB_RUN_ID) -and
+    -not [string]::IsNullOrWhiteSpace($env:GITHUB_RUN_ATTEMPT)) {
+    & (Join-Path $PSScriptRoot 'Export-SharpProofWindowsToolCoverage.ps1') `
+        -AuthorityPath $coverageAuthorityPath `
+        -OutputDirectory (Join-Path $repositoryRoot 'artifacts/coverage-windows-input')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows Tool coverage input export failed.' }
+}
+
 $dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $managedSettings = Join-Path `
     $repositoryRoot `

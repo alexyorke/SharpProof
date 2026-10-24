@@ -39,6 +39,18 @@ embedded PDB and its `.snupkg` counterpart. The facade must contain no DLL,
 executable, or PDB and must depend on the exact matching Verifier version.
 Native worker integrity checks remain independent of symbol validation.
 
+For the official private preview, retain the exact `.snupkg` archives and extracted
+matching symbols as private release assets. Do not assume the private GitHub package
+feed supplies a public symbol-server route. Private package `RepositoryUrl` associates
+the package with the private mirrored repository at the unchanged public source
+commit; the signed manifest records the public source origin separately. Inspect the
+qualified PDBs to record their actual Source Link URLs and approved commit rather
+than inferring the URL from `RepositoryUrl`. The private workflow commit and detached
+manifest signature identify orchestration and subjects. Record actual symbol retrieval,
+signature verification, and source/PE/PDB matching in the
+[private release receipt](private-preview-release-receipt.md); these checks are pending
+until the exact release candidate is tested.
+
 ## Verify packed artifacts
 
 Run repository commands in the canonical Linux amd64 container. The host wrapper

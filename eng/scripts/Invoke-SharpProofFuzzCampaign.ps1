@@ -34,6 +34,7 @@ $evidenceLease = Enter-SharpProofFuzzEvidenceLease `
     -OutputDirectory $resolvedOutput
 try {
     Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
+    [IO.File]::Delete((Join-Path $resolvedOutput 'runner-build.json'))
     $sourceCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
     $contract = Get-Content `
@@ -82,13 +83,56 @@ try {
 
     $buildArguments = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
             'build', $fuzzProject, '-c', 'Release', '--no-restore', '--no-incremental', '--nologo'))
-    $buildProcess = Start-SharpProofEncodedPowerShell `
-        -WrapperPath $dotnetWrapper `
-        -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds) `
-        -WorkingDirectory $repositoryRoot `
-        -ImmutableArguments $buildArguments
+    $buildTimeoutSeconds = [int]$contract.automation.solutionBuildWallSeconds
+    $buildStandardOutput = Join-Path $resolvedOutput 'runner-build.stdout.txt'
+    $buildStandardError = Join-Path $resolvedOutput 'runner-build.stderr.txt'
+    $buildProcess = $null
+    $buildTimer = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $buildProcess = Start-SharpProofEncodedPowerShell `
+            -WrapperPath $dotnetWrapper `
+            -TimeoutSeconds $buildTimeoutSeconds `
+            -WorkingDirectory $repositoryRoot `
+            -ImmutableArguments $buildArguments `
+            -StandardOutput $buildStandardOutput `
+            -StandardError $buildStandardError
+    }
+    finally {
+        $buildTimer.Stop()
+        $buildExitCode = if ($null -eq $buildProcess) { $null } else { [int]$buildProcess.ExitCode }
+        $buildReceipt = ([ordered]@{
+                schemaVersion       = 1
+                commit              = $sourceCommit
+                deadlineSeconds     = $buildTimeoutSeconds
+                elapsedMilliseconds = $buildTimer.ElapsedMilliseconds
+                exitCode            = $buildExitCode
+                timedOut            = $buildExitCode -eq 124
+            }).AsReadOnly()
+        [IO.File]::WriteAllText((Join-Path $resolvedOutput 'runner-build.json'),
+            (($buildReceipt | ConvertTo-Json) + "`n"), [Text.UTF8Encoding]::new($false))
+        Write-Host ('Fuzz runner rebuild: elapsedMilliseconds={0} deadlineSeconds={1} exitCode={2}' -f
+            $buildReceipt.elapsedMilliseconds, $buildReceipt.deadlineSeconds, $buildReceipt.exitCode)
+    }
     if ($buildProcess.ExitCode -ne 0) {
-        throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
+        $buildFailure = if ($buildProcess.ExitCode -eq 124) {
+            "timed out after $buildTimeoutSeconds seconds (code 124)"
+        }
+        else {
+            "failed with code $($buildProcess.ExitCode)"
+        }
+        $buildFailureTail = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                foreach ($logPath in @($buildStandardOutput, $buildStandardError)) {
+                    if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+                        "$([IO.Path]::GetFileName($logPath)) (last 20 lines):"
+                        Get-Content -LiteralPath $logPath -Tail 20 | ForEach-Object {
+                            $line = [string]$_
+                            $line.Substring(0, [Math]::Min(400, $line.Length))
+                        }
+                    }
+                }))
+        throw ("SharpProof fuzz runner rebuild $buildFailure. " +
+            "Logs: $logicalOutput/runner-build.stdout.txt; $logicalOutput/runner-build.stderr.txt`n" +
+            ($buildFailureTail -join "`n"))
     }
     $builtCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
