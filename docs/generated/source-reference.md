@@ -462,7 +462,7 @@ public enum SharpProofEffect : long
 ```powershell
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -510,7 +510,15 @@ param(
     [ValidateSet('Text', 'Json')]
     [string]$Format = 'Text',
 
-    [string]$TargetFramework = ''
+    [string]$TargetFramework = '',
+
+    [ValidateSet('Sequential', 'Build', 'Compare')][string]$ReproductionMode = 'Sequential',
+
+    [ValidateRange(0, 1)][int]$ReproductionRunIndex = 0,
+
+    [ValidateRange(0, 2147483647)][int]$FirstRunAttempt = 0,
+
+    [ValidateRange(0, 2147483647)][int]$SecondRunAttempt = 0
 )
 ```
 

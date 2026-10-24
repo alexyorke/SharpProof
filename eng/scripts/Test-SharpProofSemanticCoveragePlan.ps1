@@ -3,6 +3,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
+& (Join-Path $PSScriptRoot 'Test-SharpProofCoverageAuthorityBuildPlan.ps1')
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-semantic-plan-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($fixture) | Out-Null

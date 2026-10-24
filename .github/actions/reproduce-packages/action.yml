@@ -1,0 +1,44 @@
+name: Independently reproduce packages
+description: Build one complete analyzer-enabled package reproduction in a fresh checkout.
+
+inputs:
+  run-index:
+    description: Independent source-path index, zero or one.
+    required: true
+
+outputs:
+  artifact-id:
+    description: Immutable artifact containing this run's receipt and original phase logs.
+    value: ${{ steps.upload.outputs.artifact-id }}
+  producer-attempt:
+    description: Successful workflow attempt that produced the receipt.
+    value: ${{ steps.identity.outputs.attempt }}
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/prepare-qualified-packages
+      with:
+        download-packages: "false"
+    - name: Build the independent full package and developer payloads
+      shell: bash
+      env:
+        REPRODUCTION_INDEX: ${{ inputs.run-index }}
+      run: |
+        set -euo pipefail
+        [[ "${REPRODUCTION_INDEX}" == 0 || "${REPRODUCTION_INDEX}" == 1 ]]
+        docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling \
+          package-reproducibility -Configuration Release -ReproductionMode Build \
+          -ReproductionRunIndex "${REPRODUCTION_INDEX}"
+    - name: Upload the independent receipt and complete phase logs
+      id: upload
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: package-reproducibility-run-${{ inputs.run-index }}-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+        path: artifacts/reproducibility/
+        if-no-files-found: error
+    - name: Record the successful producer attempt
+      id: identity
+      shell: bash
+      run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"

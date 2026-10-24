@@ -105,6 +105,10 @@ jobs:
     outputs:
       package-artifact-id: ${{ steps.package-upload.outputs.artifact-id }}
       consumer-harness-artifact-id: ${{ steps.consumer-harness-upload.outputs.artifact-id }}
+      prepared-tool-artifact-id: ${{ steps.prepared-tool-upload.outputs.artifact-id }}
+      codefix-artifact-id: ${{ steps.codefix-upload.outputs.artifact-id }}
+      developer-harness-artifact-id: ${{ steps.developer-harness-upload.outputs.artifact-id }}
+      producer-attempt: ${{ steps.product-identity.outputs.attempt }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -137,7 +141,7 @@ jobs:
         run: docker compose run --rm tooling format-check
 
       - name: Pack and validate the package graph
-        run: docker compose run --rm tooling pack -Configuration Release
+        run: docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling pack-ci-products -Configuration Release
 
       - name: Record qualified package identities and hashes
         run: |
@@ -159,6 +163,32 @@ jobs:
           path: artifacts/consumer-harness/
           if-no-files-found: error
           include-hidden-files: true
+
+      - name: Upload the prepared optional tool archive
+        id: prepared-tool-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepared-tool-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/tool-packages/*.nupkg
+          if-no-files-found: error
+      - name: Upload the prepared editor archive
+        id: codefix-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prepared-codefix-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/prepared-developer-packages/*.nupkg
+          if-no-files-found: error
+      - name: Upload the authenticated developer test harness
+        id: developer-harness-upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: developer-harness-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/developer-harness/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Bind the successful product producer attempt
+        id: product-identity
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -459,9 +489,40 @@ jobs:
           ./eng/scripts/Test-SharpProofWindowsProofs.ps1
           -PackageSource nupkgs -Architecture arm64
 
+  # Qualify immutable artifacts while the existing platform checks run. Tags
+  # retain their original release barriers and same-job image publication.
+  developer-experience-candidate:
+    name: Qualify developer candidate artifacts
+    if: ${{ !inputs.private_preview && !startsWith(github.ref, 'refs/tags/') }}
+    needs: [package-artifacts, optional-tool]
+    outputs:
+      developer-artifact-id: ${{ steps.qualification.outputs.developer-artifact-id }}
+      qualified-commit: ${{ steps.qualification.outputs.qualified-commit }}
+      qualified-run-id: ${{ steps.qualification.outputs.qualified-run-id }}
+      qualified-run-attempt: ${{ steps.qualification.outputs.qualified-run-attempt }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
+          fetch-depth: 0
+      - uses: ./.github/actions/qualify-developer-experience
+        id: qualification
+        with:
+          package-artifact-id: ${{ needs.package-artifacts.outputs.package-artifact-id }}
+          tool-artifact-id: ${{ needs.optional-tool.outputs.tool-artifact-id }}
+          tool-producer-attempt: ${{ needs.optional-tool.outputs.producer-attempt }}
+          producer-attempt: ${{ needs.package-artifacts.outputs.producer-attempt }}
+          codefix-artifact-id: ${{ needs.package-artifacts.outputs.codefix-artifact-id }}
+          developer-harness-artifact-id: ${{ needs.package-artifacts.outputs.developer-harness-artifact-id }}
+
   developer-experience:
     name: Developer tools, templates, and canonical consumer image
-    needs: [repository-quality, release-qualification, security, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool, provenance]
+    needs: [repository-quality, release-qualification, security, package-artifacts, package, container-verifier, native-linux-verifier, native-windows-arm64-verifier, portable-consumers, visual-studio-consumers, optional-tool, provenance, developer-experience-candidate]
     if: >-
       always() && !inputs.private_preview && needs.package.result == 'success' &&
       needs.container-verifier.result == 'success' && needs.portable-consumers.result == 'success' &&
@@ -472,137 +533,78 @@ jobs:
          needs.native-windows-arm64-verifier.result == 'success' && needs.visual-studio-consumers.result == 'success' &&
          needs.provenance.result == 'success'))
     outputs:
-      developer-artifact-id: ${{ steps.developer-upload.outputs.artifact-id }}
+      developer-artifact-id: ${{ steps.qualification.outputs.developer-artifact-id || steps.candidate-gate.outputs.developer-artifact-id }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       packages: write
       id-token: write
       attestations: write
     steps:
+      - name: Require exact successful candidate qualification and its immutable artifact
+        id: candidate-gate
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RESULT: ${{ needs.developer-experience-candidate.result }}
+          QUALIFIED_COMMIT: ${{ needs.developer-experience-candidate.outputs.qualified-commit }}
+          QUALIFIED_RUN_ID: ${{ needs.developer-experience-candidate.outputs.qualified-run-id }}
+          QUALIFIED_RUN_ATTEMPT: ${{ needs.developer-experience-candidate.outputs.qualified-run-attempt }}
+          DEVELOPER_ARTIFACT_ID: ${{ needs.developer-experience-candidate.outputs.developer-artifact-id }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "${CANDIDATE_RESULT}" = success
+          test "${QUALIFIED_COMMIT}" = "${GITHUB_SHA}"
+          test "${QUALIFIED_RUN_ID}" = "${GITHUB_RUN_ID}"
+          [[ "${QUALIFIED_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ && "${GITHUB_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          # Compare canonical decimal strings without integer overflow.
+          [[ "${#QUALIFIED_RUN_ATTEMPT}" -lt "${#GITHUB_RUN_ATTEMPT}" ||
+             ( "${#QUALIFIED_RUN_ATTEMPT}" -eq "${#GITHUB_RUN_ATTEMPT}" &&
+               ( "${QUALIFIED_RUN_ATTEMPT}" == "${GITHUB_RUN_ATTEMPT}" ||
+                 "${QUALIFIED_RUN_ATTEMPT}" < "${GITHUB_RUN_ATTEMPT}" ) ) ]]
+          [[ "${DEVELOPER_ARTIFACT_ID}" =~ ^[0-9]+$ ]]
+          [[ "${EXPECTED_HEAD}" =~ ^[a-f0-9]{40}$ ]]
+          receipt="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${DEVELOPER_ARTIFACT_ID}")"
+          jq --exit-status \
+            --arg id "${DEVELOPER_ARTIFACT_ID}" \
+            --arg name "developer-packages-${GITHUB_RUN_ID}-${GITHUB_SHA}-${QUALIFIED_RUN_ATTEMPT}" \
+            --arg run "${GITHUB_RUN_ID}" --arg head "${EXPECTED_HEAD}" \
+            --arg repository "${GITHUB_REPOSITORY_ID}" \
+            '(.id | tostring) == $id and .name == $name and .expired == false and
+             .size_in_bytes > 0 and (.digest | test("^sha256:[a-f0-9]{64}$")) and
+             (.workflow_run.id | tostring) == $run and .workflow_run.head_sha == $head and
+             (.workflow_run.repository_id | tostring) == $repository' <<< "${receipt}" > /dev/null
+          echo "developer-artifact-id=${DEVELOPER_ARTIFACT_ID}" >> "${GITHUB_OUTPUT}"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           persist-credentials: false
           ref: ${{ env.SHARPPROOF_SOURCE_COMMIT }}
           fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-        id: prepared
+      - uses: ./.github/actions/qualify-developer-experience
+        id: qualification
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          artifact-id: ${{ needs.package.outputs.package-artifact-id }}
-      - name: Download the exact separately qualified CLI archive
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.optional-tool.outputs.tool-artifact-id }}
-          merge-multiple: true
-          path: tool-nupkgs
-      - name: Build candidate consumer image
-        id: consumer
-        shell: bash
-        env:
-          WINDOWS_NATIVE_PATH: ${{ steps.prepared.outputs.windows-native-path }}
-        run: |
-          set -euo pipefail
-          test -n "${WINDOWS_NATIVE_PATH}"
-          test -f "${WINDOWS_NATIVE_PATH}/payload/win-x64/libz3.dll"
-          test -f "${WINDOWS_NATIVE_PATH}/payload/win-arm64/libz3.dll"
-          version="$(pwsh -NoLogo -NoProfile -Command 'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
-          docker buildx build --platform linux/amd64 --file eng/container/Dockerfile \
-            --build-context "windows-native=${WINDOWS_NATIVE_PATH}" \
-            --target consumer --build-arg "SHARPPROOF_PACKAGE_VERSION=${version}" --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --provenance=false --load --metadata-file consumer-image.json \
-            --tag "ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}" .
-          digest="$(jq -r '."containerimage.digest"' consumer-image.json)"
-          [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
-          echo "reference=ghcr.io/alexyorke/sharpproof@${digest}" >> "${GITHUB_OUTPUT}"
-          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
-      - name: Qualify exact packages and generated consumers
-        env:
-          SHARPPROOF_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
-          SHARPPROOF_QUALIFIED_TOOL_PACKAGES: tool-nupkgs
-        run: >-
-          docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE -e SHARPPROOF_QUALIFIED_TOOL_PACKAGES tooling
-          developer-experience -Configuration Release -PackageSource nupkgs
-      - name: Exercise the retained generated Compose project in the exact candidate image
-        env:
-          QUALIFIED_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          fixture="$(find artifacts/developer-experience -mindepth 2 -maxdepth 2 -type d -name consumer -print -quit)"
-          test -f "${fixture}/Native.csproj"
-          evidence="$(realpath -e -- "$(dirname "${fixture}")")"
-          [[ "${evidence%/*}" == "$(realpath -e -- artifacts/developer-experience)" && "${evidence##*/}" =~ ^[a-f0-9]{32}$ ]]
-          # Hand only the run directory to the host; package/input ownership stays unchanged.
-          sudo chown -- "$(id -u):$(id -g)" "${evidence}"
-          image="ghcr.io/alexyorke/sharpproof:sha-${GITHUB_SHA}"
-          pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
-            -EvidenceDirectory "${evidence}" -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
-            -LocalImage "${image}" -BuildMetadataPath consumer-image.json
-          pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofTemplateCompose.ps1 \
-            -EvidenceDirectory "${evidence}" -ConsumerDirectory workspace-consumer -ConsumerImage "${QUALIFIED_CONSUMER_IMAGE}" \
-            -LocalImage "${image}" -BuildMetadataPath consumer-image.json
-      - name: Record exact optional editor and template archives
-        env:
-          QUALIFIED_CONSUMER_IMAGE: ${{ steps.consumer.outputs.reference }}
-        run: |
-          set -euo pipefail
-          fixture="$(find artifacts/developer-experience -mindepth 2 -maxdepth 2 -type d -name packages -print -quit)"
-          test -n "$fixture"
-          docker compose run --rm -e QUALIFIED_DEVELOPER_PACKAGES="$fixture" -e QUALIFIED_COMMIT="$GITHUB_SHA" -e QUALIFIED_CONSUMER_IMAGE tooling dev -lc \
-            '
-            set -euo pipefail
-            pwsh -NoProfile -File eng/scripts/Test-SharpProofDeveloperRelease.ps1
-            pwsh -NoProfile -File eng/scripts/Record-SharpProofDeveloperPackages.ps1 -PackageSource "$QUALIFIED_DEVELOPER_PACKAGES" -RepositoryCommit "$QUALIFIED_COMMIT" -ConsumerImage "$QUALIFIED_CONSUMER_IMAGE"
-            '
-      - name: Attest qualified developer archives and their identity inventory
-        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: artifacts/developer-packages/*
-      - name: Upload exact developer package feed
-        id: developer-upload
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: developer-packages-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/developer-packages/*
-          if-no-files-found: error
-      - name: Publish qualified immutable consumer image
-        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EXPECTED_DIGEST: ${{ steps.consumer.outputs.digest }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash eng/scripts/Test-SharpProofConsumerImagePublication.sh
-          bash eng/scripts/Publish-SharpProofConsumerImage.sh "$GITHUB_SHA" "$GITHUB_REF_NAME" "$EXPECTED_DIGEST"
-      - name: Attest the same published consumer-image digest
-        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-name: ghcr.io/alexyorke/sharpproof
-          subject-digest: ${{ steps.consumer.outputs.digest }}
-          push-to-registry: true
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: developer-consumer-image-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: consumer-image.json
-          if-no-files-found: error
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: developer-experience-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/developer-experience/
-          if-no-files-found: error
-          overwrite: true
+          package-artifact-id: ${{ needs.package.outputs.package-artifact-id }}
+          tool-artifact-id: ${{ needs.optional-tool.outputs.tool-artifact-id }}
+          tool-producer-attempt: ${{ needs.optional-tool.outputs.producer-attempt }}
+          producer-attempt: ${{ needs.package-artifacts.outputs.producer-attempt }}
+          codefix-artifact-id: ${{ needs.package-artifacts.outputs.codefix-artifact-id }}
+          developer-harness-artifact-id: ${{ needs.package-artifacts.outputs.developer-harness-artifact-id }}
 
   optional-tool:
     name: Pack and qualify the optional CLI tool
-    needs: release-context
+    needs: package-artifacts
     outputs:
       tool-artifact-id: ${{ steps.tool-upload.outputs.artifact-id }}
+      producer-attempt: ${{ steps.tool-identity.outputs.attempt }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -612,23 +614,47 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Pack the isolated optional tool feed
-        run: docker compose run --rm tooling pack-tool -Configuration Release
+      - name: Authenticate the prepared optional tool archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PREPARED_TOOL_ARTIFACT_ID: ${{ needs.package-artifacts.outputs.prepared-tool-artifact-id }}
+          PRODUCER_ATTEMPT: ${{ needs.package-artifacts.outputs.producer-attempt }}
+        run: >-
+          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs
+          --artifact-id "${PREPARED_TOOL_ARTIFACT_ID}"
+          --name "prepared-tool-${GITHUB_RUN_ID}-${GITHUB_SHA}-${PRODUCER_ATTEMPT}"
+          --producer-attempt "${PRODUCER_ATTEMPT}"
+      - name: Download the isolated exact-source optional tool feed
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.package-artifacts.outputs.prepared-tool-artifact-id }}
+          merge-multiple: true
+          path: artifacts/tool-packages
       - name: Restore the exact tool into an outside-repository local manifest and exercise it
         run: >-
           docker compose run --rm tooling tool-consumer
           -PackageSource artifacts/tool-packages
       - name: Record the separate optional tool identity and hashes
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofPackageManifest.ps1
-          -PackageDirectory artifacts/tool-packages'
+        run: |
+          docker compose run --rm tooling dev -lc '
+            set -euo pipefail
+            test ! -e artifacts/qualified-tool-packages
+            mkdir -- artifacts/qualified-tool-packages
+            cp -- artifacts/tool-packages/*.nupkg artifacts/qualified-tool-packages/
+            cmp -- artifacts/tool-packages/*.nupkg artifacts/qualified-tool-packages/*.nupkg
+            pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofPackageManifest.ps1 \
+              -PackageDirectory artifacts/qualified-tool-packages
+          '
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         id: tool-upload
         with:
           name: nuget-tool-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/tool-packages/*
+          path: artifacts/qualified-tool-packages/*
           if-no-files-found: error
+      - name: Bind the successful tool qualification attempt
+        id: tool-identity
+        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
 
   private-qualification:
     name: Require every private package and platform qualification
@@ -735,6 +761,8 @@ jobs:
       - name: Authenticate the exact artifacts and generate the shipped-payload SBOM
         run: |
           set -euo pipefail
+          test ! -e artifacts/release-supply-chain
+          sudo install -d -o 1000 -g 1000 -- artifacts/release-supply-chain
           docker compose run --rm -e RELEASE_SOURCE_COMMIT="$GITHUB_SHA" tooling dev -lc '
             set -euo pipefail
             pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseEvidenceRegression.ps1
@@ -743,6 +771,7 @@ jobs:
             pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseEvidence.ps1 -PackageSource nupkgs -EvidenceDirectory artifacts/release-supply-chain -RepositoryCommit "$RELEASE_SOURCE_COMMIT"
             pwsh -NoLogo -NoProfile -File eng/scripts/New-SharpProofToolReleaseEvidence.ps1 -PackageSource tool-nupkgs -OutputDirectory artifacts/release-supply-chain -RepositoryCommit "$RELEASE_SOURCE_COMMIT"
           '
+          sudo chown -- "$(id -u):$(id -g)" artifacts/release-supply-chain
 
       - name: Attest the qualified release artifacts and evidence
         id: release-provenance

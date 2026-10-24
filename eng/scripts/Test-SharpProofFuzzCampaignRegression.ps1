@@ -21,7 +21,7 @@ $campaignTry = @($tree.EndBlock.Statements | Where-Object {
     })
 if ($campaignTry.Count -ne 1) { throw 'Actual fuzz campaign body not found.' }
 $campaignBody = [scriptblock]::Create(
-    'param([int]$RotatingSeed, [int]$RotatingCases, [int]$RetainedCases, [string]$RepositoryRoot)' + "`n" +
+    'param([int]$RotatingSeed, [int]$RotatingCases, [int]$RetainedCases, [string]$RepositoryRoot, [Collections.IDictionary]$PreparedRunnerReceipt)' + "`n" +
     (($campaignTry[0].Body.Statements | ForEach-Object { $_.Extent.Text }) -join "`n"))
 $sourceRepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) (

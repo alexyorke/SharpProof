@@ -43,7 +43,10 @@ function Invoke-LintCheck([string]$Name, [scriptblock]$Check) {
     $checks.Add(([ordered]@{ check = $Name; passed = $passed }).AsReadOnly())
 }
 
-Invoke-LintCheck 'Workflows' { Invoke-LintNative 'actionlint' @('-oneline') }
+Invoke-LintCheck 'Workflows' {
+    Invoke-LintNative 'node' @('eng/scripts/Test-SharpProofWorkflowArtifact.mjs', '--self-test')
+    Invoke-LintNative 'actionlint' @('-oneline')
+}
 Invoke-LintCheck 'WorkflowSecurity' {
     # Plain output preserves finding exit codes; SARIF mode does not.
     Invoke-LintNative 'zizmor' @('--offline', '--format', 'plain', '--config', 'eng/lint/zizmor.yml', '.github')

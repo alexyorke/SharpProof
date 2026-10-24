@@ -1,5 +1,65 @@
 Set-StrictMode -Version Latest
 
+# This is a conservative build selection, not coverage authority. Build every
+# non-test solution project before the collector derives its evaluated Compile
+# items and PDB universe. The gate still recomputes that authority independently.
+function Get-SharpProofCoverageAuthorityBuildProjects {
+    param(
+        [string]$RepositoryRoot,
+        [AllowEmptyCollection()]
+        [string[]]$AdditionalProjects = @()
+    )
+    $root = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    [xml]$solution = [IO.File]::ReadAllText((Join-Path $root 'SharpProof.slnx'))
+    $solutionProjects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
+        [StringComparer]::Ordinal)
+    $buildProjects = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
+        [StringComparer]::Ordinal)
+    foreach ($project in @($solution.SelectNodes('/Solution//Project'))) {
+        $attribute = $project.Attributes['Path']
+        if ($null -eq $attribute -or [string]::IsNullOrWhiteSpace($attribute.Value)) {
+            throw 'Coverage build solution has a project without a Path.'
+        }
+        $candidate = $attribute.Value.Replace('\', '/')
+        if ([IO.Path]::GetExtension($candidate) -cne '.csproj') { continue }
+        $absolute = [IO.Path]::GetFullPath($candidate, $root)
+        if (-not $absolute.StartsWith($prefix, [StringComparison]::Ordinal)) {
+            throw 'Coverage build solution has a project outside the repository.'
+        }
+        $relative = [IO.Path]::GetRelativePath($root, $absolute).Replace('\', '/')
+        if (-not $solutionProjects.Add($relative)) {
+            throw 'Coverage build solution has a duplicate project.'
+        }
+        if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) {
+            throw "Coverage build solution project is absent: '$relative'."
+        }
+        # Repository layout requires these suffixes for all test projects.
+        # Do not infer production membership from an unevaluated project flag.
+        if ($relative -cnotmatch '\.(Tests|UnitTests|IntegrationTests|PerformanceTests)\.csproj$') {
+            [void]$buildProjects.Add($relative)
+        }
+    }
+    if ($buildProjects.Count -eq 0) {
+        throw 'Coverage authority build has no non-test solution projects.'
+    }
+    foreach ($project in $AdditionalProjects) {
+        if ([string]::IsNullOrWhiteSpace($project)) {
+            throw 'Coverage authority build has an empty additional project.'
+        }
+        $absolute = [IO.Path]::GetFullPath($project.Replace('\', '/'), $root)
+        $relative = [IO.Path]::GetRelativePath($root, $absolute).Replace('\', '/')
+        if (-not $absolute.StartsWith($prefix, [StringComparison]::Ordinal) -or
+            -not $solutionProjects.Contains($relative)) {
+            throw 'Coverage authority build additional project is not in the solution.'
+        }
+        [void]$buildProjects.Add($relative)
+    }
+    return , [Collections.Immutable.ImmutableArray]::CreateRange[string](
+        [string[]]@($buildProjects.ToImmutable() | Sort-Object -CaseSensitive))
+}
+
 function Get-SharpProofSemanticCoverageShards {
     return , [Collections.Immutable.ImmutableArray]::Create[string](
         'semantic-gates-corpus-a', 'semantic-gates-corpus-b', 'semantic-gates-shards',
