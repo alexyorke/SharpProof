@@ -85,7 +85,7 @@ public sealed class CompanionScaffoldingTests
             }
             """;
         using var workspace = new AdhocWorkspace();
-        var document = CreateDocument(workspace, source).WithFilePath("/fixture/nested/Target.cs").WithFolders(["nested"]);
+        var document = CreateDocument(workspace, source);
         var actions = await RefactoringsAsync(document);
         Assert.That(actions, Has.Length.EqualTo(1));
         var operations = await actions[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
@@ -96,23 +96,11 @@ public sealed class CompanionScaffoldingTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That((await solution.GetDocument(document.Id)!.GetTextAsync()).ToString(), Is.EqualTo(source));
-            Assert.That(generated.FilePath, Is.EqualTo("/fixture/nested/ApiContracts.cs"));
-            Assert.That(generated.Folders.Single(), Is.EqualTo("nested"));
             Assert.That(text, Does.Contain("#nullable enable").And.Contain("NotImplementedException"));
             Assert.That(text, Does.Not.Contain("Contract.Requires").And.Not.Contain("Contract.Assume").And.Not.Contain("Contract.Ensures"));
             Assert.That(await CompilerErrorsAsync(generated), Is.Empty, text);
             Assert.That(await CompanionDiagnosticsAsync(generated), Is.Empty, text);
         }
-    }
-
-    [Test]
-    public async Task RefactoringDoesNotReplaceAnExistingDocumentAtTheCompanionPath()
-    {
-        using var workspace = new AdhocWorkspace();
-        const string source = "public interface Api { void Read(); }";
-        var document = CreateDocument(workspace, source).WithFilePath("/fixture/ApiContracts.cs");
-        Assert.That(await RefactoringsAsync(document), Is.Empty);
-        Assert.That((await document.GetTextAsync()).ToString(), Is.EqualTo(source));
     }
 
     [TestCase("file class Api { public int Read() => 0; }")]
