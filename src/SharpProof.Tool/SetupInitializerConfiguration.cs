@@ -44,16 +44,16 @@ internal static class SetupInitializerConfiguration
         path ??= Path.Combine(directory, "NuGet.Config");
         var document = SetupInitializerFiles.Xml(files.Read(path), "configuration");
         var root = document.Root!;
-        var sources = Section(root, "packageSources");
-        var source = Entries(sources, "add", "key", FeedName).SingleOrDefault();
-        if (source != null && !string.Equals((string?)source.Attribute("value"), FeedUrl, StringComparison.Ordinal))
-        { throw new InvalidOperationException("The existing SharpProofPreview source points to a different location."); }
         if (root.Element("packageSourceCredentials")?.Elements().Any(static element =>
         {
             ArgumentNullException.ThrowIfNull(element);
             return element.Name.LocalName.Equals(FeedName, StringComparison.OrdinalIgnoreCase);
         }) == true)
         { throw new InvalidOperationException("Keep SharpProofPreview credentials in a credential provider or environment, outside the generated configuration."); }
+        var sources = Section(root, "packageSources");
+        var source = Entries(sources, "add", "key", FeedName).SingleOrDefault();
+        if (source != null && !string.Equals((string?)source.Attribute("value"), FeedUrl, StringComparison.Ordinal))
+        { throw new InvalidOperationException("The existing SharpProofPreview source points to a different location."); }
         var disabled = root.Element("disabledPackageSources");
         if (disabled != null && Entries(disabled, "add", "key", FeedName).Any(static element =>
         {
@@ -61,15 +61,6 @@ internal static class SetupInitializerConfiguration
             return ((string?)element.Attribute("value"))?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
         }))
         { throw new InvalidOperationException("The SharpProofPreview source is explicitly disabled."); }
-        if (source == null)
-        { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", FeedName), new XAttribute("value", FeedUrl))); }
-        if (!sources.Elements("add").Any(static element =>
-        {
-            ArgumentNullException.ThrowIfNull(element);
-            return !string.Equals((string?)element.Attribute("key"), FeedName, StringComparison.OrdinalIgnoreCase);
-        }))
-        { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", "nuget.org"), new XAttribute("value", "https://api.nuget.org/v3/index.json"))); }
-        var hadMapping = root.Element("packageSourceMapping") != null;
         var mapping = Section(root, "packageSourceMapping");
         foreach (var mapped in mapping.Elements("packageSource"))
         {
@@ -82,11 +73,68 @@ internal static class SetupInitializerConfiguration
             }))
             { throw new InvalidOperationException("SharpProof packages are already mapped to another package source."); }
         }
+        // Resolve inheritance with NuGet's reader, including user/machine settings,
+        // clear/remove entries and disabled sources. Never write those settings.
+        using var settingsContext = new NuGet.Configuration.SettingsLoadingContext();
+        var settings = LoadFeedSettings(files, directory,
+            NuGet.Common.NuGetEnvironment.GetFolderPath(NuGet.Common.NuGetFolderPath.UserSettingsDirectory), settingsContext);
+        var effectiveSources = new NuGet.Configuration.PackageSourceProvider(settings).LoadPackageSources().ToArray();
+        var effectiveMapping = NuGet.Configuration.PackageSourceMapping.GetPackageSourceMapping(settings);
+        foreach (var inheritedSource in effectiveSources)
+        {
+            if (!inheritedSource.Name.Equals(FeedName, StringComparison.OrdinalIgnoreCase))
+            { continue; }
+            if (inheritedSource.Source != FeedUrl)
+            { throw new InvalidOperationException("The existing SharpProofPreview source points to a different location."); }
+            if (!inheritedSource.IsEnabled)
+            { throw new InvalidOperationException("The SharpProofPreview source is explicitly disabled."); }
+        }
+        foreach (var inheritedMapping in new NuGet.Configuration.PackageSourceMappingProvider(settings).GetPackageSourceMappingItems())
+        {
+            if (!inheritedMapping.Key.Equals(FeedName, StringComparison.OrdinalIgnoreCase) &&
+                effectiveSources.Any(packageSource =>
+                {
+                    ArgumentNullException.ThrowIfNull(packageSource);
+                    return packageSource.IsEnabled && packageSource.Name.Equals(inheritedMapping.Key, StringComparison.OrdinalIgnoreCase);
+                }) &&
+                inheritedMapping.Patterns.Any(static pattern =>
+                {
+                    ArgumentNullException.ThrowIfNull(pattern);
+                    return pattern.Pattern.StartsWith("SharpProof", StringComparison.OrdinalIgnoreCase);
+                }))
+            { throw new InvalidOperationException("SharpProof packages are already mapped to another package source."); }
+        }
+        if (source == null)
+        { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", FeedName), new XAttribute("value", FeedUrl))); }
+        if (!effectiveSources.Any(static packageSource =>
+        {
+            ArgumentNullException.ThrowIfNull(packageSource);
+            return packageSource.IsEnabled && !packageSource.Name.Equals(FeedName, StringComparison.OrdinalIgnoreCase);
+        }) && !sources.Elements("add").Any(static element =>
+        {
+            ArgumentNullException.ThrowIfNull(element);
+            return !string.Equals((string?)element.Attribute("key"), FeedName, StringComparison.OrdinalIgnoreCase);
+        }))
+        { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", "nuget.org"), new XAttribute("value", "https://api.nuget.org/v3/index.json"))); }
+        var hadMapping = effectiveMapping.IsEnabled;
         if (!hadMapping)
         {
-            foreach (var external in sources.Elements("add"))
+            foreach (var key in effectiveSources.Where(static packageSource =>
             {
-                var key = (string?)external.Attribute("key");
+                ArgumentNullException.ThrowIfNull(packageSource);
+                return packageSource.IsEnabled;
+            }).Select(static packageSource =>
+            {
+                ArgumentNullException.ThrowIfNull(packageSource);
+                return packageSource.Name;
+            })
+                .Concat(sources.Elements("add").Select(static element =>
+                {
+                    ArgumentNullException.ThrowIfNull(element);
+                    return (string?)element.Attribute("key");
+                }))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
                 if (!string.IsNullOrEmpty(key) && !key.Equals(FeedName, StringComparison.OrdinalIgnoreCase))
                 { SetupInitializerFiles.Append(mapping, new XElement("packageSource", new XAttribute("key", key), new XElement("package", new XAttribute("pattern", "*")))); }
             }
@@ -104,6 +152,63 @@ internal static class SetupInitializerConfiguration
         }))
         { SetupInitializerFiles.Append(previewMapping, new XElement("package", new XAttribute("pattern", "SharpProof*"))); }
         files.Add(path, SetupInitializerFiles.Serialize(document));
+    }
+
+    internal static NuGet.Configuration.ISettings LoadFeedSettings(SetupInitializerFiles files, string directory, string userDirectory,
+        NuGet.Configuration.SettingsLoadingContext settingsContext)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentException.ThrowIfNullOrEmpty(directory);
+        ArgumentException.ThrowIfNullOrEmpty(userDirectory);
+        ArgumentNullException.ThrowIfNull(settingsContext);
+        // LoadDefaultSettings can create the user config. Discover existing files
+        // explicitly and use the immutable reader so preview never writes it.
+        var paths = new List<string>();
+        for (var current = new DirectoryInfo(directory); current != null; current = current.Parent)
+        {
+            var candidates = NuGetNames.Select(name =>
+            {
+                ArgumentNullException.ThrowIfNull(name);
+                return Path.Combine(current.FullName, name);
+            })
+                .Where(File.Exists).Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal).ToArray();
+            if (candidates.Length > 1)
+            { throw new InvalidOperationException("Multiple NuGet configuration files make initialization ambiguous."); }
+            paths.AddRange(candidates);
+        }
+        var userFile = Path.Combine(userDirectory, NuGet.Configuration.Settings.DefaultSettingsFileName);
+        if (File.Exists(userFile))
+        { paths.Add(userFile); }
+        var additionalDirectory = Path.Combine(userDirectory, "config");
+        if (Directory.Exists(additionalDirectory))
+        {
+            paths.AddRange(Directory.EnumerateFiles(additionalDirectory)
+                .Where(static path =>
+                {
+                    ArgumentNullException.ThrowIfNull(path);
+                    var extension = Path.GetExtension(path);
+                    return (OperatingSystem.IsWindows() ? extension.Equals(".config", StringComparison.OrdinalIgnoreCase) : extension is ".config" or ".Config") &&
+                        !Path.GetFileName(path).Equals(NuGet.Configuration.Settings.DefaultSettingsFileName,
+                            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+                })
+                .Order(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal));
+        }
+        paths.AddRange(new NuGet.Configuration.XPlatMachineWideSetting().Settings.GetConfigFilePaths());
+        paths = paths.Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal).ToList();
+        foreach (var configPath in paths)
+        {
+            var config = SetupInitializerFiles.Xml(files.Read(configPath), "configuration");
+            foreach (var name in new[] { "packageSources", "packageSourceMapping" })
+            {
+                var section = Section(config.Root!, name);
+                var entryName = name == "packageSources" ? "add" : "packageSource";
+                _ = Entries(section, entryName, "key", FeedName);
+            }
+        }
+        try
+        { return NuGet.Configuration.Settings.LoadImmutableSettingsGivenConfigPaths(paths, settingsContext); }
+        catch (NuGet.Configuration.NuGetConfigurationException)
+        { throw new InvalidDataException("Inherited NuGet configuration is invalid; initialize it manually."); }
     }
 
     private static void PlanManifest(SetupInitializerFiles files, string directory, string version)

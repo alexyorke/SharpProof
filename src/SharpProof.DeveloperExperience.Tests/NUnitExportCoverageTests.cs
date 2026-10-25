@@ -43,7 +43,8 @@ public sealed class NUnitExportCoverageTests
             Assert.That(project.Descendants("ManagePackageVersionsCentrally").Single().Value, Is.EqualTo("false"));
             Assert.That(reference.Attribute("Include")!.Value, Is.EqualTo("../Consumer/Consumer.csproj"));
             Assert.That(Path.GetFullPath(Path.Combine(fixture.OutputPath, reference.Attribute("Include")!.Value)), Is.EqualTo(fixture.ProjectPath));
-            Assert.That(reference.Attribute("AdditionalProperties")!.Value, Is.EqualTo("SharpProofProfile=advisory;SharpProofVerify=false"));
+            Assert.That(reference.Attribute("AdditionalProperties")!.Value, Does.StartWith("SharpProofProfile=advisory;SharpProofVerify=false;DefineConstants="));
+            Assert.That(reference.Attribute("AdditionalProperties")!.Value, Does.Contain(";CheckForOverflowUnderflow=" + (checkOverflow ? "true" : "false")));
             Assert.That(project.Descendants("PackageReference").Select(static item =>
                 (item ?? throw new ArgumentNullException(nameof(item))).Attribute("Include")!.Value),
                 Is.EquivalentTo(ImmutableArray.Create("Microsoft.NET.Test.Sdk", "NUnit", "NUnit3TestAdapter")));
@@ -434,6 +435,96 @@ public sealed class NUnitExportCoverageTests
         Assert.That(NUnitExporter.ScalarTypeName(compilation.GetSpecialType(SpecialType.System_Boolean)), Is.EqualTo("bool"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ExportedRegressionRetainsRecordedSymbolsAcrossBuildConfigurations(bool customSymbols)
+    {
+        var directive = customSymbols ? "TRACE && AUDIT_REPLAY" : "!DEBUG";
+        var source = "using SharpProof.Attributes; public static class Api { public static int Run(int value) { Contract.Ensures(Contract.Result<int>() > 0);\n#if " + directive + "\nreturn value;\n#else\nreturn 1;\n#endif\n} }";
+        using var fixture = new ExportFixture(source, targetFramework: "net10.0");
+        if (customSymbols)
+        {
+            fixture.Snapshot = fixture.Snapshot with { SyntaxTrees = [fixture.Snapshot.SyntaxTrees[0] with { PreprocessorSymbols = ["TRACE", "AUDIT_REPLAY"] }] };
+        }
+        await fixture.ExportAsync(TestContext.CurrentContext.CancellationToken);
+        var consumer = new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"),
+            new XElement("PropertyGroup", new XElement("TargetFramework", "net10.0"), new XElement("AssemblyName", "ExportFixture")),
+            new XElement("ItemGroup", new XElement("Reference", new XAttribute("Include", "SharpProof.Attributes"), new XElement("HintPath", typeof(Contract).Assembly.Location)))));
+        consumer.Save(fixture.ProjectPath);
+        var testProject = Path.Combine(fixture.OutputPath, "SharpProof.Regression.csproj");
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var tested = await ToolProcess.RunAsync("dotnet", fixture.Root, TestContext.CurrentContext.CancellationToken,
+                "test", testProject, "-c", configuration, "--nologo");
+            Assert.That(tested.ExitCode, Is.EqualTo(1), tested.Output);
+            Assert.That(tested.Output, Does.Contain("Failed:     1"), tested.Output);
+        }
+        await File.WriteAllTextAsync(fixture.SourcePath, source.Replace("return value;", "return 1;", StringComparison.Ordinal), TestContext.CurrentContext.CancellationToken);
+        var fixedTest = await ToolProcess.RunAsync("dotnet", fixture.Root, TestContext.CurrentContext.CancellationToken,
+            "test", testProject, "--nologo");
+        Assert.That(fixedTest.ExitCode, Is.Zero, fixedTest.Output);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ExportRehydratesTopLevelApplications(bool windowed)
+    {
+        using var fixture = new ExportFixture("using SharpProof.Attributes; int marker = 1; public static class Api { public static int Run(int value) { Contract.Ensures(Contract.Result<int>() > 0); return value; } }");
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { OutputKind = windowed ? CompilerOutputKind.WindowsApplication : CompilerOutputKind.ConsoleApplication } };
+        await fixture.ExportAsync(TestContext.CurrentContext.CancellationToken);
+        Assert.That(File.Exists(Path.Combine(fixture.OutputPath, "Regression.cs")), Is.True);
+        new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"),
+            new XElement("PropertyGroup", new XElement("TargetFramework", "net8.0"), new XElement("AssemblyName", "ExportFixture"),
+                new XElement("OutputType", windowed ? "WinExe" : "Exe")),
+            new XElement("ItemGroup", new XElement("Reference", new XAttribute("Include", "SharpProof.Attributes"),
+                new XElement("HintPath", typeof(Contract).Assembly.Location))))).Save(fixture.ProjectPath);
+        var tested = await ToolProcess.RunAsync("dotnet", fixture.Root, TestContext.CurrentContext.CancellationToken,
+            "test", Path.Combine(fixture.OutputPath, "SharpProof.Regression.csproj"), "--nologo");
+        Assert.That(tested.ExitCode, Is.EqualTo(1), tested.Output);
+        Assert.That(tested.Output, Does.Contain("Failed:     1"), tested.Output);
+    }
+
+    [TestCase((int)CompilerNullableContext.Disable, "disable")]
+    [TestCase((int)CompilerNullableContext.Warnings, "warnings")]
+    [TestCase((int)CompilerNullableContext.Annotations, "annotations")]
+    [TestCase((int)CompilerNullableContext.Enable, "enable")]
+    public void ReplayPropertiesPreserveNullableContext(int context, string expected)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(expected);
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { NullableContext = (CompilerNullableContext)context } };
+        Assert.That(NUnitExporter.ReplayBuildProperties(fixture.Snapshot), Does.EndWith(";Nullable=" + expected));
+    }
+
+    [Test]
+    public void ReplayPropertiesRejectInvalidNullableContext()
+    {
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { NullableContext = (CompilerNullableContext)int.MaxValue } };
+        var error = Assert.Throws<InvalidDataException>(new Action(() => { _ = NUnitExporter.ReplayBuildProperties(fixture.Snapshot); }));
+        Assert.That(error!.Message, Does.Contain("nullable context"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ReplayPropertiesRejectMixedTreeSettings(bool language)
+    {
+        using var fixture = new ExportFixture();
+        var original = fixture.Snapshot.SyntaxTrees[0];
+        var other = language ? original with { LanguageVersion = "CSharp12" } : original with { PreprocessorSymbols = ["OTHER"] };
+        fixture.Snapshot = fixture.Snapshot with { SyntaxTrees = [original, other] };
+        var error = Assert.Throws<InvalidOperationException>(new Action(() => { _ = NUnitExporter.ReplayBuildProperties(fixture.Snapshot); }));
+        Assert.That(error!.Message, Does.Contain("uniform"));
+    }
+
+    [Test]
+    public void ExportRejectsUnsupportedApplicationOutputKinds()
+    {
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { OutputKind = CompilerOutputKind.NetModule } };
+        AssertExportRejected<InvalidOperationException>(fixture, "output kind is not supported");
+    }
+
     private static void AssertExportRejected<TException>(ExportFixture fixture, string message) where TException : Exception
     {
         ArgumentNullException.ThrowIfNull(fixture);
@@ -537,6 +628,7 @@ public sealed class NUnitExportCoverageTests
                     ProjectDirectory = directory,
                     AssemblyName = "ExportFixture",
                     TargetFramework = targetFramework,
+                    Options = new() { OutputKind = CompilerOutputKind.DynamicallyLinkedLibrary },
                     SyntaxTrees = [new() { Path = SourcePath, TextLength = source.Length, Sha256 = Digest(Encoding.UTF8.GetBytes(source)),
                         LanguageVersion = "CSharp13", Kind = "Regular" }],
                     References = ReferenceSnapshots.Value

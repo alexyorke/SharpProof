@@ -23,6 +23,19 @@ Source: https://github.com/dotnet/runtime
 License: MIT
 Copyright (c) .NET Foundation and Contributors
 
+Optional developer tool configuration reader
+
+Package: NuGet.Configuration 6.14.0
+Package: NuGet.Common 6.14.0
+Package: NuGet.Frameworks 6.14.0
+Source: https://github.com/NuGet/NuGet.Client
+License: Apache-2.0 (full Apache License text appears below)
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+The optional tool also redistributes System.Security.Cryptography.ProtectedData
+4.4.0 from https://github.com/dotnet/corefx, under the MIT License below.
+Copyright (c) .NET Foundation and Contributors.
+
 Microsoft Z3
 
 Package: Microsoft.Z3 4.12.2
@@ -1590,7 +1603,7 @@ FIXME: Cephes math lib
 Copyright (C) 1984-1998 Stephen L. Moshier
 
 It sounds vague, but as to be found at
-<http://lists.debian.org/debian-legal/2004/12/msg00295.html>, it gives an
+<https://lists.debian.org/debian-legal/2004/12/msg00295.html>, it gives an
 impression that the author could be willing to give an explicit
 permission to distribute those files e.g. under a BSD style license. So
 probably there is no problem here, although it could be good to get a

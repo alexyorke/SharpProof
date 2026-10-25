@@ -380,6 +380,10 @@ emitted as a test host.
 
 The generated project builds its consumer reference in advisory portable mode so a
 Refuted verifier gate does not prevent the runtime regression from compiling.
+It pins the recorded preprocessor symbols, language version, overflow checking,
+unsafe setting, optimization, and nullable context for that reference, including
+when the test is run in a different Debug or Release configuration. Mixed source-tree
+language or preprocessor settings require manual integration and are rejected.
 The consumer's ordinary build policy remains unchanged. The assertion represents the
 original postcondition: the generated test should fail on the defective implementation
 and pass once it is fixed. It does not enable runtime contract checks.

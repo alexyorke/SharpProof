@@ -188,7 +188,7 @@ internal static class NUnitExporter
             "net10.0" => "net10.0",
             _ => throw new InvalidOperationException("NUnit export currently supports net8.0/net9.0/net10.0 consumers and netstandard2.0/netstandard2.1 libraries. Other test runtimes are not qualified.")
         };
-        var testProject = new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("PropertyGroup", new XElement("TargetFramework", testFramework), new XElement("IsTestProject", "true"), new XElement("IsPackable", "false"), new XElement("ManagePackageVersionsCentrally", "false")), new XElement("ItemGroup", new XElement("ProjectReference", new XAttribute("Include", EscapeMsBuildPath(projectReference)), new XAttribute("AdditionalProperties", "SharpProofProfile=advisory;SharpProofVerify=false")), Package("Microsoft.NET.Test.Sdk", ToolVersions.TestSdk), Package("NUnit", ToolVersions.NUnit), Package("NUnit3TestAdapter", ToolVersions.NUnitAdapter))));
+        var testProject = new XDocument(new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("PropertyGroup", new XElement("TargetFramework", testFramework), new XElement("IsTestProject", "true"), new XElement("IsPackable", "false"), new XElement("ManagePackageVersionsCentrally", "false")), new XElement("ItemGroup", new XElement("ProjectReference", new XAttribute("Include", EscapeMsBuildPath(projectReference)), new XAttribute("AdditionalProperties", ReplayBuildProperties(snapshot))), Package("Microsoft.NET.Test.Sdk", ToolVersions.TestSdk), Package("NUnit", ToolVersions.NUnit), Package("NUnit3TestAdapter", ToolVersions.NUnitAdapter))));
         var parent = Path.GetDirectoryName(outputDirectory)!;
         if (!Directory.Exists(parent))
         {
@@ -223,6 +223,35 @@ internal static class NUnitExporter
         global::SharpProof.Internal.InputValidation.Require(id, nameof(id));
         global::SharpProof.Internal.InputValidation.Require(version, nameof(version));
         return new("PackageReference", new XAttribute("Include", id), new XAttribute("Version", version));
+    }
+
+    internal static string ReplayBuildProperties(CompilerCompilationSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var first = snapshot.SyntaxTrees[0];
+        foreach (var tree in snapshot.SyntaxTrees)
+        {
+            if (tree.LanguageVersion != first.LanguageVersion || !tree.PreprocessorSymbols.SequenceEqual(first.PreprocessorSymbols))
+            { throw new InvalidOperationException("Export requires uniform recorded language and preprocessor settings across source trees."); }
+        }
+        var language = Enum.Parse<LanguageVersion>(first.LanguageVersion);
+        var nullable = snapshot.Options.NullableContext switch
+        {
+            CompilerNullableContext.Disable => "disable",
+            CompilerNullableContext.Warnings => "warnings",
+            CompilerNullableContext.Annotations => "annotations",
+            CompilerNullableContext.Enable => "enable",
+            _ => throw new InvalidDataException("Invalid recorded nullable context.")
+        };
+        // Escape list separators so the symbols reach one MSBuild global property.
+        var symbols = string.Join(";", first.PreprocessorSymbols);
+        var constants = symbols.Length == 0 ? string.Empty : EscapeMsBuildPath(symbols);
+        return "SharpProofProfile=advisory;SharpProofVerify=false;" +
+            "DefineConstants=" + constants + ";LangVersion=" + LanguageVersionFacts.ToDisplayString(language) +
+            ";CheckForOverflowUnderflow=" + (snapshot.Options.CheckOverflow ? "true" : "false") +
+            ";AllowUnsafeBlocks=" + (snapshot.Options.AllowUnsafe ? "true" : "false") +
+            ";Optimize=" + (snapshot.Options.OptimizationLevel == CompilerOptimizationLevel.Release ? "true" : "false") +
+            ";Nullable=" + nullable;
     }
 
     private static string RelativeProjectPath(string directory, string projectPath)
@@ -443,7 +472,14 @@ internal static class NUnitExporter
             references.Add(MetadataReference.CreateFromFile(path));
         }
 
-        var compilation = CSharpCompilation.Create(snapshot.AssemblyName, trees, references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: snapshot.Options.CheckOverflow, allowUnsafe: snapshot.Options.AllowUnsafe, usings: snapshot.Options.Usings, nullableContextOptions: (NullableContextOptions)snapshot.Options.NullableContext));
+        var outputKind = snapshot.Options.OutputKind switch
+        {
+            CompilerOutputKind.ConsoleApplication => OutputKind.ConsoleApplication,
+            CompilerOutputKind.WindowsApplication => OutputKind.WindowsApplication,
+            CompilerOutputKind.DynamicallyLinkedLibrary => OutputKind.DynamicallyLinkedLibrary,
+            _ => throw new InvalidOperationException("The recorded compilation output kind is not supported by the exporter.")
+        };
+        var compilation = CSharpCompilation.Create(snapshot.AssemblyName, trees, references, new CSharpCompilationOptions(outputKind, checkOverflow: snapshot.Options.CheckOverflow, allowUnsafe: snapshot.Options.AllowUnsafe, usings: snapshot.Options.Usings, nullableContextOptions: (NullableContextOptions)snapshot.Options.NullableContext));
         if (compilation.GetDiagnostics(cancellationToken).Any(static diagnostic =>
         {
             global::SharpProof.Internal.InputValidation.Require(diagnostic, nameof(diagnostic));
