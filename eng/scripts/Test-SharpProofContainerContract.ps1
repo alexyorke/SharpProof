@@ -18,9 +18,6 @@ if ([string]::IsNullOrWhiteSpace($ComposePath)) {
 $catalog = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/toolchain.json') -Raw |
     ConvertFrom-Json
-$apiInventoryManifest = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'eng/api-coverage/net10.0.manifest.json') -Raw |
-    ConvertFrom-Json
 $acceptance = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -457,7 +454,6 @@ Assert-Exact `
     $catalog.platform `
     'Acceptance container platform'
 
-Assert-Exact $catalog.dotnet.sdkVersion $apiInventoryManifest.sdkVersion 'API inventory generation SDK'
 Assert-Exact $catalog.dotnet.apiInventoryPackUrl ('https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/{0}/microsoft.netcore.app.ref.{0}.nupkg' -f $catalog.dotnet.apiInventoryPackVersion) 'API inventory reference pack source'
 Assert-Exact $catalog.dotnet.testRuntimeVersion $catalog.dotnet.minimumSdkFrameworkVersion 'Test runtime from the minimum-framework SDK'
 Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
@@ -520,10 +516,6 @@ Assert-Exact `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
-    $apiInventoryPack = "/usr/share/dotnet/packs/$($apiInventoryManifest.pack)/$($apiInventoryManifest.version)/ref/$($apiInventoryManifest.framework)"
-    if (-not (Test-Path -LiteralPath $apiInventoryPack -PathType Container)) {
-        throw "The reviewed active API inventory reference pack is missing: $apiInventoryPack"
-    }
     $compatibilityFramework = 'net{0}.0' -f ([version]$catalog.dotnet.apiInventoryPackVersion).Major
     $compatibilityPack = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/$($catalog.dotnet.apiInventoryPackVersion)/ref/$compatibilityFramework"
     if (-not (Test-Path -LiteralPath $compatibilityPack -PathType Container)) {

@@ -49,8 +49,7 @@ The `loop` service uses a separate named workspace with read-only host source in
 | Command | Purpose |
 | --- | --- |
 | `contract` | Validate the canonical container contract |
-| `docs` | Check generated source-reference drift, local Markdown links/anchors, and documentation automation regressions |
-| `docs-update` | Export regenerated source reference to `artifacts/docs/source-reference.md` and check links/automation; copy back explicitly |
+| `docs` | Check local Markdown links and anchors |
 | `restore` | Locked restore of `-Target` |
 | `format-check` | Check C# formatting, PowerShell parsing/lint/format, ShellCheck and shfmt for all tracked scripts, plus script-tool failure regressions; never write source changes |
 | `build` | Locked restore and build of `-Target` |

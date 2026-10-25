@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using SharpProof.Frontend;
 using SharpProof.Specs;
 
@@ -22,13 +20,6 @@ internal static class DotnetApiInventory
         public string Id { get; init; } = Id ?? throw new global::System.ArgumentNullException(nameof(Id));
         public string Kind { get; init; } = Kind ?? throw new global::System.ArgumentNullException(nameof(Kind));
         public string Evidence { get; init; } = Evidence ?? throw new global::System.ArgumentNullException(nameof(Evidence));
-    }
-
-    internal sealed record Delta(ImmutableArray<string> Added, ImmutableArray<string> Removed, ImmutableArray<string> Changed)
-    {
-        public ImmutableArray<string> Added { get; init; } = Added.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Added)) : Added;
-        public ImmutableArray<string> Removed { get; init; } = Removed.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Removed)) : Removed;
-        public ImmutableArray<string> Changed { get; init; } = Changed.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Changed)) : Changed;
     }
 
     internal static ImmutableArray<Row> Collect(CSharpCompilation compilation)
@@ -191,77 +182,5 @@ internal static class DotnetApiInventory
         }
 
         return new Row(symbol.ContainingAssembly.Identity.Name, symbol.GetDocumentationCommentId() ?? throw new InvalidOperationException("Missing API identity: " + symbol), symbol.Kind.ToString(), string.Join(";", evidence.ToImmutable()));
-    }
-
-    internal static Delta Compare(IEnumerable<string> baseline, IEnumerable<string> current)
-    {
-        global::System.ArgumentNullException.ThrowIfNull(baseline);
-        global::System.ArgumentNullException.ThrowIfNull(current);
-        static ImmutableDictionary<string, string> Index(IEnumerable<string> lines)
-        {
-            global::System.ArgumentNullException.ThrowIfNull(lines);
-            var index = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
-            foreach (var line in lines)
-            {
-                global::System.ArgumentNullException.ThrowIfNull(line);
-                var key = string.Join('\t', line.Split('\t').Take(2));
-                if (index.ContainsKey(key))
-                {
-                    throw new ArgumentException("An item with the same key has already been added. Key: " + key);
-                }
-                index.Add(key, line);
-            }
-            return index.ToImmutable();
-        }
-
-        var before = Index(baseline);
-        var after = Index(current);
-        return new Delta(after.Keys.Except(before.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToImmutableArray(), before.Keys.Except(after.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToImmutableArray(), after.Keys.Intersect(before.Keys, StringComparer.Ordinal).Where(key => key is null ? throw new global::System.ArgumentNullException(nameof(key)) : (!string.Equals(before[key], after[key], StringComparison.Ordinal))).Order(StringComparer.Ordinal).ToImmutableArray());
-    }
-
-    internal static string Fingerprint(string path)
-    {
-        global::System.ArgumentNullException.ThrowIfNull(path);
-        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
-    }
-
-    internal static string Markdown(ImmutableArray<Row> rows, Delta delta)
-    {
-        if (rows.IsDefault)
-        { throw new ArgumentException("Array must be initialized.", nameof(rows)); }
-        global::System.ArgumentNullException.ThrowIfNull(delta);
-        var report = new StringBuilder("# .NET API coverage inventory\n\n").Append(CultureInfo.InvariantCulture, $"Microsoft.NETCore.App.Ref {PackVersion}, {Framework}. {rows.Length} declarations.\n\n").Append(CultureInfo.InvariantCulture, $"Partial evidence: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "partially-modeled"))}; unmodeled: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "unmodeled"))}; excluded containers: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "excluded-container"))}.\n\n").Append(CultureInfo.InvariantCulture, $"Added: {delta.Added.Length}; removed: {delta.Removed.Length}; evidence changed: {delta.Changed.Length}.\n\n").Append("Partial evidence is not a universal proof guarantee. Unmodeled means no evidence from the default catalog or the audited intrinsic predicates.\n\n").Append("| Assembly | Declarations | Partial evidence | Unmodeled | Excluded containers |\n| --- | ---: | ---: | ---: | ---: |\n");
-        foreach (var group in rows.GroupBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Assembly)))
-        {
-            report.Append(CultureInfo.InvariantCulture, $"| {group.Key} | {group.Count()} | {group.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "partially-modeled"))} | {group.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "unmodeled"))} | {group.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "excluded-container"))} |\n");
-        }
-
-        report.Append("\n## Modeled facets and intrinsics\n\n| API | Evidence |\n| --- | --- |\n");
-        foreach (var row in rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Length != 0)))
-        {
-            report.Append("| ").Append(row.Id).Append(" | ").Append(row.Evidence).Append(" |\n");
-        }
-
-        foreach (var (label, keys) in ImmutableArray.Create(
-            ("Added", delta.Added),
-            ("Removed", delta.Removed),
-            ("Evidence changed", delta.Changed)
-        )
-
-        )
-        {
-            report.Append("\n## ").Append(label).Append("\n\n");
-            foreach (var key in keys.Take(100))
-            {
-                report.Append("- `").Append(key.Replace('\t', ' ')).Append("`\n");
-            }
-
-            if (keys.Length > 100)
-            {
-                report.Append("\nShowing first 100; delta.json contains every identity.\n");
-            }
-        }
-
-        return report.ToString();
     }
 }

@@ -6,8 +6,6 @@ SharpProof's optional developer packages are versioned with the three product pa
 These additions do not change existing verification or assumption policies. Package
 availability on a public feed is not implied; use the matching packages from your
 configured feed or this checkout's qualified package artifacts.
-The [delivery checklist](developer-experience-plan.md) distinguishes implementation,
-workflow evidence, and the remaining CI and release decisions.
 Official `1.0.0-preview.1` binaries, symbols, image, and detailed release evidence use
 the private `alexyorke/SharpProof-preview` path; source remains public. Public CI uses
 distinct validation versions. The [private release receipt](private-preview-release-receipt.md)

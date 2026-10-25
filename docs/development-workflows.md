@@ -10,7 +10,7 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Changed project feedback | `tooling test-changed` or `tooling quick` | Selects impacted tests from Git changes; `quick` selects Debug and `-Fast` |
 | Full development check | `tooling check` | Restore/build, semantic tests, package tests, and timing profile |
 | Pull request qualification | `tooling pr` | Documentation checks, Release contract/build, and semantic/package phases with the canonical category filter |
-| Documentation maintenance | `tooling docs`; `tooling docs-update` for regeneration | Source-reference drift, local links/anchors, and automation regressions; update exports a file for explicit copy-back |
+| Documentation links | `tooling docs` | Local Markdown links and anchors |
 | Portable/worker/package suite | `tooling portable-tests`, `worker-tests`, or `package-tests` | Selects the corresponding suite; package tests use their scheduler |
 | Repository analysis and samples | `tooling self-apply -Configuration Release` | Builds every tracked source project with advisory portable analysis, then runs the complete package sample matrix; required by PR CI |
 | Corpus qualification | `tooling corpus -Configuration Release` | Snapshot, metamorphic invariance, support classifications, Unknown ratchets, and replay |
@@ -27,8 +27,6 @@ The nightly fuzz runner rebuild uses the 600-second solution-build allowance. Th
 worker's default per-project wall-time budget remains 300 seconds; these measure
 different boundaries. See [analysis limits](analysis-limits.md) before changing either
 value.
-
-[Documentation maintenance](documentation-maintenance.md) explains generation and update PRs. The [generated reference](generated/source-reference.md) preserves literal declarations; the authored guides explain their behavior and limitations.
 
 ## Parameters and test selection
 
@@ -53,7 +51,7 @@ The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCa
 - `canonical-package-partition` runs `package-tests -Configuration Release -Fast -PackagePartitionCount 4 -PackagePartition <0..3>` with the canonical filter on four runners. Partition zero also runs the source-only `repository-gates`. The `canonical-package` check requires every partition and reconciles retained discovery and TRX evidence. `-Fast` skips analyzers only in those builds.
 - `canonical-gates` runs `semantic-tests -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates` with the canonical filter. The Gates tests run as four tasks: `gates-corpus` holds the classes that run the whole reviewed corpus through the corpus verifier's worker pool and reserves three scheduler slots, and `gates-remainder-1` to `-3` split the other classes by class name prefix and use one slot each. The last remainder shard takes every class the listed prefixes do not match, so each class runs exactly once.
 - `formatting` runs `format-check` while `package-reproducibility` runs the unchanged Full independent-path package reproduction.
-- `self-application` runs `self-apply -SelfApplicationPhase Sources`, while `self-application-samples` runs `-SelfApplicationPhase Samples`. The default `All` retains both phases locally. `api-coverage` separately runs the existing inventory, runtime-oracle, and usage-ranking checks and publishes their reports.
+- `self-application` runs `self-apply -SelfApplicationPhase Sources`, while `self-application-samples` runs `-SelfApplicationPhase Samples`. The default `All` retains both phases locally. `api-coverage` separately runs the intrinsic-evidence and runtime-oracle checks and publishes their reports.
 - `build-and-test` requires all those jobs to succeed, downloads their evidence into `artifacts/canonical-cohorts/remaining` and `gates`, then runs [Invoke-SharpProofCanonicalCohortGate.ps1](../eng/scripts/Invoke-SharpProofCanonicalCohortGate.ps1), the script behind `canonical-cohort-gate`. The gate reads only evidence and Git identity, so this job runs it on the checksum-verified PowerShell archive from `toolchain.json` instead of building the tooling image.
 
 The self-application phases, API checks, and formatting become ready after repository quality succeeds. Package partitions and independent reproduction start alongside quality so their final aggregation can finish earlier. This limits the first wave of runner requests so the longer semantic and coverage jobs can start promptly; all successful-PR checks and aggregate requirements remain in force.

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'docs-update', 'developer-experience', 'developer-packages')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'contract', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'repository-gates', 'test', 'test-changed', 'semantic-tests', 'canonical-cohort-gate', 'package-partition-gate', 'package-reproducibility', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'coverage', 'coverage-shard', 'coverage-gate', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-ci-products', 'pack-tool', 'tool-consumer', 'format-check', 'docs', 'developer-experience', 'developer-packages')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -598,23 +598,7 @@ switch ($Command) {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofDoctor.ps1') -Target $doctorTarget -Format $Format -TargetFramework $TargetFramework
     }
     'docs' {
-        $global:LASTEXITCODE = 0
-        Invoke-RequiredScript 'eng/scripts/Sync-SharpProofDocumentation.ps1' 'Source reference drift detected.'
         Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
-        & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofDocumentationUpdater.sh')
-        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
-    }
-    'docs-update' {
-        $global:LASTEXITCODE = 0
-        Invoke-RequiredScript 'eng/scripts/Sync-SharpProofDocumentation.ps1' 'Source reference generation failed.' ([ordered]@{
-                Update     = $true
-                OutputPath = (Join-Path $repositoryRoot 'artifacts/docs/source-reference.md')
-            }).AsReadOnly()
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentation.ps1' 'Documentation links failed.'
-        Invoke-RequiredScript 'eng/scripts/Test-SharpProofDocumentationAutomation.ps1' 'Documentation automation regressions failed.'
-        & bash (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofDocumentationUpdater.sh')
-        if ($LASTEXITCODE -ne 0) { throw 'Documentation updater lifecycle regressions failed.' }
     }
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')

@@ -75,5 +75,4 @@ List.get_Item may throw ArgumentOutOfRangeException and may allocate an exceptio
 Its effects remain Unknown because exceptional helpers may initialize ambient
 resources. Setter behavior, element identity/content relations, and numeric Count
 relations are not supplied by these entries. Interface dispatch and comparer-driven
-collection methods retain conservative behavior. See the usage-driven backlog in
-[API coverage](../eng/api-coverage/README.md).
+collection methods retain conservative behavior.
