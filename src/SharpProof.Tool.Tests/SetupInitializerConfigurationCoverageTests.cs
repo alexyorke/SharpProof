@@ -298,6 +298,37 @@ public sealed class SetupInitializerConfigurationCoverageTests
         AssertRejected<InvalidOperationException>(fixture, "package versions conflict");
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task InheritedMappingsForClearedOrDisabledSourcesDoNotConflict(bool disabled)
+    {
+        using var fixture = new ConfigurationFixture();
+        const string parent = "<configuration><packageSources><add key=\"Company\" value=\"https://packages.example.test/v3/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"Company\"><package pattern=\"SharpProof.*\" /></packageSource></packageSourceMapping></configuration>";
+        await fixture.WriteAsync("NuGet.Config", parent);
+        var sources = disabled
+            ? "<disabledPackageSources><add key=\"Company\" value=\"true\" /></disabledPackageSources><packageSources>"
+            : "<packageSources><clear/>";
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration>" + sources + "<add key=\"SharpProofPreview\" value=\"https://nuget.pkg.github.com/alexyorke/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"SharpProofPreview\"><package pattern=\"SharpProof*\" /></packageSource></packageSourceMapping></configuration>");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
+        Assert.That(await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken), Is.EqualTo(parent));
+    }
+
+    [Test]
+    public async Task ActiveInheritedSharpProofMappingsStillRejectBeforeWrites()
+    {
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"Company\" value=\"https://packages.example.test/v3/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"Company\"><package pattern=\"SharpProof.*\" /></packageSource></packageSourceMapping></configuration>");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        var project = Path.Combine(fixture.Root, "app/Consumer.csproj");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        var before = fixture.Snapshot();
+        var error = Assert.ThrowsAsync<InvalidOperationException>(new Func<Task>(async () =>
+            _ = await SetupInitializer.InitializeAsync(project, "portable", true, null, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.Message, Does.Contain("already mapped"));
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
+    }
+
     [Test]
     public async Task InheritedAuthenticationConfigurationIsNotCopiedOrRewritten()
     {
@@ -313,13 +344,20 @@ public sealed class SetupInitializerConfigurationCoverageTests
         Assert.That(generated.Root!.Element("packageSourceCredentials"), Is.Null);
     }
 
-    [TestCase("SharpProof.Attributes")]
-    [TestCase("SharpProof.Verifier")]
-    public async Task MatchingExplicitCorePackagePinsRemainSupported(string package)
+    [TestCase("SharpProof.Attributes", false)]
+    [TestCase("SharpProof.Verifier", false)]
+    [TestCase("SharpProof.Attributes", true)]
+    [TestCase("SharpProof.Verifier", true)]
+    public async Task MatchingExplicitCorePackagePinsRemainSupported(string package, bool central)
     {
         ArgumentException.ThrowIfNullOrEmpty(package);
         using var fixture = new ConfigurationFixture();
-        await fixture.WriteAsync("Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"" + package + "\" Version=\"" + SetupInitializer.PackageVersion + "\" /></ItemGroup></Project>");
+        if (central)
+        {
+            await fixture.WriteAsync("Directory.Packages.props", "<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup><PackageVersion Include=\"" + package + "\" Version=\"" + SetupInitializer.PackageVersion + "\" /></ItemGroup></Project>");
+        }
+        var version = central ? string.Empty : " Version=\"" + SetupInitializer.PackageVersion + "\"";
+        await fixture.WriteAsync("Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"" + package + "\"" + version + " /></ItemGroup></Project>");
         _ = await fixture.InitializeAsync();
         var project = XDocument.Load(fixture.ProjectPath);
         var reference = project.Descendants("PackageReference").Single(element =>
@@ -327,7 +365,95 @@ public sealed class SetupInitializerConfigurationCoverageTests
             ArgumentNullException.ThrowIfNull(element);
             return (string?)element.Attribute("Include") == package;
         });
-        Assert.That((string?)reference.Attribute("Version"), Is.EqualTo(SetupInitializer.PackageVersion));
+        Assert.That((string?)reference.Attribute("Version"), Is.EqualTo(central ? null : SetupInitializer.PackageVersion));
+        if (central)
+        {
+            var versions = XDocument.Load(Path.Combine(fixture.Root, "Directory.Packages.props"));
+            Assert.That(versions.Descendants("PackageVersion").Single(element =>
+            {
+                ArgumentNullException.ThrowIfNull(element);
+                return (string?)element.Attribute("Include") == package;
+            }).Attribute("Version")!.Value, Is.EqualTo(SetupInitializer.PackageVersion));
+        }
+    }
+
+    [TestCase("SharpProof.Attributes")]
+    [TestCase("SharpProof.Verifier")]
+    public async Task MissingCentralCorePackageVersionsRejectBeforeWrites(string package)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(package);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Packages.props", "<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup></Project>");
+        await fixture.WriteAsync("Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"" + package + "\" /></ItemGroup></Project>");
+        AssertRejected<InvalidOperationException>(fixture, "explicit matching central version");
+    }
+
+    [Test]
+    public async Task AdditionalUserSettingsAreMergedWithoutReadingUnrelatedFiles()
+    {
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("user/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("user/config/company.config", "<configuration><packageSources><add key=\"Company\" value=\"https://packages.example.test/v3/index.json\" /></packageSources></configuration>");
+        await fixture.WriteAsync("user/config/ignored.txt", "not configuration");
+        await fixture.WriteAsync("user/config/NuGet.Config", "not configuration");
+        var before = fixture.Snapshot();
+        using var context = new NuGet.Configuration.SettingsLoadingContext();
+        var files = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
+        var settings = SetupInitializerConfiguration.LoadFeedSettings(files, fixture.Root, Path.Combine(fixture.Root, "user"), context);
+        var company = new NuGet.Configuration.PackageSourceProvider(settings).LoadPackageSources().Single(source =>
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            return source.Name == "Company";
+        });
+        Assert.That(company.Source, Is.EqualTo("https://packages.example.test/v3/index.json"));
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
+    }
+
+    [Test]
+    public async Task AmbiguousAncestorNugetFilesRejectBeforeWrites()
+    {
+        if (!OperatingSystem.IsLinux())
+        { Assert.Ignore("Case-distinct NuGet files require the canonical Linux filesystem."); return; }
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("nuget.config", "<configuration />");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        var before = fixture.Snapshot();
+        var error = Assert.ThrowsAsync<InvalidOperationException>(new Func<Task>(async () =>
+            _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.Message, Does.Contain("Multiple NuGet configuration files"));
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
+    }
+
+    [Test]
+    public async Task InvalidInheritedNugetSettingsRejectBeforeWrites()
+    {
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"Company\" /></packageSources></configuration>");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        var before = fixture.Snapshot();
+        var error = Assert.ThrowsAsync<InvalidDataException>(new Func<Task>(async () =>
+            _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.Message, Does.Contain("Inherited NuGet configuration is invalid"));
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ConflictingInheritedPreviewSourcesRejectBeforeWrites(bool disabled)
+    {
+        using var fixture = new ConfigurationFixture();
+        var address = disabled ? "https://nuget.pkg.github.com/alexyorke/index.json" : "https://other.example.test/v3/index.json";
+        var disabledSettings = disabled ? "<disabledPackageSources><add key=\"SharpProofPreview\" value=\"true\" /></disabledPackageSources>" : string.Empty;
+        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"SharpProofPreview\" value=\"" + address + "\" /></packageSources>" + disabledSettings + "</configuration>");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        var before = fixture.Snapshot();
+        var error = Assert.ThrowsAsync<InvalidOperationException>(new Func<Task>(async () =>
+            _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(error!.Message, Does.Contain(disabled ? "explicitly disabled" : "different location"));
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
     }
 
     private sealed class ConfigurationFixture : IDisposable

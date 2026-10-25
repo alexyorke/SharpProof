@@ -484,6 +484,47 @@ public sealed class NUnitExportCoverageTests
         Assert.That(tested.Output, Does.Contain("Failed:     1"), tested.Output);
     }
 
+    [TestCase((int)CompilerNullableContext.Disable, "disable")]
+    [TestCase((int)CompilerNullableContext.Warnings, "warnings")]
+    [TestCase((int)CompilerNullableContext.Annotations, "annotations")]
+    [TestCase((int)CompilerNullableContext.Enable, "enable")]
+    public void ReplayPropertiesPreserveNullableContext(int context, string expected)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(expected);
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { NullableContext = (CompilerNullableContext)context } };
+        Assert.That(NUnitExporter.ReplayBuildProperties(fixture.Snapshot), Does.EndWith(";Nullable=" + expected));
+    }
+
+    [Test]
+    public void ReplayPropertiesRejectInvalidNullableContext()
+    {
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { NullableContext = (CompilerNullableContext)int.MaxValue } };
+        var error = Assert.Throws<InvalidDataException>(new Action(() => { _ = NUnitExporter.ReplayBuildProperties(fixture.Snapshot); }));
+        Assert.That(error!.Message, Does.Contain("nullable context"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void ReplayPropertiesRejectMixedTreeSettings(bool language)
+    {
+        using var fixture = new ExportFixture();
+        var original = fixture.Snapshot.SyntaxTrees[0];
+        var other = language ? original with { LanguageVersion = "CSharp12" } : original with { PreprocessorSymbols = ["OTHER"] };
+        fixture.Snapshot = fixture.Snapshot with { SyntaxTrees = [original, other] };
+        var error = Assert.Throws<InvalidOperationException>(new Action(() => { _ = NUnitExporter.ReplayBuildProperties(fixture.Snapshot); }));
+        Assert.That(error!.Message, Does.Contain("uniform"));
+    }
+
+    [Test]
+    public void ExportRejectsUnsupportedApplicationOutputKinds()
+    {
+        using var fixture = new ExportFixture();
+        fixture.Snapshot = fixture.Snapshot with { Options = fixture.Snapshot.Options with { OutputKind = CompilerOutputKind.NetModule } };
+        AssertExportRejected<InvalidOperationException>(fixture, "output kind is not supported");
+    }
+
     private static void AssertExportRejected<TException>(ExportFixture fixture, string message) where TException : Exception
     {
         ArgumentNullException.ThrowIfNull(fixture);

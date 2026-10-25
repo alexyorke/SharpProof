@@ -225,7 +225,7 @@ internal static class NUnitExporter
         return new("PackageReference", new XAttribute("Include", id), new XAttribute("Version", version));
     }
 
-    private static string ReplayBuildProperties(CompilerCompilationSnapshot snapshot)
+    internal static string ReplayBuildProperties(CompilerCompilationSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var first = snapshot.SyntaxTrees[0];
