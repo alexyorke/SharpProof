@@ -443,6 +443,7 @@ public enum SharpProofEffect : long
     <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>
     <NUnitVersion>4.6.1</NUnitVersion>
     <NUnit3TestAdapterVersion>6.2.0</NUnit3TestAdapterVersion>
+    <NuGetConfigurationVersion>6.14.0</NuGetConfigurationVersion>
     <SystemCollectionsImmutableVersion>9.0.18</SystemCollectionsImmutableVersion>
     <SystemCompositionAttributedModelVersion>9.0.0</SystemCompositionAttributedModelVersion>
     <SystemTextJsonVersion>10.0.10</SystemTextJsonVersion>

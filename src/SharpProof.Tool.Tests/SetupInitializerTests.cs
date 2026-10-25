@@ -374,12 +374,14 @@ public sealed class SetupInitializerTests
         if (!OperatingSystem.IsLinux())
         { Assert.Ignore("The permission workflow requires the canonical Linux container."); return; }
         using var fixture = new InitFixture();
-        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSourceCredentials><Company /></packageSourceCredentials></configuration>");
+        // Use valid NuGet metadata; the permission test needs no credentials.
+        const string privateConfig = "<configuration><config><add key=\"Company\" value=\"private-settings\" /></config></configuration>";
+        await fixture.WriteAsync("NuGet.Config", privateConfig);
         var target = Path.Combine(fixture.Root, "NuGet.Config");
         var mode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         File.SetUnixFileMode(target, mode);
         var plan = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
-        plan.Add(target, "<configuration><packageSourceCredentials><Company /></packageSourceCredentials><!--updated--></configuration>");
+        plan.Add(target, privateConfig.Replace("</configuration>", "<!--updated--></configuration>", StringComparison.Ordinal));
         await plan.ApplyAsync(token =>
         {
             token.ThrowIfCancellationRequested();

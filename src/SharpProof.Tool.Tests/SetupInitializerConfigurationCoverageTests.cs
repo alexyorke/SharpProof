@@ -221,6 +221,115 @@ public sealed class SetupInitializerConfigurationCoverageTests
         Assert.That(Directory.GetFiles(fixture.Root, ".sharpproof-init-*", SearchOption.AllDirectories), Is.Empty);
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    [Platform("Linux")]
+    public async Task InitializationPreservesColdRestoreFromAnInheritedFeed(bool userLevel)
+    {
+        using var fixture = new ConfigurationFixture();
+        var feed = Path.Combine(fixture.Root, "feed");
+        var package = Path.Combine(fixture.Root, "package");
+        Directory.CreateDirectory(feed);
+        Directory.CreateDirectory(package);
+        await fixture.WriteAsync("package/Company.Demo.nuspec", "<package><metadata><id>Company.Demo</id><version>1.0.0</version><authors>Test</authors><description>Local restore fixture</description></metadata></package>");
+        await System.IO.Compression.ZipFile.CreateFromDirectoryAsync(package, Path.Combine(feed, "Company.Demo.1.0.0.nupkg"), TestContext.CurrentContext.CancellationToken);
+        await fixture.WriteAsync(userLevel ? "home/.nuget/NuGet/NuGet.Config" : "NuGet.Config", new XDocument(new XElement("configuration", new XElement("packageSources",
+            new XElement("clear"), new XElement("add", new XAttribute("key", "Company"), new XAttribute("value", feed))))).ToString());
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration><packageSources><add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" /></packageSources></configuration>");
+        const string project = "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Company.Demo\" Version=\"1.0.0\" /></ItemGroup></Project>";
+        await fixture.WriteAsync("app/Consumer.csproj", project);
+        await fixture.WriteAsync("app/Control.csproj", project);
+        var app = Path.Combine(fixture.Root, "app");
+        async Task<(int ExitCode, string Output)> RunDotnetAsync(params string[] arguments)
+        {
+            ArgumentNullException.ThrowIfNull(arguments);
+            return userLevel
+                ? await ToolProcess.RunAsync("/usr/bin/env", app, TestContext.CurrentContext.CancellationToken,
+                    ["HOME=" + Path.Combine(fixture.Root, "home"), "DOTNET_CLI_HOME=" + Path.Combine(fixture.Root, "home"), "dotnet", .. arguments])
+                : await ToolProcess.RunAsync("dotnet", app, TestContext.CurrentContext.CancellationToken, arguments);
+        }
+        var before = await RunDotnetAsync("restore", "Control.csproj", "--packages", Path.Combine(fixture.Root, "before"), "--nologo");
+        Assert.That(before.ExitCode, Is.Zero, before.Output);
+        if (userLevel)
+        {
+            var initialized = await RunDotnetAsync(typeof(SetupInitializer).Assembly.Location, "init", "--project", Path.Combine(app, "Consumer.csproj"), "--apply");
+            Assert.That(initialized.ExitCode, Is.Zero, initialized.Output);
+        }
+        else
+        { _ = await SetupInitializer.InitializeAsync(Path.Combine(app, "Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken); }
+        var after = await RunDotnetAsync("restore", "Control.csproj", "--packages", Path.Combine(fixture.Root, "after"), "--nologo");
+        Assert.That(after.ExitCode, Is.Zero, after.Output);
+    }
+
+    [Test]
+    public async Task InitializationDoesNotBroadenInheritedPackageMappings()
+    {
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><clear/><add key=\"Company\" value=\"https://packages.example.test/v3/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"Company\"><package pattern=\"Company.*\" /></packageSource></packageSourceMapping></configuration>");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        var parent = await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken);
+        _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
+        var child = XDocument.Load(Path.Combine(fixture.Root, "app/NuGet.Config"));
+        Assert.That(child.Descendants("package").Select(static element =>
+        {
+            ArgumentNullException.ThrowIfNull(element);
+            return (string?)element.Attribute("pattern");
+        }), Is.EqualTo(ImmutableArray.Create("SharpProof*")));
+        Assert.That(await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken), Is.EqualTo(parent));
+    }
+
+    [TestCase("SharpProof.Attributes", false)]
+    [TestCase("SharpProof.Verifier", false)]
+    [TestCase("SharpProof.Attributes", true)]
+    [TestCase("SharpProof.Verifier", true)]
+    public async Task IncompatibleCorePackagePinsAreRejectedBeforeAnyWrites(string package, bool central)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(package);
+        using var fixture = new ConfigurationFixture();
+        if (central)
+        {
+            await fixture.WriteAsync("Directory.Packages.props", "<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup><PackageVersion Include=\"" + package + "\" Version=\"0.9.0\" /></ItemGroup></Project>");
+        }
+        else
+        {
+            await fixture.WriteAsync("Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"" + package + "\" Version=\"0.9.0\" /></ItemGroup></Project>");
+        }
+        AssertRejected<InvalidOperationException>(fixture, "package versions conflict");
+    }
+
+    [Test]
+    public async Task InheritedAuthenticationConfigurationIsNotCopiedOrRewritten()
+    {
+        using var fixture = new ConfigurationFixture();
+        // An environment reference supplies no credential and makes no request.
+        const string inherited = "<configuration><packageSources><add key=\"SharpProofPreview\" value=\"https://nuget.pkg.github.com/alexyorke/index.json\" /></packageSources><packageSourceCredentials><SharpProofPreview><add key=\"Username\" value=\"fixture\" /><add key=\"ClearTextPassword\" value=\"%SHARPPROOF_TEST_PASSWORD_REFERENCE%\" /></SharpProofPreview></packageSourceCredentials></configuration>";
+        await fixture.WriteAsync("NuGet.Config", inherited);
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
+        Assert.That(await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken), Is.EqualTo(inherited));
+        var generated = XDocument.Load(Path.Combine(fixture.Root, "app/NuGet.Config"));
+        Assert.That(generated.Root!.Element("packageSourceCredentials"), Is.Null);
+    }
+
+    [TestCase("SharpProof.Attributes")]
+    [TestCase("SharpProof.Verifier")]
+    public async Task MatchingExplicitCorePackagePinsRemainSupported(string package)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(package);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"" + package + "\" Version=\"" + SetupInitializer.PackageVersion + "\" /></ItemGroup></Project>");
+        _ = await fixture.InitializeAsync();
+        var project = XDocument.Load(fixture.ProjectPath);
+        var reference = project.Descendants("PackageReference").Single(element =>
+        {
+            ArgumentNullException.ThrowIfNull(element);
+            return (string?)element.Attribute("Include") == package;
+        });
+        Assert.That((string?)reference.Attribute("Version"), Is.EqualTo(SetupInitializer.PackageVersion));
+    }
+
     private sealed class ConfigurationFixture : IDisposable
     {
         internal const string EmptyManifest = """{"version":1,"isRoot":true,"tools":{}}""";

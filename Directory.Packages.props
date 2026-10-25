@@ -21,6 +21,7 @@
     <PackageVersion Include="Microsoft.Z3" Version="$(MicrosoftZ3Version)" />
     <PackageVersion Include="NUnit" Version="$(NUnitVersion)" />
     <PackageVersion Include="NUnit3TestAdapter" Version="$(NUnit3TestAdapterVersion)" />
+    <PackageVersion Include="NuGet.Configuration" Version="$(NuGetConfigurationVersion)" />
     <PackageVersion Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
     <PackageVersion Include="System.Composition.AttributedModel" Version="$(SystemCompositionAttributedModelVersion)" />
     <PackageVersion Include="System.Text.Json" Version="$(SystemTextJsonVersion)" />

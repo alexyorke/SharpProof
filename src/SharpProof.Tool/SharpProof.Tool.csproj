@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
     <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="/" />
     <InternalsVisibleTo Include="SharpProof.Tool.Test" />
   </ItemGroup>
   <ItemGroup>
@@ -32,6 +33,7 @@
     <ProjectReference Include="../SharpProof.Specs/SharpProof.Specs.csproj" />
     <ProjectReference Include="../SharpProof.Frontend/SharpProof.Frontend.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="NuGet.Configuration" />
     <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
   </ItemGroup>
 </Project>

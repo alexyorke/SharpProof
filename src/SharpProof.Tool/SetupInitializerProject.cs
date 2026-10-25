@@ -53,6 +53,31 @@ internal static class SetupInitializerProject
             central = SetupInitializerFiles.Xml(null, "Project");
             SetProperty(central.Root!, "ManagePackageVersionsCentrally", "true");
         }
+        foreach (var package in new[] { "SharpProof.Attributes", "SharpProof.Verifier" })
+        {
+            foreach (var element in root.Descendants("PackageReference").Concat(
+                central?.Root!.Descendants("PackageVersion") ?? Enumerable.Empty<XElement>()))
+            {
+                var identity = (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update");
+                if (!string.Equals(identity, package, StringComparison.OrdinalIgnoreCase))
+                { continue; }
+                var pinned = Metadata(element, "Version");
+                if (Metadata(element, "VersionOverride") != null || pinned != null && pinned != version ||
+                    element.Name.LocalName == "PackageReference" && (managed ? pinned != null : pinned == null) ||
+                    element.Attribute("Update") != null || element.AncestorsAndSelf().Any(static ancestor =>
+                    {
+                        ArgumentNullException.ThrowIfNull(ancestor);
+                        return ancestor.Attribute("Condition") != null;
+                    }))
+                { throw new InvalidOperationException("Existing SharpProof package versions conflict with the installed tool version: " + package); }
+                if (managed && element.Name.LocalName == "PackageReference" && !central!.Root!.Descendants("PackageVersion").Any(candidate =>
+                {
+                    ArgumentNullException.ThrowIfNull(candidate);
+                    return string.Equals((string?)candidate.Attribute("Include"), package, StringComparison.OrdinalIgnoreCase);
+                }))
+                { throw new InvalidOperationException("Existing SharpProof package versions require an explicit matching central version: " + package); }
+            }
+        }
         SetProperty(root, "SharpProofProfile", verification == "portable" ? "advisory" : "strict");
         SetProperty(root, "SharpProofVerify", verification == "portable" ? "false" : "true");
         if (verification == "container")

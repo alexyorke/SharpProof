@@ -23,6 +23,19 @@ Source: https://github.com/dotnet/runtime
 License: MIT
 Copyright (c) .NET Foundation and Contributors
 
+Optional developer tool configuration reader
+
+Package: NuGet.Configuration 6.14.0
+Package: NuGet.Common 6.14.0
+Package: NuGet.Frameworks 6.14.0
+Source: https://github.com/NuGet/NuGet.Client
+License: Apache-2.0 (full Apache License text appears below)
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+The optional tool also redistributes System.Security.Cryptography.ProtectedData
+4.4.0 from https://github.com/dotnet/corefx, under the MIT License below.
+Copyright (c) .NET Foundation and Contributors.
+
 Microsoft Z3
 
 Package: Microsoft.Z3 4.12.2
