@@ -125,6 +125,13 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
             return document;
         }
 
+        var recursiveGroup = Inference.AnalyzeRecursiveGroup(method, model, cancellationToken);
+        if (recursiveGroup is not null && recursiveGroup.Results.TryGetValue(method, out var groupResult)
+            && groupResult.Signature is not null)
+        {
+            return await ApplyGroupAsync(document, method, recursiveGroup, cancellationToken).ConfigureAwait(false);
+        }
+
         var result = Inference.Analyze(method, model, cancellationToken);
         if (result.Status != "Suggestion" || result.Signature is null)
         {
@@ -201,8 +208,86 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
 
     }
 
+    private static async Task<Document> ApplyGroupAsync(Document document, MethodDeclarationSyntax method,
+        RecursiveGroupAnalysis analysis, CancellationToken cancellationToken)
+    {
+        if (method is null)
+        {
+            throw new ArgumentNullException(nameof(method));
+        }
+
+        var solution = document.Project.Solution;
+        var originals = new Dictionary<DocumentId, (SyntaxNode Root, SemanticModel Model)>();
+        foreach (var entry in analysis.RewrittenRoots)
+        {
+            var originalDocument = document.Project.GetDocument(entry.Key);
+            if (originalDocument is null)
+            {
+                return document;
+            }
+
+            var originalRoot = (await originalDocument.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var originalModel = (await originalDocument.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
+            originals.Add(originalDocument.Id, (originalRoot, originalModel));
+            var candidates = Enumerable.Range(0, analysis.Results.Count)
+                .SelectMany(index => entry.Value.GetAnnotatedNodes("HM.RecursiveGroup." + index))
+                .OfType<MethodDeclarationSyntax>().ToArray();
+            if (candidates.Length != analysis.Results.Count)
+            {
+                return document;
+            }
+
+            var root = entry.Value.ReplaceNodes(candidates, (before, rewritten) =>
+            {
+                if (before is null || rewritten is null)
+                {
+                    throw new ArgumentNullException(nameof(before));
+                }
+
+                return rewritten.WithAdditionalAnnotations(Formatter.Annotation);
+            });
+            solution = solution.WithDocumentSyntaxRoot(originalDocument.Id, root);
+        }
+
+        foreach (var entry in originals)
+        {
+            var changed = solution.GetDocument(entry.Key)!;
+            var changedRoot = (await changed.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var formatted = await Formatter.FormatAsync(changed, Formatter.Annotation,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            var formattedRoot = (await formatted.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+            var formattedModel = (await formatted.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false))!;
+            if (Inference.PreservesCallerInfoArguments(entry.Value.Root, entry.Value.Model,
+                formattedRoot, formattedModel, cancellationToken))
+            {
+                solution = formatted.Project.Solution;
+                continue;
+            }
+
+            var unformattedRoot = changedRoot.ReplaceNodes(
+                changedRoot.GetAnnotatedNodes(Formatter.Annotation), (original, rewritten) =>
+                {
+                    if (original is null || rewritten is null)
+                    {
+                        throw new ArgumentNullException(nameof(original));
+                    }
+
+                    return rewritten.WithoutAnnotations(Formatter.Annotation);
+                });
+            solution = solution.WithDocumentSyntaxRoot(entry.Key, unformattedRoot);
+        }
+
+        var expected = analysis.Results.ToDictionary(entry => entry.Key.Identifier.SpanStart,
+            entry => entry.Value.Signature!);
+        solution = await UpdateLinkedDocumentsAsync(document.Project.Solution, solution, originals.Keys,
+            document.Id, method.Identifier.SpanStart, analysis.Results[method].Signature!,
+            cancellationToken, expected).ConfigureAwait(false) ?? document.Project.Solution;
+        return solution.GetDocument(document.Id)!;
+    }
+
     private static async Task<Solution?> UpdateLinkedDocumentsAsync(Solution original, Solution changed,
-        IEnumerable<DocumentId> changedIds, DocumentId targetId, int targetPosition, string expectedSignature, CancellationToken cancellationToken)
+        IEnumerable<DocumentId> changedIds, DocumentId targetId, int targetPosition, string expectedSignature, CancellationToken cancellationToken,
+        Dictionary<int, string>? expectedGroupSignatures = null)
     {
         if (original is null)
         {
@@ -313,6 +398,24 @@ public sealed class HmSignatureCodeFixProvider : CodeFixProvider
             if (linkedResult.Status != "Suggestion" || linkedResult.Signature != expectedSignature)
             {
                 return null;
+            }
+
+            if (expectedGroupSignatures is not null)
+            {
+                var linkedGroup = Inference.AnalyzeRecursiveGroup(linkedMethod, linkedModel, cancellationToken);
+                if (linkedGroup is null || linkedGroup.Results.Count != expectedGroupSignatures.Count)
+                {
+                    return null;
+                }
+
+                var linkedSignatures = linkedGroup.Results.ToDictionary(entry =>
+                    entry.Key.Identifier.SpanStart, entry => entry.Value.Signature);
+                if (expectedGroupSignatures.Any(entry =>
+                    !linkedSignatures.TryGetValue(entry.Key, out var signature)
+                    || signature != entry.Value))
+                {
+                    return null;
+                }
             }
         }
 

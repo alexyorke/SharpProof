@@ -2651,7 +2651,7 @@ public static partial class Inference
             return prefix + warning.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private bool IntroducesCompilerWarnings(Compilation changed, IEnumerable<Diagnostic>? originalDiagnostics = null, IEnumerable<Diagnostic>? changedDiagnostics = null)
+        internal bool IntroducesCompilerWarnings(Compilation changed, IEnumerable<Diagnostic>? originalDiagnostics = null, IEnumerable<Diagnostic>? changedDiagnostics = null)
         {
             if (changed is null)
             { throw new ArgumentNullException(nameof(changed)); }

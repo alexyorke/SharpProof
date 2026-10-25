@@ -46,6 +46,13 @@ internal static class Program
             return await (SelfTest(cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
+        if (args is ["--recursive-group-checks"])
+        {
+            RecursiveGroupChecks.Run(cancellationToken);
+            await RecursiveGroupCodeFixChecks.Run(cancellationToken).ConfigureAwait(false);
+            return 0;
+        }
+
         if (args is ["--hm-samples"])
         {
             CoreChecks.Run(samplesOnly: true, cancellationToken: cancellationToken);
@@ -54,7 +61,7 @@ internal static class Program
 
         if (args.Length == 0 || args is ["--help"])
         {
-            Program.Log.Info("HM inference: [--unsafe] <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore --no-build\nDependencies are restored and declared tool projects are built by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
+            Program.Log.Info("HM inference: [--unsafe] <source.cs> [...] | --project <project.csproj> | --solution <solution.sln[x]> | --samples | --hm-samples | --recursive-group-checks | --self-test\nProject options: --framework <tfm> --configuration <name> --property <Name=Value> --no-restore --no-build\nDependencies are restored and declared tool projects are built by default. Loose files are analyzed together as a library. Suggestions change APIs; review manually.");
             return 0;
         }
 
@@ -98,6 +105,11 @@ internal static class Program
         {
             Program.Log.Info($"{result.Method}: {result.Status}: {result.Signature ?? result.Message}");
         }
+        if (!diagnosticsOnly)
+        {
+            foreach (var notice in RecursiveGroupNotices(results))
+            { Program.Log.Info(notice); }
+        }
 
         var diagnostics = await (compilation.WithAnalyzers([new HmInferenceAnalyzer()], new CompilationWithAnalyzersOptions(analyzerOptions ?? new AnalyzerOptions([]), onAnalyzerException: null, concurrentAnalysis: true, logAnalyzerExecutionTime: false)).GetAnalyzerDiagnosticsAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
         foreach (var diagnostic in diagnostics.OrderBy(d =>
@@ -111,6 +123,11 @@ internal static class Program
         }))
         {
             Program.Log.Info(diagnostic.ToString());
+        }
+        if (diagnosticsOnly)
+        {
+            foreach (var notice in RecursiveGroupNotices(diagnostics))
+            { Program.Log.Info(notice); }
         }
 
         if (diagnosticsOnly)
@@ -164,6 +181,60 @@ internal static class Program
                 return Inference.Analyze(method, compilation.GetSemanticModel(tree), cancellationToken: cancellationToken);
             });
         }).ToArray();
+    }
+
+    internal static string[] RecursiveGroupNotices(IEnumerable<MethodResult> results)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        var seen = new HashSet<(SyntaxTree Tree, int AnchorStart)>();
+        var notices = new List<string>();
+        foreach (var result in results)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            var group = result.RecursiveGroup;
+            if (group is null || !seen.Add((group.Tree, group.AnchorStart)))
+            { continue; }
+            notices.Add(RecursiveGroupNotice(group.Signatures));
+        }
+        return notices.ToArray();
+    }
+
+    internal static string[] RecursiveGroupNotices(IEnumerable<Diagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        var seen = new HashSet<(SyntaxTree Tree, int AnchorStart)>();
+        var notices = new List<string>();
+        foreach (var diagnostic in diagnostics)
+        {
+            ArgumentNullException.ThrowIfNull(diagnostic);
+            var tree = diagnostic.Location.SourceTree;
+            if (diagnostic.Id != "HM0001" || tree is null
+                || !diagnostic.Properties.TryGetValue(RecursiveGroupInfo.DiagnosticAnchorProperty, out var anchorText)
+                || !int.TryParse(anchorText, global::System.Globalization.NumberStyles.None,
+                    global::System.Globalization.CultureInfo.InvariantCulture, out var anchor)
+                || !diagnostic.Properties.TryGetValue(RecursiveGroupInfo.DiagnosticCountProperty, out var countText)
+                || !int.TryParse(countText, global::System.Globalization.NumberStyles.None,
+                    global::System.Globalization.CultureInfo.InvariantCulture, out var count)
+                || count < 2 || count > diagnostic.Properties.Count)
+            { continue; }
+            var signatures = new List<string>();
+            for (var i = 0; i < count; i++)
+            {
+                if (!diagnostic.Properties.TryGetValue(RecursiveGroupInfo.DiagnosticSignaturePrefix + i,
+                    out var signature) || signature is null)
+                { break; }
+                signatures.Add(signature);
+            }
+            if (signatures.Count == count && seen.Add((tree, anchor)))
+            { notices.Add(RecursiveGroupNotice(signatures)); }
+        }
+        return notices.ToArray();
+    }
+
+    private static string RecursiveGroupNotice(IReadOnlyList<string> signatures)
+    {
+        ArgumentNullException.ThrowIfNull(signatures);
+        return $"Recursive group ({signatures.Count} methods): apply all member signatures together: {string.Join("; ", signatures)}";
     }
 
     private static async Task<int> SelfTest(CancellationToken cancellationToken)
@@ -426,6 +497,8 @@ internal static class Program
         passed += BindingChecks.Run(cancellationToken);
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
+        passed += RecursiveGroupChecks.Run(cancellationToken);
+        passed += await RecursiveGroupCodeFixChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (DeclarationChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += CoreChecks.Run(cancellationToken: cancellationToken);
         if (failures.Count != 0)

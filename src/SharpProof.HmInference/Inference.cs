@@ -11,6 +11,7 @@ public sealed record MethodResult(string Method, string Status, string Message, 
     public string Method { get; } = Method ?? throw new ArgumentNullException(nameof(Method));
     public string Status { get; } = Status ?? throw new ArgumentNullException(nameof(Status));
     public string Message { get; } = Message ?? throw new ArgumentNullException(nameof(Message));
+    public RecursiveGroupInfo? RecursiveGroup { get; init; }
 }
 
 public static partial class Inference
@@ -35,6 +36,10 @@ public static partial class Inference
         {
             throw new global::System.ArgumentNullException(nameof(model));
         }
+
+        var group = AnalyzeRecursiveGroup(method, model, cancellationToken);
+        if (group is not null && group.Results.TryGetValue(method, out var grouped))
+        { return grouped; }
 
         MethodResult? rejected = null;
         try
@@ -101,7 +106,8 @@ public static partial class Inference
     private sealed partial class Session(SemanticModel model, CancellationToken cancellationToken,
         Dictionary<TextSpan, NullableFlowState>? nullableReadFlow = null, List<Dictionary<TextSpan, NullableFlowState>>? readFlowHistory = null, HashSet<TextSpan>? nullableCollectionInputs = null, Dictionary<TextSpan, HashSet<string>>? nullableInvocationResults = null,
         HashSet<(int Parameter, string Path)>? nullableReceiverInputs = null,
-        HashSet<(int Parameter, string Path)>? valueReceiverInputs = null)
+        HashSet<(int Parameter, string Path)>? valueReceiverInputs = null,
+        RecursiveGroupContext? recursiveGroup = null, bool groupBodyOnly = false)
     {
         private readonly SemanticModel model = model ?? throw new ArgumentNullException(nameof(model));
         private readonly Dictionary<ISymbol, HmType> environment = new(SymbolEqualityComparer.Default);
@@ -113,6 +119,8 @@ public static partial class Inference
         private readonly HashSet<(int Parameter, string Path)> valueReceiverInputs = valueReceiverInputs ?? [];
         private IMethodSymbol? currentMethod;
         private HmType? currentFunction;
+        private readonly RecursiveGroupContext? recursiveGroup = recursiveGroup;
+        private readonly bool groupBodyOnly = groupBodyOnly;
         public MethodResult Analyze(MethodDeclarationSyntax method, HashSet<(int Parameter, string Path)> pins)
         {
             if (method is null)
@@ -136,7 +144,9 @@ public static partial class Inference
             if (iteratorReturn is null)
             { SetAsyncReturn(symbol); }
             needsBuilderEmission |= HasNestedAsyncBuilder(method);
-            var parameters = symbol.Parameters.Select(p =>
+            var groupFunction = recursiveGroup is not null && recursiveGroup.Functions.TryGetValue(symbol.OriginalDefinition, out var mappedFunction)
+                ? mappedFunction : null;
+            var parameters = groupFunction is null ? symbol.Parameters.Select(p =>
             {
                 if (p is null)
                 {
@@ -145,7 +155,7 @@ public static partial class Inference
 
                 return CSharpTypes.Erase(p.Type, method.SyntaxTree.Options is CSharpParseOptions { LanguageVersion: >= LanguageVersion.CSharp13 }
                     && model.Compilation.SupportsRuntimeCapability(RuntimeCapability.ByRefLikeGenerics));
-            }).ToArray();
+            }).ToArray() : groupFunction.Arguments.Take(groupFunction.Arguments.Length - 1).ToArray();
             if (symbol.PartialDefinitionPart is { } partialDefinition)
             {
                 for (var i = 0; i < parameters.Length; i++)
@@ -174,14 +184,14 @@ public static partial class Inference
             }
             // Seed the declared structure so recursive nullable results do not acquire
             // an extra nullable wrapper while the body is still being inferred.
-            var recursiveReturn = CSharpTypes.Erase(symbol.ReturnType);
-            currentFunction = HmType.Function(parameters, recursiveReturn);
+            var recursiveReturn = groupFunction is null ? CSharpTypes.Erase(symbol.ReturnType) : groupFunction.Arguments[groupFunction.Arguments.Length - 1];
+            currentFunction = groupFunction ?? HmType.Function(parameters, recursiveReturn);
             for (var i = 0; i < parameters.Length; i++)
             {
                 environment.Add(symbol.Parameters[i], parameters[i]);
             }
             PrepareIndirectStorage(parameters);
-            currentFunction = HmType.Function(parameters, recursiveReturn);
+            currentFunction = groupFunction ?? HmType.Function(parameters, recursiveReturn);
 
             HmType result;
             if (method.ExpressionBody is not null)
@@ -214,6 +224,8 @@ public static partial class Inference
             { _ = MergeDefaultValues(recursiveReturn, result); }
             else
             { HmType.Unify(recursiveReturn, result); }
+            if (groupBodyOnly)
+            { return new(symbol.Name, "Prepared", "Recursive group body unified."); }
             var inferable = new HashSet<HmType>(parameters.SelectMany(p =>
             {
                 if (p is null)
@@ -338,6 +350,16 @@ public static partial class Inference
             }
             var candidate = method.WithReturnType(RenderReturnSyntax()).WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList((method.TypeParameterList?.Parameters ?? default).Concat(variables.Values.Select(SyntaxFactory.TypeParameter))))).WithParameterList(RenderParameters());
             candidate = candidate.WithConstraintClauses(method.ConstraintClauses.AddRange(nullableConstraints));
+            if (recursiveGroup is not null)
+            {
+                recursiveGroup.Candidates[symbol.OriginalDefinition] = candidate;
+                var groupTypes = string.Join(", ", (method.TypeParameterList?.Parameters.Select(p /* SPINT001: all values valid - SyntaxList contains nonnull type parameters. */ => p.Identifier.Text) ?? Enumerable.Empty<string>()).Concat(variables.Values));
+                var groupParameters = string.Join(", ", candidate.Parameters().Select((p /* SPINT001: all values valid - Candidate parameters are nonnull syntax nodes. */, i /* SPINT001: all values valid - Index addresses the matching rendered type. */) => parameterNames[i] + " " + p.Identifier.Text));
+                var groupSignature = $"{returnName} {method.Identifier.Text}<{groupTypes}>({groupParameters})";
+                if (candidate.ConstraintClauses.Count != 0)
+                { groupSignature += " " + string.Join(" ", candidate.ConstraintClauses.Select(c /* SPINT001: all values valid - Candidate constraint clauses are nonnull. */ => c.NormalizeWhitespace().ToFullString())); }
+                return new(symbol.Name, "Suggestion", "Recursive group candidate awaits atomic validation.", groupSignature);
+            }
             // Recheck the original compilation with just this signature changed. This catches
             // explicit local types, conversions, name collisions and broken call sites.
             var tree = method.SyntaxTree;
@@ -1845,6 +1867,13 @@ public static partial class Inference
                 BindArguments(operation, signature.Inputs, argumentValues,
                     NullableReceiverInputObserver(invocation, called, receiverValue));
                 return ApplyReturnNullability(operation, signature.Output, forStorage, argumentValues);
+            }
+            if (recursiveGroup is not null && currentMethod is not null
+                && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod.ContainingType)
+                && recursiveGroup.Functions.TryGetValue(called.OriginalDefinition, out var peerFunction))
+            {
+                BindArguments(operation, peerFunction.Arguments.Take(peerFunction.Arguments.Length - 1).ToArray(), argumentValues);
+                return ApplyReturnNullability(operation, peerFunction.Arguments[peerFunction.Arguments.Length - 1], forStorage, argumentValues);
             }
             if (SameMethodDefinition(called, currentMethod) && SymbolEqualityComparer.Default.Equals(called.ContainingType, currentMethod!.ContainingType)
                 && Enumerable.SequenceEqual<ITypeSymbol>(called.TypeArguments, currentMethod.TypeParameters, SymbolEqualityComparer.Default))

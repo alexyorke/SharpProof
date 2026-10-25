@@ -211,9 +211,42 @@ syntax. Collection expressions and expanded non-array params are inferred throug
 their element and construction protocols. Add calls preserve omitted defaults and
 normal/expanded array/span/builder params forms, including trailing packs and
 constrained/ref extension receivers. Selected methods and nested collection
-construction are rechecked across supplied files. It does not
-infer mutually recursive C# method groups or fully simplify arbitrary combinations
-of generic constraints. See [the completion ledger](LIMITATIONS.md).
+construction are rechecked across supplied files. Arbitrary combinations of generic
+constraints still require further work. See [the completion ledger](LIMITATIONS.md).
+
+Static mutually recursive methods can infer their signatures together. The initial
+group path covers expression-bodied methods in one source tree whose bodies use
+parameter reads, primitive literals, conditionals and direct calls to group
+members. Calls can be unqualified, type-qualified, globally qualified or alias-
+qualified; peer calls retain their exact constructed containing type. Shared
+monomorphic function shapes unify before any member is generalized. The entire
+rewritten group must compile and preserve supplied call bindings; a valid
+suggestion for one member must be applied with the other group signatures. The
+IDE action and Fix All update the complete group atomically, including linked
+documents, and reject edits that break dependent projects. File and project CLI
+output prints a deduplicated notice listing every signature that must change
+together. `MethodResult.RecursiveGroup` and HM0001 diagnostic properties expose
+the same group information to consumers. API consumers can use
+`Inference.AnalyzeRecursiveGroup` and its `RewrittenRoots` to obtain the joint
+edit rather than applying one signature independently.
+
+For example, both members of this cycle can become generic identity methods:
+
+```csharp
+static int First(int value, bool again) => again ? Second(value, false) : value;
+static int Second(int value, bool again) => again ? First(value, false) : value;
+// Joint signatures: T First<T>(T value, bool again), T Second<T>(T value, bool again)
+```
+
+Group inference uses the ordinary configured diagnostic policy: unchanged
+warnings and style diagnostics remain allowed, while newly introduced warnings
+or style errors reject the proposal. Method-group references, cross-file groups,
+instance/async methods, statement bodies, existing method type parameters and
+operator/member/protocol expressions remain on the individually validated path.
+Compilations with unsupported invocation operations, including dynamic and
+function-pointer calls, still decline group proposals. These cases remain open.
+Two- and three-member source and IDE checks cover original and new payload
+domains, Fix All, linked-context conflicts and dependent-project rollback.
 
 Tuple and custom deconstruction support declarations, reassignment, mixed targets,
 discards, member/indexer stores and nested instance/extension Deconstruct methods.

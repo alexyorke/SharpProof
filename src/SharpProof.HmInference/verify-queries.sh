@@ -16,6 +16,7 @@ for language in 8 9 13; do
 EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Linq;using System.Collections.Generic;using System.Threading.Tasks;
+using RecursiveCliAlias=RecursiveQualifiedCli;
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
 public delegate List<T> ReceiverPair<T>(T first,T second);
 public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second)=>new List<T>{first,second};}
@@ -60,6 +61,20 @@ public delegate T RequiredInputAction<T>([System.Diagnostics.CodeAnalysis.Disall
 #if ANNOTATED_REF
 public static partial class ForwardInputPartial{public static partial int RequiredPartial(int value);public static partial int RequiredPartial(int value)=>QueryConsumer.RequiredForwardHelper(value);}
 #endif
+public static class RecursiveCliCases{
+  public static int PairFirst(int value,bool again)=>again?PairSecond(value,false):value;
+  public static int PairSecond(int value,bool again)=>again?PairFirst(value,false):value;
+  public static int TripleFirst(int value,bool again)=>again?TripleSecond(value,false):value;
+  public static int TripleSecond(int value,bool again)=>again?TripleThird(value,false):value;
+  public static int TripleThird(int value,bool again)=>again?TripleFirst(value,false):value;
+  public static int ExistingPair()=>PairFirst(7,true);
+  public static int ExistingTriple()=>TripleFirst(9,true);
+}
+public static class RecursiveQualifiedCli{
+  public static int QualifiedFirst(int value,bool again)=>again?global::RecursiveQualifiedCli.QualifiedSecond(value,false):value;
+  public static int QualifiedSecond(int value,bool again)=>again?RecursiveCliAlias.QualifiedFirst(value,false):value;
+  public static int ExistingQualified()=>QualifiedFirst(11,true);
+}
 public static class QueryConsumer{
   public static T RequiredForwardHelper<T>([System.Diagnostics.CodeAnalysis.DisallowNull]T value)=>value;
   static T RequiredReadonlyHelper<T>([System.Diagnostics.CodeAnalysis.DisallowNull]in T value)=>value;
@@ -453,6 +468,13 @@ EOF
     grep -Fq 'T1? IndirectInactiveGuard<T1>(global::IndirectReceiver<T1?> receiver, T1 fill)' "$log"
     grep -Fq 'T1? IndirectPriorityMaybe<T1>(global::IndirectReceiver<T1?> receiver, global::IndirectPrioritySource<T1> source)' "$log"
   fi
+  if [ "$#" -eq 1 ]; then
+    test "$(grep -Fc 'Recursive group (2 methods): apply all member signatures together:' "$log")" -eq 2
+    test "$(grep -Fc 'Recursive group (3 methods): apply all member signatures together:' "$log")" -eq 1
+  fi
+  for recursive_method in PairFirst PairSecond TripleFirst TripleSecond TripleThird QualifiedFirst QualifiedSecond; do
+    grep -Fq "T1 $recursive_method<T1>(T1 value, bool again)" "$log"
+  done
   grep -Fq 'global::System.Collections.Generic.List<T1> LambdaListMixed<T1>(global::LambdaListReceiver<T1> receiver, T1 value, bool choose) where T1 : struct' "$log"
   grep -Fq 'T1 IndirectTupleGuarded<T1, T2>(global::IndirectReceiver<T1> receiver, T1 fill, T2 tag, out T2 copied)' "$log"
   grep -Fq 'T1 IndirectTupleConditional<T1, T2>(global::IndirectReceiver<T1> receiver, T1 fill, T2 tag, bool choose, out T2 copied)' "$log"

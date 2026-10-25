@@ -42,7 +42,18 @@ public sealed class HmInferenceAnalyzer : DiagnosticAnalyzer
                 var result = Inference.Analyze(method, node.SemanticModel, node.CancellationToken);
                 if (result.Signature is not null)
                 {
-                    node.ReportDiagnostic(Diagnostic.Create(Rule, method.Identifier.GetLocation(), result.Signature));
+                    var properties = ImmutableDictionary<string, string?>.Empty;
+                    if (result.RecursiveGroup is { } group)
+                    {
+                        properties = properties.Add(RecursiveGroupInfo.DiagnosticAnchorProperty,
+                            group.AnchorStart.ToString(global::System.Globalization.CultureInfo.InvariantCulture))
+                            .Add(RecursiveGroupInfo.DiagnosticCountProperty,
+                                group.Signatures.Count.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+                        for (var i = 0; i < group.Signatures.Count; i++)
+                        { properties = properties.Add(RecursiveGroupInfo.DiagnosticSignaturePrefix + i, group.Signatures[i]); }
+                    }
+                    node.ReportDiagnostic(Diagnostic.Create(Rule, method.Identifier.GetLocation(), properties,
+                        result.Signature));
                 }
             }, SyntaxKind.MethodDeclaration);
         });
