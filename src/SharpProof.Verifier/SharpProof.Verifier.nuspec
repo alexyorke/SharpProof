@@ -35,9 +35,7 @@
     <file src="..\..\artifacts\bin\SharpProof.Analyzer.Core\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Compiler.Semantics.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Dataflow.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Effects.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Frontend.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Ir.dll" target="tools\shared\netstandard2.0" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\shared\netstandard2.0" />
@@ -69,7 +67,6 @@
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Host.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Smt.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Specs.dll" target="tools\net10" />
-    <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Verify.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.Worker\$configuration$\net10.0\SharpProof.Worker.Protocol.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.BuildTasks\$configuration$\net10.0\SharpProof.BuildTasks.dll" target="tools\net10" />
     <file src="..\..\artifacts\bin\SharpProof.BuildTasks\$configuration$\net10.0\SharpProof.BuildTasks.pdb" target="tools\net10" />

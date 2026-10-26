@@ -16,9 +16,7 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.CompilerArtifact",
-        "SharpProof.Contracts",
         "SharpProof.Dataflow",
-        "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Specs",
@@ -32,10 +30,8 @@ public sealed class AnalyzerArchitectureTests
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
         "SharpProof.CompilerCollector",
-        "SharpProof.Contracts",
         "SharpProof.Dataflow",
         "SharpProof.DefensiveCodingAnalyzer",
-        "SharpProof.Effects",
         "SharpProof.Frontend",
         "SharpProof.Ir",
         "SharpProof.Specs",
@@ -179,7 +175,6 @@ public sealed class AnalyzerArchitectureTests
 
         Assert.That(project, Does.Not.Contain("Microsoft.Z3"));
         Assert.That(project, Does.Not.Contain("SharpProof.Smt"));
-        Assert.That(project, Does.Not.Contain("SharpProof.Verify"));
     }
 
     [Test]

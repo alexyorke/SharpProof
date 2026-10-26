@@ -14,12 +14,8 @@ namespace SharpProof.Internal.SharpProofCompilerArtifact;
 namespace SharpProof.Internal.SharpProofCompilerCollector;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_COMPILERPROBE_TESTASSET
 namespace SharpProof.Internal.SharpProofCompilerProbeTestAsset;
-#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_CONTRACTS
-namespace SharpProof.Internal.SharpProofContracts;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_DATAFLOW
 namespace SharpProof.Internal.SharpProofDataflow;
-#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_EFFECTS
-namespace SharpProof.Internal.SharpProofEffects;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_FRONTEND
 namespace SharpProof.Internal.SharpProofFrontend;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_FUZZ
@@ -38,8 +34,6 @@ namespace SharpProof.Internal.SharpProofSpecs;
 namespace SharpProof.Internal.SharpProofTesting;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_TOOL
 namespace SharpProof.Internal.SharpProofTool;
-#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_VERIFY
-namespace SharpProof.Internal.SharpProofVerify;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_WORKER
 namespace SharpProof.Internal.SharpProofWorker;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_WORKER_PROTOCOL

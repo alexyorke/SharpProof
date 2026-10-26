@@ -7,12 +7,10 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | Component | Responsibility |
 | --- | --- |
 | `SharpProof.Attributes` | Public contract types, intrinsics, flags, trust/reporting controls |
-| `SharpProof.Contracts` | Clause inventory, effective source selection, intrinsic validation and binding |
 | `SharpProof.Specs` | Reviewed API catalog and resolved specification evidence |
 | `SharpProof.Frontend` | Roslyn expression/program lowering to typed IR |
 | `SharpProof.Ir` | Owned types, values, instructions, blocks, source provenance, evaluation |
 | `SharpProof.Dataflow` | Analysis primitives over the modeled program |
-| `SharpProof.Effects` | Effect values, mappings, and conservative summaries |
 | `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
 | `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
@@ -21,7 +19,7 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Smt` | Native solver abstraction, typed encoding and result evidence |
 | `SharpProof.Worker` | Artifact preparation, native claims, VC checks, replay, response cache |
 | `SharpProof.Host` | Container/native loading and host infrastructure |
-| `SharpProof.BuildTasks` / `SharpProof.Verify` | MSBuild integration and verifier orchestration |
+| `SharpProof.BuildTasks` | MSBuild integration and verifier orchestration |
 | `SharpProof.Package` | Metadata-only standard package facade with exact verifier dependency |
 | `SharpProof.Verifier` | Analyzer/collector, MSBuild integration, managed worker and native solver package assets |
 | `SharpProof.Tool` | Optional separately packaged doctor and stored-evidence explanation commands |

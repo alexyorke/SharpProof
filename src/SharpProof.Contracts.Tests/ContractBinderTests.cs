@@ -1876,7 +1876,7 @@ internal sealed class ContractBinderTests
     {
         var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
-            Path.Combine(root, "src/SharpProof.Contracts"),
+            Path.Combine(root, "src/SharpProof.Compiler.Semantics/Contracts"),
             "*.cs",
             SearchOption.AllDirectories).ToImmutableArray();
         var forbidden = ImmutableArray.Create("SyntaxFactory.",

@@ -62,11 +62,11 @@ dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1822.severity = none
 
 # This value type's operators are the public domain comparison surface.
-[src/SharpProof.Effects/EffectRegions.cs]
+[src/SharpProof.Compiler.Semantics/Effects/EffectRegions.cs]
 dotnet_diagnostic.CA1036.severity = none
 
 # The flags enum intentionally defines a named composite value.
-[src/SharpProof.Effects/EffectValues.cs]
+[src/SharpProof.Compiler.Semantics/Effects/EffectValues.cs]
 dotnet_diagnostic.CA2217.severity = none
 
 # The struct is an immutable Roslyn-facing value without custom equality.

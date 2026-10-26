@@ -16,7 +16,7 @@ public sealed class ProjectDagTests
             new("DefensiveCodingAnalyzer", []),
             new("SharpProof.Analyzer", ["SharpProof.Analyzer.Core"]),
             new("SharpProof.Analyzer.Core", ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"]),
-            new("SharpProof.Compiler.Semantics", ["SharpProof.Contracts", "SharpProof.Effects"]),
+            new("SharpProof.Compiler.Semantics", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
             new("SharpProof.Attributes", []),
             new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
             new("SharpProof.CodeFixes", ["SharpProof.EditorSuggestions"]),
@@ -25,10 +25,8 @@ public sealed class ProjectDagTests
                 "SharpProof.Compiler.Semantics",
                 "SharpProof.CompilerArtifact"
             ]),
-            new("SharpProof.Contracts", ["SharpProof.Frontend"]),
             new("SharpProof.Dataflow", []),
             new("SharpProof.EditorSuggestions", []),
-            new("SharpProof.Effects", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
             new("SharpProof.Frontend", ["SharpProof.Attributes", "SharpProof.Ir"]),
             new("SharpProof.Fuzz", [
                 "SharpProof.Attributes",
@@ -50,10 +48,9 @@ public sealed class ProjectDagTests
             new("SharpProof.Host", []),
             new("SharpProof.Ir", []),
             new("SharpProof.Logging", []),
-            new("SharpProof.Smt", ["SharpProof.Verify"]),
+            new("SharpProof.Smt", ["SharpProof.Ir"]),
             new("SharpProof.Specs", ["SharpProof.Ir"]),
             new("SharpProof.Tool", ["SharpProof.Worker.Protocol", "SharpProof.CompilerArtifact", "SharpProof.Specs", "SharpProof.Frontend"]),
-            new("SharpProof.Verify", ["SharpProof.Ir"]),
             new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Host",
@@ -83,10 +80,8 @@ public sealed class ProjectDagTests
         "SharpProof.CodeFixes",
         "SharpProof.EditorSuggestions",
         "SharpProof.Attributes",
-        "SharpProof.Contracts",
         "SharpProof.CompilerCollector",
         "SharpProof.Compiler.Semantics",
-        "SharpProof.Effects",
         "SharpProof.Frontend",
     ];
 
@@ -188,7 +183,6 @@ public sealed class ProjectDagTests
         var closure = RuntimeClosure(root);
         Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(closure, Does.Not.Contain("SharpProof.Worker"));
-        Assert.That(closure, Does.Not.Contain("SharpProof.Verify"));
         foreach (var item in EvaluatedItems())
         {
             if (closure.Contains(item.Project) && item.Kind == "PackageReference")

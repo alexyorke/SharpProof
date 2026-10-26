@@ -23,9 +23,7 @@
     <Analyzer Include="
         $(_SharpProofSharedDirectory)/SharpProof.Analyzer.Core.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Compiler.Semantics.dll;
-        $(_SharpProofSharedDirectory)/SharpProof.Contracts.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Dataflow.dll;
-        $(_SharpProofSharedDirectory)/SharpProof.Effects.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Frontend.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Ir.dll;
         $(_SharpProofSharedDirectory)/SharpProof.Specs.dll;

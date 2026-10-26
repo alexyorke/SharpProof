@@ -83,7 +83,6 @@
       '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Contracts' Or
       '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' Or
       '$(SharpProofProjectName)' == 'SharpProof.Frontend' Or
       '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' Or
@@ -93,7 +92,6 @@
       '$(SharpProofProjectName)' == 'SharpProof.Specs' Or
       '$(SharpProofProjectName)' == 'SharpProof.Testing' Or
       '$(SharpProofProjectName)' == 'SharpProof.Testing.Test' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Verify' Or
       '$(SharpProofProjectName)' == 'SharpProof.Verify.Test' Or
       '$(SharpProofProjectName)' == 'SharpProof.Worker' Or
       '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">true</SharpProofUsesIrIdentifiers>
@@ -120,9 +118,7 @@
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerProbe.TestAsset' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Contracts' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Dataflow' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Effects' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Frontend' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Fuzz' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Gates' OR
@@ -132,7 +128,6 @@
                         '$(SharpProofProjectName)' == 'SharpProof.Specs' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Testing' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Tool' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Verify' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Worker.Protocol'">
     <SharpProofHasParameterGuard>true</SharpProofHasParameterGuard>

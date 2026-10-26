@@ -12,8 +12,6 @@
     <InternalsVisibleTo Include="SharpProof.Worker" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
-    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
-    <InternalsVisibleTo Include="SharpProof.Effects" />
     <InternalsVisibleTo Include="SharpProof.Effects.Test" />
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />

@@ -126,12 +126,6 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Z3": "[4.12.2, )",
-          "SharpProof.Verify": "[1.0.0-preview.1, )"
-        }
-      },
-      "sharpproof.verify": {
-        "type": "Project",
-        "dependencies": {
           "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },

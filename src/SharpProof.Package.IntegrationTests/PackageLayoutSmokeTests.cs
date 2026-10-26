@@ -49,9 +49,7 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
         "SharpProof.Compiler.Semantics.dll",
-        "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
-        "SharpProof.Effects.dll",
         "SharpProof.Frontend.dll",
         "SharpProof.Ir.dll",
         "SharpProof.Specs.dll",
@@ -96,9 +94,7 @@ public sealed class PackageLayoutSmokeTests
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.Compiler.Semantics.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
-        "tools/shared/netstandard2.0/SharpProof.Contracts.dll",
         "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
-        "tools/shared/netstandard2.0/SharpProof.Effects.dll",
         "tools/shared/netstandard2.0/SharpProof.Frontend.dll",
         "tools/shared/netstandard2.0/SharpProof.Ir.dll",
         "tools/shared/netstandard2.0/SharpProof.Specs.dll",
@@ -126,7 +122,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/net10/SharpProof.Logging.dll",
         "tools/net10/SharpProof.Smt.dll",
         "tools/net10/SharpProof.Specs.dll",
-        "tools/net10/SharpProof.Verify.dll",
         "tools/net10/SharpProof.Worker.deps.json",
         "tools/net10/SharpProof.Worker.dll",
         "tools/net10/SharpProof.Worker.Protocol.dll",
@@ -2438,7 +2433,7 @@ public sealed class PackageLayoutSmokeTests
                     StringComparison.Ordinal) ||
                 entry is
                     "tools/net10/SharpProof.Attributes.dll" or
-                    "tools/net10/SharpProof.Contracts.dll" or
+                    "tools/net10/SharpProof.Compiler.Semantics.dll" or
                     "tools/net10/SharpProof.Frontend.dll")),
             Is.Empty);
         Assert.That(
@@ -2466,7 +2461,7 @@ public sealed class PackageLayoutSmokeTests
                 Does.Not.Contain("\"Microsoft.CodeAnalysis/\"")
                     .And.Not.Contain("\"Microsoft.CodeAnalysis.CSharp/\"")
                     .And.Not.Contain("SharpProof.Attributes")
-                    .And.Not.Contain("SharpProof.Contracts")
+                    .And.Not.Contain("SharpProof.Compiler.Semantics")
                     .And.Not.Contain("SharpProof.Frontend"),
                 dependencies);
         }

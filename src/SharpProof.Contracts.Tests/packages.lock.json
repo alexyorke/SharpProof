@@ -132,12 +132,20 @@
       "sharpproof.attributes": {
         "type": "Project"
       },
-      "sharpproof.contracts": {
+      "sharpproof.compiler.semantics": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
+          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.dataflow": {
+        "type": "Project",
+        "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -156,11 +164,18 @@
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
-      "sharpproof.verify": {
+      "sharpproof.smt": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.Z3": "[4.12.2, )",
           "SharpProof.Ir": "[1.0.0-preview.1, )",
           "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.specs": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "Microsoft.CodeAnalysis.Analyzers": {
@@ -179,6 +194,12 @@
           "System.Collections.Immutable": "9.0.0",
           "System.Reflection.Metadata": "9.0.0"
         }
+      },
+      "Microsoft.Z3": {
+        "type": "CentralTransitive",
+        "requested": "[4.12.2, )",
+        "resolved": "4.12.2",
+        "contentHash": "dOV/D1K+OH2Ris7HcXHM2OIyHaFc6t3twNg9d8xqRKs3JZBvWgTp+OmzVfNGPn+Yz/wQDAHeWgecJly5aHGYAw=="
       },
       "System.Collections.Immutable": {
         "type": "CentralTransitive",
