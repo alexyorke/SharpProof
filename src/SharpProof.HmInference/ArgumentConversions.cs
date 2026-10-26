@@ -29,6 +29,10 @@ public static partial class Inference
             var source = operand is IConditionalAccessInstanceOperation ? operand.Type : model.GetTypeInfo(expression, cancellationToken).Type;
             if (source is null || SymbolEqualityComparer.Default.Equals(source, target))
             { return false; }
+            var bound = conversion.GetConversion();
+            if (!bound.IsUserDefined && bound.IsInlineArray
+                && TryBindInlineArrayConversion(source, target, inferred, expected))
+            { conversionTargets.Add((expected, target)); return true; }
             BindConvertedArgument(source, target, inferred, expected);
             conversionTargets.Add((expected, target));
             return true;
@@ -216,6 +220,62 @@ public static partial class Inference
             // Numeric, lifted numeric and user-defined conversions are not equality.
             // Preserve their endpoints, including the original boxing/operator effects.
             PinConversion(source, target, inferred, expected);
+        }
+
+        private bool IsInlineArraySpanTarget(INamedTypeSymbol target)
+        {
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            var span = model.Compilation.GetTypeByMetadataName("System.Span`1");
+            var readOnlySpan = model.Compilation.GetTypeByMetadataName("System.ReadOnlySpan`1");
+            return SymbolEqualityComparer.Default.Equals(target.OriginalDefinition, span)
+                || SymbolEqualityComparer.Default.Equals(target.OriginalDefinition, readOnlySpan);
+        }
+
+        private bool HasInlineArrayAttribute(INamedTypeSymbol type)
+        {
+            if (type is null)
+            { throw new ArgumentNullException(nameof(type)); }
+            var inlineAttribute = model.Compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.InlineArrayAttribute");
+            if (inlineAttribute is null)
+            { return false; }
+            return type.GetAttributes().Any(attribute =>
+            {
+                if (attribute is null)
+                { throw new ArgumentNullException(nameof(attribute)); }
+                return SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, inlineAttribute);
+            });
+        }
+
+        private bool TryBindInlineArrayConversion(ITypeSymbol source, ITypeSymbol target, HmType inferred, HmType expected)
+        {
+            if (source is null)
+            { throw new ArgumentNullException(nameof(source)); }
+            if (target is null)
+            { throw new ArgumentNullException(nameof(target)); }
+            if (inferred is null)
+            { throw new ArgumentNullException(nameof(inferred)); }
+            if (expected is null)
+            { throw new ArgumentNullException(nameof(expected)); }
+            if (source is not INamedTypeSymbol inlineArray || target is not INamedTypeSymbol span
+                || !HasInlineArrayAttribute(inlineArray) || !IsInlineArraySpanTarget(span))
+            { return false; }
+            var element = InlineArrayElement(inlineArray, inferred);
+            HmType.Unify(expected, CSharpTypes.Rigid(span).WithArguments(element));
+            return true;
+        }
+
+        private static HmType InlineArrayElement(INamedTypeSymbol owner, HmType receiver)
+        {
+            if (owner is null)
+            { throw new ArgumentNullException(nameof(owner)); }
+            if (receiver is null)
+            { throw new ArgumentNullException(nameof(receiver)); }
+            var fields = owner.GetMembers().OfType<IFieldSymbol>().Where(field =>
+            { if (field is null) { throw new ArgumentNullException(nameof(field)); } return !field.IsStatic; }).ToArray();
+            if (fields.Length != 1)
+            { throw new InferenceException("Invalid inline-array element field."); }
+            return PatternSymbolType(fields[0], receiver, owner);
         }
 
         private static void PinConversion(ITypeSymbol source, ITypeSymbol target, HmType inferred, HmType expected)

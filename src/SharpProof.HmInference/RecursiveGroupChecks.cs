@@ -410,6 +410,123 @@ internal static class RecursiveGroupChecks
             instanceCompilation.GetSemanticModel(instanceTree), cancellationToken) is not null)
         { throw new InvalidOperationException("Unsupported instance group was generalized."); }
         Program.Log.Info("PASS RecursiveGroupUnsupportedRoot");
-        return 15;
+
+        CheckBlockRuntime("""
+            public static class BlockReturnPair
+            {
+                public static int First(int value, bool again)
+                { return again ? Second(value, false) : value; }
+                public static int Second(int value, bool again)
+                { return again ? First(value, false) : value; }
+                public static int ExistingCaller() => First(7, true);
+            }
+            """, "BlockReturnPair", "RecursiveBlockReturnAtomicRuntime", cancellationToken);
+        CheckBlockRuntime("""
+            public static class BlockEarlyPair
+            {
+                public static int First(int value, bool again)
+                {
+                    if (again) return Second(value, false);
+                    return value;
+                }
+                public static int Second(int value, bool again)
+                {
+                    if (again) return First(value, false);
+                    return value;
+                }
+                public static int ExistingCaller() => First(7, true);
+            }
+            """, "BlockEarlyPair", "RecursiveBlockEarlyReturnAtomicRuntime", cancellationToken);
+        CheckBlockRuntime("""
+            public static class BlockIfElsePair
+            {
+                public static int First(int value, bool again)
+                {
+                    if (again) { return Second(value, false); }
+                    else { return value; }
+                }
+                public static int Second(int value, bool again) => again ? First(value, false) : value;
+                public static int ExistingCaller() => First(7, true);
+            }
+            """, "BlockIfElsePair", "RecursiveBlockIfElseAtomicRuntime", cancellationToken);
+
+        const string effectConditionSource = """
+            public static class BlockEffectPair
+            {
+                public static int Calls;
+                private static bool Mark(bool value) { Calls++; return value; }
+                public static int First(int value, bool again)
+                {
+                    if (Mark(again)) return Second(value, false);
+                    return value;
+                }
+                public static int Second(int value, bool again)
+                {
+                    if (Mark(again)) return First(value, false);
+                    return value;
+                }
+                public static int ExistingCaller() => First(17, true);
+            }
+            """;
+        var effectTree = CSharpSyntaxTree.ParseText(effectConditionSource, cancellationToken: cancellationToken);
+        var effectCompilation = Program.Compile([effectTree]);
+        if (effectCompilation.GetDiagnostics(cancellationToken).Any(d /* SPINT001: all values valid - Compiler diagnostics are nonnull values. */ =>
+            d.Severity == DiagnosticSeverity.Error))
+        { throw new InvalidOperationException("Effectful condition control must compile natively."); }
+        var effectFirst = effectTree.GetRoot(cancellationToken).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(method /* SPINT001: all values valid - Syntax descendants are nonnull method nodes. */ =>
+                method.Identifier.ValueText == "First");
+        if (Inference.AnalyzeRecursiveGroup(effectFirst,
+            effectCompilation.GetSemanticModel(effectTree), cancellationToken) is not null)
+        { throw new InvalidOperationException("Effectful block condition entered the safe SCC calculus."); }
+        using var effectImage = new MemoryStream();
+        if (!effectCompilation.Emit(effectImage, cancellationToken: cancellationToken).Success)
+        { throw new InvalidOperationException("Effectful condition control failed native emission."); }
+        var effectType = System.Reflection.Assembly.Load(effectImage.ToArray()).GetType("BlockEffectPair")!;
+        if (!Equals(effectType.GetMethod("ExistingCaller")!.Invoke(null, null), 17)
+            || !Equals(effectType.GetField("Calls")!.GetValue(null), 2))
+        { throw new InvalidOperationException("Effectful condition control changed call count."); }
+        Program.Log.Info("PASS RecursiveBlockEffectfulConditionRejected");
+        return 19;
+    }
+
+    private static void CheckBlockRuntime(string source, string typeName, string label,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(typeName);
+        ArgumentNullException.ThrowIfNull(label);
+        var tree = CSharpSyntaxTree.ParseText(source, cancellationToken: cancellationToken);
+        var compilation = Program.Compile([tree]);
+        if (compilation.GetDiagnostics(cancellationToken).Any(d /* SPINT001: all values valid - Compiler diagnostics are nonnull values. */ =>
+            d.Severity == DiagnosticSeverity.Error))
+        { throw new InvalidOperationException(label + " must compile natively."); }
+        var first = tree.GetRoot(cancellationToken).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(method /* SPINT001: all values valid - Syntax descendants are nonnull method nodes. */ =>
+                method.Identifier.ValueText == "First");
+        var analysis = Inference.AnalyzeRecursiveGroup(first,
+            compilation.GetSemanticModel(tree), cancellationToken)
+            ?? throw new InvalidOperationException(label + " lacked an SCC proposal.");
+        if (analysis.Results.Count != 2 || analysis.Results.Values.Any(result /* SPINT001: all values valid - Group results are nonnull records. */ =>
+            result.Status != "Suggestion" || result.RecursiveGroup is null))
+        { throw new InvalidOperationException(label + " did not validate both members atomically."); }
+        var root = analysis.RewrittenRoots[tree];
+        var owner = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        var caller = SyntaxFactory.ParseMemberDeclaration(
+            "public static string NewCaller() => Second(\"text\", true);")!;
+        var testedTree = tree.WithRootAndOptions(root.ReplaceNode(owner, owner.AddMembers(caller)), tree.Options);
+        var testedCompilation = compilation.ReplaceSyntaxTree(tree, testedTree);
+        using var image = new MemoryStream();
+        var emitted = testedCompilation.Emit(image, cancellationToken: cancellationToken);
+        if (!emitted.Success)
+        {
+            throw new InvalidOperationException(label + " failed applied emission: "
+                + string.Join("\n", emitted.Diagnostics.Select(d /* SPINT001: all values valid - Compiler diagnostics are nonnull values. */ => d.ToString())));
+        }
+        var type = System.Reflection.Assembly.Load(image.ToArray()).GetType(typeName)!;
+        if (!Equals(type.GetMethod("ExistingCaller")!.Invoke(null, null), 7)
+            || !Equals(type.GetMethod("NewCaller")!.Invoke(null, null), "text"))
+        { throw new InvalidOperationException(label + " failed original/new caller runtime controls."); }
+        Program.Log.Info("PASS " + label);
     }
 }

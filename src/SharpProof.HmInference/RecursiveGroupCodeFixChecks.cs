@@ -279,7 +279,66 @@ internal static class RecursiveGroupCodeFixChecks
             { throw new InvalidOperationException("Three-member divergent linked SCC caused a partial edit."); }
         }
         Program.Log.Info("PASS RecursiveTripleIDELinkedRollback");
-        return 11;
+
+        var blockDocument = project.AddDocument("BlockRecursive.cs", """
+            public static class BlockRecursivePair
+            {
+                public static int First(int value, bool again)
+                {
+                    if (again) return Second(value, false);
+                    return value;
+                }
+                public static int Second(int value, bool again)
+                {
+                    if (again) { return First(value, false); }
+                    else { return value; }
+                }
+                public static int ExistingCaller() => First(7, true);
+            }
+            """);
+        var blockDiagnostics = await Diagnostics(blockDocument, cancellationToken).ConfigureAwait(false);
+        if (blockDiagnostics.Length != 2)
+        { throw new InvalidOperationException("Expected two block-bodied SCC diagnostics in the IDE."); }
+        actions.Clear();
+        await provider.RegisterCodeFixesAsync(new CodeFixContext(blockDocument, blockDiagnostics[0],
+            (action /* SPINT001: all values valid - Code fix registration supplies a nonnull action. */, _) =>
+                actions.Add(action), cancellationToken)).ConfigureAwait(false);
+        if (actions.Count != 1)
+        { throw new InvalidOperationException("Expected one block-bodied SCC code action."); }
+        var blockFixed = (await ChangedSolution(actions.Single(), cancellationToken)
+            .ConfigureAwait(false)).GetDocument(blockDocument.Id)!;
+        await AssertBlockApplied(blockFixed, cancellationToken).ConfigureAwait(false);
+        Program.Log.Info("PASS RecursiveBlockIDEAtomicApply");
+
+        var blockContext = new FixAllContext(blockDocument, provider, FixAllScope.Document,
+            "HM.GeneralizeSignature", provider.FixableDiagnosticIds,
+            new CodeFixChecks.DiagnosticSource(), cancellationToken);
+        var blockFixAll = await provider.GetFixAllProvider().GetFixAsync(blockContext)
+            .ConfigureAwait(false);
+        if (blockFixAll is null)
+        { throw new InvalidOperationException("Missing block-bodied SCC Fix All action."); }
+        var blockAll = await ChangedSolution(blockFixAll, cancellationToken).ConfigureAwait(false);
+        await AssertBlockApplied(blockAll.GetDocument(blockDocument.Id)!, cancellationToken)
+            .ConfigureAwait(false);
+        Program.Log.Info("PASS RecursiveBlockIDEFixAll");
+
+        var effectDocument = project.AddDocument("BlockEffect.cs", """
+            public static class BlockEffectPair
+            {
+                public static int Calls;
+                private static bool Mark(bool value) { Calls++; return value; }
+                public static int First(int value, bool again)
+                { if (Mark(again)) return Second(value, false); return value; }
+                public static int Second(int value, bool again)
+                { if (Mark(again)) return First(value, false); return value; }
+            }
+            """);
+        var effectDiagnostics = await Diagnostics(effectDocument, cancellationToken).ConfigureAwait(false);
+        if (effectDiagnostics.Any(d /* SPINT001: all values valid - Analyzer diagnostics are nonnull values. */ =>
+            awaitableMethodName(d, effectDocument, cancellationToken) is "First" or "Second"))
+        { throw new InvalidOperationException("Effectful block condition produced a group IDE action."); }
+        Program.Log.Info("PASS RecursiveBlockIDEEffectfulConditionRejected");
+        return 14;
     }
 
     private static string awaitableMethodName(
@@ -389,5 +448,33 @@ internal static class RecursiveGroupCodeFixChecks
         if (!Equals(pair.GetMethod("ExistingCaller")!.Invoke(null, null), 7)
             || !Equals(pair.GetMethod("NewCaller")!.Invoke(null, null), "text"))
         { throw new InvalidOperationException("IDE group fix failed int/string runtime controls."); }
+    }
+
+    private static async Task AssertBlockApplied(Document document, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var root = (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false))!;
+        var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        if (methods.Count(method /* SPINT001: all values valid - Syntax descendants are nonnull method nodes. */ =>
+            method.TypeParameterList is not null && method.Body is not null) != 2
+            || methods.Count(method /* SPINT001: all values valid - Syntax descendants are nonnull method nodes. */ =>
+                method.DescendantNodes().OfType<IfStatementSyntax>().Any()) != 2)
+        { throw new InvalidOperationException("Block IDE action missed a member or changed its control flow."); }
+        var owner = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        var caller = SyntaxFactory.ParseMemberDeclaration(
+            "public static string NewCaller() => Second(\"text\", true);")!;
+        var tested = document.WithSyntaxRoot(root.ReplaceNode(owner, owner.AddMembers(caller)));
+        var compilation = (await tested.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
+        using var image = new MemoryStream();
+        var emitted = compilation.Emit(image, cancellationToken: cancellationToken);
+        if (!emitted.Success)
+        {
+            throw new InvalidOperationException("Block IDE fix failed emission: "
+                + string.Join("\n", emitted.Diagnostics.Select(d /* SPINT001: all values valid - Analyzer diagnostics are nonnull values. */ => d.ToString())));
+        }
+        var type = System.Reflection.Assembly.Load(image.ToArray()).GetType("BlockRecursivePair")!;
+        if (!Equals(type.GetMethod("ExistingCaller")!.Invoke(null, null), 7)
+            || !Equals(type.GetMethod("NewCaller")!.Invoke(null, null), "text"))
+        { throw new InvalidOperationException("Block IDE fix failed int/string runtime controls."); }
     }
 }

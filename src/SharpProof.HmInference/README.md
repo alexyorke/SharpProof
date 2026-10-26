@@ -26,6 +26,15 @@ value/reference/nullable payloads, ref/in receivers, evaluation counts, mutation
 null receivers and bounds exceptions. CLI and fresh-package consumers cover C# 12
 and 13.
 
+Implicit inline-array conversions keep the buffer element linked to `Span<T>` or
+`ReadOnlySpan<T>` in returns and generic helper calls. Direct inline-array
+`foreach` can generalize an unused element type while retaining fixed numeric
+operations and fixed helper signatures. Applied fixes verify original and new
+payloads, mutation and bounds. The bundled Roslyn 4.14 accepts the tested span
+returns in C# 12, but requires C# 13 for the tested direct inline-array `foreach`;
+the newer SDK compiler accepts those native foreach controls in C# 12. Tests
+preserve that compiler-version distinction and reject analyzer exceptions.
+
 ## Run
 
 From the repository root, use the host wrapper to run verification in the
@@ -225,7 +234,8 @@ construction are rechecked across supplied files. Arbitrary combinations of gene
 constraints still require further work. See [the completion ledger](LIMITATIONS.md).
 
 Static mutually recursive methods can infer their signatures together. The initial
-group path covers expression-bodied methods in one source tree whose bodies use
+group path covers expression bodies and total-return blocks in one source tree.
+Blocks may use early returns and if/else returns. Both forms use
 parameter reads, primitive literals, conditionals and direct calls to group
 members. Calls can be unqualified, type-qualified, globally qualified or alias-
 qualified; peer calls retain their exact constructed containing type. Shared

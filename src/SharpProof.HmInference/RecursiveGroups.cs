@@ -108,7 +108,7 @@ public static partial class Inference
         { return null; }
         if (members.Any(item => item.Symbol.ContainingType.GetMembers(item.Symbol.Name)
                 .OfType<IMethodSymbol>().Count() != 1)
-            || !members.All(member => SafeCoreExpression(member.Method.ExpressionBody!.Expression,
+            || !members.All(member => SafeCoreBody(member.Method,
                 member.Symbol, members, model, cancellationToken))
             || !OnlyDirectReferences(compilation, members, cancellationToken)
             || compilation.GetDiagnostics(cancellationToken).Any(d /* SPINT001: all values valid - Compiler diagnostics are nonnull values. */ =>
@@ -192,7 +192,7 @@ public static partial class Inference
             && !symbol.IsExtern && !symbol.ReturnsVoid && symbol.RefKind == RefKind.None
             && symbol.Arity == 0 && symbol.PartialDefinitionPart is null
             && symbol.PartialImplementationPart is null
-            && method.Body is null && method.ExpressionBody is not null
+            && (method.Body is not null || method.ExpressionBody is not null)
             && method.TypeParameterList is null && method.ConstraintClauses.Count == 0
             && method.AttributeLists.Count == 0
             && method.ParameterList.Parameters.All(parameter =>
@@ -200,6 +200,82 @@ public static partial class Inference
                 && parameter.Modifiers.Count == 0)
             && symbol.Parameters.All(parameter /* SPINT001: all values valid - Roslyn parameter symbols are nonnull. */ =>
                 parameter.RefKind == RefKind.None && !parameter.IsOptional && !parameter.IsParams);
+    }
+
+    // Admit a small statement calculus whose every path returns. A block may
+    // contain only returns or if/else returns over the safe expression calculus.
+    private static bool SafeCoreBody(MethodDeclarationSyntax method, IMethodSymbol owner,
+        (MethodDeclarationSyntax Method, IMethodSymbol Symbol)[] members,
+        SemanticModel model, CancellationToken cancellationToken)
+    {
+        if (method is null)
+        { throw new ArgumentNullException(nameof(method)); }
+        if (owner is null)
+        { throw new ArgumentNullException(nameof(owner)); }
+        if (members is null)
+        { throw new ArgumentNullException(nameof(members)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
+        return method.ExpressionBody is { } arrow
+            ? SafeCoreExpression(arrow.Expression, owner, members, model, cancellationToken)
+            : method.Body is { } block
+                && SafeCoreStatements(block.Statements, owner, members, model, cancellationToken);
+    }
+
+    private static bool SafeCoreStatements(IEnumerable<StatementSyntax> statements, IMethodSymbol owner,
+        (MethodDeclarationSyntax Method, IMethodSymbol Symbol)[] members,
+        SemanticModel model, CancellationToken cancellationToken)
+    {
+        if (statements is null)
+        { throw new ArgumentNullException(nameof(statements)); }
+        if (owner is null)
+        { throw new ArgumentNullException(nameof(owner)); }
+        if (members is null)
+        { throw new ArgumentNullException(nameof(members)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
+        var returned = false;
+        foreach (var statement in statements)
+        {
+            if (returned)
+            { return false; }
+            switch (statement)
+            {
+                case ReturnStatementSyntax { Expression: { } value }:
+                    if (!SafeCoreExpression(value, owner, members, model, cancellationToken))
+                    { return false; }
+                    returned = true;
+                    break;
+                case IfStatementSyntax conditional:
+                    if (!SafeCoreExpression(conditional.Condition, owner, members, model, cancellationToken)
+                        || !SafeCoreBranch(conditional.Statement, owner, members, model, cancellationToken)
+                        || conditional.Else is { } alternate
+                            && !SafeCoreBranch(alternate.Statement, owner, members, model, cancellationToken))
+                    { return false; }
+                    returned = conditional.Else is not null;
+                    break;
+                default:
+                    return false;
+            }
+        }
+        return returned;
+    }
+
+    private static bool SafeCoreBranch(StatementSyntax statement, IMethodSymbol owner,
+        (MethodDeclarationSyntax Method, IMethodSymbol Symbol)[] members,
+        SemanticModel model, CancellationToken cancellationToken)
+    {
+        if (statement is null)
+        { throw new ArgumentNullException(nameof(statement)); }
+        if (owner is null)
+        { throw new ArgumentNullException(nameof(owner)); }
+        if (members is null)
+        { throw new ArgumentNullException(nameof(members)); }
+        if (model is null)
+        { throw new ArgumentNullException(nameof(model)); }
+        return statement is BlockSyntax block
+            ? SafeCoreStatements(block.Statements, owner, members, model, cancellationToken)
+            : SafeCoreStatements(SyntaxFactory.SingletonList(statement), owner, members, model, cancellationToken);
     }
 
     // Until the group's protocol and operator checks share the ordinary

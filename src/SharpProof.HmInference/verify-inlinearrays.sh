@@ -17,6 +17,8 @@ using System.Runtime.CompilerServices;
 [InlineArray(4)] public struct AnnotatedBuffer<T> { [MaybeNull] private T _element0; }
 public static class Forms {
     public static int ReadIn(in Buffer<int> values, int index, int ignored) => values[index];
+    public static ReadOnlySpan<int> ReturnReadOnly(in Buffer<int> values, int ignored) => values;
+    public static Span<int> ReturnWritable(ref Buffer<int> values, int ignored) => values;
     public static int ReadIndex(Buffer<int> values, Index index, int ignored) => values[index];
     public static int Last(Buffer<int> values, int ignored) => values[^1];
     public static Span<int> Tail(ref Buffer<int> values, int start, int ignored) => values[start..];
@@ -34,6 +36,15 @@ root=true
 dotnet_diagnostic.HM0001.severity=warning
 EOF
 for language in 12 13; do
+  if [ "$language" -eq 13 ]; then
+    cat > "$fixture/Iteration.cs" << 'EOF'
+public static class Iteration {
+    public static int Count(Buffer<int> values, int ignored) { int count = 0; foreach (var item in values) count++; return count; }
+    public static int CountIn(in Buffer<int> values, int ignored) { int count = 0; foreach (var item in values) count++; return count; }
+    public static int CountRef(ref Buffer<int> values, int ignored) { int count = 0; foreach (var item in values) count++; return count; }
+}
+EOF
+  fi
   cat > "$fixture/InlineArrays.csproj" << EOF
 <Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><TargetFramework>net8.0</TargetFramework><LangVersion>$language</LangVersion><Nullable>enable</Nullable><NuGetAudit>false</NuGetAudit><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
@@ -64,12 +75,26 @@ EOF
     destination="$evidence/cli-inline-arrays-$language.txt"
   fi
   cp "$log" "$destination"
+  if [ "$language" -eq 13 ]; then
+    for expected in \
+      'int Count<T1, T2>(global::Buffer<T1> values, T2 ignored)' \
+      'int CountIn<T1, T2>(in global::Buffer<T1> values, T2 ignored)' \
+      'int CountRef<T1, T2>(ref global::Buffer<T1> values, T2 ignored)'; do
+      if ! grep -Fq "$expected" "$log"; then
+        printf 'Missing inline-array iteration signature: %s\n' "$expected"
+        tail -35 "$log"
+        exit 1
+      fi
+    done
+  fi
   if grep -Fq 'AD0001' "$log"; then
     tail -35 "$log"
     exit 1
   fi
   for expected in \
     'T1 ReadIn<T1, T2>(in global::Buffer<T1> values, int index, T2 ignored)' \
+    'global::System.ReadOnlySpan<T1> ReturnReadOnly<T1, T2>(in global::Buffer<T1> values, T2 ignored)' \
+    'global::System.Span<T1> ReturnWritable<T1, T2>(ref global::Buffer<T1> values, T2 ignored)' \
     'T1 ReadIndex<T1, T2>(global::Buffer<T1> values, global::System.Index index, T2 ignored)' \
     'T1 Last<T1, T2>(global::Buffer<T1> values, T2 ignored)' \
     'global::System.Span<T1> Tail<T1, T2>(ref global::Buffer<T1> values, int start, T2 ignored)' \

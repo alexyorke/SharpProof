@@ -90,6 +90,13 @@ public static partial class Inference
                 HmType.Unify(Expression(loop.Expression), new("[" + new string(',', array.Rank - 1) + "]", element));
                 return element;
             }
+            if (!info.IsAsynchronous
+                && model.GetTypeInfo(loop.Expression, cancellationToken).Type is INamedTypeSymbol inlineArray
+                && info.GetEnumeratorMethod?.ContainingType is INamedTypeSymbol span
+                && HasInlineArrayAttribute(inlineArray)
+                && IsInlineArraySpanTarget(span)
+                && model.ClassifyConversion(loop.Expression, span) is { IsImplicit: true, IsUserDefined: false, IsInlineArray: true })
+            { return InlineArrayElement(inlineArray, Expression(loop.Expression)); }
             if (info.GetEnumeratorMethod is null || info.GetEnumeratorMethod.ReturnType is not (INamedTypeSymbol or ITypeParameterSymbol)
                 || info.CurrentProperty is null)
             {
@@ -227,7 +234,8 @@ public static partial class Inference
         {
             return left.IsIdentity == right.IsIdentity && left.IsImplicit == right.IsImplicit && left.IsNumeric == right.IsNumeric
             && left.IsReference == right.IsReference && left.IsBoxing == right.IsBoxing && left.IsUnboxing == right.IsUnboxing
-            && left.IsNullable == right.IsNullable && ProtocolMember(left.MethodSymbol) == ProtocolMember(right.MethodSymbol);
+            && left.IsNullable == right.IsNullable && left.IsInlineArray == right.IsInlineArray
+            && ProtocolMember(left.MethodSymbol) == ProtocolMember(right.MethodSymbol);
         }
     }
 }

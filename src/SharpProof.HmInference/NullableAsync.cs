@@ -1370,7 +1370,10 @@ public static partial class Inference
             var returnConversion = model.ClassifyConversion(expression, converted);
             var value = Expression(expression);
             var targetShape = IsFixedDeclaredReturn(expression) ? CSharpTypes.Rigid(converted) : CSharpTypes.Erase(converted);
-            if (!returnConversion.IsUserDefined || !TryUserConversion(info.Type, converted, value, targetShape, returnConversion.MethodSymbol))
+            var inlineArrayConversion = returnConversion.IsImplicit && !returnConversion.IsUserDefined && returnConversion.IsInlineArray
+                && TryBindInlineArrayConversion(info.Type, converted, value, targetShape);
+            if (!inlineArrayConversion && (!returnConversion.IsUserDefined
+                || !TryUserConversion(info.Type, converted, value, targetShape, returnConversion.MethodSymbol)))
             { BindConvertedArgument(info.Type, converted, value, targetShape, false); }
             conversionTargets.Add((targetShape, converted));
             return BindDeclaredReturn(expression, targetShape, converted);
