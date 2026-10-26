@@ -371,7 +371,8 @@ public static partial class Inference
                         }
                         return;
                     }
-                    if (!named.IsGenericType || named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+                    if ((!named.IsGenericType && named is not { TypeKind: TypeKind.Delegate, ContainingType: not null })
+                        || named.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
                     { return; }
                     var formalOffset = expectedCore.NestedTypeName is null ? 0 : 1;
                     if (expectedCore.Arguments.Length - formalOffset != named.TypeArguments.Length)
@@ -379,11 +380,17 @@ public static partial class Inference
                     var aligned = actualCore is not null && actualCore.Name == expectedCore.Name
                         && actualCore.NestedTypeName == expectedCore.NestedTypeName
                         && actualCore.Arguments.Length == expectedCore.Arguments.Length;
+                    var nestedDelegate = formalOffset == 1 && named.TypeKind == TypeKind.Delegate;
+                    if (nestedDelegate && named.ContainingType is { } containingType)
+                    {
+                        Collect(containingType, expectedCore.Arguments[0],
+                            aligned ? actualCore!.Arguments[0] : null, typePath + "/0");
+                    }
                     for (var item = 0; item < named.TypeArguments.Length; item++)
                     {
                         Collect(named.TypeArguments[item], expectedCore.Arguments[item + formalOffset],
                             aligned ? actualCore!.Arguments[item + formalOffset] : null,
-                            typePath + "/" + item.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                            typePath + "/" + (item + (nestedDelegate ? formalOffset : 0)).ToString(System.Globalization.CultureInfo.InvariantCulture));
                     }
                 }
                 Collect(called.OriginalDefinition.Parameters[parameter.Ordinal].Type, expected, actual, "");

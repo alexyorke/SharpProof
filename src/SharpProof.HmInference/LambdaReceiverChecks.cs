@@ -12,6 +12,7 @@ internal static class LambdaReceiverChecks
     public static int Run(CancellationToken cancellationToken)
     {
         var branchChecks = VerifyNestedReturnArms(cancellationToken);
+        var gapChecks = VerifyGapSources(cancellationToken);
         (string Name, string Method, string Signature)[] tests =
         [
             ("LambdaReceiverExpressionReturn", "static int M(Box<int> box,int value)=>box.Run(value,()=>Maybe(value));", "T1? M<T1>(global::Cases.Box<T1?> box, T1 value)"),
@@ -181,7 +182,105 @@ internal static class LambdaReceiverChecks
             { throw new InvalidOperationException(boundary.Name + " promoted a receiver without a direct, effective return warning: " + result.Signature); }
             Program.Log.Info("PASS " + boundary.Name);
         }
-        return tests.Length + boundaries.Length + branchChecks;
+        return tests.Length + boundaries.Length + branchChecks + gapChecks;
+    }
+
+    private static int VerifyGapSources(CancellationToken cancellationToken)
+    {
+        var source = "#nullable enable\nusing System;using System.Diagnostics.CodeAnalysis;using System.Linq.Expressions;"
+            + "using System.Runtime.CompilerServices;using System.Threading.Tasks;\n"
+            + CustomBuilderChecks.Support + "\n" + """
+            sealed class TreeGapBox<T> { public T Run(T seed, Expression<Func<T>> read) => read.Compile()(); }
+            sealed class NestedGapBox<T> { public delegate T Reader(); public T Run(T seed, Reader read) => read(); }
+            sealed class OwnGapBox<T,U> { public delegate R Reader<R>(U tag); public T Run(T seed, Reader<T> read,U tag) => read(tag); }
+            sealed class ShadowGapBox<T> {
+            #pragma warning disable CS0693
+                public delegate T Reader<T>();
+            #pragma warning restore CS0693
+                public T Run(T seed, Reader<T> read) => read();
+            }
+            sealed class CustomGapBox<T> { public ProbeTask<T> Run(T seed,Func<ProbeTask<T>> read) => read(); }
+            static class GapCases {
+                [return:MaybeNull]static T Maybe<T>(T value) => default;
+                static int TreeM(TreeGapBox<int> box,int value) => box.Run(value,()=>Maybe(value));
+                static T TreeBad<T>(TreeGapBox<T> box,T value) => box.Run(value,()=>Maybe(value));
+                static T? TreeGood<T>(TreeGapBox<T?> box,T value) => box.Run(value,()=>Maybe(value));
+                static int NestedM(NestedGapBox<int> box,int value) => box.Run(value,()=>Maybe(value));
+                static T NestedBad<T>(NestedGapBox<T> box,T value) => box.Run(value,()=>Maybe(value));
+                static T? NestedGood<T>(NestedGapBox<T?> box,T value) => box.Run(value,()=>Maybe(value));
+                static int OwnM(OwnGapBox<int,string> box,int value,string tag) => box.Run(value,_=>Maybe(value),tag);
+                static T OwnBad<T,U>(OwnGapBox<T,U> box,T value,U tag) => box.Run(value,_=>Maybe(value),tag);
+                static T? OwnGood<T,U>(OwnGapBox<T?,U> box,T value,U tag) => box.Run(value,_=>Maybe(value),tag);
+                static int ShadowM(ShadowGapBox<int> box,int value) => box.Run(value,()=>Maybe(value));
+                static T ShadowBad<T>(ShadowGapBox<T> box,T value) => box.Run(value,()=>Maybe(value));
+                static T? ShadowGood<T>(ShadowGapBox<T?> box,T value) => box.Run(value,()=>Maybe(value));
+                static ProbeTask<int> CustomM(CustomGapBox<int> box,int value) =>
+                    box.Run(value,async()=>{await Task.Yield();return Maybe(value);});
+                static ProbeTask<T> CustomBad<T>(CustomGapBox<T> box,T value) =>
+                    box.Run(value,async()=>{await Task.Yield();return Maybe(value);});
+                static ProbeTask<T?> CustomGood<T>(CustomGapBox<T?> box,T value) =>
+                    box.Run(value,async()=>{await Task.Yield();return Maybe(value);});
+                static int TreeExplicit(TreeGapBox<int> box,int value) => box.Run(value,int()=>Maybe(value));
+                static int NestedExplicit(NestedGapBox<int> box,int value) => box.Run(value,int()=>Maybe(value));
+                static ProbeTask<int> CustomExplicit(CustomGapBox<int> box,int value) =>
+                    box.Run(value,async ProbeTask<int> () => {await Task.Yield();return Maybe(value);});
+                static ProbeTask<int> CustomOverride(CustomGapBox<int> box,int value) =>
+                    box.Run(value,[AsyncMethodBuilder(typeof(ProbeBuilder<>))] async ProbeTask<int> () =>
+                        {await Task.Yield();return Maybe(value);});
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(source, cancellationToken: cancellationToken);
+        var compilation = Program.Compile([tree]);
+        var diagnostics = compilation.GetDiagnostics(cancellationToken).ToArray();
+        var error = diagnostics.FirstOrDefault(diagnostic =>
+        { ArgumentNullException.ThrowIfNull(diagnostic); return diagnostic.Severity == DiagnosticSeverity.Error; });
+        if (error is not null)
+        { throw new InvalidOperationException("Lambda gap fixture: " + error); }
+        var methods = tree.GetRoot(cancellationToken).DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(declaration =>
+            { ArgumentNullException.ThrowIfNull(declaration); return declaration.Identifier.ValueText == "GapCases"; })
+            .DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .ToDictionary(method =>
+            { ArgumentNullException.ThrowIfNull(method); return method.Identifier.ValueText; }, StringComparer.Ordinal);
+        (string Name, string Signature)[] expected =
+        [
+            ("TreeM", "T1? TreeM<T1>(global::TreeGapBox<T1?> box, T1 value)"),
+            ("NestedM", "T1? NestedM<T1>(global::NestedGapBox<T1?> box, T1 value)"),
+            ("OwnM", "T1? OwnM<T1, T2>(global::OwnGapBox<T1?, T2> box, T1 value, T2 tag)"),
+            ("ShadowM", "T1? ShadowM<T1>(global::ShadowGapBox<T1?> box, T1 value)"),
+            ("CustomM", "global::ProbeTask<T1?> CustomM<T1>(global::CustomGapBox<T1?> box, T1 value)")
+        ];
+        var results = Program.Results(compilation, cancellationToken);
+        bool HasReturnWarning(MethodDeclarationSyntax method)
+        {
+            ArgumentNullException.ThrowIfNull(method);
+            foreach (var diagnostic in diagnostics)
+            {
+                if (diagnostic.Id == "CS8603" && method.Span.Contains(diagnostic.Location.SourceSpan))
+                { return true; }
+            }
+            return false;
+        }
+        foreach (var (name, signature) in expected)
+        {
+            var bad = methods[name.Replace("M", "Bad", StringComparison.Ordinal)];
+            var good = methods[name.Replace("M", "Good", StringComparison.Ordinal)];
+            if (!HasReturnWarning(bad) || HasReturnWarning(good))
+            { throw new InvalidOperationException(name + " native nullable controls differ from CS8603/clean."); }
+            var result = results.Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == name; });
+            if (result.Status != "Suggestion" || result.Signature != signature)
+            { throw new InvalidOperationException(name + ": expected " + signature + "; got " + result.Status + ": " + (result.Signature ?? result.Message)); }
+            Program.Log.Info("PASS LambdaGap" + name);
+        }
+        foreach (var name in new[] { "TreeExplicit", "NestedExplicit", "CustomExplicit", "CustomOverride" })
+        {
+            var result = results.Single(candidate =>
+            { ArgumentNullException.ThrowIfNull(candidate); return candidate.Method == name; });
+            if (result.Status == "Suggestion" && result.Signature?.Contains("GapBox<T1?>", StringComparison.Ordinal) == true)
+            { throw new InvalidOperationException(name + " widened an explicit result boundary."); }
+        }
+        return expected.Length + 4;
     }
 
     private static int VerifyNestedReturnArms(CancellationToken cancellationToken)
@@ -349,11 +448,13 @@ internal static class LambdaReceiverChecks
 
     public static async Task<int> RunApplied(CancellationToken cancellationToken)
     {
-        const string source = """
+        var source = """
             #nullable enable
             using System;
             using System.Collections.Generic;
             using System.Diagnostics.CodeAnalysis;
+            using System.Linq.Expressions;
+            using System.Runtime.CompilerServices;
             using System.Threading;
             using System.Threading.Tasks;
             #pragma warning disable HM0001
@@ -410,6 +511,34 @@ internal static class LambdaReceiverChecks
                     }
                 }
             }
+            public sealed class TreeGapReceiver<T> {
+                public int Runs;
+                public Expression<Func<T>>? Last;
+                public T Run(T seed,Expression<Func<T>> read) { Runs++; Last=read; return read.Compile()(); }
+            }
+            public sealed class NestedGapReceiver<T> {
+                public delegate T Reader();
+                public int Runs;
+                public Reader? Last;
+                public T Run(T seed,Reader read) { Runs++; Last=read; return read(); }
+            }
+            public sealed class OwnGapReceiver<T,U> {
+                public delegate R Reader<R>(U tag);
+                public int Runs;
+                public U? LastTag;
+                public T Run(T seed,Reader<T> read,U tag) { Runs++; LastTag=tag; return read(tag); }
+            }
+            public sealed class ShadowGapReceiver<T> {
+            #pragma warning disable CS0693
+                public delegate T Reader<T>();
+            #pragma warning restore CS0693
+                public int Runs;
+                public T Run(T seed,Reader<T> read) { Runs++; return read(); }
+            }
+            public sealed class CustomGapReceiver<T> {
+                public int Runs;
+                public ProbeTask<T> Run(T seed,Func<ProbeTask<T>> read) { Runs++; return read(); }
+            }
             #pragma warning restore HM0001
             public static class ReceiverProbe {
                 [return:MaybeNull]static T Maybe<T>(T value) {
@@ -447,6 +576,12 @@ internal static class LambdaReceiverChecks
                     =>box.Run(value,()=>Maybe(value));
                 public static List<int> NestedList(NestedReceiverOuter<int>.Inner<string> box,int value)
                     =>box.RunList(value,()=>Pack(value,Maybe(value)));
+                public static int TreeGap(TreeGapReceiver<int> box,int value)=>box.Run(value,()=>Maybe(value));
+                public static int NestedGap(NestedGapReceiver<int> box,int value)=>box.Run(value,()=>Maybe(value));
+                public static int OwnGap(OwnGapReceiver<int,string> box,int value,string tag)=>box.Run(value,_=>Maybe(value),tag);
+                public static int ShadowGap(ShadowGapReceiver<int> box,int value)=>box.Run(value,()=>Maybe(value));
+                public static ProbeTask<int> CustomGap(CustomGapReceiver<int> box,int value,Task gate)
+                    =>box.Run(value,async()=>{await gate;return Maybe(value);});
             }
             public static class OriginalReceiverRunner {
                 public static void Run() {
@@ -498,6 +633,21 @@ internal static class LambdaReceiverChecks
                     var deep=new DeepReceiverOuter<int>.Middle.Inner<string>();
                     if(ReceiverProbe.DeepOuter(deep,101)!=0||deep.Runs!=1||deep.Seed!=101||ReceiverTrace.Helpers!=4)
                         throw new Exception("deep nested enclosing value/effects");
+                    ReceiverTrace.Helpers=0;ReceiverTrace.UseDefault=true;
+                    var treeGap=new TreeGapReceiver<int>();
+                    if(ReceiverProbe.TreeGap(treeGap,107)!=0||treeGap.Runs!=1||ReceiverTrace.Helpers!=1
+                        ||treeGap.Last?.Body is not MethodCallExpression { Method.Name: "Maybe" }
+                        ||treeGap.Last.Parameters.Count!=0)
+                        throw new Exception("quoted gap structure/result/effects");
+                    var nestedGap=new NestedGapReceiver<int>();
+                    if(ReceiverProbe.NestedGap(nestedGap,109)!=0||nestedGap.Runs!=1||nestedGap.Last is null||ReceiverTrace.Helpers!=2)
+                        throw new Exception("nested delegate gap result/effects");
+                    var ownGap=new OwnGapReceiver<int,string>();
+                    if(ReceiverProbe.OwnGap(ownGap,111,"own")!=0||ownGap.Runs!=1||ownGap.LastTag!="own"||ReceiverTrace.Helpers!=3)
+                        throw new Exception("nested own-slot gap result/tag/effects");
+                    var shadowGap=new ShadowGapReceiver<int>();
+                    if(ReceiverProbe.ShadowGap(shadowGap,113)!=0||shadowGap.Runs!=1||ReceiverTrace.Helpers!=4)
+                        throw new Exception("nested shadow gap result/effects");
                 }
                 public static async Task RunAsync() {
                     ReceiverTrace.UseDefault=false;ReceiverTrace.Helpers=0;
@@ -569,12 +719,31 @@ internal static class LambdaReceiverChecks
                     catch(OperationCanceledException caught) when(caught.CancellationToken==canceled.Token){}
                     if(interfaceBox.Runs!=3||ReceiverTrace.Helpers!=1||ReceiverTrace.Packs!=1)
                         throw new Exception("async interface cancel effects");
+                    ReceiverTrace.Helpers=0;ReceiverTrace.UseDefault=true;BuilderTrace.Value="";
+                    var customGap=new CustomGapReceiver<int>();var customGate=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var customPending=ReceiverProbe.CustomGap(customGap,127,customGate.Task);
+                    if(customPending.GetAwaiter().IsCompleted||customGap.Runs!=1||ReceiverTrace.Helpers!=0
+                        ||!BuilderTrace.Value.Contains("create;",StringComparison.Ordinal)
+                        ||!BuilderTrace.Value.Contains("start;",StringComparison.Ordinal))
+                        throw new Exception("custom task gap suspension/builder start");
+                    customGate.SetResult();
+                    if(await customPending!=0||ReceiverTrace.Helpers!=1
+                        ||!BuilderTrace.Value.Contains("result;",StringComparison.Ordinal))
+                        throw new Exception("custom task gap result/builder completion");
+                    var customFailure=new InvalidOperationException("custom-gap-fault");
+                    ReceiverTrace.Failure=customFailure;
+                    try{await ReceiverProbe.CustomGap(customGap,131,Task.CompletedTask);throw new Exception("missing custom task fault");}
+                    catch(InvalidOperationException caught) when(ReferenceEquals(caught,customFailure)){}
+                    finally{ReceiverTrace.Failure=null;}
+                    if(customGap.Runs!=2||ReceiverTrace.Helpers!=2||!BuilderTrace.Value.Contains("error;",StringComparison.Ordinal))
+                        throw new Exception("custom task gap fault/builder effects");
                 }
             }
-            """;
+            """ + "\n#pragma warning disable HM0001\n" + CustomBuilderChecks.Support;
         const string newSource = """
             #nullable enable
             using System;
+            using System.Threading;
             using System.Threading.Tasks;
             public static class NewReceiverRunner {
                 public static void Run() {
@@ -653,6 +822,28 @@ internal static class LambdaReceiverChecks
                     finally{ReceiverTrace.Failure=null;}
                     if(nestedStrings.Runs!=2||ReceiverTrace.Helpers!=6)
                         throw new Exception("new nested fault effects");
+                    ReceiverTrace.Helpers=0;ReceiverTrace.UseDefault=true;
+                    var treeGap=new TreeGapReceiver<string?>();
+                    if(ReceiverProbe.TreeGap(treeGap,"quoted") is not null||treeGap.Runs!=1||ReceiverTrace.Helpers!=1
+                        ||treeGap.Last?.Body is not System.Linq.Expressions.MethodCallExpression { Method.Name: "Maybe" })
+                        throw new Exception("new quoted gap reference/structure/effects");
+                    ReceiverTrace.UseDefault=false;
+                    var sentinel=new Uri("https://example.invalid/");var uriTree=new TreeGapReceiver<Uri?>();
+                    if(!ReferenceEquals(ReceiverProbe.TreeGap(uriTree,sentinel),sentinel)||uriTree.Runs!=1||ReceiverTrace.Helpers!=2)
+                        throw new Exception("new quoted gap reference identity/effects");
+                    ReceiverTrace.UseDefault=true;
+                    var valueTree=new TreeGapReceiver<int?>();
+                    if(ReceiverProbe.TreeGap(valueTree,(int?)139) is not null||valueTree.Runs!=1||ReceiverTrace.Helpers!=3)
+                        throw new Exception("new quoted gap physical nullable/effects");
+                    var nestedGap=new NestedGapReceiver<string?>();
+                    if(ReceiverProbe.NestedGap(nestedGap,"nested") is not null||nestedGap.Runs!=1||ReceiverTrace.Helpers!=4)
+                        throw new Exception("new nested delegate gap reference/effects");
+                    var ownGap=new OwnGapReceiver<string?,int>();
+                    if(ReceiverProbe.OwnGap(ownGap,"own",149) is not null||ownGap.Runs!=1||ownGap.LastTag!=149||ReceiverTrace.Helpers!=5)
+                        throw new Exception("new nested own-slot gap sibling/effects");
+                    var shadowGap=new ShadowGapReceiver<int?>();
+                    if(ReceiverProbe.ShadowGap(shadowGap,(int?)151) is not null||shadowGap.Runs!=1||ReceiverTrace.Helpers!=6)
+                        throw new Exception("new nested shadow gap physical nullable/effects");
                 }
                 public static async Task RunAsync() {
                     ReceiverTrace.Helpers=0;ReceiverTrace.UseDefault=true;
@@ -690,6 +881,30 @@ internal static class LambdaReceiverChecks
                     physicalGate.SetResult();var physicalResult=await physicalPending;
                     if(physicalResult.Count!=2||physicalResult[0]!=83||physicalResult[1] is not null||ReceiverTrace.Helpers!=2||ReceiverTrace.Packs!=2)
                         throw new Exception("new async interface physical nullable/effects");
+                    ReceiverTrace.Helpers=0;ReceiverTrace.UseDefault=true;BuilderTrace.Value="";
+                    var customGap=new CustomGapReceiver<string?>();var customGate=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var customPending=ReceiverProbe.CustomGap(customGap,"async",customGate.Task);
+                    if(customPending.GetAwaiter().IsCompleted||customGap.Runs!=1||ReceiverTrace.Helpers!=0)
+                        throw new Exception("new custom task gap suspension");
+                    customGate.SetResult();
+                    if(await customPending is not null||ReceiverTrace.Helpers!=1
+                        ||!BuilderTrace.Value.Contains("result;",StringComparison.Ordinal))
+                        throw new Exception("new custom task gap reference/builder effects");
+                    var valueGap=new CustomGapReceiver<int?>();var customValueGate=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var customValuePending=ReceiverProbe.CustomGap(valueGap,(int?)157,customValueGate.Task);
+                    if(customValuePending.GetAwaiter().IsCompleted||valueGap.Runs!=1||ReceiverTrace.Helpers!=1)
+                        throw new Exception("new custom task gap physical suspension");
+                    customValueGate.SetResult();
+                    if(await customValuePending is not null||ReceiverTrace.Helpers!=2)
+                        throw new Exception("new custom task gap physical nullable/effects");
+                    using var canceled=new CancellationTokenSource();canceled.Cancel();
+                    var cancelGate=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var canceledTask=ReceiverProbe.CustomGap(customGap,"cancel",cancelGate.Task);
+                    cancelGate.SetCanceled(canceled.Token);
+                    try{await canceledTask;throw new Exception("missing custom gap cancellation");}
+                    catch(OperationCanceledException caught) when(caught.CancellationToken==canceled.Token){}
+                    if(customGap.Runs!=2||ReceiverTrace.Helpers!=2)
+                        throw new Exception("new custom task gap cancellation effects");
                 }
             }
             """;
@@ -706,10 +921,10 @@ internal static class LambdaReceiverChecks
         var solution = (await action.GetOperationsAsync(cancellationToken).ConfigureAwait(false)).OfType<ApplyChangesOperation>().Single().ChangedSolution;
         var changed = (await solution.GetDocument(document.Id)!.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false))!;
         var methods = changed.GetTypeByMetadataName("ReceiverProbe")!;
-        foreach (var name in new[] { "M", "Block", "List", "Tuple", "Async", "ValueAsync", "AsyncList", "InterfaceConditional", "InterfaceSwitch", "AsyncInterfaceConditional" })
+        foreach (var name in new[] { "M", "Block", "List", "Tuple", "Async", "ValueAsync", "AsyncList", "InterfaceConditional", "InterfaceSwitch", "AsyncInterfaceConditional", "TreeGap", "NestedGap", "OwnGap", "ShadowGap", "CustomGap" })
         {
             var method = methods.GetMembers(name).OfType<IMethodSymbol>().Single();
-            var expectedParameters = name == "Tuple" ? 2 : 1;
+            var expectedParameters = name is "Tuple" or "OwnGap" ? 2 : 1;
             if (method.TypeParameters.Length != expectedParameters || method.Parameters[0].Type is not INamedTypeSymbol owner
                 || owner.TypeArguments[0].NullableAnnotation != NullableAnnotation.Annotated)
             {

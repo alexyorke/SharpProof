@@ -16,12 +16,36 @@ for language in 8 9 13; do
 EOF
   cat > "$fixture/Methods.cs" << 'EOF'
 using System;using System.Linq;using System.Collections.Generic;using System.Threading.Tasks;
+using System.Linq.Expressions;using System.Runtime.CompilerServices;
 using RecursiveCliAlias=RecursiveQualifiedCli;
 public sealed class QueryBox<T>{public QueryBox<U> Select<U>(Func<T,U> selector)=>throw new NotImplementedException();}
 public delegate List<T> ReceiverPair<T>(T first,T second);
 public sealed class ReceiverBox<T>{public List<T> Pair(T first,T second)=>new List<T>{first,second};}
 public delegate T[] CompoundPair<T>(T[] first,T[] second);
 public sealed class LambdaReceiver<T>{public T Run(T seed,Func<T> action)=>action();public Task<T> RunAsync(T seed,Func<Task<T>> action)=>action();public ValueTask<T> RunValueAsync(T seed,Func<ValueTask<T>> action)=>action();}
+public sealed class LambdaTreeReceiver<T>{public T Run(T seed,Expression<Func<T>> read)=>read.Compile()();}
+public sealed class LambdaNestedReceiver<T>{public delegate T Reader();public T Run(T seed,Reader read)=>read();}
+public sealed class LambdaOwnReceiver<T,U>{public delegate R Reader<R>(U tag);public T Run(T seed,Reader<T> read,U tag)=>read(tag);}
+public sealed class LambdaShadowReceiver<T>{
+#pragma warning disable CS0693
+  public delegate T Reader<T>();
+#pragma warning restore CS0693
+  public T Run(T seed,Reader<T> read)=>read();
+}
+[AsyncMethodBuilder(typeof(ProbeBuilder<>))]
+public readonly struct ProbeTask<T>{private readonly Task<T> task;public ProbeTask(Task<T> task){this.task=task;}public TaskAwaiter<T> GetAwaiter()=>task.GetAwaiter();}
+public struct ProbeBuilder<T>{
+  private AsyncTaskMethodBuilder<T> inner;
+  public static ProbeBuilder<T> Create()=>new ProbeBuilder<T>{inner=AsyncTaskMethodBuilder<T>.Create()};
+  public ProbeTask<T> Task=>new ProbeTask<T>(inner.Task);
+  public void SetResult(T value)=>inner.SetResult(value);
+  public void SetException(Exception error)=>inner.SetException(error);
+  public void SetStateMachine(IAsyncStateMachine state)=>inner.SetStateMachine(state);
+  public void Start<S>(ref S state) where S:IAsyncStateMachine=>inner.Start(ref state);
+  public void AwaitOnCompleted<A,S>(ref A awaiter,ref S state) where A:INotifyCompletion where S:IAsyncStateMachine=>inner.AwaitOnCompleted(ref awaiter,ref state);
+  public void AwaitUnsafeOnCompleted<A,S>(ref A awaiter,ref S state) where A:ICriticalNotifyCompletion where S:IAsyncStateMachine=>inner.AwaitUnsafeOnCompleted(ref awaiter,ref state);
+}
+public sealed class LambdaTaskReceiver<T>{public ProbeTask<T> Run(T seed,Func<ProbeTask<T>> read)=>read();}
 public sealed class IndirectReceiver<T>{public T Value;public IndirectReceiver(T value){Value=value;}}
 public sealed class IndirectSource<T>{[return:System.Diagnostics.CodeAnalysis.MaybeNull]public T Read(T fill)=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Property=>default!;[System.Diagnostics.CodeAnalysis.MaybeNull]public T Field=default!;}
 [return:System.Diagnostics.CodeAnalysis.MaybeNull]public delegate T IndirectRead<T>(T fill);
@@ -119,6 +143,11 @@ public static class QueryConsumer{
   public static int LambdaBlockReturn(LambdaReceiver<int> receiver,int value)=>receiver.Run(value,()=>{return GenericResultMaybe(value);});
   public static async Task<int> LambdaAsyncReturn(LambdaReceiver<int> receiver,int value)=>await receiver.RunAsync(value,async()=>{await Task.Yield();return GenericResultMaybe(value);});
   public static async ValueTask<int> LambdaValueAsyncReturn(LambdaReceiver<int> receiver,int value)=>await receiver.RunValueAsync(value,async()=>{await Task.Yield();return GenericResultMaybe(value);});
+  public static int LambdaTreeNullable(LambdaTreeReceiver<int> receiver,int value)=>receiver.Run(value,()=>GenericResultMaybe(value));
+  public static int LambdaNestedNullable(LambdaNestedReceiver<int> receiver,int value)=>receiver.Run(value,()=>GenericResultMaybe(value));
+  public static int LambdaOwnNullable(LambdaOwnReceiver<int,string> receiver,int value,string tag)=>receiver.Run(value,_=>GenericResultMaybe(value),tag);
+  public static int LambdaShadowNullable(LambdaShadowReceiver<int> receiver,int value)=>receiver.Run(value,()=>GenericResultMaybe(value));
+  public static ProbeTask<int> LambdaCustomTaskNullable(LambdaTaskReceiver<int> receiver,int value)=>receiver.Run(value,async()=>{await Task.Yield();return GenericResultMaybe(value);});
   public static int IndirectFieldMaybe(IndirectReceiver<int> receiver,int fill){ref var alias=ref receiver.Value;alias=GenericResultMaybe(fill);return receiver.Value;}
   public static int IndirectChainedMaybe(IndirectReceiver<int> receiver,int fill){ref var first=ref receiver.Value;ref var second=ref first;second=GenericResultMaybe(fill);return receiver.Value;}
   public static int IndirectElementMaybe(int[] values,int fill){ref var alias=ref values[0];alias=GenericResultMaybe(fill);return values[0];}
@@ -427,11 +456,21 @@ EOF
     grep -Fq 'T1 LambdaBlockReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1> LambdaAsyncReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<T1> LambdaValueAsyncReturn<T1>(global::LambdaReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 LambdaTreeNullable<T1>(global::LambdaTreeReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 LambdaNestedNullable<T1>(global::LambdaNestedReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'T1 LambdaOwnNullable<T1, T2>(global::LambdaOwnReceiver<T1, T2> receiver, T1 value, T2 tag) where T1 : struct' "$log"
+    grep -Fq 'T1 LambdaShadowNullable<T1>(global::LambdaShadowReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
+    grep -Fq 'global::ProbeTask<T1> LambdaCustomTaskNullable<T1>(global::LambdaTaskReceiver<T1> receiver, T1 value) where T1 : struct' "$log"
   else
     grep -Fq 'T1? LambdaReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
     grep -Fq 'T1? LambdaBlockReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.Task<T1?> LambdaAsyncReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
     grep -Fq 'global::System.Threading.Tasks.ValueTask<T1?> LambdaValueAsyncReturn<T1>(global::LambdaReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1? LambdaTreeNullable<T1>(global::LambdaTreeReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1? LambdaNestedNullable<T1>(global::LambdaNestedReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'T1? LambdaOwnNullable<T1, T2>(global::LambdaOwnReceiver<T1?, T2> receiver, T1 value, T2 tag)' "$log"
+    grep -Fq 'T1? LambdaShadowNullable<T1>(global::LambdaShadowReceiver<T1?> receiver, T1 value)' "$log"
+    grep -Fq 'global::ProbeTask<T1?> LambdaCustomTaskNullable<T1>(global::LambdaTaskReceiver<T1?> receiver, T1 value)' "$log"
   fi
   if [ "$language" = 8 ]; then
     grep -Fq 'T1 IndirectFieldMaybe<T1>(global::IndirectReceiver<T1> receiver, T1 fill) where T1 : struct' "$log"

@@ -260,7 +260,17 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(candidateModel)); }
             if (compilation is null)
             { throw new ArgumentNullException(nameof(compilation)); }
-            if (formal is not INamedTypeSymbol { TypeKind: TypeKind.Delegate, IsGenericType: true } delegateType
+            var expressionDefinition = compilation.GetTypeByMetadataName("System.Linq.Expressions.Expression`1");
+            if (formal is INamedTypeSymbol quote
+                && SymbolEqualityComparer.Default.Equals(quote.OriginalDefinition, expressionDefinition))
+            {
+                if (!typePath.StartsWith("/0/", StringComparison.Ordinal)
+                    || quote.TypeArguments.Length != 1)
+                { return false; }
+                formal = quote.TypeArguments[0];
+                typePath = typePath.Substring(2);
+            }
+            if (formal is not INamedTypeSymbol { TypeKind: TypeKind.Delegate } delegateType
                 || delegateType.OriginalDefinition.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } invoke
                 || delegateType.DelegateInvokeMethod is not { ReturnsVoid: false, RefKind: RefKind.None } constructedInvoke)
             { return false; }
@@ -270,10 +280,20 @@ public static partial class Inference
                 || lambda is ParenthesizedLambdaExpressionSyntax { ReturnType: not null })
             { return false; }
             var steps = typePath.Split(ReceiverTypePathSeparators, StringSplitOptions.RemoveEmptyEntries);
-            if (steps.Length < 1 || !int.TryParse(steps[0], System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out var returnIndex))
+            var parameterOwner = delegateType.OriginalDefinition;
+            var ownerDepth = 0;
+            while (parameterOwner.ContainingType is { } containingOwner
+                && ownerDepth < steps.Length && steps[ownerDepth] == "0")
+            {
+                parameterOwner = containingOwner.OriginalDefinition;
+                ownerDepth++;
+            }
+            if (ownerDepth >= steps.Length
+                || !int.TryParse(steps[ownerDepth], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var ownerSlot))
             { return false; }
-            if (returnIndex >= delegateType.TypeArguments.Length)
+            var returnIndex = ownerSlot - (parameterOwner.ContainingType is null ? 0 : 1);
+            if (returnIndex < 0 || returnIndex >= parameterOwner.TypeParameters.Length)
             { return false; }
             var templatePaths = new List<string>();
             void FindTemplatePaths(ITypeSymbol node, string path)
@@ -285,7 +305,7 @@ public static partial class Inference
                 if (node is ITypeParameterSymbol parameter)
                 {
                     if (parameter.Ordinal == returnIndex
-                        && SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, delegateType.OriginalDefinition))
+                        && SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, parameterOwner))
                     { templatePaths.Add(path); }
                     return;
                 }
@@ -308,10 +328,26 @@ public static partial class Inference
             ITypeSymbol expectedReturn = constructedInvoke.ReturnType;
             if (lambda.AsyncKeyword.RawKind != 0)
             {
-                if (expectedReturn is not INamedTypeSymbol task
-                    || task.OriginalDefinition.MetadataName is not ("Task`1" or "ValueTask`1")
-                    || task.ContainingNamespace.ToDisplayString() != "System.Threading.Tasks")
+                if (expectedReturn is not INamedTypeSymbol { TypeArguments.Length: 1 } task)
                 { return false; }
+                var standardTask = task.OriginalDefinition.MetadataName is "Task`1" or "ValueTask`1"
+                    && task.ContainingNamespace.ToDisplayString() == "System.Threading.Tasks";
+                if (!standardTask)
+                {
+                    var builderAttribute = candidateModel.GetOperation(lambda, cancellationToken)
+                        is IAnonymousFunctionOperation function
+                        ? BuilderAttribute(function.Symbol, task) : null;
+                    if (builderAttribute is null)
+                    { return false; }
+                    try
+                    {
+                        var (_, usesResult) = ConstructBuilder(builderAttribute, task);
+                        if (!usesResult)
+                        { return false; }
+                    }
+                    catch (InferenceException)
+                    { return false; }
+                }
                 expectedReturn = task.TypeArguments[0];
             }
             var returnPaths = new List<string>();
@@ -320,7 +356,7 @@ public static partial class Inference
                 if (templatePath is null)
                 { throw new InvalidOperationException("Missing delegate return template path."); }
                 var returnPath = templatePath;
-                for (var depth = 1; depth < steps.Length; depth++)
+                for (var depth = ownerDepth + 1; depth < steps.Length; depth++)
                 { returnPath += "/" + steps[depth]; }
                 if (lambda.AsyncKeyword.RawKind != 0)
                 {

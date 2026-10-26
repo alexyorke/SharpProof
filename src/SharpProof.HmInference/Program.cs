@@ -49,6 +49,7 @@ internal static class Program
         if (args is ["--recursive-group-checks"])
         {
             RecursiveGroupChecks.Run(cancellationToken);
+            RecursiveConversionChecks.Run(cancellationToken);
             await RecursiveGroupCodeFixChecks.Run(cancellationToken).ConfigureAwait(false);
             return 0;
         }
@@ -498,6 +499,7 @@ internal static class Program
         passed += await StorageChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (CodeFixChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += RecursiveGroupChecks.Run(cancellationToken);
+        passed += RecursiveConversionChecks.Run(cancellationToken);
         passed += await RecursiveGroupCodeFixChecks.Run(cancellationToken).ConfigureAwait(false);
         passed += await (DeclarationChecks.Run(cancellationToken: cancellationToken)).ConfigureAwait(false);
         passed += CoreChecks.Run(cancellationToken: cancellationToken);

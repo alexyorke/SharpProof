@@ -247,6 +247,8 @@ Compilations with unsupported invocation operations, including dynamic and
 function-pointer calls, still decline group proposals. These cases remain open.
 Two- and three-member source and IDE checks cover original and new payload
 domains, Fix All, linked-context conflicts and dependent-project rollback.
+Runtime checks also cover return and argument user conversions, boxing and
+conversions on constructed generic types, including operator counts and identity.
 
 Tuple and custom deconstruction support declarations, reassignment, mixed targets,
 discards, member/indexer stores and nested instance/extension Deconstruct methods.
@@ -1026,6 +1028,13 @@ list results. Direct conditional and switch return arms can refine interface
 receiver results when the warning is attached to an arm, including async and
 custom Task delegates. Mixed invariant list arms use a verified struct-constrained
 signature; independent tuple siblings retain their own contracts.
+Expression-tree callbacks, delegates nested in generic owners and custom task-like
+callback results now use the same return-leaf mapping. Nested delegates keep their
+own type parameters separate from their containing types, including same-spelled
+parameters. Explicit lambda result types remain fixed, including valid builder
+overrides. Applied fixes verify quoted expression structure, callback identity,
+custom-builder suspension, faults and cancellation. C# 8 retains representable
+struct bounds; C# 9/13 permit unconstrained nullable receiver and result payloads.
 Indirect ref-alias stores now discover nullable generic helper and member results
 before body inference, including generic owners, delegates, declared T? returns,
 MaybeNull fields and properties. Property flow attributes take precedence over
