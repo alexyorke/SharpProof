@@ -130,7 +130,7 @@ foreach ($relative in $files) {
     elseif ($relative.StartsWith('src/', [StringComparison]::Ordinal)) { 'source-project-or-source-asset' }
     elseif ($relative.StartsWith('eng/', [StringComparison]::Ordinal)) { 'engineering' }
     elseif ($relative.StartsWith('docs/', [StringComparison]::Ordinal) -or $relative.EndsWith('.md', [StringComparison]::Ordinal)) { 'documentation' }
-    elseif ($relative.StartsWith('tests/', [StringComparison]::Ordinal)) { 'test-data' }
+    elseif ($relative.StartsWith('tests/', [StringComparison]::Ordinal)) { 'test-infrastructure-or-test-data' }
     elseif ($relative.StartsWith('.github/', [StringComparison]::Ordinal)) { 'ci' }
     else { 'repository-metadata-or-developer-configuration' }
     $records.Add(([ordered]@{ path = $relative; classification = $classification }).AsReadOnly())
@@ -147,7 +147,7 @@ foreach ($relative in $files) {
         }
     }
     if ($relative.EndsWith('.csproj', [StringComparison]::Ordinal)) {
-        Require ($relative.StartsWith('src/', [StringComparison]::Ordinal)) "Source project is outside src: $relative"
+        Require ($relative.StartsWith('src/', [StringComparison]::Ordinal) -or $relative.StartsWith('tests/', [StringComparison]::Ordinal)) "Project is outside src or tests: $relative"
         Require ($coveredProjects.Contains($relative)) "Project is absent from all checked-in solutions: $relative"
         $name = [IO.Path]::GetFileNameWithoutExtension($relative)
         Require ($projectNames.Add($name)) "Duplicate project output key: $name"

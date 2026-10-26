@@ -83,7 +83,7 @@ try {
         -MaximumCases $maximumCampaignCases
     $dotnetWrapper = Get-SharpProofDotnetWrapperPath
     $fuzzProject = Join-Path `
-        $repositoryRoot 'src\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
+        $repositoryRoot 'tests\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
 
     if ($PSBoundParameters.ContainsKey('PreparedRunnerReceipt')) {
         if ($null -eq $PreparedRunnerReceipt) {

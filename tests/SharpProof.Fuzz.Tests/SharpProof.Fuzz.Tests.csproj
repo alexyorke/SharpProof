@@ -5,6 +5,6 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SharpProof.Fuzz\SharpProof.Fuzz.csproj" />
+    <ProjectReference Include="..\SharpProof.Fuzz\SharpProof.Fuzz.csproj" />
   </ItemGroup>
 </Project>

@@ -66,6 +66,34 @@ $attributesSettings.Save($attributesSettingsPath)
     --results-directory (Join-Path $results 'attributes')
 if ($LASTEXITCODE -ne 0) { throw "Attributes coverage failed with exit code $LASTEXITCODE." }
 
+# The real Console interrupt and default campaign need their own testhost,
+# outside the broad suites (Coverage category), over a private output copy.
+[xml]$fuzzSettings = Get-Content -LiteralPath $managedSettings -Raw
+$fuzzSettings.SelectSingleNode('//ModulePaths').InnerXml =
+'<Include><ModulePath>.*SharpProof\.Fuzz\.dll$</ModulePath></Include>'
+$fuzzSettingsPath = Join-Path $results 'coverage-fuzz-console.runsettings'
+$fuzzSettings.Save($fuzzSettingsPath)
+$fuzzOutputRoot = Join-Path ([IO.Path]::GetTempPath()) ('sharpproof-fuzz-console-' + [Guid]::NewGuid().ToString('N'))
+$previousIsolation = [Environment]::GetEnvironmentVariable('SHARPPROOF_FUZZ_CONSOLE_ISOLATED')
+try {
+    $fuzzOutput = New-SharpProofIsolatedTestOutput `
+        -SourceDirectory (Join-Path $repositoryRoot 'artifacts/bin/SharpProof.Fuzz.Tests/Release/net10.0') `
+        -DestinationDirectory (Join-Path $fuzzOutputRoot 'net10.0')
+    [Environment]::SetEnvironmentVariable('SHARPPROOF_FUZZ_CONSOLE_ISOLATED', '1')
+    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
+        test (Join-Path $repositoryRoot 'tests/SharpProof.Fuzz.Tests/SharpProof.Fuzz.Tests.csproj') `
+        -c Release --no-build --no-restore "-p:OutDir=$fuzzOutput/" `
+        --filter 'FullyQualifiedName~FuzzConsoleCancellationTests|FullyQualifiedName~FuzzDefaultCliCoverageTests' `
+        --settings $fuzzSettingsPath `
+        --collect 'Code Coverage;Format=Cobertura' `
+        --results-directory (Join-Path $results 'fuzz-console')
+    if ($LASTEXITCODE -ne 0) { throw "Isolated Fuzz console coverage failed with exit code $LASTEXITCODE." }
+}
+finally {
+    [Environment]::SetEnvironmentVariable('SHARPPROOF_FUZZ_CONSOLE_ISOLATED', $previousIsolation)
+    Remove-SharpProofOwnedDirectory -Directory $fuzzOutputRoot
+}
+
 # Merge every report by repository-relative file and line.
 $covered = [Collections.Generic.Dictionary[string, bool]]::new([StringComparer]::Ordinal)
 $sourcePrefix = $repositoryRoot.Replace('\', '/').TrimEnd('/') + '/'

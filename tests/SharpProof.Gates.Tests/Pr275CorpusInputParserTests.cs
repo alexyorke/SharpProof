@@ -33,7 +33,7 @@ public sealed class Pr275CorpusInputParserTests
     {
         System.ArgumentNullException.ThrowIfNull(input);
         System.ArgumentNullException.ThrowIfNull(message);
-        var path = Path.Combine(RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus", "oss-methods.json");
+        var path = Path.Combine(RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus", "oss-methods.json");
         var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         if (input == "missing")
         {
@@ -52,7 +52,7 @@ public sealed class Pr275CorpusInputParserTests
     [Test]
     public void ReviewedAllowancesRemainEmpty()
     {
-        var path = Path.Combine(RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus", "proven-to-unknown.json");
+        var path = Path.Combine(RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus", "proven-to-unknown.json");
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var actual = CorpusInputParsers.ReadAllowances(document.RootElement);
         Assert.That(actual, Is.Empty);

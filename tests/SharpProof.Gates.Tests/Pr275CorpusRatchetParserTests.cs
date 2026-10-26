@@ -151,7 +151,7 @@ public sealed class Pr275CorpusRatchetParserTests
     private static string ReadReviewedJson()
     {
         return File.ReadAllText(Path.Combine(
-            RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus", "unknown-reason-ratchet.json"));
+            RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus", "unknown-reason-ratchet.json"));
     }
 
     private static JsonObject ReviewedInput()

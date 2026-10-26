@@ -25,6 +25,6 @@
     <ProjectReference Include="..\..\src\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Smt\SharpProof.Smt.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Worker\SharpProof.Worker.csproj" />
-    <ProjectReference Include="..\..\src\SharpProof.Testing\SharpProof.Testing.csproj" />
+    <ProjectReference Include="..\SharpProof.Testing\SharpProof.Testing.csproj" />
   </ItemGroup>
 </Project>

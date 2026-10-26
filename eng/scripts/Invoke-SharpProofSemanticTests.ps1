@@ -57,7 +57,7 @@ $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
 $semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticSolution.solution.projects |
             ForEach-Object { ([string]$_).Replace('\', '/') }))
-$gatesProject = 'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
+$gatesProject = 'tests/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
 $partitionFilter = ''
 if ($SemanticCohort -ne 'All') {
     if ($TestFilter -cne 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus') {

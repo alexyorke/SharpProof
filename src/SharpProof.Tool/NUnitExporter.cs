@@ -14,39 +14,6 @@ namespace SharpProof.Tool;
 
 internal static class NUnitExporter
 {
-    private const string WorkspaceComposeShape = """
-        services:
-          verify:
-            image: __IMAGE__
-            platform: linux/amd64
-            mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
-            cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
-            working_dir: /workspace/consumer
-            environment:
-              - NuGetPackageSourceCredentials_SharpProofPreview
-            volumes:
-              - .:/workspace/consumer
-              - sharpproof-obj:/workspace/consumer/.sharpproof-obj
-              - sharpproof-bin:/workspace/consumer/.sharpproof-bin
-              - sharpproof-packages:/home/sharpproof/.nuget/packages
-              - sharpproof-dotnet:/home/sharpproof/.dotnet
-        volumes:
-          sharpproof-obj:
-          sharpproof-bin:
-          sharpproof-packages:
-          sharpproof-dotnet:
-        """;
-
-    private const string WorkspaceOutputProperties = """
-        <Project>
-          <PropertyGroup Condition="'$(SHARPPROOF_CONTAINER)' == '1'">
-            <SharpProofProjectOutputKey>$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectDirectory)'))/$(MSBuildProjectName)</SharpProofProjectOutputKey>
-            <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).sharpproof-obj/$(SharpProofProjectOutputKey)/</BaseIntermediateOutputPath>
-            <BaseOutputPath>$(MSBuildThisFileDirectory).sharpproof-bin/$(SharpProofProjectOutputKey)/</BaseOutputPath>
-          </PropertyGroup>
-        </Project>
-        """;
-
     internal static Task ExportAsync(string projectPath, EvidenceSet evidence, string claimId, string outputDirectory, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(projectPath);
@@ -305,7 +272,7 @@ internal static class NUnitExporter
         var imageLine = lines.FirstOrDefault(static line =>
             (line ?? throw new ArgumentNullException(nameof(line))).StartsWith(imagePrefix, StringComparison.Ordinal));
         if (imageLine == null || !SetupInitializer.IsPinnedConsumerImage(imageLine[imagePrefix.Length..]) ||
-            string.Join("\n", lines).Replace(imageLine, "    image: __IMAGE__", StringComparison.Ordinal) != WorkspaceComposeShape)
+            string.Join("\n", lines).Replace(imageLine, "    image: __IMAGE__", StringComparison.Ordinal) != ContainerScaffold.ComposeShape("__IMAGE__"))
         {
             throw new InvalidDataException("Workspace compose.yaml must match the SharpProof workspace template's digest-pinned Linux amd64 verify service and isolated root mounts.");
         }
@@ -313,7 +280,7 @@ internal static class NUnitExporter
         var properties = EvidenceSet.ReadBounded(Path.Combine(root, "Directory.Build.props"), 64 * 1024, cancellationToken);
         try
         {
-            if (!XNode.DeepEquals(XDocument.Parse(properties).Root, XDocument.Parse(WorkspaceOutputProperties).Root))
+            if (!XNode.DeepEquals(XDocument.Parse(properties).Root, XDocument.Parse(ContainerScaffold.OutputProperties).Root))
             {
                 throw new InvalidDataException("Workspace Directory.Build.props must match the SharpProof workspace template's isolated compiler output paths.");
             }

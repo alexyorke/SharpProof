@@ -73,15 +73,15 @@ The same action starts a temporary [runner telemetry](../.github/actions/runner-
 
 ## Corpus and native effect oracles
 
-`corpus` prints a structured result with case counts, support counts, Unknown reasons, replay counts, and failures. [The corpus guide](../src/SharpProof.Gates/README.md) describes the case universe and independent ratchets. Use `sp corpus-update -Configuration Release` only for an intentional observation refresh in a persistent workspace, then review the source changes. A finite task copy discards ordinary source edits.
+`corpus` prints a structured result with case counts, support counts, Unknown reasons, replay counts, and failures. [The corpus guide](../tests/SharpProof.Gates/README.md) describes the case universe and independent ratchets. Use `sp corpus-update -Configuration Release` only for an intentional observation refresh in a persistent workspace, then review the source changes. A finite task copy discards ordinary source edits.
 
-The [Gates executable](../src/SharpProof.Gates/Program.cs) also exposes five developer oracle modes: `exception-oracle`, `allocation-oracle`, `purity-oracle`, `capability-oracle`, and `effectcontract-oracle`. These are executable subcommands rather than `tooling` commands. Inside the canonical container:
+The [Gates executable](../tests/SharpProof.Gates/Program.cs) also exposes five developer oracle modes: `exception-oracle`, `allocation-oracle`, `purity-oracle`, `capability-oracle`, and `effectcontract-oracle`. These are executable subcommands rather than `tooling` commands. Inside the canonical container:
 
 ```text
-dotnet run --project src/SharpProof.Gates/SharpProof.Gates.csproj -c Release -- exception-oracle --limit 5
+dotnet run --project tests/SharpProof.Gates/SharpProof.Gates.csproj -c Release -- exception-oracle --limit 5
 ```
 
-Omit `--limit` or use zero for the full pinned method universe. Positive limits select method IDs in ordinal order and cannot exceed the universe size. A partial run is explicitly nonexhaustive. Reports include the universe hash/count, checked count, native outcomes/reasons, runtime observations, and reachable-source summary counts. [NativeEffectOracleGate.cs](../src/SharpProof.Gates/Corpus/NativeEffectOracleGate.cs) consumes the compiler artifact and independently checks applicable IL/runtime witnesses. Some purity/capability/lock cases explicitly report an oracle as not run; a successful report is not a runtime witness for every effect verdict. These reports do not publish worker proof authority.
+Omit `--limit` or use zero for the full pinned method universe. Positive limits select method IDs in ordinal order and cannot exceed the universe size. A partial run is explicitly nonexhaustive. Reports include the universe hash/count, checked count, native outcomes/reasons, runtime observations, and reachable-source summary counts. [NativeEffectOracleGate.cs](../tests/SharpProof.Gates/Corpus/NativeEffectOracleGate.cs) consumes the compiler artifact and independently checks applicable IL/runtime witnesses. Some purity/capability/lock cases explicitly report an oracle as not run; a successful report is not a runtime witness for every effect verdict. These reports do not publish worker proof authority.
 
 ## Bounded fuzz campaigns
 
@@ -99,10 +99,10 @@ or worker proof budgets.
 For a bounded individual replay, the fuzz executable accepts `--cases` (default 1,000, range 1..1,000,000), `--seed` (signed 32-bit integer, default `0x5A17`), and `--max-parallelism` (default 4, range 1..4):
 
 ```text
-dotnet run --project src/SharpProof.Fuzz/SharpProof.Fuzz.csproj -c Release -- --cases 1000 --seed 23063 --max-parallelism 4
+dotnet run --project tests/SharpProof.Fuzz/SharpProof.Fuzz.csproj -c Release -- --cases 1000 --seed 23063 --max-parallelism 4
 ```
 
-Sources: [FuzzOptions.cs](../src/SharpProof.Fuzz/FuzzOptions.cs), [FuzzRunner.cs](../src/SharpProof.Fuzz/FuzzRunner.cs), and [evidence lifecycle](../eng/scripts/SharpProof.FuzzEvidenceLifecycle.ps1). A standalone replay does not produce a qualified clean-source campaign envelope. [nightly.yml](../.github/workflows/nightly.yml) schedules the full nightly profile and uploads its artifacts even on failure.
+Sources: [FuzzOptions.cs](../tests/SharpProof.Fuzz/FuzzOptions.cs), [FuzzRunner.cs](../tests/SharpProof.Fuzz/FuzzRunner.cs), and [evidence lifecycle](../eng/scripts/SharpProof.FuzzEvidenceLifecycle.ps1). A standalone replay does not produce a qualified clean-source campaign envelope. [nightly.yml](../.github/workflows/nightly.yml) schedules the full nightly profile and uploads its artifacts even on failure.
 
 ## LongFuzz exploration and finding review
 

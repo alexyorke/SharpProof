@@ -62,28 +62,7 @@ internal static class SetupInitializerContainer
     internal static string Compose(string image)
     {
         ArgumentException.ThrowIfNullOrEmpty(image);
-        return """
-services:
-  verify:
-    image: __IMAGE__
-    platform: linux/amd64
-    mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
-    cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
-    working_dir: /workspace/consumer
-    environment:
-      - NuGetPackageSourceCredentials_SharpProofPreview
-    volumes:
-      - .:/workspace/consumer
-      - sharpproof-obj:/workspace/consumer/.sharpproof-obj
-      - sharpproof-bin:/workspace/consumer/.sharpproof-bin
-      - sharpproof-packages:/home/sharpproof/.nuget/packages
-      - sharpproof-dotnet:/home/sharpproof/.dotnet
-volumes:
-  sharpproof-obj:
-  sharpproof-bin:
-  sharpproof-packages:
-  sharpproof-dotnet:
-""".Replace("__IMAGE__", image, StringComparison.Ordinal) + "\n";
+        return ContainerScaffold.Compose(image);
     }
 
     private static string[] Lines(string text)

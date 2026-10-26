@@ -15,7 +15,7 @@
              Link="HashEncoding.cs" />
     <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
-    <Compile Include="..\SharpProof.Ir\AtomicFile.cs"
+    <Compile Include="..\..\src\SharpProof.Ir\AtomicFile.cs"
              Link="AtomicFile.cs" />
     <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />

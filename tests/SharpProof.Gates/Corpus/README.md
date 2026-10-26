@@ -33,7 +33,7 @@ Use a persistent canonical container workspace so edits survive. Inside its shel
 ```text
 git clone https://github.com/aalhour/C-Sharp-Algorithms /tmp/sharpproof-upstream
 git -C /tmp/sharpproof-upstream checkout b82432474a916ac784cd1446eabcba615c333463
-pwsh -NoLogo -NoProfile -File src/SharpProof.Gates/Corpus/Import-OssCorpus.ps1 -UpstreamRoot /tmp/sharpproof-upstream
+pwsh -NoLogo -NoProfile -File tests/SharpProof.Gates/Corpus/Import-OssCorpus.ps1 -UpstreamRoot /tmp/sharpproof-upstream
 ```
 
 The target clone path must be unused. The commands above run inside the canonical container, not a host PowerShell session.

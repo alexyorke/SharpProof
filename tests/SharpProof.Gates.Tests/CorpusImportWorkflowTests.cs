@@ -92,7 +92,7 @@ public sealed class CorpusImportWorkflowTests
         var pinned = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
         var pinnedSource = pinned.Sources.Single();
         var license = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus", pinnedSource.LicenseFile));
+            RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus", pinnedSource.LicenseFile));
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "LICENSE"), license);
         for (var file = 0; file < 25; file++)
         {

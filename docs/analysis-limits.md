@@ -56,7 +56,7 @@ See [preview support](preview-support.md) for local filesystem requirements and 
 
 ## Acceptance-only thresholds
 
-The [corpus ratchet](../src/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. [eng/acceptance/contract.json](../eng/acceptance/contract.json) owns automation CPU and wall-time budgets. These are qualification criteria, not user-configurable worker limits.
+The [corpus ratchet](../tests/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. [eng/acceptance/contract.json](../eng/acceptance/contract.json) owns automation CPU and wall-time budgets. These are qualification criteria, not user-configurable worker limits.
 
 Use the [container commands](container-development.md) to run the corresponding gates. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
 

@@ -112,7 +112,7 @@ internal static class OpenSourceCorpusCatalog
         System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         return Path.Combine(
             Path.GetFullPath(repositoryRoot),
-            "src/SharpProof.Gates",
+            "tests/SharpProof.Gates",
             "Corpus");
     }
 

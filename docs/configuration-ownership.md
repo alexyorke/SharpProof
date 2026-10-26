@@ -18,10 +18,10 @@ effective defaults, limits, wire formats, and explicit caller overrides.
 | Optional tool SDK-discovery limits | [SdkProbe](../src/SharpProof.Tool/SdkProbe.cs) | Tool doctor discovery: 15-second timeout, 5-second process cleanup wait, and 4096 characters per stdout/stderr stream; separate from solver budgets and analysis deadlines |
 | Host contract environment names | [HostEnvironmentVariables](../src/SharpProof.Host/HostEnvironmentVariables.cs) | Contract readers and trusted child environment allowlist |
 | Atomic publication retry count | [AtomicFile](../src/SharpProof.Ir/AtomicFile.cs) | Staging-name allocation and publication retries |
-| Fuzz case, seed and parallelism settings | [FuzzOptions](../src/SharpProof.Fuzz/FuzzOptions.cs) | CLI parsing/help, runner validation and summary admission |
-| Gate child-process cleanup deadline | [GateProcess](../src/SharpProof.Gates/GateProcess.cs) | Captured processes and corpus Git importer |
-| Fuzz source replay step budget | [FuzzExecutionDefaults](../src/SharpProof.Fuzz/FuzzExecutionDefaults.cs) | Metadata and total-program replay oracles |
-| Corpus execution and evidence presentation | [CorpusExecutionDefaults](../src/SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs) | Wall-time threshold/message, diagnostic caps, IL body bound and allocation observation loops |
+| Fuzz case, seed and parallelism settings | [FuzzOptions](../tests/SharpProof.Fuzz/FuzzOptions.cs) | CLI parsing/help, runner validation and summary admission |
+| Gate child-process cleanup deadline | [GateProcess](../tests/SharpProof.Gates/GateProcess.cs) | Captured processes and corpus Git importer |
+| Fuzz source replay step budget | [FuzzExecutionDefaults](../tests/SharpProof.Fuzz/FuzzExecutionDefaults.cs) | Metadata and total-program replay oracles |
+| Corpus execution and evidence presentation | [CorpusExecutionDefaults](../tests/SharpProof.Gates/Corpus/CorpusExecutionDefaults.cs) | Wall-time threshold/message, diagnostic caps, IL body bound and allocation observation loops |
 
 These are implementation defaults, not new public configuration switches.
 Consumer overrides remain documented in [consumer configuration](configuration.md).

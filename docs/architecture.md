@@ -86,6 +86,6 @@ Profiles select activation; worker policy decides what results the build accepts
 
 Coverage is an independent measurement: [Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) reports line coverage of the C# sources. A passing coverage run and a proof of user code are different claims; neither implies the other. See [development workflows](development-workflows.md) for coverage commands.
 
-Tests cover frontend, IR, contracts, specs, SMT, effects, analyzer, worker, protocol behavior, architecture, and packaged consumers. [Golden fixtures](../tests/golden/README.md) freeze stable stage output. [Corpus gates](../src/SharpProof.Gates/README.md) compare independently classified cases, outcomes, and canonical diagnostics.
+Tests cover frontend, IR, contracts, specs, SMT, effects, analyzer, worker, protocol behavior, architecture, and packaged consumers. [Golden fixtures](../tests/golden/README.md) freeze stable stage output. [Corpus gates](../tests/SharpProof.Gates/README.md) compare independently classified cases, outcomes, and canonical diagnostics.
 
 Run the relevant target first, then the smallest broader [container gate](container-development.md). These checks establish the exercised cases and boundaries, not universal language correctness.

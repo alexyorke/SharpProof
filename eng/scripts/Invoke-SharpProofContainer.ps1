@@ -555,7 +555,7 @@ switch ($Command) {
     }
     { $_ -in @('corpus', 'corpus-update') } {
         $gateMode = $Command
-        $gateProject = 'src/SharpProof.Gates/SharpProof.Gates.csproj'
+        $gateProject = 'tests/SharpProof.Gates/SharpProof.Gates.csproj'
         Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
             'run', '--project', $gateProject,

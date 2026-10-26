@@ -47,7 +47,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 - [Development workflows](development-workflows.md): choose targeted, PR, coverage, corpus, packaging, and qualification workflows.
 - [Container development](container-development.md): all commands and workspace modes.
 - [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
-- [Corpus gate](../src/SharpProof.Gates/README.md) and [source provenance](../src/SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
+- [Corpus gate](../tests/SharpProof.Gates/README.md) and [source provenance](../tests/SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
 - [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
 - [Release process](../eng/release/README.md): tag checks, consumer matrix, and publication.
 - [Security policy](../SECURITY.md): private reporting and scope.

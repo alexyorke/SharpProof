@@ -78,6 +78,6 @@ Complete eligible responses can be cached, including stable semantic abstentions
 | Corpus and metamorphic gates | Reviewed support classification, semantic outcomes, invariant diagnostics |
 | Coverage gate | Tracked production inventory, executable coverage, changed trusted-code floor |
 
-[Corpus documentation](../src/SharpProof.Gates/README.md) explains its source pin, classifications, and ratchet. [Golden documentation](../tests/golden/README.md) explains updates. Numeric floors are owned by checked-in acceptance data and must not be relaxed to hide unsupported behavior.
+[Corpus documentation](../tests/SharpProof.Gates/README.md) explains its source pin, classifications, and ratchet. [Golden documentation](../tests/golden/README.md) explains updates. Numeric floors are owned by checked-in acceptance data and must not be relaxed to hide unsupported behavior.
 
 Passing these gates verifies exercised cases. It is not a completeness claim about C# or all methods in an upstream library.

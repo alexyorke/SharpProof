@@ -29,6 +29,10 @@
     <AssemblyMetadata Include="SharpProof.NUnit" Value="$(NUnitVersion)" />
     <AssemblyMetadata Include="SharpProof.NUnitAdapter" Value="$(NUnit3TestAdapterVersion)" />
     <Compile Include="../../eng/shared/InputValidation.cs" Link="Reporting/InputValidation.cs" />
+    <EmbeddedResource Include="../SharpProof.Templates/content/container/compose.yaml.template"
+                      LogicalName="SharpProof.Tool.compose.yaml.template" />
+    <EmbeddedResource Include="../SharpProof.Templates/content/container/Directory.Build.props.template"
+                      LogicalName="SharpProof.Tool.Directory.Build.props.template" />
     <ProjectReference Include="../SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="../SharpProof.Specs/SharpProof.Specs.csproj" />
     <ProjectReference Include="../SharpProof.Frontend/SharpProof.Frontend.csproj" />

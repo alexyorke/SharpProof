@@ -7,7 +7,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
+    <ProjectReference Include="..\..\src\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Fuzz" />

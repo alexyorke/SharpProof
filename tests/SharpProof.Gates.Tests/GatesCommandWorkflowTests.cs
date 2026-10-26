@@ -21,8 +21,8 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         var builtDirectory = Path.GetDirectoryName(typeof(CorpusGate).Assembly.Location)!;
         CopyDirectory(builtDirectory, runtimeDirectory);
         var root = RepositoryLayout.FindRoot();
-        CopyDirectory(Path.Combine(root, "src/SharpProof.Gates", "Corpus"),
-            Path.Combine(repository.FullName, "src/SharpProof.Gates", "Corpus"));
+        CopyDirectory(Path.Combine(root, "tests/SharpProof.Gates", "Corpus"),
+            Path.Combine(repository.FullName, "tests/SharpProof.Gates", "Corpus"));
         File.Copy(Path.Combine(root, "SharpProof.slnx"), Path.Combine(repository.FullName, "SharpProof.slnx"));
         var acceptanceDirectory = Path.Combine(repository.FullName, "eng", "acceptance");
         Directory.CreateDirectory(acceptanceDirectory);
@@ -109,7 +109,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
     [Test]
     public async Task CorpusUpdateCommandReproducesTheReviewedSnapshot()
     {
-        var snapshot = Path.Combine(repository!.FullName, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
+        var snapshot = Path.Combine(repository!.FullName, "tests/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
         var before = (await File.ReadAllBytesAsync(snapshot)).ToImmutableArray();
 
         var result = await RunAsync(["corpus-update"]);

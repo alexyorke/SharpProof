@@ -163,7 +163,7 @@ public sealed class CorpusSnapshotWorkflowTests
     private static string CopyCorpus(string targetRoot)
     {
         System.ArgumentNullException.ThrowIfNull(targetRoot);
-        var source = Path.Combine(RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus");
+        var source = Path.Combine(RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus");
         var destination = OpenSourceCorpusCatalog.GetCorpusDirectory(targetRoot);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {

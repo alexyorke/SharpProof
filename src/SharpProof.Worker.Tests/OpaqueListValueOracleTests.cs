@@ -28,7 +28,7 @@ public sealed class OpaqueListValueOracleTests
     {
         ArgumentNullException.ThrowIfNull(domain);
         var (type, first, second) = Inputs(domain);
-        using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(), "src/SharpProof.Gates/Corpus/oss-methods.json")));
+        using var corpus = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestRepository.FindRoot(), "tests/SharpProof.Gates/Corpus/oss-methods.json")));
         var method = corpus.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = corpus.RootElement.GetProperty("files").EnumerateArray().Single(item => item.GetProperty("path").GetString() == method.GetProperty("path").GetString());
         var lines = file.GetProperty("content").GetString()!.Split('\n').ToImmutableArray();

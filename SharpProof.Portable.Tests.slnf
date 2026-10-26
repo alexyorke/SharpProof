@@ -12,7 +12,7 @@
       "src\\SharpProof.Ir.Tests\\SharpProof.Ir.Tests.csproj",
       "src\\SharpProof.Smt.Tests\\SharpProof.Smt.Tests.csproj",
       "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj",
-      "src\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
+      "tests\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
       "src\\SharpProof.Verify.Tests\\SharpProof.Verify.Tests.csproj"
     ]
   }

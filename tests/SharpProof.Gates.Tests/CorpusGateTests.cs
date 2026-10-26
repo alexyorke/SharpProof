@@ -69,7 +69,7 @@ public sealed class CorpusGateTests
     {
         SharpProof.Host.ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var root = RepositoryLayout.FindRoot();
-        var snapshotPath = Path.Combine(root, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
+        var snapshotPath = Path.Combine(root, "tests/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
         var snapshotBefore = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
         var frozen = ImmutableDictionaryCapture.Create((await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
 , static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0]), static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : line, StringComparer.Ordinal);
@@ -166,7 +166,7 @@ public sealed class CorpusGateTests
     {
         var repositoryRoot = RepositoryLayout.FindRoot();
         var license = File.ReadAllText(Path.Combine(
-            repositoryRoot, "src/SharpProof.Gates", "Corpus",
+            repositoryRoot, "tests/SharpProof.Gates", "Corpus",
             "third-party", "aalhour-C-Sharp-Algorithms-LICENSE.txt"));
 
         Assert.Throws<InvalidDataException>((Action)(() =>
@@ -260,13 +260,13 @@ public sealed class CorpusGateTests
         var repository = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(repository);
         using var temporary = new TempDirectory("SharpProof.Gates.Test-catalog-");
-        var corpus = Path.Combine(temporary.FullName, "src/SharpProof.Gates", "Corpus");
+        var corpus = Path.Combine(temporary.FullName, "tests/SharpProof.Gates", "Corpus");
         Directory.CreateDirectory(corpus);
         foreach (var source in document.Sources)
         {
             var destination = Path.Combine(corpus, source.LicenseFile);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(Path.Combine(repository, "src/SharpProof.Gates", "Corpus", source.LicenseFile), destination);
+            File.Copy(Path.Combine(repository, "tests/SharpProof.Gates", "Corpus", source.LicenseFile), destination);
         }
         var manifestPath = Path.Combine(corpus, "oss-methods.json");
         File.WriteAllText(manifestPath, JsonSerializer.Serialize(document));
@@ -1010,7 +1010,7 @@ public sealed class CorpusGateTests
         var lines = File.ReadAllLines(
             Path.Combine(
                 root,
-                "src/SharpProof.Gates",
+                "tests/SharpProof.Gates",
                 "Corpus",
                 "expected.canonical.snapshot")).ToImmutableArray();
         var refuted = lines.Single(static line =>
@@ -1155,7 +1155,7 @@ public sealed class IndependentPinnedRequiresCensusTests
             Assert.That(existing.Failures, Is.Empty, item.Id);
         }
         Assert.That(obligations, Is.EqualTo(100));
-        var snapshot = (await File.ReadAllLinesAsync(Path.Combine(root, "src/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"))).ToImmutableArray();
+        var snapshot = (await File.ReadAllLinesAsync(Path.Combine(root, "tests/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"))).ToImmutableArray();
         var pinnedContractIds = snapshot.Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
             .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0])).ToImmutableArray();
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));

@@ -36,8 +36,8 @@ public sealed class CorpusPolicyWorkflowTests
         System.ArgumentNullException.ThrowIfNull(expectedMessage);
         System.ArgumentNullException.ThrowIfNull(policyFile);
         using var temporary = new TempDirectory("SharpProof-corpus-policy-");
-        var source = Path.Combine(RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus");
-        var destination = Path.Combine(temporary.FullName, "src/SharpProof.Gates", "Corpus");
+        var source = Path.Combine(RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus");
+        var destination = Path.Combine(temporary.FullName, "tests/SharpProof.Gates", "Corpus");
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var target = Path.Combine(destination, Path.GetRelativePath(source, file));
@@ -57,7 +57,7 @@ public sealed class CorpusPolicyWorkflowTests
     public void GateRejectsRepeatedCanonicalSnapshotCaseBeforeRunningCases()
     {
         using var temporary = new TempDirectory("SharpProof-duplicate-snapshot-");
-        var source = Path.Combine(RepositoryLayout.FindRoot(), "src/SharpProof.Gates", "Corpus");
+        var source = Path.Combine(RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus");
         var destination = OpenSourceCorpusCatalog.GetCorpusDirectory(temporary.FullName);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
