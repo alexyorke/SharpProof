@@ -3,7 +3,7 @@ description: Report comparable end-to-end measurements with proof quality retain
 body:
   - type: markdown
     attributes:
-      value: "See docs/consumer-performance.md and docs/support.md. Do not attach unreviewed logs or proprietary source."
+      value: "See docs/support.md. Do not attach unreviewed logs or proprietary source."
   - type: textarea
     id: reproduction
     attributes:

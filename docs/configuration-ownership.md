@@ -30,12 +30,10 @@ Consumer overrides remain documented in [consumer configuration](configuration.m
 
 [toolchain.json](../eng/container/toolchain.json) owns the container toolchain
 versions, image pins, native payload identities and platform. Dockerfile and
-SDK-policy copies are intentional format-specific representations checked by
-[Test-SharpProofContainerContract.ps1](../eng/scripts/Test-SharpProofContainerContract.ps1).
+SDK-policy copies are intentional format-specific representations.
 
-[The acceptance contract](../eng/acceptance/contract.json) owns acceptance
-thresholds, automation CPU/wall budgets, and independently frozen worker/cache
-expectations. [ContainerExecution](../eng/scripts/SharpProof.ContainerExecution.psm1)
+[The acceptance contract](../eng/acceptance/contract.json) owns automation CPU/wall
+budgets, fuzz campaign limits, and independently frozen worker/cache expectations. [ContainerExecution](../eng/scripts/SharpProof.ContainerExecution.psm1)
 interprets automation settings. Its named missing-contract timeout fallback is
 retained for minimal changed-test fixtures.
 
@@ -45,14 +43,6 @@ are the conditional MSBuild representation of worker defaults. The
 evaluate those defaults and compare them with runtime constants. Keep both the
 independent acceptance assertions and these parity checks when changing policy.
 No build-time code generator or runtime configuration-file dependency is added.
-
-New defaults sources must retain explicit ownership in the acceptance contract.
-Files containing only compile-time constants have no executable sequence points
-and are explicitly registered in the
-[declaration-only coverage baseline](../eng/coverage/baseline.json). Aggregate,
-changed-TCB, and project coverage floors remain at 100%. Declaration classification
-also distinguishes compile-time const initializers from executable readonly,
-property, and method bodies; authenticated module and PDB checks still apply.
 
 ## Repository audit coverage
 

@@ -14,14 +14,13 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Portable/worker/package suite | `tooling portable-tests`, `worker-tests`, or `package-tests` | Selects the corresponding suite; package tests use their scheduler |
 | Repository analysis and samples | `tooling self-apply -Configuration Release` | Builds every tracked source project with advisory portable analysis, then runs the complete package sample matrix; required by PR CI |
 | Corpus qualification | `tooling corpus -Configuration Release` | Snapshot, metamorphic invariance, support classifications, Unknown ratchets, and replay |
-| Coverage qualification | `tooling coverage` with a comparison ref | Release collection, source/PDB authority, coverage floors and changed trusted-code coverage |
-| Clean package graph | `tooling pack -Configuration Release` | Exact-commit packages and package layout validation |
-| Packed consumer behavior | `tooling package-consumers -PackageSource <feed>` | Real analyzer/verifier and minimum-SDK framework consumers |
+| Coverage | `tooling coverage` | Release Cobertura line coverage of the C# sources, merged into `artifacts/coverage/summary.md` |
+| Clean package graph | `tooling pack -Configuration Release` | Exact-commit product packages; `tooling pack-tool` packs the optional developer packages |
 | Retained and rotating fuzz | `tooling fuzz-nightly -Configuration Release` | Bounded clean-source campaign with validated per-run results |
 | Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus and bounded fuzz; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
-The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns trusted pipeline classifications and acceptance wall-time budgets; [baseline.json](../eng/coverage/baseline.json) owns numeric coverage floors. A successful selected test or feedback profile establishes only its selected scope.
+The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns test parallelism and wall-time budgets. A successful selected test or feedback profile establishes only its selected scope.
 
 The nightly fuzz runner rebuild uses the 600-second solution-build allowance. The
 worker's default per-project wall-time budget remains 300 seconds; these measure
@@ -43,46 +42,26 @@ pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofDevCheck.ps1 -Configu
 
 `-PlanOnly` prints selection or the developer command plan without running the selected builds/tests. These script parameters are not dispatcher parameters. Sources: [changed-test selection](../eng/scripts/Invoke-SharpProofChangedTests.ps1), [developer check](../eng/scripts/Invoke-SharpProofDevCheck.ps1), and [command plan](../eng/scripts/Get-SharpProofDevCheckPlan.ps1).
 
-## Canonical PR cohorts
+## Canonical PR jobs
 
-The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus`. [ci.yml](../.github/workflows/ci.yml) splits this unchanged universe across parallel jobs:
+The canonical filter is `TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus`. [ci.yml](../.github/workflows/ci.yml) splits it across parallel jobs:
 
-- `canonical-main` runs `pr -SemanticCohort Remaining -TaskGroup <group> -TestResultsDirectory artifacts/canonical-remaining -SkipPackageTests -SkipRepositoryGates` as three parts on separate runners: `worker-a` (`-TaskGroup WorkerA`, remainder shards 1 and 4), `worker-b` (`-TaskGroup WorkerB`, remainder shards 2 and 3) and `projects` (`-TaskGroup Projects`, every other Remaining task). Each part's full Release solution build is an analyzer-enforcing build.
-- `canonical-package-partition` runs `package-tests -Configuration Release -Fast -PackagePartitionCount 4 -PackagePartition <0..3>` with the canonical filter on four runners. Partition zero also runs the source-only `repository-gates`. The `canonical-package` check requires every partition and reconciles retained discovery and TRX evidence. `-Fast` skips analyzers only in those builds.
-- `canonical-gates` runs `semantic-tests -Configuration Release -SemanticCohort Gates -TestResultsDirectory artifacts/canonical-gates` with the canonical filter. The Gates tests run as four tasks: `gates-corpus` holds the classes that run the whole reviewed corpus through the corpus verifier's worker pool and reserves three scheduler slots, and `gates-remainder-1` to `-3` split the other classes by class name prefix and use one slot each. The last remainder shard takes every class the listed prefixes do not match, so each class runs exactly once.
-- `formatting` runs `format-check` while `package-reproducibility` runs the unchanged Full independent-path package reproduction.
-- `self-application` runs `self-apply -SelfApplicationPhase Sources`, while `self-application-samples` runs `-SelfApplicationPhase Samples`. The default `All` retains both phases locally. `api-coverage` separately runs the intrinsic-evidence and runtime-oracle checks and publishes their reports.
-- `build-and-test` requires all those jobs to succeed, downloads their evidence into `artifacts/canonical-cohorts/remaining` and `gates`, then runs [Invoke-SharpProofCanonicalCohortGate.ps1](../eng/scripts/Invoke-SharpProofCanonicalCohortGate.ps1), the script behind `canonical-cohort-gate`. The gate reads only evidence and Git identity, so this job runs it on the checksum-verified PowerShell archive from `toolchain.json` instead of building the tooling image.
+- `canonical-build` builds the complete Release solution with all analyzers.
+- `canonical-main` runs `semantic-tests -SemanticCohort Remaining -TaskGroup <WorkerA|WorkerB|Projects>` on three runners.
+- `canonical-package` runs `package-tests -PackagePartitionCount 4 -PackagePartition <0..3>` on four runners. Partitions hash the fully qualified method identity, so all parameter cases of a method stay together. Partition zero also runs `docs` and `layout`.
+- `canonical-gates` runs `semantic-tests -SemanticCohort Gates` as the corpus part and the remainder shards.
+- `formatting`, `self-application`, `self-application-samples`, and `api-coverage` run alongside.
+- `build-and-test` is the single required check; it succeeds only when every job above succeeded.
 
-The self-application phases, API checks, and formatting become ready after repository quality succeeds. Package partitions and independent reproduction start alongside quality so their final aggregation can finish earlier. This limits the first wave of runner requests so the longer semantic and coverage jobs can start promptly; all successful-PR checks and aggregate requirements remain in force.
+`-Fast` skips analyzers only in the test jobs; `canonical-build` enforces them. `-SemanticCohort`, `-TaskGroup`, and `-TestResultsDirectory` apply only to `pr`, `pr-gates`, and `semantic-tests`. Source: [semantic scheduler](../eng/scripts/Invoke-SharpProofSemanticTests.ps1).
 
-`All` is the default cohort. `Remaining` and `Gates` require retained test results and the exact canonical filter. Without coverage, `-TaskGroup` accepts `Worker`, `WorkerA`, `WorkerB`, or `Projects` with the `Remaining` cohort. build-and-test moves all Remaining parts' task directories into one cohort directory and keeps each part's receipt as `canonical-cohort.<part>.json`; the gate requires the parts to share their run, source, and selection, and checks their merged tasks, discovery, and cases as one cohort. `pr` retains package phases unless `-SkipPackageTests` is given, retains repository gates unless `-SkipRepositoryGates` is given, and rejects Gates-only selection. `-SemanticCohort`, `-TaskGroup`, and `-TestResultsDirectory` apply only to `pr`, `pr-gates`, and `semantic-tests`.
-
-Reconciliation checks actual NUnit discovery, TRX execution identities/outcomes, source identity, and the CI run/attempt evidence. The six existing Explicit LongFuzz skips have specific allowed identities and reasons; additional skipped tests fail reconciliation. Two independently successful job labels alone do not replace this gate. Sources: [semantic scheduler](../eng/scripts/Invoke-SharpProofSemanticTests.ps1) and [cohort evidence validator](../eng/scripts/SharpProof.CanonicalCohortEvidence.ps1).
-
-Package partitions hash the UTF-8 fully qualified method identity with SHA-256 and take the unsigned digest modulo four. All parameter cases of a method stay together. Each partition retains the complete NUnit discovery dump, selected case names, source/run identity, and TRX receipts. The gate recomputes ownership, requires identical discovered universes, and checks that the four executed case lists cover that universe exactly once. Unexpected skips and unsuccessful results fail; the established unsupported-host test may retain its exact container-specific skip. Package coverage uses the same method partition logic and authenticates these receipts alongside its coverage reports. Successful partitions retain their artifact attempts across failed-only reruns. Canonical Worker, Projects, and Gates receipts also retain their successful producer attempts; the final gate requires an exact receipt-to-attempt map from the workflow outputs and rejects mismatched or future attempts.
-
-## Coverage collection and acceptance
-
-For a complete finite run:
+## Coverage
 
 ```text
-docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tooling coverage
+docker compose run --rm tooling coverage
 ```
 
-Choose the actual change base. CI resolves the PR base SHA, the preceding push SHA, or the required manual `comparison_ref` input to an exact commit. The normal command builds Release and writes a unique `artifacts/coverage/container-<id>` directory.
-
-[coverage.yml](../.github/workflows/coverage.yml) collects fourteen shards on separate runners. `semantic-gates-corpus-a` runs the snapshot workflow class; `semantic-gates-corpus-b` runs its complete complement within the original corpus selection, including Corpus-category tests. `semantic-gates-shards` retains the three Gates remainder tasks. `semantic-worker-a-1` retains remainder 1 and the fixed-checksum task; `semantic-worker-a-4` retains remainder 4; `semantic-worker-b-2` and `semantic-worker-b-3` give each task of the other half its own runner. `semantic-analyzer` runs Analyzer tests alongside the existing semantic Fuzz campaign; `semantic-projects-rest` runs all other original project tasks; `semantic-extras` runs architecture checks and the isolated Attributes and Fuzz console collectors. `package-0` through `package-3` retain the four package method partitions. Each shard emits normalized Cobertura reports, source/binary authority, TRX receipts, and a report manifest. Successful artifact attempts remain available for failed-only reruns.
-
-`coverage-gate` requires every phase in the [semantic coverage plan](../eng/scripts/SharpProof.SemanticCoveragePlan.ps1). It authenticates manifests, checks each complete task partition, and verifies the corpus case union against actual full NUnit discovery, including parameter cases and category exclusions. The gate independently rebuilds production source/PDB authority, keeps maximum hits within each authenticated production module, and enforces the unchanged floors and changed-TCB criteria. Identical class records may reuse an earlier validation only after their module and source have been authenticated in the current report; any changed record receives full line/PDB validation. Reuse preserves zero hits, overlapping credits, and distinct ownership of linked sources. Path resolution also reuses earlier results only for an identical ordered source-root array and filename within the immutable private source snapshot; module ownership and every changed record still receive their normal validation. No authority build, comparison, or coverage obligation is removed.
-
-Coverage shards derive their test build projects from the same task plan and add every evaluated production project. Canonical PR jobs still build the full solution with analyzers. The merge streams XML directly into XmlDocument rather than first copying each whole report into a PowerShell string. Source/module authority, range and hit validation, all overlapping credits, direct zero-hit evidence, and MAX merging are unchanged. Exact immutable artifact IDs allow concurrent downloads while retaining successful producer attempts.
-
-`-CoveragePhase` is valid only for `coverage-shard`. The legacy `semantic-gates-corpus`, `semantic-projects`, `semantic-worker-a`, and `semantic-worker-b` selections remain available for standalone probes; they do not replace the fourteen required CI phases. The gate rejects preexisting merged authority and reports outside its exact phase set. Shard collection alone does not enforce final acceptance. Sources: [collection](../eng/scripts/Invoke-SharpProofCoverage.ps1), [shard evidence](../eng/scripts/SharpProof.CoverageShardEvidence.ps1), and [coverage validation](../eng/scripts/Test-SharpProofCoverage.ps1).
-
-Inspect `SharpProof.coverage.json` with the reports and `artifacts/timings/*-coverage.json`. Preserve source commit, comparison SHA, configuration, binary/PDB identity, denominators, and individual shard evidence when comparing results. [Production inventory](../eng/scripts/Get-SharpProofProductionInventory.ps1) derives the coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. The acceptance contract classifies trusted pipeline projects/paths; the coverage baseline defines line floors and declaration-only coverage classification, with its project set checked against evaluated inventory. Changing collection layout does not authorize changing these authorities.
-
-The changed-TCB percentage measures changed lines with an authenticated PDB span or direct collector record, including generated and zero-hit spans. `changedTcb.unmappedLines` separately lists changed lines without either measurement; these receive no execution credit. This reporting requires valid syntax and matching source, module, PDB, and collector evidence from every owning compilation. Missing evidence still fails the gate. The 100% floor applies to measurable lines; it does not establish execution or semantic correctness for unmapped lines.
+[Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) builds Release, runs the semantic and package tests with the Microsoft collector (Cobertura), collects `SharpProof.Attributes` in its own test host, then merges every report by file and line: a line is covered when any report hit it. It writes per-project and total line coverage to `artifacts/coverage/summary.md`. `-MinimumLinePercent` optionally fails below an aggregate floor. [coverage.yml](../.github/workflows/coverage.yml) runs it on `master` pushes and on demand.
 
 ## CI runner setup and telemetry
 
@@ -142,8 +121,8 @@ The NUnit harnesses record findings and continue. [long-fuzz.yml](../.github/wor
 
 ## Packed qualification and evidence inspection
 
-`pack` exports the exact three-package graph to `artifacts/container-packages`; it requires clean exact-commit source. Run `package-consumers -Configuration Release -PackageSource artifacts/container-packages` and `samples` against those bytes. Consumer qualification also selects the pinned minimum SDK for framework consumers. The sample harness checks eight package-only projects, expected diagnostics, strict Proven claims, and mixed typed outcomes; see [samples](../src/samples/README.md).
+`pack` exports the exact three-package graph to `artifacts/container-packages`; it requires clean exact-commit source. Run `package-tests` and `samples` against those bytes. The sample harness checks eight package-only projects, expected diagnostics, strict Proven claims, and mixed typed outcomes; see [samples](../src/samples/README.md).
 
-[Release process](../eng/release/README.md) describes branch versus tag qualification, platform consumers, and feed routing. Keep the uploaded package artifact's source identity with consumer results. [Golden tests](../tests/golden/README.md) documents all four fixture stages and guarded original-workspace updates.
+[Release process](../eng/release/README.md) describes tag publication. Keep the uploaded package artifact's source identity with consumer results. [Golden tests](../tests/golden/README.md) documents all four fixture stages and guarded original-workspace updates.
 
 When inspecting CI, begin with the failing phase's summary, source SHA, requested scope, and artifact name. Then inspect bounded failures in the matching report and timings. Keep raw corpus observations, coverage counts, bounded fuzz campaign evidence, and exploratory findings distinct: they establish different claims and have different stopping conditions.

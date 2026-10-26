@@ -102,5 +102,4 @@ suite passed 83 tests, the frontend catalog two, and analyzer resource/projectio
 checks 296. Packaged conditional-Proven controls passed for returned and configured roots,
 including all quantities, used assumptions, task/layout provenance and SARIF.
 The no-premise Unknown package regression also passed after the rebase.
-Exact-head hosted qualification and the unchanged 100% changed-TCB coverage gate
-also remain open.
+Exact-head hosted qualification also remains open.

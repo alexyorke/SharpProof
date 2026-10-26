@@ -27,7 +27,6 @@ fi
 cd "${target}"
 contract_path="${SHARPPROOF_CONTAINER_CONTRACT:-}"
 test -n "${contract_path}" && test -f "${contract_path}"
-sp contract
 sp restore
 
 cat << 'EOF'

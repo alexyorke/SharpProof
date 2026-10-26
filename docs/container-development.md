@@ -10,7 +10,6 @@ From the repository root:
 
 ```text
 docker compose build tooling
-docker compose run --rm tooling contract
 docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~NameOfTest
 docker compose run --rm tooling pr
 ```
@@ -35,7 +34,6 @@ Open [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json) with 
 Inside that workspace, `sp` dispatches the same command profiles:
 
 ```text
-sp contract
 sp test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
 sp pr
 ```
@@ -48,33 +46,27 @@ The `loop` service uses a separate named workspace with read-only host source in
 
 | Command | Purpose |
 | --- | --- |
-| `contract` | Validate the canonical container contract |
 | `docs` | Check local Markdown links and anchors |
 | `restore` | Locked restore of `-Target` |
-| `format-check` | Check C# formatting, PowerShell parsing/lint/format, ShellCheck and shfmt for all tracked scripts, plus script-tool failure regressions; never write source changes |
+| `format-check` | Check C# formatting, PowerShell parsing/lint/format, ShellCheck and shfmt for all tracked scripts, never write source changes |
 | `build` | Locked restore and build of `-Target` |
 | `test` | Targeted project/solution testing |
 | `test-changed` | Change-based test selection |
 | `quick` | Debug changed tests with `-Fast`; development feedback |
 | `semantic-tests` | Scheduled semantic test suite |
-| `canonical-cohort-gate` | Reconcile downloaded Remaining/Gates discovery, TRX, and receipts from the same CI run |
 | `portable-tests` | Portable test solution |
 | `worker-tests` | Worker test project |
 | `package-tests` | Package test scheduler and package-backed harness |
 | `check` | Developer-check plan: restore, build, semantic and package validation |
 | `pr` | Release `pr-gates` profile |
-| `pr-gates` | `repository-gates`, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
-| `repository-gates` | Source-only `pr-gates` checks: documentation, container contract, repository layout, package and release regressions, public API governance |
-| `package-reproducibility` | Run Full independent-path reproduction in a clean private workspace and export the report |
+| `pr-gates` | Documentation links, repository layout, solution build, semantic/package tests excluding Performance, Coverage, and Corpus categories; requires Release |
 | `self-apply` | Apply packaged analysis to the source project set and samples |
 | `samples` | Package-backed sample matrix; packs a feed if none is supplied |
-| `pack` | Clean exact-commit package graph build and validation |
-| `package-consumers` | Real analyzer/verifier consumers and minimum-SDK framework consumers; requires `-PackageSource` |
+| `pack` | Clean exact-commit package graph build |
+| `pack-tool` | Optional Tool, CodeFixes, and Templates packages |
 | `corpus` | Canonical corpus and support-ratchet checks |
 | `corpus-update` | Intentional corpus observation update |
-| `coverage` | Release coverage and acceptance checks; requires a comparison ref |
-| `coverage-shard` | Collect one Release phase from the fourteen-part [semantic coverage plan](../eng/scripts/SharpProof.SemanticCoveragePlan.ps1) |
-| `coverage-gate` | Validate and merge all fourteen downloaded coverage shards; requires a comparison ref |
+| `coverage` | Release Cobertura line coverage of the C# sources with a merged summary |
 | `dependency-audit` | Locked restore and dependency vulnerability audit |
 | `security` | Dependency audit and full Release build with banned-API enforcement |
 | `fuzz-nightly` | Clean exact-commit fuzz campaign |
@@ -94,39 +86,21 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates`, `-TaskGroup All|Worker|WorkerA|WorkerB|Projects`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone. `-SkipPackageTests` and `-SkipRepositoryGates` are supported only by `pr` and `pr-gates`, for CI runs that execute the package phase or the repository gates in a separate job. `-CoveragePhase` is supported only by `coverage-shard`. `self-apply -SelfApplicationPhase All|Sources|Samples` defaults to `All`. `package-tests -PackagePartitionCount 4 -PackagePartition 0..3` runs one method partition; the default count of one retains a complete local run. `package-partition-gate` reconciles all four retained partitions. See [development workflows](development-workflows.md) for the exact CI split and evidence requirements.
+`-SemanticCohort All|Remaining|Gates`, `-TaskGroup All|Worker|WorkerA|WorkerB|Projects`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone.
 
 After packing clean source, test the exported package bytes:
 
 ```text
-docker compose run --rm tooling package-consumers -Configuration Release -PackageSource artifacts/container-packages
 docker compose run --rm tooling samples -Configuration Release -PackageSource artifacts/container-packages
 ```
 
 ## Coverage
 
-The gate needs a reachable comparison commit/ref for changed trusted-code coverage. Choose the actual base of the change, not an arbitrary ref that hides changed lines.
-
 ```text
-docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tooling coverage -Configuration Release
+docker compose run --rm tooling coverage -Configuration Release
 ```
 
-The Compose services also forward `SHARPPROOF_COVERAGE_COMPARISON_REF` from the host environment. For a Git worktree, set it before invoking the wrapper:
-
-```powershell
-$env:SHARPPROOF_COVERAGE_COMPARISON_REF = 'origin/master'
-pwsh -File eng/scripts/Invoke-SharpProof.ps1 coverage -Configuration Release
-```
-
-The comparison ref must already be available in the checkout's Git metadata. The wrapper mounts that metadata read-only and does not fetch refs.
-
-Coverage shards derive their test build projects from the same task plan and add every evaluated production project. Canonical PR jobs still build the full solution with analyzers. The merge streams XML directly into XmlDocument rather than first copying each whole report into a PowerShell string. Source/module authority, range and hit validation, all overlapping credits, direct zero-hit evidence, and MAX merging are unchanged. Exact immutable artifact IDs allow concurrent downloads while retaining successful producer attempts.
-
-CI passes its resolved comparison SHA. [coverage.yml](../.github/workflows/coverage.yml) collects fourteen independent phases: two corpus parts, Gates remainder tasks, four Worker parts, Analyzer with the semantic Fuzz campaign, remaining project tasks, isolated architecture/Attributes/Fuzz checks, and four package partitions. Every phase retains source and binary/PDB authority and a report manifest. The gate rejects missing or mismatched evidence, verifies complete task and corpus-case partitions, and independently rebuilds production authority before enforcing coverage. Corpus parts reserve every worker slot. Proof budgets, timeouts, module ownership, MAX merging, coverage floors, and changed-TCB enforcement are unchanged.
-
-Coverage validation caches coverage credits for each production assembly, source, and line from that assembly's matching PDB ranges within one run. It preserves every overlapping sequence-point start and keeps lines that are permitted without granting coverage credit. The cache is rebuilt from independently authenticated current binaries and PDBs on each invocation. Project totals include every document owned by the project's evaluated `Compile` items and authenticated module, including linked sources outside its directory. Aggregate totals sum assembly/source/start obligations, so source compiled into two production assemblies contributes separately for each assembly. Repeated reports use maximum hits within the same assembly; another production or test assembly cannot supply its coverage.
-
-Each CI shard uploads its timing profile from `artifacts/timings/*-coverage.json` in the same artifact as its coverage reports. These profiles show test phase and shard durations when investigating slow runs.
+Coverage builds Release, collects Cobertura line coverage of the C# sources from the semantic and package tests, and writes a merged per-project summary to `artifacts/coverage/summary.md`. See [development workflows](development-workflows.md#coverage).
 
 ## Long-running fuzz campaign
 

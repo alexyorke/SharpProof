@@ -160,8 +160,7 @@ partial candidates. The existing explicit refactoring can still handle compatibl
 cross-file partials. Applying the action previews ordinary attributed source with
 reviewable signatures and throwing placeholders; no assumptions or clauses are guessed.
 Companion generation/repair has no Fix All. See the
-[editor guide](editor-workflows.md) and pending
-[interactive qualification](editor-acceptance.md).
+[editor guide](editor-workflows.md).
 
 ## Worker reporting
 

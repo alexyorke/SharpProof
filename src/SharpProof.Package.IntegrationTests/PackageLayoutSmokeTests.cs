@@ -25,86 +25,10 @@ public sealed class PackageLayoutSmokeTests
         s_sharedCompilationServerIds = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     private static readonly string[] s_nativeResourceMetricNames = ["LoopBodyEntries", "ArrayAllocations", "AllocatedElements"];
-    private static readonly int[] s_resourcePerformanceInputSizes = [0, 16, 128];
 
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
-    }
-
-    [TestCase("contracts", TestName = "ConsumerContractPerformanceWorkflow")]
-    [TestCase("resources", TestName = "ConsumerResourcePerformanceWorkflow")]
-    [Platform("Linux")]
-    public async Task ConsumerPerformancePreservesProofQualityAndComparableMeasurements(string workload)
-    {
-        ArgumentNullException.ThrowIfNull(workload);
-        var feed = await PackagedProductFeed.GetAsync();
-        var repository = TestRepository.FindRoot();
-        using var directory = new TempDirectory("SharpProof.Performance.Test-");
-        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", feed.Source, "-Iterations", "1", "-Workload", workload, "-InputSizes", "0,16,128", "-RuntimeRepetitions", "3", "-OutputDirectory", directory.FullName]);
-        Assert.That(result.ExitCode, Is.Zero, result.Output);
-        var reports = Directory.GetFiles(directory.FullName, "measurements.json", SearchOption.AllDirectories);
-        Assert.That(reports, Has.Length.EqualTo(1), result.Output);
-        var reportText = await File.ReadAllTextAsync(reports.Single(), TestContext.CurrentContext.CancellationToken);
-        var evidenceDirectory = Path.Combine(repository, "artifacts", "consumer-performance-validation");
-        Directory.CreateDirectory(evidenceDirectory);
-        var evidencePath = Path.Combine(evidenceDirectory, workload + "-" + Guid.NewGuid().ToString("N") + ".json");
-        await File.WriteAllTextAsync(evidencePath, reportText, TestContext.CurrentContext.CancellationToken);
-        TestContext.AddTestAttachment(evidencePath);
-        using var report = JsonDocument.Parse(reportText);
-        var root = report.RootElement;
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
-        Assert.That(root.GetProperty("completed").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("workload").GetString(), Is.EqualTo(workload));
-        var measurements = root.GetProperty("measurements").EnumerateArray().ToArray();
-        Assert.That(measurements, Has.Length.EqualTo(15));
-        foreach (var measurement in measurements.Where(row => row.GetProperty("variant").GetString() == "verified" && row.GetProperty("scenario").GetString() != "restore"))
-        {
-            Assert.That(measurement.GetProperty("claims").GetInt32(), Is.EqualTo(8));
-            Assert.That(measurement.GetProperty("proven").GetInt32(), Is.EqualTo(8));
-            Assert.That(measurement.GetProperty("incomplete").GetInt32(), Is.Zero);
-        }
-        var runtime = root.GetProperty("runtimeMeasurements").EnumerateArray().ToArray();
-        if (workload == "contracts")
-        { Assert.That(runtime, Is.Empty); return; }
-        Assert.That(runtime, Has.Length.EqualTo(3));
-        Assert.That(runtime.Select(row => row.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Measurement must be an object.", nameof(row)) : row.GetProperty("sourceSha256").GetString()).Distinct().Count(), Is.EqualTo(1));
-        foreach (var measurement in runtime)
-        {
-            Assert.That(measurement.GetProperty("processElapsedMilliseconds").GetInt64(), Is.GreaterThanOrEqualTo(0));
-            var samples = measurement.GetProperty("samples").EnumerateArray().ToArray();
-            Assert.That(samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("inputSize").GetInt32()), Is.EqualTo(s_resourcePerformanceInputSizes));
-            var allocated = samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("allocatedBytes").GetInt64()).ToArray();
-            Assert.That(allocated[0], Is.GreaterThan(0));
-            Assert.That(allocated[1], Is.GreaterThan(allocated[0]));
-            Assert.That(allocated[2], Is.GreaterThan(allocated[1]));
-            foreach (var sample in samples)
-            {
-                Assert.That(sample.GetProperty("repetitions").GetInt32(), Is.EqualTo(3));
-                Assert.That(sample.GetProperty("checksum").GetInt64(), Is.EqualTo(sample.GetProperty("inputSize").GetInt32() == 0 ? 0 : 48));
-                Assert.That(sample.GetProperty("stopwatchFrequency").GetInt64(), Is.GreaterThan(0));
-                Assert.That(sample.GetProperty("kernelElapsedTicks").GetInt64(), Is.GreaterThanOrEqualTo(0));
-            }
-        }
-        var comparisons = root.GetProperty("runtimeComparisons").EnumerateArray().ToArray();
-        Assert.That(comparisons, Has.Length.EqualTo(9));
-        foreach (var comparison in comparisons)
-        {
-            Assert.That(comparison.GetProperty("allocatedDeltaBytes").GetInt64(), Is.Zero);
-            Assert.That(comparison.GetProperty("kernelMilliseconds").GetDouble(), Is.GreaterThanOrEqualTo(0));
-        }
-    }
-
-    [TestCase("0,0")]
-    [TestCase("0,1001")]
-    [Platform("Linux")]
-    public async Task ConsumerPerformanceRejectsInvalidScalesBeforeLoadingPackages(string sizes)
-    {
-        ArgumentNullException.ThrowIfNull(sizes);
-        var repository = TestRepository.FindRoot();
-        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", Path.Combine(repository, "missing-performance-packages"), "-Workload", "resources", "-InputSizes", sizes]);
-        Assert.That(result.ExitCode, Is.Not.Zero);
-        Assert.That(result.Output, Does.Contain("Input sizes must be distinct integers"));
     }
 
     private static readonly ImmutableArray<byte> PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];

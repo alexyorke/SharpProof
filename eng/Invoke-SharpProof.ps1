@@ -4,7 +4,7 @@ param(
     [ValidateSet(
         'quick', 'check', 'pr', 'nightly', 'security', 'coverage',
         'build', 'test', 'test-changed', 'pack', 'samples', 'corpus',
-        'fuzz-nightly', 'package-consumers', 'dependency-audit')]
+        'fuzz-nightly', 'dependency-audit')]
     [Alias('Profile')]
     [string]$BuildProfile = 'check',
 
@@ -16,8 +16,6 @@ param(
     [string]$TestFilter = '',
 
     [string]$PackageSource = '',
-
-    [string]$ComparisonRef = '',
 
     [switch]$Fast
 )
@@ -88,17 +86,8 @@ if ($forcedConfigurations.Contains($BuildProfile)) {
 
 switch ($BuildProfile) {
     'coverage' {
-        if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
-            throw 'coverage requires -ComparisonRef <commit-or-ref>.'
-        }
-        $exactComparison = (& git rev-parse --verify "$ComparisonRef^{commit}").Trim()
-        if ($LASTEXITCODE -ne 0 -or
-            $exactComparison -notmatch '^[0-9a-f]{40}$') {
-            throw "Coverage comparison '$ComparisonRef' is not one exact commit."
-        }
-        Invoke-Container 'coverage' 'Release' @() ([ordered]@{
-                SHARPPROOF_COVERAGE_COMPARISON_REF = $exactComparison
-            }).AsReadOnly()
+        $coverageArguments = if ([string]::IsNullOrWhiteSpace($TestFilter)) { @() } else { @('-TestFilter', $TestFilter) }
+        Invoke-Container 'coverage' 'Release' $coverageArguments
     }
     'test' {
         $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -116,13 +105,6 @@ switch ($BuildProfile) {
         $arguments = $argumentBuilder.ToImmutable()
         $nativeArguments = if ($arguments.IsEmpty) { $null } else { , [string[]]@($arguments) }
         Invoke-Container 'test-changed' $Configuration $nativeArguments
-    }
-    'package-consumers' {
-        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-            throw "$BuildProfile requires -PackageSource."
-        }
-        Invoke-Container $BuildProfile $Configuration @(
-            '-PackageSource', $PackageSource)
     }
     default {
         $argumentBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()

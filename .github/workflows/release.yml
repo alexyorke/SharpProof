@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sharpproof-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  COMPOSE_PROJECT_NAME: sharpproof-release-${{ github.run_id }}-${{ github.run_attempt }}
+  SHARPPROOF_CONTAINER_CPU_LIMIT: 4
+
+jobs:
+  package:
+    name: Pack and test packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check the tag matches the checked-in package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          version="$(pwsh -NoLogo -NoProfile -Command 'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
+          test "v${version}" = "${GITHUB_REF_NAME}"
+
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
+
+      - name: Pack the product packages
+        run: docker compose run --rm tooling pack -Configuration Release
+
+      - name: Pack the optional developer packages
+        run: docker compose run --rm tooling pack-tool -Configuration Release
+
+      # Task workspaces copy only the ignored nupkgs/ input, not artifacts/.
+      - name: Run the package tests against the packed feed
+        run: |
+          mkdir -p nupkgs
+          cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/
+          docker compose run --rm tooling package-tests -Configuration Release \
+            -PackageSource nupkgs \
+            -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+
+      - name: Upload packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/container-packages/*.nupkg
+            artifacts/container-packages/*.snupkg
+            artifacts/tool-packages/*.nupkg
+          if-no-files-found: error
+
+  publish:
+    name: Publish to nuget.org and GitHub
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+    runs-on: ubuntu-latest
+    environment: nuget.org
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
+          path: nupkgs
+
+      - name: Exchange GitHub OIDC token for a temporary NuGet key
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push packages and symbols
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          for package in $(find nupkgs -name '*.nupkg' | sort); do
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json \
+              --api-key "$NUGET_API_KEY" --skip-duplicate
+          done
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          mapfile -t assets < <(find nupkgs -name '*.nupkg' -o -name '*.snupkg' | sort)
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --target "$GITHUB_SHA" --generate-notes "${flags[@]}" "${assets[@]}"

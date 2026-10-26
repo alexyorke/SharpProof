@@ -8,7 +8,6 @@
   "overrideCommand": false,
   "shutdownAction": "stopCompose",
   "postCreateCommand": "sharpproof-dev-init",
-  "postStartCommand": "sp contract",
   "customizations": {
     "vscode": {
       "settings": {

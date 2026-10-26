@@ -59,18 +59,7 @@ cancellation, and process-tree termination. Native runs do not have Docker's
 CPU/memory isolation or an OS memory quota. The caller must provision sufficient
 resources or supply an external execution boundary for untrusted workloads.
 
-The Windows CI matrix runs `eng/scripts/Test-SharpProofWindowsProofs.ps1` against packages built
-by the canonical container for x64 and ARM64. This maintainer acceptance helper requires native
-architecture-matched Windows PowerShell 7.6 or later running on .NET 10 or later because its path
-and lease checks load the packaged .NET 10 host assembly into PowerShell.
-Installing the .NET SDK does not upgrade PowerShell's runtime. This prerequisite
-applies to the acceptance helper; NuGet consumers run `dotnet build` directly.
-It checks actual proven/refuted/unknown results,
-structured claim/input identity, stale-evidence rejection after source changes,
-project deadline failure, Windows path guards, and missing/modified DLL rejection.
-The matrix also checks the single-package/no-configuration consumer and native
-payload loading. Review the source SHA, architecture, and completed job evidence;
-compiled binaries and import audits alone do not establish a passed native ABI
-run. The canonical Linux proof consumer and portable consumers remain separate.
+Native Windows proofs are not exercised in CI; the canonical Linux container runs the
+package tests.
 Native Windows repository build/test/pack remains unsupported outside the canonical
 Linux container.

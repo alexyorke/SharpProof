@@ -6,10 +6,6 @@ SharpProof's optional developer packages are versioned with the three product pa
 These additions do not change existing verification or assumption policies. Package
 availability on a public feed is not implied; use the matching packages from your
 configured feed or this checkout's qualified package artifacts.
-Official `1.0.0-preview.1` binaries, symbols, image, and detailed release evidence use
-the private `alexyorke/SharpProof-preview` path; source remains public. Public CI uses
-distinct validation versions. The [private release receipt](private-preview-release-receipt.md)
-keeps actual publication and access evidence pending until verified.
 
 ## Install and start
 
@@ -272,8 +268,6 @@ refactoring can still handle compatible cross-file partials.
 SPCF0004 offers missing-member scaffolding when the target and missing names are unambiguous.
 Ambiguous companion repairs are declined, and companion repair has no Fix All. The
 existing Result-type correction retains its own Fix All support.
-All real-editor qualification is pending for the three required Windows x64 hosts;
-follow the [interactive acceptance runbook](editor-acceptance.md).
 
 ## Author a contract and inspect its result
 
@@ -386,24 +380,8 @@ The consumer's ordinary build policy remains unchanged. The assertion represents
 original postcondition: the generated test should fail on the defective implementation
 and pass once it is fixed. It does not enable runtime contract checks.
 
-## Qualify developer packages
+## Pack developer packages
 
-Set `SHARPPROOF_CONSUMER_IMAGE` to the qualified immutable GHCR image reference, then run
-`docker compose run --rm -e SHARPPROOF_CONSUMER_IMAGE tooling developer-experience`.
-This builds the solution, packs all six packages, installs the tool/template in isolated
-locations, and checks generated portable/native consumers, comparison, and regression export.
-Evidence and phase timings are exported beneath `artifacts/developer-experience/<run-id>`.
-`run.json` records scope, pass/fail status, analyzer mode, source identity, package
-hashes, and consumer image reference. A complete local consumer run requires
-`scope=developer-experience`, `qualificationMode=AnalyzerEnabled`, and `status=passed`;
-a package-only or feedback-only pass does not establish that result.
-Timings are observations, not a claim of improvement over an unmeasured baseline.
-`-Fast` permits development feedback without repository build analyzers; it does not
-qualify a release and is never used by the release workflow.
-
-`tooling developer-packages` requires clean exact-commit source and exports the same six
-packages under `artifacts/developer-experience/<run-id>/packages` without running the
-consumer demonstration. The release process records the new template/editor packages
-separately under `artifacts/developer-packages`; the existing optional-tool publisher
-handles `SharpProof.Tool`. The original `tooling pack` keeps its three-package graph.
-Template packaging refuses an absent or mutable image reference.
+`docker compose run --rm tooling pack-tool -Configuration Release` packs
+`SharpProof.Tool`, `SharpProof.CodeFixes`, and `SharpProof.Templates` into
+`artifacts/tool-packages`. The original `tooling pack` keeps its three-package graph.

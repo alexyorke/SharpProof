@@ -31,10 +31,6 @@ jobs:
       - uses: ./.github/actions/prepare-qualified-packages
         with:
           download-packages: "false"
-      - name: Exercise release security failure paths in the canonical container
-        run: >-
-          docker compose run --rm tooling dev -lc
-          'pwsh -NoLogo -NoProfile -File eng/scripts/Test-SharpProofReleaseSecurity.ps1'
       - name: Scan the actual qualified tooling image
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:

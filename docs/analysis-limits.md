@@ -56,9 +56,9 @@ See [preview support](preview-support.md) for local filesystem requirements and 
 
 ## Acceptance-only thresholds
 
-[eng/acceptance/contract.json](../eng/acceptance/contract.json) owns trusted pipeline project/path classifications. [Get-SharpProofProductionInventory.ps1](../eng/scripts/Get-SharpProofProductionInventory.ps1) derives the production coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. [eng/coverage/baseline.json](../eng/coverage/baseline.json) owns aggregate, per-project, and changed-TCB line floors plus the declaration-only coverage list; its project set must match that evaluated universe. The [corpus ratchet](../src/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. These are qualification criteria, not user-configurable worker limits.
+The [corpus ratchet](../src/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. [eng/acceptance/contract.json](../eng/acceptance/contract.json) owns automation CPU and wall-time budgets. These are qualification criteria, not user-configurable worker limits.
 
-Use the [container commands](container-development.md) to run the corresponding gates. Coverage needs a valid changed-code comparison ref. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
+Use the [container commands](container-development.md) to run the corresponding gates. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
 
 ## Outcome behavior at a limit
 

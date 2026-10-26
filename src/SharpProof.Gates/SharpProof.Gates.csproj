@@ -8,8 +8,6 @@
              Link="RepositoryRoot.cs" />
     <Compile Include="..\..\eng\scripts\SharpProof.JsonDefaults.cs"
              Link="SharpProof.JsonDefaults.cs" />
-    <Compile Include="..\..\eng\scripts\SharpProof.SymbolPackageValidator.cs"
-             Link="SharpProof.SymbolPackageValidator.cs" />
     <Reference Include="Microsoft.CodeAnalysis"
                HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll"
                Private="true" />

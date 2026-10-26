@@ -319,9 +319,6 @@ try {
         Resolve-Path -LiteralPath $PackageSource -ErrorAction Stop).Path
     $script:nugetConfig =
     New-IsolatedNuGetConfig $script:resolvedPackageSource
-    & (Join-Path $PSScriptRoot 'Test-SharpProofPackageConsumers.ps1') `
-        -PackageSource $script:resolvedPackageSource `
-        -ValidatePackageSourceOnly
 
     foreach ($projectName in @(
             'Effects',

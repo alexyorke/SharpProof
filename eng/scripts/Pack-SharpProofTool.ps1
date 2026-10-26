@@ -11,8 +11,11 @@ $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repository 'artifacts/tool-packages' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 [void][IO.Directory]::CreateDirectory($OutputDirectory)
-& dotnet pack (Join-Path $repository 'src/SharpProof.Tool/SharpProof.Tool.csproj') `
-    --configuration $Configuration --output $OutputDirectory -p:ContinuousIntegrationBuild=true -p:SharpProofPackTool=true
-if ($LASTEXITCODE -ne 0) { throw 'Optional SharpProof.Tool packing failed.' }
-Write-Host "Optional tool feed: $OutputDirectory"
-Write-Host 'The main SharpProof application package graph does not depend on this tool.'
+foreach ($project in @('Tool', 'CodeFixes', 'Templates')) {
+    & dotnet pack (Join-Path $repository "src/SharpProof.$project/SharpProof.$project.csproj") `
+        --configuration $Configuration --output $OutputDirectory -p:ContinuousIntegrationBuild=true `
+        -p:SharpProofPackTool=true -p:SharpProofDeveloperPackages=true
+    if ($LASTEXITCODE -ne 0) { throw "Optional SharpProof.$project packing failed." }
+}
+Write-Host "Optional developer package feed: $OutputDirectory"
+Write-Host 'The main SharpProof application package graph does not depend on these packages.'

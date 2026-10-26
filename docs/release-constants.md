@@ -28,11 +28,4 @@ The acceptance contract also mirrors protocol, artifact, summary, pack, cache, a
 
 ## Qualification and publication
 
-Trusted pipeline classifications belong to [contract.json](../eng/acceptance/contract.json); numeric coverage floors belong to [baseline.json](../eng/coverage/baseline.json), with corpus support independently ratcheted. The coverage universe comes from evaluated solution/MSBuild inventory. Updating a snapshot or schema cannot silently relax those criteria.
-
-The [public package workflow](../.github/workflows/package-consumers.yml) uses distinct
-CI validation versions and retains the future public tag/version qualification path.
-The official `1.0.0-preview.1` path instead uses the private repository, exact source and
-workflow commits, and signed manifest described in the
-[release process](../eng/release/README.md). Passing branch CI does not establish
-private release qualification, interactive editor acceptance, or publication.
+Corpus support is independently ratcheted. Updating a snapshot or schema cannot silently relax those criteria. Public CI uses distinct `0.0.0-ci.<run>.<attempt>` validation versions; [release.yml](../.github/workflows/release.yml) publishes tagged versions as described in the [release process](../eng/release/README.md).

@@ -12,9 +12,8 @@ function Get-SharpProofEffectivePackageVersion {
     }
     $version = $versionNode.InnerText.Replace('$(SharpProofVersionPrefix)', $prefixNode.InnerText)
     if (-not [string]::IsNullOrEmpty($env:SHARPPROOF_CI_PACKAGE_VERSION)) {
-        if ($env:SHARPPROOF_PRIVATE_PREVIEW -ceq 'true' -or
-            $env:SHARPPROOF_CI_PACKAGE_VERSION -cnotmatch '\A0\.0\.0-ci\.[1-9][0-9]*\.[1-9][0-9]*\z') {
-            throw 'CI validation versions require 0.0.0-ci.<run-id>.<attempt> and cannot be private release versions.'
+        if ($env:SHARPPROOF_CI_PACKAGE_VERSION -cnotmatch '\A0\.0\.0-ci\.[1-9][0-9]*\.[1-9][0-9]*\z') {
+            throw 'CI validation versions require 0.0.0-ci.<run-id>.<attempt>.'
         }
         $version = $env:SHARPPROOF_CI_PACKAGE_VERSION
     }
@@ -26,23 +25,7 @@ function Get-SharpProofEffectivePackageVersion {
 
 function Get-SharpProofExpectedRepositoryUrl {
     param()
-
-    $requested = $env:SHARPPROOF_REPOSITORY_URL
-    if ([string]::IsNullOrEmpty($requested) -or $requested -ceq 'https://github.com/alexyorke/SharpProof') {
-        if ($env:SHARPPROOF_PRIVATE_PREVIEW -ceq 'true') {
-            throw 'Private preview packages must link to their private distribution repository.'
-        }
-        return 'https://github.com/alexyorke/SharpProof'
-    }
-    if ($requested -cne 'https://github.com/alexyorke/SharpProof-preview' -or
-        $env:SHARPPROOF_PRIVATE_PREVIEW -cne 'true' -or
-        $env:GITHUB_REPOSITORY -cne 'alexyorke/SharpProof-preview' -or
-        $env:SHARPPROOF_SOURCE_REPOSITORY -cne 'alexyorke/SharpProof' -or
-        $env:SHARPPROOF_SOURCE_COMMIT -cnotmatch '\A[a-f0-9]{40}\z' -or
-        $env:SHARPPROOF_WORKFLOW_COMMIT -cnotmatch '\A[a-f0-9]{40}\z') {
-        throw 'Private repository metadata requires the explicit private preview workflow and bound source identities.'
-    }
-    return $requested
+    return 'https://github.com/alexyorke/SharpProof'
 }
 
 Export-ModuleMember -Function Get-SharpProofEffectivePackageVersion, Get-SharpProofExpectedRepositoryUrl

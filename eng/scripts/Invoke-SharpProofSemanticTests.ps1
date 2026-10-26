@@ -36,9 +36,6 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.SemanticBuildPlan.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -700,16 +697,6 @@ try {
                     elapsedMilliseconds = $result.ElapsedMilliseconds
                     exitCode            = $result.ExitCode
                 }).AsReadOnly())
-    }
-    if ($coverageEnabled) {
-        Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
-    }
-    if ($retainCanonicalResults) {
-        Save-SharpProofCanonicalCohort -Root $resultsRoot `
-            -RepositoryRoot $repositoryRoot -Cohort $SemanticCohort `
-            -Configuration $Configuration -Filter $semanticFilter `
-            -Projects $semanticProjects -Expected $tasks `
-            -Completed @($testRun.Completed)
     }
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0

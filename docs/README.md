@@ -16,10 +16,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
 | [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest installation, SDK discovery, project setup checks, and stored-evidence commands |
 | [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |
-| [Consumer performance](consumer-performance.md) | Comparable build/runtime allocation measurements, quality evidence and explicit budgets |
 | [Editor workflows](editor-workflows.md) | Portable feedback, safe code fixes, container tasks and managed debugging |
-| [Interactive editor acceptance](editor-acceptance.md) | Required Windows x64 Visual Studio, VS Code/C#, and Rider sessions; all qualification evidence pending |
-| [Private preview release receipt](private-preview-release-receipt.md) | Separate source/workflow identities, private artifacts/signatures/symbols/access, and pending publication evidence |
 | [Progressive tutorials](tutorials/README.md) | Eight runnable lessons with captured diagnostics and proof results |
 | [Configuration](configuration.md) | Consumer MSBuild properties, selection, IDE behavior, budgets, cache, and report paths |
 | [Verification evidence](verification-results.md) | Find reports, join claims to selection, interpret proofs, replay, assumptions, vacuity, and cache records |

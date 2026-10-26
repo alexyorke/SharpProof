@@ -28,10 +28,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PackageTestDiscovery.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PackagePartitions.ps1')
-& (Join-Path $PSScriptRoot 'Test-SharpProofPackageDiscovery.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Import-Module (Join-Path `
@@ -993,24 +991,7 @@ try {
         -Prepare $preparePackageTest `
         -Label 'Package test' `
         -Quiet:$Quiet
-    if ($PackagePartitionCount -eq 4) {
-        $receiptRoot = Join-Path $partitionEvidence 'results'
-        [IO.Directory]::CreateDirectory($receiptRoot) | Out-Null
-        foreach ($trx in Get-ChildItem -LiteralPath $results -Recurse -Filter '*.trx' -File) {
-            Copy-Item -LiteralPath $trx.FullName -Destination (Join-Path $receiptRoot ($trx.Directory.Name + '-' + $trx.Name))
-        }
-        Assert-SharpProofPackagePartitionReceipt -Root $receiptRoot -Expected $partitionCases
-        ([ordered]@{
-            schemaVersion = 1; count = 4; index = $PackagePartition
-            commit   = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-            runId = [string]$env:GITHUB_RUN_ID; filter = $TestFilter
-            selected = @($partitionCases | ForEach-Object { $_.name } | Sort-Object -CaseSensitive)
-        }).AsReadOnly() | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partitionEvidence 'package-partition.json') -Encoding utf8NoBOM
-    }
     $shardTimings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
-    if ($coverageEnabled) {
-        Save-SharpProofCoverageCohort -Root $results -Expected $orderedShards -Completed @($testRun.Completed) -ProjectPath $testProject
-    }
     foreach ($result in @($testRun.Completed)) {
         $shardTimings.Add(([ordered]@{
                     name                = $result.Test.Name

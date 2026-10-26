@@ -225,8 +225,6 @@ public sealed class ProjectDagTests
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
             allowed |= item.Project == "SharpProof.Logging" &&
                 relative == "eng/logging/RepositoryLogger.cs";
-            allowed |= item.Project == "SharpProof.Gates" &&
-                relative == "eng/scripts/SharpProof.SymbolPackageValidator.cs";
             allowed |= item.Project == "SharpProof.EditorSuggestions" &&
                 relative is "src/SharpProof.CodeFixes/CompanionEligibility.cs" or "src/SharpProof.CodeFixes/CompanionSuggestionContract.cs";
             if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")

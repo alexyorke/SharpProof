@@ -55,7 +55,7 @@ docker compose run --rm tooling pr
 Replace the project and filter with the relevant test. `pr` runs the Release PR gates, excluding tests categorized Performance, Coverage, or Corpus. Run additional relevant gates:
 
 ```text
-docker compose run --rm -e SHARPPROOF_COVERAGE_COMPARISON_REF=origin/master tooling coverage -Configuration Release
+docker compose run --rm tooling coverage -Configuration Release
 docker compose run --rm tooling corpus -Configuration Release
 docker compose run --rm tooling security
 docker compose run --rm tooling samples -Configuration Release
