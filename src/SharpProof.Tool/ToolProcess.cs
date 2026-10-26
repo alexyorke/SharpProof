@@ -7,11 +7,20 @@ internal static class ToolProcess
 {
     internal const int MaximumOutputCharacters = 16 * 1024 * 1024;
 
-    internal static async Task<(int ExitCode, string Output)> RunAsync(string command, string directory, CancellationToken cancellationToken, params string[] arguments)
+    internal static Task<(int ExitCode, string Output)> RunAsync(string command, string directory, CancellationToken cancellationToken, params string[] arguments)
     {
         ArgumentException.ThrowIfNullOrEmpty(command);
         ArgumentException.ThrowIfNullOrEmpty(directory);
         ArgumentNullException.ThrowIfNull(arguments);
+        return RunAsync(command, directory, TimeSpan.FromSeconds(30), cancellationToken, arguments);
+    }
+
+    internal static async Task<(int ExitCode, string Output)> RunAsync(string command, string directory, TimeSpan deadline, CancellationToken cancellationToken, params string[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(command);
+        ArgumentException.ThrowIfNullOrEmpty(directory);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(deadline, TimeSpan.Zero);
         cancellationToken.ThrowIfCancellationRequested();
         var start = new ProcessStartInfo(command)
         {
@@ -25,7 +34,7 @@ internal static class ToolProcess
         { start.ArgumentList.Add(argument); }
         using var process = new Process { StartInfo = start };
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        timeout.CancelAfter(deadline);
         // Direct execution starts a fresh process or throws; shell reuse is disabled.
         process.Start();
         var output = ReadOutputAsync(process.StandardOutput, timeout.Token);
@@ -45,13 +54,13 @@ internal static class ToolProcess
         }
         catch (OperationCanceledException)
         {
-            SdkProbe.TerminateAndJoin(process);
+            TerminateAndJoin(process);
             cancellationToken.ThrowIfCancellationRequested();
-            throw new IOException(command + " did not finish within 30 seconds.");
+            throw new IOException(FormattableString.Invariant($"{command} did not finish within {deadline.TotalSeconds} seconds."));
         }
         catch
         {
-            SdkProbe.TerminateAndJoin(process);
+            TerminateAndJoin(process);
             throw;
         }
         finally
@@ -62,6 +71,19 @@ internal static class ToolProcess
             { await Task.WhenAll(output, errors, exit).ConfigureAwait(false); }
             catch (Exception exception) when (exception is OperationCanceledException or IOException or InvalidOperationException) { }
         }
+    }
+
+    internal static void TerminateAndJoin(Process process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (!process.HasExited)
+        {
+            // .NET's tree-kill implementation tolerates a concurrent process exit.
+            process.Kill(entireProcessTree: true);
+        }
+        // Synchronous resource teardown intentionally outlives caller cancellation.
+        // Pipe reads are separately canceled and joined by the owning async finally.
+        _ = process.WaitForExit(5000);
     }
 
     private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken cancellationToken)

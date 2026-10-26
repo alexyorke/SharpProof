@@ -15,7 +15,6 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Effects` | Effect values, mappings, and conservative summaries |
 | `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
 | `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
-| `SharpProof.ContractForGenerator` | Generator loading hook; companion validation runs after generators in analysis |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
 | `SharpProof.CompilerArtifact` | Versioned compiler evidence, codecs, validation |
 | `SharpProof.Worker.Protocol` | Request/response models, budgets, manifests, tuple/accountability checks |

@@ -130,21 +130,21 @@ internal sealed record CompilerTotalCallableArtifact
     public ImmutableArray<CompilerDisjointInputPair>? DisjointInputs { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool EffectsCompleteAtEntry { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsBodyAbstraction { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool HasReceiver { get; init; }
     public PortableIrGraph Graph { get; init; } = new();
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerTotalParameterArtifact> Parameters { get; init; } = [];
     public int Result { get; init; } = -1;
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerTotalClauseArtifact> Clauses { get; init; } = [];
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerTotalExceptionConstraintArtifact> ExceptionConstraints { get; init; } = [];
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerTotalCallPreconditionArtifact> CallPreconditions { get; init; } = [];
 }
 
@@ -170,7 +170,7 @@ internal sealed record CompilerTotalCallPreconditionArtifact
 internal sealed record CompilerTotalExceptionConstraintArtifact
 {
     public string ClaimId { get; init; } = string.Empty;
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<IrExceptionKind> AllowedKinds { get; init; } = [];
 }
 
@@ -198,7 +198,7 @@ internal static class CompilerArtifactLimits
 
 internal sealed record CompilerSpecificationPackConfiguration
 {
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> SpecificationPackIds { get; init; } = [];
     public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
     public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
@@ -212,7 +212,7 @@ internal sealed record CompilerCallableArtifact
     public WorkerDiagnosticContext? Diagnostic { get; init; }
     public string CallableId { get; init; } = string.Empty;
     public WorkerClaimReason FailureReason { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerEffectClaimArtifact> EffectClaims { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerTotalCallableArtifact? Total { get; init; }
@@ -242,7 +242,7 @@ internal sealed record CompilerEffectConstraintArtifact
 {
     public WorkerEffectSet AllowedEffects { get; init; }
     public WorkerEffectCapabilitySet AllowedCapabilities { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> AllowedExceptionTypes { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkerResourceConstraint? ResourceUpperBound { get; init; }
@@ -324,7 +324,7 @@ internal sealed record CompilerManifestArtifact
     public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
     public int RelationalSummarySchemaVersion { get; init; } = CompilerRelationalSummaryVersions.Current;
     public int SpecificationPackSchemaVersion { get; init; } = CompilerSpecificationPackVersions.Current;
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> SpecificationPackIds { get; init; } = [];
     public int SpecificationPackCatalogVersion { get; init; } = CompilerSpecificationPackCatalogVersions.Current;
     public string SpecificationPackCatalogSha256 { get; init; } = CompilerSpecificationPackCatalogVersions.Sha256;
@@ -332,9 +332,9 @@ internal sealed record CompilerManifestArtifact
     public CompilerCompilationSnapshot Compilation { get; init; } = new();
     public WorkerClaimManifest Manifest { get; init; } = new();
     public int MaximumExpressionDepth { get; init; } = WorkerBudgets.DefaultMaximumExpressionDepth;
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerDiagnosticArtifact> CompilerDiagnostics { get; init; } = [];
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerCallableArtifact> Callables { get; init; } = [];
     public CompilerReachableSourceArtifact? ReachableSource { get; init; }
 }
@@ -344,11 +344,11 @@ internal sealed record CompilerManifestArtifact
 internal sealed record CompilerReachableSourceArtifact
 {
     public bool CollectionComplete { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerSourceRootArtifact> Roots { get; init; } = [];
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerSourceBodyArtifact> Bodies { get; init; } = [];
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerSourceDocumentArtifact> Documents { get; init; } = [];
 }
 
@@ -371,7 +371,7 @@ internal sealed record CompilerSourceBodyArtifact
     public string MethodIdentity { get; init; } = string.Empty;
     public string CallIdentity { get; init; } = string.Empty;
     public bool IsStatic { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> ParameterTypes { get; init; } = [];
     public string? ReturnType { get; init; }
     public int SourceTreeOrdinal { get; init; }
@@ -379,11 +379,11 @@ internal sealed record CompilerSourceBodyArtifact
     public int Length { get; init; }
     public bool CallsComplete { get; init; }
     public bool EffectsCompleteAtEntry { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> Callees { get; init; } = [];
     public PortableIrGraph? Graph { get; init; }
     public bool IsCallSkeleton { get; init; }
-    [JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<CompilerSourceCallArtifact> SourceCalls { get; init; } = [];
 }
 

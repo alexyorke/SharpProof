@@ -694,90 +694,27 @@ internal sealed class FrontendLoweringTests
     }
 
     [Test]
-    public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
-    {
-        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
-        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
-        Assert.That(kinds, Is.Not.Empty);
-        Assert.That(kinds, Is.Ordered);
-        Assert.That(kinds.Distinct().Count(), Is.EqualTo(kinds.Length));
-        foreach (var kind in kinds)
-        {
-            var classification = OperationSubsetClassifier.Classify(stage, kind);
-            Assert.That(
-                classification.Decision,
-                Is.AnyOf(
-                    FrontendSubsetDecision.Exact,
-                    FrontendSubsetDecision.ClosedAbstention));
-            Assert.That(
-                classification.IsExact
-                    ? classification.Abstention == FrontendAbstention.None
-                    : classification.Abstention != FrontendAbstention.None,
-                Is.True,
-                kind.ToString());
-        }
-        Assert.That(
-            OperationSubsetClassifier.Classify(
-                stage,
-                (OperationKind)int.MaxValue).Abstention,
-            Is.EqualTo(FrontendAbstention.UnknownOperationKind));
-        var snapshot = OperationSubsetClassifier.CreateSnapshot();
-        Assert.That(snapshot.Split('\n'), Has.Length.GreaterThan(100));
-        Assert.That(snapshot, Does.Contain("|Invocation|ClosedAbstention|"));
-        Assert.That(snapshot, Does.Contain("|Literal|Exact|None"));
-        var snapshotHash = Convert.ToHexString(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(snapshot)));
-        Assert.That(
-            snapshotHash,
-            Is.EqualTo(
-                "423FE9D03A156149D96290A64F84A1B53F7FBD0F5EA8C1BC4AC9A19B72416641"));
-    }
-
-    [Test]
     public void FieldReferencesAreAdmittedToContractExpressionStage()
     {
-        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         Assert.That(
-            OperationSubsetClassifier.Classify(stage, OperationKind.FieldReference)
-                .IsExact,
+            CSharpOperationSemantics.IsSupported(
+                OperationSupportStage.ContractExpressionLowering,
+                OperationKind.FieldReference),
             Is.True);
     }
 
     [Test]
-    public void StageSpecificOperationClassifiersMatchTheClosedCatalog()
+    public void EffectDiscoveryAdmitsCaughtExceptionsAndInterpolatedStrings()
     {
-        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
-        foreach (var stage in Enum.GetValues<OperationSupportStage>())
-        {
-            foreach (var kind in kinds)
-            {
-                var classification =
-                    OperationSubsetClassifier.Classify(stage, kind);
-                Assert.That(
-                    classification.IsExact,
-                    Is.EqualTo(
-                        CSharpOperationSemantics.IsSupported(stage, kind)),
-                    $"{stage}:{kind}");
-            }
-
-            Assert.That(
-                OperationSubsetClassifier.Classify(
-                    stage,
-                    (OperationKind)int.MaxValue).Abstention,
-                Is.EqualTo(FrontendAbstention.UnknownOperationKind),
-                stage.ToString());
-        }
-
         Assert.That(
-            OperationSubsetClassifier.Classify(
+            CSharpOperationSemantics.IsSupported(
                 OperationSupportStage.EffectDiscovery,
-                OperationKind.CaughtException).IsExact,
+                OperationKind.CaughtException),
             Is.True);
         Assert.That(
-            OperationSubsetClassifier.Classify(
+            CSharpOperationSemantics.IsSupported(
                 OperationSupportStage.EffectDiscovery,
-                OperationKind.InterpolatedString).IsExact,
+                OperationKind.InterpolatedString),
             Is.True);
     }
 

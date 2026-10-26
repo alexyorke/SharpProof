@@ -262,12 +262,6 @@
       "sharpproof.ir": {
         "type": "Project"
       },
-      "sharpproof.reporting": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
-        }
-      },
       "sharpproof.specs": {
         "type": "Project",
         "dependencies": {
@@ -281,7 +275,6 @@
           "NuGet.Configuration": "[6.14.0, )",
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
-          "SharpProof.Reporting": "[1.0.0-preview.1, )",
           "SharpProof.Specs": "[1.0.0-preview.1, )",
           "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
         }

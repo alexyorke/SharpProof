@@ -25,7 +25,6 @@ public sealed class ProjectDagTests
                 "SharpProof.Compiler.Semantics",
                 "SharpProof.CompilerArtifact"
             ]),
-            new("SharpProof.ContractForGenerator", []),
             new("SharpProof.Contracts", ["SharpProof.Frontend"]),
             new("SharpProof.Dataflow", []),
             new("SharpProof.EditorSuggestions", []),
@@ -45,7 +44,6 @@ public sealed class ProjectDagTests
                 "SharpProof.Analyzer",
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
-                "SharpProof.ContractForGenerator",
                 "SharpProof.Logging",
                 "SharpProof.Worker"
             ]),
@@ -54,7 +52,7 @@ public sealed class ProjectDagTests
             new("SharpProof.Logging", []),
             new("SharpProof.Smt", ["SharpProof.Verify"]),
             new("SharpProof.Specs", ["SharpProof.Ir"]),
-            new("SharpProof.Reporting", ["SharpProof.Worker.Protocol"]), new("SharpProof.Tool", ["SharpProof.Worker.Protocol", "SharpProof.Reporting", "SharpProof.CompilerArtifact", "SharpProof.Specs", "SharpProof.Frontend"]),
+            new("SharpProof.Tool", ["SharpProof.Worker.Protocol", "SharpProof.CompilerArtifact", "SharpProof.Specs", "SharpProof.Frontend"]),
             new("SharpProof.Verify", ["SharpProof.Ir"]),
             new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",

@@ -24,11 +24,6 @@
                       SkipGetTargetFrameworkProperties="true"
                       PrivateAssets="all"
                       TreatAsPackageReference="false" />
-    <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
-                      ReferenceOutputAssembly="false"
-                      SkipGetTargetFrameworkProperties="true"
-                      PrivateAssets="all"
-                      TreatAsPackageReference="false" />
     <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"

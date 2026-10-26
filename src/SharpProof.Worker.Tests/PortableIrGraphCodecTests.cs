@@ -193,7 +193,7 @@ public sealed class PortableIrGraphCodecTests
         var options = WorkerProtocolJson.Options;
         var converter =
             (System.Text.Json.Serialization.JsonConverter<ImmutableArray<int>>)
-            new PortableIrArrayJsonConverter().CreateConverter(
+            new SharpProof.Worker.Protocol.ProtocolArrayJsonConverter().CreateConverter(
                 typeof(ImmutableArray<int>), options);
         Assert.Throws<JsonException>((Action)(() =>
         {

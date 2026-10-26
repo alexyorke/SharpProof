@@ -22,15 +22,9 @@ internal static class VerificationComparison
 {
     internal static IReadOnlyList<VerificationChange> Compare(WorkerVerifyResponse baseline, WorkerVerifyResponse current)
     {
-        if (baseline == null)
-        {
-            throw new ArgumentNullException(nameof(baseline));
-        }
+        ArgumentNullException.ThrowIfNull(baseline);
 
-        if (current == null)
-        {
-            throw new ArgumentNullException(nameof(current));
-        }
+        ArgumentNullException.ThrowIfNull(current);
 
         if (baseline.ProtocolVersion != current.ProtocolVersion || baseline.Summary.Versions.ApiSpecContentSha256 != current.Summary.Versions.ApiSpecContentSha256)
         {

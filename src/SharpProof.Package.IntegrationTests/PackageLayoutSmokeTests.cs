@@ -44,9 +44,7 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.CodeFixes.dll"
     ];
 
-    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [
-        "SharpProof.ContractForGenerator.dll"
-    ];
+    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [];
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
@@ -78,7 +76,6 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
         "SharpProof.Analyzer.Core.csproj",
-        "SharpProof.ContractForGenerator.csproj",
         "SharpProof.CompilerCollector.csproj"
     ];
 
@@ -94,7 +91,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
-        "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
@@ -299,8 +295,6 @@ public sealed class PackageLayoutSmokeTests
         foreach (var path in ImmutableArray.Create(Path.Combine(
                          analyzerDirectory,
                          "SharpProof.Analyzer.dll"), Path.Combine(
-                         analyzerDirectory,
-                         "SharpProof.ContractForGenerator.dll"), Path.Combine(
                          collectorDirectory,
                          "SharpProof.CompilerCollector.dll"), Path.Combine(
                          sharedDirectory,
@@ -345,7 +339,7 @@ public sealed class PackageLayoutSmokeTests
                 Has.Length.EqualTo(2));
             Assert.That(
                 generators,
-                Has.Length.EqualTo(1));
+                Is.Empty);
         }
     }
 
@@ -482,7 +476,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             enabledItems.Output,
             Does.Contain("SharpProof.Analyzer.dll")
-                .And.Contain("SharpProof.ContractForGenerator.dll"));
+                .And.Not.Contain("SharpProof.ContractForGenerator.dll"));
         var packagedAnalyzerItems =
             GetPackagedAnalyzerItems(enabledItems.Output);
         Assert.That(
@@ -947,8 +941,7 @@ public sealed class PackageLayoutSmokeTests
             await File.ReadAllLinesAsync(
                 workspace.MappedProjectConfigurationsPath),
             Does.Contain("SharpProof.Analyzer|Release")
-                .And.Contain("SharpProof.Analyzer.Core|Debug")
-                .And.Contain("SharpProof.ContractForGenerator|Release"));
+                .And.Contain("SharpProof.Analyzer.Core|Debug"));
 
         var dependencyPaths = (await File.ReadAllLinesAsync(
                 workspace.MappedAnalyzerItemsPath))
@@ -2409,8 +2402,6 @@ public sealed class PackageLayoutSmokeTests
                 .And.Contain(
                     "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
                 .And.Contain(
-                    "<SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>")
-                .And.Contain(
                     "<SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>Collector</SharpProofAnalyzerRole>")
@@ -3195,8 +3186,6 @@ public sealed class PackageLayoutSmokeTests
                 "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
             const string analyzerCoreGuid =
                 "{B1C90B5D-04E7-4D8E-9D6F-3F5EE0F3C6CB}";
-            const string generatorGuid =
-                "{7F668C71-D5B2-48B7-8C57-FE9CDBED2FE5}";
             const string projectTypeGuid =
                 "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
             var attributesProject = GetSolutionPath(
@@ -3211,10 +3200,6 @@ public sealed class PackageLayoutSmokeTests
                 repository,
                 "src/SharpProof.Analyzer.Core",
                 "SharpProof.Analyzer.Core.csproj");
-            var generatorProject = GetSolutionPath(
-                repository,
-                "src/SharpProof.ContractForGenerator",
-                "SharpProof.ContractForGenerator.csproj");
             var solution = Path.Combine(
                 ConsumerDirectory,
                 "MappedConsumer.sln");
@@ -3233,8 +3218,6 @@ public sealed class PackageLayoutSmokeTests
                 EndProject
                 Project("{projectTypeGuid}") = "SharpProof.Analyzer.Core", "{analyzerCoreProject}", "{analyzerCoreGuid}"
                 EndProject
-                Project("{projectTypeGuid}") = "SharpProof.ContractForGenerator", "{generatorProject}", "{generatorGuid}"
-                EndProject
                 Global
                     GlobalSection(SolutionConfigurationPlatforms) = preSolution
                         Debug|Any CPU = Debug|Any CPU
@@ -3248,8 +3231,6 @@ public sealed class PackageLayoutSmokeTests
                         {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                         {analyzerCoreGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
                         {analyzerCoreGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
-                        {generatorGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-                        {generatorGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                     EndGlobalSection
                 EndGlobal
                 """);

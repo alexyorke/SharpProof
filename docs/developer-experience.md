@@ -145,8 +145,7 @@ dotnet sharpproof compare --baseline baseline/result.json --current artifacts/sh
 JSON/Markdown reports are one document on stdout, including setup/regression status 1.
 Invalid arguments or evidence return 2, leave stdout empty, and write the error to
 stderr; cancellation returns 130. Exit 0 means command processing completed, not that
-every selected contract is Proven. Legacy `doctor [--json]` and positional
-`explain <result.json> ... [--json]` keep their existing syntax and stored-evidence scope.
+every selected contract is Proven.
 
 ## Inspect setup and evidence
 
@@ -162,11 +161,9 @@ its package checks. A passing setup check does not execute a proof or establish 
 freshness. Advisory project checks require SDK 9.0.300 or newer; evaluated active
 verification requires SDK 10.0.100 or newer. The tool itself requires .NET 10.
 
-The existing `dotnet sharpproof doctor [--json]` command remains SDK discovery only.
-The positional `dotnet sharpproof explain <result.json>` form still reads a standalone
-stored result and supports `--file`, `--line`, and `--json`; it does not require the
-request or compiler manifest. See the [tool reference](../src/SharpProof.Tool/README.md)
-for those options.
+`dotnet sharpproof doctor` without `--project` is SDK discovery only. `explain --result`
+reads a standalone stored result when no sibling request and compiler manifest exist.
+See the [tool reference](../src/SharpProof.Tool/README.md).
 
 `dotnet sharpproof explain --result artifacts/sharpproof/result.json` reads the matching
 evidence set and explains outcomes, assumptions, vacuity, and Unknown reasons.

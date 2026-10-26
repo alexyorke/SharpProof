@@ -12,7 +12,6 @@
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
-    <InternalsVisibleTo Include="SharpProof.ContractForGenerator.Test" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
   </ItemGroup>

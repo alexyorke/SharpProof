@@ -1,14 +1,12 @@
-using SharpProof.Worker.Protocol;
-
-namespace SharpProof.Reporting;
+namespace SharpProof.Worker.Protocol;
 
 internal sealed class ReasonExplanation
 {
     internal ReasonExplanation(string category, string description, string nextAction)
     {
-        global::SharpProof.Internal.InputValidation.Require(category, nameof(category));
-        global::SharpProof.Internal.InputValidation.Require(description, nameof(description));
-        global::SharpProof.Internal.InputValidation.Require(nextAction, nameof(nextAction));
+        ArgumentNullGuard.NotNull(category, nameof(category));
+        ArgumentNullGuard.NotNull(description, nameof(description));
+        ArgumentNullGuard.NotNull(nextAction, nameof(nextAction));
         Category = category;
         Description = description;
         NextAction = nextAction;
@@ -68,20 +66,20 @@ internal static class ReasonCatalog
 
     private static ReasonExplanation Model(string description)
     {
-        global::SharpProof.Internal.InputValidation.Require(description, nameof(description));
+        ArgumentNullGuard.NotNull(description, nameof(description));
         return new("Model limit", description, "Inspect the reported source site and language reference. Isolate the unsupported operation; increasing a timeout cannot add missing semantics.");
     }
 
     private static ReasonExplanation Replay(string description)
     {
-        global::SharpProof.Internal.InputValidation.Require(description, nameof(description));
+        ArgumentNullGuard.NotNull(description, nameof(description));
         return new("Replay limit", description, "Inspect the model and replay evidence. Keep the result Unknown; only a validated executable witness establishes a violation.");
     }
 
     private static ReasonExplanation Infrastructure(string description, string action)
     {
-        global::SharpProof.Internal.InputValidation.Require(description, nameof(description));
-        global::SharpProof.Internal.InputValidation.Require(action, nameof(action));
+        ArgumentNullGuard.NotNull(description, nameof(description));
+        ArgumentNullGuard.NotNull(action, nameof(action));
         return new("Infrastructure", description, action);
     }
 }

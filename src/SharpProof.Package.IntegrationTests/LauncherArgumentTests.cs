@@ -709,7 +709,7 @@ internal sealed class LauncherArgumentTests
                         "(UnsupportedExpression)"));
                 Assert.That(outputCapture.ToString(), Does.Contain(
                     LauncherPresentation.SourcePrefix(manifest.Claims[0].Location) + ": Unknown claim-1 (UnsupportedExpression)."));
-                Assert.That(outputCapture.ToString(), Does.Contain("More time does not add expression support."));
+                Assert.That(outputCapture.ToString(), Does.Contain("increasing a timeout cannot add missing semantics."));
                 Assert.That(outputCapture.ToString(), Does.Contain(
                     "https://github.com/alexyorke/SharpProof/blob/master/docs/unknown-reasons.md"));
                 Assert.That(outputCapture.ToString(), Does.Contain(

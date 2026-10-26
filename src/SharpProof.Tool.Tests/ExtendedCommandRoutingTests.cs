@@ -13,14 +13,14 @@ public sealed class ExtendedCommandRoutingTests
     [TestCase("compare --baseline --current <missing>", "Missing value for --baseline")]
     [TestCase("compare --baseline <missing> --current <missing> --fail-on-regression --fail-on-regression", "Duplicate option --fail-on-regression")]
     [TestCase("export-test", "Required option --project")]
-    [TestCase("doctor --verification portable", "Required option --project")]
+    [TestCase("doctor --verification portable", "Unknown option --verification")]
     [TestCase("doctor --verification portable --project", "Missing value for --project")]
     [TestCase("doctor --json --project <missing>", "Missing value for --json")]
     [TestCase("explain --claim claim.0", "Required option --result")]
     [TestCase("explain --claim claim.0 --result", "Missing value for --result")]
     [TestCase("explain --result <missing> --result <missing>", "Duplicate option --result")]
     [TestCase("explain --result <missing> --unknown value", "Unknown option --unknown")]
-    [TestCase("explain <missing> --result <missing>", "Unknown or incomplete option: --result")]
+    [TestCase("explain <missing> --result <missing>", "Expected a named --option")]
     [TestCase("compare --baseline <missing>", "Required option --current")]
     [TestCase("compare --baseline <missing> --current <missing> --fail-on-regression true", "Expected a named --option")]
     [TestCase("export-test --project <missing> --result <missing> --claim claim.0", "Required option --output")]
@@ -111,7 +111,7 @@ public sealed class ExtendedCommandRoutingTests
         Assert.That(await DeveloperCommands.RunAsync(command.Length == 0 ? [] : [command], output, error,
             TestContext.CurrentContext.CancellationToken), Is.Zero);
         Assert.That(error.ToString(), Is.Empty);
-        Assert.That(output.ToString(), Does.Contain("doctor --project").And.Contain("explain --result")
+        Assert.That(output.ToString(), Does.Contain("doctor [--project").And.Contain("explain --result")
             .And.Contain("compare --baseline").And.Contain("export-test --project")
             .And.Contain("--baseline-request").And.Contain("--baseline-compiler-manifest")
             .And.Contain("1 setup/regression failure").And.Contain("2 invalid arguments/evidence"));

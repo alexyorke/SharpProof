@@ -14,8 +14,6 @@ namespace SharpProof.Internal.SharpProofCompilerArtifact;
 namespace SharpProof.Internal.SharpProofCompilerCollector;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_COMPILERPROBE_TESTASSET
 namespace SharpProof.Internal.SharpProofCompilerProbeTestAsset;
-#elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_CONTRACTFORGENERATOR
-namespace SharpProof.Internal.SharpProofContractForGenerator;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_CONTRACTS
 namespace SharpProof.Internal.SharpProofContracts;
 #elif SHARPPROOF_PARAMETER_GUARD_SHARPPROOF_DATAFLOW

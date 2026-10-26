@@ -28,8 +28,6 @@
     <file src="..\..\artifacts\bin\SharpProof.CodeFixes\$configuration$\netstandard2.0\SharpProof.CodeFixes.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\..\artifacts\bin\SharpProof.Analyzer\$configuration$\netstandard2.0\SharpProof.Analyzer.dll" target="tools\analyzers\dotnet\cs" />
     <file src="..\..\artifacts\bin\SharpProof.Analyzer\$configuration$\netstandard2.0\SharpProof.Analyzer.pdb" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.ContractForGenerator\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />
-    <file src="..\..\artifacts\bin\SharpProof.ContractForGenerator\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.dll" target="tools\collector" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.CompilerCollector.pdb" target="tools\collector" />
     <file src="..\..\artifacts\bin\SharpProof.CompilerCollector\$configuration$\netstandard2.0\SharpProof.*.pdb" target="tools\shared\netstandard2.0" exclude="**\SharpProof.CompilerCollector.pdb" />

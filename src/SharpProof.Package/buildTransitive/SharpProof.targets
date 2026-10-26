@@ -4,8 +4,6 @@
     <_SharpProofAnalyzerDirectory Condition="'$(_SharpProofTestAnalyzerDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerPath>$(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>
-    <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' == '' and ('$(_SharpProofContractForGeneratorPath)' == '' or '$(_SharpProofContractForGeneratorPathWasDefault)' == 'true')">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
-    <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestContractForGeneratorPath)'))</_SharpProofContractForGeneratorPath>
     <_SharpProofCollectorDirectory Condition="'$(_SharpProofTestCollectorDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestCollectorDirectory)'))</_SharpProofCollectorDirectory>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
     <_SharpProofSharedDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofSharedDirectory)'))</_SharpProofSharedDirectory>
@@ -21,9 +19,6 @@
     </Analyzer>
     <Analyzer Include="$(_SharpProofAnalyzerPath)">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
-    </Analyzer>
-    <Analyzer Include="$(_SharpProofContractForGeneratorPath)">
-      <SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>
     </Analyzer>
     <Analyzer Include="
         $(_SharpProofSharedDirectory)/SharpProof.Analyzer.Core.dll;

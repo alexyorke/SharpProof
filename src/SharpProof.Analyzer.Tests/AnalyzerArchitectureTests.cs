@@ -183,16 +183,6 @@ public sealed class AnalyzerArchitectureTests
     }
 
     [Test]
-    public void OperationKindGateCatalogIsExhaustive()
-    {
-        var runtimeKinds = Enum.GetValues<OperationKind>().Distinct().ToImmutableArray();
-
-        Assert.That(
-            OperationSubsetClassifier.GetKnownOperationKinds(),
-            Is.EquivalentTo(runtimeKinds));
-    }
-
-    [Test]
     public void ReleaseTrackingMatchesCurrentSupportedDescriptors()
     {
         var root = TestRepository.FindRoot();

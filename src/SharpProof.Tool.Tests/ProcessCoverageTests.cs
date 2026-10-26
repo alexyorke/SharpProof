@@ -84,85 +84,11 @@ public sealed class ProcessCoverageTests
     }
 
     [Test]
-    public void SdkProbeRejectsMissingExecutableAndCancellationBeforeLaunch()
-    {
-        Assert.ThrowsAsync<ArgumentNullException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync(null!, [], TimeSpan.FromSeconds(1), TestContext.CurrentContext.CancellationToken)));
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("must-not-start", [], TimeSpan.FromSeconds(1), cancellation.Token)));
-    }
-
-    [TestCase(0d)]
-    [TestCase(-1d)]
-    [TestCase(4294967295d)]
-    public void SdkProbeRequiresAFiniteSupportedDeadline(double milliseconds)
-    {
-        Assert.ThrowsAsync<ArgumentOutOfRangeException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("must-not-start", [], TimeSpan.FromMilliseconds(milliseconds), TestContext.CurrentContext.CancellationToken)));
-    }
-
-    [Test]
     public async Task ActualSdkDiscoveryUsesTheSelectedDotnetHost()
     {
         var result = await SdkProbe.ReadAsync(TestContext.CurrentContext.CancellationToken);
         Assert.That(Version.TryParse(result.Trim().Split('-')[0], out var version), Is.True);
         Assert.That(version, Is.GreaterThanOrEqualTo(new Version(9, 0, 300)));
-    }
-
-    [Test]
-    public async Task SdkProbeKeepsItsBoundedStandardOutputSeparateFromDiagnostics()
-    {
-        RequireLinux();
-        var result = await SdkProbe.RunAsync("/bin/sh", ["-c", "printf 'sdk-version'; printf 'synthetic-private-stderr' >&2"],
-            TimeSpan.FromSeconds(5), TestContext.CurrentContext.CancellationToken);
-        Assert.That(result, Is.EqualTo("sdk-version").And.Not.Contain("synthetic-private"));
-    }
-
-    [TestCase("exit 0")]
-    [TestCase("printf '   '")]
-    [TestCase("printf 'sdk-version'; printf 'synthetic-private-stderr' >&2; exit 3")]
-    public void SdkProbeRejectsEmptyOrUnsuccessfulDiscoveryWithoutExposingStderr(string script)
-    {
-        ArgumentNullException.ThrowIfNull(script);
-        RequireLinux();
-        var failure = Assert.ThrowsAsync<InvalidOperationException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("/bin/sh", ImmutableArray.Create("-c", script),
-                TimeSpan.FromSeconds(5), TestContext.CurrentContext.CancellationToken)));
-        Assert.That(failure!.Message, Does.Contain("SDK discovery failed").And.Not.Contain("synthetic-private"));
-    }
-
-    [TestCase(false)]
-    [TestCase(true)]
-    public void SdkProbeRejectsEitherStreamAboveItsOutputLimit(bool standardError)
-    {
-        RequireLinux();
-        var script = standardError ? "printf 'sdk-version'; printf '%4097s' x >&2" : "printf '%4097s' x";
-        var failure = Assert.ThrowsAsync<InvalidOperationException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("/bin/sh", ImmutableArray.Create("-c", script),
-                TimeSpan.FromSeconds(5), TestContext.CurrentContext.CancellationToken)));
-        Assert.That(failure!.Message, Does.Contain("4096-character limit"));
-    }
-
-    [Test]
-    public void SdkProbeDeadlineTerminatesTheOwnedChild()
-    {
-        RequireLinux();
-        var failure = Assert.ThrowsAsync<TimeoutException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("/bin/sh", ["-c", "exec sleep 60"],
-                TimeSpan.FromMilliseconds(200), TestContext.CurrentContext.CancellationToken)));
-        Assert.That(failure!.Message, Does.Contain("discovery exceeded").And.Contain("deadline"));
-    }
-
-    [Test]
-    public void SdkProbePreservesCallerCancellation()
-    {
-        RequireLinux();
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CurrentContext.CancellationToken);
-        cancellation.CancelAfter(TimeSpan.FromMilliseconds(200));
-        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () =>
-            _ = await SdkProbe.RunAsync("/bin/sh", ["-c", "exec sleep 60"], TimeSpan.FromSeconds(5), cancellation.Token)));
     }
 
     [Test]
@@ -181,14 +107,14 @@ public sealed class ProcessCoverageTests
         process.StartInfo.ArgumentList.Add("exit 0");
         Assert.That(process.Start(), Is.True);
         await process.WaitForExitAsync(TestContext.CurrentContext.CancellationToken);
-        SdkProbe.TerminateAndJoin(process);
+        ToolProcess.TerminateAndJoin(process);
         Assert.That(process.HasExited, Is.True);
     }
 
     [Test]
     public void CleanupRejectsAnAbsentProcess()
     {
-        Assert.Throws<ArgumentNullException>(new Action(() => SdkProbe.TerminateAndJoin(null!)));
+        Assert.Throws<ArgumentNullException>(new Action(() => ToolProcess.TerminateAndJoin(null!)));
     }
 
     private static void RequireLinux()

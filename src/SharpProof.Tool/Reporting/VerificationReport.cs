@@ -7,10 +7,7 @@ internal static class VerificationReport
 {
     internal static string Summary(WorkerVerifyResponse response)
     {
-        if (response == null)
-        {
-            throw new ArgumentNullException(nameof(response));
-        }
+        ArgumentNullException.ThrowIfNull(response);
 
         return string.Format(CultureInfo.InvariantCulture, "SharpProof: {0} selected callables, {1} claims: {2} Proven, {3} Refuted, {4} Unknown; {5} incomplete callables, {6} vacuous claims, {7} declared user/trust assumptions. Run: {8} ({11}); cache: {9}; {10} ms. Unselected methods are not proved.", response.Manifest.Callables.Length, response.Manifest.Claims.Length, response.ClaimResults.Count(static claim =>
         {
@@ -49,15 +46,9 @@ internal static class VerificationReport
 
     internal static void Write(TextWriter writer, WorkerVerifyResponse response, string? claimId = null)
     {
-        if (writer == null)
-        {
-            throw new ArgumentNullException(nameof(writer));
-        }
+        ArgumentNullException.ThrowIfNull(writer);
 
-        if (response == null)
-        {
-            throw new ArgumentNullException(nameof(response));
-        }
+        ArgumentNullException.ThrowIfNull(response);
 
         var claims = response.Manifest.Claims.ToDictionary(static claim =>
         {
@@ -77,7 +68,7 @@ internal static class VerificationReport
         }))
         {
             var claim = claims[result.ClaimId];
-            var displayName = claim.CallableId.StartsWith("M:", StringComparison.Ordinal) ? claim.CallableId.Substring(2).Replace("~", " -> ") : claim.CallableId;
+            var displayName = claim.CallableId.StartsWith("M:", StringComparison.Ordinal) ? claim.CallableId[2..].Replace("~", " -> ", StringComparison.Ordinal) : claim.CallableId;
             if (result.Presentation is { } presentation)
             {
                 displayName = presentation.Name + "(" + string.Join(", ", presentation.ParameterNames) + ")";
@@ -149,13 +140,11 @@ internal static class VerificationReport
 
     internal static string VariableName(WorkerClaimResult result, string variable)
     {
-        if (result == null)
-        { throw new ArgumentNullException(nameof(result)); }
-        if (variable == null)
-        { throw new ArgumentNullException(nameof(variable)); }
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(variable);
         const string prefix = "parameter:";
         if (result.Presentation is { } presentation && variable.StartsWith(prefix, StringComparison.Ordinal) &&
-            int.TryParse(variable.Substring(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal) &&
+            int.TryParse(variable.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal) &&
             ordinal < presentation.ParameterNames.Length)
         {
             return presentation.ParameterNames[ordinal];

@@ -14,7 +14,6 @@
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Architecture.Tests'">SharpProof.ArchitectureTest</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes.Tests'">SharpProof.Attributes.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.CodeFixes.Tests'">SharpProof.CodeFixes.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Tests'">SharpProof.ContractForGenerator.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Contracts.Tests'">SharpProof.Contracts.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Dataflow.Tests'">SharpProof.Dataflow.Test</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Effects.Tests'">SharpProof.Effects.Test</SharpProofProjectName>
@@ -121,7 +120,6 @@
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerProbe.TestAsset' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.ContractForGenerator' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Contracts' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Dataflow' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Effects' OR
@@ -170,7 +168,6 @@
 
   <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.ArchitectureTest' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Fuzz.Test' OR
@@ -207,7 +204,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
@@ -245,7 +241,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Gates' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Package.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DictionaryAnalyzerConfigOptions.cs"

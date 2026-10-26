@@ -22,9 +22,6 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)src\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj"
                       ReferenceOutputAssembly="false" />
-    <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)src\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Analyzer.Core.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Compiler.Semantics.dll" />
     <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Contracts.dll" />

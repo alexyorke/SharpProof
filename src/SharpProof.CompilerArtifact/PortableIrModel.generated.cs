@@ -14,22 +14,22 @@ internal sealed record PortableIrGraph
     [System.Text.Json.Serialization.JsonRequired]
     public IrExecutionSemantics Semantics { get; init; }
     public bool HasProgram { get; init; }
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrType> Types { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Identities { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrVariable> Variables { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrMember> Members { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrOperation> Operations { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrTerm> Terms { get; init; } = [];
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrBlock> Blocks { get; init; } = [];
     public int Entry { get; init; } = -1;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Roots { get; init; } = [];
 
 }
@@ -105,7 +105,7 @@ internal sealed record PortableIrMember
     public string Name { get; init; } = string.Empty;
     public int ReturnType { get; init; } = -1;
     public bool IsStatic { get; init; } = false;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> ParameterTypes { get; init; } = [];
     public string? DocumentationCommentId { get; init; }
 
@@ -174,7 +174,7 @@ internal sealed record PortableIrTerm
     [System.Text.Json.Serialization.JsonRequired]
     public ulong Bits { get; init; }
     public string? Text { get; init; } = null;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Items { get; init; } = [];
 
     [System.Text.Json.Serialization.JsonConstructor]
@@ -211,7 +211,7 @@ internal sealed record PortableIrLocation
     public int Type { get; init; } = -1;
     public int A { get; init; } = -1;
     public int B { get; init; } = -1;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Items { get; init; } = [];
 
     [System.Text.Json.Serialization.JsonConstructor]
@@ -241,7 +241,7 @@ internal sealed record PortableIrInstruction
     public int A { get; init; } = -1;
     public int B { get; init; } = -1;
     public int C { get; init; } = -1;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Items { get; init; } = [];
     public PortableIrLocation? Location { get; init; } = null;
     [System.Text.Json.Serialization.JsonRequired]
@@ -274,7 +274,7 @@ internal sealed record PortableIrInstruction
 internal sealed record PortableIrBlock
 {
     public string? Name { get; init; } = null;
-    [System.Text.Json.Serialization.JsonConverter(typeof(PortableIrArrayJsonConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrInstruction> Instructions { get; init; } = [];
 
     [System.Text.Json.Serialization.JsonConstructor]

@@ -12,7 +12,6 @@
     <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.ContractForGenerator" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />

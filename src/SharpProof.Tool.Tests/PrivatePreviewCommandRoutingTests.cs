@@ -17,7 +17,7 @@ public sealed class PrivatePreviewCommandRoutingTests
     [TestCase("init --apply", "Required option --project")]
     [TestCase("doctor --project missing.csproj --apply", "Unknown option --apply")]
     [TestCase("compare --format json --format markdown", "Duplicate option --format")]
-    [TestCase("explain result.json --format json", "Unknown or incomplete option: --format")]
+    [TestCase("explain result.json --format json", "Expected a named --option")]
     public async Task NewSyntaxRejectsAmbiguousFlagsBeforePerformingWork(string command, string diagnostic)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -142,19 +142,20 @@ public sealed class PrivatePreviewCommandRoutingTests
     }
 
     [Test]
-    public async Task LegacyDoctorJsonKeepsItsOriginalSchema()
+    public async Task SdkDoctorUsesTheVersionedCommandPresentation()
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         using var error = new StringWriter(CultureInfo.InvariantCulture);
-        Assert.That(await ToolApplication.RunAsync(["doctor", "--json"], output, error,
+        Assert.That(await ToolApplication.RunAsync(["doctor", "--format", "json"], output, error,
             static cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return Task.FromResult("10.0.402");
             }, TestContext.CurrentContext.CancellationToken), Is.Zero);
         using var document = JsonDocument.Parse(output.ToString());
-        Assert.That(document.RootElement.GetProperty("sdk").GetString(), Is.EqualTo("10.0.402"));
-        Assert.That(document.RootElement.TryGetProperty("schema", out _), Is.False);
+        Assert.That(document.RootElement.GetProperty("schema").GetString(), Is.EqualTo("SharpProof.CommandPresentation"));
+        Assert.That(document.RootElement.GetProperty("command").GetString(), Is.EqualTo("doctor"));
+        Assert.That(output.ToString(), Does.Contain("10.0.402"));
         Assert.That(error.ToString(), Is.Empty);
     }
 
