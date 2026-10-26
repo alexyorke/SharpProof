@@ -28,6 +28,7 @@ bash src/SharpProof.HmInference/verify-unsafe.sh "$output" | tee /workspace/Shar
 bash src/SharpProof.HmInference/verify-constraints.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/constraint-checks.txt
 bash src/SharpProof.HmInference/verify-aliases.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/alias-import-checks.txt
 bash src/SharpProof.HmInference/verify-arrays.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/array-construction-checks.txt
+bash src/SharpProof.HmInference/verify-inlinearrays.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/inline-array-checks.txt
 bash src/SharpProof.HmInference/verify-partials.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/partial-method-checks.txt
 bash src/SharpProof.HmInference/verify-callerconstraints.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/caller-constraint-checks.txt
 bash src/SharpProof.HmInference/verify-nullablecallers.sh "$output" | tee /workspace/SharpProof/artifacts/hm-inference/nullable-caller-checks.txt

@@ -1213,6 +1213,8 @@ public static partial class Inference
                     }
                     if (model.GetOperation(element, cancellationToken) is IImplicitIndexerReferenceOperation implicitIndex)
                     { return IndexedImplicitly(element, implicitIndex, forStorage); }
+                    if (model.GetOperation(element, cancellationToken) is IInlineArrayAccessOperation inlineArray)
+                    { return IndexedInlineArray(element, inlineArray, forStorage); }
                     var array = model.GetTypeInfo(element.Expression, cancellationToken).Type as IArrayTypeSymbol ?? throw new InferenceException("Only array indexing is supported.");
                     var elementType = HmType.Variable();
                     HmType.Unify(Expression(element.Expression), new("[" + new string(',', array.Rank - 1) + "]", elementType));

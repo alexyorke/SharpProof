@@ -122,6 +122,41 @@ public static partial class Inference
             return ApplyMemberNullability(indexer.IndexerSymbol, PatternSymbolType(indexer.IndexerSymbol, Expression(syntax.Expression), original), forStorage, syntax: syntax);
         }
 
+        private HmType IndexedInlineArray(ElementAccessExpressionSyntax syntax, IInlineArrayAccessOperation access, bool forStorage)
+        {
+            if (syntax is null)
+            { throw new ArgumentNullException(nameof(syntax)); }
+            if (access is null)
+            { throw new ArgumentNullException(nameof(access)); }
+            return IndexedInlineArray(syntax.ArgumentList, access, Expression(syntax.Expression, forStorage));
+        }
+
+        private HmType IndexedInlineArray(BracketedArgumentListSyntax arguments, IInlineArrayAccessOperation access, HmType receiver)
+        {
+            if (arguments is null)
+            { throw new ArgumentNullException(nameof(arguments)); }
+            if (access is null)
+            { throw new ArgumentNullException(nameof(access)); }
+            if (receiver is null)
+            { throw new ArgumentNullException(nameof(receiver)); }
+            if (arguments.Arguments.Count != 1 || access.Instance.Type is not INamedTypeSymbol owner)
+            { throw new InferenceException("Unresolved inline-array access."); }
+            var fields = owner.GetMembers().OfType<IFieldSymbol>().Where(field =>
+            { if (field is null) { throw new ArgumentNullException(nameof(field)); } return !field.IsStatic; }).ToArray();
+            if (fields.Length != 1)
+            { throw new InferenceException("Invalid inline-array element field."); }
+            var element = PatternSymbolType(fields[0], receiver, owner);
+            Anchor(arguments.Arguments[0].Expression);
+            var range = model.Compilation.GetTypeByMetadataName("System.Range");
+            if (range is not null && SymbolEqualityComparer.Default.Equals(access.Argument.Type, range))
+            {
+                if (access.Type is not INamedTypeSymbol { TypeArguments.Length: 1 } slice)
+                { throw new InferenceException("Unresolved inline-array slice type."); }
+                return CSharpTypes.Rigid(slice).WithArguments(element);
+            }
+            return element;
+        }
+
         private static string? MemberSymbol(ISymbol symbol)
         {
             if (symbol is null)
@@ -142,8 +177,8 @@ public static partial class Inference
             { throw new ArgumentNullException(nameof(beforeModel)); }
             if (afterModel is null)
             { throw new ArgumentNullException(nameof(afterModel)); }
-            var originals = before.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or WithExpressionSyntax; }).ToArray();
-            var candidates = after.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or WithExpressionSyntax; }).ToArray();
+            var originals = before.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or ElementBindingExpressionSyntax or WithExpressionSyntax; }).ToArray();
+            var candidates = after.DescendantNodes().Where(node => { if (node is null) { throw new ArgumentNullException(nameof(node)); } return node is MemberAccessExpressionSyntax or ElementAccessExpressionSyntax or ElementBindingExpressionSyntax or WithExpressionSyntax; }).ToArray();
             if (originals.Length != candidates.Length)
             { return false; }
             for (var i = 0; i < originals.Length; i++)
@@ -159,6 +194,20 @@ public static partial class Inference
                 {
                     if (right is not IImplicitIndexerReferenceOperation other || ProtocolMember(implicitIndexer.LengthSymbol) != ProtocolMember(other.LengthSymbol)
                     || ProtocolMember(implicitIndexer.IndexerSymbol) != ProtocolMember(other.IndexerSymbol))
+                    { return false; }
+                }
+                else if (left is IInlineArrayAccessOperation inlineArray)
+                {
+                    if (right is not IInlineArrayAccessOperation other
+                        || inlineArray.Instance.Type is null || other.Instance.Type is null
+                        || CSharpTypes.ConstructorIdentity(inlineArray.Instance.Type) != CSharpTypes.ConstructorIdentity(other.Instance.Type)
+                        || inlineArray.Argument.Type is null || other.Argument.Type is null
+                        || CSharpTypes.ConstructorIdentity(inlineArray.Argument.Type) != CSharpTypes.ConstructorIdentity(other.Argument.Type))
+                    { return false; }
+                    var range = beforeModel.Compilation.GetTypeByMetadataName("System.Range");
+                    if (range is not null && SymbolEqualityComparer.Default.Equals(inlineArray.Argument.Type, range)
+                        && (inlineArray.Type is null || other.Type is null
+                            || CSharpTypes.ConstructorIdentity(inlineArray.Type) != CSharpTypes.ConstructorIdentity(other.Type)))
                     { return false; }
                 }
             }

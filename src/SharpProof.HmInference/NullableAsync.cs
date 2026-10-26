@@ -1187,6 +1187,8 @@ public static partial class Inference
                 var indexType = binding.ArgumentList.Arguments.Count == 1 ? model.GetTypeInfo(binding.ArgumentList.Arguments[0].Expression, cancellationToken).Type : null;
                 return indexType is INamedTypeSymbol { Name: "Range" } range && range.ContainingNamespace.ToDisplayString() == "System" ? receiver.Value : element;
             }
+            if (expression is ElementBindingExpressionSyntax inlineBinding && operation is IInlineArrayAccessOperation inlineAccess)
+            { return IndexedInlineArray(inlineBinding.ArgumentList, inlineAccess, receiver.Value); }
             if (operation is IEventReferenceOperation referencedEvent)
             {
                 var mapping = PatternOwnerMapping(referencedEvent.Event.ContainingType, receiver.Value, receiver.Type);

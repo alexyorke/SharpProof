@@ -16,6 +16,16 @@ early disposal, traces, reference identity, provider expression trees, independe
 key/value domains, suspension, faults and cancellation. Bundled examples are in
 `Samples/Queries.cs.txt`; CLI and package fixtures cover C# 8, 9 and 13.
 
+Inline-array element access follows Roslyn's bound operation, retaining the
+buffer's generic element relationship through reads, writes and ref aliases.
+Range access preserves writable `Span<T>` and readonly `ReadOnlySpan<T>` results.
+Conditional access retains class or struct payload bounds; the pinned compiler
+crashes on an unconstrained nullable inline-array candidate, so that unsupported
+compiler form is not generated. Applied IDE fixes and Fix All checks exercise
+value/reference/nullable payloads, ref/in receivers, evaluation counts, mutation,
+null receivers and bounds exceptions. CLI and fresh-package consumers cover C# 12
+and 13.
+
 ## Run
 
 From the repository root, use the host wrapper to run verification in the
