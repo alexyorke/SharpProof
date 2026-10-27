@@ -581,7 +581,9 @@ switch ($Command) {
             foreach ($isolatedProject in @(
                     'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj',
                     'tests/SharpProof.Fuzz.Tests/SharpProof.Fuzz.Tests.csproj')) {
-                Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $isolatedProject
+                # The build lane enforces analyzers.
+                Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $isolatedProject `
+                    -AdditionalBuildArguments @('-p:RunAnalyzersDuringBuild=false')
             }
         }
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `

@@ -42,20 +42,27 @@ pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofDevCheck.ps1 -Configu
 
 `-PlanOnly` prints selection or the developer command plan without running the selected builds/tests. These script parameters are not dispatcher parameters. Sources: [changed-test selection](../eng/scripts/Invoke-SharpProofChangedTests.ps1), [developer check](../eng/scripts/Invoke-SharpProofDevCheck.ps1), and [command plan](../eng/scripts/Get-SharpProofDevCheckPlan.ps1).
 
-## CI jobs
+## CI
 
-[ci.yml](../.github/workflows/ci.yml) runs on pull requests, `master` pushes, weekly, and on demand. Each test suite runs once, with the coverage collector on:
+All of CI is in [ci.sh](../ci.sh). The workflows only build the tooling image, hand each `ci.sh` lane to a runner, and upload `artifacts/`. Run the same thing locally:
 
-- `build` runs `security`: the dependency audit plus the complete Release solution with all analyzers.
-- `worker-a`, `worker-b`, `projects`, `gates-corpus`, and `gates-shards` run `coverage -CoveragePart Semantic -TaskGroup <group>`. Each runner builds only its task group's closure, without analyzers.
-- `package-0`..`package-3` run `coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition <n>`. Partitions hash the fully qualified method identity, so all parameter cases of a method stay together.
-- `self-apply-sources`, `self-apply-samples`, and `format` run alongside.
-- `repository` runs lint, `docs`, `layout`, the API inventory and catalog evidence tests, `coverage -CoveragePart Isolated`, and a Grype scan of the tooling image.
-- `dependency-review` checks dependency changes on pull requests.
-- `coverage` merges every shard's `lines.tsv` into `summary.md`.
-- `build-and-test` is the single required check; it succeeds only when every job above succeeded.
+```text
+./ci.sh                 # build the image, every PR lane in order, then the coverage merge
+./ci.sh build format    # just these lanes
+./ci.sh --list          # the PR lanes (ci.yml's matrix)
+```
 
-The test lanes use the coverage filter `TestCategory!=Performance&TestCategory!=Coverage`, so they also run `Corpus` tests. The canonical filter and its `-SemanticCohort` and `-TestResultsDirectory` partitions remain for local `pr` runs. Source: [semantic scheduler](../eng/scripts/Invoke-SharpProofSemanticTests.ps1).
+PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes, weekly, on demand):
+
+- `build`: `security`, the dependency audit plus the complete Release solution with all analyzers.
+- `worker-a`, `worker-b`, `projects`, `gates-corpus`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`. Each lane builds only its task group's closure, without analyzers.
+- `package-0`..`package-3`: `coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition <n>`. Partitions hash the fully qualified method identity, so all parameter cases of a method stay together.
+- `self-apply-sources`, `self-apply-samples`, `format`.
+- `repository`: lint, `docs`, `layout`, the API inventory and catalog evidence tests, `coverage -CoveragePart Isolated`, and a Grype scan of the tooling image. It runs every check and then fails if any failed.
+
+Then `coverage` merges every shard's `lines.tsv`, and `build-and-test`, the single required check, succeeds only when every lane, the merge, and (on pull requests) GitHub's dependency review succeeded. Each test suite runs once, under the coverage collector, with the filter `TestCategory!=Performance&TestCategory!=Coverage`, so CI also runs `Corpus` tests.
+
+Other lanes: [nightly.yml](../.github/workflows/nightly.yml) runs `nightly` and `fuzz-0`..`fuzz-5`, [release.yml](../.github/workflows/release.yml) runs `release-packages`, and every workflow builds its image with `image` and `image-key`.
 
 ## Coverage
 
@@ -63,13 +70,13 @@ The test lanes use the coverage filter `TestCategory!=Performance&TestCategory!=
 docker compose run --rm tooling coverage
 ```
 
-[Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) builds Release, runs the semantic and package tests with the Microsoft collector (Cobertura), and collects `SharpProof.Attributes` and the Fuzz console in their own test hosts. It reduces the reports to repository-relative line hits in `lines.tsv`, then writes per-project and total line coverage to `artifacts/coverage/summary.md`; a line is covered when any report hit it. `-MinimumLinePercent` optionally fails below an aggregate floor. CI splits the same work with `-CoveragePart Semantic|Package|Isolated` and merges the shards on the runner with `pwsh eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge`.
+[Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) builds Release, runs the semantic and package tests with the Microsoft collector (Cobertura), and collects `SharpProof.Attributes` and the Fuzz console in their own test hosts. It reduces the reports to repository-relative line hits in `lines.tsv`, then writes per-project and total line coverage to `artifacts/coverage/summary.md`; a line is covered when any report hit it. `-MinimumLinePercent` optionally fails below an aggregate floor. CI splits the same work with `-CoveragePart Semantic|Package|Isolated`; each shard writes its own `artifacts/coverage/<shard>/lines.tsv`, and `./ci.sh coverage` merges whatever shards are present.
 
-## CI runner setup
+## Tooling image
 
-Every container job builds the tooling image through [setup-tooling](../.github/actions/setup-tooling/action.yml) with the default docker driver. The `windows-native` stage, which compiles Z3 for win-x64 and win-arm64, takes about 14 of an uncached build's 15 minutes. The action caches that stage's 53 MB `/payload` output in the Actions cache, keyed on the stage text, its base image, the [cross-build recipe](../eng/container/windows-native/README.md), and the `z3` section of `toolchain.json` (the only part the stage reads), so unrelated catalog changes keep the cache. On a hit, `--build-context windows-native=<payload>` replaces the stage. `Prepare-NativePayload.ps1` still checks both DLLs against the pinned byte lengths, SHA-256 digests, and receipt provenance, so a cached payload must match what a fresh compile produces. On a miss, the stage builds as before and the job saves its verified output. Default-branch entries are readable by every pull request, and pull-request entries stay scoped to their own branch. Scheduled runs and release tags skip the cache and compile from source, so the recipe keeps proving it reproduces the pins and releases never ship a cached payload. The image pulls three .NET SDK base images: the build SDK, the minimum SDK, and the minimum-framework SDK, which also supplies the pinned test runtime. The serviced PowerShell archive and the API inventory reference pack are checksum-pinned downloads rather than images. Base-image pulls and the rest of the image take under a minute, so no buildx layer cache is used.
+`./ci.sh image` builds the tooling image with the default docker driver. The `windows-native` stage, which compiles Z3 for win-x64 and win-arm64, takes about 14 of an uncached build's 15 minutes. With `SHARPPROOF_WINDOWS_NATIVE_CACHE` set to a directory, `ci.sh` reuses that stage's 53 MB `/payload` output from it through `--build-context windows-native=<payload>`, or saves a freshly built payload there. [setup-tooling](../.github/actions/setup-tooling/action.yml) keeps that directory in the Actions cache under `./ci.sh image-key`, which hashes the stage text, its base image, the [cross-build recipe](../eng/container/windows-native/README.md), and the `z3` section of `toolchain.json` (the only part the stage reads). `Prepare-NativePayload.ps1` still checks both DLLs against the pinned byte lengths, SHA-256 digests, and receipt provenance, so a cached payload must match what a fresh compile produces. Default-branch entries are readable by every pull request, and pull-request entries stay scoped to their own branch. Scheduled runs and release tags skip the cache and compile from source, so the recipe keeps proving it reproduces the pins and releases never ship a cached payload. Base-image pulls and the rest of the image take under a minute, so no buildx layer cache is used.
 
-The `repository` job builds the lint image on top of the prepared tooling image instead of running `docker compose build lint`, which would rebuild tooling through its `service:tooling` context.
+The lint image builds on top of the prepared tooling image instead of through `docker compose build lint`, which would rebuild tooling through its `service:tooling` context.
 
 ## Corpus and native effect oracles
 
@@ -117,7 +124,7 @@ The six Explicit harnesses and their feature families are described in [containe
 
 Replay needs the harness identity and seed together. `hits.jsonl` records claim, worker outcome/reason, CLR observation, details, and full source; `hits/*.cs` preserves standalone sources with a header. `stats-<harness>.json` refreshes every 50 cases and at completion. `events.log` records live annotations. Sources can receive numeric suffixes when multiple findings share a harness/seed/kind.
 
-The NUnit harnesses record findings and continue. The `fuzz` job in [nightly.yml](../.github/workflows/nightly.yml) adds a separate error-severity check after artifact upload. It runs nightly or manually with six shards, disjoint 250,000-seed ranges, a default 300-minute budget per shard, manual range 1..320 minutes, and a 350-minute job timeout. It is advisory and does not run on PRs. Review errors and warnings separately; an unobserved refutation on a finite CLR input grid does not by itself establish an incorrect refutation. Turn a confirmed finding into a focused deterministic regression before editing expectations.
+The NUnit harnesses record findings and continue. The `fuzz-<n>` lanes of [ci.sh](../ci.sh), scheduled by [nightly.yml](../.github/workflows/nightly.yml), fail on error-severity findings; CI uploads the findings either way. It runs nightly or manually with six shards, disjoint 250,000-seed ranges, a default 300-minute budget per shard, manual range 1..320 minutes, and a 350-minute job timeout. It is advisory and does not run on PRs. Review errors and warnings separately; an unobserved refutation on a finite CLR input grid does not by itself establish an incorrect refutation. Turn a confirmed finding into a focused deterministic regression before editing expectations.
 
 ## Packed qualification and evidence inspection
 

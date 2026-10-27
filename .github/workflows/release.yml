@@ -36,20 +36,8 @@ jobs:
 
       - uses: ./.github/actions/setup-tooling
 
-      - name: Pack the product packages
-        run: docker compose run --rm tooling pack -Configuration Release
-
-      - name: Pack the optional developer packages
-        run: docker compose run --rm tooling pack-tool -Configuration Release
-
-      # Task workspaces copy only the ignored nupkgs/ input, not artifacts/.
-      - name: Run the package tests against the packed feed
-        run: |
-          mkdir -p nupkgs
-          cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/
-          docker compose run --rm tooling package-tests -Configuration Release \
-            -PackageSource nupkgs \
-            -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+      - name: ./ci.sh release-packages
+        run: ./ci.sh release-packages
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

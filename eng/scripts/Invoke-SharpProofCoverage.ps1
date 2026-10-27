@@ -53,6 +53,14 @@ if ($Part -eq 'Semantic' -and $TaskGroup -eq 'All') { throw 'The Semantic part r
 
 if ($Part -ne 'Merge') {
     Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+    # Each shard owns a subdirectory, so shards run in one workspace merge too.
+    $mergeRoot = $results
+    $results = switch ($Part) {
+        'All' { $mergeRoot }
+        'Semantic' { Join-Path $mergeRoot ('semantic-' + $TaskGroup.ToLowerInvariant()) }
+        'Package' { Join-Path $mergeRoot ('package-' + $PackagePartition) }
+        'Isolated' { Join-Path $mergeRoot 'isolated' }
+    }
     if (Test-Path -LiteralPath $results) { Remove-Item -LiteralPath $results -Recurse -Force }
     [void][IO.Directory]::CreateDirectory($results)
     $dotnetWrapper = Get-SharpProofDotnetWrapperPath
