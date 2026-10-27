@@ -52,7 +52,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 - [Release process](../eng/release/README.md): tag checks, consumer matrix, and publication.
 - [Security policy](../SECURITY.md): private reporting and scope.
 
-The analyzer's [unshipped](../src/SharpProof.Analyzer/AnalyzerReleases.Unshipped.md) and [shipped](../src/SharpProof.Analyzer/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
+The analyzer's [unshipped](../src/SharpProof.Analyzer.Core/AnalyzerReleases.Unshipped.md) and [shipped](../src/SharpProof.Analyzer.Core/AnalyzerReleases.Shipped.md) rule tables are tooling metadata. They are not publication evidence.
 
 ## Documentation validation
 
