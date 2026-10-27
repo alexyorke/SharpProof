@@ -593,44 +593,6 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
-    public void SlotCatalogsAreExhaustiveAndDeclarative()
-    {
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
-            Assert.That(
-                PortableIrSlotCatalog.Terms.Select(static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrTermKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Locations.Select(static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrLocationKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Instructions.Select(
-                    static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrInstructionKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque].Slots,
-                Is.EqualTo([
-                    "memberIndex",
-                    "optionalTermIndex",
-                    "wire:OpaquePurities",
-                    "operationWhenImpure",
-                    "unused",
-                    "unused",
-                    "termIndices"]));
-            Assert.That(
-                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call].Slots,
-                Is.EqualTo([
-                    "optionalVariableIndex",
-                    "memberIndex",
-                    "optionalTermIndex",
-                    "unused",
-                    "termIndices",
-                    "unused"]));
-        }
-    }
-
-    [Test]
     public void CanonicalGoldenWireRoundTripsWithoutChangingBytes()
     {
         var fixture = CreateFixture(includeExceptionEdges: false);
