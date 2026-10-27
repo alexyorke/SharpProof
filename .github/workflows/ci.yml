@@ -270,6 +270,12 @@ jobs:
         with:
           download-packages: "false"
 
+      - name: Check pinned .NET API inventory and support evidence
+        if: ${{ !cancelled() }}
+        run: >-
+          docker compose run --rm tooling test
+          -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj
+          -TestFilter FullyQualifiedName~DotnetApiInventoryTests
       - name: Require executed test evidence for every modeled catalog facet
         if: ${{ !cancelled() }}
         run: >-
