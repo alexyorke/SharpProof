@@ -106,7 +106,7 @@ public sealed class PartialNativeObservationControls
                 ProofDiagnosticKind.InternalConsistency, new SourceLocationId(index)));
         }
 
-        FrontendLoweringResult LowerActual(string name)
+        FrontendTotalLoweringResult LowerActual(string name)
         {
             System.ArgumentNullException.ThrowIfNull(name);
             var syntax = methods[name];
@@ -116,7 +116,7 @@ public sealed class PartialNativeObservationControls
             Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
             var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
             Assert.That(operation, Is.Not.Null);
-            var lowered = new RoslynOperationLowerer(factory).Lower(operation!);
+            var lowered = FrontendTotalLowering.Lower(factory, operation!);
             Assert.That(lowered.Variables, Is.Empty);
             return lowered;
         }

@@ -196,8 +196,8 @@ public sealed class FrontendExpressionCoverageTests
             Case(GeneratedCSharpExpression.Length(text)),
             Case(GeneratedCSharpExpression.Length(values)),
             Case(GeneratedCSharpExpression.ArrayIndex(values, GeneratedCSharpExpression.Integer(1))),
-            Case(GeneratedCSharpExpression.CastToString(reference)),
-            Case(GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.NullReference())),
+            Case(GeneratedCSharpExpression.CastToString(text)),
+            Case(GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.NullString())),
             Case(GeneratedCSharpExpression.Conditional(boolean, integer, other)),
             Case(GeneratedCSharpExpression.Conditional(boolean, text, GeneratedCSharpExpression.NullString())),
             Case(GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!")))));
@@ -257,7 +257,7 @@ public sealed class FrontendExpressionCoverageTests
             GeneratedCSharpExpression.Conditional(boolean, integer, other),
             GeneratedCSharpExpression.Length(text),
             GeneratedCSharpExpression.ArrayIndex(values, integer),
-            GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.Reference()),
+            GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.Text()),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("!"))));
         foreach (var kind in ImmutableArray.Create(
             GeneratedExpressionKind.Add,

@@ -77,8 +77,7 @@ internal sealed record FrontendFuzzCoverage(
         DivideByZeroExceptions > 0 &&
         OverflowExceptions > 0 &&
         NullReferenceExceptions > 0 &&
-        IndexOutOfRangeExceptions > 0 &&
-        InvalidCastExceptions > 0;
+        IndexOutOfRangeExceptions > 0;
 
     public bool HasValidExceptionCounts(int cases)
     {

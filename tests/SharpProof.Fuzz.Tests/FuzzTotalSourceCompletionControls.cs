@@ -20,7 +20,8 @@ public sealed class FuzzTotalSourceCompletionControls
     public async Task ActualCorrectCompletionKeepsItsOwnedTotalSourceAndNativeBoundary(bool fault, bool opaque)
     {
         const string parameters = "bool value";
-        var targetBody = fault ? "((string)null!).StartsWith(\"x\")" : "value";
+        // The Total lowerer models string length, so the fault stays in the formula.
+        var targetBody = fault ? "((string)null!).Length == 0" : "value";
         var completionBody = opaque ? fault ? "!(value is var _)" : "value is var _" : fault ? "false" : "true";
         var members = "public static bool Target(" + parameters + ") => " + targetBody + "; " +
             "public static bool NormalCompletion(" + parameters + ") => " + completionBody + ";";
@@ -45,7 +46,7 @@ public sealed class FuzzTotalSourceCompletionControls
         var formula = LowerActual("Target");
         var completion = LowerActual("NormalCompletion");
         var bindings = bindingBuilder.ToImmutable();
-        Assert.That(formula.IsExact, Is.EqualTo(!fault));
+        Assert.That(formula.IsExact, Is.True);
         Assert.That(completion.IsExact, Is.EqualTo(!opaque));
         Assert.That(completion.Variables, Is.Empty);
         if (opaque)
@@ -89,12 +90,10 @@ public sealed class FuzzTotalSourceCompletionControls
         var reference = actualFault != null ? PartialTermSemanticOutcome.Undefined
             : returned == true ? PartialTermSemanticOutcome.DefinedTrue : PartialTermSemanticOutcome.DefinedFalse;
         var interpreter = new IrInterpreter(factory);
-        var formulaResult = interpreter.Evaluate(formula.Term, bindings);
-        Assert.That(formulaResult.Status, Is.EqualTo(fault ? IrEvaluationStatus.Exception : IrEvaluationStatus.Value));
-        if (fault)
-        {
-            Assert.That(formulaResult.Exception!.Kind, Is.EqualTo(IrExceptionKind.NullReference));
-        }
+        // The Total lowerer keeps the fault in the formula's safe condition.
+        var formulaSafe = interpreter.Evaluate(formula.SafeCondition, bindings);
+        Assert.That(formulaSafe.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(formulaSafe.Value!.Boolean, Is.EqualTo(!fault));
         var completionResult = interpreter.Evaluate(completion.Term, bindings);
         Assert.That(completionResult.Status, Is.EqualTo(opaque ? IrEvaluationStatus.Unsupported : IrEvaluationStatus.Value));
         if (!opaque)
@@ -109,20 +108,23 @@ public sealed class FuzzTotalSourceCompletionControls
         Assert.That(campaign.Cases, Is.EqualTo(1));
         Assert.That(campaign.FrontendAgreements, Is.EqualTo(1));
         Assert.That(campaign.SmtAgreements, Is.EqualTo(1));
-        Assert.That(campaign.PartialSmtAgreements, Is.EqualTo(opaque ? 0 : 1));
-        Assert.That(campaign.Agreements, Is.EqualTo(opaque ? 0 : 1));
-        Assert.That(campaign.Abstentions, Is.EqualTo(opaque ? 1 : 0));
-        Assert.That(campaign.Failures.Length, Is.EqualTo(opaque ? 1 : 0));
+        // The backend cannot encode an opaque completion, but a faulting target
+        // already refutes normal completion and decides the scenario.
+        var abstains = opaque && !fault;
+        Assert.That(campaign.PartialSmtAgreements, Is.EqualTo(abstains ? 0 : 1));
+        Assert.That(campaign.Agreements, Is.EqualTo(abstains ? 0 : 1));
+        Assert.That(campaign.Abstentions, Is.EqualTo(abstains ? 1 : 0), campaign.PartialResults.Single().Status + ": " + campaign.PartialResults.Single().Detail);
+        Assert.That(campaign.Failures.Length, Is.EqualTo(abstains ? 1 : 0));
         var result = campaign.PartialResults.Single();
         await TestContext.Out.WriteLineAsync("fault=" + fault + "; opaque=" + opaque + "; status=" + result.Status + "; detail=" + result.Detail);
-        Assert.That(result.Status, Is.EqualTo(opaque ? FuzzOracleStatus.Abstained : FuzzOracleStatus.Agreement), result.Detail);
+        Assert.That(result.Status, Is.EqualTo(abstains ? FuzzOracleStatus.Abstained : FuzzOracleStatus.Agreement), result.Detail);
         Assert.That(result.ScenarioCount, Is.EqualTo(1));
         Assert.That(result.UndefinedCount, Is.EqualTo(actualFault != null ? 1 : 0));
         Assert.That(result.DefinedTrueCount, Is.EqualTo(returned == true ? 1 : 0));
         Assert.That(result.DefinedFalseCount, Is.Zero);
-        Assert.That(result.Detail, opaque ? Does.Contain("Unknown(UnsupportedEncoding)") : Is.Empty);
+        Assert.That(result.Detail, abstains ? Does.Contain("Unknown(UnsupportedEncoding)") : Is.Empty);
 
-        FrontendLoweringResult LowerActual(string name)
+        FrontendTotalLoweringResult LowerActual(string name)
         {
             System.ArgumentNullException.ThrowIfNull(name);
             var syntax = methods[name];
@@ -134,7 +136,7 @@ public sealed class FuzzTotalSourceCompletionControls
                 Is.EqualTo(SpecialType.System_Boolean));
             var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
             Assert.That(operation, Is.Not.Null);
-            var lowered = new RoslynOperationLowerer(factory).Lower(operation!);
+            var lowered = FrontendTotalLowering.Lower(factory, operation!);
             foreach (var binding in lowered.Variables)
             {
                 Assert.That(binding.Symbol, Is.InstanceOf<IParameterSymbol>());

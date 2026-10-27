@@ -17,9 +17,9 @@ public sealed class FuzzNumericCampaignRegressionTests
         Assert.That(summary.Passed, Is.True, string.Join(Environment.NewLine, summary.Failures));
         var serialized = JsonSerializer.Serialize(summary);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(serialized)));
-        // Captured from the public campaign before removing the unused retry.
+        // Captured after the frontend oracle moved to the Total body lowerer.
         Assert.That(digest, Is.EqualTo(
-            "EC69FE2C4ADF80C846C14552582843573D7589AB06E57055D0CC80E8F79080EB"));
+            "F6EDE86E42140BA6B0C97C2D305CE122525B0DCCFD4A707BEDC3438F94816C27"));
     }
 
     [Test]

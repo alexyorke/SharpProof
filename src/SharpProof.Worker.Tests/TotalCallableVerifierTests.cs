@@ -142,7 +142,7 @@ public sealed class TotalCallableVerifierTests
     }
 
     [Test]
-    public async Task LegacyLoweringFailureDoesNotSuppressTypedVerification()
+    public async Task TypedVerificationUsesTheTotalProgram()
     {
         using var project = new ShadowTestProject("""
             using SharpProof.Attributes;
@@ -155,7 +155,7 @@ public sealed class TotalCallableVerifierTests
             }
             """);
         var preparation = project.Snapshot.Callables.Single();
-        Assert.That(preparation.IsSuccess, Is.False);
+        Assert.That(preparation.IsSuccess, Is.True);
         Assert.That(preparation.Total, Is.Not.Null);
         var checkBuilder = ImmutableDictionary.CreateBuilder<string, TotalCallableClaimCheck>(StringComparer.Ordinal);
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,

@@ -31,21 +31,21 @@ public sealed class FrontendSemanticEdgeCaseTests
             Exact("long", "", "checked((int)3L)", []),
             Exact("object?", "object? value", "value", [new object()]),
             Exact("long[]", "long[] value", "value", [SequenceValue.ToArray()]),
-            Closed("ulong", "ulong[] value", "value[0]", FrontendAbstention.UnsupportedType, [UnsupportedSequenceValue.ToArray()]),
-            Exact("string?", "object? value", "(string)value", [(object?)null]),
-            Exact("string?", "object? value", "(string)value", ["proof"]),
-            Exact("string?", "object? value", "(string)value", [new object()]),
-            Exact("long", "long[,] value", "value.LongLength", [MultidimensionalSequenceValue]),
-            Closed("long", "long value", "checked((int)value)", FrontendAbstention.ConversionMayChangeValue, [long.MaxValue]),
-            Closed("long", "long value", "unchecked((int)value)", FrontendAbstention.ConversionMayChangeValue, [long.MaxValue]),
-            Closed("string?", "object? value", "value as string", FrontendAbstention.ConversionMayChangeValue, ["proof"]),
-            Closed("long", "long value", "(long)new SharpProofGeneratedConvertible(value)", FrontendAbstention.UserDefinedOperator, [1L]),
-            Closed("SharpProofGeneratedEdgeEnum", "", "SharpProofGeneratedEdgeEnum.One", FrontendAbstention.UnsupportedType, []),
+            Exact("ulong", "ulong[] value", "value[0]", [UnsupportedSequenceValue.ToArray()]),
+            // String is its own IR value domain, so object-to-string casts close.
+            Closed("string?", "object? value", "(string)value", FrontendAbstention.UnsupportedOperationKind, [(object?)null]),
+            Closed("string?", "object? value", "(string)value", FrontendAbstention.UnsupportedOperationKind, ["proof"]),
+            Closed("string?", "object? value", "(string)value", FrontendAbstention.UnsupportedOperationKind, [new object()]),
+            Closed("long", "long[,] value", "value.LongLength", FrontendAbstention.UnsupportedOperationKind, [MultidimensionalSequenceValue]),
+            Exact("long", "long value", "checked((int)value)", [long.MaxValue]),
+            Exact("long", "long value", "unchecked((int)value)", [long.MaxValue]),
+            Closed("string?", "object? value", "value as string", FrontendAbstention.UnsupportedOperationKind, ["proof"]),
+            Closed("long", "long value", "(long)new SharpProofGeneratedConvertible(value)", FrontendAbstention.UnsupportedOperationKind, [1L]),
             Closed("long?", "", "(long?)1L", FrontendAbstention.UnsupportedType, []),
-            Closed("long?", "long value", "(long?)value", FrontendAbstention.ConversionMayChangeValue, [1L]),
-            Closed("long?", "long? value", "value + 1L", FrontendAbstention.LiftedOperator, [(long?)1L]),
-            Closed("bool", "long? value", "value == 0L", FrontendAbstention.LiftedOperator, [(long?)0L]),
-            Closed("long?", "long? value", "-value", FrontendAbstention.LiftedOperator, [(long?)1L]));
+            Closed("long?", "long value", "(long?)value", FrontendAbstention.UnsupportedType, [1L]),
+            Closed("long?", "long? value", "value + 1L", FrontendAbstention.UnsupportedType, [(long?)1L]),
+            Closed("bool", "long? value", "value == 0L", FrontendAbstention.UnsupportedType, [(long?)0L]),
+            Closed("long?", "long? value", "-value", FrontendAbstention.UnsupportedType, [(long?)1L]));
 
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -58,8 +58,8 @@ public sealed class FrontendSemanticEdgeCaseTests
                 results.Select((result, index) =>
                     result is null ? throw new System.ArgumentNullException(nameof(result)) : (index + ": " + result.Detail))));
         Assert.That(
-            results[16].ExceptionKind,
-            Is.EqualTo(IrExceptionKind.InvalidCast));
+            results[18].ExceptionKind,
+            Is.EqualTo(IrExceptionKind.Overflow));
         for (var index = 0; index < cases.Length; index++)
         {
             Assert.That(

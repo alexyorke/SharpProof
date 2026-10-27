@@ -18,11 +18,8 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         "[InRange(1, 3)] count"
     ];
 
-    [TestCase("NotNull", "string", IrExecutionSemantics.Legacy, ContractBindingFailure.InvalidClosedAttribute)]
     [TestCase("NotNull", "string", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
-    [TestCase("Positive", "int", IrExecutionSemantics.Legacy, ContractBindingFailure.InvalidClosedAttribute)]
     [TestCase("Positive", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
-    [TestCase("InRange(-2L, 2L)", "int", IrExecutionSemantics.Legacy, ContractBindingFailure.InvalidClosedAttribute)]
     [TestCase("InRange(-2L, 2L)", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
     public void EveryRealClosedAttributeFamilyRejectsAValidBooleanIrValue(
         string attributeText,
@@ -57,7 +54,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             },
             parameter.Name,
             BoundContractKind.Requires,
-            total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
                 operationCalls++;
@@ -71,11 +67,8 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase("NotNull", "string", IrExecutionSemantics.Legacy)]
     [TestCase("NotNull", "string", IrExecutionSemantics.Total)]
-    [TestCase("Positive", "int", IrExecutionSemantics.Legacy)]
     [TestCase("Positive", "int", IrExecutionSemantics.Total)]
-    [TestCase("InRange(1L, 3L)", "int", IrExecutionSemantics.Legacy)]
     [TestCase("InRange(1L, 3L)", "int", IrExecutionSemantics.Total)]
     public void MissingLegalIrValueFailsClosedForRealAnnotations(
         string attributeText,
@@ -103,7 +96,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             },
             parameter.Name,
             BoundContractKind.Requires,
-            total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
                 operationCalls++;
@@ -116,7 +108,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
     [TestCase(IrExecutionSemantics.Total)]
     public void OutParameterIsRejectedBeforeRequestingItsIrValue(IrExecutionSemantics semantics)
     {
@@ -148,7 +139,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             },
             parameter.Name,
             BoundContractKind.Requires,
-            total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
                 operationCalls++;
@@ -161,7 +151,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
     [TestCase(IrExecutionSemantics.Total)]
     public void RealNonContractMarkerIsSkippedAroundAClosedAnnotation(IrExecutionSemantics semantics)
     {
@@ -197,7 +186,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             },
             parameter.Name,
             BoundContractKind.Requires,
-            total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
                 operationSiteBuilder.Add(syntax);
@@ -220,9 +208,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, positive).Value!.Boolean, Is.True);
     }
 
-    [TestCase("text", IrExecutionSemantics.Legacy)]
     [TestCase("text", IrExecutionSemantics.Total)]
-    [TestCase("count", IrExecutionSemantics.Legacy)]
     [TestCase("count", IrExecutionSemantics.Total)]
     public void MetadataAttributesKeepLegacyFallbackAndRequireSourceSyntaxInTotal(
         string parameterName,
@@ -256,7 +242,6 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
             },
             parameter.Name,
             BoundContractKind.Requires,
-            total: semantics == IrExecutionSemantics.Total,
             syntax =>
             {
                 operationCalls++;

@@ -247,10 +247,12 @@ internal sealed class GeneratedCSharpExpression
             throw new ArgumentNullException(nameof(value));
         }
 
-        if (value.Type != GeneratedExpressionType.Reference)
+        // The Total semantics model string as its own value domain, so the
+        // cast the verifier can check is the identity conversion.
+        if (value.Type != GeneratedExpressionType.String)
         {
             throw new ArgumentException(
-                "The generated cast requires a reference operand.",
+                "The generated cast requires a string operand.",
                 nameof(value));
         }
 
@@ -549,9 +551,9 @@ internal sealed class GeneratedCSharpExpression
             case GeneratedExpressionKind.ArrayIndex:
                 builder.Append('(');
                 Children[0].AppendTo(builder);
-                builder.Append(")[");
+                builder.Append(")[checked((int)");
                 Children[1].AppendTo(builder);
-                builder.Append(']');
+                builder.Append(")]");
                 return;
             case GeneratedExpressionKind.CastToString:
                 builder.Append("((string)");
@@ -657,6 +659,9 @@ internal sealed class SmallCSharpCaseGenerator(int seed)
     private static readonly ImmutableArray<long> LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
 
+    private static readonly ImmutableArray<long> IntIndexes = [.. DifferentialIntegerCorpus.InterestingIntegers
+        .Where(static value => value is >= int.MinValue and <= int.MaxValue)];
+
     public GeneratedCSharpCase Next(int maximumDepth = 4)
     {
         if (maximumDepth < 0)
@@ -670,8 +675,9 @@ internal sealed class SmallCSharpCaseGenerator(int seed)
                 .Select(_ => DifferentialIntegerCorpus.InterestingIntegers[
                     _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)])
                 .ToArray();
-        var index = DifferentialIntegerCorpus.InterestingIntegers[
-            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)];
+        // Element reads convert the index with checked((int)...); an index
+        // inside the int range keeps the bounds check observable.
+        var index = IntIndexes[_random.Next(IntIndexes.Length)];
         if (_random.Next(3) == 0 && values != null)
         {
             index = _random.Next(2) == 0 ? -1 : values.Length;
@@ -690,7 +696,7 @@ internal sealed class SmallCSharpCaseGenerator(int seed)
                     ? GeneratedCSharpExpression.NullString()
                     : GeneratedCSharpExpression.Text()),
             3 => GeneratedCSharpExpression.CastToString(
-                GeneratedCSharpExpression.Reference()),
+                String(maximumDepth)),
             4 => GeneratedCSharpExpression.Length(
                 GeneratedCSharpExpression.Values()),
             5 => GeneratedCSharpExpression.ArrayIndex(
@@ -1068,14 +1074,14 @@ internal static class FrontendDifferentialOracle
                         continue;
                     }
 
-                    var factory = new IrFactory();
-                    var lowering = new RoslynOperationLowerer(factory).Lower(operation);
-                    if (!lowering.IsExact)
+                    var body = FrontendTotalBody.Lower(methodSymbol, methodSyntax, model, cancellationToken);
+                    var factory = body.Factory;
+                    if (!body.IsExact)
                     {
                         results.Add(
                             Mismatch(
-                                "Generated supported C# closed the frontend subset: " +
-                                lowering.Classification.Abstention +
+                                "Generated supported C# closed the Total body subset: " +
+                                body.Classification.Abstention +
                                 "."));
                         continue;
                     }
@@ -1084,12 +1090,9 @@ internal static class FrontendDifferentialOracle
                     var environment = CreateEnvironment(
                         factory,
                         methodSymbol,
-                        lowering,
-                        generated);
-                    var interpreted = new IrInterpreter(factory).Evaluate(
-                        lowering.Term,
-                        environment.Variables,
-                        cancellationToken);
+                        body.Parameters,
+                        generated,
+                        body.UnreadParameters);
                     var runtimeMethod = runtimeType.GetMethod(
                         MethodName(index),
                         BindingFlags.Public | BindingFlags.Static) ??
@@ -1099,8 +1102,8 @@ internal static class FrontendDifferentialOracle
                         runtimeMethod,
                         generated,
                         cancellationToken);
-                    results.Add(CompareOutcomes(
-                        interpreted,
+                    results.Add(CompareExecution(
+                        body.Execute(environment.Variables, cancellationToken),
                         actual,
                         environment.SequenceOrigins));
                 }
@@ -1316,22 +1319,28 @@ internal static class FrontendDifferentialOracle
         ImmutableDictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
         IrFactory factory,
         IMethodSymbol method,
-        FrontendLoweringResult lowering,
-        GeneratedCSharpCase generated)
+        ImmutableArray<FrontendVariableBinding> bindings,
+        GeneratedCSharpCase generated,
+        ImmutableHashSet<IrVarId>? unread = null /* SPINT001: all values valid - null means the body reads every binding */)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         generated = RepositoryParameterGuard.NotNull(generated, nameof(generated));
-        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        RepositoryParameterGuard.ThrowIfMissing(bindings.IsDefault, nameof(bindings));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         var sequenceOrigins = ImmutableDictionary.CreateBuilder<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
+        foreach (var (variable, ordinal) in ParameterBindings(method, bindings))
         {
+            if (unread?.Contains(variable) == true)
+            {
+                environment.AddUnique(variable, NeutralValue(factory, variable));
+                continue;
+            }
             var value = ordinal switch
             {
-                0 => factory.CreateIntegerValue(generated.Left),
-                1 => factory.CreateIntegerValue(generated.Right),
+                0 => factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, generated.Left),
+                1 => factory.CreateIntegerValue(factory.GetVariableInfo(variable).Type, generated.Right),
                 2 => factory.CreateBooleanValue(generated.Condition),
                 3 => generated.Text == null
                     ? factory.CreateNullValue(factory.StringType)
@@ -1354,13 +1363,28 @@ internal static class FrontendDifferentialOracle
         }
         return (environment.ToImmutable(), sequenceOrigins.ToImmutable());
 
+        static IrValue NeutralValue(IrFactory factory, IrVarId variable)
+        {
+            factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+            RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
+            var type = factory.GetVariableInfo(variable).Type;
+            return factory.GetTypeInfo(type).Kind switch
+            {
+                IrTypeKind.Boolean => factory.CreateBooleanValue(false),
+                IrTypeKind.Integer => factory.CreateIntegerValue(type, 0L),
+                _ => factory.CreateNullValue(type)
+            };
+        }
+
         IrValue CreateSequenceValue(IrTypeId type, long[] values)
         {
             values = RepositoryParameterGuard.NotNull(values, nameof(values));
             RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+            var elementType = factory.GetTypeInfo(type).ElementType ??
+                throw new InvalidOperationException("A generated sequence has no element type.");
             var value = factory.CreateSequenceValue(
                 type,
-                values.Select(factory.CreateIntegerValue));
+                values.Select(element => factory.CreateIntegerValue(elementType, element)));
             sequenceOrigins.AddUnique(value, values);
             return value;
         }
@@ -1399,9 +1423,9 @@ internal static class FrontendDifferentialOracle
                 "The semantic-edge runtime argument count is incorrect.");
         }
 
-        var factory = new IrFactory();
-        var lowering = new RoslynOperationLowerer(factory).Lower(operation);
-        var actual = lowering.Classification;
+        var body = FrontendTotalBody.Lower(method, methodSyntax, model, cancellationToken);
+        var factory = body.Factory;
+        var actual = body.Classification;
         if (actual.Decision != generated.ExpectedDecision ||
             actual.Abstention != generated.ExpectedAbstention)
         {
@@ -1433,19 +1457,15 @@ internal static class FrontendDifferentialOracle
         var environment = CreateSemanticEdgeEnvironment(
             factory,
             method,
-            lowering,
+            body.Parameters,
             arguments.MoveToImmutable());
-        var interpreted = new IrInterpreter(factory).Evaluate(
-            lowering.Term,
-            environment.Variables,
-            cancellationToken);
         var runtimeMethod = runtimeType.GetMethod(
             SemanticEdgeMethodName(index),
             BindingFlags.Public | BindingFlags.Static) ??
             throw new InvalidOperationException(
                 "The generated semantic-edge assembly does not define " + SemanticEdgeMethodName(index) + ".");
-        var comparison = CompareOutcomes(
-            interpreted,
+        var comparison = CompareExecution(
+            body.Execute(environment.Variables, cancellationToken),
             InvokeMethod(
                 runtimeMethod,
                 generated.Arguments,
@@ -1465,19 +1485,19 @@ internal static class FrontendDifferentialOracle
         CreateSemanticEdgeEnvironment(
             IrFactory factory,
             IMethodSymbol method,
-            FrontendLoweringResult lowering,
+            ImmutableArray<FrontendVariableBinding> bindings,
             ImmutableArray<object?> arguments)
     {
         RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        RepositoryParameterGuard.ThrowIfMissing(bindings.IsDefault, nameof(bindings));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         var sequenceValues = ImmutableDictionary.CreateBuilder<object, ImmutableDictionary<IrTypeId, IrValue>.Builder>(
             ReferenceEqualityComparer.Instance);
         var sequenceOrigins = ImmutableDictionary.CreateBuilder<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
+        foreach (var (variable, ordinal) in ParameterBindings(method, bindings))
         {
             var type = factory.GetVariableInfo(variable).Type;
             environment.AddUnique(
@@ -1494,11 +1514,11 @@ internal static class FrontendDifferentialOracle
 
     private static IEnumerable<(IrVarId Variable, int Ordinal)> ParameterBindings(
         IMethodSymbol method,
-        FrontendLoweringResult lowering)
+        ImmutableArray<FrontendVariableBinding> bindings)
     {
-        lowering = RepositoryParameterGuard.NotNull(lowering, nameof(lowering));
+        RepositoryParameterGuard.ThrowIfMissing(bindings.IsDefault, nameof(bindings));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        foreach (var binding in lowering.Variables)
+        foreach (var binding in bindings)
         {
             if (binding.Symbol is IParameterSymbol parameter &&
                 SymbolEqualityComparer.Default.Equals(
@@ -1538,9 +1558,11 @@ internal static class FrontendDifferentialOracle
         {
             IrTypeKind.Boolean when value is bool boolean =>
                 factory.CreateBooleanValue(boolean),
+            IrTypeKind.Integer when value is ulong unsigned =>
+                factory.CreateIntegerValue(type, unsigned),
             IrTypeKind.Integer when value is sbyte or byte or short or ushort or
                 int or uint or long or char =>
-                factory.CreateIntegerValue(Convert.ToInt64(
+                factory.CreateIntegerValue(type, Convert.ToInt64(
                     value,
                     CultureInfo.InvariantCulture)),
             IrTypeKind.String when value is string text =>
@@ -1770,46 +1792,50 @@ internal static class FrontendDifferentialOracle
         return (syntaxTree, compilation, image, emit);
     }
 
-    private static FrontendDifferentialResult CompareOutcomes(
-        IrEvaluationResult interpreted,
+    // The program interpreter raises the same exceptions as compiled C#, so
+    // outcomes and exception kinds must agree.
+    private static FrontendDifferentialResult CompareExecution(
+        IrProgramExecutionResult execution,
         RuntimeOutcome actual,
         ImmutableDictionary<IrValue, Array> sequenceOrigins)
     {
+        execution = RepositoryParameterGuard.NotNull(execution, nameof(execution));
+        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
         sequenceOrigins = RepositoryParameterGuard.NotNull(sequenceOrigins, nameof(sequenceOrigins));
         if (actual.Exception != null)
         {
             var kind = IrExceptionKindFacts.FromException(actual.Exception);
-            if (interpreted.Status == IrEvaluationStatus.Exception &&
+            return execution.Status == IrProgramExecutionStatus.Exception &&
                 kind != null &&
-                interpreted.Exception!.Kind == kind)
-            {
-                return Agreement(kind);
-            }
-
-            return Mismatch(
-                "Compiled C# threw " +
-                actual.Exception.GetType().Name +
-                " while the lowered IR reported " +
-                DifferentialFormatting.Describe(interpreted) +
-                ".");
+                execution.Exception!.Kind == kind
+                ? Agreement(kind)
+                : Mismatch(
+                    "Compiled C# threw " +
+                    actual.Exception.GetType().Name +
+                    " while the lowered program reported " +
+                    Describe(execution) +
+                    ".");
         }
 
-        if (interpreted.Status != IrEvaluationStatus.Value)
+        if (execution.Status != IrProgramExecutionStatus.Returned || execution.ReturnValue == null)
         {
             return Mismatch(
-                "Compiled C# returned normally while the lowered IR reported " +
-                DifferentialFormatting.Describe(interpreted) +
+                "Compiled C# returned normally while the lowered program reported " +
+                Describe(execution) +
                 ".");
         }
 
-        var agrees = SemanticValueEquals(
-            actual.Value,
-            interpreted.Value!,
-            sequenceOrigins);
-        return agrees
+        return SemanticValueEquals(actual.Value, execution.ReturnValue, sequenceOrigins)
             ? Agreement()
-            : Mismatch(
-                "Compiled C# and the lowered IR produced different values.");
+            : Mismatch("Compiled C# and the lowered program produced different values.");
+    }
+
+    private static string Describe(IrProgramExecutionResult execution)
+    {
+        execution = RepositoryParameterGuard.NotNull(execution, nameof(execution));
+        return execution.Status == IrProgramExecutionStatus.Exception
+            ? "exception " + execution.Exception?.Kind
+            : execution.Status.ToString();
     }
 
     private static bool SemanticValueEquals(

@@ -209,8 +209,8 @@ public sealed class FuzzEmissionLifecycleTests
                 TestContext.CurrentContext.CancellationToken);
             Assert.That(operation, Is.Not.Null);
             Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
-            var factory = new IrFactory();
-            var lowering = new RoslynOperationLowerer(factory).Lower(operation);
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var lowering = FrontendTotalLowering.Lower(factory, operation);
             Assert.That(lowering.IsExact, Is.True);
             var binding = lowering.Variables.Single();
             Assert.That(binding.Symbol, Is.AssignableTo<IParameterSymbol>());
@@ -223,7 +223,7 @@ public sealed class FuzzEmissionLifecycleTests
             if (supported)
             {
                 var environment = FrontendDifferentialOracle.CreateEnvironment(
-                    factory, symbol, lowering, generated);
+                    factory, symbol, lowering.Variables, generated);
                 Assert.That(environment.Variables.Single().Key, Is.EqualTo(binding.Variable));
                 Assert.That(environment.Variables.Single().Value.Boolean, Is.True);
                 Assert.That(environment.SequenceOrigins, Is.Empty);
@@ -231,7 +231,7 @@ public sealed class FuzzEmissionLifecycleTests
             else
             {
                 Action bind = () => FrontendDifferentialOracle.CreateEnvironment(
-                    factory, symbol, lowering, generated);
+                    factory, symbol, lowering.Variables, generated);
                 var exception = Assert.Throws<InvalidOperationException>(bind);
                 Assert.That(exception!.Message,
                     Is.EqualTo("The generated method has an unexpected parameter."));
@@ -308,16 +308,15 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(operation, Is.Not.Null);
         Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
         Assert.That(operation.ConstantValue.HasValue, Is.False);
-        var lowering = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
+        var lowering = FrontendTotalLowering.Lower(new IrFactory(IrExecutionSemantics.Total), operation);
         Assert.That(lowering.IsExact, Is.False);
-        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.Term, Is.TypeOf<IrOpaqueTerm>());
         var results = FrontendDifferentialOracle.CompareBatch([positive, negative], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Length, Is.EqualTo(2));
         Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement), results[0].Detail);
         Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         Assert.That(results[1].Detail,
-            Is.EqualTo("Generated supported C# closed the frontend subset: UnsupportedType."));
+            Does.StartWith("Generated supported C# closed the Total body subset: "));
     }
 
     [Test]

@@ -63,7 +63,7 @@ public sealed class FuzzStructuralInputsTests
             GeneratedCSharpExpression.Length(GeneratedCSharpExpression.Binary(
                 GeneratedExpressionKind.StringConcat, text, GeneratedCSharpExpression.String("xy"))),
             GeneratedCSharpExpression.CastToString(GeneratedCSharpExpression.Conditional(
-                condition, reference, GeneratedCSharpExpression.NullReference())),
+                condition, text, GeneratedCSharpExpression.NullString())),
             GeneratedCSharpExpression.ArrayIndex(GeneratedCSharpExpression.Conditional(
                 condition, values, values), GeneratedCSharpExpression.Binary(
                 GeneratedExpressionKind.Add, GeneratedCSharpExpression.Left(),

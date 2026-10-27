@@ -123,22 +123,6 @@ internal readonly struct FrontendVariableBinding(ISymbol symbol, IrVarId variabl
     public IrVarId Variable { get; } = (variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : variable);
 }
 
-internal sealed partial class FrontendLoweringResult
-{
-    internal FrontendLoweringResult(
-        IrTerm term,
-        FrontendSubsetClassification classification /* SPINT001: all values valid - every classification, including default Exact, is valid */,
-        ImmutableArray<FrontendVariableBinding> variables)
-        : this(
-            ArgumentNullGuard.NotNull(term, nameof(term)),
-            classification,
-            variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : variables,
-            default)
-    {
-    }
-    public bool IsExact => Classification.IsExact;
-}
-
 internal readonly struct FrontendProgramAbstention
 {
     public FrontendProgramAbstention(

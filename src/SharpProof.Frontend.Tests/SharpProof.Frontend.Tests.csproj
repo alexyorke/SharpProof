@@ -23,4 +23,7 @@
     <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
     <ProjectReference Include="..\SharpProof.Compiler.Semantics\SharpProof.Compiler.Semantics.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\tests\SharpProof.Fuzz\FrontendTotalLowering.cs" Link="Shared\FrontendTotalLowering.cs" />
+  </ItemGroup>
 </Project>

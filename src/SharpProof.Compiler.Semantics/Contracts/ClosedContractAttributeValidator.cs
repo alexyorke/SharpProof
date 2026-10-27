@@ -36,20 +36,6 @@ internal readonly struct ClosedContractAttributeValidation(
         }
     }
 
-    internal bool SupportsLegacyValue(IrFactory factory, IrTerm value)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).SupportsLegacyValue(factory, value);
-    }
-
-    internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return ArgumentNullGuard.NotNull(_classification, nameof(_classification)).CreateLegacyPredicate(factory, value, Minimum, Maximum);
-    }
-
     internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
@@ -192,55 +178,33 @@ internal static class ClosedContractAttributeValidator
 internal sealed class ClosedContractAttributeClassification
 {
     internal static readonly ClosedContractAttributeClassification NotNull =
-        new(ClosedContractAttributeKind.NotNull, "[NotNull]", IsReferenceValue, CreateNotNullPredicate,
+        new(ClosedContractAttributeKind.NotNull, "[NotNull]",
             IsTotalReferenceValue, CreateTotalNotNullPredicate);
     internal static readonly ClosedContractAttributeClassification Positive =
-        new(ClosedContractAttributeKind.Positive, "[Positive]", IsIntegerValue, CreatePositivePredicate,
+        new(ClosedContractAttributeKind.Positive, "[Positive]",
             IsTotalIntegerValue, CreateTotalPositivePredicate);
     internal static readonly ClosedContractAttributeClassification InRange =
-        new(ClosedContractAttributeKind.InRange, "[InRange]", IsIntegerValue, CreateRangePredicate,
+        new(ClosedContractAttributeKind.InRange, "[InRange]",
             IsTotalIntegerValue, CreateTotalRangePredicate);
 
-    private readonly Func<IrFactory, IrTerm, bool> _supportsLegacyValue;
-    private readonly Func<IrFactory, IrTerm, long, long, IrTerm> _createLegacyPredicate;
     private readonly Func<IrTypeInfo, bool> _supportsTotalValue;
     private readonly Func<IrFactory, IrTerm, IrTypeInfo, long, long, IrTerm> _createTotalPredicate;
 
     private ClosedContractAttributeClassification(ClosedContractAttributeKind kind, string attributeName,
-        Func<IrFactory, IrTerm, bool> supportsLegacyValue,
-        Func<IrFactory, IrTerm, long, long, IrTerm> createLegacyPredicate,
         Func<IrTypeInfo, bool> supportsTotalValue,
         Func<IrFactory, IrTerm, IrTypeInfo, long, long, IrTerm> createTotalPredicate)
     {
         attributeName = RepositoryParameterGuard.NotNull(attributeName, nameof(attributeName));
-        createLegacyPredicate = RepositoryParameterGuard.NotNull(createLegacyPredicate, nameof(createLegacyPredicate));
         createTotalPredicate = RepositoryParameterGuard.NotNull(createTotalPredicate, nameof(createTotalPredicate));
-        supportsLegacyValue = RepositoryParameterGuard.NotNull(supportsLegacyValue, nameof(supportsLegacyValue));
         supportsTotalValue = RepositoryParameterGuard.NotNull(supportsTotalValue, nameof(supportsTotalValue));
         Kind = kind;
         AttributeName = attributeName;
-        _supportsLegacyValue = supportsLegacyValue;
-        _createLegacyPredicate = createLegacyPredicate;
         _supportsTotalValue = supportsTotalValue;
         _createTotalPredicate = createTotalPredicate;
     }
 
     internal ClosedContractAttributeKind Kind { get; }
     internal string AttributeName { get; }
-
-    internal bool SupportsLegacyValue(IrFactory factory, IrTerm value)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return _supportsLegacyValue(factory, value);
-    }
-
-    internal IrTerm CreateLegacyPredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return _createLegacyPredicate(factory, value, minimum, maximum);
-    }
 
     internal IrTerm? CreateTotalPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
     {
@@ -270,7 +234,7 @@ internal sealed class ClosedContractAttributeClassification
 
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return CreateNotNullPredicate(factory, value, 0, 0);
+        return factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(value.Type));
     }
 
     private static IrTerm CreateTotalPositivePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long _, long __)
@@ -307,45 +271,4 @@ internal sealed class ClosedContractAttributeClassification
         return factory.Binary(op, value, factory.Integer(value.Type, bound));
     }
 
-    private static bool IsReferenceValue(IrFactory factory, IrTerm value)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        var type = factory.GetTypeInfo(value.Type);
-        return type.Kind is
-            IrTypeKind.Reference or
-            IrTypeKind.String or
-            IrTypeKind.Sequence;
-    }
-
-    private static bool IsIntegerValue(IrFactory factory, IrTerm value)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return value.Type == factory.IntegerType;
-    }
-
-    private static IrTerm CreateNotNullPredicate(IrFactory factory, IrTerm value, long _, long __)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(value.Type));
-    }
-
-    private static IrTerm CreatePositivePredicate(IrFactory factory, IrTerm value, long _, long __)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return factory.Binary(IrBinaryOperator.GreaterThan, value, factory.Integer(0));
-    }
-
-    private static IrTerm CreateRangePredicate(IrFactory factory, IrTerm value, long minimum, long maximum)
-    {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return factory.Binary(
-            IrBinaryOperator.AndAlso,
-            factory.Binary(IrBinaryOperator.GreaterThanOrEqual, value, factory.Integer(minimum)),
-            factory.Binary(IrBinaryOperator.LessThanOrEqual, value, factory.Integer(maximum)));
-    }
 }

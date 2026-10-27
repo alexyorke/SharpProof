@@ -96,7 +96,7 @@ public sealed class FuzzClosedDomainTests
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var lowering = new RoslynOperationLowerer(factory).Lower(operation!);
+        var lowering = FrontendTotalLowering.Lower(factory, operation!);
 
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Term, Is.InstanceOf<IrOpaqueTerm>());
@@ -115,8 +115,9 @@ public sealed class FuzzClosedDomainTests
         Assert.That(comparison.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
         Assert.That(comparison.Actual, Is.Null);
         Assert.That(comparison.Detail, Is.EqualTo("SMT abstained: UnsupportedEncoding."));
+        // The opaque abstention term has no structure left to shrink.
         var candidates = IrStructuralShrinker.GetCandidates(factory, lowering.Term);
-        Assert.That(candidates, Is.Not.Empty);
+        Assert.That(candidates, Is.Empty);
         var retained = await SmtFailureRetention.RetainFiniteDomainAsync(
             factory, lowering.Term, 7, 12345, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var printed = new IrPrinter(factory).Print(lowering.Term);

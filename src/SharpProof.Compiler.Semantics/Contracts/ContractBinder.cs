@@ -5,7 +5,6 @@ internal sealed partial class ContractBinder
     private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
-    private readonly ContractCanonicalization _canonicalization;
     private readonly ContractClauseInventoryBuilder _clauseInventory;
     private ImmutableDictionary<IMethodSymbol, ContractBindingResult> _bindings =
         ImmutableDictionary.Create<IMethodSymbol, ContractBindingResult>(SymbolEqualityComparer.IncludeNullability);
@@ -57,9 +56,6 @@ internal sealed partial class ContractBinder
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ContractApiSymbols.TryCreate(compilation);
         _intrinsics = new ContractIntrinsicValidator(_api);
-        _canonicalization = new ContractCanonicalization(
-            compilation,
-            _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
@@ -235,57 +231,22 @@ internal sealed partial class ContractBinder
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;
-        var expressionBinder = new ContractExpressionBinder(
-            _factory,
-            _api,
-            source,
-            _canonicalization.CreateTypeSpecializer(usesCompanion ? source : target));
-        var invocationResult = BindInvocations(
-            expressionBinder,
-            inventory,
-            usesCompanion,
-            requiresOnly,
-            directIntrinsicsValidated && !usesCompanion);
-        if (invocationResult.Failure != ContractBindingFailure.None)
+        var clauses = ImmutableArray.CreateBuilder<BoundContractClause>();
+        var invocationFailure = ClassifyInvocations(
+            inventory, usesCompanion, requiresOnly, directIntrinsicsValidated && !usesCompanion, clauses);
+        if (invocationFailure != ContractBindingFailure.None)
         {
-            return ContractBindingResult.Fail(invocationResult.Failure);
+            return ContractBindingResult.Fail(invocationFailure);
         }
 
-        var canonical = _canonicalization.CreateVariables(
-            target,
-            includeResult: !requiresOnly);
-        var substitutions = _canonicalization.CreateSubstitutions(
-            source,
-            usesCompanion,
-            expressionBinder,
-            canonical);
-        if (substitutions == null)
-        {
-            return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedExpression);
-        }
-
-        var substituted = ContractClauseSubstitution.Substitute(
-            _factory, invocationResult.Clauses, substitutions);
-        if (substituted.Failure != ContractBindingFailure.None)
-        {
-            return ContractBindingResult.Fail(substituted.Failure);
-        }
-        var clauses = substituted.Clauses.ToBuilder();
-        void AppendClause(BoundContractClause clause)
-        {
-            clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
-            clauses.Add(clause);
-        }
-
-        var attributeFailure = BindClosedAttributes(
-            target, canonical, requiresOnly, AppendClause);
+        var attributeFailure = ClassifyClosedAttributes(target, requiresOnly, clauses);
         if (attributeFailure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(attributeFailure);
         }
 
         return ContractBindingResult.Success(new BoundMethodContracts(
-            target, source, clauses.ToImmutable(), canonical.ToBoundVariables(), usesCompanion));
+            target, source, clauses.ToImmutable(), usesCompanion));
     }
 
     private static bool HasRequiresPlacementErrors(
@@ -298,31 +259,51 @@ internal sealed partial class ContractBinder
             clause.Placement != ContractClausePlacement.NestedCallable));
     }
 
-    private ContractInvocationMaterializationResult BindInvocations(
-        ContractExpressionBinder expressionBinder,
+    // Classifies the valid contract invocations without lowering their
+    // conditions; the Total binder owns expression semantics.
+    private ContractBindingFailure ClassifyInvocations(
         ContractClauseInventory inventory,
         bool usesCompanion,
         bool requiresOnly,
-        bool intrinsicsAlreadyValidated)
+        bool intrinsicsAlreadyValidated,
+        ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        expressionBinder = RepositoryParameterGuard.NotNull(expressionBinder, nameof(expressionBinder));
+        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         var body = inventory.ImplementationBody;
         if (body == null)
         {
-            return ContractInvocationMaterializationResult.Empty;
+            return ContractBindingFailure.None;
         }
         var failure = intrinsicsAlreadyValidated
             ? ContractBindingFailure.None
             : ValidateIntrinsics(inventory.Callable, body, requiresOnly);
         if (failure != ContractBindingFailure.None)
         {
-            return new([], failure);
+            return failure;
         }
-        return ContractInvocationMaterialization.Bind(
-            _factory, expressionBinder,
-            [.. inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
-                .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation)))],
-            usesCompanion, requiresOnly);
+        foreach (var occurrence in inventory.Clauses)
+        {
+            if (occurrence is null || !occurrence.IsValid || (requiresOnly && occurrence.Kind != BoundContractKind.Requires))
+            {
+                continue;
+            }
+            var invocation = occurrence.Invocation;
+            if (invocation.Arguments.Length != 1)
+            {
+                return ContractBindingFailure.InvalidIntrinsicSignature;
+            }
+            var condition = invocation.Arguments[0].Value;
+            if (condition.Type?.SpecialType != SpecialType.System_Boolean)
+            {
+                return ContractBindingFailure.NonBooleanCondition;
+            }
+            clauses.Add(new BoundContractClause(
+                occurrence.Kind,
+                usesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation,
+                ContractStructuralKey.Create(condition)));
+        }
+        return ContractBindingFailure.None;
     }
 
     private ContractBindingFailure ValidateIntrinsics(
@@ -341,70 +322,53 @@ internal sealed partial class ContractBinder
         return ContractBindingFailure.None;
     }
 
-    private ContractBindingFailure BindClosedAttributes(
+    private ContractBindingFailure ClassifyClosedAttributes(
         IMethodSymbol target,
-        ContractCanonicalVariableBuilder variables,
         bool requiresOnly,
-        Action<BoundContractClause> clauses)
+        ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
+        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
                      target,
                      includeReturn: !requiresOnly))
         {
-            var value = site.IsReturn
-                ? variables.Result.HasValue
-                    ? _factory.Variable(variables.Result.Value)
-                    : null
-                : _factory.Variable(variables.Parameters[site.ParameterIndex]);
-            var result = BindValueAttributes(
-                site.Attributes,
-                site.Type,
-                site.RefKind,
-                value,
-                site.IsReturn
-                    ? "return value"
-                    : target.Parameters[site.ParameterIndex].Name,
-                site.IsReturn
-                    ? BoundContractKind.Ensures
-                    : BoundContractKind.Requires,
-                clauses);
-            if (result != ContractBindingFailure.None)
+            var siteKey = site.IsReturn
+                ? "return"
+                : "p" + site.ParameterIndex.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            foreach (var attribute in site.Attributes)
             {
-                return result;
+                if (_api!.Selections.IsRejectedClosedContract(attribute))
+                {
+                    return ContractBindingFailure.InvalidClosedAttribute;
+                }
+                var validation = ClosedContractAttributeValidator.Validate(
+                    attribute, site.Type, site.RefKind, _api.Selections, includeUnsigned64: false);
+                if (!validation.IsRecognized)
+                {
+                    continue;
+                }
+                if (!validation.IsValid || (site.IsReturn && target.ReturnsVoid))
+                {
+                    return ContractBindingFailure.InvalidClosedAttribute;
+                }
+                clauses.Add(new BoundContractClause(
+                    site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
+                    BoundContractEvidence.ClosedAttribute,
+                    "attribute:" + siteKey + ":" + AttributeKey(attribute)));
             }
         }
         return ContractBindingFailure.None;
     }
 
-    private ContractBindingFailure BindValueAttributes(
-        ImmutableArray<AttributeData> attributes,
-        ITypeSymbol sourceType,
-        RefKind refKind,
-        IrTerm? value,
-        string valueName,
-        BoundContractKind kind,
-        Action<BoundContractClause> clauses)
+    private static string AttributeKey(AttributeData attribute)
     {
-
-        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-        sourceType = RepositoryParameterGuard.NotNull(sourceType, nameof(sourceType));
-        valueName = RepositoryParameterGuard.NotNull(valueName, nameof(valueName));
-        var bound = ClosedContractAttributeBinding.BindValue(
-            _factory, _api!.Selections, attributes, sourceType, refKind, () => value, valueName, kind,
-            total: false, _ => _factory.CreateOperation("closed-attribute"));
-        if (bound.Failure != ContractBindingFailure.None)
-        {
-            return bound.Failure;
-        }
-        foreach (var clause in bound.Clauses)
-        {
-            clauses(new BoundContractClause(clause.Kind, clause.Condition, clause.SourceOperation,
-                BoundContractEvidence.ClosedAttribute, clause.DiagnosticText, clause.SourceSyntax));
-        }
-        return ContractBindingFailure.None;
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        return attribute.AttributeClass?.GetDocumentationCommentId() + "(" +
+            string.Join(",", attribute.ConstructorArguments.Select(static argument =>
+            {
+                RepositoryParameterGuard.RequireInitialized(argument.IsNull && argument.Kind == TypedConstantKind.Error, nameof(argument), "Attribute arguments must be valid.");
+                return argument.ToCSharpString();
+            })) + ")";
     }
 }

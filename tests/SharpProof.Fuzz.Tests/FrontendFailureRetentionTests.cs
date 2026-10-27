@@ -8,69 +8,35 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FrontendFailureRetentionTests
 {
     [Test]
-    public void ActualSequenceMismatchIsRetainedAndMinimized()
+    // The retired expression lowerer mismatched on sequence identity through a
+    // conditional; the Total body lowerer models it.
+    public void SequenceIdentityThroughAConditionalAgrees()
     {
         var original = Case(GeneratedCSharpExpression.Binary(
             GeneratedExpressionKind.Equal,
             GeneratedCSharpExpression.Values(),
             Compound(GeneratedCSharpExpression.Values(), GeneratedCSharpExpression.Values())));
         var observed = FrontendDifferentialOracle.Compare(original, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        Assert.That(observed.Detail, Does.Contain("UnsupportedCast"));
-        VerifyRetention(original, observed, 0);
+        Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Agreement), observed.Detail);
     }
 
     [Test]
-    public void EntireFrozenBatchRetainsEveryActualFailureWithoutChangingItsOutcome()
+    public void EntireFrozenBatchAgreesWithCompiledCSharp()
     {
         var cases = FrozenRecursiveCases();
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(cases, Has.Length.EqualTo(269));
+        Assert.That(cases, Has.Length.EqualTo(272));
         Assert.That(results, Has.Length.EqualTo(cases.Length));
-        var knownFailures = ImmutableHashSet.Create(StringComparer.Ordinal,
-            "(values == (condition ? values : values))",
-            "((condition ? values : values) == values)",
-            "(values != (condition ? values : values))",
-            "((condition ? values : values) != values)");
         var semanticFailures = 0;
         var agreements = 0;
         for (var index = 0; index < cases.Length; index++)
         {
             var observed = results[index];
-            var expression = cases[index].Expression.Render();
-            Assert.That(observed.Status, Is.EqualTo(knownFailures.Contains(expression)
-                ? FuzzOracleStatus.Mismatch : FuzzOracleStatus.Agreement), expression);
-            if (observed.Status == FuzzOracleStatus.Agreement)
-            {
-                agreements++;
-            }
-            else
-            {
-                Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-                Assert.That(FuzzRunner.IsCompilationFailure(observed), Is.False);
-                Assert.That(observed.Detail, Is.EqualTo(
-                    "Compiled C# returned normally while the lowered IR reported unsupported UnsupportedCast."));
-                Assert.That(observed.ExceptionKind, Is.Null);
-                VerifyRetention(cases[index], observed, index);
-                semanticFailures++;
-            }
+            Assert.That(observed.Status, Is.EqualTo(FuzzOracleStatus.Agreement),
+                cases[index].Expression.Render() + ": " + observed.Detail);
+            agreements++;
         }
-        Assert.That(agreements, Is.EqualTo(265));
-        Assert.That(semanticFailures, Is.EqualTo(4));
-        var known = -1;
-        for (var index = 0; index < cases.Length; index++)
-        {
-            var generated = cases[index];
-            System.ArgumentNullException.ThrowIfNull(generated);
-            if (generated.Expression.Render() == "(values == (condition ? values : values))")
-            {
-                known = index;
-                break;
-            }
-        }
-        Assert.That(known, Is.GreaterThanOrEqualTo(0));
-        Assert.That(results[known].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        Assert.That(results[known].Detail, Does.Contain("UnsupportedCast"));
+        Assert.That(agreements, Is.EqualTo(272));
         var census = JsonSerializer.Serialize(new
         {
             cases = cases.Length,
@@ -204,7 +170,7 @@ public sealed class FrontendFailureRetentionTests
             GeneratedCSharpExpression.Length(text),
             GeneratedCSharpExpression.Length(sequence),
             GeneratedCSharpExpression.ArrayIndex(sequence, integer),
-            GeneratedCSharpExpression.CastToString(reference),
+            GeneratedCSharpExpression.CastToString(text),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.StringConcat, text, text),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.AndAlso, boolean, boolean),
             GeneratedCSharpExpression.Binary(GeneratedExpressionKind.OrElse, boolean, boolean)));

@@ -9,7 +9,7 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ClosedContractAttributeBindingComponentTests
 {
-    private static readonly ImmutableArray<IrExecutionSemantics> Modes = [IrExecutionSemantics.Legacy, IrExecutionSemantics.Total];
+    private static readonly ImmutableArray<IrExecutionSemantics> Modes = [IrExecutionSemantics.Total];
     private static readonly ImmutableArray<string> ExpectedDiagnostics = ["[Positive] count", "[InRange(1L, 3L)] count"];
     private static readonly ImmutableArray<long> Inputs = [-1L, 2L, 4L];
     [Test]
@@ -40,7 +40,6 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 },
                 parameter.Name,
                 BoundContractKind.Requires,
-                total: semantics == IrExecutionSemantics.Total,
                 syntax =>
                 {
                     operationSiteBuilder.Add(syntax);
@@ -97,7 +96,6 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 () => value,
                 "result",
                 BoundContractKind.Ensures,
-                total: semantics == IrExecutionSemantics.Total,
                 syntax => factory.CreateOperation("held-return-attribute"));
 
             Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -143,7 +141,6 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 },
                 parameter.Name,
                 BoundContractKind.Requires,
-                total: semantics == IrExecutionSemantics.Total,
                 syntax =>
                 {
                     operationCalls++;
@@ -182,7 +179,6 @@ public sealed class ClosedContractAttributeBindingComponentTests
                 () => value,
                 parameter.Name,
                 BoundContractKind.Requires,
-                total: semantics == IrExecutionSemantics.Total,
                 syntax => factory.CreateOperation("held-prefix"));
 
             Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));

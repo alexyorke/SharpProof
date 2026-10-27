@@ -10,31 +10,6 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class BulkCompilerChildGuardCoverageTests
 {
-    [Test]
-    public void ActualNullableCfgNullCheckRetainsLegacyChildTypeClosure()
-    {
-        using var subject = TypedProgramSubject.Create("int Target(int? value) => value ?? 7;");
-        Assert.That(subject.Invoke([17]), Is.EqualTo(17));
-        Assert.That(subject.Invoke([null!]), Is.EqualTo(7));
-        var operation = subject.Graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsNullOperation>().Single();
-        var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
-        Assert.That(result.IsExact, Is.False);
-        Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
-        using var supported = TypedProgramSubject.Create("string Target(string value) => value ?? \"fallback\";");
-        Assert.That(supported.Invoke(["word"]), Is.EqualTo("word"));
-        Assert.That(supported.Invoke([null!]), Is.EqualTo("fallback"));
-        var supportedOperation = supported.Graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsNullOperation>().Single();
-        var factory = new IrFactory();
-        var lowerer = new RoslynOperationLowerer(factory);
-        var exact = lowerer.Lower(supportedOperation);
-        Assert.That(exact.IsExact, Is.True);
-        var capture = lowerer.CreateCaptureBindings().Single();
-        var environment = global::System.Collections.Immutable.ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
-        environment[capture] = factory.CreateStringValue("word");
-        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment.ToImmutable()).Value!.Boolean, Is.False);
-        environment[capture] = factory.CreateNullValue(factory.StringType);
-        Assert.That(new IrInterpreter(factory).Evaluate(exact.Term, environment.ToImmutable()).Value!.Boolean, Is.True);
-    }
 
     [Test]
     public void RealGenericTypeTestPreservesUnsupportedUnboxingChild()

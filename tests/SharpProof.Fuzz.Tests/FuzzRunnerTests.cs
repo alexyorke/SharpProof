@@ -97,10 +97,9 @@ public sealed class FuzzRunnerTests
         Assert.That(
             first.PartialSmtAgreements,
             Is.EqualTo(options.Cases));
-        Assert.That(first.FrontendCoverage.HasExpandedCategories, Is.True);
+        Assert.That(first.FrontendCoverage.HasExpandedCategories, Is.True, first.FrontendCoverage.ToString());
         Assert.That(first.FrontendCoverage.DivideByZeroExceptions, Is.GreaterThan(0));
         Assert.That(first.FrontendCoverage.OverflowExceptions, Is.GreaterThan(0));
-        Assert.That(first.FrontendCoverage.InvalidCastExceptions, Is.GreaterThan(0));
     }
 
     [Test]
@@ -353,7 +352,7 @@ public sealed class FuzzRunnerTests
             },
             new GeneratedCSharpCase(
                 GeneratedCSharpExpression.CastToString(
-                    GeneratedCSharpExpression.NullReference()),
+                    GeneratedCSharpExpression.NullString()),
                 Left: 0,
                 Right: 0,
                 Condition: false));

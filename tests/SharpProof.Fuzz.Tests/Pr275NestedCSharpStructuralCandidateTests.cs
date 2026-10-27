@@ -61,7 +61,7 @@ internal sealed class Pr275NestedCSharpStructuralCandidateTests
             GeneratedCSharpExpression.Unary(GeneratedExpressionKind.Negate, left)));
         yield return Case("NestedLength", GeneratedCSharpExpression.Length(text));
         yield return Case("NestedArrayIndex", GeneratedCSharpExpression.ArrayIndex(sequence, integer));
-        yield return Case("NestedCast", GeneratedCSharpExpression.CastToString(reference));
+        yield return Case("NestedCast", GeneratedCSharpExpression.CastToString(text));
         yield return Case("NestedIntegerConditional", GeneratedCSharpExpression.Conditional(boolean, integer, other));
         yield return Case("NestedStringConditional", GeneratedCSharpExpression.Conditional(boolean, text, otherText));
         foreach (var kind in ImmutableArray.Create(

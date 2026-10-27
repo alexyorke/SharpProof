@@ -357,12 +357,7 @@ internal static class FuzzSourceCaseExecutor
             else
             {
                 // A closed Total clause carries a placeholder value, not a model.
-                // Keep the compatibility boundary's actual opaque term for rejection.
-                var opaque = new RoslynOperationLowerer(Factory).Lower(operation);
-                if (opaque.Term is not IrOpaqueTerm)
-                {
-                    throw new InvalidOperationException("An incomplete Total clause has no authentic opaque expression for rejection.");
-                }
+                var opaque = FrontendTotalLowering.Lower(Factory, symbol, operation, _model.Compilation);
                 term = opaque.Term;
                 variables = opaque.Variables;
             }
@@ -418,12 +413,16 @@ internal static class FuzzSourceCaseExecutor
                 scenario = Bind(completion, arguments, scenario);
                 scenarios.Add(scenario);
             }
+            // C# completes normally only when the target does not fault, whether
+            // or not the completion predicate itself is modeled.
             var normalCompletion = completion.Term;
-            if (target.Expression.Classification.IsExact && completion.Expression.Classification.IsExact)
+            if (target.Expression.Classification.IsExact)
             {
-                normalCompletion = Factory.Binary(IrBinaryOperator.AndAlso,
-                    Factory.Binary(IrBinaryOperator.AndAlso, target.Expression.SafeCondition,
-                        completion.Expression.SafeCondition), completion.Term);
+                var safe = completion.Expression.Classification.IsExact
+                    ? Factory.Binary(IrBinaryOperator.AndAlso, target.Expression.SafeCondition,
+                        completion.Expression.SafeCondition)
+                    : target.Expression.SafeCondition;
+                normalCompletion = Factory.Binary(IrBinaryOperator.AndAlso, safe, completion.Term);
             }
             return new PartialTermSmtCase(target.Term, normalCompletion,
                 scenarios.ToImmutable(), references.ToImmutable());

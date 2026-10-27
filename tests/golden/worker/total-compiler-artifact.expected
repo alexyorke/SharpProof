@@ -1,6 +1,6 @@
 schema: 56
 authority: legacy
-legacy-success: False
+legacy-success: True
 total-present: True
 integer-width: 64
 unsigned: True

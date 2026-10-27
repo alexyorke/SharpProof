@@ -44,13 +44,13 @@ public sealed class FrontendTypeInitializationControls
         Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
-        var factory = new IrFactory();
-        var lowered = new RoslynOperationLowerer(factory).Lower(operation!);
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var lowered = FrontendTotalLowering.Lower(factory, operation!);
         Assert.That(lowered.IsExact, Is.True);
         var binding = lowered.Variables.Single();
         Assert.That(SymbolEqualityComparer.Default.Equals(binding.Symbol, symbol.Parameters[0]), Is.True);
         var interpreted = new IrInterpreter(factory).Evaluate(lowered.Term,
-            ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(binding.Variable, factory.CreateIntegerValue(7)));
+            ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(binding.Variable, factory.CreateIntegerValue(factory.GetVariableInfo(binding.Variable).Type, 7)));
         Assert.That(interpreted.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(interpreted.Value!.Integer, Is.EqualTo(7));
         var context = new AssemblyLoadContext("FrontendTypeInitializationPremise", isCollectible: true);
@@ -85,7 +85,7 @@ public sealed class FrontendTypeInitializationControls
         Assert.That(result.ExceptionKind, Is.Null);
         if (fault)
         {
-            Assert.That(result.Detail, Does.StartWith("Compiled C# threw TypeInitializationException while the lowered IR reported "));
+            Assert.That(result.Detail, Does.StartWith("Compiled C# threw TypeInitializationException while the lowered program reported "));
         }
         else
         {

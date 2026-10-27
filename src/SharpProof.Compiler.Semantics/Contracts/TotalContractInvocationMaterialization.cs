@@ -6,6 +6,14 @@ namespace SharpProof.Contracts;
 // is published; ordinary raw candidates are useful rejection inputs.
 internal static class TotalContractInvocationMaterialization
 {
+    internal static string FormatDiagnosticSourceText(SyntaxNode syntax)
+    {
+        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
+        return syntax.Span.Length > ClosedContractAttributeBinding.MaximumDiagnosticConditionLength
+            ? "[condition exceeds the display limit]"
+            : syntax.ToString();
+    }
+
     internal static TotalContractInvocationMaterializationResult Bind(
         TotalLoweringContext context,
         ContractApiSymbols api,
@@ -91,7 +99,7 @@ internal static class TotalContractInvocationMaterialization
             }
             if (expression.Value.Type != factory.BooleanType)
             { return Fail(ContractBindingFailure.NonBooleanCondition); }
-            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), ContractInvocationMaterialization.FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
+            clauses.Add(new(occurrence.Kind, expression, context.Site(invocation), FormatDiagnosticSourceText(invocation.Arguments[0].Value.Syntax),
                 resolution.UsesCompanion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation,
                 invocation.Syntax.GetReference()));
         }
@@ -125,4 +133,13 @@ internal sealed class TotalContractInvocationMaterializationResult(
 {
     internal ImmutableArray<BoundTotalContractClause> Clauses { get; } = (clauses.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauses)) : clauses);
     internal ContractBindingFailure Failure { get; } = failure;
+}
+
+internal readonly struct ContractInvocationCandidate(
+    BoundContractKind kind,
+    IInvocationOperation invocation)
+{
+    internal BoundContractKind Kind { get; } = kind;
+    internal IInvocationOperation Invocation { get; } =
+        ArgumentNullGuard.NotNull(invocation, nameof(invocation));
 }

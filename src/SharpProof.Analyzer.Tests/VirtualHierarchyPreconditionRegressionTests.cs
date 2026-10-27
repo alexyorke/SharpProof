@@ -5,46 +5,6 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class VirtualHierarchyPreconditionRegressionTests
 {
-
-    [Test]
-    public void VariableShapedStringLiteralsAreNotAlphaRenamed()
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation("""
-            using SharpProof.Attributes;
-            public class Base { public virtual void Run(string value) { Contract.Requires(value != "seed"); } }
-            public class Derived : Base { public override void Run(string value) { Contract.Requires(value != "seed"); } }
-            """, []);
-        var factory = new SharpProof.Ir.IrFactory();
-        var binder = new SharpProof.Contracts.ContractBinder(compilation, factory);
-        var left = Rewrite("Base");
-        var right = Rewrite("Derived");
-        var compare = typeof(SharpProof.Analyzer.OverridePreconditionDiagnostics).GetMethod(
-            "HaveSameRequires", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-        Assert.That(compare.Invoke(null, [left, right, factory]), Is.False);
-
-        SharpProof.Contracts.BoundMethodContracts Rewrite(string type)
-        {
-            System.ArgumentNullException.ThrowIfNull(type);
-            var method = compilation.GetTypeByMetadataName(type)!.GetMembers("Run")
-                .OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
-            var bound = binder.BindRequires(method).Contracts!;
-            var variable = bound.Variables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Role == SharpProof.Contracts.BoundContractVariableRole.Parameter));
-            var clause = bound.Clauses.Single();
-            var condition = factory.Binary(SharpProof.Ir.IrBinaryOperator.NotEqual,
-                factory.Variable(variable.Variable), factory.String("v" + variable.Variable.Value));
-            var rewritten = (SharpProof.Contracts.BoundContractClause)Activator.CreateInstance(
-                typeof(SharpProof.Contracts.BoundContractClause),
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                null, [clause.Kind, condition, clause.SourceOperation,
-                    clause.Evidence, clause.DiagnosticText, clause.SourceSyntax], null)!;
-            return (SharpProof.Contracts.BoundMethodContracts)Activator.CreateInstance(
-                typeof(SharpProof.Contracts.BoundMethodContracts),
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                null, [bound.Target, bound.Source,
-                    System.Collections.Immutable.ImmutableArray.Create(rewritten), bound.Variables, bound.UsesCompanion], null)!;
-        }
-    }
-
     [TestCase(false, false, 1)]
     [TestCase(true, false, 1)]
     [TestCase(false, true, 0)]

@@ -15,7 +15,6 @@ internal static class ClosedContractAttributeBinding
         Func<IrTerm?> getValue,
         string valueName,
         BoundContractKind kind,
-        bool total,
         Func<SyntaxNode?, OperationId> createOperation)
     {
 
@@ -32,50 +31,31 @@ internal static class ClosedContractAttributeBinding
             }
 
             var validation = ClosedContractAttributeValidator.Validate(
-                attribute, sourceType, refKind, symbols, includeUnsigned64: total);
+                attribute, sourceType, refKind, symbols, includeUnsigned64: true);
             if (!validation.IsRecognized)
             {
                 continue;
             }
 
-            if (total)
+            if (!validation.IsValid ||
+                attribute.ApplicationSyntaxReference?.GetSyntax() is not { } syntax)
             {
-                if (!validation.IsValid ||
-                    attribute.ApplicationSyntaxReference?.GetSyntax() is not { } syntax)
-                {
-                    return new([], ContractBindingFailure.InvalidClosedAttribute);
-                }
-                var value = getValue();
-                if (value == null)
-                {
-                    return new([], ContractBindingFailure.InvalidClosedAttribute);
-                }
-                var condition = validation.CreateTotalPredicate(factory, value, factory.GetTypeInfo(value.Type));
-                if (condition == null)
-                {
-                    return new([], ContractBindingFailure.UnsupportedExpression);
-                }
-                var safeCondition = factory.Boolean(true);
-                var sourceOperation = createOperation(syntax);
-                clauses.Add(new(kind, condition, safeCondition, sourceOperation,
-                    FormatDiagnosticText(attribute, validation, valueName), syntax.GetReference()));
+                return new([], ContractBindingFailure.InvalidClosedAttribute);
             }
-            else
+            var value = getValue();
+            if (value == null)
             {
-                if (!validation.IsValid)
-                {
-                    return new([], ContractBindingFailure.InvalidClosedAttribute);
-                }
-                var value = getValue();
-                if (value == null || !validation.SupportsLegacyValue(factory, value))
-                {
-                    return new([], ContractBindingFailure.InvalidClosedAttribute);
-                }
-                var diagnosticText = FormatDiagnosticText(attribute, validation, valueName);
-                var condition = validation.CreateLegacyPredicate(factory, value);
-                clauses.Add(new(kind, condition, null, createOperation(null), diagnosticText,
-                    attribute.ApplicationSyntaxReference));
+                return new([], ContractBindingFailure.InvalidClosedAttribute);
             }
+            var condition = validation.CreateTotalPredicate(factory, value, factory.GetTypeInfo(value.Type));
+            if (condition == null)
+            {
+                return new([], ContractBindingFailure.UnsupportedExpression);
+            }
+            var safeCondition = factory.Boolean(true);
+            var sourceOperation = createOperation(syntax);
+            clauses.Add(new(kind, condition, safeCondition, sourceOperation,
+                FormatDiagnosticText(attribute, validation, valueName), syntax.GetReference()));
         }
         return new(clauses.ToImmutable(), ContractBindingFailure.None);
     }

@@ -197,7 +197,7 @@ internal sealed partial class ContractBinder
                     ? context.Result is { } result ? _factory.Variable(result) : null
                     : _factory.Variable(context.Parameters[site.ParameterIndex].Entry), name,
                 site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
-                total: true, syntax => context.AttributeSite(syntax!));
+                syntax => context.AttributeSite(syntax!));
             if (bound.Failure != ContractBindingFailure.None)
             {
                 return bound.Failure;

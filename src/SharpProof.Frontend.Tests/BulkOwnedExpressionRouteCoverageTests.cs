@@ -9,41 +9,6 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class BulkOwnedExpressionRouteCoverageTests
 {
-    [Test]
-    public void RealRefLocalReadClosesLegacyMutationWhilePlainLocalRetainsCompiledValue()
-    {
-        using var subject = TypedProgramSubject.Create("int Target(int value) { ref int alias = ref value; return alias; }");
-        Assert.That(subject.Invoke([17]), Is.EqualTo(17));
-        var tree = subject.Compilation.SyntaxTrees.Single();
-        var syntax = tree.GetRoot().DescendantNodes().OfType<IdentifierNameSyntax>().Single(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Identifier.ValueText == "alias"));
-        var operation = (ILocalReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
-        Assert.That(operation.Local.RefKind, Is.EqualTo(Microsoft.CodeAnalysis.RefKind.Ref));
-        var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
-        Assert.That(result.IsExact, Is.False);
-        Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
-        using var supported = TypedProgramSubject.Create("int Target(int value) { int alias = value; return alias; }");
-        Assert.That(supported.Invoke([17]), Is.EqualTo(17));
-        ExactInteger(supported, [17], 17);
-    }
-
-    [Test]
-    public void ActualCustomIndexerRetainsLegacyMemberClosureAndNaturalArgumentBindings()
-    {
-        using var subject = TypedProgramSubject.Create("int Target(int value) { var item = new Cell(); return item[value]; } public sealed class Cell { public int this[int value] => value + 1; }");
-        Assert.That(subject.Invoke([16]), Is.EqualTo(17));
-        var tree = subject.Compilation.SyntaxTrees.Single();
-        var syntax = tree.GetRoot().DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
-        var operation = (IPropertyReferenceOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
-        Assert.That(operation.Arguments, Has.Length.EqualTo(1));
-        Assert.That(operation.Arguments[0].Value, Is.InstanceOf<IParameterReferenceOperation>());
-        var result = new RoslynOperationLowerer(new IrFactory()).Lower(operation);
-        Assert.That(result.IsExact, Is.False);
-        Assert.That(result.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMemberAccess));
-        Assert.That(result.Variables.Any(binding => binding.Symbol.Name == "value"), Is.True);
-        using var supported = TypedProgramSubject.Create("int Target(int value) => value + 1;");
-        Assert.That(supported.Invoke([16]), Is.EqualTo(17));
-        ExactInteger(supported, [16], 17);
-    }
 
     [Test]
     public void RealOpaqueArgumentBoxingRetainsUnsupportedStructUnboxingChild()

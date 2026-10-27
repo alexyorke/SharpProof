@@ -174,7 +174,9 @@ public sealed class FinalCompilationCollectorTests
         {
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
-            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+            // The exact receiver body is admitted; the opaque mutation leaves no Total program.
+            Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(mutate
+                ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         }
         if (mutate)
         {
@@ -848,7 +850,7 @@ public sealed class FinalCompilationCollectorTests
 
     [TestCase("D800")]
     [TestCase("DC00")]
-    public async Task IllFormedCompilerStringTermsBecomeUnsupportedExpression(
+    public async Task IllFormedCompilerStringTermsBecomeUnsupportedBody(
         string escape)
     {
         System.ArgumentNullException.ThrowIfNull(escape);
@@ -873,7 +875,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(artifact.CompilerDiagnostics, Is.Empty);
             Assert.That(
                 artifact.Callables.Single().FailureReason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         }
     }
 

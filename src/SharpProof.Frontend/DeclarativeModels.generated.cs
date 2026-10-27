@@ -5,27 +5,6 @@
 #nullable enable
 namespace SharpProof.Frontend;
 
-internal sealed partial class FrontendLoweringResult
-{
-    internal readonly struct StorageTag
-    {
-    }
-    internal FrontendLoweringResult(
-        IrTerm term,
-        FrontendSubsetClassification classification,
-        ImmutableArray<FrontendVariableBinding> variables,
-        StorageTag storage
-    )
-    {
-        Term = term;
-        Classification = classification;
-        Variables = variables;
-    }
-    public IrTerm Term { get; }
-    public FrontendSubsetClassification Classification { get; }
-    public ImmutableArray<FrontendVariableBinding> Variables { get; }
-}
-
 internal sealed partial class FrontendProgramLoweringResult
 {
     internal readonly struct StorageTag
