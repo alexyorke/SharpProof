@@ -26,7 +26,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private const int InvalidInputExitCode = 2;
     private const int PublicationFailureExitCode = 3;
     private readonly object _gate = new();
-    private readonly ManualResetEventSlim _cancellationSignal = new();
     private readonly CancellationTokenSource _cancellation = new();
     // Execute owns the process; this action borrows it only for cancellation.
     private Action? _cancelProcess;
@@ -56,7 +55,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     public void Dispose()
     {
-        _cancellationSignal.Dispose();
         _cancellation.Dispose();
     }
 
@@ -109,7 +107,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             System.Threading.Tasks.Task<string> standardError;
             lock (_gate)
             {
-                if (_cancellationSignal.IsSet)
+                if (_cancellation.IsCancellationRequested)
                 {
                     ExitCode = -1;
                     return true;
@@ -126,7 +124,13 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 Kill(process);
             }
-            process.WaitForExit();
+            // A failed tree kill must not hold the MSBuild node forever.
+            if (!process.WaitForExit(TerminationGraceMilliseconds))
+            {
+                Log.LogMessage(
+                    MessageImportance.High,
+                    "SharpProof verifier did not exit after termination; the process was abandoned.");
+            }
             if (!System.Threading.Tasks.Task.WaitAll(
                     [standardOutput, standardError], OutputDrainMilliseconds))
             {
@@ -146,7 +150,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 LogStandardError(error);
             }
 
-            ExitCode = _cancellationSignal.IsSet
+            ExitCode = _cancellation.IsCancellationRequested
                 ? -1
                 : exited
                     ? process.ExitCode
@@ -173,7 +177,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         catch (OperationCanceledException)
         {
             Kill(process);
-            ExitCode = _cancellationSignal.IsSet ? -1 : LinuxProcessControlConstants.TimeoutExitCode;
+            ExitCode = _cancellation.IsCancellationRequested ? -1 : LinuxProcessControlConstants.TimeoutExitCode;
         }
         catch (TimeoutException)
         {
@@ -211,7 +215,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         Action? cancelProcess;
         lock (_gate)
         {
-            _cancellationSignal.Set();
             _cancellation.Cancel();
             cancelProcess = _cancelProcess;
         }
@@ -349,16 +352,17 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private bool WaitForExitOrCancellation(Process process, int timeoutMilliseconds)
     {
         System.ArgumentNullException.ThrowIfNull(process);
-        var deadline = Stopwatch.StartNew();
-        while (!process.WaitForExit(50))
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
+        deadline.CancelAfter(timeoutMilliseconds);
+        try
         {
-            if (_cancellationSignal.IsSet ||
-                deadline.ElapsedMilliseconds >= timeoutMilliseconds)
-            {
-                return false;
-            }
+            process.WaitForExitAsync(deadline.Token).GetAwaiter().GetResult();
+            return true;
         }
-        return true;
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private static void Kill(Process process)
