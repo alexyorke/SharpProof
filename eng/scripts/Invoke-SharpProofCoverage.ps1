@@ -3,9 +3,10 @@ param(
     [Parameter()]
     [string]$ResultsDirectory = 'artifacts/coverage',
 
+    # Instrumented semantic runs take about 20 minutes on hosted runners.
     [Parameter()]
     [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1200,
+    [int]$TimeoutSeconds = 3600,
 
     [Parameter()]
     [string]$TestFilter = '',
