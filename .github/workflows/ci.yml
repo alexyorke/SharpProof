@@ -1,9 +1,11 @@
-name: Canonical container PR gates
+name: CI
 
 on:
   push:
     branches: [master]
   pull_request:
+  # Weekly: compile the Windows Z3 payload from source (setup-tooling skips
+  # its cache on schedules) and pick up new advisories and broken links.
   schedule:
     - cron: "41 7 * * 3"
   workflow_dispatch:
@@ -16,335 +18,244 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  SHARPPROOF_CI_PACKAGE_VERSION: ${{ !startsWith(github.ref, 'refs/tags/v') && format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) || '' }}
+  SHARPPROOF_CI_PACKAGE_VERSION: ${{ format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) }}
   COMPOSE_PROJECT_NAME: sharpproof-ci-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
-  repository-quality:
-    uses: ./.github/workflows/quality.yml
-
-  # Enforce the full solution and every build analyzer once. Test partitions
-  # build their own dependency closures in parallel with this required lane.
-  canonical-build:
-    if: github.event_name != 'schedule'
+  # Every lane is one container task on its own runner. The test lanes run
+  # the semantic and package suites once, with the coverage collector on;
+  # the coverage job merges their line hits.
+  lanes:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Build the complete Release solution with analyzers
-        run: docker compose run --rm tooling build -Configuration Release -Target SharpProof.slnx
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  # The Remaining cohort saturates a four-CPU runner, so it runs as three parts on
-  # separate runners. Every part builds only its test dependency closure.
-  canonical-main:
-    name: canonical-main (${{ matrix.part }})
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - part: worker-a
-            task-group: WorkerA
-          - part: worker-b
-            task-group: WorkerB
-          - part: projects
-            task-group: Projects
+          # Dependency audit plus the complete Release solution with analyzers.
+          - name: build
+            task: security -Configuration Release
+          - name: worker-a
+            task: coverage -CoveragePart Semantic -TaskGroup WorkerA
+            coverage: true
+          - name: worker-b
+            task: coverage -CoveragePart Semantic -TaskGroup WorkerB
+            coverage: true
+          - name: projects
+            task: coverage -CoveragePart Semantic -TaskGroup Projects
+            coverage: true
+          - name: gates-corpus
+            task: coverage -CoveragePart Semantic -TaskGroup GatesCorpus
+            coverage: true
+          - name: gates-shards
+            task: coverage -CoveragePart Semantic -TaskGroup GatesShards
+            coverage: true
+          - name: package-0
+            task: coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition 0
+            coverage: true
+          - name: package-1
+            task: coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition 1
+            coverage: true
+          - name: package-2
+            task: coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition 2
+            coverage: true
+          - name: package-3
+            task: coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition 3
+            coverage: true
+          - name: self-apply-sources
+            task: self-apply -Configuration Release -SelfApplicationPhase Sources
+          - name: self-apply-samples
+            task: self-apply -Configuration Release -SelfApplicationPhase Samples
+          - name: format
+            task: format-check
+    env:
+      # Instrumented lanes stay below the runner's 16 GB of RAM.
+      SHARPPROOF_CONTAINER_MEMORY_LIMIT: ${{ matrix.coverage && '12g' || '' }}
+      SHARPPROOF_TMPFS_SIZE: ${{ matrix.coverage && '4g' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: ./.github/actions/prepare-qualified-packages
+      - uses: ./.github/actions/setup-tooling
+
+      - name: Run ${{ matrix.name }}
+        env:
+          TASK: ${{ matrix.task }}
+        run: |
+          read -ra task <<< "$TASK"
+          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling "${task[@]}"
+
+      - name: Upload coverage line hits
+        if: matrix.coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          download-packages: "false"
+          name: coverage-lines-${{ matrix.name }}
+          path: artifacts/coverage/lines.tsv
+          if-no-files-found: error
+          retention-days: 14
 
-      # Package tests and source-only repository gates run in canonical-package.
-      # -Fast skips analyzers only here; canonical-build enforces all of them.
-      - name: Run the ${{ matrix.part }} part of the non-Gates semantic PR phases
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
-          -Configuration Release -Fast
-          -SemanticCohort Remaining -TaskGroup ${{ matrix.task-group }}
-          -TestResultsDirectory artifacts/canonical-remaining
-          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-
-      - name: Upload container gate evidence
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-main-${{ matrix.part }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: lane-${{ matrix.name }}-${{ github.run_attempt }}
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-          name: ${{ github.job }}-${{ matrix.part }}
-
-  canonical-package:
-    if: github.event_name != 'schedule'
+  # Short source and image checks share one runner.
+  repository:
     runs-on: ubuntu-latest
-    env:
-      # Match the constrained coverage envelope and leave room for runner services.
-      SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
-      SHARPPROOF_TMPFS_SIZE: 4g
-    strategy:
-      fail-fast: false
-      matrix:
-        partition: [0, 1, 2, 3]
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: ./.github/actions/prepare-qualified-packages
-        id: tooling
-        with:
-          download-packages: "false"
+      - uses: ./.github/actions/setup-tooling
+        id: setup
 
-      # The source-only checks that pr runs before its build.
+      # Build lint on the tooling image prepared above, as compose.yaml's
+      # service:tooling context does. `docker compose build lint` would
+      # rebuild tooling without the cached Windows Z3 payload.
+      - name: Lint (code, docs, spelling, workflows, links)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --file eng/lint/Dockerfile \
+            --load \
+            --tag "${COMPOSE_PROJECT_NAME}-lint:local" \
+            --build-context "canonical_tooling=docker-image://${COMPOSE_PROJECT_NAME}-tooling:local" \
+            --progress plain \
+            .
+          docker compose run --rm -e GITHUB_TOKEN lint
+
       - name: Check documentation links and repository layout
-        if: matrix.partition == 0
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           docker compose run --rm tooling docs
           docker compose run --rm tooling layout
 
-      # The package phase of pr, with the same Release configuration and
-      # canonical filter. -Fast skips analyzers in this build only;
-      # canonical-build's full solution build enforces them.
-      - name: Run the PR package phase
-        if: ${{ !cancelled() && steps.tooling.outcome == 'success' }}
-        run: >-
-          docker compose run
-          --name "${COMPOSE_PROJECT_NAME}-canonical-package-${{ matrix.partition }}"
-          -e GITHUB_RUN_ID tooling package-tests
-          -Configuration Release -Fast
-          -PackagePartitionCount 4 -PackagePartition ${{ matrix.partition }}
-          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+      - name: Check pinned .NET API inventory and catalog test evidence
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          docker compose run --rm tooling test \
+            -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
+            -TestFilter FullyQualifiedName~DotnetApiInventoryTests
+          docker compose run --rm tooling test \
+            -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj \
+            -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
+          test -s artifacts/api-coverage/catalog-test-evidence.json
+          test -s artifacts/api-coverage/intrinsic-test-evidence.json
 
-      - name: Record package container termination
+      - name: Collect isolated Attributes and Fuzz-console coverage
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: docker compose run --rm tooling coverage -CoveragePart Isolated
+
+      - name: Scan the tooling image for vulnerabilities
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ env.COMPOSE_PROJECT_NAME }}-tooling:local
+          grype-version: v0.120.1
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: json
+          output-file: artifacts/toolchain-vulnerabilities.json
+          cache-db: false
+          config: .grype.yaml
+
+      - name: Publish summaries
         if: always()
         run: |
-          task_container="${COMPOSE_PROJECT_NAME}-canonical-package-${{ matrix.partition }}"
-          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
-          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
-          mkdir -p "$state_dir"
-          if docker inspect --format \
-            '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
-            "$task_container" > "${state_dir}/canonical-package.json"; then
-            cat "${state_dir}/canonical-package.json"
-          else
-            printf '{"available":false}\n' > "${state_dir}/canonical-package.json"
-          fi
+          for report in artifacts/lint/summary.md \
+            artifacts/api-coverage/catalog-test-evidence.md \
+            artifacts/api-coverage/intrinsic-test-evidence.md; do
+            if [[ -f "$report" ]]; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
 
-      - name: Upload package container termination
-        if: always()
+      - name: Upload coverage line hits
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-package-container-${{ matrix.partition }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/sharpproof-container-state/*.json
+          name: coverage-lines-isolated
+          path: artifacts/coverage/lines.tsv
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload package phase evidence
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-package-${{ matrix.partition }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: |
-            artifacts/timings
-            artifacts/layout-audit
+          name: repository-${{ github.run_attempt }}
+          path: artifacts
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  canonical-gates:
-    if: github.event_name != 'schedule'
+  dependency-review:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - part: corpus
-            task-group: GatesCorpus
-          - part: shards
-            task-group: GatesShards
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          download-packages: "false"
+          fail-on-severity: low
+          deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-1.0-only, AGPL-3.0-only
 
-      # -Fast skips analyzers in this build only; canonical-build's full
-      # solution build, required through build-and-test, enforces them.
-      - name: Run the ${{ matrix.part }} part of the canonical Gates cohort
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling semantic-tests
-          -Configuration Release -Fast -SemanticCohort Gates -TaskGroup ${{ matrix.task-group }} -TestResultsDirectory artifacts/canonical-gates
-          -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+  # Merging is plain file aggregation, so it runs on the runner's pwsh
+  # without building the tooling image.
+  coverage:
+    needs: [lanes, repository]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Upload Gates cohort and timing evidence
-        if: always()
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-lines-*
+          path: artifacts/coverage
+
+      - name: Merge line coverage
+        run: |
+          pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge
+          cat artifacts/coverage/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage summary
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: canonical-gates-${{ matrix.part }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts
-          if-no-files-found: error
+          name: coverage-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/coverage
           retention-days: 14
 
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-          name: ${{ github.job }}-${{ matrix.part }}
-
-  self-application:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Apply SharpProof to every tracked source project
-        run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Sources
-
-  self-application-samples:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-      - name: Apply SharpProof through package-backed samples
-        run: docker compose run --rm tooling self-apply -Configuration Release -SelfApplicationPhase Samples
-
-  api-coverage:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Check pinned .NET API inventory and support evidence
-        if: ${{ !cancelled() }}
-        run: >-
-          docker compose run --rm tooling test
-          -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj
-          -TestFilter FullyQualifiedName~DotnetApiInventoryTests
-      - name: Require executed test evidence for every modeled catalog facet
-        if: ${{ !cancelled() }}
-        run: >-
-          docker compose run --rm tooling test
-          -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj
-          -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
-      - name: Require executed evidence reports
-        if: ${{ !cancelled() }}
-        run: |
-          test -s artifacts/api-coverage/catalog-test-evidence.json
-          test -s artifacts/api-coverage/intrinsic-test-evidence.json
-      - name: Publish API coverage summary
-        if: always()
-        run: |
-          for report in catalog-test-evidence intrinsic-test-evidence; do
-            if [[ -f "artifacts/api-coverage/$report.md" ]]; then
-              cat "artifacts/api-coverage/$report.md" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
-      - name: Upload API test evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: api-test-evidence-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/api-coverage
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  formatting:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-      - name: Require C#, PowerShell, and shell linting and formatting
-        run: docker compose run --rm tooling format-check
-
-
-  # The single required check: every lane above must succeed.
+  # The single required check.
   build-and-test:
-    if: always() && github.event_name != 'schedule'
-    needs: [canonical-build, canonical-main, canonical-package, canonical-gates, self-application, self-application-samples, api-coverage, formatting, repository-quality]
+    if: always()
+    needs: [lanes, repository, dependency-review, coverage]
     runs-on: ubuntu-latest
     steps:
-      - name: Require every lane to succeed
+      - name: Require every job to succeed
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          for result in $RESULTS; do
-            if [[ "$result" != success ]]; then
-              echo "A required lane did not succeed: $RESULTS" >&2
-              exit 1
-            fi
-          done
-
-  exact-sha-security:
-    uses: ./.github/workflows/security-reusable.yml
-    with:
-      run-dependency-review: ${{ github.event_name == 'pull_request' }}
-    permissions:
-      contents: read
+          jq -e 'to_entries | all(.value.result == "success"
+            or (.key == "dependency-review" and .value.result == "skipped"))' <<< "$NEEDS" > /dev/null || {
+            echo "A required job did not succeed:" >&2
+            jq -r 'to_entries[] | "  \(.key): \(.value.result)"' <<< "$NEEDS" >&2
+            exit 1
+          }

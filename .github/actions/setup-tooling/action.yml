@@ -1,44 +1,9 @@
-name: Prepare qualified packages
-description: Download exact package artifacts and build the pinned tooling image.
-
-inputs:
-  artifact-id:
-    description: Immutable artifact ID emitted by the package job.
-    required: false
-    default: ""
-
-  download-packages:
-    description: Download the qualified package artifact before building tooling.
-    required: false
-    default: "true"
-
-outputs:
-  windows-native-path:
-    description: Same-job native payload directory verified by the prepared toolchain.
-    value: ${{ steps.windows-native.outputs.path }}
+name: Set up tooling
+description: Build the pinned Linux amd64 tooling image, reusing the cached Windows Z3 cross-build.
 
 runs:
   using: composite
   steps:
-    # Temporary diagnostics: sample runner CPU and memory for the whole job.
-    # The job's final runner-telemetry report step stops it and summarizes.
-    - name: Start runner telemetry
-      uses: ./.github/actions/runner-telemetry
-      with:
-        mode: start
-    - name: Require an immutable qualified artifact identity
-      if: inputs.download-packages == 'true'
-      shell: bash
-      env:
-        QUALIFIED_ARTIFACT_ID: ${{ inputs.artifact-id }}
-      run: '[[ "$QUALIFIED_ARTIFACT_ID" =~ ^[0-9]+$ ]]'
-    - name: Download exact NuGet artifacts
-      if: inputs.download-packages == 'true'
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-      with:
-        artifact-ids: ${{ inputs.artifact-id }}
-        merge-multiple: true
-        path: nupkgs
     # The windows-native stage compiles Z3 from source for win-x64 and
     # win-arm64: about 14 of an uncached build's 15 minutes. Its DLLs are
     # pinned byte-for-byte in toolchain.json and the toolchain stage

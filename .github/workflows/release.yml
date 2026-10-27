@@ -34,9 +34,7 @@ jobs:
           version="$(pwsh -NoLogo -NoProfile -Command 'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
           test "v${version}" = "${GITHUB_REF_NAME}"
 
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
+      - uses: ./.github/actions/setup-tooling
 
       - name: Pack the product packages
         run: docker compose run --rm tooling pack -Configuration Release
