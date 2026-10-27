@@ -90,9 +90,9 @@ api_evidence() {
 scan_image() {
   mkdir -p artifacts &&
     docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/repo" -w /repo \
-    anchore/grype:v0.120.1@sha256:e4a44ef45d285b829ce6efe2642980329661bd2d18eab5fc539138d4adaebbbe \
-    "docker:$image" --config .grype.yaml --only-fixed --fail-on high \
-    --output table --output json=artifacts/toolchain-vulnerabilities.json
+      anchore/grype:v0.120.1@sha256:e4a44ef45d285b829ce6efe2642980329661bd2d18eab5fc539138d4adaebbbe \
+      "docker:$image" --config .grype.yaml --only-fixed --fail-on high \
+      --output table --output json=artifacts/toolchain-vulnerabilities.json
 }
 
 # Run every check, then fail if any did, so one CI run reports them all.
