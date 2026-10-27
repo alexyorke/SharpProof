@@ -1,0 +1,270 @@
+namespace SharpProof.Frontend;
+
+internal enum ContractApiMethodShape
+{
+    Clause,
+    Old,
+    Result,
+}
+
+internal enum ContractApiClauseRole
+{
+    None,
+    Requires,
+    Ensures,
+    Assume,
+}
+
+internal enum ContractApiAttributeCategory
+{
+    Companion,
+    InputModel,
+    Closed,
+    Effect,
+    Control,
+}
+
+[Flags]
+internal enum ContractApiSelectionFeature
+{
+    None = 0,
+    Contracts = 1,
+    Effects = 2,
+    All = Contracts | Effects,
+}
+
+internal readonly struct ContractApiMethodDescriptor(
+    string name,
+    ContractApiMethodShape shape,
+    ContractApiClauseRole clauseRole)
+{
+    internal string Name { get; } = name ?? throw new ArgumentNullException(nameof(name));
+    internal ContractApiMethodShape Shape { get; } = shape;
+    internal ContractApiClauseRole ClauseRole { get; } = clauseRole;
+}
+
+internal readonly struct ContractApiAttributeDescriptor(
+    string metadataName,
+    string typeName,
+    ContractApiAttributeCategory category,
+    ContractApiSelectionFeature selection)
+{
+    internal string MetadataName { get; } = metadataName ?? throw new ArgumentNullException(nameof(metadataName));
+    internal string TypeName { get; } = typeName ?? throw new ArgumentNullException(nameof(typeName));
+    internal ContractApiAttributeCategory Category { get; } = category;
+    internal ContractApiSelectionFeature Selection { get; } = selection;
+}
+
+internal static class ContractApiCatalog
+{
+    internal const string AttributesNamespace = "SharpProof.Attributes";
+    internal const string ConditionalSymbol = "SHARPPROOF_CONTRACTS";
+    internal const string Contract = AttributesNamespace + ".Contract";
+    internal const string RequiresMethodName = "Requires";
+    internal const string EnsuresMethodName = "Ensures";
+    internal const string AssumeMethodName = "Assume";
+    internal const string OldMethodName = "Old";
+    internal const string ResultMethodName = "Result";
+    internal const string ContractFor = AttributesNamespace + ".ContractForAttribute";
+    internal const string EnforcePure = AttributesNamespace + ".EnforcePureAttribute";
+    internal const string ZeroAllocations = AttributesNamespace + ".ZeroAllocationsAttribute";
+    internal const string ResourceUpperBound = AttributesNamespace + ".ResourceUpperBoundAttribute";
+    internal const string ResourceBooleanInput = AttributesNamespace + ".ResourceBooleanInputAttribute";
+    internal const string ResourceTaskDeployment = AttributesNamespace + ".ResourceTaskDeploymentAttribute";
+    internal const string ResourceTaskRuntimeUpperBound = AttributesNamespace + ".ResourceTaskRuntimeUpperBoundAttribute";
+    internal const string AllowedCapabilities = AttributesNamespace + ".AllowedCapabilitiesAttribute";
+    internal const string DoesNotThrow = AttributesNamespace + ".DoesNotThrowAttribute";
+    internal const string AllowedExceptions = AttributesNamespace + ".AllowedExceptionsAttribute";
+    internal const string EffectContract = AttributesNamespace + ".EffectContractAttribute";
+    internal const string NotNull = AttributesNamespace + ".NotNullAttribute";
+    internal const string Positive = AttributesNamespace + ".PositiveAttribute";
+    internal const string InRange = AttributesNamespace + ".InRangeAttribute";
+    internal const string Suppress = AttributesNamespace + ".SharpProofSuppressAttribute";
+    internal const string Trusted = AttributesNamespace + ".SharpProofTrustedAttribute";
+
+    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } =
+        [
+            new(
+                RequiresMethodName,
+                ContractApiMethodShape.Clause,
+                ContractApiClauseRole.Requires),
+            new(
+                EnsuresMethodName,
+                ContractApiMethodShape.Clause,
+                ContractApiClauseRole.Ensures),
+            new(
+                AssumeMethodName,
+                ContractApiMethodShape.Clause,
+                ContractApiClauseRole.Assume),
+            new(
+                OldMethodName,
+                ContractApiMethodShape.Old,
+                ContractApiClauseRole.None),
+            new(
+                ResultMethodName,
+                ContractApiMethodShape.Result,
+                ContractApiClauseRole.None),
+        ];
+
+    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } =
+        [
+            new(
+                ContractFor,
+                "ContractForAttribute",
+                ContractApiAttributeCategory.Companion,
+                ContractApiSelectionFeature.None),
+            new(
+                EnforcePure,
+                "EnforcePureAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                ZeroAllocations,
+                "ZeroAllocationsAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                ResourceBooleanInput,
+                "ResourceBooleanInputAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceTaskDeployment,
+                "ResourceTaskDeploymentAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceTaskRuntimeUpperBound,
+                "ResourceTaskRuntimeUpperBoundAttribute",
+                ContractApiAttributeCategory.InputModel,
+                ContractApiSelectionFeature.None),
+            new(
+                ResourceUpperBound,
+                "ResourceUpperBoundAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                AllowedCapabilities,
+                "AllowedCapabilitiesAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                DoesNotThrow,
+                "DoesNotThrowAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                AllowedExceptions,
+                "AllowedExceptionsAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                EffectContract,
+                "EffectContractAttribute",
+                ContractApiAttributeCategory.Effect,
+                ContractApiSelectionFeature.Effects),
+            new(
+                NotNull,
+                "NotNullAttribute",
+                ContractApiAttributeCategory.Closed,
+                ContractApiSelectionFeature.Contracts),
+            new(
+                Positive,
+                "PositiveAttribute",
+                ContractApiAttributeCategory.Closed,
+                ContractApiSelectionFeature.Contracts),
+            new(
+                InRange,
+                "InRangeAttribute",
+                ContractApiAttributeCategory.Closed,
+                ContractApiSelectionFeature.Contracts),
+            new(
+                Suppress,
+                "SharpProofSuppressAttribute",
+                ContractApiAttributeCategory.Control,
+                ContractApiSelectionFeature.All),
+            new(
+                Trusted,
+                "SharpProofTrustedAttribute",
+                ContractApiAttributeCategory.Control,
+                ContractApiSelectionFeature.All),
+        ];
+
+    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =
+        Methods.Select(static method => method.Name).ToImmutableArray();
+
+    internal static ImmutableArray<string> AttributeMetadataNames { get; } =
+        Attributes.Select(static attribute => attribute.MetadataName).ToImmutableArray();
+}
+
+internal static class ContractApiClauseProjection
+{
+    internal static ContractApiClauseRole GetClauseRole(string name)
+    {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        return name switch
+        {
+            ContractApiCatalog.RequiresMethodName => ContractApiClauseRole.Requires,
+            ContractApiCatalog.EnsuresMethodName => ContractApiClauseRole.Ensures,
+            ContractApiCatalog.AssumeMethodName => ContractApiClauseRole.Assume,
+            _ => ContractApiClauseRole.None
+        };
+    }
+}
+
+internal static partial class ContractApiMetadata
+{
+    internal const string AttributesNamespace =
+        ContractApiCatalog.AttributesNamespace;
+    internal const string Attribute = "System.Attribute";
+    internal const string ConditionalAttribute =
+        "System.Diagnostics.ConditionalAttribute";
+    internal const string AttributesPayloadSha256MetadataKey =
+        AttributesNamespace + ".SHA256";
+    internal const string Contract = ContractApiCatalog.Contract;
+    internal const string RequiresMethodName =
+        ContractApiCatalog.RequiresMethodName;
+    internal const string EnsuresMethodName =
+        ContractApiCatalog.EnsuresMethodName;
+    internal const string AssumeMethodName =
+        ContractApiCatalog.AssumeMethodName;
+    internal const string OldMethodName =
+        ContractApiCatalog.OldMethodName;
+    internal const string ResultMethodName =
+        ContractApiCatalog.ResultMethodName;
+    internal const string ContractFor =
+        ContractApiCatalog.ContractFor;
+    internal const string EnforcePure =
+        ContractApiCatalog.EnforcePure;
+    internal const string ZeroAllocations =
+        ContractApiCatalog.ZeroAllocations;
+    internal const string ResourceUpperBound = ContractApiCatalog.ResourceUpperBound;
+    internal const string ResourceBooleanInput = ContractApiCatalog.ResourceBooleanInput;
+    internal const string ResourceTaskDeployment = ContractApiCatalog.ResourceTaskDeployment;
+    internal const string ResourceTaskRuntimeUpperBound = ContractApiCatalog.ResourceTaskRuntimeUpperBound;
+    internal const string AllowedCapabilities =
+        ContractApiCatalog.AllowedCapabilities;
+    internal const string DoesNotThrow =
+        ContractApiCatalog.DoesNotThrow;
+    internal const string AllowedExceptions =
+        ContractApiCatalog.AllowedExceptions;
+    internal const string EffectContract =
+        ContractApiCatalog.EffectContract;
+    internal const string NotNull =
+        ContractApiCatalog.NotNull;
+    internal const string Positive =
+        ContractApiCatalog.Positive;
+    internal const string InRange =
+        ContractApiCatalog.InRange;
+    internal const string Suppress =
+        ContractApiCatalog.Suppress;
+    internal const string Trusted =
+        ContractApiCatalog.Trusted;
+
+    internal static ImmutableArray<ContractApiMethodDescriptor> Methods { get; } = ContractApiCatalog.Methods;
+    internal static ImmutableArray<ContractApiAttributeDescriptor> Attributes { get; } = ContractApiCatalog.Attributes;
+    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =
+        ContractApiCatalog.ContractMethodCandidateNames;
+    internal static ImmutableArray<string> AttributeMetadataNames { get; } =
+        ContractApiCatalog.AttributeMetadataNames;
+}

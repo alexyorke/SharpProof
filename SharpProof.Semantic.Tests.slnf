@@ -7,7 +7,6 @@
       "src\\SharpProof.Architecture.Tests\\SharpProof.Architecture.Tests.csproj",
       "src\\SharpProof.Attributes.Tests\\SharpProof.Attributes.Tests.csproj",
       "src\\SharpProof.CodeFixes.Tests\\SharpProof.CodeFixes.Tests.csproj",
-      "src\\SharpProof.ContractForGenerator.Tests\\SharpProof.ContractForGenerator.Tests.csproj",
       "src\\SharpProof.Contracts.Tests\\SharpProof.Contracts.Tests.csproj",
       "src\\SharpProof.Dataflow.Tests\\SharpProof.Dataflow.Tests.csproj",
       "src\\SharpProof.DeveloperExperience.Tests\\SharpProof.DeveloperExperience.Tests.csproj",
@@ -16,10 +15,10 @@
       "src\\SharpProof.Ir.Tests\\SharpProof.Ir.Tests.csproj",
       "src\\SharpProof.Smt.Tests\\SharpProof.Smt.Tests.csproj",
       "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj",
-      "src\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
+      "tests\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
       "src\\SharpProof.Tool.Tests\\SharpProof.Tool.Tests.csproj",
-      "src\\SharpProof.Fuzz.Tests\\SharpProof.Fuzz.Tests.csproj",
-      "src\\SharpProof.Gates.Tests\\SharpProof.Gates.Tests.csproj",
+      "tests\\SharpProof.Fuzz.Tests\\SharpProof.Fuzz.Tests.csproj",
+      "tests\\SharpProof.Gates.Tests\\SharpProof.Gates.Tests.csproj",
       "src\\SharpProof.Verify.Tests\\SharpProof.Verify.Tests.csproj"
     ]
   }

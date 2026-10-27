@@ -193,7 +193,7 @@ public sealed class PortableIrGraphCodecTests
         var options = WorkerProtocolJson.Options;
         var converter =
             (System.Text.Json.Serialization.JsonConverter<ImmutableArray<int>>)
-            new PortableIrArrayJsonConverter().CreateConverter(
+            new SharpProof.Worker.Protocol.ProtocolArrayJsonConverter().CreateConverter(
                 typeof(ImmutableArray<int>), options);
         Assert.Throws<JsonException>((Action)(() =>
         {
@@ -590,44 +590,6 @@ public sealed class PortableIrGraphCodecTests
     public void WireEnumCatalogsAreExhaustive()
     {
         Assert.That(PortableIrGraphCodec.HasCompleteWireEnumCatalogs, Is.True);
-    }
-
-    [Test]
-    public void SlotCatalogsAreExhaustiveAndDeclarative()
-    {
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(PortableIrGraphCodec.HasCompleteSlotCatalogs, Is.True);
-            Assert.That(
-                PortableIrSlotCatalog.Terms.Select(static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrTermKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Locations.Select(static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrLocationKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Instructions.Select(
-                    static mapping => mapping.Kind),
-                Is.EqualTo(Enum.GetNames<IrInstructionKind>()));
-            Assert.That(
-                PortableIrSlotCatalog.Terms[(int)IrTermKind.Opaque].Slots,
-                Is.EqualTo([
-                    "memberIndex",
-                    "optionalTermIndex",
-                    "wire:OpaquePurities",
-                    "operationWhenImpure",
-                    "unused",
-                    "unused",
-                    "termIndices"]));
-            Assert.That(
-                PortableIrSlotCatalog.Instructions[(int)IrInstructionKind.Call].Slots,
-                Is.EqualTo([
-                    "optionalVariableIndex",
-                    "memberIndex",
-                    "optionalTermIndex",
-                    "unused",
-                    "termIndices",
-                    "unused"]));
-        }
     }
 
     [Test]

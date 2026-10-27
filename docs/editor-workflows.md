@@ -2,11 +2,8 @@
 
 SharpProof's portable analyzer provides editor diagnostics when the editor's Roslyn host meets the [support boundary](preview-support.md). Native verification runs at build time, not on every keystroke. Automated Roslyn workspace tests cover code-fix behavior; this is not certification of every IDE/version or extension combination.
 
-The next private preview requires real Windows x64 acceptance in a stable .NET
-10-capable Visual Studio, VS Code with the Microsoft C# extension, and Rider. All
-three remain unqualified until the exact candidate passes the
-[interactive acceptance runbook](editor-acceptance.md). Record actual editor/compiler
-versions and retained action previews; a command-line SDK does not qualify an IDE.
+Interactive Visual Studio, VS Code with the Microsoft C# extension, and Rider sessions
+are not qualified; a command-line SDK does not qualify an IDE.
 
 ## Safe fixes
 

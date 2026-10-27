@@ -25,86 +25,10 @@ public sealed class PackageLayoutSmokeTests
         s_sharedCompilationServerIds = ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     private static readonly string[] s_nativeResourceMetricNames = ["LoopBodyEntries", "ArrayAllocations", "AllocatedElements"];
-    private static readonly int[] s_resourcePerformanceInputSizes = [0, 16, 128];
 
     internal static void DisposeSharedPackageCache()
     {
         PackageWorkspace.DisposeSharedPackageCache();
-    }
-
-    [TestCase("contracts", TestName = "ConsumerContractPerformanceWorkflow")]
-    [TestCase("resources", TestName = "ConsumerResourcePerformanceWorkflow")]
-    [Platform("Linux")]
-    public async Task ConsumerPerformancePreservesProofQualityAndComparableMeasurements(string workload)
-    {
-        ArgumentNullException.ThrowIfNull(workload);
-        var feed = await PackagedProductFeed.GetAsync();
-        var repository = TestRepository.FindRoot();
-        using var directory = new TempDirectory("SharpProof.Performance.Test-");
-        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", feed.Source, "-Iterations", "1", "-Workload", workload, "-InputSizes", "0,16,128", "-RuntimeRepetitions", "3", "-OutputDirectory", directory.FullName]);
-        Assert.That(result.ExitCode, Is.Zero, result.Output);
-        var reports = Directory.GetFiles(directory.FullName, "measurements.json", SearchOption.AllDirectories);
-        Assert.That(reports, Has.Length.EqualTo(1), result.Output);
-        var reportText = await File.ReadAllTextAsync(reports.Single(), TestContext.CurrentContext.CancellationToken);
-        var evidenceDirectory = Path.Combine(repository, "artifacts", "consumer-performance-validation");
-        Directory.CreateDirectory(evidenceDirectory);
-        var evidencePath = Path.Combine(evidenceDirectory, workload + "-" + Guid.NewGuid().ToString("N") + ".json");
-        await File.WriteAllTextAsync(evidencePath, reportText, TestContext.CurrentContext.CancellationToken);
-        TestContext.AddTestAttachment(evidencePath);
-        using var report = JsonDocument.Parse(reportText);
-        var root = report.RootElement;
-        Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(3));
-        Assert.That(root.GetProperty("completed").GetBoolean(), Is.True);
-        Assert.That(root.GetProperty("workload").GetString(), Is.EqualTo(workload));
-        var measurements = root.GetProperty("measurements").EnumerateArray().ToArray();
-        Assert.That(measurements, Has.Length.EqualTo(15));
-        foreach (var measurement in measurements.Where(row => row.GetProperty("variant").GetString() == "verified" && row.GetProperty("scenario").GetString() != "restore"))
-        {
-            Assert.That(measurement.GetProperty("claims").GetInt32(), Is.EqualTo(8));
-            Assert.That(measurement.GetProperty("proven").GetInt32(), Is.EqualTo(8));
-            Assert.That(measurement.GetProperty("incomplete").GetInt32(), Is.Zero);
-        }
-        var runtime = root.GetProperty("runtimeMeasurements").EnumerateArray().ToArray();
-        if (workload == "contracts")
-        { Assert.That(runtime, Is.Empty); return; }
-        Assert.That(runtime, Has.Length.EqualTo(3));
-        Assert.That(runtime.Select(row => row.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Measurement must be an object.", nameof(row)) : row.GetProperty("sourceSha256").GetString()).Distinct().Count(), Is.EqualTo(1));
-        foreach (var measurement in runtime)
-        {
-            Assert.That(measurement.GetProperty("processElapsedMilliseconds").GetInt64(), Is.GreaterThanOrEqualTo(0));
-            var samples = measurement.GetProperty("samples").EnumerateArray().ToArray();
-            Assert.That(samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("inputSize").GetInt32()), Is.EqualTo(s_resourcePerformanceInputSizes));
-            var allocated = samples.Select(sample => sample.ValueKind != JsonValueKind.Object ? throw new ArgumentException("Sample must be an object.", nameof(sample)) : sample.GetProperty("allocatedBytes").GetInt64()).ToArray();
-            Assert.That(allocated[0], Is.GreaterThan(0));
-            Assert.That(allocated[1], Is.GreaterThan(allocated[0]));
-            Assert.That(allocated[2], Is.GreaterThan(allocated[1]));
-            foreach (var sample in samples)
-            {
-                Assert.That(sample.GetProperty("repetitions").GetInt32(), Is.EqualTo(3));
-                Assert.That(sample.GetProperty("checksum").GetInt64(), Is.EqualTo(sample.GetProperty("inputSize").GetInt32() == 0 ? 0 : 48));
-                Assert.That(sample.GetProperty("stopwatchFrequency").GetInt64(), Is.GreaterThan(0));
-                Assert.That(sample.GetProperty("kernelElapsedTicks").GetInt64(), Is.GreaterThanOrEqualTo(0));
-            }
-        }
-        var comparisons = root.GetProperty("runtimeComparisons").EnumerateArray().ToArray();
-        Assert.That(comparisons, Has.Length.EqualTo(9));
-        foreach (var comparison in comparisons)
-        {
-            Assert.That(comparison.GetProperty("allocatedDeltaBytes").GetInt64(), Is.Zero);
-            Assert.That(comparison.GetProperty("kernelMilliseconds").GetDouble(), Is.GreaterThanOrEqualTo(0));
-        }
-    }
-
-    [TestCase("0,0")]
-    [TestCase("0,1001")]
-    [Platform("Linux")]
-    public async Task ConsumerPerformanceRejectsInvalidScalesBeforeLoadingPackages(string sizes)
-    {
-        ArgumentNullException.ThrowIfNull(sizes);
-        var repository = TestRepository.FindRoot();
-        var result = await RunProcessAsync(repository, "pwsh", ["-NoProfile", "-File", Path.Combine(repository, "eng", "scripts", "Measure-SharpProofConsumerPerformance.ps1"), "-PackageSource", Path.Combine(repository, "missing-performance-packages"), "-Workload", "resources", "-InputSizes", sizes]);
-        Assert.That(result.ExitCode, Is.Not.Zero);
-        Assert.That(result.Output, Does.Contain("Input sizes must be distinct integers"));
     }
 
     private static readonly ImmutableArray<byte> PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -120,16 +44,12 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.CodeFixes.dll"
     ];
 
-    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [
-        "SharpProof.ContractForGenerator.dll"
-    ];
+    private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [];
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
         "SharpProof.Analyzer.Core.dll",
         "SharpProof.Compiler.Semantics.dll",
-        "SharpProof.Contracts.dll",
         "SharpProof.Dataflow.dll",
-        "SharpProof.Effects.dll",
         "SharpProof.Frontend.dll",
         "SharpProof.Ir.dll",
         "SharpProof.Specs.dll",
@@ -154,7 +74,6 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
         "SharpProof.Analyzer.Core.csproj",
-        "SharpProof.ContractForGenerator.csproj",
         "SharpProof.CompilerCollector.csproj"
     ];
 
@@ -170,15 +89,12 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedConditionalAnalyzerEntries = [
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
-        "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.Compiler.Semantics.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
-        "tools/shared/netstandard2.0/SharpProof.Contracts.dll",
         "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
-        "tools/shared/netstandard2.0/SharpProof.Effects.dll",
         "tools/shared/netstandard2.0/SharpProof.Frontend.dll",
         "tools/shared/netstandard2.0/SharpProof.Ir.dll",
         "tools/shared/netstandard2.0/SharpProof.Specs.dll",
@@ -206,7 +122,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/net10/SharpProof.Logging.dll",
         "tools/net10/SharpProof.Smt.dll",
         "tools/net10/SharpProof.Specs.dll",
-        "tools/net10/SharpProof.Verify.dll",
         "tools/net10/SharpProof.Worker.deps.json",
         "tools/net10/SharpProof.Worker.dll",
         "tools/net10/SharpProof.Worker.Protocol.dll",
@@ -375,8 +290,6 @@ public sealed class PackageLayoutSmokeTests
         foreach (var path in ImmutableArray.Create(Path.Combine(
                          analyzerDirectory,
                          "SharpProof.Analyzer.dll"), Path.Combine(
-                         analyzerDirectory,
-                         "SharpProof.ContractForGenerator.dll"), Path.Combine(
                          collectorDirectory,
                          "SharpProof.CompilerCollector.dll"), Path.Combine(
                          sharedDirectory,
@@ -421,7 +334,7 @@ public sealed class PackageLayoutSmokeTests
                 Has.Length.EqualTo(2));
             Assert.That(
                 generators,
-                Has.Length.EqualTo(1));
+                Is.Empty);
         }
     }
 
@@ -558,7 +471,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             enabledItems.Output,
             Does.Contain("SharpProof.Analyzer.dll")
-                .And.Contain("SharpProof.ContractForGenerator.dll"));
+                .And.Not.Contain("SharpProof.ContractForGenerator.dll"));
         var packagedAnalyzerItems =
             GetPackagedAnalyzerItems(enabledItems.Output);
         Assert.That(
@@ -1023,8 +936,7 @@ public sealed class PackageLayoutSmokeTests
             await File.ReadAllLinesAsync(
                 workspace.MappedProjectConfigurationsPath),
             Does.Contain("SharpProof.Analyzer|Release")
-                .And.Contain("SharpProof.Analyzer.Core|Debug")
-                .And.Contain("SharpProof.ContractForGenerator|Release"));
+                .And.Contain("SharpProof.Analyzer.Core|Debug"));
 
         var dependencyPaths = (await File.ReadAllLinesAsync(
                 workspace.MappedAnalyzerItemsPath))
@@ -2485,8 +2397,6 @@ public sealed class PackageLayoutSmokeTests
                 .And.Contain(
                     "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
                 .And.Contain(
-                    "<SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>")
-                .And.Contain(
                     "<SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>Collector</SharpProofAnalyzerRole>")
@@ -2523,7 +2433,7 @@ public sealed class PackageLayoutSmokeTests
                     StringComparison.Ordinal) ||
                 entry is
                     "tools/net10/SharpProof.Attributes.dll" or
-                    "tools/net10/SharpProof.Contracts.dll" or
+                    "tools/net10/SharpProof.Compiler.Semantics.dll" or
                     "tools/net10/SharpProof.Frontend.dll")),
             Is.Empty);
         Assert.That(
@@ -2551,7 +2461,7 @@ public sealed class PackageLayoutSmokeTests
                 Does.Not.Contain("\"Microsoft.CodeAnalysis/\"")
                     .And.Not.Contain("\"Microsoft.CodeAnalysis.CSharp/\"")
                     .And.Not.Contain("SharpProof.Attributes")
-                    .And.Not.Contain("SharpProof.Contracts")
+                    .And.Not.Contain("SharpProof.Compiler.Semantics")
                     .And.Not.Contain("SharpProof.Frontend"),
                 dependencies);
         }
@@ -3271,8 +3181,6 @@ public sealed class PackageLayoutSmokeTests
                 "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
             const string analyzerCoreGuid =
                 "{B1C90B5D-04E7-4D8E-9D6F-3F5EE0F3C6CB}";
-            const string generatorGuid =
-                "{7F668C71-D5B2-48B7-8C57-FE9CDBED2FE5}";
             const string projectTypeGuid =
                 "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
             var attributesProject = GetSolutionPath(
@@ -3287,10 +3195,6 @@ public sealed class PackageLayoutSmokeTests
                 repository,
                 "src/SharpProof.Analyzer.Core",
                 "SharpProof.Analyzer.Core.csproj");
-            var generatorProject = GetSolutionPath(
-                repository,
-                "src/SharpProof.ContractForGenerator",
-                "SharpProof.ContractForGenerator.csproj");
             var solution = Path.Combine(
                 ConsumerDirectory,
                 "MappedConsumer.sln");
@@ -3309,8 +3213,6 @@ public sealed class PackageLayoutSmokeTests
                 EndProject
                 Project("{projectTypeGuid}") = "SharpProof.Analyzer.Core", "{analyzerCoreProject}", "{analyzerCoreGuid}"
                 EndProject
-                Project("{projectTypeGuid}") = "SharpProof.ContractForGenerator", "{generatorProject}", "{generatorGuid}"
-                EndProject
                 Global
                     GlobalSection(SolutionConfigurationPlatforms) = preSolution
                         Debug|Any CPU = Debug|Any CPU
@@ -3324,8 +3226,6 @@ public sealed class PackageLayoutSmokeTests
                         {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                         {analyzerCoreGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
                         {analyzerCoreGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
-                        {generatorGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-                        {generatorGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                     EndGlobalSection
                 EndGlobal
                 """);

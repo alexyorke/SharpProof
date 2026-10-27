@@ -63,7 +63,7 @@ internal static class CompilerTotalCallableLowerer
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         RepositoryParameterGuard.ThrowIfMissing(capturedTrees.IsDefault, nameof(capturedTrees));
         RepositoryParameterGuard.ThrowIfMissing(capturedReferences is { IsDefault: true }, nameof(capturedReferences));
-        if (!TotalBodyLowering.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
+        if (!TotalSourceCallSession.IsBodyDeclaration(target.Declaration) || target.SemanticModel == null ||
             target.Method.Parameters.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
         var declaration = target.Declaration!;
@@ -116,7 +116,7 @@ internal static class CompilerTotalCallableLowerer
         { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
         else
         {
-            graph = TotalBodyLowering.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
+            graph = TotalSourceCallSession.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
             lowering = graph == null ? null : LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority,
                 cancellationToken, opaqueCalls: true);
         }

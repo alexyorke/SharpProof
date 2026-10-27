@@ -29,7 +29,7 @@ public sealed class ResolvedApiSpecNullabilityContractTests
         Assert.That(annotations, Has.Length.EqualTo(1));
         var annotation = annotations[0];
         var attributeType = annotation.GetType();
-        Assert.That(owner.Assembly.GetName().Name, Is.EqualTo("SharpProof.Effects"));
+        Assert.That(owner.Assembly.GetName().Name, Is.EqualTo("SharpProof.Compiler.Semantics"));
         Assert.That(attributeType.Assembly, Is.SameAs(owner.Assembly));
         Assert.That(attributeType.Module, Is.SameAs(owner.Module));
         Assert.That(attributeType.IsPublic, Is.False);

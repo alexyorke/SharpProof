@@ -33,14 +33,10 @@
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Tool.Test" />
-    <!-- Reader fixture compiled by eng/scripts/Test-SharpProofToolConsumer.ps1. -->
-    <InternalsVisibleTo Include="SharpProof.Tool.ConsumerFixture" />
     <Compile Include="..\..\eng\shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Tool" />
     <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
   </ItemGroup>
-  <ItemGroup><InternalsVisibleTo Include="SharpProof.Reporting" /></ItemGroup>
 </Project>

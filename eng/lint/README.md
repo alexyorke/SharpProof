@@ -92,4 +92,3 @@ missing-file and missing-anchor fixtures on successful runs.
 One historical Debian license reference is mapped to an archive mirror of the
 same message, verified by its Message-ID, because the original host times out in
 CI. The exact URL mapping is recorded in `lychee.toml`; the mirror is checked.
-See [documentation maintenance](../../docs/documentation-maintenance.md) for scope.

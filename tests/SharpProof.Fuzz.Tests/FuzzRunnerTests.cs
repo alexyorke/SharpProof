@@ -1,0 +1,731 @@
+using System.Collections.Immutable;
+using NUnit.Framework;
+using SharpProof.Ir;
+using SharpProof.Fuzz;
+using SharpProof.Verify;
+
+namespace SharpProof.Fuzz.Test;
+
+[TestFixture]
+public sealed class FuzzRunnerTests
+{
+    [Test]
+    public void FailureEvidenceRetentionUsesDeterministicBoundedKeys()
+    {
+        var statuses = Enumerable.Repeat(
+                FuzzOracleStatus.Mismatch,
+                FuzzRunner.MaximumRetainedFailures)
+            .ToImmutableArray();
+        var keys = FuzzRunner.SelectFailureKeys(
+            statuses,
+            statuses,
+            statuses);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                keys.Length,
+                Is.EqualTo(FuzzRunner.MaximumRetainedFailures));
+            Assert.That(
+                keys.Take(3),
+                Is.EqualTo(ImmutableArray.Create(
+                    new FuzzFailureKey(0, "finite-domain-smt"),
+                    new FuzzFailureKey(0, "frontend"),
+                    new FuzzFailureKey(0, "partial-term-smt"))));
+            Assert.That(
+                keys[^1],
+                Is.EqualTo(new FuzzFailureKey(
+                    21,
+                    "finite-domain-smt")));
+        }
+    }
+
+    [Test]
+    public void PartialAbstentionIsRetainedAsFailureEvidence()
+    {
+        var classification = FuzzRunner.ClassifyCase(
+            FuzzOracleStatus.Agreement,
+            FuzzOracleStatus.Agreement,
+            FuzzOracleStatus.Abstained);
+        var keys = FuzzRunner.SelectFailureKeys(
+            ImmutableArray.Create(FuzzOracleStatus.Agreement),
+            ImmutableArray.Create(FuzzOracleStatus.Agreement),
+            ImmutableArray.Create(FuzzOracleStatus.Abstained));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(classification.HasMismatch, Is.False);
+            Assert.That(classification.HasAbstention, Is.True);
+            Assert.That(
+                keys,
+                Is.EqualTo(ImmutableArray.Create(new FuzzFailureKey(0, "partial-term-smt"))));
+        }
+    }
+
+    [Test]
+    public void FrontendMinimizationDoesNotTreatCompileErrorsAsSemanticMismatches()
+    {
+        var compileFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Generated C# did not compile: CS1002");
+        var semanticFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Compiled C# and lowered IR produced different values.");
+
+        Assert.That(FuzzRunner.IsCompilationFailure(compileFailure), Is.True);
+        Assert.That(FuzzRunner.IsSemanticMismatch(compileFailure), Is.False);
+        Assert.That(FuzzRunner.IsSemanticMismatch(semanticFailure), Is.True);
+    }
+
+    [Test]
+    public async Task FixedSeedIsDeterministicAndSound()
+    {
+        var options = new FuzzOptions(Cases: 24, Seed: 12345, MaximumParallelism: 4);
+
+        var first = await FuzzRunner.RunAsync(options, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await FuzzRunner.RunAsync(options, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(first.Passed, Is.True, string.Join(Environment.NewLine, first.Failures));
+        Assert.That(first, Is.EqualTo(second));
+        Assert.That(first.SchemaVersion, Is.EqualTo(7));
+        Assert.That(first.Passed, Is.True);
+        Assert.That(first.Agreements, Is.EqualTo(options.Cases));
+        Assert.That(first.Abstentions, Is.Zero);
+        Assert.That(first.TotalProgramCoverage.Agreements, Is.EqualTo(options.Cases));
+        Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
+        Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
+        Assert.That(
+            first.PartialSmtAgreements,
+            Is.EqualTo(options.Cases));
+        Assert.That(first.FrontendCoverage.HasExpandedCategories, Is.True, first.FrontendCoverage.ToString());
+        Assert.That(first.FrontendCoverage.DivideByZeroExceptions, Is.GreaterThan(0));
+        Assert.That(first.FrontendCoverage.OverflowExceptions, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void GeneratorCorpusCoversEverySupportedOperatorFamily()
+    {
+        var observedBuilder = ImmutableHashSet.CreateBuilder<GeneratedExpressionKind>();
+        for (var seed = 0; seed < 256; seed++)
+        {
+            var expression = new SmallCSharpCaseGenerator(seed).Next(
+                maximumDepth: 5).Expression;
+            Collect(expression, observedBuilder);
+        }
+
+        var observed = observedBuilder.ToImmutable();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Add));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Subtract));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Multiply));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Divide));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Remainder));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Conditional));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.AndAlso));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.OrElse));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Equal));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.NotEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThanOrEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThanOrEqual));
+        }
+
+        static void Collect(
+            GeneratedCSharpExpression expression,
+            ImmutableHashSet<GeneratedExpressionKind>.Builder observed)
+        {
+            System.ArgumentNullException.ThrowIfNull(expression);
+            System.ArgumentNullException.ThrowIfNull(observed);
+            observed.Add(expression.Kind);
+            foreach (var child in expression.Children)
+            {
+                Collect(child, observed);
+            }
+        }
+    }
+
+    [Test]
+    public async Task ParallelismDoesNotChangeDeterministicOutcomes()
+    {
+        var serial = await FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 1), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var parallel = await FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4), cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(
+            serial.Passed,
+            Is.True,
+            string.Join(Environment.NewLine, serial.Failures.Select(
+                static failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.ToString()))));
+        Assert.That(parallel.Passed, Is.True);
+        Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
+        Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
+        Assert.That(
+            parallel.FrontendAgreements,
+            Is.EqualTo(serial.FrontendAgreements));
+        Assert.That(parallel.SmtAgreements, Is.EqualTo(serial.SmtAgreements));
+        Assert.That(
+            parallel.PartialSmtAgreements,
+            Is.EqualTo(serial.PartialSmtAgreements));
+        Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
+        Assert.That(parallel.TotalProgramCoverage, Is.EqualTo(serial.TotalProgramCoverage));
+        Assert.That(parallel.MetadataProgramCoverage, Is.EqualTo(serial.MetadataProgramCoverage));
+    }
+
+    [Test]
+    public void SupportedDomainAbstentionFailsTheCampaign()
+    {
+        var coverage = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
+        var summary = new FuzzSummary(
+            SchemaVersion: 7,
+            Cases: 1,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: 1,
+            Abstentions: 0,
+            FrontendAgreements: 1,
+            SmtAgreements: 1,
+            PartialSmtAgreements: 1,
+            FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
+            CoverageSatisfied: true,
+            Failures: []);
+
+        Assert.That(summary.Passed, Is.True);
+        Assert.That((summary with { Abstentions = 1 }).Passed, Is.False);
+    }
+
+    [TestCase(0, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1, 5)]
+    public void InvalidSummaryOptionsDoNotPass(
+        int cases,
+        int maximumParallelism)
+    {
+        var coverage = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0);
+        var valid = new FuzzSummary(
+            SchemaVersion: 7,
+            Cases: 1,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: 1,
+            Abstentions: 0,
+            FrontendAgreements: 1,
+            SmtAgreements: 1,
+            PartialSmtAgreements: 1,
+            FrontendCoverage: coverage,
+            TotalProgramCoverage: new(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0),
+            MetadataProgramCoverage: new(1, 1, 1, 1, 1, 1),
+            CoverageSatisfied: true,
+            Failures: []);
+
+        Assert.That(valid.Passed, Is.True);
+        var invalid = valid with
+        {
+            Cases = cases,
+            MaximumParallelism = maximumParallelism,
+            Agreements = cases,
+            FrontendAgreements = cases,
+            SmtAgreements = cases,
+            PartialSmtAgreements = cases
+        };
+        Assert.That(invalid.Passed, Is.False);
+    }
+
+    [Test]
+    public void MalformedSummaryEvidenceDoesNotPass()
+    {
+        var complete = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        var empty = new FrontendFuzzCoverage(
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var negative = complete with { TextParameters = -1 };
+        var impossibleExceptions = complete with
+        {
+            DivideByZeroExceptions = FuzzOptions.DefaultCases
+        };
+        var valid = new FuzzSummary(
+            SchemaVersion: 7,
+            Cases: FuzzOptions.DefaultCases,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: FuzzOptions.DefaultCases,
+            Abstentions: 0,
+            FrontendAgreements: FuzzOptions.DefaultCases,
+            SmtAgreements: FuzzOptions.DefaultCases,
+            PartialSmtAgreements: FuzzOptions.DefaultCases,
+            FrontendCoverage: complete,
+            TotalProgramCoverage: new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40),
+            MetadataProgramCoverage: new(1000, 1000, 1000, 1000, 1023, 127),
+            CoverageSatisfied: true,
+            Failures: []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(valid.Passed, Is.True);
+            Assert.That((valid with { MetadataProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { NativeRefutations = 999 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { TypeMask = 1022 } }).Passed, Is.False);
+            Assert.That((valid with { MetadataProgramCoverage = valid.MetadataProgramCoverage with { RecipeMask = 63 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = null! }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { Agreements = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { NativeProofs = 999 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ReferenceBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { TypeMask = 1023 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 0 } }).Passed, Is.False);
+            Assert.That((valid with { TotalProgramCoverage = valid.TotalProgramCoverage with { ArrayReadBodies = 101 } }).Passed, Is.False);
+            Assert.That(
+                (valid with { SchemaVersion = 999 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { Failures = default }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FrontendCoverage = null! }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FrontendCoverage = empty }).Passed,
+                Is.False);
+            Assert.That((valid with { FrontendCoverage = negative }).Passed, Is.False);
+            Assert.That((valid with { FrontendCoverage = impossibleExceptions }).Passed, Is.False);
+        }
+    }
+
+    [Test]
+    public void CancellationPropagates()
+    {
+        var cancellation = new CancellationToken(canceled: true);
+        Func<Task> run = () => FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
+            cancellation);
+        Assert.ThrowsAsync<OperationCanceledException>(run);
+    }
+
+    [Test]
+    public void GeneratedSourceFlowsThroughFrontendAndMatchesRuntime()
+    {
+        var first = new SmallCSharpCaseGenerator(seed: 741).Next(
+            maximumDepth: 4);
+        var second = new SmallCSharpCaseGenerator(seed: 741).Next(
+            maximumDepth: 4);
+
+        Assert.That(first.Source, Is.EqualTo(second.Source));
+        Assert.That(first.Left, Is.EqualTo(second.Left));
+        Assert.That(first.Right, Is.EqualTo(second.Right));
+        Assert.That(first.Condition, Is.EqualTo(second.Condition));
+        var comparison = FrontendDifferentialOracle.Compare(first, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(
+            comparison.Status,
+            Is.EqualTo(FuzzOracleStatus.Agreement),
+            comparison.Detail + Environment.NewLine + first.Source);
+    }
+
+    [Test]
+    public void ExpandedFrontendShapesMatchRuntime()
+    {
+        var cases = ImmutableArray.Create(
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.Length(
+                    GeneratedCSharpExpression.Text()),
+                Left: 0,
+                Right: 0,
+                Condition: false)
+            {
+                Text = null
+            },
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.ArrayIndex(
+                    GeneratedCSharpExpression.Values(),
+                    GeneratedCSharpExpression.Left()),
+                Left: 1,
+                Right: 0,
+                Condition: false)
+            {
+                Values = [7]
+            },
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.CastToString(
+                    GeneratedCSharpExpression.NullString()),
+                Left: 0,
+                Right: 0,
+                Condition: false));
+
+        var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(
+            results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)),
+            Is.All.EqualTo(FuzzOracleStatus.Agreement),
+            string.Join(Environment.NewLine, results.Select(
+                static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
+        Assert.That(
+            results[0].ExceptionKind,
+            Is.EqualTo(IrExceptionKind.NullReference));
+        Assert.That(
+            results[1].ExceptionKind,
+            Is.EqualTo(IrExceptionKind.IndexOutOfRange));
+        Assert.That(results[2].ExceptionKind, Is.Null);
+    }
+
+    [Test]
+    public void FrontendBatchCompileFailureIsIsolatedToInvalidCase()
+    {
+        var valid = new GeneratedCSharpCase(
+            GeneratedCSharpExpression.Integer(0),
+            Left: 0,
+            Right: 0,
+            Condition: false);
+        var invalid = new GeneratedCSharpCase(
+            GeneratedCSharpExpression.Binary(
+                GeneratedExpressionKind.Add,
+                GeneratedCSharpExpression.Integer(long.MaxValue),
+                GeneratedCSharpExpression.Integer(1)),
+            Left: 0,
+            Right: 0,
+            Condition: false);
+
+        var results = FrontendDifferentialOracle.CompareBatch([valid, invalid], cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(results.Length, Is.EqualTo(2));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void ExpandedCoverageRequirementFailsClosed()
+    {
+        var empty = new FrontendFuzzCoverage(
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        Assert.That(empty.HasExpandedCategories, Is.False);
+    }
+
+    [Test]
+    public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var enabled = factory.CreateVariable("enabled", factory.BooleanType);
+        var satisfiable = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                factory.Variable(value),
+                factory.Integer(2)),
+            factory.Variable(enabled));
+        var unsatisfiable = factory.Binary(
+            IrBinaryOperator.LessThan,
+            factory.Variable(value),
+            factory.Integer(-2));
+        var sat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory, satisfiable, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var unsat = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory, unsatisfiable, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(
+            FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
+                factory,
+                satisfiable,
+                TestContext.CurrentContext.CancellationToken,
+                out var preparedSat),
+            Is.True);
+        Assert.That(
+            FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(
+                factory,
+                unsatisfiable,
+                TestContext.CurrentContext.CancellationToken,
+                out var preparedUnsat),
+            Is.True);
+        var preparedSatResult =
+            await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
+                factory,
+                preparedSat!, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparedUnsatResult =
+            await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
+                factory,
+                preparedUnsat!, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        AssertAgreement(
+            sat,
+            FiniteDomainSatisfiability.Satisfiable,
+            assumptions: 2);
+        AssertAgreement(
+            unsat,
+            FiniteDomainSatisfiability.Unsatisfiable,
+            assumptions: 1);
+        Assert.That(preparedSatResult, Is.EqualTo(sat));
+        Assert.That(preparedUnsatResult, Is.EqualTo(unsat));
+
+        static void AssertAgreement(
+            FiniteDomainDifferentialResult result,
+            FiniteDomainSatisfiability expected,
+            int assumptions)
+        {
+            System.ArgumentNullException.ThrowIfNull(result);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+                Assert.That(result.Expected, Is.EqualTo(expected));
+                Assert.That(result.Actual, Is.EqualTo(expected));
+                Assert.That(
+                    result.FiniteDomainAssumptions,
+                    Is.EqualTo(assumptions));
+            }
+        }
+    }
+
+    [Test]
+    public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        IrTerm any = factory.Boolean(false);
+        for (var index = 0; index < 32; index++)
+        {
+            var variable = factory.CreateVariable(
+                "value" + index,
+                factory.BooleanType);
+            any = factory.Binary(
+                IrBinaryOperator.OrElse,
+                any,
+                factory.Variable(variable));
+        }
+        var contradiction = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            any,
+            factory.Unary(IrUnaryOperator.Not, any));
+        using var safety = new CancellationTokenSource(
+            TimeSpan.FromSeconds(1));
+
+        var defined = FiniteDomainSmtDifferentialOracle
+            .IsDefinedForAllAssignments(
+                factory,
+                contradiction,
+                safety.Token);
+        var comparison = await FiniteDomainSmtDifferentialOracle.CompareAsync(
+            factory,
+            contradiction,
+            safety.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(defined, Is.False);
+            Assert.That(
+                comparison.Status,
+                Is.EqualTo(FuzzOracleStatus.Abstained));
+            Assert.That(
+                comparison.Detail,
+                Does.Contain("assignment limit"));
+            Assert.That(
+                safety.IsCancellationRequested,
+                Is.False,
+                "The safety timeout fired before the oracle budget.");
+        }
+    }
+
+    [TestCase(0, 0, 1, 1)]
+    [TestCase(7, 1, 0, 1)]
+    public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
+        int seed,
+        int expectedTrue,
+        int expectedFalse,
+        int expectedUndefined)
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(
+            factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(FuzzOracleStatus.Agreement),
+                result.Detail);
+            Assert.That(result.ScenarioCount, Is.EqualTo(2));
+            Assert.That(result.DefinedTrueCount, Is.EqualTo(expectedTrue));
+            Assert.That(result.DefinedFalseCount, Is.EqualTo(expectedFalse));
+            Assert.That(result.UndefinedCount, Is.EqualTo(expectedUndefined));
+        }
+    }
+
+    [Test]
+    public async Task GuardedPartialTermCampaignMatchesCSharpAcrossEveryControlBit([Range(0, 31)] int seed)
+    {
+        if (seed is < 0 or > 31)
+        {
+            throw new ArgumentOutOfRangeException(nameof(seed));
+        }
+
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+        var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
+        Assert.That(result.ScenarioCount, Is.EqualTo(2));
+        Assert.That(result.DefinedTrueCount + result.DefinedFalseCount + result.UndefinedCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var first = PartialTermSmtCaseGenerator.Create(factory, 0);
+        var second = PartialTermSmtCaseGenerator.Create(factory, 8);
+        var printer = new IrPrinter(factory);
+
+        Assert.That(printer.Print(first.Formula), Is.Not.EqualTo(printer.Print(second.Formula)));
+    }
+
+    [Test]
+    public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var goal = new Goal(
+            factory,
+            factory.Boolean(true),
+            ProofDiagnosticKind.Postcondition,
+            new SourceLocationId(0));
+        var query = new VerificationQuery(factory, [], goal, [variable]);
+        var outcome = await new ProofKernel(
+                new StubBackend(BackendCheckResult.Satisfiable(new BackendModel([]))))
+            .VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(
+                ((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+            Assert.That(
+                PartialTermSmtDifferentialOracle.Classify(outcome),
+                Is.Null);
+        }
+    }
+
+    private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
+    {
+        private readonly BackendCheckResult _guarded_result = result ?? throw new System.ArgumentNullException(nameof(result));
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            System.ArgumentNullException.ThrowIfNull(query);
+            return Task.FromResult(_guarded_result);
+        }
+    }
+
+    [Test]
+    public void CSharpShrinkerIsDeterministicAndPreservesMismatch()
+    {
+        var expression = GeneratedCSharpExpression.Binary(
+            GeneratedExpressionKind.Add,
+            GeneratedCSharpExpression.Conditional(
+                GeneratedCSharpExpression.Condition(),
+                GeneratedCSharpExpression.Left(),
+                GeneratedCSharpExpression.Right()),
+            GeneratedCSharpExpression.Integer(1));
+        var generated = new GeneratedCSharpCase(
+            expression,
+            Left: 3,
+            Right: 4,
+            Condition: true);
+        static bool Preserves(GeneratedCSharpCase candidate)
+        {
+            System.ArgumentNullException.ThrowIfNull(candidate);
+            return candidate.Expression.Render().Contains(
+                "left",
+                StringComparison.Ordinal);
+        }
+
+        var first = CSharpStructuralShrinker.Minimize(generated, Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = CSharpStructuralShrinker.Minimize(generated, Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(
+            first.Expression.NodeCount,
+            Is.LessThan(expression.NodeCount));
+        Assert.That(Preserves(first), Is.True);
+        Assert.That(first.Source, Is.EqualTo(second.Source));
+    }
+
+    [Test]
+    public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
+    {
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var variableTerm = factory.Variable(variable);
+        var formula = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.GreaterThan,
+                factory.Binary(
+                    IrBinaryOperator.Add,
+                    variableTerm,
+                    factory.Integer(1)),
+                factory.Integer(0)),
+            factory.Binary(
+                IrBinaryOperator.LessThan,
+                variableTerm,
+                factory.Integer(2)));
+        Task<bool> Preserves(IrTerm candidate, CancellationToken _)
+        {
+            System.ArgumentNullException.ThrowIfNull(candidate);
+            return Task.FromResult(
+                IrTermAnalysis.CollectVariables(candidate).Contains(variable));
+        }
+
+        var first = await IrStructuralShrinker.MinimizeAsync(
+            factory,
+            formula,
+            Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var second = await IrStructuralShrinker.MinimizeAsync(
+            factory,
+            formula,
+            Preserves, cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(
+            IrStructuralShrinker.StructuralSize(first),
+            Is.LessThan(IrStructuralShrinker.StructuralSize(formula)));
+        Assert.That(
+            IrTermAnalysis.CollectVariables(first).Contains(variable),
+            Is.True);
+        Assert.That(first, Is.SameAs(second));
+    }
+
+    [TestCase("--cases", "0")]
+    [TestCase("--cases", "1000001")]
+    [TestCase("--max-parallelism", "5")]
+    [TestCase("--unknown", "1")]
+    public void InvalidOptionsFailClosed(string option, string value)
+    {
+        System.ArgumentNullException.ThrowIfNull(option);
+        System.ArgumentNullException.ThrowIfNull(value);
+        Action parse = () => FuzzOptions.Parse([option, value]);
+        Assert.Throws<FuzzUsageException>(parse);
+    }
+
+    [TestCase(0, 1)]
+    [TestCase(1000001, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1, 5)]
+    public void DirectRunnerRejectsInvalidOptions(
+        int cases,
+        int maximumParallelism)
+    {
+        Func<Task> run = () => FuzzRunner.RunAsync(new FuzzOptions(
+            cases,
+            Seed: 1,
+            maximumParallelism), cancellationToken: TestContext.CurrentContext.CancellationToken);
+
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(run);
+    }
+
+}

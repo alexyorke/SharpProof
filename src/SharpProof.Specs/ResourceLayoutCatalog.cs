@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 
 namespace SharpProof.Specs;
 
@@ -13,17 +11,14 @@ internal static class ResourceLayoutCatalog
     internal static bool IsReviewedReference(string assembly)
     {
         assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
-        return assembly is
-            "System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e" or
-            "System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
+        return ResourceCatalogIdentity.IsReviewedFrameworkReference(assembly);
     }
 
     internal static string AssumptionId(string callableId, string assembly)
     {
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
         assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
-        using var hash = SHA256.Create();
-        var owner = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(callableId + "\n" + assembly))).Replace("-", string.Empty);
+        var owner = ResourceCatalogIdentity.OwnerHash(callableId, assembly);
         return "resource-metadata-" + ResourceRuntimeLayout.ModelId + ":" + ContentSha256 + ":" + Witness + ":" +
             ResourceRuntimeLayout.EvidenceSource + ":owner:" + owner;
     }

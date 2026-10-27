@@ -1,0 +1,79 @@
+#nullable enable
+
+namespace SharpProof.Contracts;
+
+internal enum BoundContractKind
+{
+    Requires,
+    Ensures,
+    Assume
+}
+
+internal enum BoundContractEvidence
+{
+    CompilerBoundInvocation,
+    ClosedAttribute,
+    Companion
+}
+
+internal enum ContractBindingFailure
+{
+    None,
+    ContractApiUnavailable,
+    UnsupportedExpression,
+    NonBooleanCondition,
+    ResultOutsideEnsures,
+    OldOutsideEnsures,
+    NestedOld,
+    InvalidIntrinsicSignature,
+    MissingCompanion,
+    AmbiguousCompanion,
+    CompanionSignatureMismatch,
+    CompanionBodyUnavailable,
+    InvalidClosedAttribute,
+    InvalidClausePlacement,
+    UnsupportedTarget
+}
+
+// A classified contract clause: its kind, evidence and a structural key of its
+// condition. Expressions are lowered only by the Total binder.
+internal sealed class BoundContractClause
+{
+    internal BoundContractClause(
+        BoundContractKind kind,
+        BoundContractEvidence evidence,
+        string comparisonKey
+    )
+    {
+        comparisonKey = RepositoryParameterGuard.NotNull(comparisonKey, nameof(comparisonKey));
+        Kind = kind;
+        Evidence = evidence;
+        ComparisonKey = comparisonKey;
+    }
+    public BoundContractKind Kind { get; }
+    public BoundContractEvidence Evidence { get; }
+    public string ComparisonKey { get; }
+}
+
+internal sealed class BoundMethodContracts
+{
+    internal BoundMethodContracts(
+        IMethodSymbol target,
+        IMethodSymbol source,
+        ImmutableArray<BoundContractClause> clauses,
+        bool usesCompanion
+    )
+    {
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
+        Target = target;
+        Source = source;
+        Clauses = clauses;
+        UsesCompanion = usesCompanion;
+    }
+    public IMethodSymbol Target { get; }
+    public IMethodSymbol Source { get; }
+    public ImmutableArray<BoundContractClause> Clauses { get; }
+    public bool UsesCompanion { get; }
+}

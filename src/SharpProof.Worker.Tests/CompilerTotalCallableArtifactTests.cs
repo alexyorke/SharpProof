@@ -932,7 +932,7 @@ public sealed class CompilerTotalCallableArtifactTests
     }
 
     [Test]
-    public async Task LegacyAdmissionFailureDoesNotSuppressFullUlongTypedCandidate()
+    public async Task FullUlongTypedCandidateIsAdmittedAndProven()
     {
         var preparation = RoundTrip("""
             using SharpProof.Attributes;
@@ -944,7 +944,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 }
             }
             """);
-        Assert.That(preparation.IsSuccess, Is.False);
+        Assert.That(preparation.IsSuccess, Is.True);
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That((await Check(preparation, 0)).Outcome, Is.TypeOf<ProvenOutcome>());
     }

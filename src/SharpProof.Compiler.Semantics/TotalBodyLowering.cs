@@ -9,18 +9,6 @@ internal static class TotalBodyLowering
 {
     internal const int MaximumWork = 4096;
 
-    internal static bool IsBodyDeclaration(SyntaxNode? declaration)
-    { return TotalSourceCallSession.IsBodyDeclaration(declaration); }
-
-    internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
-        CancellationToken cancellationToken)
-    {
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        return TotalSourceCallSession.CreateGraph(declaration, method, model, cancellationToken);
-    }
-
     internal static AccessorDeclarationSyntax? AutoAccessor(SyntaxNode declaration)
     { declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration)); return declaration is AccessorDeclarationSyntax { Body: null, ExpressionBody: null } accessor ? accessor : null; }
 

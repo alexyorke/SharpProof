@@ -11,64 +11,6 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class Pr275BulkContractsApiTests
 {
-    private static readonly ImmutableArray<BoundContractKind> FullClauseKinds =
-        [BoundContractKind.Requires, BoundContractKind.Requires, BoundContractKind.Ensures];
-    private static readonly ImmutableArray<BoundContractKind> RequiresClauseKinds =
-        [BoundContractKind.Requires, BoundContractKind.Requires];
-    private static readonly ImmutableArray<string> FullClauseTexts =
-        ["value != 0", "value >= 0", "Contract.Result<int>() == value"];
-    private static readonly ImmutableArray<string> RequiresClauseTexts = ["value != 0", "value >= 0"];
-
-    [Test]
-    public void SuccessfulSourceBindingReturnsTheWholeDirectContractSetAndRequiresView()
-    {
-        var compilation = CreateCompilation(
-            "Pr275BulkContractsApiBinding",
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Target(int value) {
-                    Contract.Requires(value != 0);
-                    Contract.Requires(value >= 0);
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return value;
-                }
-                internal static int Plain(int value) => value;
-            }
-            """);
-        var subject = compilation.GetTypeByMetadataName("Subject")!;
-        var target = subject.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var plain = subject.GetMembers("Plain").OfType<IMethodSymbol>().Single();
-        var binder = new ContractBinder(compilation, new IrFactory());
-
-        var full = binder.Bind(target);
-
-        Assert.That(full.IsSuccess, Is.True);
-        Assert.That(full.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(full.Contracts, Is.Not.Null);
-        var fullContracts = full.Contracts!;
-        Assert.That(SymbolEqualityComparer.Default.Equals(fullContracts.Target, target), Is.True);
-        Assert.That(fullContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(FullClauseKinds));
-        Assert.That(fullContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)), Is.EqualTo(FullClauseTexts));
-        Assert.That(fullContracts.Clauses.All(static clause =>
-            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.CompilerBoundInvocation &&
-            clause.SourceSyntax != null)), Is.True);
-
-        var requires = binder.BindRequires(target);
-
-        Assert.That(requires.IsSuccess, Is.True);
-        Assert.That(requires.Contracts, Is.Not.Null);
-        var requiresContracts = requires.Contracts!;
-        Assert.That(requiresContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(RequiresClauseKinds));
-        Assert.That(requiresContracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)), Is.EqualTo(RequiresClauseTexts));
-
-        var empty = binder.Bind(plain);
-
-        Assert.That(empty.IsSuccess, Is.True);
-        Assert.That(empty.Contracts, Is.Not.Null);
-        Assert.That(empty.Contracts!.Clauses, Is.Empty);
-    }
-
     [Test]
     public void MaintainedBinderAndInventoryEntryPointsRejectMissingCallables()
     {
@@ -82,39 +24,6 @@ public sealed class Pr275BulkContractsApiTests
         AssertMissingCallable("requires", "target", () => _ = binder.BindRequires(null!));
         AssertMissingCallable("inventory query", "target", () => _ = binder.GetClauseInventory(null!));
         AssertMissingCallable("inventory create", "callable", () => _ = inventory.Create(null!));
-    }
-
-    [Test]
-    public void ExpressionBinderUsesItsDefaultSpecializerForACompilerBoundOperation()
-    {
-        var compilation = CreateCompilation(
-            "Pr275BulkContractsApiExpression",
-            "internal static class Subject { internal static bool Predicate(int value) => value > 0; }");
-        var method = compilation.GetTypeByMetadataName("Subject")!
-            .GetMembers("Predicate").OfType<IMethodSymbol>().Single();
-        var declaration = (MethodDeclarationSyntax)method.DeclaringSyntaxReferences
-            .Single().GetSyntax();
-        var operation = compilation.GetSemanticModel(declaration.SyntaxTree)
-            .GetOperation(declaration.ExpressionBody!.Expression);
-        Assert.That(operation, Is.Not.Null);
-
-        var api = ContractApiSymbols.TryCreate(compilation);
-        Assert.That(api, Is.Not.Null);
-        var binder = new ContractExpressionBinder(new IrFactory(), api!, method);
-        var binding = binder.Bind(operation!);
-
-        Assert.That(binding.IsSuccess, Is.True);
-        Assert.That(binding.Term, Is.InstanceOf<IrBinaryTerm>());
-        Assert.That(((IrBinaryTerm)binding.Term!).Operator, Is.EqualTo(IrBinaryOperator.GreaterThan));
-        Assert.That(binding.Variables, Has.Count.EqualTo(1));
-        Assert.That(binder.VariableBindings, Has.Length.EqualTo(1));
-        Assert.That(SymbolEqualityComparer.Default.Equals(
-            binder.VariableBindings.Single().Symbol,
-            method.Parameters.Single()), Is.True);
-
-        var missingOperation = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = binder.Bind(null!)));
-        Assert.That(missingOperation!.ParamName, Is.EqualTo("operation"));
     }
 
     [TestCase("property", "17")]

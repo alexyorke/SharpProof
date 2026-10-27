@@ -16,7 +16,6 @@
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <_SharpProofSelfRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))</_SharpProofSelfRepositoryRoot>
     <_SharpProofSelfAnalyzerDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'artifacts', 'bin', 'SharpProof.Analyzer', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfAnalyzerDirectory>
-    <_SharpProofSelfGeneratorDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'artifacts', 'bin', 'SharpProof.ContractForGenerator', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfGeneratorDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="
@@ -39,15 +38,10 @@
     <Analyzer Include="$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
     </Analyzer>
-    <Analyzer Include="$(_SharpProofSelfGeneratorDirectory)/SharpProof.ContractForGenerator.dll">
-      <SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>
-    </Analyzer>
     <Analyzer Include="
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.Core.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Compiler.Semantics.dll;
-        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Contracts.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Dataflow.dll;
-        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Effects.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Frontend.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Ir.dll;
         $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Specs.dll;
@@ -73,7 +67,5 @@
             '$(DesignTimeBuild)' != 'true'">
     <Error Condition="!Exists('$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll')"
            Text="SharpProof self-application requires a bootstrapped analyzer at '$(_SharpProofSelfAnalyzerDirectory)'. Run the self-apply container command to build the analyzer first." />
-    <Error Condition="!Exists('$(_SharpProofSelfGeneratorDirectory)/SharpProof.ContractForGenerator.dll')"
-           Text="SharpProof self-application requires a bootstrapped contract generator at '$(_SharpProofSelfGeneratorDirectory)'. Run the self-apply container command to build the generator first." />
   </Target>
 </Project>

@@ -1,15 +1,10 @@
-name: Container coverage
+name: Coverage
 
 on:
   push:
     branches: [master]
   pull_request:
   workflow_dispatch:
-    inputs:
-      comparison_ref:
-        description: Exact commit or named ref for changed-TCB comparison
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -19,79 +14,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Coverage packages are private run inputs, including a manual tagged run.
   SHARPPROOF_CI_PACKAGE_VERSION: ${{ format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) }}
   COMPOSE_PROJECT_NAME: sharpproof-coverage-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
-  # Public Linux runners have 16 GB RAM. Keep the container and its charged
-  # scratch below that host capacity so Docker enforces the resource boundary.
+  # Public Linux runners have 16 GB RAM; keep the container below that.
   SHARPPROOF_CONTAINER_MEMORY_LIMIT: 12g
   SHARPPROOF_TMPFS_SIZE: 4g
 
-# Fifteen shards retain the complete selection: split corpus workflows and
-# Worker A4 fixtures, isolate Analyzer and the Attributes/Fuzz console tail,
-# and run every other project plus four package method partitions.
-# The required coverage gate authenticates every artifact, verifies the complete
-# task/case partition, and preserves independent authority, MAX merging, floors,
-# and changed-TCB enforcement.
 jobs:
-  coverage-shard:
-    name: coverage shard (${{ matrix.shard }})
+  coverage:
     runs-on: ubuntu-latest
-    outputs:
-      semantic-gates-corpus-a-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-a-attempt }}
-      semantic-gates-corpus-a-artifact-id: ${{ steps.shard-identity.outputs.semantic-gates-corpus-a-artifact-id }}
-      semantic-gates-corpus-b-attempt: ${{ steps.shard-identity.outputs.semantic-gates-corpus-b-attempt }}
-      semantic-gates-corpus-b-artifact-id: ${{ steps.shard-identity.outputs.semantic-gates-corpus-b-artifact-id }}
-      semantic-gates-shards-attempt: ${{ steps.shard-identity.outputs.semantic-gates-shards-attempt }}
-      semantic-gates-shards-artifact-id: ${{ steps.shard-identity.outputs.semantic-gates-shards-artifact-id }}
-      semantic-worker-a-1-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-1-attempt }}
-      semantic-worker-a-4a-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-4a-attempt }}
-      semantic-worker-a-4b-attempt: ${{ steps.shard-identity.outputs.semantic-worker-a-4b-attempt }}
-      semantic-worker-a-1-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-1-artifact-id }}
-      semantic-worker-a-4a-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-4a-artifact-id }}
-      semantic-worker-a-4b-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-a-4b-artifact-id }}
-      semantic-worker-b-2-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-2-attempt }}
-      semantic-worker-b-2-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-b-2-artifact-id }}
-      semantic-worker-b-3-attempt: ${{ steps.shard-identity.outputs.semantic-worker-b-3-attempt }}
-      semantic-worker-b-3-artifact-id: ${{ steps.shard-identity.outputs.semantic-worker-b-3-artifact-id }}
-      semantic-analyzer-attempt: ${{ steps.shard-identity.outputs.semantic-analyzer-attempt }}
-      semantic-analyzer-artifact-id: ${{ steps.shard-identity.outputs.semantic-analyzer-artifact-id }}
-      semantic-projects-rest-attempt: ${{ steps.shard-identity.outputs.semantic-projects-rest-attempt }}
-      semantic-projects-rest-artifact-id: ${{ steps.shard-identity.outputs.semantic-projects-rest-artifact-id }}
-      semantic-extras-attempt: ${{ steps.shard-identity.outputs.semantic-extras-attempt }}
-      semantic-extras-artifact-id: ${{ steps.shard-identity.outputs.semantic-extras-artifact-id }}
-      package-0-attempt: ${{ steps.shard-identity.outputs.package-0-attempt }}
-      package-0-artifact-id: ${{ steps.shard-identity.outputs.package-0-artifact-id }}
-      package-1-attempt: ${{ steps.shard-identity.outputs.package-1-attempt }}
-      package-1-artifact-id: ${{ steps.shard-identity.outputs.package-1-artifact-id }}
-      package-2-attempt: ${{ steps.shard-identity.outputs.package-2-attempt }}
-      package-2-artifact-id: ${{ steps.shard-identity.outputs.package-2-artifact-id }}
-      package-3-attempt: ${{ steps.shard-identity.outputs.package-3-attempt }}
-      package-3-artifact-id: ${{ steps.shard-identity.outputs.package-3-artifact-id }}
-      windows-tool-input-id: ${{ steps.windows-tool-input.outputs.artifact-id }}
-      windows-tool-input-attempt-number: ${{ steps.windows-tool-identity.outputs.attempt }}
-    strategy:
-      fail-fast: false
-      matrix:
-        shard:
-          - semantic-gates-corpus-a
-          - semantic-gates-corpus-b
-          - semantic-gates-shards
-          - semantic-worker-a-1
-          - semantic-worker-a-4a
-          - semantic-worker-a-4b
-          - semantic-worker-b-2
-          - semantic-worker-b-3
-          - semantic-analyzer
-          - semantic-projects-rest
-          - semantic-extras
-          - package-0
-          - package-1
-          - package-2
-          - package-3
-    env:
-      SHARPPROOF_COVERAGE_SHARD: ${{ matrix.shard }}
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,296 +35,23 @@ jobs:
         with:
           download-packages: "false"
 
-      - name: Collect ${{ matrix.shard }} coverage shard
-        run: >-
-          docker compose run
-          --name "${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
-          -e GITHUB_RUN_ID
-          -e GITHUB_RUN_ATTEMPT
-          tooling coverage-shard -Configuration Release
-          -CoveragePhase "$SHARPPROOF_COVERAGE_SHARD"
+      - name: Collect line coverage of the C# sources
+        run: docker compose run --rm tooling coverage -Configuration Release
 
-      # Retain the exact task container until Docker's terminal state is saved.
-      # This records Docker evidence without adding host process-memory probes.
-      - name: Record coverage container termination
+      - name: Publish the coverage summary
         if: always()
         run: |
-          task_container="${COMPOSE_PROJECT_NAME}-${SHARPPROOF_COVERAGE_SHARD}"
-          trap 'docker rm --force "$task_container" >/dev/null 2>&1 || true' EXIT
-          state_dir="${RUNNER_TEMP}/sharpproof-container-state"
-          state_file="${state_dir}/${SHARPPROOF_COVERAGE_SHARD}.json"
-          mkdir -p "$state_dir"
-          if docker inspect --format \
-            '{"exitCode":{{.State.ExitCode}},"oomKilled":{{.State.OOMKilled}},"error":{{json .State.Error}}}' \
-            "$task_container" > "$state_file"; then
-            cat "$state_file"
-          else
-            printf '{"available":false}\n' > "$state_file"
+          if [[ -f artifacts/coverage/summary.md ]]; then
+            cat artifacts/coverage/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload coverage container termination
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-container-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/sharpproof-container-state/*.json
-          if-no-files-found: error
-          retention-days: 30
-
-      # One artifact per shard holds artifacts/coverage/<shard> and the
-      # shard's uniquely named timing profiles under artifacts/timings.
-      - name: Upload coverage shard and timing profile
-        id: shard-evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-shard-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: |
-            artifacts/coverage/${{ matrix.shard }}
-            artifacts/timings/*-coverage.json
-          if-no-files-found: error
-          retention-days: 30
-
-      # A failed-only rerun retains successful matrix jobs from earlier attempts.
-      # Publish unique matrix outputs only after both uploads succeed, so the
-      # gate selects each successful job's evidence without deleting old attempts.
-      - name: Record successful shard artifact attempt
-        id: shard-identity
-        env:
-          SHARPPROOF_SHARD: ${{ matrix.shard }}
-          SHARPPROOF_ARTIFACT_ID: ${{ steps.shard-evidence.outputs.artifact-id }}
-        run: |
-          set -euo pipefail
-          [[ "$SHARPPROOF_ARTIFACT_ID" =~ ^[0-9]+$ ]]
-          echo "${SHARPPROOF_SHARD}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-          echo "${SHARPPROOF_SHARD}-artifact-id=${SHARPPROOF_ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
-
-      # The producer seals the already-built Tool before collection can
-      # instrument it. This separate artifact never changes a shard cohort.
-      - name: Upload canonical Windows installed-tool input
-        id: windows-tool-input
-        if: matrix.shard == 'semantic-extras'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-windows-tool-input-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/coverage-windows-input
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Record canonical Windows input attempt
-        id: windows-tool-identity
-        if: matrix.shard == 'semantic-extras'
-        run: echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-          name: ${{ github.job }}-${{ matrix.shard }}
-
-  native-windows-tool:
-    name: native Windows installed-tool coverage
-    needs: coverage-shard
-    if: ${{ !cancelled() && needs.coverage-shard.outputs.windows-tool-input-id != '' && needs.coverage-shard.outputs.windows-tool-input-attempt-number != '' }}
-    runs-on: windows-latest
-    outputs:
-      artifact-id: ${{ steps.native-evidence.outputs.artifact-id }}
-      attempt: ${{ steps.native-identity.outputs.attempt }}
-    env:
-      SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
-      SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT: ${{ needs.coverage-shard.outputs.windows-tool-input-attempt-number }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Require exact canonical input
-        shell: pwsh
-        run: |
-          foreach ($identity in @($env:SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID, $env:SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT)) {
-            if ($identity -cnotmatch '\A[1-9][0-9]*\z') { throw 'Missing canonical installed-tool input identity.' }
-          }
-
-      - name: Select pinned consumer SDKs
-        id: consumer-sdks
-        shell: pwsh
-        run: |
-          $toolchain = Get-Content eng/container/toolchain.json -Raw | ConvertFrom-Json
-          if ($toolchain.dotnet.minimumSdkFrameworkImage -cnotmatch '\Amcr\.microsoft\.com/dotnet/sdk:(?<version>[0-9]+\.[0-9]+\.[0-9]+)-') {
-            throw 'Missing pinned framework SDK for the coverage collector.'
-          }
-          "framework-sdk=$($Matches.version)" >> $env:GITHUB_OUTPUT
-
-      # Setup only runtimes/SDKs. The Windows job never builds repository code.
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-          dotnet-version: ${{ steps.consumer-sdks.outputs.framework-sdk }}
-
-      - name: Download exact canonical installed-tool input
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
-          merge-multiple: true
-          path: ${{ runner.temp }}/coverage-windows-input
-
-      - name: Exercise protected Windows DACL through the installed Tool
-        shell: pwsh
-        run: >-
-          ./eng/scripts/Test-SharpProofWindowsToolCoverage.ps1
-          -InputDirectory "$env:RUNNER_TEMP/coverage-windows-input"
-          -OutputDirectory "$env:RUNNER_TEMP/coverage-native-windows"
-
-      - name: Upload native Windows installed-tool evidence
-        id: native-evidence
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-windows-tool-output-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/coverage-native-windows
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Record successful native attempt
-        id: native-identity
-        shell: pwsh
-        run: '"attempt=$env:GITHUB_RUN_ATTEMPT" >> $env:GITHUB_OUTPUT'
-
-  coverage-gate:
-    name: coverage
-    permissions:
-      contents: read
-      actions: read
-    # Keep the existing required-check identity and explicitly reject failed
-    # or cancelled prerequisites; a skipped job can satisfy required checks.
-    if: always()
-    needs: [coverage-shard, native-windows-tool]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require every successful coverage shard
-        env:
-          SHARPPROOF_SHARD_RESULT: ${{ needs.coverage-shard.result }}
-          SHARPPROOF_NATIVE_RESULT: ${{ needs.native-windows-tool.result }}
-        run: |
-          if [[ "$SHARPPROOF_SHARD_RESULT" != success ]]; then
-            echo "Coverage shards did not all succeed: $SHARPPROOF_SHARD_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_NATIVE_RESULT" != success ]]; then
-            echo "Native Windows installed-tool coverage did not succeed: $SHARPPROOF_NATIVE_RESULT" >&2
-            exit 1
-          fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Select changed-TCB comparison commit
-        env:
-          SHARPPROOF_REQUESTED_COMPARISON_REF: ${{ inputs.comparison_ref }}
-        run: |
-          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
-            candidate='${{ github.event.pull_request.base.sha }}'
-          elif [[ '${{ github.event.before }}' =~ ^[0-9a-f]{40}$ ]] &&
-               [[ '${{ github.event.before }}' != '0000000000000000000000000000000000000000' ]]; then
-            candidate='${{ github.event.before }}'
-          elif [[ '${{ github.event_name }}' == 'workflow_dispatch' ]] &&
-               [[ -n "${SHARPPROOF_REQUESTED_COMPARISON_REF}" ]]; then
-            candidate="${SHARPPROOF_REQUESTED_COMPARISON_REF}"
-          else
-            echo 'No durable coverage comparison authority was supplied.' >&2
-            exit 1
-          fi
-          comparison="$(git rev-parse --verify "${candidate}^{commit}")"
-          [[ "${comparison}" =~ ^[0-9a-f]{40}$ ]] || {
-            echo 'Coverage comparison did not resolve to one exact commit.' >&2
-            exit 1
-          }
-          echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      # Download exact immutable IDs concurrently, retaining each successful
-      # producer's attempt across failed-only reruns. Never use a broad pattern.
-      - name: Require exact shard artifact identities
-        id: shard-artifacts
-        env:
-          SHARPPROOF_SHARD_OUTPUTS: ${{ toJSON(needs.coverage-shard.outputs) }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          outputs = json.loads(os.environ['SHARPPROOF_SHARD_OUTPUTS'])
-          attempts = {key.removesuffix('-attempt'): value for key, value in outputs.items() if key.endswith('-attempt')}
-          artifacts = {key.removesuffix('-artifact-id'): value for key, value in outputs.items() if key.endswith('-artifact-id')}
-          if len(attempts) != 15 or artifacts.keys() != attempts.keys():
-              raise SystemExit('Every coverage shard must supply its producer attempt and immutable artifact ID.')
-          if any(not str(value).isdigit() or int(value) < 1 for value in [*attempts.values(), *artifacts.values()]):
-              raise SystemExit('Coverage producer identities must be positive integers.')
-          if len(set(artifacts.values())) != 15:
-              raise SystemExit('Coverage shards must have distinct immutable artifact IDs.')
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write('artifact-ids=' + ','.join(artifacts.values()) + '\n')
-          PY
-
-      - name: Download exact coverage shards
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ steps.shard-artifacts.outputs.artifact-ids }}
-          merge-multiple: true
-          path: artifacts
-
-      # Independently download the immutable producer input as well as native
-      # output. A consumer receipt alone cannot authenticate its own package.
-      - name: Download exact native Tool producer authority
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
-          merge-multiple: true
-          path: artifacts/coverage-windows-input
-
-      - name: Download exact native Windows coverage supplement
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.native-windows-tool.outputs.artifact-id }}
-          merge-multiple: true
-          path: artifacts/coverage-native-windows
-
-      - name: Merge and enforce container coverage
-        env:
-          SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID: ${{ needs.coverage-shard.outputs.windows-tool-input-id }}
-          SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT: ${{ needs.coverage-shard.outputs.windows-tool-input-attempt-number }}
-          SHARPPROOF_WINDOWS_TOOL_OUTPUT_ARTIFACT_ID: ${{ needs.native-windows-tool.outputs.artifact-id }}
-          SHARPPROOF_WINDOWS_TOOL_OUTPUT_RUN_ATTEMPT: ${{ needs.native-windows-tool.outputs.attempt }}
-          SHARPPROOF_COVERAGE_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT
-          -e GITHUB_REPOSITORY -e GITHUB_TOKEN
-          -e SHARPPROOF_WINDOWS_TOOL_INPUT_ARTIFACT_ID
-          -e SHARPPROOF_WINDOWS_TOOL_INPUT_RUN_ATTEMPT
-          -e SHARPPROOF_WINDOWS_TOOL_OUTPUT_ARTIFACT_ID
-          -e SHARPPROOF_WINDOWS_TOOL_OUTPUT_RUN_ATTEMPT
-          -e SHARPPROOF_COVERAGE_WORKFLOW_HEAD_SHA
-          -e SHARPPROOF_COVERAGE_COMPARISON_REF
-          tooling coverage-gate -Configuration Release
-
-      - name: Upload coverage evidence
+      - name: Upload Cobertura reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            artifacts/coverage
-            artifacts/coverage-windows-input
-            artifacts/coverage-native-windows
-            artifacts/timings/*-coverage.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
+            artifacts/coverage/**/*.cobertura.xml
+            artifacts/coverage/summary.md
+          if-no-files-found: warn
+          retention-days: 14

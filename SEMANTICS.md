@@ -95,4 +95,4 @@ Protocol validation and atomic publication are infrastructure boundaries. A malf
 - [Reading verification evidence](docs/verification-results.md): manifests, claim results, replay models, assumptions, vacuity, SARIF, and cache interpretation.
 - [Analysis limits](docs/analysis-limits.md): current defaults.
 - [Coverage and limits](docs/coverage-and-limits.md): supported examples and remaining boundaries.
-- [Golden fixtures](tests/golden/README.md) and [corpus gates](src/SharpProof.Gates/README.md): executable regression evidence.
+- [Golden fixtures](tests/golden/README.md) and [corpus gates](tests/SharpProof.Gates/README.md): executable regression evidence.

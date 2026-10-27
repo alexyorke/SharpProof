@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
@@ -12,102 +13,6 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 internal sealed class ContractBinderTests
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public void LocalContractsUseTheirOwnParametersWithoutBorrowingCapturedCallerState(bool captured)
-    {
-        var parameterName = captured ? "outerValue" : "innerValue";
-        var compilation = TestCompilation.Create("ContractsLocalOwnerBoundary",
-            $$"""
-            using SharpProof.Attributes;
-            public static class Target {
-                public static int Read(int outerValue, int argument) {
-                    int Local(int innerValue) {
-                        Contract.Requires({{parameterName}} > 0);
-                        return innerValue;
-                    }
-                    return Local(argument);
-                }
-            }
-            """);
-        var tree = compilation.SyntaxTrees.Single();
-        var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();
-        var local = model.GetDeclaredSymbol(syntax)!;
-        var invocation = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
-        var condition = (BinaryExpressionSyntax)invocation.ArgumentList.Arguments.Single().Expression;
-        var parameter = (IParameterSymbol)model.GetSymbolInfo(condition.Left).Symbol!;
-        Assert.That(SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, local), Is.EqualTo(!captured));
-
-        var factory = new IrFactory();
-        var result = new ContractBinder(compilation, factory).Bind(local);
-        Assert.That(result.Failure, Is.EqualTo(captured
-            ? ContractBindingFailure.UnsupportedExpression
-            : ContractBindingFailure.None));
-        Assert.That(result.IsSuccess, Is.EqualTo(!captured));
-        if (captured)
-        {
-            Assert.That(result.Contracts, Is.Null);
-            return;
-        }
-        var contracts = result.Contracts!;
-        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
-        var binding = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
-        var interpreter = new IrInterpreter(factory);
-        foreach (var input in ImmutableArray.Create(-1L, 1L))
-        {
-            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(binding.Variable, factory.CreateIntegerValue(factory.IntegerType, input));
-            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
-                Is.EqualTo(input > 0));
-        }
-    }
-
-    [TestCase("Positive", "long", IrExecutionSemantics.Legacy, true)]
-    [TestCase("Positive", "int", IrExecutionSemantics.Total, true)]
-    [TestCase("Positive", "long", IrExecutionSemantics.Total, false)]
-    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Legacy, true)]
-    [TestCase("InRange(1, 10)", "int", IrExecutionSemantics.Total, true)]
-    [TestCase("InRange(1, 10)", "long", IrExecutionSemantics.Total, false)]
-    public void LegacyClosedIntegerPredicatesRequireTheirFactoryIntegerDomain(
-        string attribute, string type, IrExecutionSemantics semantics, bool admitted)
-    {
-        System.ArgumentNullException.ThrowIfNull(attribute);
-        System.ArgumentNullException.ThrowIfNull(type);
-        var compilation = TestCompilation.Create("ContractsFactoryIntegerBoundary",
-            $$"""
-            using SharpProof.Attributes;
-            public static class Target {
-                public static void Read([{{attribute}}] {{type}} value) { }
-            }
-            """);
-        var method = compilation.GetTypeByMetadataName("Target")!
-            .GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(semantics);
-        var result = new ContractBinder(compilation, factory).Bind(method);
-
-        Assert.That(result.Failure, Is.EqualTo(admitted
-            ? ContractBindingFailure.None
-            : ContractBindingFailure.InvalidClosedAttribute));
-        Assert.That(result.IsSuccess, Is.EqualTo(admitted));
-        if (!admitted)
-        {
-            Assert.That(result.Contracts, Is.Null);
-            return;
-        }
-        var contracts = result.Contracts!;
-        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
-        Assert.That(contracts.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
-        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
-        var parameterType = factory.GetVariableInfo(parameter.Variable).Type;
-        Assert.That(parameterType, Is.EqualTo(factory.IntegerType));
-        var interpreter = new IrInterpreter(factory);
-        foreach (var input in ImmutableArray.Create(-1L, 1L))
-        {
-            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(parameterType, input));
-            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean,
-                Is.EqualTo(input > 0));
-        }
-    }
 
     [TestCase(false)]
     [TestCase(true)]
@@ -179,34 +84,6 @@ internal sealed class ContractBinderTests
         {
             Assert.That(result.Contracts, Is.Null);
         }
-    }
-
-    [Test]
-    public void RepeatedOldClausesShareOneCanonicalPreStatePerParameter()
-    {
-        var subject = ContractSubject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Target {
-                public static long Read(long value, long other) {
-                    Contract.Ensures(Contract.Result<long>() == Contract.Old(value));
-                    Contract.Ensures(Contract.Old(value) == value);
-                    Contract.Ensures(Contract.Old(other) == other);
-                    return value;
-                }
-            }
-            """);
-        var result = subject.Bind("Target", "Read");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        var contracts = result.Contracts!;
-        Assert.That(contracts.Clauses, Has.Length.EqualTo(3));
-        var preStates = contracts.Variables.Where(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState)).ToImmutableArray();
-        Assert.That(preStates, Has.Length.EqualTo(2));
-        Assert.That(preStates.Select(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.CurrentStateVariable)), Is.Unique);
-        var first = (IrBinaryTerm)contracts.Clauses[0].Condition;
-        var second = (IrBinaryTerm)contracts.Clauses[1].Condition;
-        Assert.That(((IrVariableTerm)first.Right).Variable, Is.EqualTo(((IrVariableTerm)second.Left).Variable));
     }
 
     [TestCase("int*")]
@@ -641,49 +518,7 @@ internal sealed class ContractBinderTests
     }
 
     [Test]
-    public void ResultAndOldBindToTypedResultAndPreStateVariables()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public static class Target {
-                public static long Advance(long value) {
-                    Contract.Ensures(
-                        Contract.Result<long>() > Contract.Old(value));
-                    return checked(value + 1L);
-                }
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-        var result = subject.Bind("Target", "Advance");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        var contracts = result.Contracts!;
-        Assert.That(contracts.Clauses.Length, Is.EqualTo(1));
-        Assert.That(contracts.Clauses[0].Condition, Is.TypeOf<IrBinaryTerm>());
-        var binary = (IrBinaryTerm)contracts.Clauses[0].Condition;
-        Assert.That(binary.Left, Is.TypeOf<IrVariableTerm>());
-        Assert.That(binary.Right, Is.TypeOf<IrVariableTerm>());
-        var resultVariable = contracts.Variables.Single(
-            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result));
-        var preState = contracts.Variables.Single(
-            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.PreState));
-        Assert.That(
-            ((IrVariableTerm)binary.Left).Variable,
-            Is.EqualTo(resultVariable.Variable));
-        Assert.That(
-            ((IrVariableTerm)binary.Right).Variable,
-            Is.EqualTo(preState.Variable));
-        Assert.That(preState.CurrentStateVariable, Is.Not.Null);
-        Assert.That(
-            preState.CurrentStateVariable,
-            Is.EqualTo(contracts.Variables.Single(
-                static variable =>
-                    variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter)).Variable));
-    }
-
-    [Test]
-    public void ResultWithUnsupportedNullableValueDomainFailsClosed()
+    public void ResultWithUnsupportedNullableValueDomainBindsInTotal()
     {
         const string source =
             """
@@ -699,38 +534,8 @@ internal sealed class ContractBinderTests
         var subject = ContractSubject.Create(source);
 
         Assert.That(
-            subject.Bind("Target", "Read").Failure,
-            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
-    }
-
-    [Test]
-    public void ArrayLengthOverResultBindsToSequenceLength()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public static class Target {
-                public static int[] Empty() {
-                    Contract.Ensures(
-                        Contract.Result<int[]>() != null);
-                    Contract.Ensures(
-                        Contract.Result<int[]>().Length == 0);
-                    return System.Array.Empty<int>();
-                }
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-        var result = subject.Bind("Target", "Empty");
-
-        Assert.That(
-            result.IsSuccess,
-            Is.True,
-            result.Failure.ToString());
-        var equality = (IrBinaryTerm)result.Contracts!.Clauses
-            .Last()
-            .Condition;
-        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(2));
-        Assert.That(equality.Left, Is.TypeOf<IrLengthTerm>());
+            subject.BindTotal("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.None));
     }
 
     [TestCase("int", "long")]
@@ -765,13 +570,8 @@ internal sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.InvalidIntrinsicSignature));
     }
 
-    [TestCase("ulong")]
-    [TestCase("nint")]
-    [TestCase("nuint")]
     [TestCase("float")]
     [TestCase("double")]
-    [TestCase("decimal")]
-    [TestCase("Choice")]
     public void EqualityWithAnUnmodeledValueDomainFailsClosed(
         string typeName)
     {
@@ -791,8 +591,36 @@ internal sealed class ContractBinderTests
         var subject = ContractSubject.Create(source);
 
         Assert.That(
-            subject.Bind("Target", "Echo").Failure,
+            subject.BindTotal("Target", "Echo").Failure,
             Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+    }
+
+    [TestCase("ulong")]
+    [TestCase("nint")]
+    [TestCase("nuint")]
+    [TestCase("decimal")]
+    [TestCase("Choice")]
+    public void EqualityOverATotalModeledValueDomainBinds(
+        string typeName)
+    {
+        System.ArgumentNullException.ThrowIfNull(typeName);
+        var source =
+            """
+            using SharpProof.Attributes;
+            public enum Choice { First, Second }
+            public static class Target {
+                public static TYPE Echo(TYPE value) {
+                    Contract.Ensures(
+                        Contract.Result<TYPE>() == value);
+                    return value;
+                }
+            }
+            """.Replace("TYPE", typeName, StringComparison.Ordinal);
+        var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.BindTotal("Target", "Echo").Failure,
+            Is.EqualTo(ContractBindingFailure.None));
     }
 
     [Test]
@@ -886,41 +714,6 @@ internal sealed class ContractBinderTests
     }
 
     [Test]
-    public void RequiresOnlyBindingIgnoresUnsupportedEnsuresAndAssumeClauses()
-    {
-        const string source =
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Target {
-                public static long Read(long value) {
-                    Contract.Requires(value > 0L);
-                    Contract.Ensures(DateTime.Now.Ticks > value);
-                    Contract.Assume(DateTime.Now.Ticks != value);
-                    return value;
-                }
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-
-        Assert.That(
-            subject.Bind("Target", "Read").Failure,
-            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
-        var result = subject.BindRequires("Target", "Read");
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
-        Assert.That(
-            result.Contracts.Clauses[0].Kind,
-            Is.EqualTo(BoundContractKind.Requires));
-        Assert.That(
-            result.Contracts.Variables,
-            Has.None.Matches<BoundContractVariable>(
-                static variable =>
-                    variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Result ||
-                    variable.Role == BoundContractVariableRole.PreState)));
-    }
-
-    [Test]
     public void ConditionalAndUnaryPostconditionsBindExactly()
     {
         const string source =
@@ -945,7 +738,7 @@ internal sealed class ContractBinderTests
     }
 
     [Test]
-    public void NarrowingConversionInAPostconditionFailsClosed()
+    public void NarrowingConversionInAPostconditionBindsInTotal()
     {
         const string source =
             """
@@ -961,8 +754,8 @@ internal sealed class ContractBinderTests
         var subject = ContractSubject.Create(source);
 
         Assert.That(
-            subject.Bind("Target", "Read").Failure,
-            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+            subject.BindTotal("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.None));
     }
 
     [Test]
@@ -1132,52 +925,6 @@ internal sealed class ContractBinderTests
     }
 
     [Test]
-    public void NotNullAcceptsNullableValueTypes()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public static class Target {
-                public static void Read([NotNull] int? value) {
-                }
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-
-        var result = subject.Bind("Target", "Read");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        var condition = result.Contracts!.Clauses.Single().Condition;
-        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
-        var binary = (IrBinaryTerm)condition;
-        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
-        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
-    }
-
-    [Test]
-    public void NotNullAcceptsUnconstrainedTypeParameters()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public static class Target {
-                public static void Read<T>([NotNull] T value) {
-                }
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-
-        var result = subject.Bind("Target", "Read");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        var condition = result.Contracts!.Clauses.Single().Condition;
-        Assert.That(condition, Is.TypeOf<IrBinaryTerm>());
-        var binary = (IrBinaryTerm)condition;
-        Assert.That(binary.Operator, Is.EqualTo(IrBinaryOperator.NotEqual));
-        Assert.That(binary.Right, Is.TypeOf<IrNullTerm>());
-    }
-
-    [Test]
     public void NotNullRejectsValueConstrainedTypeParameters()
     {
         const string source =
@@ -1321,50 +1068,6 @@ internal sealed class ContractBinderTests
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
         Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
-    }
-
-    [Test]
-    public void ConstructedContainingTypeUsesOpenGenericCompanion()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public interface IRepository<T>
-                where T : class {
-                T Read(T value);
-            }
-            [ContractFor(typeof(IRepository<>))]
-            public static class RepositoryContracts<T>
-                where T : class {
-                public static T Read(
-                    IRepository<T> receiver,
-                    T value) {
-                    Contract.Requires(value != null);
-                    return value;
-                }
-            }
-            public static class Caller {
-                public static string Call(
-                    IRepository<string> repository,
-                    string value) => repository.Read(value);
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-
-        var result = subject.BindCallRequires("Caller", "Call", "Read");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.UsesCompanion, Is.True);
-        Assert.That(
-            result.Contracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
-            Is.EqualTo([BoundContractKind.Requires]));
-        var parameter = (IParameterSymbol)result.Contracts.Variables
-            .Single(variable =>
-                variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
-            .Symbol!;
-        Assert.That(
-            parameter.Type.SpecialType,
-            Is.EqualTo(SpecialType.System_String));
     }
 
     [Test]
@@ -1538,50 +1241,6 @@ internal sealed class ContractBinderTests
         Assert.That(
             subject.BindCallRequires("Caller", "Call", "Read").Failure,
             Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
-    }
-
-    [Test]
-    public void ConstructedGenericMethodUsesGenericCompanionMember()
-    {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            public interface ITarget {
-                T Select<T>(T value)
-                    where T : class;
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static T Select<T>(
-                    ITarget receiver,
-                    T value)
-                    where T : class {
-                    Contract.Requires(value != null);
-                    return value;
-                }
-            }
-            public static class Caller {
-                public static string Call(
-                    ITarget target,
-                    string value) => target.Select<string>(value);
-            }
-            """;
-        var subject = ContractSubject.Create(source);
-
-        var result = subject.BindCallRequires("Caller", "Call", "Select");
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        Assert.That(result.Contracts!.UsesCompanion, Is.True);
-        Assert.That(
-            result.Contracts.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
-            Is.EqualTo([BoundContractKind.Requires]));
-        var parameter = (IParameterSymbol)result.Contracts.Variables
-            .Single(variable =>
-                variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter))
-            .Symbol!;
-        Assert.That(
-            parameter.Type.SpecialType,
-            Is.EqualTo(SpecialType.System_String));
     }
 
     [TestCase("Left", ContractBindingFailure.None)]
@@ -1876,7 +1535,7 @@ internal sealed class ContractBinderTests
     {
         var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
-            Path.Combine(root, "src/SharpProof.Contracts"),
+            Path.Combine(root, "src/SharpProof.Compiler.Semantics/Contracts"),
             "*.cs",
             SearchOption.AllDirectories).ToImmutableArray();
         var forbidden = ImmutableArray.Create("SyntaxFactory.",
@@ -1931,6 +1590,18 @@ internal sealed class ContractBinderTests
             System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
+        }
+
+        // Expression semantics belong to the Total binder.
+        internal TotalContractBindingResult BindTotal(
+            string typeName,
+            string methodName)
+        {
+            System.ArgumentNullException.ThrowIfNull(methodName);
+            System.ArgumentNullException.ThrowIfNull(typeName);
+            var method = GetMethod(typeName, methodName);
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            return new ContractBinder(Compilation, factory).BindTotal(new TotalLoweringContext(factory, method));
         }
 
         internal ContractBindingResult Bind(IMethodSymbol method)

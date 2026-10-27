@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);RS1035;RS2008</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\eng\CompilerAdditionalTextStability.cs"
+             Link="CompilerAdditionalTextStability.cs" />
+    <Compile Include="..\..\eng\shared\HashEncoding.cs"
+             Link="HashEncoding.cs" />
+    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
+             Link="ArgumentNullGuard.cs" />
+    <Compile Include="..\..\src\SharpProof.Ir\AtomicFile.cs"
+             Link="AtomicFile.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
+             Link="Polyfills\NotNullAttribute.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+             Link="Polyfills\EmbeddedAttribute.cs" />
+    <Using Include="System.Threading.Tasks" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+  </ItemGroup>
+</Project>

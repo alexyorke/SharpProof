@@ -123,7 +123,7 @@ type's entire range.
 The portable validator accepts `sbyte`, `byte`, `short`, `ushort`, `char`,
 `int`, `uint`, and `long`. Total worker binding also admits `ulong`; that
 does not remove the portable analyzer's SP0024 for an unsupported `ulong`
-closed attribute. See [ClosedContractAttributeValidator.cs](../src/SharpProof.Contracts/ClosedContractAttributeValidator.cs)
+closed attribute. See [ClosedContractAttributeValidator.cs](../src/SharpProof.Compiler.Semantics/Contracts/ClosedContractAttributeValidator.cs)
 and [coverage and limits](coverage-and-limits.md) for the separate boundaries.
 
 `NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters

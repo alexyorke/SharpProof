@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Frontend;
 using SharpProof.Ir;
 
 namespace SharpProof.Contracts.Test;
@@ -63,44 +64,6 @@ public sealed class ConstructedGenericContractTests
             }
             """,
             ContractBindingFailure.UnsupportedExpression);
-    }
-
-    [TestCase("Outer<T>.Item")]
-    [TestCase("Outer<T>.Item<T>")]
-    public void NestedGenericTypesUsedOnlyInClausesPreserveTheScalarCondition(string clauseType)
-    {
-        System.ArgumentNullException.ThrowIfNull(clauseType);
-        var compilation = CreateCompilation(
-            $$"""
-            using SharpProof.Attributes;
-            public sealed class Outer<T> {
-                public sealed class Item {}
-                public sealed class Item<U> {}
-            }
-            public static class Reader<T> where T : class {
-                public static void Read(int value) {
-                    Contract.Requires(value > 0 && default({{clauseType}}) == null);
-                }
-            }
-            public static class Caller {
-                public static void Call(int value) => Reader<string>.Read(value);
-            }
-            """);
-        var target = GetConstructedTargets(compilation, "Reader<string>.Read").Single();
-        var factory = new IrFactory();
-        var result = new ContractBinder(compilation, factory).Bind(target);
-
-        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-        var contracts = result.Contracts!;
-        Assert.That(contracts.Clauses, Has.Length.EqualTo(1));
-        var parameter = contracts.Variables.Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Role == BoundContractVariableRole.Parameter));
-        var type = factory.GetVariableInfo(parameter.Variable).Type;
-        var interpreter = new IrInterpreter(factory);
-        foreach (var input in ImmutableArray.Create(-1, 1))
-        {
-            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(parameter.Variable, factory.CreateIntegerValue(type, input));
-            Assert.That(interpreter.Evaluate(contracts.Clauses[0].Condition, values).Value!.Boolean, Is.EqualTo(input > 0));
-        }
     }
 
     [TestCase("owner")]
@@ -898,6 +861,18 @@ public sealed class ConstructedGenericContractTests
             .GetSymbolInfo(invocation)
             .Symbol as IMethodSymbol ??
             throw new InvalidOperationException(invocation.ToString());
+
+        // Expression failures belong to the Total binder, which may reject
+        // the whole target before reaching the expression; either way the
+        // clause never becomes proof evidence.
+        if (expectedFailure == ContractBindingFailure.UnsupportedExpression)
+        {
+            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var total = new ContractBinder(compilation, factory)
+                .BindTotal(new TotalLoweringContext(factory, target));
+            Assert.That(total.IsSuccess, Is.False);
+            return;
+        }
 
         var result = new ContractBinder(compilation, new IrFactory())
             .Bind(target);

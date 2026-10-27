@@ -3,16 +3,26 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
-    <ProjectReference Include="..\SharpProof.Effects\SharpProof.Effects.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="System.Collections.Immutable" />
+    <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
+    <ProjectReference Include="..\SharpProof.Frontend\SharpProof.Frontend.csproj" />
+    <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
     <Compile Include="..\..\eng\shared\Polyfills\IsExternalInit.cs" Link="Polyfills\IsExternalInit.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />
+    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs" Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
+    <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
-    <InternalsVisibleTo Include="SharpProof.ContractForGenerator.Test" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
   </ItemGroup>

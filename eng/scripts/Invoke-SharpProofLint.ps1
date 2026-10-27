@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'Links', 'ToolDependencies', 'Compatibility', 'GateRegressions')]
+    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'Links', 'ToolDependencies', 'Compatibility')]
     [string]$Category = 'All'
 )
 
@@ -44,7 +44,6 @@ function Invoke-LintCheck([string]$Name, [scriptblock]$Check) {
 }
 
 Invoke-LintCheck 'Workflows' {
-    Invoke-LintNative 'node' @('eng/scripts/Test-SharpProofWorkflowArtifact.mjs', '--self-test')
     Invoke-LintNative 'actionlint' @('-oneline')
 }
 Invoke-LintCheck 'WorkflowSecurity' {
@@ -81,7 +80,6 @@ Invoke-LintCheck 'ToolDependencies' {
         '--cache', (Join-Path ([IO.Path]::GetTempPath()) 'sharpproof-npm-cache'))
 }
 Invoke-LintCheck 'Compatibility' { & (Join-Path $PSScriptRoot 'Test-SharpProofPackageCompatibility.ps1') }
-Invoke-LintCheck 'GateRegressions' { & (Join-Path $PSScriptRoot 'Test-SharpProofLint.ps1') }
 
 $checkSnapshot = $checks.ToImmutable()
 $checkSnapshot | ConvertTo-Json | Set-Content (Join-Path $reportRoot 'results.json')

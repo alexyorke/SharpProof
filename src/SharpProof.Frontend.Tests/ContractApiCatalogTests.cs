@@ -48,7 +48,7 @@ public sealed class ContractApiCatalogTests
         var source = File.ReadAllText(Path.Combine(
             TestRepository.FindRoot(),
             "src/SharpProof.Frontend",
-            "ContractApiMetadata.generated.cs"));
+            "ContractApiMetadata.cs"));
 
         Assert.That(source, Does.Not.Contain("foreach"));
         Assert.That(source, Does.Not.Contain("TryGetMethod"));

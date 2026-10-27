@@ -3,8 +3,6 @@
     <_SharpProofPortablePackagePresent>true</_SharpProofPortablePackagePresent>
     <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</_SharpProofAnalyzerDirectory>
     <_SharpProofAnalyzerDirectory Condition="'$(_SharpProofTestAnalyzerDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-    <_SharpProofContractForGeneratorPathWasDefault Condition="'$(_SharpProofContractForGeneratorPath)' == ''">true</_SharpProofContractForGeneratorPathWasDefault>
-    <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
     <_SharpProofSharedDirectory Condition="'$(_SharpProofSharedDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/shared/netstandard2.0'))</_SharpProofSharedDirectory>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/collector'))</_SharpProofCollectorDirectory>
     <_SharpProofCollectorDirectory Condition="'$(_SharpProofTestCollectorDirectory)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestCollectorDirectory)'))</_SharpProofCollectorDirectory>

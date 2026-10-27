@@ -36,6 +36,6 @@ The worker consumes the sealed compiler artifact, not a source reparse. Current 
 
 `tooling pack -Configuration Release` requires clean exact-commit source, builds the package graph, and validates packed layouts and metadata. The release set contains three main packages and their matching symbol packages at one version.
 
-Package and consumer checks cover entrypoint/layout separation, dependency ranges, source/repository metadata, native closure, and actual analyzer/verifier behavior. Portable consumer checks remain separate. The native verifier matrix uses the exact packaged artifacts on Windows, macOS, and glibc Linux on x64/ARM64, alongside the canonical container. Review the actual job outcomes for the source SHA before making a release qualification claim.
+Package tests cover entrypoint/layout separation, dependency ranges, source/repository metadata, native closure, and actual analyzer/verifier behavior in the canonical container.
 
-The tag workflow downloads the package job's artifacts for consumers and publication and uses `dotnet nuget push --skip-duplicate`. Duplicate skipping does not establish that an existing remote package has identical bytes. See [release process](../eng/release/README.md) for security dependencies and private-preview routing.
+The tag workflow publishes the package job's artifacts with `dotnet nuget push --skip-duplicate`. Duplicate skipping does not establish that an existing remote package has identical bytes. See [release process](../eng/release/README.md).

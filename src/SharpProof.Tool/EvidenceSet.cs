@@ -20,6 +20,23 @@ internal sealed class EvidenceSet
     internal WorkerVerifyResponse Response { get; }
     internal WorkerVerifyRequest Request { get; }
     internal CompilerManifestArtifact Artifact { get; }
+    // Explain accepts a standalone stored result when no sibling evidence exists.
+    internal static WorkerVerifyResponse LoadExplainable(string resultPath, string? requestPath, string? manifestPath, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resultPath);
+        var directory = Path.GetDirectoryName(Path.GetFullPath(resultPath))!;
+        if (requestPath == null && manifestPath == null &&
+            !(File.Exists(Path.Combine(directory, "request.json")) && File.Exists(Path.Combine(directory, "compiler-manifest.json"))))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var response = WorkerProtocolJson.DeserializeResponse(ReadBounded(resultPath, WorkerProtocolJson.MaximumJsonBytes, cancellationToken))
+                ?? throw new InvalidDataException("The result is empty.");
+            RequireValid(WorkerProtocolJson.Validate(response));
+            return response;
+        }
+        return Load(resultPath, requestPath, manifestPath, cancellationToken).Response;
+    }
+
     internal static EvidenceSet Load(string resultPath, string? requestPath, string? manifestPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

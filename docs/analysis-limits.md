@@ -6,7 +6,7 @@ Shipping worker budgets, fixed construction bounds, and repository acceptance fl
 
 The standard single `SharpProof` reference enables full verification automatically with profile `strict`, features `all`, policy `require-proven`, and assumption policy `error`; no activation properties are needed. `SharpProof.Verifier` remains a compatibility entrypoint with the same defaults. Portable-only operation requires an explicit advisory profile, which defaults verification to false; the default installation requires SDK 10. Profiles remain `advisory`, `strict`, or `off`; features remain `effects`, `contracts`, or `all`. An explicit advisory rollout can enable verification deliberately. Strict requires verification; unsupported selected claims remain Unknown/incomplete rather than becoming successful proofs.
 
-Worker defaults are owned by [ProtocolModel.generated.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and mirrored in [SharpProof.Verifier.defaults.props](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
+Worker defaults are owned by [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and mirrored in [SharpProof.Verifier.defaults.props](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
 
 See [configuration](configuration.md) for activation, policy, cache-directory and report-path controls, plus a complete consumer example.
 
@@ -56,9 +56,9 @@ See [preview support](preview-support.md) for local filesystem requirements and 
 
 ## Acceptance-only thresholds
 
-[eng/acceptance/contract.json](../eng/acceptance/contract.json) owns trusted pipeline project/path classifications. [Get-SharpProofProductionInventory.ps1](../eng/scripts/Get-SharpProofProductionInventory.ps1) derives the production coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. [eng/coverage/baseline.json](../eng/coverage/baseline.json) owns aggregate, per-project, and changed-TCB line floors plus the declaration-only coverage list; its project set must match that evaluated universe. The [corpus ratchet](../src/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. These are qualification criteria, not user-configurable worker limits.
+The [corpus ratchet](../tests/SharpProof.Gates/Corpus/unknown-reason-ratchet.json) owns supported-case floors and Unknown caps. [eng/acceptance/contract.json](../eng/acceptance/contract.json) owns automation CPU and wall-time budgets. These are qualification criteria, not user-configurable worker limits.
 
-Use the [container commands](container-development.md) to run the corresponding gates. Coverage needs a valid changed-code comparison ref. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
+Use the [container commands](container-development.md) to run the corresponding gates. PR testing does not implicitly run every nightly, corpus, coverage, or security gate.
 
 ## Outcome behavior at a limit
 

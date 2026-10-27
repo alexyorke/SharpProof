@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.Reporting;
 
@@ -6,17 +8,27 @@ namespace SharpProof.Tool;
 
 internal static class DeveloperCommands
 {
-    internal static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    internal static Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        return RunAsync(args, output, error, SdkProbe.ReadAsync, cancellationToken);
+    }
+
+    internal static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error,
+        Func<CancellationToken, Task<string>> discoverSdk, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(discoverSdk);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (args.Length == 0 || args is ["--help"] or ["-h"])
             {
-                await output.WriteLineAsync(("SharpProof developer tools\n  init --project <csproj> [--verification portable|container] [--apply] [--consumer-image <digest-pinned-image>]\n  doctor --project <csproj> [--verification portable|container]\n  explain --result <json> [--claim <id>]\n  compare --baseline <json> --current <json> [--fail-on-regression]\n  export-test --project <csproj> --result <json> --claim <id> --output <new-directory> [--workspace <root>]\nNamed commands accept --format text|json|markdown (default text). Init previews setup unless --apply is present. Evidence paths: --request <json> --compiler-manifest <json>; comparison also accepts --baseline-request and --baseline-compiler-manifest. Exit codes: 0 success, 1 setup/regression failure, 2 invalid arguments/evidence.").AsMemory(), cancellationToken).ConfigureAwait(false);
+                await output.WriteLineAsync(("SharpProof developer tools\n  init --project <csproj> [--verification portable|container] [--apply] [--consumer-image <digest-pinned-image>]\n  doctor [--project <csproj> [--verification portable|container]]\n  explain --result <json> [--claim <id>]\n  compare --baseline <json> --current <json> [--fail-on-regression]\n  export-test --project <csproj> --result <json> --claim <id> --output <new-directory> [--workspace <root>]\nNamed commands accept --format text|json|markdown (default text). Init previews setup unless --apply is present. Evidence paths: --request <json> --compiler-manifest <json>; comparison also accepts --baseline-request and --baseline-compiler-manifest. Exit codes: 0 success, 1 setup/regression failure, 2 invalid arguments/evidence.").AsMemory(), cancellationToken).ConfigureAwait(false);
                 return 0;
             }
 
@@ -41,6 +53,17 @@ internal static class DeveloperCommands
                     presentation = CommandPresentation.CreateMessage("init", exitCode, rendered.ToString(),
                         "Project setup plan; no restore, build, proof, or consumer execution.", generatedFiles: generated);
                     break;
+                case "doctor" when !options.Has("project"):
+                    options.Allow("format");
+                    var sdk = (await discoverSdk(cancellationToken).ConfigureAwait(false)).Trim();
+                    await rendered.WriteLineAsync(FormattableString.Invariant(
+                        $"SDK={sdk}; runtime={Environment.Version}; RID={RuntimeInformation.RuntimeIdentifier}; OS={RuntimeInformation.OSArchitecture}; process={RuntimeInformation.ProcessArchitecture}.").AsMemory(), cancellationToken).ConfigureAwait(false);
+                    await rendered.WriteLineAsync("SDK discovery only; no project evaluation, restore, build, or solver execution.".AsMemory(), cancellationToken).ConfigureAwait(false);
+                    await rendered.WriteLineAsync("Build your consumer with SharpProof, or pass --project, to check its actual configuration and native solver.".AsMemory(), cancellationToken).ConfigureAwait(false);
+                    exitCode = 0;
+                    presentation = CommandPresentation.CreateMessage("doctor", exitCode, rendered.ToString(),
+                        "SDK discovery only; no project evaluation, restore, build, or solver execution.");
+                    break;
                 case "doctor":
                     options.Allow("project", "verification", "format");
                     exitCode = await SetupDoctor.RunAsync(options.Required("project"), options.Get("verification"), rendered, cancellationToken).ConfigureAwait(false);
@@ -48,10 +71,10 @@ internal static class DeveloperCommands
                     break;
                 case "explain":
                     options.Allow("result", "request", "compiler-manifest", "claim", "format");
-                    var evidence = EvidenceSet.Load(options.Required("result"), options.Get("request"), options.Get("compiler-manifest"), cancellationToken);
-                    VerificationReport.Write(rendered, evidence.Response, options.Get("claim"));
+                    var explained = EvidenceSet.LoadExplainable(options.Required("result"), options.Get("request"), options.Get("compiler-manifest"), cancellationToken);
+                    VerificationReport.Write(rendered, explained, options.Get("claim"));
                     exitCode = 0;
-                    presentation = CommandPresentation.CreateExplain(evidence.Response, options.Get("claim"), exitCode, rendered.ToString());
+                    presentation = CommandPresentation.CreateExplain(explained, options.Get("claim"), exitCode, rendered.ToString());
                     break;
                 case "compare":
                     options.Allow("baseline", "current", "request", "compiler-manifest", "baseline-request", "baseline-compiler-manifest", "fail-on-regression", "format");
@@ -134,7 +157,7 @@ internal static class DeveloperCommands
             return exitCode;
         }
         catch (OperationCanceledException) { return 130; }
-        catch (Exception exception) when (exception is ArgumentException or IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException or BadImageFormatException)
+        catch (Exception exception) when (exception is ArgumentException or IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException or BadImageFormatException or Win32Exception or TimeoutException)
         {
             await error.WriteLineAsync(("SharpProof: " + exception.Message).AsMemory(), cancellationToken).ConfigureAwait(false);
             return 2;

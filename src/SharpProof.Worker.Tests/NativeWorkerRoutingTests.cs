@@ -525,7 +525,7 @@ internal sealed class NativeWorkerRoutingTests
     [TestCase(1, false)]
     [TestCase(2, false)]
     [TestCase(1, true)]
-    public async Task NativeWorkerVerifiesLegacyFailedCallablesAndReusesValidatedCache(int parallelism, bool cacheEnabled)
+    public async Task NativeWorkerVerifiesTotalCallablesAndReusesValidatedCache(int parallelism, bool cacheEnabled)
     {
         using var project = new ShadowTestProject("""
             using SharpProof.Attributes;
@@ -542,7 +542,7 @@ internal sealed class NativeWorkerRoutingTests
             }
             """, cacheEnabled);
         project.Request.Budgets.MaxParallelism = parallelism;
-        Assert.That(project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal))).IsSuccess, Is.False);
+        Assert.That(project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal))).IsSuccess, Is.True);
         Assert.That(SharpProofWorker.CountSolverTargets(project.Snapshot.Callables), Is.EqualTo(2));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         for (var run = 0; run < 2; run++)

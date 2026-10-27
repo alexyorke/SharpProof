@@ -64,12 +64,6 @@
       "sharpproof.ir": {
         "type": "Project"
       },
-      "sharpproof.reporting": {
-        "type": "Project",
-        "dependencies": {
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
-        }
-      },
       "sharpproof.specs": {
         "type": "Project",
         "dependencies": {

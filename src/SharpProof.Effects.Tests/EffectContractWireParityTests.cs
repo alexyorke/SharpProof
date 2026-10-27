@@ -64,8 +64,8 @@ internal sealed class EffectContractWireParityTests
     {
         var source = File.ReadAllText(Path.Combine(
             TestRepository.FindRoot(),
-            "src/SharpProof.Effects",
-            "EffectContractMappings.generated.cs"));
+            "src/SharpProof.Compiler.Semantics/Effects",
+            "EffectContractMappingCatalog.cs"));
         var syntaxTree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.Preview));

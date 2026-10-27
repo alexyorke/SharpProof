@@ -44,10 +44,9 @@ Effect contracts separate read/write regions, allocations, exceptions, capabilit
 
 ## API specifications
 
-The [automatic .NET API inventory](../eng/api-coverage/README.md) compares the pinned
+CI resolves the default catalog and audited intrinsics against the pinned
 .NET 10 framework surface (`Microsoft.NETCore.App.Ref` 10.0.13, `net10.0`)
-with default catalog and audited intrinsic evidence. CI
-reports API additions/removals and fails on changes to reviewed support evidence.
+and requires executed runtime evidence for every modeled facet.
 This is separate from executable line coverage and does not imply full API semantics.
 The same gate publishes an API/facet-to-test matrix and requires executed behavioral
 checks and rejection of deliberately wrong claims for each modeled default-catalog
@@ -55,11 +54,11 @@ facet/postcondition and each inventoried intrinsic. Missing or failing evidence 
 
 The default catalog is a closed reviewed set of exact member matches and approved assembly evidence. It does not trust arbitrary same-named framework members. Its facets must be interpreted independently: an allocation or exception facet does not establish a result relation.
 
-See the [catalog](api-spec-catalog.generated.md) and [DefaultApiSpecCatalog.generated.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The declarative C# source and Markdown projection are hand-maintained; no retired generator is required to update them.
+See the [catalog](api-spec-catalog.md) and [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs). The declarative C# source and the Markdown reference are both hand-maintained.
 
 Specification identity, runtime domains, exception hierarchy, and result relationships participate in compiler evidence and worker validation. A modeled API result may remain unreplayable when no concrete evaluator can execute that boundary.
 
-`SharpProofSpecificationPacks` enables embedded reviewed relational packs by semicolon-delimited ID. The current [pack catalog](../src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs) contains `dotnet.scalar@1`, including the Int32 `Math.Max` result relation. Packs are opt-in; an effect/exception catalog entry alone does not imply that relation. Unknown IDs, duplicate IDs, and empty entries in a nonempty list fail closed.
+`SharpProofSpecificationPacks` enables embedded reviewed relational packs by semicolon-delimited ID. The current [pack catalog](../src/SharpProof.Specs/RelationalSpecPackCatalog.cs) contains `dotnet.scalar@1`, including the Int32 `Math.Max` result relation. Packs are opt-in; an effect/exception catalog entry alone does not imply that relation. Unknown IDs, duplicate IDs, and empty entries in a nonempty list fail closed.
 
 ## Outcomes, accountability, and cache boundary
 
@@ -79,6 +78,6 @@ Complete eligible responses can be cached, including stable semantic abstentions
 | Corpus and metamorphic gates | Reviewed support classification, semantic outcomes, invariant diagnostics |
 | Coverage gate | Tracked production inventory, executable coverage, changed trusted-code floor |
 
-[Corpus documentation](../src/SharpProof.Gates/README.md) explains its source pin, classifications, and ratchet. [Golden documentation](../tests/golden/README.md) explains updates. Numeric floors are owned by checked-in acceptance data and must not be relaxed to hide unsupported behavior.
+[Corpus documentation](../tests/SharpProof.Gates/README.md) explains its source pin, classifications, and ratchet. [Golden documentation](../tests/golden/README.md) explains updates. Numeric floors are owned by checked-in acceptance data and must not be relaxed to hide unsupported behavior.
 
 Passing these gates verifies exercised cases. It is not a completeness claim about C# or all methods in an upstream library.

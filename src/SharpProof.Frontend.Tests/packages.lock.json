@@ -144,12 +144,20 @@
       "sharpproof.attributes": {
         "type": "Project"
       },
-      "sharpproof.contracts": {
+      "sharpproof.compiler.semantics": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
+          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
           "SharpProof.Frontend": "[1.0.0-preview.1, )",
+          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.dataflow": {
+        "type": "Project",
+        "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -166,6 +174,12 @@
         "type": "Project",
         "dependencies": {
           "System.Collections.Immutable": "[9.0.18, )"
+        }
+      },
+      "sharpproof.specs": {
+        "type": "Project",
+        "dependencies": {
+          "SharpProof.Ir": "[1.0.0-preview.1, )"
         }
       },
       "Microsoft.CodeAnalysis.Analyzers": {

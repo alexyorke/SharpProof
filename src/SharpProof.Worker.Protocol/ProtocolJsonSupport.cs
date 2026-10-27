@@ -66,6 +66,10 @@ internal static partial class WorkerProtocolJson
             string prefix = "")
         {
             rules = RepositoryParameterGuard.NotNull(rules, nameof(rules));
+            if (value is null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
             foreach (var rule in rules)
             {
                 Check(rule.IsValid(value), prefix + rule.Code);

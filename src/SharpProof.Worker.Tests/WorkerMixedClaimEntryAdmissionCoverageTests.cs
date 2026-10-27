@@ -33,7 +33,7 @@ internal sealed partial class WorkerTests
             Assert.That(preparation.TotalEntry == null, Is.EqualTo(decimalEntry));
             Assert.That(preparation.IsSuccess, Is.EqualTo(!decimalEntry));
             Assert.That(preparation.FailureReason, Is.EqualTo(decimalEntry
-                ? WorkerClaimReason.UnsupportedExpression : WorkerClaimReason.None));
+                ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
         }
 
         using var project = TestProject.Create(source);
@@ -49,7 +49,7 @@ internal sealed partial class WorkerTests
             Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(decimalEntry
                 ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven), WorkerProtocolJson.SerializeResponse(response));
             Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(decimalEntry
-                ? WorkerClaimReason.UnsupportedExpression : WorkerClaimReason.None));
+                ? WorkerClaimReason.UnsupportedBody : WorkerClaimReason.None));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }

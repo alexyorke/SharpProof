@@ -1,6 +1,4 @@
 using System.Collections.Immutable;
-using System.Security.Cryptography;
-using System.Text;
 using SharpProof.Ir;
 
 namespace SharpProof.Specs;
@@ -24,13 +22,13 @@ internal static class ResourceTaskStorageCatalog
     internal static ImmutableArray<ResourceStorageKind> JoinFields { get; } =
         [.. TaskFields, ResourceStorageKind.Reference, ResourceStorageKind.Word32];
 
-    internal static string ContentSha256 { get; } = Hash(Model + "\n" + ResourceMetadataCatalog.Runtime + "\n" + EvidenceSource + "\n" +
+    internal static string ContentSha256 { get; } = ResourceCatalogIdentity.Sha256Upper(Model + "\n" + ResourceMetadataCatalog.Runtime + "\n" + EvidenceSource + "\n" +
         string.Join(",", TaskFields) + "\n" + string.Join(",", JoinFields) +
         "\nnormal-successful-join;isolated-void-primitive-children;all-overlap-orders;per-root-invocation\n" +
         "default-or-suppressed-execution-context;no-debugger-or-tracing-instrumentation\n" +
         "owned-managed-carriers-only;excludes-scheduler-global-initialization-and-caller-induced-storage\n" +
         "one-Task-per-child;one-WhenAll-promise;single-private-continuation-per-child\n");
-    internal static string ConfiguredContentSha256 { get; } = Hash(ConfiguredModel + "\n" + ContentSha256 + "\n" + FutureSource + "\n" + BuilderSource +
+    internal static string ConfiguredContentSha256 { get; } = ResourceCatalogIdentity.Sha256Upper(ConfiguredModel + "\n" + ContentSha256 + "\n" + FutureSource + "\n" + BuilderSource +
         "\nstandard-builder;single-configured-await-false;Task-of-empty-VoidTaskResult\n" +
         "at-most-one-box;embedded-compiler-state;context-reuses-Task-state-field\n" +
         "at-most-one-MoveNext-Action-and-one-static-ContextCallback;no-weak-debugger-box\n");
@@ -41,13 +39,6 @@ internal static class ResourceTaskStorageCatalog
         assembly = ArgumentNullGuard.NotNull(assembly, nameof(assembly));
         return "resource-metadata-" + (configured ? ConfiguredModel : Model) + ":" +
             (configured ? ConfiguredContentSha256 : ContentSha256) + ":" + Witness + ":" + EvidenceSource +
-            ":owner:" + Hash(callableId + "\n" + assembly);
-    }
-
-    private static string Hash(string value)
-    {
-        value = ArgumentNullGuard.NotNull(value, nameof(value));
-        using var hash = SHA256.Create();
-        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-", string.Empty);
+            ":owner:" + ResourceCatalogIdentity.OwnerHash(callableId, assembly);
     }
 }

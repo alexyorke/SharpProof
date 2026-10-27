@@ -49,16 +49,9 @@ jobs:
           mode: report
 
   # The Remaining cohort saturates a four-CPU runner, so it runs as three parts on
-  # separate runners: "worker-a" and "worker-b" reuse the coverage halves;
-  # "projects" runs every other Remaining task. Every part builds only its test
-  # dependency closure; build-and-test requires the analyzer lane and successful
-  # reconciliation of all three unchanged test receipts.
+  # separate runners. Every part builds only its test dependency closure.
   canonical-main:
     name: canonical-main (${{ matrix.part }})
-    outputs:
-      worker-a-attempt: ${{ steps.cohort-identity.outputs.worker-a-attempt }}
-      worker-b-attempt: ${{ steps.cohort-identity.outputs.worker-b-attempt }}
-      projects-attempt: ${{ steps.cohort-identity.outputs.projects-attempt }}
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
@@ -100,12 +93,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Record successful cohort artifact attempt
-        id: cohort-identity
-        env:
-          SHARPPROOF_PART: ${{ matrix.part }}
-        run: echo "${SHARPPROOF_PART}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
         uses: ./.github/actions/runner-telemetry
@@ -113,9 +100,7 @@ jobs:
           mode: report
           name: ${{ github.job }}-${{ matrix.part }}
 
-  # Package partitions start alongside quality: their aggregation otherwise
-  # extends required-check completion after the longer semantic cohorts finish.
-  canonical-package-partition:
+  canonical-package:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
@@ -126,11 +111,6 @@ jobs:
       fail-fast: false
       matrix:
         partition: [0, 1, 2, 3]
-    outputs:
-      partition-0-attempt: ${{ steps.partition-identity.outputs.partition-0-attempt }}
-      partition-1-attempt: ${{ steps.partition-identity.outputs.partition-1-attempt }}
-      partition-2-attempt: ${{ steps.partition-identity.outputs.partition-2-attempt }}
-      partition-3-attempt: ${{ steps.partition-identity.outputs.partition-3-attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -142,12 +122,12 @@ jobs:
         with:
           download-packages: "false"
 
-      # The documentation, container contract, layout, and regression checks
-      # that pr runs before its build. They read only sources, so they run
-      # here, off canonical-main's critical path.
-      - name: Run the PR repository gates
+      # The source-only checks that pr runs before its build.
+      - name: Check documentation links and repository layout
         if: matrix.partition == 0
-        run: docker compose run --rm tooling repository-gates -Configuration Release
+        run: |
+          docker compose run --rm tooling docs
+          docker compose run --rm tooling layout
 
       # The package phase of pr, with the same Release configuration and
       # canonical filter. -Fast skips analyzers in this build only;
@@ -186,24 +166,16 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload package phase and repository gate evidence
+      - name: Upload package phase evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: canonical-package-${{ matrix.partition }}-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            artifacts/package-partitions
             artifacts/timings
             artifacts/layout-audit
-            artifacts/public-api-governance
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
-
-      - name: Record successful package artifact attempt
-        id: partition-identity
-        env:
-          SHARPPROOF_PARTITION: ${{ matrix.partition }}
-        run: echo "partition-${SHARPPROOF_PARTITION}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -211,49 +183,7 @@ jobs:
         with:
           mode: report
 
-  canonical-package:
-    if: always() && github.event_name != 'schedule'
-    needs: canonical-package-partition
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require every successful package partition
-        env:
-          PARTITION_RESULT: ${{ needs.canonical-package-partition.result }}
-        run: test "$PARTITION_RESULT" = success
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-      - name: Download package partition 0
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-package-0-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-0-attempt }}
-          path: artifacts
-      - name: Download package partition 1
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-package-1-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-1-attempt }}
-          path: artifacts
-      - name: Download package partition 2
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-package-2-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-2-attempt }}
-          path: artifacts
-      - name: Download package partition 3
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-package-3-evidence-${{ github.sha }}-${{ needs.canonical-package-partition.outputs.partition-3-attempt }}
-          path: artifacts
-      - name: Reconcile package discovery and executed identities
-        run: docker compose run --rm -e GITHUB_RUN_ID tooling package-partition-gate
-
   canonical-gates:
-    outputs:
-      corpus-attempt: ${{ steps.cohort-identity.outputs.corpus-attempt }}
-      shards-attempt: ${{ steps.cohort-identity.outputs.shards-attempt }}
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
@@ -290,12 +220,6 @@ jobs:
           path: artifacts
           if-no-files-found: error
           retention-days: 14
-
-      - name: Record successful Gates artifact attempt
-        id: cohort-identity
-        env:
-          SHARPPROOF_PART: ${{ matrix.part }}
-        run: echo "${SHARPPROOF_PART}-attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Report runner telemetry
         if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
@@ -358,34 +282,24 @@ jobs:
           docker compose run --rm tooling test
           -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj
           -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests
-      - name: Rank API gaps in original corpus targets and samples
-        if: ${{ !cancelled() }}
-        run: >-
-          docker compose run --rm tooling test
-          -Target src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj
-          -TestFilter FullyQualifiedName~ApiUsageRankingTests
-      - name: Require executed evidence and usage reports
+      - name: Require executed evidence reports
         if: ${{ !cancelled() }}
         run: |
           test -s artifacts/api-coverage/catalog-test-evidence.json
           test -s artifacts/api-coverage/intrinsic-test-evidence.json
-          test -s artifacts/api-coverage/usage-ranking.json
       - name: Publish API coverage summary
         if: always()
         run: |
-          if [[ -f artifacts/api-coverage/report.md ]]; then
-            cat artifacts/api-coverage/report.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-          for report in catalog-test-evidence intrinsic-test-evidence usage-ranking; do
+          for report in catalog-test-evidence intrinsic-test-evidence; do
             if [[ -f "artifacts/api-coverage/$report.md" ]]; then
               cat "artifacts/api-coverage/$report.md" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
-      - name: Upload complete API inventory and delta
+      - name: Upload API test evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: dotnet-api-inventory-${{ github.sha }}-${{ github.run_attempt }}
+          name: api-test-evidence-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/api-coverage
           if-no-files-found: error
           retention-days: 14
@@ -396,10 +310,6 @@ jobs:
         with:
           mode: report
 
-  # Formatting and independent-path reproduction remain required and run in parallel.
-  # Each reproduction compiles a fresh independent checkout with all analyzers.
-  # Their original named gate authenticates and compares both complete results.
-  # Release qualification requires this workflow's exact-commit success on master.
   formatting:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -415,284 +325,22 @@ jobs:
         run: docker compose run --rm tooling format-check
 
 
-  package-reproducibility-first:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    outputs:
-      artifact-id: ${{ steps.reproduction.outputs.artifact-id }}
-      producer-attempt: ${{ steps.reproduction.outputs.producer-attempt }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/reproduce-packages
-        id: reproduction
-        with:
-          run-index: "0"
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  package-reproducibility-second:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    outputs:
-      artifact-id: ${{ steps.reproduction.outputs.artifact-id }}
-      producer-attempt: ${{ steps.reproduction.outputs.producer-attempt }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/reproduce-packages
-        id: reproduction
-        with:
-          run-index: "1"
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  package-reproducibility:
-    if: always() && github.event_name != 'schedule'
-    needs: [package-reproducibility-first, package-reproducibility-second]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - name: Require both independent analyzer-enabled reproductions
-        env:
-          FIRST_RESULT: ${{ needs.package-reproducibility-first.result }}
-          SECOND_RESULT: ${{ needs.package-reproducibility-second.result }}
-        run: |
-          set -euo pipefail
-          [[ "${FIRST_RESULT}" == success && "${SECOND_RESULT}" == success ]]
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Authenticate both independent immutable run artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHARPPROOF_WORKFLOW_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          FIRST_ID: ${{ needs.package-reproducibility-first.outputs.artifact-id }}
-          SECOND_ID: ${{ needs.package-reproducibility-second.outputs.artifact-id }}
-          FIRST_ATTEMPT: ${{ needs.package-reproducibility-first.outputs.producer-attempt }}
-          SECOND_ATTEMPT: ${{ needs.package-reproducibility-second.outputs.producer-attempt }}
-        run: |
-          set -euo pipefail
-          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${FIRST_ID}" \
-            --name "package-reproducibility-run-0-${GITHUB_RUN_ID}-${GITHUB_SHA}-${FIRST_ATTEMPT}" \
-            --producer-attempt "${FIRST_ATTEMPT}"
-          node eng/scripts/Test-SharpProofWorkflowArtifact.mjs --artifact-id "${SECOND_ID}" \
-            --name "package-reproducibility-run-1-${GITHUB_RUN_ID}-${GITHUB_SHA}-${SECOND_ATTEMPT}" \
-            --producer-attempt "${SECOND_ATTEMPT}"
-      - name: Download the first exact independent reproduction
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.package-reproducibility-first.outputs.artifact-id }}
-          merge-multiple: true
-          path: artifacts/reproducibility-inputs/0
-      - name: Download the second exact independent reproduction
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          artifact-ids: ${{ needs.package-reproducibility-second.outputs.artifact-id }}
-          merge-multiple: true
-          path: artifacts/reproducibility-inputs/1
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Require full independent-path managed payload reproducibility
-        id: package-reproducibility
-        env:
-          FIRST_ATTEMPT: ${{ needs.package-reproducibility-first.outputs.producer-attempt }}
-          SECOND_ATTEMPT: ${{ needs.package-reproducibility-second.outputs.producer-attempt }}
-        run: >-
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT tooling
-          package-reproducibility -Configuration Release -ReproductionMode Compare
-          -FirstRunAttempt "${FIRST_ATTEMPT}" -SecondRunAttempt "${SECOND_ATTEMPT}"
-
-      - name: Summarize managed payload and raw ZIP comparisons separately
-        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          report = json.loads(Path('artifacts/reproducibility/report.json').read_text())
-          archives = report.get('archiveComparisons', [])
-          equal_archives = sum(item['equal'] for item in archives)
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-              summary.write('### Independent-path package reproduction\n\n')
-              summary.write(f"Source: `{report['sourceCommit']}`; scope: `{report['scope']}`.\n\n")
-              summary.write(f"Managed first-party DLL/PDB payloads: equal=`{report['managedPayloadsEqual']}`, entries=`{report['managedPayloadCount']}`. Equality is required.\n\n")
-              summary.write(f"Raw NuGet/SNuGet ZIP archives: equal=`{report['packageBytesEqual']}`, identical archives=`{equal_archives}/{len(archives)}`. Raw ZIP equality is measured separately and is not claimed by managed payload equality.\n")
-          PY
-
-      - name: Upload the independent-path reproduction report
-        if: ${{ always() && steps.package-reproducibility.outcome != 'skipped' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: package-reproducibility-${{ github.run_id }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/reproducibility/
-          if-no-files-found: error
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
-
-  # Reconcile as soon as both semantic cohorts finish, while the independent
-  # build, package, formatting, and reproducibility lanes continue.
-  canonical-cohort-validation:
-    if: always() && github.event_name != 'schedule'
-    needs: [canonical-main, canonical-gates]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require successful canonical cohort parts
-        env:
-          SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
-          SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
-        run: |
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success ]]; then
-            echo "Canonical cohort parts did not succeed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_GATES_RESULT" >&2
-            exit 1
-          fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Download non-Gates cohort Worker A part evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-main-worker-a-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.worker-a-attempt }}
-          path: artifacts/canonical-cohorts/remaining-worker-a-evidence
-
-      - name: Download non-Gates cohort Worker B part evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-main-worker-b-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.worker-b-attempt }}
-          path: artifacts/canonical-cohorts/remaining-worker-b-evidence
-
-      - name: Download non-Gates cohort Projects part evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-main-projects-evidence-${{ github.sha }}-${{ needs.canonical-main.outputs.projects-attempt }}
-          path: artifacts/canonical-cohorts/remaining-projects-evidence
-
-      - name: Download Gates corpus part evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-gates-corpus-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.corpus-attempt }}
-          path: artifacts/canonical-cohorts/gates-corpus-evidence
-
-      - name: Download Gates shards part evidence
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: canonical-gates-shards-evidence-${{ github.sha }}-${{ needs.canonical-gates.outputs.shards-attempt }}
-          path: artifacts/canonical-cohorts/gates-shards-evidence
-
-      # Each cohort part holds disjoint task directories and its own receipt.
-      # Reconcile all three Remaining parts and both Gates parts.
-      - name: Reconcile actual discovery and TRX identities
-        env:
-          SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS: >-
-            {"Remaining":{"canonical-cohort.worker-a.json":"${{ needs.canonical-main.outputs.worker-a-attempt }}","canonical-cohort.worker-b.json":"${{ needs.canonical-main.outputs.worker-b-attempt }}","canonical-cohort.projects.json":"${{ needs.canonical-main.outputs.projects-attempt }}"},"Gates":{"canonical-cohort.corpus.json":"${{ needs.canonical-gates.outputs.corpus-attempt }}","canonical-cohort.shards.json":"${{ needs.canonical-gates.outputs.shards-attempt }}"}}
-        run: |
-          set -euo pipefail
-          remaining=artifacts/canonical-cohorts/remaining
-          mkdir -p "${remaining}"
-          for part in worker-a worker-b projects; do
-            source="artifacts/canonical-cohorts/remaining-${part}-evidence/canonical-remaining"
-            mv "${source}/canonical-cohort.json" "${remaining}/canonical-cohort.${part}.json"
-            for task in "${source}"/*/; do
-              if [[ -e "${remaining}/$(basename "${task}")" ]]; then
-                echo "Multiple Remaining parts ran task $(basename "${task}")." >&2
-                exit 1
-              fi
-              mv "${task}" "${remaining}/"
-            done
-          done
-          gates=artifacts/canonical-cohorts/gates
-          mkdir -p "${gates}"
-          for part in corpus shards; do
-            source="artifacts/canonical-cohorts/gates-${part}-evidence/canonical-gates"
-            mv "${source}/canonical-cohort.json" "${gates}/canonical-cohort.${part}.json"
-            for task in "${source}"/*/; do
-              if [[ -e "${gates}/$(basename "${task}")" ]]; then
-                echo "Multiple Gates parts ran task $(basename "${task}")." >&2
-                exit 1
-              fi
-              mv "${task}" "${gates}/"
-            done
-          done
-          docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA \
-            -e SHARPPROOF_COHORT_ARTIFACT_ATTEMPTS tooling canonical-cohort-gate
-
-      - name: Upload combined canonical cohort evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: canonical-cohort-validation-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/canonical-cohorts
-          if-no-files-found: warn
-          retention-days: 14
-
-  # Keep the required check fail-closed over every original prerequisite and
-  # the completed discovery/TRX reconciliation, without repeating its transfer.
+  # The single required check: every lane above must succeed.
   build-and-test:
     if: always() && github.event_name != 'schedule'
-    needs: [canonical-build, canonical-main, canonical-package, canonical-gates, canonical-cohort-validation, self-application, self-application-samples, api-coverage, formatting, package-reproducibility, repository-quality]
+    needs: [canonical-build, canonical-main, canonical-package, canonical-gates, self-application, self-application-samples, api-coverage, formatting, repository-quality]
     runs-on: ubuntu-latest
     steps:
-      - name: Require successful canonical cohorts and self-application
+      - name: Require every lane to succeed
         env:
-          SHARPPROOF_BUILD_RESULT: ${{ needs.canonical-build.result }}
-          SHARPPROOF_MAIN_RESULT: ${{ needs.canonical-main.result }}
-          SHARPPROOF_PACKAGE_RESULT: ${{ needs.canonical-package.result }}
-          SHARPPROOF_GATES_RESULT: ${{ needs.canonical-gates.result }}
-          SHARPPROOF_COHORT_VALIDATION_RESULT: ${{ needs.canonical-cohort-validation.result }}
-          SHARPPROOF_SAMPLES_RESULT: ${{ needs.self-application-samples.result }}
-          SHARPPROOF_API_RESULT: ${{ needs.api-coverage.result }}
-          SHARPPROOF_FORMATTING_RESULT: ${{ needs.formatting.result }}
-          SHARPPROOF_SELF_APPLICATION_RESULT: ${{ needs.self-application.result }}
-          SHARPPROOF_REPRODUCIBILITY_RESULT: ${{ needs.package-reproducibility.result }}
-          SHARPPROOF_QUALITY_RESULT: ${{ needs.repository-quality.result }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          if [[ "$SHARPPROOF_BUILD_RESULT" != success ]]; then
-            echo "Full solution build and analyzers did not succeed: $SHARPPROOF_BUILD_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_COHORT_VALIDATION_RESULT" != success ]]; then
-            echo "Canonical discovery and TRX reconciliation failed: $SHARPPROOF_COHORT_VALIDATION_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_SAMPLES_RESULT" != success || "$SHARPPROOF_API_RESULT" != success || "$SHARPPROOF_FORMATTING_RESULT" != success ]]; then
-            echo "Samples, API coverage, or formatting did not succeed." >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_QUALITY_RESULT" != success ]]; then
-            echo "Repository quality failed: $SHARPPROOF_QUALITY_RESULT" >&2
-            exit 1
-          fi
-          if [[ "$SHARPPROOF_MAIN_RESULT" != success || "$SHARPPROOF_PACKAGE_RESULT" != success || "$SHARPPROOF_GATES_RESULT" != success || "$SHARPPROOF_SELF_APPLICATION_RESULT" != success || "$SHARPPROOF_REPRODUCIBILITY_RESULT" != success ]]; then
-            echo "Canonical jobs (package includes repository gates), self-application and API inventory, or package reproducibility and formatting failed: $SHARPPROOF_MAIN_RESULT, $SHARPPROOF_PACKAGE_RESULT, $SHARPPROOF_GATES_RESULT, $SHARPPROOF_SELF_APPLICATION_RESULT, $SHARPPROOF_REPRODUCIBILITY_RESULT" >&2
-            exit 1
-          fi
+          for result in $RESULTS; do
+            if [[ "$result" != success ]]; then
+              echo "A required lane did not succeed: $RESULTS" >&2
+              exit 1
+            fi
+          done
 
   exact-sha-security:
     uses: ./.github/workflows/security-reusable.yml

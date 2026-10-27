@@ -215,7 +215,7 @@ internal sealed partial class NativeSpecifiedCallTests
     private static async Task<string> CorpusSwapDeclaration()
     {
         using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            TestRepository.FindRoot(), "src/SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
+            TestRepository.FindRoot(), "tests/SharpProof.Gates/Corpus/oss-methods.json"), TestContext.CurrentContext.CancellationToken));
         var method = document.RootElement.GetProperty("methods").EnumerateArray().Single(item => item.GetProperty("id").GetString() == "OSS0002");
         var file = document.RootElement.GetProperty("files").EnumerateArray().Single(item =>
             item.GetProperty("sourceId").GetString() == method.GetProperty("sourceId").GetString() &&

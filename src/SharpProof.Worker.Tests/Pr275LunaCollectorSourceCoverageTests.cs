@@ -39,7 +39,7 @@ public sealed class Pr275LunaCollectorSourceCoverageTests
             .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(preparation.IsSuccess, Is.False);
-        Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        Assert.That(preparation.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         Assert.That(preparation.Total, Is.Null);
     }
 

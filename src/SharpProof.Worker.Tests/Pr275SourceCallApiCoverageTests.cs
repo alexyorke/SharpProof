@@ -45,7 +45,7 @@ public sealed class Pr275SourceCallApiCoverageTests
         }
         Assert.That(approximate, Is.False);
         var syntax = caller.DeclaringSyntaxReferences.Single().GetSyntax(TestContext.CurrentContext.CancellationToken);
-        var callerGraph = SharpProof.Compiler.Semantics.TotalBodyLowering.CreateGraph(syntax, caller,
+        var callerGraph = SharpProof.Frontend.TotalSourceCallSession.CreateGraph(syntax, caller,
             compilation.GetSemanticModel(syntax.SyntaxTree), TestContext.CurrentContext.CancellationToken);
         var callerContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
         var callerLowered = SharpProof.Compiler.Semantics.TotalBodyLowering.Lower(compilation, callerGraph!, callerContext,

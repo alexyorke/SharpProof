@@ -104,8 +104,7 @@ Source calls share the root operation/depth budget. Unproved recursion returns
 `RecursiveCostUnknown`, unspecified metadata calls return `OpaqueCall`, and unsupported
 dispatch/signatures return `UnsupportedCall`. A possible static type initializer
 returns `CallTypeInitializationUnknown`; the callee body alone cannot establish
-its allocation or callback costs. These boundaries will be extended according to
-the [full implementation roadmap](resource-analysis-roadmap.md).
+its allocation or callback costs.
 
 Static void tail recursion is supported for a first `if (n <= 0) return` guard,
 a final self-call using `n - positiveConstant` or `n / divisorGreaterThanOne`,
@@ -171,9 +170,6 @@ include `UnknownReason`.
 `ResourceAssumptions` (one provenance record per line) and
 `ResourceMetadataCatalogSha256`. Unknown results publish neither numeric bounds
 nor partial metadata proof assumptions.
-
-See [milestone progress](resource-bounds-progress.md) for verification evidence,
-implementation status, and subsequent work.
 
 ## Native resource contracts
 
@@ -259,7 +255,7 @@ An internal layout kernel now models fresh source-owned instance storage under
 8-byte pointers. Typed shapes describe arrays, object fields, UTF-16 strings,
 primitive boxing, delegates, and one fresh closure frame plus delegate. The
 reviewed layout constants are pinned to the runtime source linked in the
-[roadmap](resource-analysis-roadmap.md#quantitative-memory-implementation-plan).
+[CoreCLR object layout](https://github.com/dotnet/runtime/blob/b9a49e4a6d3a444a3685e318c74a7892d01873f7/src/coreclr/vm/object.h).
 
 Array/string storage uses aligned header-plus-payload arithmetic. Ordinary
 non-overlapping fields use a packed lower bound and a conservative slot upper

@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
+using SharpProof.Frontend;
 using SharpProof.Ir;
 
 namespace SharpProof.Contracts.Test;
@@ -72,10 +73,9 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
         Assert.That(binder.GetClauseInventory(target).Callable, Is.SameAs(implementation));
         var ownImplementation = binder.Bind(implementation);
         Assert.That(ownImplementation.IsSuccess, Is.True, ownImplementation.Failure.ToString());
-        var result = binder.Bind(target);
-        Assert.That(result.Failure, Is.EqualTo(mismatched
-            ? ContractBindingFailure.UnsupportedExpression : ContractBindingFailure.None));
-        Assert.That(result.IsSuccess, Is.EqualTo(!mismatched));
-        Assert.That(result.Contracts is null, Is.EqualTo(mismatched));
+        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var result = new ContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
+        // The Total binder rejects constructed partial targets outright.
+        Assert.That(result.IsSuccess, Is.False);
     }
 }

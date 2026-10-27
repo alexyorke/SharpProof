@@ -15,7 +15,7 @@ Directory.Build.props/targets   Arcade imports and repository-wide settings
 Directory.Packages.props        Central package references
 global.json                     Exact .NET and Arcade SDK pins
 NuGet.config                    Public package sources and source mapping
-src/                            All repository-owned C# projects, including tests and developer tools
+src/                            Shipping C# projects, their tests, and developer tools
 src/samples/                    Package-backed examples and their solution
 eng/Build.props                 Arcade build graph
 eng/Versions.props              Component, dependency and tool versions
@@ -25,7 +25,7 @@ eng/scripts/                    Repository command implementations and checks
 eng/SharpProofNUnit/             NUnit integration for Arcade's Test target
 eng/container/                  Canonical Linux amd64 toolchain and entrypoints
 eng/                            Other packaging, coverage and test infrastructure
-tests/                          Golden and qualification data, without C# projects
+tests/                          Corpus gates, fuzzers, test helpers, golden and qualification data
 docs/                           Guides and implementation documentation
 artifacts/                      Ignored build output, packages and evidence
 ```

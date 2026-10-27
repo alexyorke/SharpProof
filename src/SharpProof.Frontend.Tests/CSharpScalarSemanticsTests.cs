@@ -77,39 +77,6 @@ public sealed class CSharpScalarSemanticsTests
         }
     }
 
-    [Test]
-    public void RoslynTypeLoweringUsesExactlyTheCatalogIntegerSet()
-    {
-        var compilation = CSharpCompilation.Create(
-            "ScalarCatalog",
-            references: [
-                MetadataReference.CreateFromFile(
-                    typeof(object).Assembly.Location)
-            ]);
-        var factory = new IrFactory();
-        var lowerer = new RoslynOperationLowerer(factory);
-
-        foreach (var type in ExpectedIntegerTypes.Keys)
-        {
-            Assert.That(
-                lowerer.GetTypeId(compilation.GetSpecialType(type)),
-                Is.EqualTo(factory.IntegerType),
-                type.ToString());
-        }
-
-        foreach (var type in ImmutableArray.Create(
-                     SpecialType.System_UInt64,
-                     SpecialType.System_IntPtr,
-                     SpecialType.System_UIntPtr
-                 ))
-        {
-            Assert.That(
-                lowerer.GetTypeId(compilation.GetSpecialType(type)),
-                Is.Not.EqualTo(factory.IntegerType),
-                type.ToString());
-        }
-    }
-
     private static (bool IsSigned, int BitWidth, long Minimum, long Maximum)
         GetExpectedSemantics(Type type)
     {

@@ -31,8 +31,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Documentation discovery requires a Git source 
 $tracked = $trackedBuilder.ToImmutable()
 $fileBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 foreach ($relative in $tracked) { $fileBuilder.Add((Join-Path $RepositoryRoot $relative)) }
-$generated = Join-Path $RepositoryRoot 'docs/generated/source-reference.md'
-if ((Test-Path -LiteralPath $generated) -and $generated -notin $fileBuilder) { $fileBuilder.Add($generated) }
 $files = $fileBuilder.ToImmutable()
 $checked = 0
 foreach ($file in $files) {

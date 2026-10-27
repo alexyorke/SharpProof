@@ -36,9 +36,6 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'SharpProof.CoverageShardEvidence.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.CanonicalCohortEvidence.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.SemanticCoveragePlan.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.SemanticBuildPlan.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -60,7 +57,7 @@ $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
 $semanticProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($semanticSolution.solution.projects |
             ForEach-Object { ([string]$_).Replace('\', '/') }))
-$gatesProject = 'src/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
+$gatesProject = 'tests/SharpProof.Gates.Tests/SharpProof.Gates.Tests.csproj'
 $partitionFilter = ''
 if ($SemanticCohort -ne 'All') {
     if ($TestFilter -cne 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus') {
@@ -700,16 +697,6 @@ try {
                     elapsedMilliseconds = $result.ElapsedMilliseconds
                     exitCode            = $result.ExitCode
                 }).AsReadOnly())
-    }
-    if ($coverageEnabled) {
-        Save-SharpProofCoverageCohort -Root $resultsRoot -Expected $tasks -Completed @($testRun.Completed)
-    }
-    if ($retainCanonicalResults) {
-        Save-SharpProofCanonicalCohort -Root $resultsRoot `
-            -RepositoryRoot $repositoryRoot -Cohort $SemanticCohort `
-            -Configuration $Configuration -Filter $semanticFilter `
-            -Projects $semanticProjects -Expected $tasks `
-            -Completed @($testRun.Completed)
     }
     foreach ($failure in @($testRun.Completed | Where-Object {
                 $_.ExitCode -ne 0

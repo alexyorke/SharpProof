@@ -1,7 +1,7 @@
-extern alias ReportingAssembly;
+extern alias ToolAssembly;
 using System.Collections.Immutable;
 using System.Globalization;
-using ReportingInputValidation = ReportingAssembly::SharpProof.Internal.InputValidation;
+using ReportingInputValidation = ToolAssembly::SharpProof.Internal.InputValidation;
 using NUnit.Framework;
 using SharpProof.Reporting;
 using SharpProof.Worker.Protocol;

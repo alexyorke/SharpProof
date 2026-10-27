@@ -88,7 +88,7 @@ public sealed class ContractIntrinsicInterceptionContextTests
         Assert.That(compilation.GetSemanticModel(tree).GetInterceptorMethod(syntax)?.Name, Is.EqualTo("Replacement"));
         var response = await VerifyAsync(compilation);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
     }
 

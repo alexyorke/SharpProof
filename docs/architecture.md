@@ -7,22 +7,19 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | Component | Responsibility |
 | --- | --- |
 | `SharpProof.Attributes` | Public contract types, intrinsics, flags, trust/reporting controls |
-| `SharpProof.Contracts` | Clause inventory, effective source selection, intrinsic validation and binding |
 | `SharpProof.Specs` | Reviewed API catalog and resolved specification evidence |
 | `SharpProof.Frontend` | Roslyn expression/program lowering to typed IR |
 | `SharpProof.Ir` | Owned types, values, instructions, blocks, source provenance, evaluation |
 | `SharpProof.Dataflow` | Analysis primitives over the modeled program |
-| `SharpProof.Effects` | Effect values, mappings, and conservative summaries |
 | `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
 | `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
-| `SharpProof.ContractForGenerator` | Generator loading hook; companion validation runs after generators in analysis |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
 | `SharpProof.CompilerArtifact` | Versioned compiler evidence, codecs, validation |
 | `SharpProof.Worker.Protocol` | Request/response models, budgets, manifests, tuple/accountability checks |
 | `SharpProof.Smt` | Native solver abstraction, typed encoding and result evidence |
 | `SharpProof.Worker` | Artifact preparation, native claims, VC checks, replay, response cache |
 | `SharpProof.Host` | Container/native loading and host infrastructure |
-| `SharpProof.BuildTasks` / `SharpProof.Verify` | MSBuild integration and verifier orchestration |
+| `SharpProof.BuildTasks` | MSBuild integration and verifier orchestration |
 | `SharpProof.Package` | Metadata-only standard package facade with exact verifier dependency |
 | `SharpProof.Verifier` | Analyzer/collector, MSBuild integration, managed worker and native solver package assets |
 | `SharpProof.Tool` | Optional separately packaged doctor and stored-evidence explanation commands |
@@ -85,10 +82,8 @@ Profiles select activation; worker policy decides what results the build accepts
 
 ## Mechanized checks
 
-The trusted kernel is a subset of the full trusted computing base (TCB). [The acceptance contract](../eng/acceptance/contract.json) separately owns kernel paths, component path classification, and the production pipeline projects whose evaluated `Compile` items must all be classified. [Get-SharpProofTcbPaths.ps1](../eng/scripts/Get-SharpProofTcbPaths.ps1) rejects duplicate/noncanonical paths, unclassified pipeline sources, and sources outside the evaluated production inventory, with the explicit release-validator exception recorded in that function. Splitting a partial type or renaming a file does not remove its proof-pipeline responsibility.
+Coverage is an independent measurement: [Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) reports line coverage of the C# sources. A passing coverage run and a proof of user code are different claims; neither implies the other. See [development workflows](development-workflows.md) for coverage commands.
 
-Coverage is another independent measurement. [The coverage baseline](../eng/coverage/baseline.json) owns aggregate, per-project, and changed-TCB line floors plus the explicit declaration-only classification. [The coverage gate](../eng/scripts/Test-SharpProofCoverage.ps1) reconciles the measured universe with production inventory and comparison-ref changes. A small kernel, complete TCB inventory, passing coverage floor, and a proof of user code are four different claims. None implies the others. See [development workflows](development-workflows.md) for coverage evidence and commands.
-
-Tests cover frontend, IR, contracts, specs, SMT, effects, analyzer, worker, protocol behavior, architecture, and packaged consumers. [Golden fixtures](../tests/golden/README.md) freeze stable stage output. [Corpus gates](../src/SharpProof.Gates/README.md) compare independently classified cases, outcomes, and canonical diagnostics. [Production inventory](../eng/scripts/Get-SharpProofProductionInventory.ps1) derives the coverage universe from solution projects and evaluated `SharpProofProductionProject`/`Compile` items. The acceptance contract classifies trusted pipeline projects/paths; the coverage baseline owns line floors and declaration-only coverage classification.
+Tests cover frontend, IR, contracts, specs, SMT, effects, analyzer, worker, protocol behavior, architecture, and packaged consumers. [Golden fixtures](../tests/golden/README.md) freeze stable stage output. [Corpus gates](../tests/SharpProof.Gates/README.md) compare independently classified cases, outcomes, and canonical diagnostics.
 
 Run the relevant target first, then the smallest broader [container gate](container-development.md). These checks establish the exercised cases and boundaries, not universal language correctness.

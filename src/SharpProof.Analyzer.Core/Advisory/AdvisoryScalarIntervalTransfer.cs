@@ -28,8 +28,8 @@ internal static class CoreIrScalarIntervalTransfer
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var range = TypeRange(type);
-        left = Restrict(left, range);
-        right = Restrict(right, range);
+        left = SharpProof.Analyzer.CoreIrAdvisoryDomain.Restrict(left, range);
+        right = SharpProof.Analyzer.CoreIrAdvisoryDomain.Restrict(right, range);
         if (left.IsBottom || right.IsBottom)
         {
             return IntervalValue.Bottom;
@@ -84,7 +84,7 @@ internal static class CoreIrScalarIntervalTransfer
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var range = TypeRange(type);
-        operand = Restrict(operand, range);
+        operand = SharpProof.Analyzer.CoreIrAdvisoryDomain.Restrict(operand, range);
         if (operand.IsBottom)
         {
             return operand;
@@ -103,7 +103,7 @@ internal static class CoreIrScalarIntervalTransfer
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var sourceRange = TypeRange(source);
         var targetRange = TypeRange(target);
-        operand = Restrict(operand, sourceRange);
+        operand = SharpProof.Analyzer.CoreIrAdvisoryDomain.Restrict(operand, sourceRange);
         if (operand.IsBottom)
         {
             return operand;
@@ -123,13 +123,6 @@ internal static class CoreIrScalarIntervalTransfer
     {
         return TryTypeRange(type, out var range) ? range :
             throw new ArgumentException("The type has no signed Int64 interval representation.", nameof(type));
-    }
-
-    private static IntervalValue Restrict(IntervalValue value /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
-    {
-        return IntervalDomain.Instance.AssumeAtMost(
-            IntervalDomain.Instance.AssumeAtLeast(value, range.LowerBound ?? long.MinValue),
-            range.UpperBound ?? long.MaxValue);
     }
 
     private static IntervalValue Bounded(BigInteger lower, BigInteger upper, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)

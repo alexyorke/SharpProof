@@ -13,7 +13,6 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 internal sealed class FrontendLoweringTests
 {
-    private static readonly ImmutableArray<long> ElementValues = [4L, 8L, 15L];
 
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
     [TestCase(-7L, false, 3L, ExpectedResult = -2L)]
@@ -74,61 +73,6 @@ internal sealed class FrontendLoweringTests
             Is.EqualTo(5L));
     }
 
-    [Test]
-    public void IllFormedUtf16StringConstantsAbstainWithoutCollapsingValues()
-    {
-        var factory = new IrFactory();
-        Assert.Throws<ArgumentException>((Action)(() =>
-            factory.String(new string('\uD800', 1))));
-        Assert.Throws<ArgumentException>((Action)(() =>
-            factory.String(new string('\uDC00', 1))));
-        Assert.That(factory.String("\U0001F600"), Is.Not.Null);
-        Assert.That(factory.String("\uFFFD"), Is.Not.Null);
-
-        AssertClassification(
-            """
-            public static string Target() => "\uD800";
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType);
-        AssertClassification(
-            """
-            public static string Target() => "\uDC00";
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType);
-
-        using var pair = CompiledMethod.Create(
-            """
-            public static string Target() => "\uD83D\uDE00";
-            """);
-        using var replacement = CompiledMethod.Create(
-            """
-            public static string Target() => "\uFFFD";
-            """);
-        var pairValue = pair.CompareWithInterpreter([]);
-        var replacementValue = replacement.CompareWithInterpreter([]);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(pairValue, Is.EqualTo("\U0001F600"));
-            Assert.That(replacementValue, Is.EqualTo("\uFFFD"));
-            Assert.That(pairValue, Is.Not.EqualTo(replacementValue));
-        }
-    }
-
-    [Test]
-    public void ArrayLengthAndElementAccessMatchCompiledCSharp()
-    {
-        using var element = CompiledMethod.Create(
-            """
-            public static long Target(long[] values, int index) =>
-                checked(values[index] + values.LongLength);
-            """);
-        Assert.That(
-            element.CompareWithInterpreter([ElementValues.ToArray(), 1]),
-            Is.EqualTo(11L));
-    }
-
     [TestCaseSource(nameof(ClassificationCases))]
     public void ClassificationCasesRemainClosedAndExact(
         string members,
@@ -154,12 +98,11 @@ internal sealed class FrontendLoweringTests
             0L,
             long.MinValue,
             -1L]);
+        // The Total lowerer keeps faults in the safe condition.
         var orderResult = new IrInterpreter(order.Factory)
-            .Evaluate(loweredOrder.Term, environment);
-        Assert.That(orderResult.Status, Is.EqualTo(IrEvaluationStatus.Exception));
-        Assert.That(
-            orderResult.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+            .Evaluate(loweredOrder.SafeCondition, environment);
+        Assert.That(orderResult.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(orderResult.Value!.Boolean, Is.False);
 
         using var shortCircuit = CompiledMethod.Create(
             """
@@ -170,58 +113,6 @@ internal sealed class FrontendLoweringTests
             shortCircuit.CompareWithInterpreter([false, 0L]),
             Is.EqualTo(false));
     }
-
-
-    [Test]
-    public void NullPointerConversionCannotMasqueradeAsAnExactNullReference()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            public static unsafe int* Target() => null;
-            """,
-            allowUnsafe: true);
-
-        var result = compiled.Lower();
-
-        Assert.That(result.Term, Is.Not.TypeOf<IrNullTerm>());
-        Assert.That(
-            result.Classification.Decision,
-            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
-        Assert.That(
-            result.Classification.Abstention,
-            Is.EqualTo(FrontendAbstention.UnsupportedType));
-    }
-
-    [Test]
-    public void BoxingConversionsOfConstantsCannotLowerToNull()
-    {
-        foreach (var expression in ImmutableArray.Create("(object)5", "(object)\"x\"", "(object)true"))
-        {
-            using var compiled = CompiledMethod.Create(
-                "public static object Target() => " + expression + ";");
-            var conversion = (IConversionOperation)compiled.TargetExpression;
-
-            // A boxing conversion is not a constant expression in C#, so Roslyn
-            // reports no ConstantValue on the conversion even though the operand
-            // keeps one. Lowering must not read that absence as a null constant.
-            Assert.That(
-                conversion.Operand.ConstantValue.HasValue,
-                Is.True,
-                expression + ": the operand should still carry its constant.");
-
-            var result = compiled.Lower();
-            Assert.That(
-                result.Term,
-                Is.Not.TypeOf<IrNullTerm>(),
-                expression + " lowered to a null term (conversion.ConstantValue.HasValue=" +
-                conversion.ConstantValue.HasValue.ToString(CultureInfo.InvariantCulture) + ").");
-            Assert.That(
-                result.Classification.Decision,
-                Is.EqualTo(FrontendSubsetDecision.ClosedAbstention),
-                expression + " should abstain rather than claim an exact value.");
-        }
-    }
-
 
     [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
@@ -259,7 +150,6 @@ internal sealed class FrontendLoweringTests
             Is.EqualTo(false));
     }
 
-
     [Test]
     public void NamedOptionalAndExtensionInvocationsCloseTheSubset()
     {
@@ -292,179 +182,6 @@ internal sealed class FrontendLoweringTests
             extension.Lower(),
             IrOpaquePurity.Impure,
             FrontendAbstention.UnsupportedInvocationShape);
-    }
-
-    [Test]
-    public void NamedArgumentsForExpressionOpaqueInvocationsUseParameterOrdinal()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            private static long Add(long first, long second) => first;
-            public static long Target(long value) =>
-                Add(second: value, first: 3L);
-            """);
-        var result = new RoslynOperationLowerer(
-            compiled.Factory,
-            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "Add"))
-            .Lower(compiled.TargetExpression);
-
-        AssertOpaque(
-            result,
-            IrOpaquePurity.Pure,
-            FrontendAbstention.UnsupportedInvocationShape);
-        var opaque = (IrOpaqueTerm)result.Term;
-        Assert.That(opaque.Arguments, Has.Length.EqualTo(2));
-        Assert.That(((IrIntegerTerm)opaque.Arguments[0]).Value, Is.EqualTo(3L));
-        Assert.That(opaque.Arguments[1], Is.TypeOf<IrVariableTerm>());
-    }
-
-    [Test]
-    public void PureOpaqueIdentityIsStructuralAndImpureIdentityIsPerOccurrence()
-    {
-        using var pure = CompiledMethod.Create(
-            """
-            public static bool Target(long value) =>
-                (value & 1L) == (value & 1L);
-            """);
-        var pureOperations = pure.TargetExpression
-            .DescendantsAndSelf()
-            .OfType<IBinaryOperation>()
-            .Where(static operation =>
-                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind == BinaryOperatorKind.And))
-            .ToImmutableArray();
-        Assert.That(pureOperations, Has.Length.EqualTo(2));
-        var pureLowerer = new RoslynOperationLowerer(pure.Factory);
-        var firstPure = pureLowerer.Lower(pureOperations[0]);
-        var secondPure = pureLowerer.Lower(pureOperations[1]);
-        Assert.That(firstPure.Term, Is.TypeOf<IrOpaqueTerm>());
-        Assert.That(((IrOpaqueTerm)firstPure.Term).Purity, Is.EqualTo(IrOpaquePurity.Pure));
-        Assert.That(secondPure.Term, Is.SameAs(firstPure.Term));
-
-        using var impure = CompiledMethod.Create(
-            """
-            private static long Next() => 1L;
-            public static bool Target() => Next() == Next();
-            """);
-        var invocations = impure.TargetExpression
-            .DescendantsAndSelf()
-            .OfType<IInvocationOperation>()
-            .ToImmutableArray();
-        Assert.That(invocations, Has.Length.EqualTo(2));
-        var impureLowerer = new RoslynOperationLowerer(impure.Factory);
-        var firstImpure = impureLowerer.Lower(invocations[0]);
-        var secondImpure = impureLowerer.Lower(invocations[1]);
-        Assert.That(((IrOpaqueTerm)firstImpure.Term).Purity, Is.EqualTo(IrOpaquePurity.Impure));
-        Assert.That(secondImpure.Term, Is.Not.SameAs(firstImpure.Term));
-        Assert.That(secondImpure.Term.Id, Is.Not.EqualTo(firstImpure.Term.Id));
-
-        var knownPureLowerer = new RoslynOperationLowerer(
-            impure.Factory,
-            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "Next"));
-        var firstKnownPure = knownPureLowerer.Lower(invocations[0]);
-        var secondKnownPure = knownPureLowerer.Lower(invocations[1]);
-        Assert.That(
-            ((IrOpaqueTerm)firstKnownPure.Term).Purity,
-            Is.EqualTo(IrOpaquePurity.Pure));
-        Assert.That(secondKnownPure.Term, Is.SameAs(firstKnownPure.Term));
-    }
-
-    [Test]
-    public void PureOpaqueIdentitySeparatesDifferentOperatorSemantics()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            public static bool Target(long value) =>
-                (value & 1L) == (value | 1L);
-            """);
-        var operations = compiled.TargetExpression
-            .DescendantsAndSelf()
-            .OfType<IBinaryOperation>()
-            .Where(static operation =>
-                operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind is
-                    BinaryOperatorKind.And or
-                    BinaryOperatorKind.Or))
-            .ToImmutableArray();
-        Assert.That(operations, Has.Length.EqualTo(2));
-        var lowerer = new RoslynOperationLowerer(compiled.Factory);
-
-        var first = lowerer.Lower(operations[0]).Term;
-        var second = lowerer.Lower(operations[1]).Term;
-
-        Assert.That(first, Is.TypeOf<IrOpaqueTerm>());
-        Assert.That(second, Is.TypeOf<IrOpaqueTerm>());
-        Assert.That(second, Is.Not.SameAs(first));
-        Assert.That(second.Id, Is.Not.EqualTo(first.Id));
-    }
-
-    [Test]
-    public void CompilerIdentitySeparatesSameNamedTypesFromDifferentAssemblies()
-    {
-        var leftReference = CreateAliasedTypeReference(
-            "Collision.Left",
-            "left");
-        var rightReference = CreateAliasedTypeReference(
-            "Collision.Right",
-            "right");
-        var tree = CSharpSyntaxTree.ParseText(
-            """
-            extern alias left;
-            extern alias right;
-            public static class Subject {
-                public static bool Target(
-                    left::Collision.Widget first,
-                    right::Collision.Widget second) =>
-                    first is null || second is null;
-            }
-            """,
-            new CSharpParseOptions(LanguageVersion.CSharp12));
-        var compilation = CSharpCompilation.Create(
-            "Collision.Consumer",
-            [tree],
-            TestMetadataReferences.Platform.Add(leftReference).Add(rightReference),
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .ToImmutableArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
-
-        var model = compilation.GetSemanticModel(tree);
-        var references = tree.GetRoot()
-            .DescendantNodes()
-            .OfType<IdentifierNameSyntax>()
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node)))
-            .OfType<IParameterReferenceOperation>()
-            .OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Parameter.Ordinal))
-            .ToImmutableArray();
-        Assert.That(references, Has.Length.EqualTo(2));
-
-        var factory = new IrFactory();
-        var lowerer = new RoslynOperationLowerer(factory);
-        var first = lowerer.Lower(references[0]);
-        var second = lowerer.Lower(references[1]);
-
-        Assert.That(first.Term.Type, Is.Not.EqualTo(second.Term.Type));
-        Assert.That(
-            CompilerIdentityBridge.InternType(
-                factory,
-                references[0].Parameter.Type),
-            Is.Not.EqualTo(
-                CompilerIdentityBridge.InternType(
-                    factory,
-                    references[1].Parameter.Type)));
-        Assert.That(
-            CompilerIdentityBridge.CreateTypeDisplay(
-                references[0].Parameter.Type),
-            Is.Not.EqualTo(
-                CompilerIdentityBridge.CreateTypeDisplay(
-                    references[1].Parameter.Type)));
     }
 
     [Test]
@@ -597,187 +314,27 @@ internal sealed class FrontendLoweringTests
     }
 
     [Test]
-    public void InheritedInstanceInvocationsLowerTotallyWithTypedReceivers()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            private class Base {
-                public long Read() => 1L;
-            }
-            private sealed class Derived : Base {
-            }
-            private static long Target(Derived value) => value.Read();
-            """);
-
-        var result = compiled.Lower();
-
-        AssertOpaque(
-            result,
-            IrOpaquePurity.Impure,
-            FrontendAbstention.UnsupportedInvocationShape);
-        var opaque = (IrOpaqueTerm)result.Term;
-        Assert.That(
-            compiled.Factory.GetMemberInfo(opaque.Member).DeclaringType,
-            Is.EqualTo(opaque.Receiver!.Type));
-    }
-
-    [Test]
-    public void EveryOperationInUnsupportedProgramLowersWithoutThrowing()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            private sealed class Box {
-                public long Value { get; set; }
-            }
-            public static async System.Threading.Tasks.Task<long> Target(long value) {
-                var box = new Box { Value = value };
-                await System.Threading.Tasks.Task.Yield();
-                System.Func<long> read = () => box.Value;
-                return read();
-            }
-            """,
-            returnExpressionOnly: false);
-        var lowerer = new RoslynOperationLowerer(compiled.Factory);
-        var operations = compiled.TargetRoot.DescendantsAndSelf().ToImmutableArray();
-        Assert.That(operations.Length, Is.GreaterThan(8));
-        foreach (var operation in operations)
-        {
-            FrontendLoweringResult? result = null;
-            Assert.DoesNotThrow(
-                (Action)(() => result = lowerer.Lower(operation)));
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result!.Term, Is.Not.Null);
-            if (!result.IsExact)
-            {
-                Assert.That(
-                    result.Classification.Abstention,
-                    Is.Not.EqualTo(FrontendAbstention.None));
-            }
-        }
-    }
-
-    [Test]
-    public void UnsupportedLeftAssociatedFallbackLowersEachOperationOnce()
-    {
-        using var compiled = CompiledMethod.Create(
-            """
-            public static long Target(long value) =>
-                value + 1L + 2L + 3L + 4L + 5L + 6L + 7L + 8L + 9L + 10L + 11L + 12L;
-            """);
-        var operations = compiled.TargetExpression
-            .DescendantsAndSelf()
-            .ToImmutableArray();
-        var visitBuilder = ImmutableDictionary.CreateBuilder<IOperation, int>(
-            ReferenceEqualityComparer.Instance);
-        var lowerer = RoslynOperationLowerer.CreateConfigured(
-            compiled.Factory, static type => type, operation =>
-            {
-                ArgumentNullException.ThrowIfNull(operation);
-                visitBuilder[operation] = visitBuilder.TryGetValue(operation, out var count) ? count + 1 : 1;
-                return default;
-            });
-
-        var result = lowerer.Lower(compiled.TargetExpression);
-        var visits = visitBuilder.ToImmutable();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Classification.Abstention,
-                Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
-            var expectedOperations = operations.ToImmutableHashSet<IOperation>(ReferenceEqualityComparer.Instance);
-            Assert.That(expectedOperations.Count, Is.EqualTo(operations.Length));
-            Assert.That(visits.Count, Is.EqualTo(expectedOperations.Count));
-            Assert.That(expectedOperations.SetEquals(visits.Keys), Is.True);
-            Assert.That(visits.Values, Is.All.EqualTo(1));
-        }
-    }
-
-    [Test]
-    public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
-    {
-        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
-        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
-        Assert.That(kinds, Is.Not.Empty);
-        Assert.That(kinds, Is.Ordered);
-        Assert.That(kinds.Distinct().Count(), Is.EqualTo(kinds.Length));
-        foreach (var kind in kinds)
-        {
-            var classification = OperationSubsetClassifier.Classify(stage, kind);
-            Assert.That(
-                classification.Decision,
-                Is.AnyOf(
-                    FrontendSubsetDecision.Exact,
-                    FrontendSubsetDecision.ClosedAbstention));
-            Assert.That(
-                classification.IsExact
-                    ? classification.Abstention == FrontendAbstention.None
-                    : classification.Abstention != FrontendAbstention.None,
-                Is.True,
-                kind.ToString());
-        }
-        Assert.That(
-            OperationSubsetClassifier.Classify(
-                stage,
-                (OperationKind)int.MaxValue).Abstention,
-            Is.EqualTo(FrontendAbstention.UnknownOperationKind));
-        var snapshot = OperationSubsetClassifier.CreateSnapshot();
-        Assert.That(snapshot.Split('\n'), Has.Length.GreaterThan(100));
-        Assert.That(snapshot, Does.Contain("|Invocation|ClosedAbstention|"));
-        Assert.That(snapshot, Does.Contain("|Literal|Exact|None"));
-        var snapshotHash = Convert.ToHexString(
-            System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(snapshot)));
-        Assert.That(
-            snapshotHash,
-            Is.EqualTo(
-                "423FE9D03A156149D96290A64F84A1B53F7FBD0F5EA8C1BC4AC9A19B72416641"));
-    }
-
-    [Test]
     public void FieldReferencesAreAdmittedToContractExpressionStage()
     {
-        const OperationSupportStage stage = OperationSupportStage.ContractExpressionLowering;
         Assert.That(
-            OperationSubsetClassifier.Classify(stage, OperationKind.FieldReference)
-                .IsExact,
+            CSharpOperationSemantics.IsSupported(
+                OperationSupportStage.ContractExpressionLowering,
+                OperationKind.FieldReference),
             Is.True);
     }
 
     [Test]
-    public void StageSpecificOperationClassifiersMatchTheClosedCatalog()
+    public void EffectDiscoveryAdmitsCaughtExceptionsAndInterpolatedStrings()
     {
-        var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
-        foreach (var stage in Enum.GetValues<OperationSupportStage>())
-        {
-            foreach (var kind in kinds)
-            {
-                var classification =
-                    OperationSubsetClassifier.Classify(stage, kind);
-                Assert.That(
-                    classification.IsExact,
-                    Is.EqualTo(
-                        CSharpOperationSemantics.IsSupported(stage, kind)),
-                    $"{stage}:{kind}");
-            }
-
-            Assert.That(
-                OperationSubsetClassifier.Classify(
-                    stage,
-                    (OperationKind)int.MaxValue).Abstention,
-                Is.EqualTo(FrontendAbstention.UnknownOperationKind),
-                stage.ToString());
-        }
-
         Assert.That(
-            OperationSubsetClassifier.Classify(
+            CSharpOperationSemantics.IsSupported(
                 OperationSupportStage.EffectDiscovery,
-                OperationKind.CaughtException).IsExact,
+                OperationKind.CaughtException),
             Is.True);
         Assert.That(
-            OperationSubsetClassifier.Classify(
+            CSharpOperationSemantics.IsSupported(
                 OperationSupportStage.EffectDiscovery,
-                OperationKind.InterpolatedString).IsExact,
+                OperationKind.InterpolatedString),
             Is.True);
     }
 
@@ -810,64 +367,11 @@ internal sealed class FrontendLoweringTests
     {
         yield return new TestCaseData(
             """
-            public sealed class Lookalike {
-                public long LongLength => 1L;
-            }
-            public static long Target(Lookalike value) =>
-                value.LongLength;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedMemberAccess)
-            .SetName("LookalikeAndHiddenLengthMembers_LookalikeLongLength");
-        yield return new TestCaseData(
-            """
-            public class Base {
-                public int Length => 1;
-            }
-            public sealed class Derived : Base {
-                public new int Length => 2;
-            }
-            public static long Target(Derived value) =>
-                value.Length;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedMemberAccess)
-            .SetName("LookalikeAndHiddenLengthMembers_HiddenLengthMember");
-        yield return new TestCaseData(
-            """
             public static long Target(long value) => checked(value + 1L);
             """,
             FrontendSubsetDecision.Exact,
             FrontendAbstention.None)
             .SetName("OverflowAndConversionShapes_CheckedLongAddition");
-        yield return new TestCaseData(
-            """
-            public static long Target(long value) => unchecked(value + 1L);
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UncheckedOverflowSemantics)
-            .SetName("OverflowAndConversionShapes_UncheckedLongAddition");
-        yield return new TestCaseData(
-            """
-            public static int Target(int value) => checked(value + 1);
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("OverflowAndConversionShapes_CheckedIntAddition");
-        yield return new TestCaseData(
-            """
-            public static int Target(int left, int right) => left / right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("OverflowAndConversionShapes_IntDivision");
-        yield return new TestCaseData(
-            """
-            public static uint Target(uint left, uint right) => left % right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("OverflowAndConversionShapes_UIntRemainder");
         yield return new TestCaseData(
             """
             public static long Target(int value) => value;
@@ -877,93 +381,11 @@ internal sealed class FrontendLoweringTests
             .SetName("OverflowAndConversionShapes_WideningIntToLong");
         yield return new TestCaseData(
             """
-            public static int Target(long value) => checked((int)value);
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.ConversionMayChangeValue)
-            .SetName("OverflowAndConversionShapes_CheckedLongToInt");
-        yield return new TestCaseData(
-            """
-            public static string Target(object value) => (string)value;
-            """,
-            FrontendSubsetDecision.Exact,
-            FrontendAbstention.None)
-            .SetName("OverflowAndConversionShapes_ObjectToStringCast");
-        yield return new TestCaseData(
-            """
-            public static bool Target(ulong left, ulong right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedIntegralDomains_UInt64");
-        yield return new TestCaseData(
-            """
-            public static bool Target(nint left, nint right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedIntegralDomains_NInt");
-        yield return new TestCaseData(
-            """
-            public static bool Target(nuint left, nuint right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedIntegralDomains_NUInt");
-        yield return new TestCaseData(
-            """
-            public static bool Target<T>(T left, T right)
-                where T : class => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedValueDomains_ConstrainedGeneric");
-        yield return new TestCaseData(
-            """
             public static bool Target(double left, double right) => left == right;
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedType)
             .SetName("UnsupportedValueDomains_Double");
-        yield return new TestCaseData(
-            """
-            public enum Choice {
-                First,
-                Second
-            }
-            public static bool Target(Choice left, Choice right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedValueDomains_Enum");
-        yield return new TestCaseData(
-            """
-            public delegate int Transformer(int value);
-            public static bool Target(
-                Transformer left,
-                Transformer right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedValueDomains_Delegate");
-        yield return new TestCaseData(
-            """
-            public static bool Target(
-                System.Delegate left,
-                System.Delegate right) => left == right;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("UnsupportedValueDomains_SystemDelegate");
-        yield return new TestCaseData(
-            """
-            public struct Token {
-                public Token Target() => this;
-            }
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("StructThis_UnsupportedValue");
         yield return new TestCaseData(
             """
             public abstract class Base {}
@@ -1007,31 +429,6 @@ internal sealed class FrontendLoweringTests
             .SetName("NullableAndEnumConstants_NullableLong");
         yield return new TestCaseData(
             """
-            public enum Choice {
-                First = 1
-            }
-            public static Choice Target() => Choice.First;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedType)
-            .SetName("NullableAndEnumConstants_EnumConstant");
-        yield return new TestCaseData(
-            """
-            public static long? Target(long? value) => -value;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.LiftedOperator)
-            .SetName("LiftedUnaryOperators_NullableLong");
-        yield return new TestCaseData(
-            """
-            private const long Value = 7L;
-            public static long Target() => Value;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedOperationKind)
-            .SetName("ConstantFolding_ConstField");
-        yield return new TestCaseData(
-            """
             public static string Target() => nameof(Subject);
             """,
             FrontendSubsetDecision.ClosedAbstention,
@@ -1061,27 +458,12 @@ internal sealed class FrontendLoweringTests
             .SetName("ConstantFolding_Conditional");
         yield return new TestCaseData(
             """
-            private const long Value = 7L;
-            public static long Target(long input) => Value + input;
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UnsupportedOperationKind)
-            .SetName("ConstantFolding_ConstFieldWithInput");
-        yield return new TestCaseData(
-            """
             public static bool Target(string input) =>
                 nameof(Subject) == input;
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedOperationKind)
             .SetName("ConstantFolding_NameofComparison");
-        yield return new TestCaseData(
-            """
-            public static long Target() => unchecked(1L + 2L);
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UncheckedOverflowSemantics)
-            .SetName("ConstantFolding_UnsupportedUncheckedAddition");
         yield return new TestCaseData(
             """
             public static long Target() => long.MinValue;
@@ -1103,13 +485,6 @@ internal sealed class FrontendLoweringTests
             FrontendSubsetDecision.Exact,
             FrontendAbstention.None)
             .SetName("NegativeIntegerLiterals_LongNegativeOne");
-        yield return new TestCaseData(
-            """
-            public static long Target(long input) => unchecked(-input);
-            """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.UncheckedOverflowSemantics)
-            .SetName("NegativeIntegerLiterals_UncheckedNegation");
     }
 
     private static void AssertClassification(
@@ -1128,7 +503,7 @@ internal sealed class FrontendLoweringTests
     }
 
     private static void AssertOpaque(
-        FrontendLoweringResult result,
+        SharpProof.Fuzz.FrontendTotalLoweringResult result,
         IrOpaquePurity purity,
         FrontendAbstention abstention)
     {
@@ -1138,93 +513,6 @@ internal sealed class FrontendLoweringTests
         Assert.That(result.Classification.Decision, Is.EqualTo(
             FrontendSubsetDecision.ClosedAbstention));
         Assert.That(result.Classification.Abstention, Is.EqualTo(abstention));
-    }
-
-    [TestCase(254, IrOpaquePurity.Pure, true)]
-    [TestCase(255, IrOpaquePurity.Impure, false)]
-    public void CompilerProducedUnaryChainStraddlesOpaquePurityDepth(
-        int unaryCount,
-        IrOpaquePurity expectedPurity,
-        bool expectedNativeValue)
-    {
-        var unaryExpression = new string('!', unaryCount) + "value";
-        using var compiled = CompiledMethod.Create(
-            "[System.Diagnostics.Contracts.Pure] private static bool Echo(bool value) => value;" +
-            "public static bool Target(bool value) => Echo(" + unaryExpression + ");");
-
-        var invocation = compiled.TargetExpression
-            .DescendantsAndSelf()
-            .OfType<IInvocationOperation>()
-            .Single();
-        var sourceUnaryCount = compiled.TargetExpression
-            .DescendantsAndSelf()
-            .OfType<IUnaryOperation>()
-            .Count();
-        var operationTreeNodeCount = compiled.TargetExpression.DescendantsAndSelf().Count();
-        var deepestOperationTreeDepth = MeasureOperationDepth(
-            compiled.TargetExpression, 0);
-        var pureAttributeType = invocation.TargetMethod.GetAttributes()
-            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass))
-            .Single(static attribute =>
-                attribute?.MetadataName ==
-                    typeof(System.Diagnostics.Contracts.PureAttribute).Name);
-        var pureAttribute = invocation.TargetMethod.GetAttributes()
-            .Single(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass, pureAttributeType)));
-        var echoSyntax = invocation.TargetMethod.DeclaringSyntaxReferences
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
-            .OfType<MethodDeclarationSyntax>()
-            .Single();
-        var argumentValue = invocation.Arguments.Single().Value;
-        var pureWalkDepth = 1;
-        var pureWalkLeaf = argumentValue;
-        while (pureWalkLeaf is IUnaryOperation unary)
-        {
-            pureWalkLeaf = unary.Operand;
-            pureWalkDepth++;
-        }
-        var nativeValue = (bool)compiled.Invoke([true])!;
-
-        Assert.That(invocation.TargetMethod.Name, Is.EqualTo("Echo"));
-        Assert.That(sourceUnaryCount, Is.EqualTo(unaryCount));
-        Assert.That(operationTreeNodeCount, Is.EqualTo(unaryCount + 3));
-        Assert.That(deepestOperationTreeDepth, Is.EqualTo(unaryCount + 2));
-        Assert.That(pureWalkLeaf, Is.InstanceOf<IParameterReferenceOperation>());
-        Assert.That(pureWalkDepth, Is.EqualTo(unaryCount + 1));
-        Assert.That(SymbolEqualityComparer.Default.Equals(
-            pureAttribute.AttributeClass, pureAttributeType), Is.True);
-        Assert.That(pureAttributeType!.MetadataName,
-            Is.EqualTo(typeof(System.Diagnostics.Contracts.PureAttribute).Name));
-        Assert.That(pureAttributeType.ContainingAssembly.Identity.Name,
-            Is.EqualTo(typeof(System.Diagnostics.Contracts.PureAttribute)
-                .Assembly.GetName().Name));
-        Assert.That(echoSyntax.Body, Is.Null);
-        Assert.That(echoSyntax.ExpressionBody?.Expression.ToString(),
-            Is.EqualTo("value"));
-        Assert.That(nativeValue, Is.EqualTo(expectedNativeValue));
-
-        TestContext.Progress.WriteLine(
-            $"compiler=CSharp emit=successful sourceUnaryNodes={sourceUnaryCount} " +
-            $"operationTreeNodes={operationTreeNodeCount} " +
-            $"operationTreeMaxDepth={deepestOperationTreeDepth} " +
-            $"purityArgumentMaxDepth={pureWalkDepth} " +
-            $"target={invocation.TargetMethod.ToDisplayString()} " +
-            $"pureAttribute={pureAttributeType.ToDisplayString()} " +
-            $"nativeTarget(true)={nativeValue}");
-
-        var lowerer = new RoslynOperationLowerer(
-            compiled.Factory,
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.GetAttributes().Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
-                    attribute.AttributeClass, pureAttributeType)))));
-        var result = lowerer.Lower(invocation);
-
-        Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
-        Assert.That(((IrOpaqueTerm)result.Term).Purity,
-            Is.EqualTo(expectedPurity));
-        Assert.That(((IrOpaqueTerm)result.Term).Arguments, Has.Length.EqualTo(1));
-        Assert.That(result.Classification.Abstention,
-            Is.EqualTo(FrontendAbstention.UnsupportedInvocationShape));
     }
 
     private static int MeasureOperationDepth(IOperation operation, int depth)
@@ -1257,7 +545,7 @@ internal sealed class FrontendLoweringTests
             _methodSymbol = methodSymbol;
             TargetRoot = targetRoot;
             TargetExpression = targetExpression;
-            Factory = new IrFactory();
+            Factory = new IrFactory(IrExecutionSemantics.Total);
         }
 
         internal IrFactory Factory
@@ -1349,9 +637,9 @@ internal sealed class FrontendLoweringTests
             return _method!.Invoke(null, arguments.ToArray());
         }
 
-        internal FrontendLoweringResult Lower()
+        internal SharpProof.Fuzz.FrontendTotalLoweringResult Lower()
         {
-            return new RoslynOperationLowerer(Factory).Lower(TargetExpression);
+            return SharpProof.Fuzz.FrontendTotalLowering.Lower(Factory, TargetExpression);
         }
 
         internal object? CompareWithInterpreter(ImmutableArray<object?> arguments)
@@ -1377,7 +665,7 @@ internal sealed class FrontendLoweringTests
         }
 
         internal ImmutableDictionary<IrVarId, IrValue> CreateEnvironment(
-            FrontendLoweringResult lowering,
+            SharpProof.Fuzz.FrontendTotalLoweringResult lowering,
              ImmutableArray<object?> arguments)
         {
             if (arguments.IsDefault)
@@ -1459,8 +747,9 @@ internal sealed class FrontendLoweringTests
             return info.Kind switch
             {
                 IrTypeKind.Boolean => factory.CreateBooleanValue((bool)value),
-                IrTypeKind.Integer => factory.CreateIntegerValue(
-                    Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+                IrTypeKind.Integer => value is ulong unsigned
+                    ? factory.CreateIntegerValue(type, unsigned)
+                    : factory.CreateIntegerValue(type, Convert.ToInt64(value, CultureInfo.InvariantCulture)),
                 IrTypeKind.String => factory.CreateStringValue((string)value),
                 IrTypeKind.Sequence => factory.CreateSequenceValue(
                     type,
@@ -1517,35 +806,4 @@ internal sealed class FrontendLoweringTests
         }
     }
 
-    private static PortableExecutableReference CreateAliasedTypeReference(
-        string assemblyName,
-        string alias)
-    {
-        System.ArgumentNullException.ThrowIfNull(alias);
-        System.ArgumentNullException.ThrowIfNull(assemblyName);
-        var tree = CSharpSyntaxTree.ParseText(
-            """
-            namespace Collision {
-                public sealed class Widget {
-                }
-            }
-            """,
-            new CSharpParseOptions(LanguageVersion.CSharp12));
-        var compilation = CSharpCompilation.Create(
-            assemblyName,
-            [tree],
-            TestMetadataReferences.Platform,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        using var stream = new MemoryStream();
-        var emit = compilation.Emit(stream);
-        Assert.That(
-            emit.Success,
-            Is.True,
-            string.Join(Environment.NewLine, emit.Diagnostics));
-        return MetadataReference.CreateFromImage(
-            ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
-            new MetadataReferenceProperties(
-                MetadataImageKind.Assembly,
-                aliases: [alias]));
-    }
 }

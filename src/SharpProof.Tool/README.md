@@ -21,9 +21,8 @@ install the matching tool. Teammates restore that manifest with `dotnet tool res
 dotnet new tool-manifest
 dotnet tool install SharpProof.Tool --version 1.0.0-preview.1
 dotnet sharpproof doctor
-dotnet sharpproof doctor --json
-dotnet sharpproof explain obj/Debug/net10.0/SharpProof/result.json
-dotnet sharpproof explain path/to/result.json --file src/Example.cs --line 12 --json
+dotnet sharpproof doctor --format json
+dotnet sharpproof explain --result obj/Debug/net10.0/SharpProof/result.json
 ```
 
 Tool execution requires .NET 10; local-manifest installation/restore also requires a
@@ -33,7 +32,7 @@ reports its own runtime and architecture. It does not evaluate projects, restore
 build, or load the solver.
 It cannot certify package configuration or native solver availability.
 
-The positional `explain <result.json>` form validates the stored worker protocol and
+`explain --result <result.json>` validates the stored worker protocol and
 displays recorded claim and callable outcomes, coverage, vacuity, assumptions,
 elapsed time, cache status, and errors. It always labels the output as stored
 evidence. Neither successful parsing nor a recorded Proven result establishes
@@ -41,9 +40,8 @@ current source freshness or independent request authority. Run your normal consu
 build to obtain fresh proof evidence.
 Use your build's printed result path when outputs have been customized.
 
-`--file` matches the exact recorded source path using ordinal comparison; `--line`
-matches a recorded start line. JSON includes the same scope warning and filtered
-entries. Exit 0 means the diagnostic command completed, not that a contract was
+Without a sibling `request.json` and `compiler-manifest.json` (or explicit
+`--request`/`--compiler-manifest`), `explain` reads the standalone result. Exit 0 means the diagnostic command completed, not that a contract was
 proven. Invalid syntax, malformed/missing evidence, and failed SDK discovery exit 2.
 Results can contain private paths, contracts, and counterexample values; review
 them before sharing. This tool never rewrites results or runs verification.
@@ -85,7 +83,7 @@ contract. For a generated container starter, restore/run the tool through its se
 to use the same container-owned assets, package feeds, and SDK as the consumer build.
 It evaluates a trusted project's MSBuild imports without invoking build targets and
 does not restore, build, pull images, or run verification. Exit 1 means a setup check
-failed; it does not replace the SDK-only `doctor [--json]` mode.
+failed; it does not replace the SDK-only `doctor` mode without `--project`.
 
 Named-option `init`, `doctor --project`, `explain --result`, `compare`, and `export-test`
 accept `--format text|json|markdown`, defaulting to text:
@@ -96,11 +94,9 @@ dotnet sharpproof explain --result artifacts/sharpproof/result.json --format mar
 ```
 
 JSON/Markdown output is one document on stdout, including setup/regression status 1.
-Invalid arguments or evidence return 2 with stderr only and empty stdout. Legacy
-`doctor [--json]` and positional `explain <result.json> ... [--json]` retain their
-existing JSON syntax and scope; their options do not change to `--format`.
+Invalid arguments or evidence return 2 with stderr only and empty stdout.
 
-The commands below require a complete matching evidence set: the result plus sibling
+`compare` and `export-test` require a complete matching evidence set: the result plus sibling
 `request.json` and `compiler-manifest.json`. Override companion paths with `--request`
 and `--compiler-manifest`; comparison also accepts `--baseline-request` and
 `--baseline-compiler-manifest` for its baseline.
@@ -111,8 +107,7 @@ dotnet sharpproof compare --baseline baseline/result.json --current artifacts/sh
 dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regressions
 ```
 
-Named-option `explain` explains claims and typed Unknown detail from validated evidence;
-the positional form retains its existing `--file`, `--line`, and `--json` options.
+`explain` explains claims and typed Unknown detail from validated evidence.
 Comparison requires the same assembly identity, framework, and specification selection.
 Its regression gate is enabled only by `--fail-on-regression` and does not replace the
 consumer's verifier policy. Exit 1 means that enabled gate found a regression.

@@ -19,7 +19,6 @@
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
-    <InternalsVisibleTo Include="SharpProof.Effects" />
     <InternalsVisibleTo Include="SharpProof.Frontend" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
@@ -29,12 +28,10 @@
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
-    <InternalsVisibleTo Include="SharpProof.Contracts" />
     <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
     <InternalsVisibleTo Include="SharpProof.Ir.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt" />
     <InternalsVisibleTo Include="SharpProof.Testing" />
-    <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
     <InternalsVisibleTo Include="SharpProof.Effects.Test" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />

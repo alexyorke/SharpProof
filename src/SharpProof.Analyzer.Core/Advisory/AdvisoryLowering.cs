@@ -33,7 +33,7 @@ internal static class AdvisoryLowering
         cancellationToken.ThrowIfCancellationRequested();
         if (!compilation.SyntaxTrees.Contains(declaration.SyntaxTree))
         { return (null, "SourceOwnership"); }
-        if (!TotalBodyLowering.IsBodyDeclaration(declaration))
+        if (!TotalSourceCallSession.IsBodyDeclaration(declaration))
         { return (null, "UnsupportedCallable"); }
         var documents = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture))))
             .ToImmutableArray();
@@ -51,7 +51,7 @@ internal static class AdvisoryLowering
             if (!binding.IsSuccess)
             { return (null, "ContractBinding:" + binding.Failure); }
             clauses = binding.Clauses;
-            var graph = TotalBodyLowering.CreateGraph(declaration, method,
+            var graph = TotalSourceCallSession.CreateGraph(declaration, method,
                 Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree), cancellationToken);
             lowering = graph == null ? null : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true);
         }

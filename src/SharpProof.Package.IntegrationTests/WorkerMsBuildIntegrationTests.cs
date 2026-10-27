@@ -261,10 +261,10 @@ public sealed class WorkerMsBuildIntegrationTests
             Path.GetTempPath(),
             "absolute-collector");
         using var project = ConsumerProject.CreateConfigured(
-            IdentitySource, [("_SharpProofTestAnalyzerDirectory", analyzerDirectory), ("_SharpProofTestCollectorDirectory", collectorDirectory), ("_SharpProofTestCompilerCollectorPath", " "), ("_SharpProofTestContractForGeneratorPath", " ")]);
+            IdentitySource, [("_SharpProofTestAnalyzerDirectory", analyzerDirectory), ("_SharpProofTestCollectorDirectory", collectorDirectory), ("_SharpProofTestCompilerCollectorPath", " ")]);
 
         var properties = await project.EvaluatePropertiesAsync(
-["_SharpProofAnalyzerDirectory", "_SharpProofAnalyzerPath", "_SharpProofContractForGeneratorPath", "_SharpProofCollectorDirectory", "_SharpProofCompilerCollectorPath"]);
+["_SharpProofAnalyzerDirectory", "_SharpProofAnalyzerPath", "_SharpProofCollectorDirectory", "_SharpProofCompilerCollectorPath"]);
 
         var expectedAnalyzerDirectory = Path.GetFullPath(
             Path.Combine(project.Root, analyzerDirectory));
@@ -278,11 +278,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(Path.Combine(
                     expectedAnalyzerDirectory,
                     "SharpProof.Analyzer.dll")));
-            Assert.That(
-                properties["_SharpProofContractForGeneratorPath"],
-                Is.EqualTo(Path.Combine(
-                    expectedAnalyzerDirectory,
-                    "SharpProof.ContractForGenerator.dll")));
             Assert.That(
                 properties["_SharpProofCollectorDirectory"],
                 Is.EqualTo(Path.GetFullPath(collectorDirectory)));
@@ -3081,7 +3076,6 @@ public sealed class WorkerMsBuildIntegrationTests
             string PropsPath,
             string VerifierPropsPath,
             string AnalyzerDirectory,
-            string GeneratorDirectory,
             string CollectorDirectory,
             string SharedDirectory,
             string TargetsPath,
@@ -3097,7 +3091,6 @@ public sealed class WorkerMsBuildIntegrationTests
             public string PropsPath { get; init; } = PropsPath ?? throw new System.ArgumentNullException(nameof(PropsPath));
             public string VerifierPropsPath { get; init; } = VerifierPropsPath ?? throw new System.ArgumentNullException(nameof(VerifierPropsPath));
             public string AnalyzerDirectory { get; init; } = AnalyzerDirectory ?? throw new System.ArgumentNullException(nameof(AnalyzerDirectory));
-            public string GeneratorDirectory { get; init; } = GeneratorDirectory ?? throw new System.ArgumentNullException(nameof(GeneratorDirectory));
             public string SharedDirectory { get; init; } = SharedDirectory ?? throw new System.ArgumentNullException(nameof(SharedDirectory));
             public string CollectorDirectory { get; init; } = CollectorDirectory ?? throw new System.ArgumentNullException(nameof(CollectorDirectory));
             public string TargetsPath { get; init; } = TargetsPath ?? throw new System.ArgumentNullException(nameof(TargetsPath));
@@ -3746,7 +3739,6 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Import Project="{template.VerifierPropsPath}" />
                   <PropertyGroup>
                     <_SharpProofTestAnalyzerDirectory>{template.AnalyzerDirectory}</_SharpProofTestAnalyzerDirectory>
-                    <_SharpProofTestContractForGeneratorPath>{template.GeneratorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofTestContractForGeneratorPath>
                     <_SharpProofSharedDirectory>{template.SharedDirectory}</_SharpProofSharedDirectory>
                     <_SharpProofTestCollectorDirectory>{template.CollectorDirectory}</_SharpProofTestCollectorDirectory>
                     <_SharpProofTestCompilerCollectorPath>{template.CollectorDirectory}/SharpProof.CompilerCollector.dll</_SharpProofTestCompilerCollectorPath>
@@ -3797,7 +3789,7 @@ public sealed class WorkerMsBuildIntegrationTests
                           Condition="'$(SharpProofRunAnalyzersForPackageTests)' != 'true'">
                     <ItemGroup>
                       <!-- This fixture isolates worker targets; IDE enrollment is tested with the packed product. -->
-                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofContractForGeneratorPath);$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" />
+                      <Analyzer Remove="$(_SharpProofAnalyzerPath);$(_SharpProofAnalyzerDirectory)/SharpProof.CodeFixes.dll" />
                     </ItemGroup>
                   </Target>
                 </Project>
@@ -3873,7 +3865,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 throw new InvalidOperationException(
                     "The test build configuration was not found.");
             var analyzerDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.Analyzer", testConfiguration, "netstandard2.0"]);
-            var generatorDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.ContractForGenerator", testConfiguration, "netstandard2.0"]);
             var collectorDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.CompilerCollector", testConfiguration, "netstandard2.0"]);
             var targets = EscapePath([repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.targets"]);
             var verifierTargets = EscapePath([repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets"]);
@@ -3889,7 +3880,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 props,
                 verifierProps,
                 analyzerDirectory,
-                generatorDirectory,
                 collectorDirectory,
                 sharedDirectory,
                 targets,

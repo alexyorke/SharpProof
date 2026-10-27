@@ -23,10 +23,12 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
-    <InternalsVisibleTo Include="SharpProof.ContractForGenerator" />
-    <InternalsVisibleTo Include="SharpProof.ContractForGenerator.Test" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
   </ItemGroup>
 </Project>

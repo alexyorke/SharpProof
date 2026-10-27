@@ -11,8 +11,8 @@ public sealed class RuntimeDependencyTests
     public void WorkerAssemblyHasCompilerNeutralRuntimeClosure()
     {
         var forbidden = ImmutableHashSet.Create(StringComparer.Ordinal,
-            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
-            "SharpProof.Effects", "SharpProof.Frontend"
+            "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Compiler.Semantics",
+            "SharpProof.Frontend"
         );
         var pending = ImmutableQueue<Assembly>.Empty;
         var queued = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);

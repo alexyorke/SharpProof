@@ -13,3 +13,5 @@ global using SharpProof.Effects;
 global using SharpProof.Frontend;
 global using SharpProof.Ir;
 global using SharpProof.Specs;
+global using System.Runtime.CompilerServices;
+global using SharpProof.Dataflow;

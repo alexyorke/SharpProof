@@ -433,8 +433,8 @@ internal sealed class ApiSpecValidationTests
 
         using (Assert.EnterMultipleScope())
         {
-            Reject(Equal(null!, new SpecIntegerDeclaration(1)),
-                "null-child", "cannot contain null");
+            Assert.That(() => Equal(null!, new SpecIntegerDeclaration(1)),
+                Throws.ArgumentNullException);
             Reject(Equal(
                     new SpecVariableDeclaration(
                         SpecVariableRole.Parameter, 0, IrTypeKind.Integer),
@@ -451,9 +451,8 @@ internal sealed class ApiSpecValidationTests
             Assert.That(() => ApiSpecTable.Create([wrongType]),
                 Throws.ArgumentException.With.Message.Contains(
                     "spec variable declaration has the wrong type"));
-            Reject(Equal(new SpecStringDeclaration(null!),
-                    new SpecStringDeclaration("valid")),
-                "null-string", "String constants cannot be null");
+            Assert.That(() => new SpecStringDeclaration(null!),
+                Throws.ArgumentNullException);
             Reject(Equal(new SpecNullDeclaration(IrTypeKind.Integer),
                     new SpecIntegerDeclaration(1)),
                 "nonnullable-null", "Null requires a nullable spec type");

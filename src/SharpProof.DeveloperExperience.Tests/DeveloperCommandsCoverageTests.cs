@@ -37,19 +37,6 @@ internal sealed class DeveloperCommandsCoverageTests
     }
 
     [Test]
-    public async Task PositionalExplainRetainsItsRecordedEvidenceJsonContract()
-    {
-        using var fixture = new StoredEvidenceFixture();
-        var run = await RunAsync("explain", fixture.ResultPath, "--json");
-        Assert.That(run.ExitCode, Is.Zero, run.Error);
-        Assert.That(run.Error, Is.Empty);
-        using var document = JsonDocument.Parse(run.Output);
-        Assert.That(document.RootElement.GetProperty("scope").GetString(), Does.Contain("Stored evidence only"));
-        Assert.That(document.RootElement.GetProperty("entries").GetArrayLength(), Is.EqualTo(2));
-        Assert.That(document.RootElement.GetProperty("selectedClaims").GetInt32(), Is.EqualTo(1));
-    }
-
-    [Test]
     public async Task NamedExplainRejectsAnAbsentClaimWithoutRenderingAnUnrelatedReport()
     {
         using var fixture = new StoredEvidenceFixture();

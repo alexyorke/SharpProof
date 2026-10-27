@@ -70,20 +70,12 @@ The [configuration reference](docs/configuration.md) covers selection, IDE behav
 
 The [developer tools guide](docs/developer-experience.md) covers workspace templates, preview-first project initialization, setup/evidence reports in text/JSON/Markdown, exact-base CI comparison, relocatable NUnit regression export, and optional editor scaffolding. These matching preview packages require a configured feed; this checkout does not imply public package availability.
 
-The next private preview keeps source public while official `1.0.0-preview.1` packages,
-symbols, image, and release evidence belong to the owner-only initial
-`alexyorke/SharpProof-preview` release path. Public CI uses distinct validation versions.
-The [private release receipt](docs/private-preview-release-receipt.md) and
-[interactive editor runbook](docs/editor-acceptance.md) record the required evidence;
-publication and all three interactive editor qualifications remain pending.
-
 ## Learn by doing
 
 From the repository root, with Docker Compose v2 and Linux containers:
 
 ```text
 docker compose build tooling
-docker compose run --rm tooling contract
 docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
 docker compose run --rm tooling pr
 ```
