@@ -42,19 +42,6 @@ internal static partial class CSharpOperationSemantics
                 SymbolEqualityComparer.Default.Equals(parameter.Type, method.ContainingType.TypeArguments[0])));
     }
 
-    internal static bool IsDefaultIntegerComparison(IInvocationOperation invocation)
-    {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        return IsIntegerComparerDeclaration(invocation.TargetMethod) &&
-            invocation.Instance != null && IsDefaultIntegerComparer(invocation.Instance);
-    }
-
-    internal static bool IsDefaultIntegerComparer(IOperation operation)
-    {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return IsComparisonIntegerType(DefaultComparerElement(operation));
-    }
-
     internal static bool IsComparisonIntegerType(ITypeSymbol? type)
     {
         return type != null && TryGetScalarInteger(type.SpecialType, out _);
