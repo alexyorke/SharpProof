@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Ir;

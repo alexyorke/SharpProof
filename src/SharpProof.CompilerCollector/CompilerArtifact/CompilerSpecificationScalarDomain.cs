@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // The scalar signature domain accepted by audited specification packs.
 // This conversion does not resolve methods or admit catalog definitions.

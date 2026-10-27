@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Roslyn supplies constants without invoking an attribute constructor. Every
 // declaration is checked again here and bound only to the directly named root.

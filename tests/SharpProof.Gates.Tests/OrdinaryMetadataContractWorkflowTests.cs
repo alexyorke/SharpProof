@@ -5,6 +5,7 @@ using SharpProof.Analyzer;
 using SharpProof.Compiler.Semantics;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;

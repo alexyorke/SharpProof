@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using SharpProof.Worker.Protocol;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class CompilerSourceLocationProjection
 {

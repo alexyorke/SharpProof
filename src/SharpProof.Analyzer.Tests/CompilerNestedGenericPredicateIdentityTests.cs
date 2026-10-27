@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;

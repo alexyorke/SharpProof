@@ -1,5 +1,5 @@
 // Semantic claim identities are sealed by the build-time collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static partial class SemanticClaimIdentity
 {

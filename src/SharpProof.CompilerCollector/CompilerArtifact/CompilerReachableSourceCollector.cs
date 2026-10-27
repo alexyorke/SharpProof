@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Collect potential source calls lazily from claim roots. Each method owns one
 // factory and is lowered once. This shadow graph does not publish proof results.

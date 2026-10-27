@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class CompilerWireIdentityMappings
 {

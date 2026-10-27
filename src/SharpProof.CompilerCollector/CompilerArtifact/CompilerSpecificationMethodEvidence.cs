@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Compiler binding evidence projected once from the selected audited catalog.
 internal sealed record CompilerSpecificationMethodEvidence(

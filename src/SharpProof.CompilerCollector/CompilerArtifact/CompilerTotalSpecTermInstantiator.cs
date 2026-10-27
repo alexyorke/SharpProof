@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class CompilerTotalSpecTermInstantiator
 {

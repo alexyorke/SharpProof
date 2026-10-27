@@ -7,6 +7,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Ir;
 using SharpProof.Host;
 using SharpProof.Smt;

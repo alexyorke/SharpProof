@@ -4,7 +4,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Import private generated fields from a real emission. This metadata is source
 // evidence; it supplies neither a physical layout nor an allocation verdict.

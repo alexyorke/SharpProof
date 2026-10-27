@@ -1,6 +1,6 @@
 
 // This builder runs only in the build-time compiler collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal sealed partial class ClaimManifestBuilder(
     CSharpCompilation compilation,

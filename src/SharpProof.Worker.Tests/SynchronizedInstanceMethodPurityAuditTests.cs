@@ -8,6 +8,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Worker.Protocol;
 using Program = SharpProof.Worker.Launcher.Program;
 

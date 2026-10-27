@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Gates.Corpus;
 using SharpProof.Worker.Protocol;
 

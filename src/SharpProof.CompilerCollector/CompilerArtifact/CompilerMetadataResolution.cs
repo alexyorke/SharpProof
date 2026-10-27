@@ -4,7 +4,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 
 #pragma warning disable RS1035 // Captured implementation evidence requires reading the final PE image.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class CompilerMetadataResolution
 {

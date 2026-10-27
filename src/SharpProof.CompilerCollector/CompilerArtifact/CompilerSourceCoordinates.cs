@@ -1,6 +1,6 @@
 using SharpProof.Worker.Protocol;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Producer-only mapping for stable reporting identities.
 internal static class CompilerSourceCoordinates

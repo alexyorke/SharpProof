@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Encodes a declaration's structural role within its compiler-owned syntax.
 internal static class CompilerOwnedSyntaxPath

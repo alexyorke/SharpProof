@@ -1,5 +1,5 @@
 // Relative symbol ownership used by semantic claim type-parameter identities.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class ClaimIdentitySymbolOwnership
 {

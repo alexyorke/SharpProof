@@ -1,5 +1,5 @@
 // This producer runs only in the build-time compiler collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static class CompilerManifestArtifactProducer
 {

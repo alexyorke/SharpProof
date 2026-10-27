@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Binds audited method evidence first to compiler symbols, then to Total IR values.
 internal sealed class CompilerSpecificationMethodBinding(

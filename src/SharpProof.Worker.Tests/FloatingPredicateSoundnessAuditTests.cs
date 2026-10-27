@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 

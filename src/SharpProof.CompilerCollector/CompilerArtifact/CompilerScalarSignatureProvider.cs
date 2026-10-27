@@ -1,6 +1,6 @@
 using System.Reflection.Metadata;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Classify decoded metadata types without admitting unsupported scalar shapes.
 internal sealed class CompilerScalarSignatureProvider : ISignatureTypeProvider<SpecialType, object?>

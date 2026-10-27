@@ -1,4 +1,5 @@
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 using NUnit.Framework;

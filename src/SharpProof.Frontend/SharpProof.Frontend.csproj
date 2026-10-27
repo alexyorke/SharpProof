@@ -17,7 +17,6 @@
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
@@ -99,6 +98,5 @@
   </Target>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Tool" />
-    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
   </ItemGroup>
 </Project>
