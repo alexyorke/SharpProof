@@ -43,7 +43,15 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
         return !Log.HasLoggedErrors;
     }
 
-    internal static void ValidateFiles(string requestPath, string resultPath, string manifestPath,
+    // The validated objects are returned so callers act on exactly what was checked.
+    internal sealed record ValidatedFiles(
+        WorkerVerifyRequest Request, WorkerVerifyResponse Response, WorkerVerifyResponse? InvocationResponse)
+    {
+        public WorkerVerifyRequest Request { get; init; } = Request ?? throw new System.ArgumentNullException(nameof(Request));
+        public WorkerVerifyResponse Response { get; init; } = Response ?? throw new System.ArgumentNullException(nameof(Response));
+    }
+
+    internal static ValidatedFiles ValidateFiles(string requestPath, string resultPath, string manifestPath,
         string? sarifPath, string? invocationResultPath, string? projectRoot = null)
     {
         System.ArgumentNullException.ThrowIfNull(requestPath);
@@ -145,5 +153,6 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                     "the published SARIF does not satisfy SARIF 2.1.0");
             }
         }
+        return new(request, response, invocationResponse);
     }
 }

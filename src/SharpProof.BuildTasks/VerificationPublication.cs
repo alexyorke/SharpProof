@@ -91,14 +91,12 @@ internal sealed class VerificationPublication
         var resultPaths = _paths["--publish-result"];
         var manifestPaths = _paths["--publish-compiler-manifest"];
         var sarifPaths = _paths.GetValueOrDefault("--publish-sarif");
-        ValidatePublishedVerificationResult.ValidateFiles(requestPaths.Prepared, resultPaths.Prepared, manifestPaths.Prepared,
-            sarifPaths.Prepared, _invocationResult);
-        var request = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.ReadUtf8File(requestPaths.Prepared))
-            ?? throw new InvalidDataException("The prepared publication request is missing.");
-        var response = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.ReadUtf8File(resultPaths.Prepared))
-            ?? throw new InvalidDataException("The prepared publication result is missing.");
+        var prepared = ValidatePublishedVerificationResult.ValidateFiles(requestPaths.Prepared, resultPaths.Prepared,
+            manifestPaths.Prepared, sarifPaths.Prepared, _invocationResult);
+        var request = prepared.Request;
+        var response = prepared.Response;
         var invocationRequest = WorkerProtocolJson.DeserializeRequest(WorkerProtocolJson.ReadUtf8File(_invocationRequest));
-        var invocationResponse = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.ReadUtf8File(_invocationResult))
+        var invocationResponse = prepared.InvocationResponse
             ?? throw new InvalidDataException("The private invocation result is missing.");
         if (invocationRequest == null || !WorkerProtocolJson.Validate(invocationRequest).IsValid ||
             !WorkerProtocolJson.ValidateForRequest(invocationResponse, WorkerProtocolJson.ComputeRequestHash(invocationRequest),
