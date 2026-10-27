@@ -3,14 +3,15 @@ name: Coverage
 on:
   push:
     branches: [master]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   SHARPPROOF_CI_PACKAGE_VERSION: ${{ format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) }}
