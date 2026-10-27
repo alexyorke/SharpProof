@@ -125,7 +125,6 @@ fuzz_shard() {
   local start=$((base + shard * per_shard))
   local end=$((start + per_shard))
   echo "LongFuzz shard $shard: seeds [$start, $end), $minutes minutes."
-  rm -rf "$out" && mkdir -p "$out"
   docker compose run --rm -e SHARPPROOF_LONGFUZZ_SEED_START="$start" -e SHARPPROOF_LONGFUZZ_SEED_END="$end" \
     -e SHARPPROOF_LONGFUZZ_MINUTES="$minutes" -e SHARPPROOF_LONGFUZZ_OUTPUT="$out" \
     tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter TestCategory=LongFuzz &
