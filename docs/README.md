@@ -37,7 +37,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Semantics](../SEMANTICS.md) | Meaning of outcomes, contracts, effects, assumptions, and replay |
 | [Architecture](architecture.md) | Compiler, IR, solver, worker, and build boundaries |
 | [SMT lifecycle](smt-lifecycle.md) | Native solver ownership, budgets, cancellation, replay |
-| [Default API catalog](api-spec-catalog.generated.md) | Hand-maintained projection of the checked-in catalog |
+| [Default API catalog](api-spec-catalog.md) | Hand-maintained projection of the checked-in catalog |
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
 | [Native Windows verifier](windows-native-verifier-plan.md) | Run Windows x64/ARM64 proofs, static runtime payloads, supported paths, and CI |

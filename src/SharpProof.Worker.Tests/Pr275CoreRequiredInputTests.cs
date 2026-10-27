@@ -23,18 +23,18 @@ public sealed class Pr275CoreRequiredInputTests
 
         AssertArgumentNull(
             "declaration",
-            () => TotalBodyLowering.CreateGraph(
+            () => TotalSourceCallSession.CreateGraph(
                 null!, fixture.Method, fixture.Model, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "method",
-            () => TotalBodyLowering.CreateGraph(
+            () => TotalSourceCallSession.CreateGraph(
                 fixture.Declaration, null!, fixture.Model, TestContext.CurrentContext.CancellationToken));
         AssertArgumentNull(
             "model",
-            () => TotalBodyLowering.CreateGraph(
+            () => TotalSourceCallSession.CreateGraph(
                 fixture.Declaration, fixture.Method, null!, TestContext.CurrentContext.CancellationToken));
 
-        var graph = TotalBodyLowering.CreateGraph(
+        var graph = TotalSourceCallSession.CreateGraph(
             fixture.Declaration, fixture.Method, fixture.Model, TestContext.CurrentContext.CancellationToken);
         Assert.That(graph, Is.Not.Null);
     }

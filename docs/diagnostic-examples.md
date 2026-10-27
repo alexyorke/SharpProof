@@ -1,6 +1,6 @@
 # SharpProof diagnostics
 
-Portable diagnostic descriptors are owned by [GeneratedDiagnosticDescriptors.generated.cs](../src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs) and [ContractForDiagnosticDescriptors.generated.cs](../src/SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs). The files are hand-maintained.
+Portable diagnostic descriptors are owned by [GeneratedDiagnosticDescriptors.cs](../src/SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.cs) and [ContractForDiagnosticDescriptors.cs](../src/SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.cs). The files are hand-maintained.
 
 The main package defaults to strict full verification with all features. For deliberate portable-only feedback, explicitly select `SharpProofProfile=advisory` and `SharpProofVerify=false`; all features remain enabled. Profiles are advisory, strict, or off; features are effects, contracts, or all. Normal Roslyn configuration can change effective severity.
 

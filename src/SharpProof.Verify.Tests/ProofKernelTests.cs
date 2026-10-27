@@ -326,13 +326,11 @@ internal sealed class ProofKernelTests
                 BackendCheckStatus.Unknown,
                 [],
                 model,
-                BackendFailureReason.Timeout,
-                default), new BackendCheckResult(
+                BackendFailureReason.Timeout), new BackendCheckResult(
                 BackendCheckStatus.Unknown,
                 [0],
                 null,
-                BackendFailureReason.Timeout,
-                default)
+                BackendFailureReason.Timeout)
 );
 
         foreach (var result in results)

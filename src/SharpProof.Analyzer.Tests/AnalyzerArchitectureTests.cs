@@ -183,7 +183,7 @@ public sealed class AnalyzerArchitectureTests
         var root = TestRepository.FindRoot();
         var analyzerDirectory = Path.Combine(
             root,
-            "src/SharpProof.Analyzer");
+            "src/SharpProof.Analyzer.Core");
         var shipped = ReadReleaseSection(
             Path.Combine(
                 analyzerDirectory,

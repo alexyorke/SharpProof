@@ -554,12 +554,6 @@ internal static partial class SemanticClaimIdentity
         return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
     }
 
-    private readonly partial record struct ClaimIdentityContext
-    {
-        internal ContractApiSymbols? Intrinsics { get; init; }
-        internal SemanticModel? Model { get; init; }
-    }
-
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");

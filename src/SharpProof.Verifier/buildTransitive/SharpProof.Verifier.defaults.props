@@ -1,6 +1,6 @@
 <Project>
   <!-- Verifier defaults. Keep in sync with the defaults in
-       src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs. -->
+       src/SharpProof.Worker.Protocol/ProtocolModel.cs. -->
   <PropertyGroup>
     <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
     <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>

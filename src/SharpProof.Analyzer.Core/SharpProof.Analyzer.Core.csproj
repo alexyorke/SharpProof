@@ -27,4 +27,8 @@
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
 </Project>

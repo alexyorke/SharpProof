@@ -8,10 +8,6 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
-    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

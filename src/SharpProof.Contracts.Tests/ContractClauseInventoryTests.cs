@@ -530,16 +530,20 @@ public sealed class ContractClauseInventoryTests
             6 => [valid, null!],
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
         };
+        if (shape == 0)
+        {
+            Action construct = () => _ = new ContractClauseInventory(
+                original.Callable, true, false, original.ImplementationBody, clauses);
+            Assert.Throws<ArgumentException>(construct);
+            return;
+        }
+
         var inventory = new ContractClauseInventory(
             original.Callable, true, false, original.ImplementationBody, clauses);
         Action read = () => _ = inventory.HasValidClause;
         for (var iteration = 0; iteration < 4; iteration++)
         {
-            if (shape == 0)
-            {
-                Assert.Throws<NullReferenceException>(read);
-            }
-            else if (shape is 2 or 5)
+            if (shape is 2 or 5)
             {
                 Assert.That(Assert.Throws<ArgumentNullException>(read)!.ParamName,
                     Is.EqualTo("clause"));

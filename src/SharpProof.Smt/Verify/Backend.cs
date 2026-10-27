@@ -22,12 +22,10 @@ internal enum BackendFailureReason
 internal sealed partial class BackendModel
 {
     public BackendModel(IEnumerable<KeyValuePair<IrVarId, IrValue>> assignments)
-        : this(
-            ArgumentNullGuard.NotNull(assignments, nameof(assignments)).ToImmutableDictionary(
-                static assignment => assignment.Key,
-                static assignment => assignment.Value),
-            default)
     {
+        Assignments = ArgumentNullGuard.NotNull(assignments, nameof(assignments)).ToImmutableDictionary(
+            static assignment => assignment.Key,
+            static assignment => assignment.Value);
     }
 }
 
@@ -38,15 +36,14 @@ internal sealed partial class BackendCheckResult
         assumptionIndices = ArgumentNullGuard.NotNull(assumptionIndices, nameof(assumptionIndices));
 
         return new BackendCheckResult(BackendCheckStatus.Unsatisfiable,
-            [.. assumptionIndices], null, BackendFailureReason.None, default);
+            [.. assumptionIndices], null, BackendFailureReason.None);
     }
 
     public static BackendCheckResult Satisfiable(BackendModel model)
     {
         return new(BackendCheckStatus.Satisfiable, [],
             ArgumentNullGuard.NotNull(model, nameof(model)),
-            BackendFailureReason.None,
-            default);
+            BackendFailureReason.None);
     }
 
     public static BackendCheckResult Unknown(BackendFailureReason reason)
@@ -60,8 +57,7 @@ internal sealed partial class BackendCheckResult
             BackendCheckStatus.Unknown,
             [],
             null,
-            reason,
-            default);
+            reason);
     }
 }
 

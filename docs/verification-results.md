@@ -25,7 +25,7 @@ After validating a worker response, the build prints a readable summary: run/fai
 | Evidence | `Vacuity`, `ProofCore`, `Model`, `EffectCertainty`, `EffectWitness`, `Assumptions` | Conditions, dependencies, counterexample inputs, and source sites needed to interpret that outcome |
 | Execution | `Summary`: `Versions`, `Budgets`, `ElapsedMilliseconds`, `CacheStatus`, `CacheHit` | The worker/specification identity, configured limits, timing, and reuse status |
 
-The table uses C# protocol member names; JSON properties use camel case (`runStatus`, `claimResults`, `summary.cacheStatus`) and enum values use names such as `Complete` and `Proven`. See the [protocol model](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [serializer configuration](../src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs). JSON is a versioned protocol, not a hand-written receipt format. IDs connect manifest entries and results. Missing, duplicate, foreign, or inconsistent results fail validation; counting successful diagnostics is not an accountability check.
+The table uses C# protocol member names; JSON properties use camel case (`runStatus`, `claimResults`, `summary.cacheStatus`) and enum values use names such as `Complete` and `Proven`. See the [protocol model](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and [serializer configuration](../src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs). JSON is a versioned protocol, not a hand-written receipt format. IDs connect manifest entries and results. Missing, duplicate, foreign, or inconsistent results fail validation; counting successful diagnostics is not an accountability check.
 
 [Protocol tests](../src/SharpProof.Worker.Tests/ProtocolJsonTests.cs), [expanded manifest checks](../src/SharpProof.Worker.Tests/ProtocolExpandedManifestAuthorityTests.cs), and [result projection tests](../src/SharpProof.Worker.Tests/TotalClaimResultTests.cs) exercise these boundaries.
 
@@ -83,7 +83,7 @@ SARIF includes rule IDs such as `SharpProof.Proven`, `SharpProof.Refuted`, and `
 
 The worker launcher has internal failure exit codes as well as semantic policy failures; use the recorded status/reason and build diagnostic to distinguish them. A zero ordinary compiler exit code or suppressed analyzer diagnostic is insufficient evidence of verification.
 
-Source: [SARIF projection](../src/SharpProof.Worker/Launcher/SarifProjection.cs), [launcher presentation](../src/SharpProof.Worker/Launcher/LauncherProjections.generated.cs), [launcher program](../src/SharpProof.Worker/Launcher/LauncherProgram.cs). [SARIF policy tests](../src/SharpProof.Worker.Tests/WorkerSarifPolicyCoverageTests.cs) check that reporting preserves evidence.
+Source: [SARIF projection](../src/SharpProof.Worker/Launcher/SarifProjection.cs), [launcher presentation](../src/SharpProof.Worker/Launcher/LauncherPresentation.cs), [launcher program](../src/SharpProof.Worker/Launcher/LauncherProgram.cs). [SARIF policy tests](../src/SharpProof.Worker.Tests/WorkerSarifPolicyCoverageTests.cs) check that reporting preserves evidence.
 
 ## Cache reuse and resource failures
 

@@ -1,0 +1,788 @@
+#nullable enable
+namespace SharpProof.Specs;
+
+internal enum SpecEvidenceKind
+{
+    Documented,
+    Observed
+}
+
+[Flags]
+internal enum SpecEffect
+{
+    None = 0,
+    Unknown = 1 << 0,
+    ReadsReceiverState = 1 << 1,
+    ReadsArgumentState = 1 << 2,
+    WritesReceiverState = 1 << 3,
+    WritesArgumentState = 1 << 4,
+    ReadsAmbientState = 1 << 5,
+    WritesAmbientState = 1 << 6,
+    InputOutput = 1 << 7,
+    Synchronization = 1 << 8,
+    NativeCode = 1 << 9,
+    Reflection = 1 << 10,
+    Nondeterminism = 1 << 11
+}
+
+internal enum SpecAllocationBehavior
+{
+    None,
+    MayAllocate,
+    Unknown
+}
+
+internal enum SpecThrowBehavior
+{
+    DoesNotThrow,
+    MayThrow,
+    Unknown
+}
+
+internal enum SpecTerminationBehavior
+{
+    Terminates,
+    Unknown
+}
+
+internal enum SpecNullness
+{
+    NotApplicable,
+    NonNull,
+    MaybeNull,
+    Null,
+    Unknown
+}
+
+internal enum SpecCardinality
+{
+    NotApplicable,
+    Empty,
+    NonEmpty,
+    Exact,
+    Unknown
+}
+
+internal enum SpecTargetMemberKind
+{
+    Constructor,
+    Method,
+    PropertyGet
+}
+
+internal enum SpecVariableRole
+{
+    Receiver,
+    Parameter,
+    Result
+}
+
+internal sealed record SpecEvidence(SpecEvidenceKind Kind, string Source)
+{
+    public string Source { get; init; } = Source ?? throw new ArgumentNullException(nameof(Source));
+}
+internal sealed record SpecEffectFacet(SpecEffect Effects, SpecEvidence Evidence)
+{
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+internal sealed record SpecAllocationFacet(SpecAllocationBehavior Behavior, SpecEvidence Evidence)
+{
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+internal sealed record SpecThrowFacet(
+    SpecThrowBehavior Behavior, ImmutableArray<string> ExceptionMetadataNames,
+    SpecEvidence Evidence)
+{
+    public ImmutableArray<string> ExceptionMetadataNames { get; init; } = ExceptionMetadataNames.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ExceptionMetadataNames)) : ExceptionMetadataNames;
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+    public SpecTermDeclaration? NormalCompletion { get; init; }
+
+    public SpecThrowFacet(
+        SpecThrowBehavior behavior, ImmutableArray<string> exceptionMetadataNames,
+        SpecEvidence evidence, SpecTermDeclaration? normalCompletion)
+        : this(behavior, exceptionMetadataNames, evidence)
+    {
+        RepositoryParameterGuard.RequireInitialized(exceptionMetadataNames.IsDefault, nameof(exceptionMetadataNames), "Array must be initialized.");
+        evidence = RepositoryParameterGuard.NotNull(evidence, nameof(evidence));
+        NormalCompletion = normalCompletion;
+    }
+}
+internal sealed record SpecTerminationFacet(
+    SpecTerminationBehavior Behavior, SpecEvidence Evidence)
+{
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+internal sealed record SpecNullnessFacet(SpecNullness Result, SpecEvidence Evidence)
+{
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+internal sealed record SpecCardinalityFacet(
+    SpecCardinality Result, int? ExactCount, SpecEvidence Evidence)
+{
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+
+internal enum ApiSpecReferenceFamily
+{
+    Unspecified,
+    MicrosoftNetCoreReferencePack,
+    NetStandardReferencePack,
+    NetFrameworkReferenceAssemblies,
+    MicrosoftNetCoreRuntime,
+    SharpProofPackage
+}
+
+internal sealed record ApiSpecFacets(
+    SpecEffectFacet Effects, SpecAllocationFacet Allocation,
+    SpecThrowFacet Throws, SpecNullnessFacet Nullness,
+    SpecCardinalityFacet Cardinality,
+    SpecTerminationFacet? Termination = null)
+{
+    public SpecEffectFacet Effects { get; init; } = Effects ?? throw new ArgumentNullException(nameof(Effects));
+    public SpecAllocationFacet Allocation { get; init; } = Allocation ?? throw new ArgumentNullException(nameof(Allocation));
+    public SpecThrowFacet Throws { get; init; } = Throws ?? throw new ArgumentNullException(nameof(Throws));
+    public SpecNullnessFacet Nullness { get; init; } = Nullness ?? throw new ArgumentNullException(nameof(Nullness));
+    public SpecCardinalityFacet Cardinality { get; init; } = Cardinality ?? throw new ArgumentNullException(nameof(Cardinality));
+}
+
+internal sealed record ApiSpecAssemblyIdentity(
+    string Name,
+    string PublicKeyToken,
+    ApiSpecReferenceFamily ReferenceFamily =
+        ApiSpecReferenceFamily.Unspecified)
+{
+    public string Name { get; init; } = Name ?? throw new ArgumentNullException(nameof(Name));
+    public string PublicKeyToken { get; init; } = PublicKeyToken ?? throw new ArgumentNullException(nameof(PublicKeyToken));
+}
+
+internal sealed record ApiSpecTarget(
+    string WitnessIdentifier, string DocumentationCommentId,
+    string ContainingTypeMetadataName, SpecTargetMemberKind MemberKind,
+    string MemberName, bool IsStatic, int GenericArity,
+    IrTypeKind? ReceiverType, ImmutableArray<IrTypeKind> ParameterTypes,
+    IrTypeKind? ResultType,
+    ImmutableArray<ApiSpecAssemblyIdentity> ApprovedAssemblies)
+{
+    public string WitnessIdentifier { get; init; } = WitnessIdentifier ?? throw new ArgumentNullException(nameof(WitnessIdentifier));
+    public string DocumentationCommentId { get; init; } = DocumentationCommentId ?? throw new ArgumentNullException(nameof(DocumentationCommentId));
+    public string ContainingTypeMetadataName { get; init; } = ContainingTypeMetadataName ?? throw new ArgumentNullException(nameof(ContainingTypeMetadataName));
+    public string MemberName { get; init; } = MemberName ?? throw new ArgumentNullException(nameof(MemberName));
+    public ImmutableArray<IrTypeKind> ParameterTypes { get; init; } = ParameterTypes.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ParameterTypes)) : ParameterTypes;
+    public ImmutableArray<ApiSpecAssemblyIdentity> ApprovedAssemblies { get; init; } = ApprovedAssemblies.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ApprovedAssemblies)) : ApprovedAssemblies;
+}
+
+internal abstract record SpecTermDeclaration(IrTypeKind Type);
+
+internal sealed record SpecVariableDeclaration(SpecVariableRole Role, int Ordinal, IrTypeKind Type)
+    : SpecTermDeclaration(Type);
+
+internal sealed record SpecBooleanDeclaration(bool Value)
+    : SpecTermDeclaration(IrTypeKind.Boolean);
+
+internal sealed record SpecIntegerDeclaration(long Value)
+    : SpecTermDeclaration(IrTypeKind.Integer);
+
+internal sealed record SpecStringDeclaration(string Value)
+    : SpecTermDeclaration(IrTypeKind.String)
+{
+    public string Value { get; init; } = Value ?? throw new ArgumentNullException(nameof(Value));
+}
+
+internal sealed record SpecNullDeclaration(IrTypeKind Type) : SpecTermDeclaration(Type);
+
+internal sealed record SpecUnaryDeclaration(IrUnaryOperator Operator,
+    SpecTermDeclaration Operand, IrTypeKind Type)
+    : SpecTermDeclaration(Type)
+{
+    public SpecTermDeclaration Operand { get; init; } = Operand ?? throw new ArgumentNullException(nameof(Operand));
+}
+
+internal sealed record SpecBinaryDeclaration(IrBinaryOperator Operator,
+    SpecTermDeclaration Left, SpecTermDeclaration Right, IrTypeKind Type)
+    : SpecTermDeclaration(Type)
+{
+    public SpecTermDeclaration Left { get; init; } = Left ?? throw new ArgumentNullException(nameof(Left));
+    public SpecTermDeclaration Right { get; init; } = Right ?? throw new ArgumentNullException(nameof(Right));
+}
+
+internal sealed record SpecConditionalDeclaration(SpecTermDeclaration Condition,
+    SpecTermDeclaration WhenTrue, SpecTermDeclaration WhenFalse, IrTypeKind Type)
+    : SpecTermDeclaration(Type)
+{
+    public SpecTermDeclaration Condition { get; init; } = Condition ?? throw new ArgumentNullException(nameof(Condition));
+    public SpecTermDeclaration WhenTrue { get; init; } = WhenTrue ?? throw new ArgumentNullException(nameof(WhenTrue));
+    public SpecTermDeclaration WhenFalse { get; init; } = WhenFalse ?? throw new ArgumentNullException(nameof(WhenFalse));
+}
+
+internal sealed record SpecLengthDeclaration(SpecTermDeclaration Value)
+    : SpecTermDeclaration(IrTypeKind.Integer)
+{
+    public SpecTermDeclaration Value { get; init; } = Value ?? throw new ArgumentNullException(nameof(Value));
+}
+
+internal sealed record SpecPostconditionDeclaration(SpecTermDeclaration Condition, SpecEvidence Evidence)
+{
+    public SpecTermDeclaration Condition { get; init; } = Condition ?? throw new ArgumentNullException(nameof(Condition));
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+
+internal sealed record ApiSpecDeclaration(
+    ApiSpecTarget Target, ApiSpecFacets Facets,
+    ImmutableArray<SpecPostconditionDeclaration> Postconditions)
+{
+    public ApiSpecTarget Target { get; init; } = Target ?? throw new ArgumentNullException(nameof(Target));
+    public ApiSpecFacets Facets { get; init; } = Facets ?? throw new ArgumentNullException(nameof(Facets));
+    public ImmutableArray<SpecPostconditionDeclaration> Postconditions { get; init; } = Postconditions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Postconditions)) : Postconditions;
+}
+
+internal sealed record SpecVariableInfo(
+    SpecVarId Id, SpecVariableRole Role, int Ordinal, IrTypeKind Type)
+{
+    public SpecVarId Id { get; init; } = Id.IsDefault ? throw new ArgumentOutOfRangeException(nameof(Id)) : Id;
+}
+
+internal sealed record SpecPostcondition(
+    SpecTermDeclaration Condition, SpecEvidence Evidence)
+{
+    public SpecTermDeclaration Condition { get; init; } = Condition ?? throw new ArgumentNullException(nameof(Condition));
+    public SpecEvidence Evidence { get; init; } = Evidence ?? throw new ArgumentNullException(nameof(Evidence));
+}
+
+internal sealed class ApiSpecTemplate
+{
+    internal ApiSpecTemplate(
+        SpecId id, ApiSpecTarget target, ApiSpecFacets facets,
+        ImmutableArray<SpecVariableInfo> variables, SpecVarId? receiver,
+        ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variablesBySlot,
+        ImmutableArray<SpecVarId> parameters, SpecVarId? result,
+        ImmutableArray<SpecPostcondition> postconditions,
+        ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
+    {
+        id = RepositoryParameterGuard.NotNull(id, nameof(id));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        facets = RepositoryParameterGuard.NotNull(facets, nameof(facets));
+        RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
+        variablesBySlot = RepositoryParameterGuard.NotNull(variablesBySlot, nameof(variablesBySlot));
+        RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(postconditions.IsDefault, nameof(postconditions), "Array must be initialized.");
+        validatedTerms = RepositoryParameterGuard.NotNull(validatedTerms, nameof(validatedTerms));
+        (Id, Target, Facets, Variables) = (id, target, facets, variables);
+        (Receiver, Parameters, Result, Postconditions) =
+            (receiver, parameters, result, postconditions);
+        VariablesById = variables.ToImmutableDictionary(
+            static variable => variable is null ? throw new ArgumentNullException(nameof(variable)) : variable.Id);
+        VariablesBySlot = variablesBySlot;
+        ValidatedTerms = validatedTerms;
+    }
+
+    public SpecId Id { get; }
+    public ApiSpecTarget Target { get; }
+    public ApiSpecFacets Facets { get; }
+    public ImmutableArray<SpecVariableInfo> Variables { get; }
+    internal ImmutableDictionary<SpecVarId, SpecVariableInfo> VariablesById { get; }
+    internal ImmutableDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> VariablesBySlot { get; }
+    internal ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> ValidatedTerms { get; }
+    public SpecVarId? Receiver { get; }
+    public ImmutableArray<SpecVarId> Parameters { get; }
+    public SpecVarId? Result { get; }
+    public ImmutableArray<SpecPostcondition> Postconditions { get; }
+}
+
+internal sealed partial class ApiSpecTable
+{
+    public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
+    public const string DefaultTableVersion = "10";
+
+    private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
+    {
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblySetFramework = [
+            new("System", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("System.Private.CoreLib", "7cec85d7bea7798e", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
+            new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("mscorlib", "b77a5c561934e089", ApiSpecReferenceFamily.NetStandardReferencePack),
+            new("System.Runtime", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("System.Runtime", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("System.Runtime", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetStandardReferencePack),
+            new("netstandard", "cc7b13ffcd2ddd51", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("netstandard", "cc7b13ffcd2ddd51", ApiSpecReferenceFamily.NetStandardReferencePack),
+            new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
+            new("System.Collections", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetStandardReferencePack),
+            new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.NetStandardReferencePack),
+            new("System.Linq", "b03f5f7f11d50a3a", ApiSpecReferenceFamily.MicrosoftNetCoreRuntime),
+            new("System.Core", "b77a5c561934e089", ApiSpecReferenceFamily.NetFrameworkReferenceAssemblies),
+            new("System.Core", "b77a5c561934e089", ApiSpecReferenceFamily.MicrosoftNetCoreReferencePack),
+            new("System.Core", "b77a5c561934e089", ApiSpecReferenceFamily.NetStandardReferencePack),
+        ];
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblySetSharpProofAttributes = [
+            new("SharpProof.Attributes", "75825c3e099f5fac", ApiSpecReferenceFamily.SharpProofPackage),
+        ];
+        var evidenceContractSemantics = new SpecEvidence(SpecEvidenceKind.Documented, "sharpproof-compiler-bound-ghost-contract");
+        var evidenceDocumented = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-api-contract");
+        var evidenceObserved = new SpecEvidence(SpecEvidenceKind.Observed, "supported-runtime-observation");
+        var evidenceTypeInitialization = new SpecEvidence(SpecEvidenceKind.Documented, "dotnet-generic-cache-type-initialization-boundary");
+        var evidenceExceptionCulture = new SpecEvidence(SpecEvidenceKind.Observed, "dotnet-resource-message-culture-callback-boundary");
+        return [
+            ImmutablePairGetterDeclaration("Key", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            ImmutablePairGetterDeclaration("Value", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.dictionary.count", "System.Collections.Generic.Dictionary`2", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.queue.count", "System.Collections.Generic.Queue`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionCountDeclaration("bcl.stack.count", "System.Collections.Generic.Stack`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget("bcl.list.item.int32", "M:System.Collections.Generic.List`1.get_Item(System.Int32)",
+                    "System.Collections.Generic.List`1", SpecTargetMemberKind.Method, "get_Item",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.Integer], IrTypeKind.Reference, assemblySetFramework),
+                new ApiSpecFacets(
+                    // Exceptional paths can initialize ambient resource caches.
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceDocumented),
+                    // ThrowHelper allocates the exception for an invalid index.
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.ArgumentOutOfRangeException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.Unknown, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented)), []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.array.empty",
+                    "M:System.Array.Empty``1",
+                    "System.Array",
+                    SpecTargetMemberKind.Method, "Empty",
+                    true, 1, null, [], IrTypeKind.Sequence,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceTypeInitialization),
+                    new SpecAllocationFacet(SpecAllocationBehavior.Unknown, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.enumerable.empty",
+                    "M:System.Linq.Enumerable.Empty``1",
+                    "System.Linq.Enumerable",
+                    SpecTargetMemberKind.Method, "Empty",
+                    true, 1, null, [], IrTypeKind.Sequence,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceTypeInitialization),
+                    new SpecAllocationFacet(SpecAllocationBehavior.Unknown, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.Empty, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.exception.ctor",
+                    "M:System.Exception.#ctor",
+                    "System.Exception",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.exception.ctor.string",
+                    "M:System.Exception.#ctor(System.String)",
+                    "System.Exception",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.String], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.invalid-operation-exception.ctor",
+                    "M:System.InvalidOperationException.#ctor",
+                    "System.InvalidOperationException",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceExceptionCulture),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.invalid-operation-exception.ctor.string",
+                    "M:System.InvalidOperationException.#ctor(System.String)",
+                    "System.InvalidOperationException",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.String], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceExceptionCulture),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.list.add",
+                    "M:System.Collections.Generic.List`1.Add(`0)",
+                    "System.Collections.Generic.List`1",
+                    SpecTargetMemberKind.Method, "Add",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.Reference], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.WritesReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.math.abs.int32",
+                    "M:System.Math.Abs(System.Int32)",
+                    "System.Math",
+                    SpecTargetMemberKind.Method, "Abs",
+                    true, 0, null, [IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented, (new SpecBinaryDeclaration(IrBinaryOperator.NotEqual, new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer), new SpecIntegerDeclaration(-2147483648), IrTypeKind.Boolean))),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                [
+                    new SpecPostconditionDeclaration(
+                        new SpecBinaryDeclaration(IrBinaryOperator.GreaterThanOrEqual, new SpecVariableDeclaration(SpecVariableRole.Result, -1, IrTypeKind.Integer), new SpecIntegerDeclaration(0), IrTypeKind.Boolean),
+                        evidenceDocumented),
+                ]),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.math.max.int32-int32",
+                    "M:System.Math.Max(System.Int32,System.Int32)",
+                    "System.Math",
+                    SpecTargetMemberKind.Method, "Max",
+                    true, 0, null, [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.math.min.int32-int32",
+                    "M:System.Math.Min(System.Int32,System.Int32)",
+                    "System.Math",
+                    SpecTargetMemberKind.Method, "Min",
+                    true, 0, null, [IrTypeKind.Integer, IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.get-value-or-default",
+                    "M:System.Nullable`1.GetValueOrDefault",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.Method, "GetValueOrDefault",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.get-value-or-default.value",
+                    "M:System.Nullable`1.GetValueOrDefault(`0)",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.Method, "GetValueOrDefault",
+                    false, 0, IrTypeKind.Reference, [IrTypeKind.Integer], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.has-value",
+                    "P:System.Nullable`1.HasValue",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.PropertyGet, "HasValue",
+                    false, 0, IrTypeKind.Reference, [], IrTypeKind.Boolean,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.nullable.value",
+                    "P:System.Nullable`1.Value",
+                    "System.Nullable`1",
+                    SpecTargetMemberKind.PropertyGet, "Value",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.object.ctor",
+                    "M:System.Object.#ctor",
+                    "System.Object",
+                    SpecTargetMemberKind.Constructor, ".ctor",
+                    false, 0, IrTypeKind.Reference, [], null,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.concat.string-string",
+                    "M:System.String.Concat(System.String,System.String)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "Concat",
+                    true, 0, null, [IrTypeKind.String, IrTypeKind.String], IrTypeKind.String,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceDocumented),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NonNull, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.is-null-or-empty",
+                    "M:System.String.IsNullOrEmpty(System.String)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "IsNullOrEmpty",
+                    true, 0, null, [IrTypeKind.String], IrTypeKind.Boolean,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.item.int32",
+                    "M:System.String.get_Chars(System.Int32)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "get_Chars",
+                    false, 0, IrTypeKind.String, [IrTypeKind.Integer], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.IndexOutOfRangeException"], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "bcl.string.length",
+                    "P:System.String.Length",
+                    "System.String",
+                    SpecTargetMemberKind.PropertyGet, "Length",
+                    false, 0, IrTypeKind.String, [], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceObserved),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    null),
+                [
+                    new SpecPostconditionDeclaration(
+                        new SpecBinaryDeclaration(IrBinaryOperator.Equal, new SpecVariableDeclaration(SpecVariableRole.Result, -1, IrTypeKind.Integer), new SpecLengthDeclaration(new SpecVariableDeclaration(SpecVariableRole.Receiver, -1, IrTypeKind.String)), IrTypeKind.Boolean),
+                        evidenceDocumented),
+                ]),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "contract.assume",
+                    "M:SharpProof.Attributes.Contract.Assume(System.Boolean)",
+                    "SharpProof.Attributes.Contract",
+                    SpecTargetMemberKind.Method, "Assume",
+                    true, 0, null, [IrTypeKind.Boolean], null,
+                    assemblySetSharpProofAttributes),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceContractSemantics),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "contract.ensures",
+                    "M:SharpProof.Attributes.Contract.Ensures(System.Boolean)",
+                    "SharpProof.Attributes.Contract",
+                    SpecTargetMemberKind.Method, "Ensures",
+                    true, 0, null, [IrTypeKind.Boolean], null,
+                    assemblySetSharpProofAttributes),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceContractSemantics),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "contract.old",
+                    "M:SharpProof.Attributes.Contract.Old``1(``0)",
+                    "SharpProof.Attributes.Contract",
+                    SpecTargetMemberKind.Method, "Old",
+                    true, 1, null, [IrTypeKind.Reference], IrTypeKind.Reference,
+                    assemblySetSharpProofAttributes),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceContractSemantics),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceContractSemantics),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceContractSemantics),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "contract.requires",
+                    "M:SharpProof.Attributes.Contract.Requires(System.Boolean)",
+                    "SharpProof.Attributes.Contract",
+                    SpecTargetMemberKind.Method, "Requires",
+                    true, 0, null, [IrTypeKind.Boolean], null,
+                    assemblySetSharpProofAttributes),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceContractSemantics),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceContractSemantics),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceContractSemantics),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
+                    "contract.result",
+                    "M:SharpProof.Attributes.Contract.Result``1",
+                    "SharpProof.Attributes.Contract",
+                    SpecTargetMemberKind.Method, "Result",
+                    true, 1, null, [], IrTypeKind.Reference,
+                    assemblySetSharpProofAttributes),
+                new ApiSpecFacets(
+                    new SpecEffectFacet(SpecEffect.None, evidenceContractSemantics),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceContractSemantics),
+                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceContractSemantics),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceContractSemantics),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceContractSemantics),
+                    null),
+                []),
+        ];
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Specification witness identifiers are lowercase by convention.")]
+    private static ApiSpecDeclaration ImmutablePairGetterDeclaration(string property,
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
+        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        const string type = "System.Collections.Generic.KeyValuePair`2";
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget("bcl.key-value-pair." + property.ToLowerInvariant(), "P:" + type + "." + property,
+                type, SpecTargetMemberKind.PropertyGet, property, false, 0, IrTypeKind.Reference, [], IrTypeKind.Reference, assemblies),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.None, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.Unknown, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
+    }
+
+    private static ApiSpecDeclaration CollectionCountDeclaration(string identifier, string type,
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        identifier = RepositoryParameterGuard.NotNull(identifier, nameof(identifier));
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
+        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget(identifier, "P:" + type + ".Count", type, SpecTargetMemberKind.PropertyGet, "Count",
+                false, 0, IrTypeKind.Reference, [], IrTypeKind.Integer, assemblies),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.ReadsReceiverState, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.NotApplicable, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
+    }
+}

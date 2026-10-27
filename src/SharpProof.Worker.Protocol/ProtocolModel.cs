@@ -1,0 +1,1075 @@
+#nullable enable
+using System.Collections.Immutable;
+using System.Text.Json.Serialization;
+
+namespace SharpProof.Worker.Protocol;
+
+internal static class WorkerProtocolVersions
+{
+    public const string Current = "45";
+    public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+}
+
+internal static class WorkerCacheVersions
+{
+    public const int Current = 68;
+}
+
+internal static class WorkerManifestVersions
+{
+    public const int Current = 6;
+}
+
+internal static class WorkerLauncherDefaults
+{
+    public const int TerminationGraceMilliseconds = 1000;
+    public const int MaximumTerminationGraceMilliseconds = 300000;
+    // Result publication must remain bounded after the run token is canceled.
+    public const int ResultPublicationTimeoutMilliseconds = 30_000;
+}
+
+internal sealed record WorkerVerifyRequest
+{
+    [JsonRequired]
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
+    [JsonRequired]
+    public WorkerFileReference CompilerManifest { get; init; } = new();
+    [JsonRequired]
+    public WorkerBudgets Budgets { get; init; } = new();
+    [JsonRequired]
+    public WorkerCacheOptions Cache { get; init; } = new();
+    [JsonRequired]
+    public WorkerVerifyPolicy VerifyPolicy { get; init; } = WorkerVerifyPolicy.Advisory;
+    [JsonRequired]
+    public WorkerAssumptionPolicy AssumptionPolicy { get; init; } = WorkerAssumptionPolicy.Allow;
+}
+
+internal sealed record WorkerFileReference
+{
+    [JsonRequired]
+    public string Path { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Sha256 { get; init; } = string.Empty;
+}
+
+internal enum WorkerFeatureSet
+{
+    Unspecified = 0,
+    Effects = 1,
+    Contracts = 2,
+    All = 3
+}
+
+internal enum WorkerVerifyPolicy
+{
+    Unspecified = 0,
+    Advisory = 1,
+    WarnOnUnknown = 2,
+    RequireProven = 3
+}
+
+internal enum WorkerAssumptionPolicy
+{
+    Unspecified = 0,
+    Allow = 1,
+    Warn = 2,
+    Error = 3
+}
+
+internal sealed class WorkerBudgets
+{
+    public const int MaximumParallelism = 4;
+    public const uint DefaultQueryRlimit = SharpProof.Configuration.SolverDefaults.QueryRlimit;
+    public const uint DefaultMethodRlimit = 20000000U;
+    public const int DefaultMethodWallTimeMilliseconds = 10000;
+    public const int DefaultProjectWallTimeMilliseconds = 300000;
+    public const int DefaultMaximumExpressionDepth = 64;
+    public const int MaximumAllowedExpressionDepth = 256;
+    [JsonRequired]
+    public uint QueryRlimit { get; set; } = DefaultQueryRlimit;
+    [JsonRequired]
+    public uint MethodRlimit { get; set; } = DefaultMethodRlimit;
+    [JsonRequired]
+    public int MethodWallTimeMilliseconds { get; set; } = DefaultMethodWallTimeMilliseconds;
+    [JsonRequired]
+    public int ProjectWallTimeMilliseconds { get; set; } = DefaultProjectWallTimeMilliseconds;
+    [JsonRequired]
+    public int MaxParallelism { get; set; } = MaximumParallelism;
+    [JsonRequired]
+    public int MaximumExpressionDepth { get; set; } = DefaultMaximumExpressionDepth;
+}
+
+internal sealed record WorkerCacheOptions
+{
+    public const bool DefaultEnabled = true;
+    public const long DefaultMaximumBytes = 536870912L;
+    [JsonRequired]
+    public bool Enabled { get; init; } = DefaultEnabled;
+    [JsonRequired]
+    public string? Directory { get; init; }
+    [JsonRequired]
+    public long MaximumBytes { get; init; } = DefaultMaximumBytes;
+}
+
+internal enum WorkerSelectedFeature
+{
+    Unspecified = 0,
+    Effects = 1,
+    Contracts = 2
+}
+
+internal enum WorkerSelectionReason
+{
+    Unspecified = 0,
+    ExplicitAnnotation = 1,
+    DiscoveredPostcondition = 2
+}
+
+internal enum WorkerClaimKind
+{
+    Unspecified = 0,
+    Postcondition = 1,
+    Effect = 2
+}
+
+internal enum WorkerClaimEvidence
+{
+    Unspecified = 0,
+    DirectClause = 1,
+    CompanionClause = 2,
+    ReturnAttribute = 3,
+    Attribute = 4
+}
+
+internal enum WorkerEffectContractKind
+{
+    Unspecified = 0,
+    EnforcePure = 1,
+    ZeroAllocations = 2,
+    AllowedCapabilities = 3,
+    DoesNotThrow = 4,
+    AllowedExceptions = 5,
+    EffectContract = 6,
+    ResourceUpperBound = 7
+}
+
+internal enum WorkerResourceMetric
+{
+    Unspecified = 0,
+    LoopBodyEntries = 1,
+    ArrayAllocations = 2,
+    AllocatedElements = 3,
+    AllocatedBytes = 4,
+    PeakAuxiliaryBytes = 5,
+    RetainedBytes = 6,
+    SourceActivationDepth = 7,
+    SourceStackBytes = 8
+}
+
+internal static class WorkerResourceModels
+{
+    public const string CallableScope = "callable-source";
+    public const string TaskJoinScope = "joined-isolated-source-callbacks";
+    public const string TaskSourceAllocationScope = "joined-isolated-source-allocation-prefixes";
+    public const string TaskStorageScope = "joined-isolated-normal-completion";
+    public const string TaskRuntimeScope = "joined-isolated-cumulative-runtime-premises";
+    public const string TaskRuntimeCostModel = "task-join-declared-runtime-allocation-prefixes-v1";
+    public const string TaskStorageModel = "task-join-normal-owned-storage-v1";
+    public const string ConfiguredTaskStorageModel = "configured-task-join-normal-owned-storage-v1";
+    public const string TaskCompilerCarrierModel = "emitted-task-compiler-carriers-v1";
+    public const string TaskJoinModel = "task-join-source-at-most-once-v1";
+    public const string ConfiguredTaskJoinModel = "configured-task-join-source-at-most-once-v1";
+    public const string CostModel = "loop-entries-and-primitive-array-elements-v3";
+    public const int Expression = 1;
+    public const int Program = 8;
+    public const string StackCostModel = "source-activation-records-v1:word8:bookkeeping2";
+    public const string AllocationLayout = "coreclr-8.0.32-x64-source-storage-v1";
+    public const string AllocationCostModel = AllocationLayout + ":cumulative-bytes-v1";
+    public const string LifetimeCostModel = AllocationLayout + ":finite-owned-strong-reachability-v1:normal-completion";
+    public const int MaximumExpressionBytes = 1024 * 1024;
+    public const string Asymptotic = "single-input-unbounded-expression-extension-v1";
+    public const string NormalDomain = "unbounded-scalar-counter-extension-v1:ideal-primitive-allocation";
+    public const string Accounting = "nonnegative-credit-potential-v1:unit-spend";
+    public const string Expected = "entry-bernoulli-boolean-v1:conditional-marginal-upper";
+    public const int MaximumAsymptoticDegree = 4096;
+}
+
+internal sealed record WorkerResourceConstraint
+{
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; init; }
+    [JsonRequired]
+    public string CostModel { get; init; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; init; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public byte[] UpperBound { get; init; } = [];
+}
+
+internal sealed record WorkerResourceAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Asymptotic;
+    [JsonRequired]
+    public string? UpperBound { get; init; }
+    [JsonRequired]
+    public int? PolynomialDegree { get; init; }
+    [JsonRequired]
+    public int? LogarithmicDegree { get; init; }
+    [JsonRequired]
+    public bool? IsZero { get; init; }
+    [JsonRequired]
+    public int? InputOrdinal { get; init; }
+    [JsonRequired]
+    public string? InputKind { get; init; }
+    [JsonRequired]
+    public string? InputName { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+    [JsonRequired]
+    public WorkerResourceLowerAsymptoticEvidence? Lower { get; init; }
+}
+
+internal sealed record WorkerResourceLowerAsymptoticEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.NormalDomain;
+    [JsonRequired]
+    public string? InferredBound { get; init; }
+    [JsonRequired]
+    public string? LowerBound { get; init; }
+    [JsonRequired]
+    public string? TightBound { get; init; }
+    [JsonRequired]
+    public string? TightUnknownReason { get; init; }
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Growth { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+}
+
+internal sealed record WorkerResourceBoundEvidence
+{
+    [JsonRequired]
+    public string ExecutionScope { get; init; } = WorkerResourceModels.CallableScope;
+    [JsonRequired]
+    public WorkerResourceMetric Metric { get; init; }
+    [JsonRequired]
+    public string CostModel { get; init; } = WorkerResourceModels.CostModel;
+    [JsonRequired]
+    public int ExpressionModel { get; init; } = WorkerResourceModels.Expression;
+    [JsonRequired]
+    public int ProgramModel { get; init; } = WorkerResourceModels.Program;
+    [JsonRequired]
+    public string DeclaredBoundSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string? InferredUpperBound { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+    [JsonRequired]
+    public string? ObservedLowerBound { get; init; }
+    [JsonRequired]
+    public string? EvaluatedUpperBound { get; init; }
+    [JsonRequired]
+    public WorkerResourceMetadataAssumption[] MetadataAssumptions { get; init; } = [];
+    [JsonRequired]
+    public WorkerResourceTaskRuntimePremiseEvidence? RuntimePremises { get; init; }
+    [JsonRequired]
+    public WorkerResourceAsymptoticEvidence? Asymptotic { get; init; }
+    [JsonRequired]
+    public WorkerResourceAccountingEvidence[] Accounting { get; init; } = [];
+    [JsonRequired]
+    public WorkerResourceExpectedEvidence? Expected { get; init; }
+}
+
+internal sealed record WorkerResourceExpectedEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Expected;
+    [JsonRequired]
+    public int? InputOrdinal { get; init; }
+    [JsonRequired]
+    public string? InputName { get; init; }
+    [JsonRequired]
+    public int? TrueWeight { get; init; }
+    [JsonRequired]
+    public int? FalseWeight { get; init; }
+    [JsonRequired]
+    public string? FalseUpperBound { get; init; }
+    [JsonRequired]
+    public string? TrueUpperBound { get; init; }
+    [JsonRequired]
+    public string? UpperBound { get; init; }
+    [JsonRequired]
+    public string? UnknownReason { get; init; }
+}
+
+internal sealed record WorkerResourceAccountingEvidence
+{
+    [JsonRequired]
+    public string Model { get; init; } = WorkerResourceModels.Accounting;
+    [JsonRequired]
+    public string InitialCredit { get; init; } = string.Empty;
+    [JsonRequired]
+    public string DepositPerIteration { get; init; } = string.Empty;
+    [JsonRequired]
+    public int CounterWidth { get; init; }
+    [JsonRequired]
+    public bool CheckedDeposit { get; init; }
+    [JsonRequired]
+    public string MaximumSpend { get; init; } = string.Empty;
+}
+
+internal sealed record WorkerResourceMetadataAssumption
+{
+    [JsonRequired]
+    public string AssumptionId { get; init; } = string.Empty;
+    [JsonRequired]
+    public string WitnessIdentifier { get; init; } = string.Empty;
+    [JsonRequired]
+    public string CatalogSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceAssembly { get; init; } = string.Empty;
+    [JsonRequired]
+    public string ReferenceSha256 { get; init; } = string.Empty;
+    [JsonRequired]
+    public string RuntimeModel { get; init; } = string.Empty;
+    [JsonRequired]
+    public string EvidenceSource { get; init; } = string.Empty;
+}
+internal sealed record WorkerSourceLocation
+{
+    [JsonRequired]
+    public string Path { get; init; } = string.Empty;
+    [JsonRequired]
+    public int Start { get; init; }
+    [JsonRequired]
+    public int Length { get; init; }
+    [JsonRequired]
+    public int Line { get; init; }
+    [JsonRequired]
+    public int Column { get; init; }
+}
+
+internal sealed record WorkerCallableManifestEntry
+{
+    [JsonRequired]
+    public string CallableId { get; init; } = string.Empty;
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerSelectedFeature> SelectedFeatures { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerSelectionReason> SelectionReasons { get; set; } = [];
+    [JsonRequired]
+    public WorkerSourceLocation Location { get; init; } = new();
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ClaimIds { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
+}
+
+internal sealed record WorkerClaimManifestEntry
+{
+    [JsonRequired]
+    public string ClaimId { get; init; } = string.Empty;
+    [JsonRequired]
+    public string CallableId { get; init; } = string.Empty;
+    [JsonRequired]
+    public int Ordinal { get; init; }
+    [JsonRequired]
+    public WorkerClaimKind Kind { get; init; }
+    [JsonRequired]
+    public WorkerClaimEvidence Evidence { get; init; }
+    [JsonRequired]
+    public WorkerEffectContractKind EffectContractKind { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceConstraint? ResourceUpperBound { get; init; }
+    [JsonRequired]
+    public WorkerSourceLocation Location { get; init; } = new();
+}
+
+internal sealed record WorkerClaimManifest
+{
+    [JsonRequired]
+    public int SchemaVersion { get; init; } = WorkerManifestVersions.Current;
+    [JsonRequired]
+    public string Hash { get; set; } = string.Empty;
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerCallableManifestEntry> Callables { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerClaimManifestEntry> Claims { get; set; } = [];
+}
+
+internal enum WorkerRunStatus
+{
+    Unspecified = 0,
+    Complete = 1,
+    TimedOut = 2,
+    Canceled = 3,
+    Failed = 4
+}
+
+internal enum WorkerRunFailureReason
+{
+    Unspecified = 0,
+    None = 1,
+    InvalidRequest = 2,
+    InputUnavailable = 3,
+    CompilationFailure = 4,
+    CompilerManifestMismatch = 5,
+    BackendUnavailable = 6,
+    InfrastructureFailure = 7,
+    MalformedResult = 8,
+    CounterexampleReplayFailed = 9,
+    ContainmentFailure = 10
+}
+
+internal enum WorkerCallableCoverage
+{
+    Unspecified = 0,
+    Complete = 1,
+    Incomplete = 2
+}
+
+internal enum WorkerCallableCoverageReason
+{
+    Unspecified = 0,
+    None = 1,
+    UnsupportedCallable = 2,
+    UnsupportedContract = 3,
+    SemanticUnknown = 4,
+    MissingClaimResult = 5,
+    MethodTimeout = 6,
+    ProjectTimeout = 7,
+    Canceled = 8,
+    InfrastructureFailure = 9
+}
+
+internal enum WorkerClaimOutcome
+{
+    Unspecified = 0,
+    Proven = 1,
+    Refuted = 2,
+    Unknown = 3
+}
+
+internal enum WorkerEffectEvidenceCertainty
+{
+    Unspecified = 0,
+    IncompleteMayEffectSummary = 1,
+    CompleteMayEffectSummary = 2,
+    TrustedCompleteBoundary = 3,
+    DefiniteViolation = 4,
+    Unavailable = 5,
+    VacuousEntry = 6
+}
+
+[Flags]
+internal enum WorkerEffectSet : long
+{
+    None = 0L,
+    ReadsReceiverState = 1L,
+    ReadsArgumentState = 2L,
+    ReadsCapturedState = 4L,
+    ReadsStaticState = 8L,
+    ReadsAmbientState = 16L,
+    WritesReceiverState = 32L,
+    WritesArgumentState = 64L,
+    WritesCapturedState = 128L,
+    WritesStaticState = 256L,
+    WritesAmbientState = 512L,
+    Allocates = 1024L,
+    Throws = 2048L,
+    Synchronizes = 4096L,
+    UsesNondeterminism = 8192L,
+    UsesNativeCode = 16384L,
+    UsesReflection = 32768L,
+    AllKnown = 65535L
+}
+
+[Flags]
+internal enum WorkerEffectCapabilitySet
+{
+    None = 0,
+    IO = 1,
+    FileRead = 2,
+    FileWrite = 4,
+    Network = 8,
+    Console = 16,
+    Process = 32,
+    Environment = 64,
+    Registry = 128,
+    Clock = 256,
+    Randomness = 512,
+    Reflection = 1024,
+    Synchronization = 2048,
+    NativeInterop = 4096,
+    AllKnown = 8191
+}
+
+internal enum WorkerVacuityKind
+{
+    None = 0,
+    ContradictoryPreconditions = 1,
+    NoModeledNormalReturn = 2
+}
+
+internal enum WorkerClaimReason
+{
+    Unspecified = 0,
+    None = 1,
+    UnsupportedCallable = 2,
+    UnsupportedContract = 3,
+    UnsupportedBody = 4,
+    UnsupportedExpression = 5,
+    DeepPostcondition = 6,
+    MissingReturnValue = 7,
+    ResourceLimit = 8,
+    MethodTimeout = 9,
+    ProjectTimeout = 10,
+    Canceled = 11,
+    BackendUnavailable = 12,
+    InfrastructureFailure = 13,
+    MalformedBackendResult = 14,
+    CounterexampleReplayFailed = 15,
+    PostconditionMayBeUndefined = 16,
+    CounterexampleNotReplayable = 17,
+    EffectSummaryIncomplete = 18,
+    EffectContractNotEstablished = 19,
+    SolverIncomplete = 20
+}
+
+internal enum WorkerAssumptionKind
+{
+    Unspecified = 0,
+    Precondition = 1,
+    UserAssume = 2,
+    TrustedBoundary = 3,
+    ApiSpecification = 4,
+    SourceDomain = 5,
+    NormalCompletion = 6
+}
+
+internal sealed record WorkerAssumptionEvidence
+{
+    [JsonRequired]
+    public string Id { get; init; } = string.Empty;
+    [JsonRequired]
+    public WorkerAssumptionKind Kind { get; init; }
+    [JsonRequired]
+    public bool Used { get; init; }
+}
+
+internal sealed record WorkerCallableResult
+{
+    [JsonRequired]
+    public string CallableId { get; init; } = string.Empty;
+    [JsonRequired]
+    public WorkerCallableCoverage Coverage { get; init; }
+    [JsonRequired]
+    public WorkerCallableCoverageReason Reason { get; init; }
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
+}
+
+internal sealed record WorkerClaimResult
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerCallablePresentation? Presentation { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerDiagnosticContext? Diagnostic { get; init; }
+    [JsonRequired]
+    public string ClaimId { get; init; } = string.Empty;
+    [JsonRequired]
+    public WorkerClaimOutcome Outcome { get; init; }
+    [JsonRequired]
+    public WorkerClaimReason Reason { get; init; }
+    [JsonRequired]
+    public WorkerEffectEvidenceCertainty EffectCertainty { get; init; }
+    [JsonRequired]
+    public WorkerEffectViolationWitness? EffectWitness { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerResourceBoundEvidence? ResourceBound { get; init; }
+    [JsonRequired]
+    public WorkerVacuityKind Vacuity { get; init; }
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ProofCore { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerModelValue> Model { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerAssumptionEvidence> Assumptions { get; set; } = [];
+}
+
+internal sealed record WorkerEffectViolationWitness
+{
+    [JsonRequired]
+    public string Kind { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Detail { get; init; } = string.Empty;
+    [JsonRequired]
+    public WorkerEffectSet Effects { get; init; }
+    [JsonRequired]
+    public WorkerEffectCapabilitySet Capabilities { get; init; }
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<string> ExactExceptionTypeHierarchy { get; set; } = [];
+    [JsonRequired]
+    public WorkerSourceLocation Location { get; init; } = new();
+}
+
+internal sealed record WorkerModelValue
+{
+    [JsonRequired]
+    public string Variable { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Kind { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Value { get; init; } = string.Empty;
+}
+
+internal enum WorkerCacheStatus
+{
+    Unspecified = 0,
+    Disabled = 1,
+    Miss = 2,
+    Hit = 3,
+    Written = 4,
+    Rejected = 5,
+    Unavailable = 6
+}
+
+internal sealed record WorkerVersionSummary
+{
+    [JsonRequired]
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
+    [JsonRequired]
+    public int ManifestSchemaVersion { get; init; } = WorkerManifestVersions.Current;
+    [JsonRequired]
+    public int CacheSchemaVersion { get; init; } = WorkerCacheVersions.Current;
+    [JsonRequired]
+    public string WorkerVersion { get; init; } = string.Empty;
+    [JsonRequired]
+    public string ApiSpecVersion { get; init; } = string.Empty;
+    [JsonRequired]
+    public string WorkerBinarySha256 { get; init; } = WorkerProtocolVersions.EmptySha256;
+    [JsonRequired]
+    public string ApiSpecContentSha256 { get; init; } = WorkerProtocolVersions.EmptySha256;
+}
+
+internal sealed record WorkerVerificationSummary
+{
+    [JsonRequired]
+    public bool CacheHit { get; init; }
+    [JsonRequired]
+    public WorkerCacheStatus CacheStatus { get; init; }
+    [JsonRequired]
+    public WorkerVersionSummary Versions { get; init; } = new();
+    [JsonRequired]
+    public WorkerBudgets Budgets { get; init; } = new();
+    [JsonRequired]
+    public long ElapsedMilliseconds { get; init; }
+}
+
+internal sealed record WorkerProtocolError
+{
+    [JsonRequired]
+    public string Code { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Message { get; init; } = string.Empty;
+}
+
+internal sealed record WorkerVerifyResponse
+{
+    [JsonRequired]
+    public string ProtocolVersion { get; init; } = WorkerProtocolVersions.Current;
+    [JsonRequired]
+    public string RequestHash { get; init; } = WorkerProtocolVersions.EmptySha256;
+    [JsonRequired]
+    public string InputHash { get; init; } = string.Empty;
+    [JsonRequired]
+    public WorkerClaimManifest Manifest { get; init; } = new();
+    [JsonRequired]
+    public WorkerRunStatus RunStatus { get; init; }
+    [JsonRequired]
+    public WorkerRunFailureReason FailureReason { get; init; }
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerCallableResult> CallableResults { get; set; } = [];
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerClaimResult> ClaimResults { get; set; } = [];
+    [JsonRequired]
+    public WorkerVerificationSummary Summary { get; init; } = new();
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerProtocolError> Errors { get; set; } = [];
+}
+
+internal sealed class WorkerProtocolValidationResult
+{
+    internal WorkerProtocolValidationResult(IEnumerable<WorkerProtocolError> errors)
+    {
+        errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
+        Errors = [.. errors];
+    }
+    public ImmutableArray<WorkerProtocolError> Errors { get; }
+    public bool IsValid => Errors.IsDefaultOrEmpty;
+}
+
+internal readonly struct WorkerProtocolRule<T>(string code, Func<T, bool> isValid)
+{
+    internal readonly string Code = RepositoryParameterGuard.NotNull(code, nameof(code));
+    internal readonly Func<T, bool> IsValid = RepositoryParameterGuard.NotNull(isValid, nameof(isValid));
+}
+
+internal static class WorkerProtocolMetadata
+{
+
+    private static readonly ImmutableHashSet<Enum> s_knownValues = [
+        WorkerFeatureSet.Unspecified, WorkerFeatureSet.Effects, WorkerFeatureSet.Contracts, WorkerFeatureSet.All,
+        WorkerVerifyPolicy.Unspecified, WorkerVerifyPolicy.Advisory, WorkerVerifyPolicy.WarnOnUnknown, WorkerVerifyPolicy.RequireProven,
+        WorkerAssumptionPolicy.Unspecified, WorkerAssumptionPolicy.Allow, WorkerAssumptionPolicy.Warn, WorkerAssumptionPolicy.Error,
+        WorkerSelectedFeature.Unspecified, WorkerSelectedFeature.Effects, WorkerSelectedFeature.Contracts,
+        WorkerSelectionReason.Unspecified, WorkerSelectionReason.ExplicitAnnotation, WorkerSelectionReason.DiscoveredPostcondition,
+        WorkerClaimKind.Unspecified, WorkerClaimKind.Postcondition, WorkerClaimKind.Effect,
+        WorkerClaimEvidence.Unspecified, WorkerClaimEvidence.DirectClause, WorkerClaimEvidence.CompanionClause,
+        WorkerClaimEvidence.ReturnAttribute, WorkerClaimEvidence.Attribute,
+        WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
+        WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
+        WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
+        WorkerResourceMetric.Unspecified, WorkerResourceMetric.LoopBodyEntries, WorkerResourceMetric.ArrayAllocations, WorkerResourceMetric.AllocatedElements, WorkerResourceMetric.AllocatedBytes, WorkerResourceMetric.PeakAuxiliaryBytes, WorkerResourceMetric.RetainedBytes, WorkerResourceMetric.SourceActivationDepth, WorkerResourceMetric.SourceStackBytes,
+        WorkerRunStatus.Unspecified, WorkerRunStatus.Complete, WorkerRunStatus.TimedOut, WorkerRunStatus.Canceled, WorkerRunStatus.Failed,
+        WorkerCallableCoverage.Unspecified, WorkerCallableCoverage.Complete, WorkerCallableCoverage.Incomplete,
+        WorkerClaimOutcome.Unspecified, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Unknown,
+        WorkerClaimReason.Unspecified, WorkerClaimReason.None, WorkerClaimReason.UnsupportedCallable,
+        WorkerClaimReason.UnsupportedContract, WorkerClaimReason.UnsupportedBody, WorkerClaimReason.UnsupportedExpression,
+        WorkerClaimReason.DeepPostcondition, WorkerClaimReason.MissingReturnValue, WorkerClaimReason.ResourceLimit,
+        WorkerClaimReason.MethodTimeout, WorkerClaimReason.ProjectTimeout, WorkerClaimReason.Canceled,
+        WorkerClaimReason.BackendUnavailable, WorkerClaimReason.InfrastructureFailure, WorkerClaimReason.MalformedBackendResult,
+        WorkerClaimReason.CounterexampleReplayFailed, WorkerClaimReason.PostconditionMayBeUndefined,
+        WorkerClaimReason.CounterexampleNotReplayable, WorkerClaimReason.EffectSummaryIncomplete,
+        WorkerClaimReason.EffectContractNotEstablished, WorkerClaimReason.SolverIncomplete,
+        WorkerEffectEvidenceCertainty.Unspecified, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary,
+        WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary,
+        WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerEffectEvidenceCertainty.Unavailable,
+        WorkerEffectEvidenceCertainty.VacuousEntry,
+        WorkerAssumptionKind.Unspecified, WorkerAssumptionKind.Precondition, WorkerAssumptionKind.UserAssume,
+        WorkerAssumptionKind.TrustedBoundary, WorkerAssumptionKind.ApiSpecification, WorkerAssumptionKind.SourceDomain,
+        WorkerAssumptionKind.NormalCompletion,
+    ];
+    internal static bool IsKnown<T>(T value) where T : struct, Enum
+    {
+        return s_knownValues.Contains((Enum)(object)value);
+    }
+    internal static string? GetManifestName(Enum value)
+    {
+        return value switch
+        {
+            WorkerSelectedFeature.Unspecified => nameof(WorkerSelectedFeature.Unspecified),
+            WorkerSelectedFeature.Effects => nameof(WorkerSelectedFeature.Effects),
+            WorkerSelectedFeature.Contracts => nameof(WorkerSelectedFeature.Contracts),
+            WorkerSelectionReason.Unspecified => nameof(WorkerSelectionReason.Unspecified),
+            WorkerSelectionReason.ExplicitAnnotation => nameof(WorkerSelectionReason.ExplicitAnnotation),
+            WorkerSelectionReason.DiscoveredPostcondition => nameof(WorkerSelectionReason.DiscoveredPostcondition),
+            _ => null
+        };
+    }
+    internal static int GetAssumptionOrder(WorkerAssumptionKind value)
+    {
+        return value switch
+        {
+            WorkerAssumptionKind.Unspecified => 0,
+            WorkerAssumptionKind.Precondition => 1,
+            WorkerAssumptionKind.UserAssume => 2,
+            WorkerAssumptionKind.TrustedBoundary => 3,
+            WorkerAssumptionKind.ApiSpecification => 4,
+            WorkerAssumptionKind.SourceDomain => 5,
+            WorkerAssumptionKind.NormalCompletion => 6,
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "The manifest contains an unknown enum value.")
+        };
+    }
+    internal static bool HasOnlyKnownFlags(WorkerEffectSet value)
+    {
+        return (value & ~WorkerEffectSet.AllKnown) == 0;
+    }
+    internal static bool HasOnlyKnownFlags(WorkerEffectCapabilitySet value)
+    {
+        return (value & ~WorkerEffectCapabilitySet.AllKnown) == 0;
+    }
+
+    internal static bool MatchesClaimShape(WorkerClaimKind kind, WorkerClaimEvidence evidence, WorkerEffectContractKind effectKind)
+    {
+        return (kind, evidence, effectKind) is
+                (WorkerClaimKind.Postcondition, WorkerClaimEvidence.DirectClause, WorkerEffectContractKind.Unspecified)
+                or (WorkerClaimKind.Postcondition, WorkerClaimEvidence.CompanionClause, WorkerEffectContractKind.Unspecified)
+                or (WorkerClaimKind.Postcondition, WorkerClaimEvidence.ReturnAttribute, WorkerEffectContractKind.Unspecified)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EnforcePure)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.ZeroAllocations)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedCapabilities)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.DoesNotThrow)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedExceptions)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EffectContract)
+                or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.ResourceUpperBound);
+    }
+    internal static bool MatchesCallableCoverage(WorkerCallableCoverage coverage, WorkerCallableCoverageReason reason)
+    {
+        return coverage switch
+        {
+            WorkerCallableCoverage.Complete => reason is WorkerCallableCoverageReason.None,
+            WorkerCallableCoverage.Incomplete => reason is WorkerCallableCoverageReason.UnsupportedCallable
+                or WorkerCallableCoverageReason.UnsupportedContract or WorkerCallableCoverageReason.SemanticUnknown
+                or WorkerCallableCoverageReason.MissingClaimResult or WorkerCallableCoverageReason.MethodTimeout
+                or WorkerCallableCoverageReason.ProjectTimeout or WorkerCallableCoverageReason.Canceled
+                or WorkerCallableCoverageReason.InfrastructureFailure,
+            _ => false
+        };
+    }
+    internal static bool MatchesClaimOutcome(WorkerClaimOutcome outcome, WorkerClaimReason reason)
+    {
+        return outcome switch
+        {
+            WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted => reason is WorkerClaimReason.None,
+            WorkerClaimOutcome.Unknown => reason is WorkerClaimReason.UnsupportedCallable or WorkerClaimReason.UnsupportedContract
+                or WorkerClaimReason.UnsupportedBody or WorkerClaimReason.UnsupportedExpression or WorkerClaimReason.DeepPostcondition
+                or WorkerClaimReason.MissingReturnValue or WorkerClaimReason.ResourceLimit or WorkerClaimReason.MethodTimeout
+                or WorkerClaimReason.ProjectTimeout or WorkerClaimReason.Canceled or WorkerClaimReason.BackendUnavailable
+                or WorkerClaimReason.InfrastructureFailure or WorkerClaimReason.MalformedBackendResult
+                or WorkerClaimReason.CounterexampleReplayFailed or WorkerClaimReason.PostconditionMayBeUndefined
+                or WorkerClaimReason.CounterexampleNotReplayable or WorkerClaimReason.EffectSummaryIncomplete
+                or WorkerClaimReason.EffectContractNotEstablished or WorkerClaimReason.SolverIncomplete,
+            _ => false
+        };
+    }
+    internal static bool MatchesClaimKindOutcome(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerClaimReason reason)
+    {
+        return (kind, outcome, reason) is
+                (_, WorkerClaimOutcome.Proven, WorkerClaimReason.None) or (_, WorkerClaimOutcome.Refuted, WorkerClaimReason.None)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedCallable)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedExpression)
+                or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.DeepPostcondition)
+                or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.MissingReturnValue)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MethodTimeout)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ProjectTimeout)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.Canceled)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.BackendUnavailable)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.InfrastructureFailure)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MalformedBackendResult)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleReplayFailed)
+                or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.PostconditionMayBeUndefined)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable)
+                or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete)
+                or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished)
+                or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.SolverIncomplete);
+    }
+    internal static bool MatchesEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty)
+    {
+        return (outcome, reason, certainty) is
+                (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+                or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+                or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry)
+                or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+                or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable);
+    }
+    internal static bool MatchesEffectEvidenceTuple(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty, WorkerVacuityKind vacuity, bool hasProofCore, bool hasTrustedProvenance, bool trustedProvenanceUsed)
+    {
+        return (outcome, reason, certainty, vacuity, hasProofCore, hasTrustedProvenance, trustedProvenanceUsed) is
+                (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, _, _, _)
+                or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, _, true, true)
+                or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry, WorkerVacuityKind.ContradictoryPreconditions, true, _, _)
+                or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerVacuityKind.None, false, _, _)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, true, true)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, true, true)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, true, true)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+                or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, true, true)
+                or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable, WorkerVacuityKind.None, false, _, _);
+    }
+    internal static bool MatchesVacuity(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerVacuityKind vacuity)
+    {
+        return (kind, outcome, vacuity) is
+                (_, _, WorkerVacuityKind.None)
+                or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions)
+                or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.NoModeledNormalReturn)
+                or (WorkerClaimKind.Effect, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions);
+    }
+    internal static bool MatchesRunFailure(WorkerRunStatus status, WorkerRunFailureReason reason)
+    {
+        return status switch
+        {
+            WorkerRunStatus.Complete or WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled => reason is WorkerRunFailureReason.None,
+            WorkerRunStatus.Failed => reason is WorkerRunFailureReason.InvalidRequest or WorkerRunFailureReason.InputUnavailable
+                or WorkerRunFailureReason.CompilationFailure or WorkerRunFailureReason.CompilerManifestMismatch
+                or WorkerRunFailureReason.BackendUnavailable or WorkerRunFailureReason.InfrastructureFailure
+                or WorkerRunFailureReason.MalformedResult or WorkerRunFailureReason.CounterexampleReplayFailed
+                or WorkerRunFailureReason.ContainmentFailure,
+            _ => false
+        };
+    }
+    internal static bool MatchesCacheState(WorkerCacheStatus status, bool hit)
+    {
+        return (status, hit) is
+                (WorkerCacheStatus.Disabled, false) or (WorkerCacheStatus.Miss, false) or (WorkerCacheStatus.Hit, true)
+                or (WorkerCacheStatus.Written, false) or (WorkerCacheStatus.Rejected, false) or (WorkerCacheStatus.Unavailable, false);
+    }
+    internal static bool MatchesClaimPayload(WorkerClaimOutcome outcome, bool hasProofCore, bool hasModel)
+    {
+        return (outcome, hasProofCore, hasModel) is
+                (WorkerClaimOutcome.Proven, _, false) or (WorkerClaimOutcome.Refuted, false, _) or (WorkerClaimOutcome.Unknown, false, false);
+    }
+    internal static bool MatchesAssumptionKind(WorkerAssumptionKind kind)
+    {
+        return (kind) is
+                (WorkerAssumptionKind.Precondition) or (WorkerAssumptionKind.UserAssume) or (WorkerAssumptionKind.TrustedBoundary);
+    }
+
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerVerifyRequest>> RequestRules = [
+        new("protocol.unsupported", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.ProtocolVersion == WorkerProtocolVersions.Current),
+        new("project.compiler_manifest", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            (value.CompilerManifest != null
+            && !string.IsNullOrWhiteSpace(value.CompilerManifest.Path)
+            && WorkerProtocolJson.IsSha256(value.CompilerManifest.Sha256))),
+        new("cache.null", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.Cache != null),
+        new("cache.maximum_bytes", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            (!(value.Cache != null)
+            || (value.Cache.MaximumBytes is >= 1 and <= WorkerCacheOptions.DefaultMaximumBytes))),
+        new("policy.verify", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.VerifyPolicy, WorkerVerifyPolicy.Unspecified)),
+        new("policy.assumption", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.AssumptionPolicy, WorkerAssumptionPolicy.Unspecified)),
+    ];
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerBudgets>> BudgetsRules = [
+        new("rlimit", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.QueryRlimit > 0),
+        new("method_rlimit", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.MethodRlimit > 0),
+        new("rlimit_order", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.QueryRlimit <= value.MethodRlimit),
+        new("method_wall", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.MethodWallTimeMilliseconds > 0),
+        new("project_wall", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.ProjectWallTimeMilliseconds > 0),
+        new("parallelism", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.MaxParallelism is >= 1 and <= WorkerBudgets.MaximumParallelism),
+        new("expression_depth", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.MaximumExpressionDepth is >= 1 and <= WorkerBudgets.MaximumAllowedExpressionDepth),
+        new("wall_order", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.MethodWallTimeMilliseconds <= value.ProjectWallTimeMilliseconds),
+    ];
+    internal static bool IsSourceLocationValid(WorkerSourceLocation value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return (!string.IsNullOrWhiteSpace(value.Path)
+            && value.Start >= 0
+            && value.Length >= 0
+            && value.Line > 0
+            && value.Column > 0);
+    }
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerCallableManifestEntry>> ManifestCallableRules = [
+        new("selected_features", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            WorkerProtocolJson.AreDefinedUnique(value.SelectedFeatures, WorkerSelectedFeature.Unspecified, true)),
+        new("selection_reasons", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            WorkerProtocolJson.AreDefinedUnique(value.SelectionReasons, WorkerSelectionReason.Unspecified, true)),
+        new("callable_claim_ids", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreDistinctNonblank(value.ClaimIds)),
+        new("callable_assumptions", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("callable_assumption_usage", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => (WorkerProtocolJson.EmptyIfDefault(value.Assumptions)).All(static item => item != null && !item.Used)),
+    ];
+    internal static bool ResourceConstraintsEqual(WorkerResourceConstraint? left, WorkerResourceConstraint? right)
+    {
+        return ReferenceEquals(left, right) || left is not null && right is not null &&
+            left.Metric == right.Metric && left.CostModel == right.CostModel && left.ExpressionModel == right.ExpressionModel &&
+            left.UpperBound is not null && right.UpperBound is not null && left.UpperBound.SequenceEqual(right.UpperBound);
+    }
+    internal static bool HasValidResourceConstraint(WorkerEffectContractKind kind, WorkerResourceConstraint? constraint)
+    {
+        if (kind != WorkerEffectContractKind.ResourceUpperBound)
+        { return constraint is null; }
+        return constraint is not null && WorkerProtocolJson.IsDefined(constraint.Metric, WorkerResourceMetric.Unspecified) &&
+            constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : constraint.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
+            constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
+    }
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimManifestEntry>> ManifestClaimRules = [
+        new("claim_resource_constraint", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => HasValidResourceConstraint(value.EffectContractKind, value.ResourceUpperBound)),
+        new("claim_ordinal", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.Ordinal >= 0),
+        new("claim_kind", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Kind, WorkerClaimKind.Unspecified)),
+        new("claim_evidence", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Evidence, WorkerClaimEvidence.Unspecified)),
+        new("claim_shape", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolMetadata.MatchesClaimShape(value.Kind, value.Evidence, value.EffectContractKind)),
+    ];
+    internal static bool IsAssumptionValid(WorkerAssumptionEvidence value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return (!string.IsNullOrWhiteSpace(value.Id)
+            && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
+    }
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerCallableResult>> CallableResultRules = [
+        new("response.callable_coverage", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Coverage, WorkerCallableCoverage.Unspecified)),
+        new("response.callable_reason", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolMetadata.MatchesCallableCoverage(value.Coverage, value.Reason)),
+        new("response.callable_assumptions", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.callable_assumption_usage", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => (WorkerProtocolJson.EmptyIfDefault(value.Assumptions)).All(static item => item != null && !item.Used)),
+    ];
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimResult>> ClaimResultRules = [
+        new("response.claim_outcome", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Outcome, WorkerClaimOutcome.Unspecified)),
+        new("response.claim_reason", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolMetadata.MatchesClaimOutcome(value.Outcome, value.Reason)),
+        new("response.proof_core", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreDistinctNonblank(value.ProofCore)),
+        new("response.model", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreValidModel(value.Model)),
+        new("response.assumptions", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.vacuity_evidence", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            (!(value.Vacuity != WorkerVacuityKind.None)
+            || (!value.ProofCore.IsDefaultOrEmpty))),
+        new("response.claim_payload", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            WorkerProtocolMetadata.MatchesClaimPayload(value.Outcome, !value.ProofCore.IsDefaultOrEmpty, !value.Model.IsDefaultOrEmpty)),
+    ];
+    internal static bool IsEffectWitnessValid(WorkerEffectViolationWitness value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return (!string.IsNullOrWhiteSpace(value.Kind)
+            && !string.IsNullOrWhiteSpace(value.Detail)
+            && WorkerProtocolMetadata.HasOnlyKnownFlags(value.Effects)
+            && WorkerProtocolMetadata.HasOnlyKnownFlags(value.Capabilities)
+            && (value.Effects != WorkerEffectSet.None
+            || value.Capabilities != WorkerEffectCapabilitySet.None)
+            && (!(!value.ExactExceptionTypeHierarchy.IsDefaultOrEmpty)
+            || ((value.Effects & WorkerEffectSet.Throws) != 0))
+            && WorkerProtocolJson.AreDistinctNonblank(value.ExactExceptionTypeHierarchy));
+    }
+    internal static bool IsVersionsValid(WorkerVersionSummary value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return (value.ProtocolVersion == WorkerProtocolVersions.Current
+            && value.ManifestSchemaVersion == WorkerManifestVersions.Current
+            && value.CacheSchemaVersion == WorkerCacheVersions.Current
+            && !string.IsNullOrWhiteSpace(value.WorkerVersion)
+            && !string.IsNullOrWhiteSpace(value.ApiSpecVersion)
+            && WorkerProtocolJson.IsSha256(value.WorkerBinarySha256)
+            && WorkerProtocolJson.IsSha256(value.ApiSpecContentSha256));
+    }
+    internal static readonly ImmutableArray<WorkerProtocolRule<WorkerVerificationSummary>> SummaryRules = [
+        new("summary.cache", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolMetadata.MatchesCacheState(value.CacheStatus, value.CacheHit)),
+        new("summary.versions", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ =>
+            (value.Versions != null
+            && WorkerProtocolMetadata.IsVersionsValid(value.Versions))),
+        new("summary.elapsed", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.ElapsedMilliseconds >= 0),
+    ];
+    internal static bool IsProtocolErrorValid(WorkerProtocolError value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return (!string.IsNullOrWhiteSpace(value.Code)
+            && WorkerProtocolJson.IsSingleLineText(value.Code)
+            && !string.IsNullOrWhiteSpace(value.Message)
+            && WorkerProtocolJson.IsSingleLineText(value.Message));
+    }
+}

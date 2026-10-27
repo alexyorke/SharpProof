@@ -175,9 +175,6 @@ internal sealed partial class FrontendProgramLoweringResult
         ImmutableArray<FrontendProgramAbstention> abstentions, object totalOrigin)
         : this(program, classification, variables, captures, abstentions)
     {
-
-
-
         RepositoryParameterGuard.RequireInitialized(abstentions.IsDefault, nameof(abstentions), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(captures.IsDefault, nameof(captures), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
@@ -191,14 +188,17 @@ internal sealed partial class FrontendProgramLoweringResult
         ImmutableArray<FrontendVariableBinding> variables,
         ImmutableArray<IrVarId> captures,
         ImmutableArray<FrontendProgramAbstention> abstentions)
-        : this(
-            ArgumentNullGuard.NotNull(program, nameof(program)),
-            classification,
-            variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : variables,
-            captures.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(captures)) : captures,
-            abstentions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(abstentions)) : abstentions,
-            default)
     {
+        Program = ArgumentNullGuard.NotNull(program, nameof(program));
+        Classification = classification;
+        Variables = variables.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(variables)) : variables;
+        Captures = captures.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(captures)) : captures;
+        Abstentions = abstentions.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(abstentions)) : abstentions;
     }
+    public IrProgram Program { get; }
+    public FrontendSubsetClassification Classification { get; }
+    public ImmutableArray<FrontendVariableBinding> Variables { get; }
+    public ImmutableArray<IrVarId> Captures { get; }
+    public ImmutableArray<FrontendProgramAbstention> Abstentions { get; }
     public bool IsExact => Classification.IsExact && !IsShadowCallSkeleton;
 }

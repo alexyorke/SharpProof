@@ -49,7 +49,9 @@ public sealed class Pr334ResourceIrCoverageTests
         // record boundary without corrupting a shared built-in type singleton.
         var shapeConstructor = typeof(IrNullableTypeShape).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
         var shape = (IrTypeShape)shapeConstructor.Invoke([(IrTypeKind)999]);
-        var type = new IrTypeInfo(default, default, shape, null);
+        var factory = new IrFactory();
+        var builtIn = factory.GetTypeInfo(factory.IntegerType);
+        var type = new IrTypeInfo(builtIn.Id, builtIn.Name, shape, null);
 
         Assert.That(InvokePrivate<ResourceStorageKind>(typeof(IrClosureFrameSite), "Storage", type),
             Is.EqualTo(ResourceStorageKind.Unspecified));

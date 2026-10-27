@@ -23,7 +23,7 @@ Feature selection does not mean that every method receives every possible proof.
 
 `advisory` reports incomplete selected coverage as information; `warn-on-unknown` reports warnings; `require-proven` rejects it. A replayed Refuted claim is an error under every policy. Infrastructure failures remain failures. Assumption policy checks declarations even when a particular claim does not mark them used. Preconditions and resolved API specifications remain recorded evidence and are outside that user-declaration rejection rule.
 
-Specification packs add reviewed relational semantics for exact supported members. `dotnet.scalar` currently supplies the Int32 `Math.Max` relation. Unknown IDs, duplicate IDs, and empty entries within a nonempty list are rejected. Selecting a pack changes semantic evidence and cache identity; it does not increase a timeout or grant blanket framework support. See the [API catalog](api-spec-catalog.generated.md).
+Specification packs add reviewed relational semantics for exact supported members. `dotnet.scalar` currently supplies the Int32 `Math.Max` relation. Unknown IDs, duplicate IDs, and empty entries within a nonempty list are rejected. Selecting a pack changes semantic evidence and cache identity; it does not increase a timeout or grant blanket framework support. See the [API catalog](api-spec-catalog.md).
 
 ## A CI consumer example
 

@@ -41,7 +41,7 @@ Effect and capability flags are independent closed sets. Unknown bits are invali
 
 Prefer checked source implementations when available. Use audited built-in specifications or opt-in relational packs only for their exact supported member identities and domains. An effect declaration alone does not establish a numerical result relation.
 
-For example, `SharpProofSpecificationPacks=dotnet.scalar` selects the embedded reviewed relational pack containing the Int32 Math.Max result relation. See [the specification catalog](../api-spec-catalog.generated.md) and [coverage guide](../coverage-and-limits.md#api-specifications).
+For example, `SharpProofSpecificationPacks=dotnet.scalar` selects the embedded reviewed relational pack containing the Int32 Math.Max result relation. See [the specification catalog](../api-spec-catalog.md) and [coverage guide](../coverage-and-limits.md#api-specifications).
 
 ## Finish with a CI policy
 

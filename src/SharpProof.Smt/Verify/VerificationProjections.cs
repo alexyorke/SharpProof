@@ -1,0 +1,21 @@
+#nullable enable
+namespace SharpProof.Verify;
+
+internal static class VerificationProjections
+{
+    internal static AbstentionReason MapFailure(
+        BackendFailureReason reason
+    )
+    {
+        return reason switch
+        {
+            BackendFailureReason.UnsupportedEncoding => AbstentionReason.UnsupportedEncoding,
+            BackendFailureReason.ResourceLimit => AbstentionReason.ResourceLimit,
+            BackendFailureReason.Timeout => AbstentionReason.Timeout,
+            BackendFailureReason.Unavailable => AbstentionReason.BackendUnavailable,
+            BackendFailureReason.Incomplete => AbstentionReason.SolverIncomplete,
+            BackendFailureReason.InfrastructureFailure => AbstentionReason.InfrastructureFailure,
+            _ => AbstentionReason.MalformedBackendResult
+        };
+    }
+}

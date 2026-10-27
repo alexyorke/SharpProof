@@ -1,0 +1,52 @@
+#nullable enable
+namespace SharpProof.Effects;
+
+internal static class EffectProjections
+{
+    internal static Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax? GetInitializerExpression(
+        Microsoft.CodeAnalysis.SyntaxNode declaration
+    )
+    {
+        return declaration switch
+        {
+            Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax variable => variable.Initializer?.Value,
+            Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax property => property.Initializer?.Value,
+            _ => null
+        };
+    }
+
+    internal static EffectAllocationKind MapAllocation(
+        SpecAllocationBehavior behavior
+    )
+    {
+        return behavior switch
+        {
+            SpecAllocationBehavior.None => EffectAllocationKind.None,
+            SpecAllocationBehavior.MayAllocate => EffectAllocationKind.Managed,
+            SpecAllocationBehavior.Unknown => EffectAllocationKind.Unknown,
+            _ => EffectAllocationKind.Unknown
+        };
+    }
+
+    internal static EffectThrowSet MapNonResolvedThrowBehavior(
+        SpecThrowBehavior behavior
+    )
+    {
+        return behavior switch
+        {
+            SpecThrowBehavior.DoesNotThrow => EffectThrowSet.Empty,
+            _ => EffectThrowSet.Unknown
+        };
+    }
+
+    internal static EffectTermination MapTermination(
+        SpecTerminationBehavior? behavior
+    )
+    {
+        return behavior switch
+        {
+            SpecTerminationBehavior.Terminates => EffectTermination.Terminates,
+            _ => EffectTermination.Unknown
+        };
+    }
+}

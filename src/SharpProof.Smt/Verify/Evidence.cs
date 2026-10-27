@@ -87,11 +87,9 @@ internal sealed partial class Goal
         IrTerm predicate,
         ProofDiagnosticKind diagnostic,
         SourceLocationId location /* SPINT001: all values valid - every location index, including zero, is valid */)
-        : this(
-            IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate)),
-            diagnostic,
-            location,
-            default)
     {
+        Predicate = IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate));
+        Diagnostic = diagnostic;
+        Location = location;
     }
 }

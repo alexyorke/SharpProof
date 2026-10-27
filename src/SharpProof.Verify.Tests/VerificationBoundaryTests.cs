@@ -34,7 +34,7 @@ public sealed class VerificationBoundaryTests
         var factory = new IrFactory();
         var query = new VerificationQuery(factory, [], FalseGoal(factory));
         var emptyModel = new BackendModel([]);
-        var malformed = ImmutableArray.Create<BackendCheckResult?>(null, new((BackendCheckStatus)99, [], null, BackendFailureReason.None, default), new(BackendCheckStatus.Unsatisfiable, [], emptyModel, BackendFailureReason.None, default), new(BackendCheckStatus.Satisfiable, [], null, BackendFailureReason.None, default)
+        var malformed = ImmutableArray.Create<BackendCheckResult?>(null, new((BackendCheckStatus)99, [], null, BackendFailureReason.None), new(BackendCheckStatus.Unsatisfiable, [], emptyModel, BackendFailureReason.None), new(BackendCheckStatus.Satisfiable, [], null, BackendFailureReason.None)
 );
 
         foreach (var result in malformed)
@@ -60,7 +60,7 @@ public sealed class VerificationBoundaryTests
             factory.GetOrCreateSequenceType(factory.IntegerType));
         var nested = factory.CreateVariable("nested", nestedType);
         var nullValue = new BackendModel(
-            ImmutableDictionary<IrVarId, IrValue>.Empty.Add(integer, null!), default);
+            ImmutableDictionary<IrVarId, IrValue>.Empty.Add(integer, null!));
         var nestedValue = new BackendModel([
             KeyValuePair.Create(nested, factory.CreateSequenceValue(nestedType, []))
         ]);

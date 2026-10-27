@@ -19,7 +19,7 @@ For a bug, reproduce the failure or trace the incorrect behavior before editing.
 | Protocol/cache/publication | Worker protocol and validator tests | Matching-evidence, malformed-input and compatibility regressions |
 | Guides/templates | `docs`, `templates` | Documentation checks, snippet tests and exact-feed template smoke check |
 
-For a first contribution, reproduce one issue, locate its existing test cohort, add the smallest meaningful regression, make the fix, run that focused test, then the relevant broader gate below. The [architecture](docs/architecture.md) maps the pipeline; [development workflows](docs/development-workflows.md) explains feedback versus qualification. Hand-maintained files marked `.generated.cs` are edited according to their headers, not by an assumed generator.
+For a first contribution, reproduce one issue, locate its existing test cohort, add the smallest meaningful regression, make the fix, run that focused test, then the relevant broader gate below. The [architecture](docs/architecture.md) maps the pipeline; [development workflows](docs/development-workflows.md) explains feedback versus qualification.
 
 ## Run validation
 
@@ -71,7 +71,7 @@ Preserve typed outcomes and reasons. Unsupported operations, incomplete summarie
 
 A semantic change must account for compiler lowering, VC construction, replay, protocol validation, caching, and diagnostic projection where affected. Review the [semantics](SEMANTICS.md), [architecture](docs/architecture.md), and [golden tests](tests/golden/README.md).
 
-Update versioned artifacts when their meaning or shape changes. Declarative files with `.generated.cs` names are hand-maintained where their header says so; a retired generator is not an update workflow.
+Update versioned artifacts when their meaning or shape changes. Declarative catalogs and models are ordinary hand-maintained C#; keep them, their validators and their tests synchronized.
 
 ## Documentation and review
 

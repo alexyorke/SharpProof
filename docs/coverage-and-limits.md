@@ -54,11 +54,11 @@ facet/postcondition and each inventoried intrinsic. Missing or failing evidence 
 
 The default catalog is a closed reviewed set of exact member matches and approved assembly evidence. It does not trust arbitrary same-named framework members. Its facets must be interpreted independently: an allocation or exception facet does not establish a result relation.
 
-See the [catalog](api-spec-catalog.generated.md) and [DefaultApiSpecCatalog.generated.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.generated.cs). The declarative C# source and Markdown projection are hand-maintained; no retired generator is required to update them.
+See the [catalog](api-spec-catalog.md) and [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs). The declarative C# source and the Markdown reference are both hand-maintained.
 
 Specification identity, runtime domains, exception hierarchy, and result relationships participate in compiler evidence and worker validation. A modeled API result may remain unreplayable when no concrete evaluator can execute that boundary.
 
-`SharpProofSpecificationPacks` enables embedded reviewed relational packs by semicolon-delimited ID. The current [pack catalog](../src/SharpProof.Specs/RelationalSpecPackCatalog.generated.cs) contains `dotnet.scalar@1`, including the Int32 `Math.Max` result relation. Packs are opt-in; an effect/exception catalog entry alone does not imply that relation. Unknown IDs, duplicate IDs, and empty entries in a nonempty list fail closed.
+`SharpProofSpecificationPacks` enables embedded reviewed relational packs by semicolon-delimited ID. The current [pack catalog](../src/SharpProof.Specs/RelationalSpecPackCatalog.cs) contains `dotnet.scalar@1`, including the Int32 `Math.Max` result relation. Packs are opt-in; an effect/exception catalog entry alone does not imply that relation. Unknown IDs, duplicate IDs, and empty entries in a nonempty list fail closed.
 
 ## Outcomes, accountability, and cache boundary
 

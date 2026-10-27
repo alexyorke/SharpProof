@@ -167,7 +167,7 @@ The checked baseline is nested fork/join codec 11, response cache 65, protocol 4
 
 Keep protocol 43, manifest 6, and outer artifact 55 if their structured schemas remain unchanged, matching prior nested-envelope changes. The outer fork/join field is already an opaque nested payload. Reassess only if implementation adds public structured result fields. Leave the existing compiler-carrier and direct/owned-source frame model identities unchanged because their claims are unchanged. Add the new compiler/route identities without adding successful public proof-core tokens.
 
-Coordinate the response-cache owner in `src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs`, cache expectations in `ProtocolJsonTests.cs`, `eng/acceptance/contract.json`, and current compatibility prose in `docs/release-constants.md`, `docs/architecture.md`, and `docs/resource-bounds.md`. Keep the acceptance trusted-path classification current for new production files. Do not change coverage floors or exclusions.
+Coordinate the response-cache owner in `src/SharpProof.Worker.Protocol/ProtocolModel.cs`, cache expectations in `ProtocolJsonTests.cs`, `eng/acceptance/contract.json`, and current compatibility prose in `docs/release-constants.md`, `docs/architecture.md`, and `docs/resource-bounds.md`. Keep the acceptance trusted-path classification current for new production files. Do not change coverage floors or exclusions.
 
 ## Implementation ownership record
 
@@ -180,7 +180,7 @@ The coordinator assigned the producer, scanner, transport and native consumer to
 | Native consumer | `src/SharpProof.Worker/NativeResourceContractVerifier.cs` | `src/SharpProof.Worker/NativeTaskEmittedFaultSiteVerifier.cs`; `src/SharpProof.Worker/NativeTaskPrimitiveHelperRouteVerifier.cs` |
 | Runtime selection catalog, if separated from native consumer | None of the existing HCall catalog is required to change for this slice | Optional `src/SharpProof.Specs/ResourcePrimitiveHelperRouteCatalog.cs`, only with a concrete consumer |
 | Test owner | `src/SharpProof.Worker.Tests/NativeTaskCarrierStorageTests.cs`; `src/SharpProof.Worker.Tests/NativeResourceForkJoinArtifactTests.cs`; relevant `NativeResourceTaskRootTests.cs` assertions only after checking actual reason expectations | Prefer dedicated `src/SharpProof.Worker.Tests/NativeTaskEmittedFaultSiteTests.cs` to avoid the just-finished collector-controls writer's file |
-| Coordinator compatibility and delivery | `src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs`; `src/SharpProof.Worker.Tests/ProtocolJsonTests.cs`; `eng/acceptance/contract.json`; `docs/release-constants.md`; `docs/architecture.md`; `docs/resource-bounds.md` | None |
+| Coordinator compatibility and delivery | `src/SharpProof.Worker.Protocol/ProtocolModel.cs`; `src/SharpProof.Worker.Tests/ProtocolJsonTests.cs`; `eng/acceptance/contract.json`; `docs/release-constants.md`; `docs/architecture.md`; `docs/resource-bounds.md` | None |
 
 `CompilerTotalIlBodyProvider.cs`, `NativeForkJoinSourceCostVerifier.cs`, `NativeTaskIrFaultOriginVerifier.cs`, `NativeTaskSourceExceptionInstanceVerifier.cs`, `NativeTaskCarrierStorageVerifier.cs`, and `ResourceTaskFaultCarrierCatalog.cs` need no semantic edits for this slice. If implementation finds a necessary interface adjustment there, request explicit file ownership before writing. Do not edit the completed tests-only collector controls concurrently.
 

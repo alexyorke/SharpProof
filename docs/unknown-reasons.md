@@ -2,7 +2,7 @@
 
 Unknown is explicit evidence that a selected claim was not decided. It is not a diagnostic severity, a run status, or proof by silence.
 
-The wire enums and validation rules are in [ProtocolModel.generated.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.generated.cs) and [ProtocolJson.cs](../src/SharpProof.Worker.Protocol/ProtocolJson.cs). Consumers must use the actual typed fields instead of parsing display text.
+The wire enums and validation rules are in [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and [ProtocolJson.cs](../src/SharpProof.Worker.Protocol/ProtocolJson.cs). Consumers must use the actual typed fields instead of parsing display text.
 
 ## Worker claim reasons
 

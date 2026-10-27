@@ -116,7 +116,7 @@ internal static class CompilerForkJoinResourceLowering
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
         continuation = RepositoryParameterGuard.NotNull(continuation, nameof(continuation));
         cancellationToken.ThrowIfCancellationRequested();
-        var graph = TotalBodyLowering.CreateGraph(declaration, child, model, cancellationToken);
+        var graph = TotalSourceCallSession.CreateGraph(declaration, child, model, cancellationToken);
         if (graph == null)
         { return new(null, "ForkJoinChildBodyUnavailable"); }
         return continuation(new(declaration, model, graph));
