@@ -4,6 +4,7 @@ using SharpProof.Verify;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Contracts;
 using System.Text.Json;
 

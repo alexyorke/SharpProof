@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Producer identities used for stable reporting labels. Artifact validation
 // does not authenticate the compiler's source or configuration inventory.

@@ -6,7 +6,7 @@ using System.Reflection.PortableExecutable;
 
 // Implementation evidence is read only by the build-time collector.
 #pragma warning disable RS1035
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot>? references)
 {

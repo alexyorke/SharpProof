@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Derives bounded impossible-alias certificates from compiler-owned method symbols.
 // Callable body admission and artifact policy remain enforced by the caller.

@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 #pragma warning disable RS1035 // Build-only compiler evidence resolves final reference paths.
 

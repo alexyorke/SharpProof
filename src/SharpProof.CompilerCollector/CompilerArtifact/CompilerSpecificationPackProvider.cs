@@ -1,6 +1,6 @@
 // Specification packs are audited package data. They are never discovered
 // from the consumer's filesystem and are inactive unless explicitly selected.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal sealed class CompilerSpecificationPackProvider
 {

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;

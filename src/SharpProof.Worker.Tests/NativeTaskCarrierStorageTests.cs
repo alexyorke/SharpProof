@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using System.Text.Json.Nodes;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;

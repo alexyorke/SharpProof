@@ -14,6 +14,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Analyzer;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Frontend;
 using SharpProof.Host;
 using SharpProof.Ir;

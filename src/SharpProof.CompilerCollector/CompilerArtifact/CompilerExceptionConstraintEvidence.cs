@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Projects eligible compiler effect evidence atomically against a runtime assembly.
 internal static class CompilerExceptionConstraintEvidence

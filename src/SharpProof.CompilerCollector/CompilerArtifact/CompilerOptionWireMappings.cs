@@ -1,5 +1,5 @@
 // Internal compiler-option reflection remains confined to the build-time collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal static partial class CompilerOptionWireMappings
 {

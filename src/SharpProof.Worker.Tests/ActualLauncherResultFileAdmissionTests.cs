@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

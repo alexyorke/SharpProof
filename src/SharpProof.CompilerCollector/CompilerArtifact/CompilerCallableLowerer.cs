@@ -1,5 +1,5 @@
 // This lowerer runs only in the build-time compiler collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Classifies a discovered callable and lowers its Total programs. The reason
 // says why a callable cannot be verified; a body the Total IR cannot lower is

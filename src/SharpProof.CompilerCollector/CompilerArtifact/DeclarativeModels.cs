@@ -1,5 +1,5 @@
 #nullable enable
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 internal sealed partial record ClaimManifestBuildResult(
     WorkerClaimManifest Manifest,

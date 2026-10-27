@@ -1,6 +1,6 @@
 using System.Reflection.Metadata;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // The metadata and identity facts supplied by a loaded module or its backing image.
 internal sealed record CompilerReferenceModuleEvidence(MetadataReader Reader, string Name, GuidHandle /* SPINT001: all values valid - nil is retained as raw evidence and rejected by ReadMvid */ Mvid)

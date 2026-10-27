@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using SharpProof.Analyzer;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Ir;

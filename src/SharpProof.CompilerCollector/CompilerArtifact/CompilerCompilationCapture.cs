@@ -5,7 +5,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using SharpProof.CompilerSupport;
 // This capture runs only in the build-time compiler collector.
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
 

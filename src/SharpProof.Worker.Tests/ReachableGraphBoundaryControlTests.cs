@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 
 namespace SharpProof.Worker.Test;
 

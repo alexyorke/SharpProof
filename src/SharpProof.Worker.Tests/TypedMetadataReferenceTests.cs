@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Contracts;
 using SharpProof.CompilerArtifact;
+using SharpProof.CompilerCollector;
 using SharpProof.Frontend;
 using SharpProof.Host;
 using SharpProof.Ir;

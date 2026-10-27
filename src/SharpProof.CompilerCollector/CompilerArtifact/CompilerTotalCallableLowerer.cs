@@ -1,4 +1,4 @@
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Independent admission for the same discovered target. A legacy failure is
 // preserved and does not suppress exact typed candidate evidence.

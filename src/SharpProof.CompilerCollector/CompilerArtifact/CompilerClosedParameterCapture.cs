@@ -1,7 +1,7 @@
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 
-namespace SharpProof.CompilerArtifact;
+namespace SharpProof.CompilerCollector;
 
 // Captures and pairs closed-parameter evidence from supplied metadata rows.
 // Body and metadata ownership admission remain the caller's responsibility.
