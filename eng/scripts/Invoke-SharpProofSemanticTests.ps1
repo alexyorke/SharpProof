@@ -30,7 +30,7 @@ param(
     # and its complete complement. ProjectsA and ProjectsB partition the
     # Projects group, and WorkerA1 and WorkerA4 partition WorkerA.
     # Legacy groups and All preserve the existing local task selections.
-    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerA4A', 'WorkerA4B', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'ProjectsA', 'ProjectsB')]
+    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerB', 'Projects', 'ProjectsA', 'ProjectsB')]
     [string]$TaskGroup = 'All'
 )
 
@@ -213,6 +213,7 @@ $workerPrefixGroupBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilde
 $workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeA'))
 $workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeS', 'C'))
 $workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('W', 'T', 'G', 'F'))
+$workerPrefixGroupBuilder.Add([Collections.Immutable.ImmutableArray]::Create[string]('NativeR', 'NativeW', 'NativeT', 'NativeP', 'NativeE', 'NativeM'))
 $workerRemainderShardPrefixes = $workerPrefixGroupBuilder.ToImmutable()
 $workerShardFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
 $workerComplementFilterBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -393,15 +394,9 @@ if (-not $ArchitectureOnly) {
                     DefaultEstimatedMilliseconds = 10000L
                 }).AsReadOnly())
     }
-    $unpartitionedWorkerA4Filter = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[3])"
     # Retain the upstream four-shard policy and memory-aware slot reservation.
     for ($index = 0; $index -lt $workerRemainderShardFilters.Length; $index++) {
         $workerShardFilter = "($workerRemainderTaskFilter)&$($workerRemainderShardFilters[$index])"
-        if ($index -eq 3 -and $TaskGroup -in @('WorkerA4A', 'WorkerA4B')) {
-            $firstPart = '(FullyQualifiedName~SharpProof.Worker.Test.Native|FullyQualifiedName~SharpProof.Worker.Test.Actual)'
-            $secondPart = '(FullyQualifiedName!~SharpProof.Worker.Test.Native&FullyQualifiedName!~SharpProof.Worker.Test.Actual)'
-            $workerShardFilter += '&' + $(if ($TaskGroup -ceq 'WorkerA4A') { $firstPart } else { $secondPart })
-        }
         $workerDescriptorBuilder.Add(([ordered]@{
                     Name                         = $workerRemainderTaskNames[$index]
                     Filter                       = $workerShardFilter
@@ -447,6 +442,10 @@ if ($TaskGroup -ne 'All') {
     # other Worker task, so a new remainder shard still runs exactly once.
     $workerBTaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
         'worker-remainder-2', 'worker-remainder-3')
+    # WorkerA4 takes the Native classes that worker-remainder-4 selects and the
+    # complement shard, which run side by side.
+    $workerA4TaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
+        'worker-remainder-4', 'worker-remainder-5')
     # ProjectsA takes the four slowest suites outside Worker and Gates;
     # ProjectsB takes the rest of Projects, so a new suite runs exactly once.
     $projectsATaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
@@ -464,12 +463,8 @@ if ($TaskGroup -ne 'All') {
                     'Worker' { $taskName -cin $workerTaskNames }
                     'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
                     'WorkerB' { $taskName -cin $workerBTaskNames }
-                    'WorkerA1' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames -and $taskName -cne 'worker-remainder-4' }
-                    'WorkerA4' { $taskName -ceq 'worker-remainder-4' }
-                    'WorkerA4A' { $taskName -ceq 'worker-remainder-4' }
-                    'WorkerA4B' { $taskName -ceq 'worker-remainder-4' }
-                    'WorkerB2' { $taskName -ceq 'worker-remainder-2' }
-                    'WorkerB3' { $taskName -ceq 'worker-remainder-3' }
+                    'WorkerA1' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames -and $taskName -cnotin $workerA4TaskNames }
+                    'WorkerA4' { $taskName -cin $workerA4TaskNames }
                     'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }
                     'ProjectsA' { $taskName -cin $projectsATaskNames }
                     'ProjectsB' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin $projectsATaskNames }
@@ -568,9 +563,8 @@ else {
 }
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
 $retainCorpusDiscovery = $coverageEnabled -and $TaskGroup -in @('GatesCorpusA', 'GatesCorpusB')
-$retainWorkerA4Discovery = $coverageEnabled -and $TaskGroup -in @('WorkerA4A', 'WorkerA4B')
 $discoverySettings = ''
-if ($retainCanonicalResults -or $retainCorpusDiscovery -or $retainWorkerA4Discovery) {
+if ($retainCanonicalResults -or $retainCorpusDiscovery) {
     $discoverySettings = Join-Path $resultsRoot 'discovery.runsettings'
     '<RunSettings><NUnit><DumpXmlTestDiscovery>true</DumpXmlTestDiscovery></NUnit></RunSettings>' |
         Set-Content -LiteralPath $discoverySettings -Encoding utf8NoBOM
@@ -592,7 +586,7 @@ try {
                 SHARPPROOF_TEST_PROJECT_PARALLELISM = $processSlots.ToString(
                     [Globalization.CultureInfo]::InvariantCulture)
             }).AsReadOnly()
-        if ($retainCanonicalResults -or $retainCorpusDiscovery -or $retainWorkerA4Discovery) {
+        if ($retainCanonicalResults -or $retainCorpusDiscovery) {
             $taskRoot = Join-Path $resultsRoot $task.Name
             [IO.Directory]::CreateDirectory($taskRoot) | Out-Null
             $discoveryProjectBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
@@ -617,7 +611,7 @@ try {
                     '/ListFullyQualifiedTests',
                     ('/Settings:' + $discoverySettings),
                     ('/ListTestsTargetPath:' + (Join-Path $taskRoot 'discovered-tests.txt')),
-                    ('/TestCaseFilter:' + $(if ($retainCorpusDiscovery) { $unpartitionedCorpusFilter } elseif ($retainWorkerA4Discovery) { $unpartitionedWorkerA4Filter } else { $task.Filter }))))
+                    ('/TestCaseFilter:' + $(if ($retainCorpusDiscovery) { $unpartitionedCorpusFilter } else { $task.Filter }))))
             Invoke-SharpProofRequiredDotnet -Arguments ([string[]]@($discoveryArgumentBuilder.ToImmutable())) `
                 -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
             $dumpRoot = Join-Path $taskRoot 'discovery'
