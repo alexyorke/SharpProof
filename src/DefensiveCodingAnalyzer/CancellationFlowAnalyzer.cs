@@ -159,7 +159,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         var tokenBuilder = ImmutableArray.CreateBuilder<IParameterSymbol>();
         tokenBuilder.AddRange(symbol.Parameters.Where(parameter =>
             SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
-        if (tokenBuilder.Count == 0 && (isLocalFunction || isAnonymous) && !symbol.IsStatic)
+        if ((isLocalFunction || isAnonymous) && !symbol.IsStatic)
         {
             foreach (var ancestor in declaration.Ancestors())
             {
@@ -170,7 +170,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                 }
                 tokenBuilder.AddRange(enclosing.Parameters.Where(parameter =>
                     SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
-                if (tokenBuilder.Count != 0 || ancestor is BaseMethodDeclarationSyntax || enclosing.IsStatic)
+                if (ancestor is BaseMethodDeclarationSyntax || enclosing.IsStatic)
                 {
                     break;
                 }

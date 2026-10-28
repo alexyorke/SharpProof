@@ -363,7 +363,7 @@ public sealed class CancellationFlowAnalyzerTests
     }
 
     [Test]
-    public async Task CapturedFieldLambdaAliasesCannotReplaceAnExplicitLocalToken()
+    public async Task CapturedFieldLambdaAliasesRemainAvailableAlongsideExplicitLocalTokens()
     {
         const string source = """
             using System;
@@ -379,9 +379,52 @@ public sealed class CancellationFlowAnalyzerTests
                 };
             }
             """;
-        Assert.That((await Analyze(source)).Select(static diagnostic =>
-            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id),
-            Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.DroppedTokenId)));
+        Assert.That(await Analyze(source, validateCompilation: true), Is.Empty);
+    }
+
+    [Test]
+    public async Task ExplicitLocalTokensDoNotHideCapturedTokensFromAnyEnclosingScope()
+    {
+        const string source = """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static Task RunAsync(CancellationToken outer)
+                {
+                    Task MiddleAsync(CancellationToken middle)
+                    {
+                        Task InnerAsync(CancellationToken inner) => Task.Delay(1, outer);
+                        return InnerAsync(middle);
+                    }
+                    Func<CancellationToken, Task> callback = inner => Task.Delay(1, outer);
+                    return Task.WhenAll(MiddleAsync(outer), callback(outer));
+                }
+            }
+            """;
+        Assert.That(await Analyze(source, validateCompilation: true), Is.Empty);
+    }
+
+    [Test]
+    public async Task StaticAnonymousFunctionsStopEnclosingTokenCapture()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            public static class Sample
+            {
+                public static Task RunAsync(CancellationToken outer) =>
+                    Task.Run(static () =>
+                    {
+                        Task LocalAsync() => Task.Delay(1);
+                        return LocalAsync();
+                    }, outer);
+            }
+            """;
+        Assert.That((await Analyze(source, validateCompilation: true)).Select(static diagnostic =>
+                (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id),
+            Is.EqualTo(ImmutableArray.Create(CancellationFlowAnalyzer.MissingTokenId)));
     }
 
     [TestCase("token = default;", 1)]
