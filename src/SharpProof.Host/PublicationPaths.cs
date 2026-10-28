@@ -43,7 +43,11 @@ internal static class PublicationPaths
     {
         System.ArgumentNullException.ThrowIfNull(directory);
         System.ArgumentNullException.ThrowIfNull(path);
-        var root = Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar;
+        var root = Path.TrimEndingDirectorySeparator(directory);
+        if (!Path.EndsInDirectorySeparator(root))
+        {
+            root += Path.DirectorySeparatorChar;
+        }
         return string.Equals(path, directory, Comparison) || path.StartsWith(root, Comparison);
     }
 }

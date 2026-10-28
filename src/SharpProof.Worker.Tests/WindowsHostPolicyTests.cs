@@ -85,11 +85,31 @@ public sealed class WindowsHostPolicyTests
     [TestCase(@"C:\folder\NUL.json")]
     [TestCase(@"C:\folder\COM1.json")]
     [TestCase(@"C:\folder\LPT9.json")]
+    [TestCase("C:\\folder\\COM\u00b9.json")]
+    [TestCase("C:\\folder\\COM\u00b2.json")]
+    [TestCase("C:\\folder\\COM\u00b3.json")]
+    [TestCase("C:\\folder\\LPT\u00b9.json")]
+    [TestCase("C:\\folder\\LPT\u00b2.json")]
+    [TestCase("C:\\folder\\LPT\u00b3.json")]
+    [TestCase("C:\\COM\u00b9\\result.json")]
+    [TestCase("C:\\folder\\lpt\u00b2.txt")]
     public void WindowsPathAliasesAndDevicesAreRejected(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => false)));
+    }
+
+    [TestCase("/", "/", true)]
+    [TestCase("/tmp/result.json", "/", true)]
+    [TestCase("/tmp/result.json", "/tmp", true)]
+    [TestCase("/tmp/result.json", "/tmp/", true)]
+    [TestCase("/tmp-other/result.json", "/tmp", false)]
+    public void PublicationContainmentPreservesFilesystemRoots(string path, string directory, bool expected)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(directory);
+        Assert.That(PublicationPaths.IsWithin(path, directory), Is.EqualTo(expected));
     }
 
     [Test]

@@ -138,7 +138,8 @@ internal sealed class PublicationLease : IDisposable
                 stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
                 stem.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
                 (stem.Length == 4 && (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
-                    stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) && char.IsDigit(stem[3])))
+                    stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
+                    (char.IsDigit(stem[3]) || stem[3] is '\u00b9' or '\u00b2' or '\u00b3')))
             {
                 throw new ArgumentException("SharpProof Windows paths must not use device names, alternate streams, or short-name aliases.");
             }
