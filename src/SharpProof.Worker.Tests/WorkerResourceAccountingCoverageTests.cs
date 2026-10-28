@@ -5,6 +5,32 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerResourceAccountingCoverageTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void IndependentNativeSessionsShareOneAccumulatedMethodAllowance(bool hasPrimaryCounter)
+    {
+        long primary = 0;
+        var accounting = new MethodResourceBudget(hasPrimaryCounter ? () => primary : null, 2, 10);
+        long first = 17;
+        using (accounting.TrackConsumption(() => first))
+        {
+            Assert.That(accounting.TryStartQuery(reserveResources: false), Is.True);
+            first += 6;
+            Assert.That(accounting.TryStartQuery(reserveResources: false), Is.True);
+        }
+        long second = 100;
+        using (accounting.TrackConsumption(() => second))
+        {
+            Assert.That(accounting.TryStartQuery(reserveResources: false), Is.True);
+            second += 3;
+            Assert.That(accounting.TryStartQuery(reserveResources: false), Is.False);
+            Assert.That(accounting.IsExceeded, Is.False);
+            second += 2;
+            Assert.That(accounting.IsExceeded, Is.True);
+        }
+        Assert.That(accounting.IsExceeded, Is.True, "Disposing sessions must retain their consumed allowance.");
+    }
+
     [Test]
     public void CounterBelowItsStartingValueIsRejected()
     {

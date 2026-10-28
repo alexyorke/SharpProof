@@ -14,7 +14,8 @@ internal static class NativeExceptionEffectVerifier
     }
 
     internal static async Task<ImmutableDictionary<string, PassiveCallableCheckResult>> VerifyClaimsAsync(
-        CompilerCallablePreparation preparation, WorkerBudgets budgets, CancellationToken cancellationToken)
+        CompilerCallablePreparation preparation, WorkerBudgets budgets, CancellationToken cancellationToken,
+        MethodResourceBudget? resourceBudget = null, Action<string, PassiveCallableCheckResult>? publish = null)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -31,7 +32,7 @@ internal static class NativeExceptionEffectVerifier
         foreach (var claim in expected)
         {
             if (!constraints.ContainsKey(claim.ClaimId))
-            { results.Add(claim.ClaimId, Unknown(WorkerClaimReason.UnsupportedContract)); }
+            { Publish(claim.ClaimId, Unknown(WorkerClaimReason.UnsupportedContract)); }
         }
         if (results.Count == expected.Length)
         { return results.ToImmutable(); }
@@ -40,7 +41,7 @@ internal static class NativeExceptionEffectVerifier
         { return All(Unknown(WorkerClaimReason.UnsupportedExpression)); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return All(Unknown(failure)); }
-        using var solver = new PassiveCallableSolver(plan ?? throw new InvalidOperationException("Passive callable plan missing after successful build."), budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan ?? throw new InvalidOperationException("Passive callable plan missing after successful build."), budgets.QueryRlimit, budgets.MethodRlimit, resourceBudget);
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return All(entry); }
@@ -54,7 +55,7 @@ internal static class NativeExceptionEffectVerifier
                 var anyThrowViolates = claim.ContractKind == WorkerEffectContractKind.DoesNotThrow;
                 var allowedTypes = claim.Constraint.AllowedExceptionTypes.ToImmutableHashSet(StringComparer.Ordinal);
                 var factory = candidate.Program.Factory;
-                results.Add(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, cancellationToken, anyThrowViolates,
+                Publish(claim.ClaimId, await solver.VerifyExceptionsAsync(allowed, cancellationToken, anyThrowViolates,
                     site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.Types(factory, site).Any(allowedTypes.Contains)),
                     site => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (ExplicitThrowSites.IsExact(factory, site))).ConfigureAwait(false));
             }
@@ -67,9 +68,17 @@ internal static class NativeExceptionEffectVerifier
             foreach (var claim in expected)
             {
                 if (!results.ContainsKey(claim.ClaimId))
-                { results.Add(claim.ClaimId, evidence); }
+                { Publish(claim.ClaimId, evidence); }
             }
             return results.ToImmutable();
+        }
+
+        void Publish(string claimId, PassiveCallableCheckResult evidence)
+        {
+            ArgumentNullException.ThrowIfNull(claimId);
+            ArgumentNullException.ThrowIfNull(evidence);
+            results.Add(claimId, evidence);
+            publish?.Invoke(claimId, evidence);
         }
     }
 

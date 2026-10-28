@@ -16,6 +16,7 @@ internal sealed class PassiveLoopCutterTests
     [TestCase("string-content")]
     [TestCase("string-length")]
     [TestCase("copy")]
+    [TestCase("copy-after-store")]
     [TestCase("old-input")]
     public void HeapIndependentReceiverRetainsFixedCellCut(string shape)
     {
@@ -71,17 +72,23 @@ internal sealed class PassiveLoopCutterTests
             receiver = factory.Variable(copy);
         }
         builder.FieldStore(body, subject.Site, IrWriteRegion.Field, receiver, field, factory.Integer(2));
+        if (shape == "copy-after-store")
+        { builder.Assign(body, subject.Site, owner.Current, factory.Variable(other.Current)); }
         builder.Assign(body, subject.Site, subject.Parameter.Current, factory.Binary(IrBinaryOperator.Subtract,
             factory.Variable(subject.Parameter.Current), factory.Integer(1)));
         builder.Goto(body, subject.Site, header);
         builder.Return(exit, subject.Site, factory.Integer(0));
         var candidate = new PassiveCallableCandidate("stable-cell", builder.Build(), [.. parameters], subject.Result, [],
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
-        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Has.Length.EqualTo(1));
+        var unstable = shape == "copy-after-store";
+        Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields,
+            Has.Length.EqualTo(unstable ? 0 : 1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.False);
+            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.EqualTo(unstable));
+        if (unstable)
+        { return; }
         var cell = instructions.OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (factory.GetOperationInfo(write.Operation).Description is { } id &&
             factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal)));
         Assert.That(cell.Target!.Id, Is.EqualTo(expectedReceiver.Id));

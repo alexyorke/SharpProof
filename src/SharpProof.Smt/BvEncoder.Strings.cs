@@ -8,6 +8,9 @@ internal sealed partial class BvEncoder
     private Sort? _codeUnitSort;
     private SeqSort? _textSort;
     private FuncDecl? _text;
+    private bool _initializingText;
+    private int _literalTextCount;
+    private int _concatenationTextCount;
     private readonly ImmutableHashSet<uint>.Builder _textLinked = ImmutableHashSet.CreateBuilder<uint>();
     private readonly ImmutableList<(Expr Value, Expr Left, Expr Right)>.Builder _concatenations = ImmutableList.CreateBuilder<(Expr Value, Expr Left, Expr Right)>();
 
@@ -32,10 +35,10 @@ internal sealed partial class BvEncoder
         var text = (SeqExpr)owner.Own(context.MkApp(_text!, value));
         if (!_textLinked.Contains(value.Id))
         {
-            _textLinked.Add(value.Id);
             var length = owner.Own(context.MkBV2Int((BitVecExpr)EncodeLength(value, meter), false));
             AddReferenceFact(owner.Own(context.MkOr(owner.Own(context.MkEq(value, NullReference)),
                 owner.Own(context.MkEq(length, owner.Own(context.MkLength(text)))))));
+            _textLinked.Add(value.Id);
         }
         return text;
     }
@@ -43,15 +46,33 @@ internal sealed partial class BvEncoder
     private void EnsureText(SmtQueryResourceMeter meter)
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        if (_text != null)
+        if (_initializingText)
         { return; }
-        _codeUnitSort = context.MkBitVecSort(16);
-        _textSort = context.MkSeqSort(_codeUnitSort);
-        _text = context.MkFuncDecl("text", ReferenceSort, _textSort);
-        foreach (var literal in _stringLiteralOrder.ToImmutable())
-        { AddLiteralText(literal.Value, factory.GetString(literal.Key), meter); }
-        foreach (var concatenation in _concatenations.ToImmutable())
-        { AddConcatenationText(concatenation, meter); }
+        if (_text == null)
+        {
+            _codeUnitSort = context.MkBitVecSort(16);
+            _textSort = context.MkSeqSort(_codeUnitSort);
+            _text = context.MkFuncDecl("text", ReferenceSort, _textSort);
+        }
+        // A query may exhaust its meter while adding facts. Resume only the
+        // unfinished entries when a later query uses this persistent encoder.
+        _initializingText = true;
+        try
+        {
+            while (_literalTextCount < _stringLiteralOrder.Count)
+            {
+                var literal = _stringLiteralOrder[_literalTextCount];
+                AddLiteralText(literal.Value, factory.GetString(literal.Key), meter);
+                _literalTextCount++;
+            }
+            while (_concatenationTextCount < _concatenations.Count)
+            {
+                AddConcatenationText(_concatenations[_concatenationTextCount], meter);
+                _concatenationTextCount++;
+            }
+        }
+        finally
+        { _initializingText = false; }
     }
 
     private void AddLiteralText(Expr value, string content, SmtQueryResourceMeter meter)
@@ -72,7 +93,7 @@ internal sealed partial class BvEncoder
         var concatenation = (value, left, right);
         _concatenations.Add(concatenation);
         if (_text != null)
-        { AddConcatenationText(concatenation, meter); }
+        { EnsureText(meter); }
     }
 
     // A null operand concatenates as the empty string.

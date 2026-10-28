@@ -9,7 +9,8 @@ internal static class NativeResourceViolationReplay
     private static readonly int[] SampleSizes = [-1, 0, 1, 2, 3, 4, 8, 16, 32, 64, 128];
 
     internal static async Task<WorkerClaimResult?> FindAsync(CompilerCallablePreparation target,
-        CompilerEffectClaimArtifact claim, ResourceExpression limit, WorkerBudgets budgets, CancellationToken cancellation)
+        CompilerEffectClaimArtifact claim, ResourceExpression limit, WorkerBudgets budgets, CancellationToken cancellation,
+        MethodResourceBudget? resourceBudget = null)
     {
         target = ArgumentNullGuard.NotNull(target, nameof(target));
         claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
@@ -52,7 +53,7 @@ internal static class NativeResourceViolationReplay
         }
         // Native feasibility/allocation queries can supply distinct values for
         // parameters constrained by Requires. Their verdict is not a cost proof.
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit, resourceBudget);
         var entry = await solver.VerifyEntryAsync(cancellation).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return null; }

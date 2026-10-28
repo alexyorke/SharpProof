@@ -30,6 +30,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     private long _auxiliaryResources;
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly MethodResourceBudget _budget;
+    private readonly IDisposable? _resourceTracking;
     private readonly ProofKernel _kernel;
     private bool _entryFeasible;
     // A normal return was found, but only through approximation havocs.
@@ -38,7 +39,8 @@ internal sealed class PassiveCallableSolver : IDisposable
     private InvariantSet? _invariantPlan;
 
     internal PassiveCallableSolver(PassiveCallableVcPlan plan,
-        uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit)
+        uint queryRlimit = WorkerBudgets.DefaultQueryRlimit, uint methodRlimit = WorkerBudgets.DefaultMethodRlimit,
+        MethodResourceBudget? resourceBudget = null)
     {
         _plan = ArgumentNullGuard.NotNull(plan, nameof(plan));
         if (plan.IsBoundedSearch)
@@ -46,7 +48,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(methodRlimit, queryRlimit);
         _queryRlimit = queryRlimit;
         _session = new(plan.Factory, new IrSmtBackendOptions(queryRlimit)) { ConcreteOpaqueValueProvider = plan.ObserveFrameworkOpaqueValue };
-        _budget = new(() => ConsumedResourceCount, queryRlimit, methodRlimit);
+        _budget = resourceBudget ?? new(() => ConsumedResourceCount, queryRlimit, methodRlimit);
+        _resourceTracking = resourceBudget?.TrackConsumption(() => ConsumedResourceCount);
         _kernel = new(_session) { ConcreteOpaqueValueProvider = plan.ObserveFrameworkOpaqueValue };
     }
 
@@ -163,7 +166,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         var witness = _plan.LoopSearch == null ? proof
             : await VerifyAsync(allocations ? encoding.AllocationQuery() : encoding.PurityQuery(), null, cancellationToken, encoding).ConfigureAwait(false);
         if (!allocations && (proof.Reason == WorkerClaimReason.ResourceLimit || witness.Reason == WorkerClaimReason.ResourceLimit) && _session != null &&
-            encoding.FirstPurityPrefixQuery() is { } prefix && _budget.TryStartQuery())
+            encoding.FirstPurityPrefixQuery() is { } prefix && _budget.TryStartQuery(reserveResources: _session == null))
         {
             // A resource-exhausted native session is retired. Retry the smaller
             // witness query in a fresh context, charging the same method meter.
@@ -552,7 +555,7 @@ internal sealed class PassiveCallableSolver : IDisposable
     {
         System.ArgumentNullException.ThrowIfNull(query);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_budget.TryStartQuery())
+        if (!_budget.TryStartQuery(reserveResources: _session == null))
         { return new(null, WorkerClaimReason.ResourceLimit, ImmutableDictionary<IrVarId, IrValue>.Empty, [], []); }
         var outcome = replay == null ? await _kernel.VerifyAsync(query, cancellationToken).ConfigureAwait(false)
             : await _kernel.VerifyCallableAsync(query, replay, cancellationToken).ConfigureAwait(false);
@@ -567,5 +570,10 @@ internal sealed class PassiveCallableSolver : IDisposable
     }
 
     public void Dispose()
-    { _session?.Dispose(); }
+    {
+        try
+        { _session?.Dispose(); }
+        finally
+        { _resourceTracking?.Dispose(); }
+    }
 }

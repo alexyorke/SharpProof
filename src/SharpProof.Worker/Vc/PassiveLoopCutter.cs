@@ -223,8 +223,8 @@ internal sealed partial class PassiveLoopCutter
             _havoc.AddUnique(header, written);
             var instructions = nodeOrder.SelectMany(node => node.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(node)) : (_candidate.Program.GetBlock(node).Instructions)).ToImmutableArray();
             Spend(instructions.Length);
-            // A variable the loop only ever sets to one unwritten input is that
-            // input wherever the loop reads it.
+            // A copy of one unwritten input can name a stable cell, but only
+            // after its assignment dominates that store.
             var copyBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             foreach (var group in instructions.SelectMany(IrInstructionFacts.WrittenVariables).Distinct()
                 .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (IrInstructionFacts.WrittenVariables(instruction).Contains(variable))).ToImmutableArray()))))
@@ -236,6 +236,19 @@ internal sealed partial class PassiveLoopCutter
                 { copyBuilder.AddUnique(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
             var copies = copyBuilder.ToImmutable();
+            var copiesBeforeStore = ImmutableDictionary.CreateBuilder<IrInstructionId, ImmutableDictionary<IrVarId, IrTerm>>();
+            foreach (var node in nodeOrder)
+            {
+                var available = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+                foreach (var instruction in _candidate.Program.GetBlock(node).Instructions)
+                {
+                    Spend();
+                    if (instruction is IrAssignInstruction assignment && copies.TryGetValue(assignment.Target, out var source))
+                    { available[assignment.Target] = source; }
+                    if (instruction is IrWriteInstruction store)
+                    { copiesBeforeStore.AddUnique(store.Id, available.ToImmutable()); }
+                }
+            }
             // Calls and memory havocs can change every cell. A fixed cell's
             // address must also remain stable when a guard selects its owner.
             ImmutableArray<Cell>.Builder? cells = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction ||
@@ -260,7 +273,7 @@ internal sealed partial class PassiveLoopCutter
                     continue;
                 }
                 var target = write.IsFieldStore && write.Target is not null && write.Value is not null
-                    ? IrSubstitution.Substitute(_candidate.Factory, write.Target, copies) : null;
+                    ? IrSubstitution.Substitute(_candidate.Factory, write.Target, copiesBeforeStore[write.Id]) : null;
                 if (target == null || write.Index != null || !StableAddress(target))
                 { cells = null; break; }
                 if (!cells!.Any(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (cell.Target.Id == target.Id && cell.Field == write.Field!.Value)))
