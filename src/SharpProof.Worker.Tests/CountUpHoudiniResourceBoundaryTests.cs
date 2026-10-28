@@ -200,7 +200,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
         var combinedRecheckLine = solverSource.IndexOf(
             "                var together = await VerifyAsync(plan.AllInvariantsQuery(), null, cancellationToken, plan).ConfigureAwait(false);") + 1;
         var verifyQueryLine = solverSource.IndexOf(
-            "        if (!_budget.TryStartQuery())") + 1;
+            "        if (!_budget.TryStartQuery(reserveResources: _session == null))") + 1;
         var budgetReadLine = budgetSource.IndexOf(
             "        var current = _readConsumedResourceCount();") + 1;
         Assert.That(firstPassLine, Is.GreaterThan(0));

@@ -224,7 +224,7 @@ internal sealed partial class PassiveLoopCutter
             var instructions = nodeOrder.SelectMany(node => node.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(node)) : (_candidate.Program.GetBlock(node).Instructions)).ToImmutableArray();
             Spend(instructions.Length);
             // A copy of one unwritten input can name a stable cell, but only
-            // after its assignment dominates that store.
+            // after every path to that store assigned it.
             var copyBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             foreach (var group in instructions.SelectMany(IrInstructionFacts.WrittenVariables).Distinct()
                 .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (IrInstructionFacts.WrittenVariables(instruction).Contains(variable))).ToImmutableArray()))))
@@ -236,10 +236,57 @@ internal sealed partial class PassiveLoopCutter
                 { copyBuilder.AddUnique(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
             var copies = copyBuilder.ToImmutable();
+            var allCopies = copies.Keys.ToImmutableHashSet();
+            var generatedCopies = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableHashSet<IrVarId>>();
+            var copiesAtEntry = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableHashSet<IrVarId>>();
+            var copiesAtExit = ImmutableDictionary.CreateBuilder<IrBlockId, ImmutableHashSet<IrVarId>>();
+            foreach (var node in nodeOrder)
+            {
+                var generated = ImmutableHashSet.CreateBuilder<IrVarId>();
+                foreach (var instruction in _candidate.Program.GetBlock(node).Instructions)
+                {
+                    Spend();
+                    if (instruction is IrAssignInstruction assignment && copies.ContainsKey(assignment.Target))
+                    { generated.Add(assignment.Target); }
+                }
+                generatedCopies.AddUnique(node, generated.ToImmutable());
+                copiesAtExit.AddUnique(node, allCopies);
+            }
+            // Must analysis: a copy is available only if every path from this
+            // iteration's header assigned it. The header starts empty even if
+            // a back edge carries a copy from a previous iteration.
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (var node in nodeOrder)
+                {
+                    Spend(allCopies.Count + 1);
+                    var available = node == header ? ImmutableHashSet<IrVarId>.Empty : allCopies;
+                    if (node != header)
+                    {
+                        foreach (var predecessor in _predecessors[node])
+                        {
+                            Spend(allCopies.Count + 1);
+                            available = copiesAtExit.TryGetValue(predecessor, out var previous)
+                                ? available.Intersect(previous) : ImmutableHashSet<IrVarId>.Empty;
+                        }
+                    }
+                    copiesAtEntry[node] = available;
+                    var next = available.Union(generatedCopies[node]);
+                    if (!next.SetEquals(copiesAtExit[node]))
+                    {
+                        copiesAtExit[node] = next;
+                        changed = true;
+                    }
+                }
+            } while (changed);
             var copiesBeforeStore = ImmutableDictionary.CreateBuilder<IrInstructionId, ImmutableDictionary<IrVarId, IrTerm>>();
             foreach (var node in nodeOrder)
             {
                 var available = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+                foreach (var variable in copiesAtEntry[node])
+                { available.AddUnique(variable, copies[variable]); }
                 foreach (var instruction in _candidate.Program.GetBlock(node).Instructions)
                 {
                     Spend();

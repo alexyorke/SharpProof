@@ -16,6 +16,9 @@ internal sealed class PassiveLoopCutterTests
     [TestCase("string-content")]
     [TestCase("string-length")]
     [TestCase("copy")]
+    [TestCase("copy-predecessor")]
+    [TestCase("copy-both-branches")]
+    [TestCase("copy-one-branch")]
     [TestCase("copy-after-store")]
     [TestCase("old-input")]
     public void HeapIndependentReceiverRetainsFixedCellCut(string shape)
@@ -65,11 +68,41 @@ internal sealed class PassiveLoopCutterTests
             receiver = factory.Conditional(condition, factory.Variable(owner.Current), factory.Variable(other.Current));
         }
         var expectedReceiver = receiver;
-        if (shape == "copy")
+        if (shape is "copy" or "copy-predecessor" or "copy-both-branches")
         {
             var copy = factory.CreateVariable("copy", factory.ObjectType);
-            builder.Assign(body, subject.Site, copy, receiver);
+            if (shape == "copy-both-branches")
+            {
+                var first = builder.CreateBlock();
+                var second = builder.CreateBlock();
+                var join = builder.CreateBlock();
+                builder.Branch(body, subject.Site, factory.Variable(flag.Current), first, second);
+                builder.Assign(first, subject.Site, copy, receiver);
+                builder.Goto(first, subject.Site, join);
+                builder.Assign(second, subject.Site, copy, receiver);
+                builder.Goto(second, subject.Site, join);
+                body = join;
+            }
+            else
+            {
+                builder.Assign(body, subject.Site, copy, receiver);
+                if (shape == "copy-predecessor")
+                {
+                    var next = builder.CreateBlock();
+                    builder.Goto(body, subject.Site, next);
+                    body = next;
+                }
+            }
             receiver = factory.Variable(copy);
+        }
+        if (shape == "copy-one-branch")
+        {
+            var assign = builder.CreateBlock();
+            var join = builder.CreateBlock();
+            builder.Branch(body, subject.Site, factory.Variable(flag.Current), assign, join);
+            builder.Assign(assign, subject.Site, owner.Current, factory.Variable(other.Current));
+            builder.Goto(assign, subject.Site, join);
+            body = join;
         }
         builder.FieldStore(body, subject.Site, IrWriteRegion.Field, receiver, field, factory.Integer(2));
         if (shape == "copy-after-store")
@@ -80,7 +113,7 @@ internal sealed class PassiveLoopCutterTests
         builder.Return(exit, subject.Site, factory.Integer(0));
         var candidate = new PassiveCallableCandidate("stable-cell", builder.Build(), [.. parameters], subject.Result, [],
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
-        var unstable = shape == "copy-after-store";
+        var unstable = shape is "copy-after-store" or "copy-one-branch";
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields,
             Has.Length.EqualTo(unstable ? 0 : 1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
