@@ -55,12 +55,22 @@ internal sealed class SetupInitializerFiles
         return ApplyAsync(static _ => Task.CompletedTask, cancellationToken);
     }
 
-    internal async Task ApplyAsync(Func<CancellationToken, Task> stagedCallback, CancellationToken cancellationToken)
+    internal Task ApplyAsync(Func<CancellationToken, Task> stagedCallback, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stagedCallback);
+        return ApplyAsync(stagedCallback, static _ => Task.CompletedTask, cancellationToken);
+    }
+
+    internal async Task ApplyAsync(Func<CancellationToken, Task> stagedCallback, Func<string, Task> committedCallback,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stagedCallback);
+        ArgumentNullException.ThrowIfNull(committedCallback);
         cancellationToken.ThrowIfCancellationRequested();
         VerifyObserved();
-        var staged = new List<(string Temporary, string Target)>();
+        var staged = new List<(string Temporary, string Target, string? Backup)>();
+        var committed = new List<(string Target, string? Backup)>();
+        var retainedBackups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             foreach (var change in _changes)
@@ -70,7 +80,13 @@ internal sealed class SetupInitializerFiles
                 var directory = Path.GetDirectoryName(change.Key)!;
                 Directory.CreateDirectory(directory);
                 var temporary = Path.Combine(directory, ".sharpproof-init-" + Guid.NewGuid().ToString("N"));
-                staged.Add((temporary, change.Key));
+                var backup = _observed[change.Key] == null ? null : temporary + ".backup";
+                staged.Add((temporary, change.Key, backup));
+                if (backup != null)
+                {
+                    // Reserve a private recovery path before replacing the original file.
+                    await using var backupStream = CreateStage(backup, change.Key).ConfigureAwait(false);
+                }
                 var stream = CreateStage(temporary, change.Key);
                 await using var streamLifetime = stream.ConfigureAwait(false);
                 var writer = new StreamWriter(stream, new UTF8Encoding(false), 4096, leaveOpen: true);
@@ -84,10 +100,12 @@ internal sealed class SetupInitializerFiles
             // Recheck after staging and at each commit; never overwrite a newly created target.
             foreach (var file in staged)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Verify(file.Target);
                 if (_observed[file.Target] == null)
                 {
                     File.Move(file.Temporary, file.Target, overwrite: false);
+                    committed.Add((file.Target, file.Backup));
                     if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
                     {
                         // New generated configuration is credential-free and readable by the container user.
@@ -98,9 +116,57 @@ internal sealed class SetupInitializerFiles
                 {
                     if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
                     { File.SetUnixFileMode(file.Temporary, File.GetUnixFileMode(file.Target)); }
-                    File.Replace(file.Temporary, file.Target, destinationBackupFileName: null);
+                    File.Replace(file.Temporary, file.Target, file.Backup);
+                    committed.Add((file.Target, file.Backup));
+                }
+                await committedCallback(file.Target).ConfigureAwait(false);
+            }
+        }
+        catch (Exception failure)
+        {
+            var rollbackFailures = new List<Exception>();
+            foreach (var file in committed)
+            {
+                if (file.Backup != null)
+                { retainedBackups.Add(file.Backup); }
+            }
+            for (var index = committed.Count - 1; index >= 0; index--)
+            {
+                var file = committed[index];
+                try
+                {
+                    // Recovery must finish after cancellation, without overwriting a later edit.
+#pragma warning disable SPINT003, SPINT005 // Bounded recovery reads must finish after the initialization token is canceled.
+                    var current = ReadCurrent(file.Target, CancellationToken.None);
+#pragma warning restore SPINT003, SPINT005
+                    if (!string.Equals(current, _changes[file.Target], StringComparison.Ordinal))
+                    { throw new IOException("A committed initializer file changed before rollback: " + file.Target); }
+                    if (file.Backup == null)
+                    { File.Delete(file.Target); }
+                    else
+                    {
+#pragma warning disable SPINT003, SPINT005 // Validate the recovery copy even when initialization was canceled.
+                        var original = ReadCurrent(file.Backup, CancellationToken.None);
+#pragma warning restore SPINT003, SPINT005
+                        if (!string.Equals(original, _observed[file.Target], StringComparison.Ordinal))
+                        { throw new IOException("An initializer recovery copy changed before rollback: " + file.Backup); }
+                        File.Replace(file.Backup, file.Target, destinationBackupFileName: null);
+                        retainedBackups.Remove(file.Backup);
+                    }
+                }
+                catch (Exception rollbackFailure) when (rollbackFailure is IOException or UnauthorizedAccessException or InvalidOperationException or
+                    InvalidDataException or DecoderFallbackException)
+                {
+                    rollbackFailures.Add(rollbackFailure);
                 }
             }
+            if (rollbackFailures.Count != 0)
+            {
+                rollbackFailures.Insert(0, failure);
+                throw new IOException("Initialization failed and some files could not be restored. Original recovery copies: " +
+                    string.Join(", ", retainedBackups), new AggregateException(rollbackFailures));
+            }
+            throw;
         }
         finally
         {
@@ -108,6 +174,8 @@ internal sealed class SetupInitializerFiles
             {
                 if (File.Exists(file.Temporary))
                 { File.Delete(file.Temporary); }
+                if (file.Backup != null && !retainedBackups.Contains(file.Backup) && File.Exists(file.Backup))
+                { File.Delete(file.Backup); }
             }
         }
     }
@@ -144,7 +212,13 @@ internal sealed class SetupInitializerFiles
     private string? ReadCurrent(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        _cancellationToken.ThrowIfCancellationRequested();
+        return ReadCurrent(path, _cancellationToken);
+    }
+
+    private static string? ReadCurrent(string path, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        cancellationToken.ThrowIfCancellationRequested();
         if (new FileInfo(path).LinkTarget != null)
         { throw new InvalidOperationException("Initializer targets must not be linked files."); }
         if (Directory.Exists(path))
@@ -156,7 +230,7 @@ internal sealed class SetupInitializerFiles
             if (!directory.Exists && File.Exists(directory.FullName))
             { throw new InvalidOperationException("A file collides with an initializer directory."); }
         }
-        return File.Exists(path) ? EvidenceSet.ReadBounded(path, 1024 * 1024, _cancellationToken) : null;
+        return File.Exists(path) ? EvidenceSet.ReadBounded(path, 1024 * 1024, cancellationToken) : null;
     }
 
     internal static XDocument Xml(string? content, string rootName)

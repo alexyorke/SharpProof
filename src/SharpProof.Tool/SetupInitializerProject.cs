@@ -4,6 +4,8 @@ namespace SharpProof.Tool;
 
 internal static class SetupInitializerProject
 {
+    private static readonly string[] PackageOperations = ["Include", "Update", "Remove"];
+
     internal static void Plan(SetupInitializerFiles files, string projectPath, string verification, string version)
     {
         ArgumentNullException.ThrowIfNull(files);
@@ -27,9 +29,12 @@ internal static class SetupInitializerProject
             if (inheritedRoot.Descendants().Any(static element =>
             {
                 ArgumentNullException.ThrowIfNull(element);
-                return element.Name.LocalName.StartsWith("SharpProof", StringComparison.OrdinalIgnoreCase) && element.Name.LocalName != "SharpProofProjectOutputKey" || element.Name.LocalName == "ManagePackageVersionsCentrally" ||
-                    (element.Name.LocalName is "PackageReference" or "PackageVersion" &&
-                    ((string?)element.Attribute("Include"))?.StartsWith("SharpProof", StringComparison.OrdinalIgnoreCase) == true);
+                return element.Name.LocalName.StartsWith("SharpProof", StringComparison.OrdinalIgnoreCase) && !element.Name.LocalName.Equals("SharpProofProjectOutputKey", StringComparison.OrdinalIgnoreCase) ||
+                    element.Name.LocalName.Equals("ManagePackageVersionsCentrally", StringComparison.OrdinalIgnoreCase) ||
+                    (element.Name.LocalName.Equals("PackageReference", StringComparison.OrdinalIgnoreCase) || element.Name.LocalName.Equals("PackageVersion", StringComparison.OrdinalIgnoreCase)) &&
+                    PackageOperations.Any(name =>
+                        element.Attribute(name ?? throw new ArgumentNullException(nameof(name)))?.Value.Split(';').Any(static value =>
+                            (value ?? throw new ArgumentNullException(nameof(value))).Trim().StartsWith("SharpProof", StringComparison.OrdinalIgnoreCase) || value.IndexOfAny(['$', '@', '*', '?']) >= 0) == true);
             }))
             { throw new InvalidOperationException("Inherited SharpProof configuration is ambiguous; initialize that configuration manually."); }
         }
@@ -55,22 +60,22 @@ internal static class SetupInitializerProject
         }
         foreach (var package in new[] { "SharpProof.Attributes", "SharpProof.Verifier" })
         {
-            foreach (var element in root.Descendants("PackageReference").Concat(
-                central?.Root!.Descendants("PackageVersion") ?? Enumerable.Empty<XElement>()))
+            foreach (var element in Items(root, "PackageReference").Concat(
+                central == null ? Enumerable.Empty<XElement>() : Items(central.Root!, "PackageVersion")))
             {
-                var identity = (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update");
+                var identity = (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update") ?? (string?)element.Attribute("Remove");
                 if (!string.Equals(identity, package, StringComparison.OrdinalIgnoreCase))
                 { continue; }
                 var pinned = Metadata(element, "Version");
                 if (Metadata(element, "VersionOverride") != null || pinned != null && pinned != version ||
-                    element.Name.LocalName == "PackageReference" && (managed ? pinned != null : pinned == null) ||
-                    element.Attribute("Update") != null || element.AncestorsAndSelf().Any(static ancestor =>
+                    element.Name.LocalName.Equals("PackageReference", StringComparison.OrdinalIgnoreCase) && (managed ? pinned != null : pinned == null) ||
+                    element.Attribute("Update") != null || element.Attribute("Remove") != null || element.AncestorsAndSelf().Any(static ancestor =>
                     {
                         ArgumentNullException.ThrowIfNull(ancestor);
                         return ancestor.Attribute("Condition") != null;
                     }))
                 { throw new InvalidOperationException("Existing SharpProof package versions conflict with the installed tool version: " + package); }
-                if (managed && element.Name.LocalName == "PackageReference" && !central!.Root!.Descendants("PackageVersion").Any(candidate =>
+                if (managed && element.Name.LocalName.Equals("PackageReference", StringComparison.OrdinalIgnoreCase) && !Items(central!.Root!, "PackageVersion").Any(candidate =>
                 {
                     ArgumentNullException.ThrowIfNull(candidate);
                     return string.Equals((string?)candidate.Attribute("Include"), package, StringComparison.OrdinalIgnoreCase);
@@ -161,15 +166,23 @@ internal static class SetupInitializerProject
         SetupInitializerFiles.Append(Group(root, "PropertyGroup"), new XElement(name, value));
     }
 
+    private static IEnumerable<XElement> Items(XElement root, string itemName)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentException.ThrowIfNullOrEmpty(itemName);
+        return root.Descendants().Where(element =>
+            (element ?? throw new ArgumentNullException(nameof(element))).Name.ToString().Equals(itemName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static XElement Reference(XElement root, string itemName, string package)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(itemName);
         ArgumentException.ThrowIfNullOrEmpty(package);
-        var matches = root.Descendants(itemName).Where(element =>
+        var matches = Items(root, itemName).Where(element =>
         {
             ArgumentNullException.ThrowIfNull(element);
-            var identity = (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update");
+            var identity = (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update") ?? (string?)element.Attribute("Remove");
             return identity?.Equals(package, StringComparison.OrdinalIgnoreCase) == true;
         }).ToArray();
         if (matches.Length > 1 || matches.Any(element =>

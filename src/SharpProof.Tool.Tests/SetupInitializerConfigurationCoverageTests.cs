@@ -265,6 +265,107 @@ public sealed class SetupInitializerConfigurationCoverageTests
         Assert.That(fixture.Snapshot(), Is.EqualTo(before));
     }
 
+    [TestCase("packagereference")]
+    [TestCase("PACKAGEREFERENCE")]
+    public async Task CaseVariantPackageReferencesAreUpdatedInPlace(string itemName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(itemName);
+        using var fixture = new ConfigurationFixture();
+        var reference = new XElement(itemName, new XAttribute("Include", "SharpProof"),
+            new XAttribute("Version", SetupInitializer.PackageVersion));
+        await fixture.WriteAsync("Consumer.csproj", new XDocument(new XElement("Project",
+            new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("ItemGroup", reference))).ToString());
+        _ = await fixture.InitializeAsync();
+        var updated = XDocument.Parse(await File.ReadAllTextAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken));
+        var references = updated.Descendants().Where(static item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Name.LocalName.Equals("PackageReference", StringComparison.OrdinalIgnoreCase) &&
+            item.Attribute("Include")?.Value == "SharpProof").ToArray();
+        Assert.That(references, Has.Length.EqualTo(1));
+        Assert.That(references[0].Name.LocalName, Is.EqualTo(itemName));
+    }
+
+    [TestCase("SharpProof")]
+    [TestCase("SharpProof.Attributes")]
+    [TestCase("SharpProof.Verifier")]
+    public async Task CaseVariantPackageReferencesCannotHideConflictingVersions(string package)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(package);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Consumer.csproj", new XDocument(new XElement("Project",
+            new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("ItemGroup",
+                new XElement("packagereference", new XAttribute("Include", package), new XAttribute("Version", "0.0.0-conflict"))))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "conflict");
+    }
+
+    [TestCase("SharpProof")]
+    [TestCase("SharpProof.CodeFixes")]
+    [TestCase("SharpProof.Attributes")]
+    [TestCase("SharpProof.Verifier")]
+    public async Task CaseVariantCentralPackageVersionsCannotHideConflicts(string package)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(package);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Packages.props", new XDocument(new XElement("Project",
+            new XElement("PropertyGroup", new XElement("ManagePackageVersionsCentrally", "true")),
+            new XElement("ItemGroup", new XElement("packageversion", new XAttribute("Include", package),
+                new XAttribute("Version", "0.0.0-conflict"))))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "conflict");
+    }
+
+    [TestCase("packagereference")]
+    [TestCase("packageversion")]
+    public async Task InheritedCaseVariantPackageItemsRequireManualInitialization(string itemName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(itemName);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Build.props", new XDocument(new XElement("Project",
+            new XElement("ItemGroup", new XElement(itemName, new XAttribute("Include", "SharpProof"),
+                new XAttribute("Version", SetupInitializer.PackageVersion))))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "Inherited SharpProof configuration");
+    }
+
+    [TestCase("PackageReference", "Update", "SharpProof")]
+    [TestCase("PackageReference", "Remove", "SharpProof")]
+    [TestCase("packageversion", "Update", "SharpProof.CodeFixes")]
+    [TestCase("PACKAGEVERSION", "Remove", "SharpProof.Verifier")]
+    [TestCase("PackageReference", "Update", "Other; SharpProof")]
+    [TestCase("PackageReference", "Remove", "SharpProof*")]
+    [TestCase("PackageReference", "Update", "$(InheritedPackages)")]
+    public async Task InheritedPackageMutationsAreRejectedBeforeWrites(string itemName, string operation, string packages)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(itemName);
+        ArgumentException.ThrowIfNullOrEmpty(operation);
+        ArgumentException.ThrowIfNullOrEmpty(packages);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Build.targets", new XDocument(new XElement("Project",
+            new XElement("ItemGroup", new XElement(itemName, new XAttribute(operation, packages),
+                new XAttribute("Version", "0.0.0-conflict"))))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "Inherited SharpProof configuration");
+    }
+
+    [TestCase("Update")]
+    [TestCase("Remove")]
+    public async Task UnrelatedInheritedPackageMutationsRemainSupported(string operation)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(operation);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Build.targets", new XDocument(new XElement("Project",
+            new XElement("ItemGroup", new XElement("PackageReference", new XAttribute(operation, "Company.Other"))))).ToString());
+        var result = await fixture.InitializeAsync();
+        Assert.That(result.Files.Any(static file => (file ?? throw new ArgumentNullException(nameof(file))).Written), Is.True);
+    }
+
+    [TestCase("managepackageversionscentrally")]
+    [TestCase("MANAGEPACKAGEVERSIONSCENTRALLY")]
+    public async Task InheritedCentralActivationCasingCannotBypassTheGuard(string propertyName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(propertyName);
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("Directory.Build.props", new XDocument(new XElement("Project",
+            new XElement("PropertyGroup", new XElement(propertyName, "true")))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "Inherited SharpProof configuration");
+    }
+
     private static void AssertRejected<TException>(ConfigurationFixture fixture, string message) where TException : Exception
     {
         ArgumentNullException.ThrowIfNull(fixture);

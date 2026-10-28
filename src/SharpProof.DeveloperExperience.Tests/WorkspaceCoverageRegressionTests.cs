@@ -144,6 +144,7 @@ internal sealed class WorkspaceCoverageRegressionTests
                     ["SharpProofFeatures"] = "all",
                     ["SharpProofVerify"] = "true",
                     ["SharpProofVerifyPolicy"] = "require-proven",
+                    ["SharpProofAssumptionPolicy"] = "error",
                     ["DefineConstants"] = "DEBUG;TRACE",
                     ["ProjectAssetsFile"] = Path.Combine(ProjectDirectory, "project.assets.json"),
                     ["TargetFramework"] = "net10.0",
