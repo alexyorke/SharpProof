@@ -29,6 +29,10 @@ param(
 
     [string]$TestResultsDirectory = '',
 
+    # CI collects coverage in parallel shards; see Invoke-SharpProofCoverage.ps1.
+    [ValidateSet('All', 'Semantic', 'Package', 'Isolated')]
+    [string]$CoveragePart = 'All',
+
     # CI runs the package phase of pr in a separate parallel job.
     [switch]$SkipPackageTests,
 
@@ -76,10 +80,16 @@ if ($Fast -and $Command -notin $reusableTestCommands) {
     throw '-Fast is supported only for non-qualifying test commands.'
 }
 if (($PSBoundParameters.ContainsKey('SemanticCohort') -or
-        $PSBoundParameters.ContainsKey('TaskGroup') -or
         $PSBoundParameters.ContainsKey('TestResultsDirectory')) -and
     $Command -notin @('pr', 'pr-gates', 'semantic-tests')) {
     throw 'Canonical cohort options are supported only for pr, pr-gates, and semantic-tests.'
+}
+if ($PSBoundParameters.ContainsKey('TaskGroup') -and
+    $Command -notin @('pr', 'pr-gates', 'semantic-tests', 'coverage')) {
+    throw '-TaskGroup is supported only for pr, pr-gates, semantic-tests, and coverage.'
+}
+if ($PSBoundParameters.ContainsKey('CoveragePart') -and $Command -ne 'coverage') {
+    throw '-CoveragePart is supported only for coverage.'
 }
 if ($SkipPackageTests -and $Command -notin @('pr', 'pr-gates')) {
     throw '-SkipPackageTests is supported only for pr and pr-gates.'
@@ -90,8 +100,8 @@ if ($Command -in @('pr', 'pr-gates') -and $SemanticCohort -eq 'Gates') {
 if ($PSBoundParameters.ContainsKey('SelfApplicationPhase') -and $Command -ne 'self-apply') {
     throw '-SelfApplicationPhase is supported only for self-apply.'
 }
-if (($PSBoundParameters.ContainsKey('PackagePartition') -or $PSBoundParameters.ContainsKey('PackagePartitionCount')) -and $Command -ne 'package-tests') {
-    throw 'Package partition options are supported only for package-tests.'
+if (($PSBoundParameters.ContainsKey('PackagePartition') -or $PSBoundParameters.ContainsKey('PackagePartitionCount')) -and $Command -notin @('package-tests', 'coverage')) {
+    throw 'Package partition options are supported only for package-tests and coverage.'
 }
 Assert-SharpProofTestSwitches -Fast:$Fast -NoBuild:$NoBuild
 if ($ReuseTestHarness -and $Command -ne 'package-tests') {
@@ -563,9 +573,27 @@ switch ($Command) {
             '--no-restore', '--', $gateMode)
     }
     'coverage' {
-        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        # Semantic and Package shards build only their own test closures.
+        if ($CoveragePart -eq 'All') {
+            Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
+        }
+        elseif ($CoveragePart -eq 'Isolated') {
+            foreach ($isolatedProject in @(
+                    'src/SharpProof.Attributes.Tests/SharpProof.Attributes.Tests.csproj',
+                    'tests/SharpProof.Fuzz.Tests/SharpProof.Fuzz.Tests.csproj')) {
+                # The build lane enforces analyzers.
+                Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release' -BuildTarget $isolatedProject `
+                    -AdditionalBuildArguments @('-p:RunAnalyzersDuringBuild=false')
+            }
+        }
         Invoke-RequiredScript 'eng/scripts/Invoke-SharpProofCoverage.ps1' `
-            'Coverage collection failed.' ([ordered]@{ TestFilter = $TestFilter }).AsReadOnly()
+            'Coverage collection failed.' ([ordered]@{
+                TestFilter            = $TestFilter
+                Part                  = $CoveragePart
+                TaskGroup             = $TaskGroup
+                PackagePartition      = $PackagePartition
+                PackagePartitionCount = $PackagePartitionCount
+            }).AsReadOnly()
     }
     'fuzz-nightly' {
         if ($Configuration -ne 'Release') {

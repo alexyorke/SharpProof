@@ -51,7 +51,7 @@ security regressions, repository security profile, and ordinary PR/package consu
 gates. Inspect the image vulnerability artifact before merging. Never disable the
 contract checks or vulnerability gate to accept a refresh.
 
-`toolchain-security.yml` scans the actual assembled Linux amd64 tooling image on PRs,
+The `repository` job in `ci.yml` scans the actual assembled Linux amd64 tooling image on PRs,
 master pushes, weekly schedules and manual dispatch. Fixed high/critical findings
 fail the job; the JSON report is retained for 30 days. Findings without a published
 fix remain in the report for triage. Scanner/SBOM action SHAs and Grype/Syft versions

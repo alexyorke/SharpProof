@@ -1,0 +1,37 @@
+name: Set up tooling
+description: Build the tooling image with ./ci.sh image, caching the Windows Z3 cross-build payload.
+
+# Default-branch cache entries are readable by every pull request;
+# pull-request entries stay scoped to their own branch. Scheduled runs and
+# release tags always compile Z3 from source, so the recipe keeps proving it
+# reproduces the pins and releases never ship a cached payload.
+runs:
+  using: composite
+  steps:
+    - name: Key the Windows Z3 cross-build
+      id: key
+      shell: bash
+      run: |
+        echo "key=$(./ci.sh image-key)" >> "$GITHUB_OUTPUT"
+        echo "path=${RUNNER_TEMP}/sharpproof-windows-native" >> "$GITHUB_OUTPUT"
+    - name: Restore the Windows Z3 cross-build
+      id: cache
+      if: github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/')
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.key.outputs.path }}
+        key: ${{ steps.key.outputs.key }}
+    - name: Build the tooling image
+      shell: bash
+      env:
+        SHARPPROOF_WINDOWS_NATIVE_CACHE: ${{ steps.key.outputs.path }}
+      run: ./ci.sh image
+    # Concurrent jobs may race to save the same key; a failed save never
+    # fails the job.
+    - name: Save the Windows Z3 cross-build
+      if: steps.cache.outputs.cache-hit != 'true' && !startsWith(github.ref, 'refs/tags/')
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.key.outputs.path }}
+        key: ${{ steps.key.outputs.key }}

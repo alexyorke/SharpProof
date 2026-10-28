@@ -1,45 +1,70 @@
-name: Nightly container soundness gates
+name: Nightly
+
+# Advisory only: never runs on pull requests and is not a required check.
+# Every job is a ./ci.sh lane, so `./ci.sh nightly` or
+# `LONGFUZZ_MINUTES=5 ./ci.sh fuzz-0` reproduces it locally.
 
 on:
   schedule:
-    - cron: "17 8 * * *"
+    - cron: "37 1 * * *"
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: Fuzzing minutes per shard (at most 320; jobs stop at 350).
+        required: false
+        default: "300"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
-  SHARPPROOF_CI_PACKAGE_VERSION: ${{ !startsWith(github.ref, 'refs/tags/v') && format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) || '' }}
+  SHARPPROOF_CI_PACKAGE_VERSION: ${{ format('0.0.0-ci.{0}.{1}', github.run_id, github.run_attempt) }}
   COMPOSE_PROJECT_NAME: sharpproof-nightly-${{ github.run_id }}-${{ github.run_attempt }}
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
-  soundness:
+  # All fuzz shards share one logged seed base, so their ranges are disjoint.
+  seed:
     runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.seed.outputs.base }}
+    steps:
+      - id: seed
+        run: |
+          base=$(shuf -i 0-2000000000 -n 1)
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "LongFuzz seed base: $base" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  lanes:
+    name: ${{ matrix.lane }}
+    needs: seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [nightly, fuzz-0, fuzz-1, fuzz-2, fuzz-3, fuzz-4, fuzz-5]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
-
-      - uses: ./.github/actions/prepare-qualified-packages
-        with:
-          download-packages: "false"
-
-      - name: Run the locally reproducible nightly profile
-        run: docker compose run --rm tooling nightly
-
-      - name: Upload nightly evidence
+      - uses: ./.github/actions/setup-tooling
+      - name: ./ci.sh ${{ matrix.lane }}
+        env:
+          LANE: ${{ matrix.lane }}
+          LONGFUZZ_SEED_BASE: ${{ needs.seed.outputs.base }}
+          LONGFUZZ_MINUTES: ${{ inputs.minutes || '300' }}
+        run: ./ci.sh "$LANE"
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nightly-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          name: ${{ matrix.lane }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
-
-      - name: Report runner telemetry
-        if: always() && hashFiles('.github/actions/runner-telemetry/action.yml') != ''
-        uses: ./.github/actions/runner-telemetry
-        with:
-          mode: report
