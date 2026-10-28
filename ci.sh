@@ -3,8 +3,8 @@
 # runner by calling this script; nothing else in .github decides what runs.
 #
 #   ./ci.sh                 build the image, run every lane in order, merge coverage
-#   ./ci.sh build format    run the named lanes
-#   ./ci.sh image           build the tooling image
+#   ./ci.sh build projects  run the named lanes
+#   ./ci.sh image           build the tooling image (or pull it; see pull_or_build_image)
 #   ./ci.sh coverage        merge artifacts/coverage/**/lines.tsv into summary.md
 #   ./ci.sh nightly fuzz-0  scheduled lanes (nightly.yml); release-packages (release.yml)
 #   ./ci.sh --list          print the lane names as JSON (the CI matrix)
@@ -66,6 +66,29 @@ build_image() {
     container="$(docker create "$image")"
     docker cp "$container:/opt/sharpproof/windows-native" "$cache/payload"
     docker rm "$container" > /dev/null
+  fi
+}
+
+# With SHARPPROOF_IMAGE_REGISTRY set (CI sets ghcr.io/<owner>/sharpproof-tooling),
+# reuse the image published for this exact eng/container tree, or build it.
+# The Dockerfile pins every base image and download by digest, so the tree's
+# git hash identifies the image. SHARPPROOF_IMAGE_PUSH=1 publishes a fresh build.
+pull_or_build_image() {
+  local registry="${SHARPPROOF_IMAGE_REGISTRY:-}"
+  if [[ -z "$registry" ]]; then
+    build_image
+    return
+  fi
+  local remote
+  remote="$registry:$(git ls-files --stage eng/container | sha256sum | cut -c1-64)"
+  if docker pull --quiet --platform linux/amd64 "$remote"; then
+    docker tag "$remote" "$image"
+    return
+  fi
+  build_image
+  if [[ "${SHARPPROOF_IMAGE_PUSH:-}" == 1 ]]; then
+    docker tag "$image" "$remote"
+    docker push --quiet "$remote" || echo "::warning::Could not publish $remote."
   fi
 }
 
@@ -207,7 +230,7 @@ run_lane() {
     nightly) tooling nightly ;;
     fuzz-[0-9]*) fuzz_shard "${1#fuzz-}" ;;
     release-packages) release_packages ;;
-    image) build_image ;;
+    image) pull_or_build_image ;;
     image-key) image_key ;;
     coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge ;;
     *)
