@@ -92,7 +92,24 @@ internal static class IrOpaqueCallSite
     private const string DictionaryInitializationPrefix = "framework-scalar-dictionary-ready:";
 
     private const string ExceptionInitializationPrefix = "framework-invariant-exception-ready:";
+    private const string ScalarExceptionInitializationPrefix = "framework-invariant-scalar-fault-ready:";
     internal const string ExceptionResourceLockPrefix = "framework-exception-resource-lock:";
+
+    internal static string ScalarExceptionInitialization(string kind)
+    {
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        if (kind != "MathAbsInt32")
+        { throw new ArgumentOutOfRangeException(nameof(kind)); }
+        return ScalarExceptionInitializationPrefix + kind;
+    }
+
+    internal static string? ScalarExceptionInitializationKind(IrFactory factory, OperationId site)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var description = factory.GetOperationInfo(site).Description is { } text ? factory.GetString(text) : "";
+        return description == ScalarExceptionInitializationPrefix + "MathAbsInt32" ? "MathAbsInt32" : null;
+    }
 
     internal static string ExceptionResourceLock(string kind)
     {

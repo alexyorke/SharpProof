@@ -390,11 +390,51 @@ internal sealed class PassiveCallableVcPlan
         ArgumentNullException.ThrowIfNull(request);
         return ObserveIntegralConvertInitialization(Factory, request, WarmIntegralConvert) ??
             ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ??
+            ObserveScalarExceptionInitialization(Factory, request, ProbeScalarExceptionInitialization) ??
             ObserveExceptionInitialization(Factory, request, WarmExceptionConstructor) ??
             ObserveExceptionResourceLock(Factory, request, ProbeExceptionResourceLock) ?? ObserveFrameworkValue(Factory, request, ReadDefaultComparer);
     }
 
     internal sealed record ResourceLockObservation(object? Synchronization);
+
+    internal static IrValue? ObserveScalarExceptionInitialization(IrFactory factory, IrHavocRequest request,
+        Func<string, bool> observe)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Origin != IrHavocOrigin.Approximation || factory.GetVariableInfo(request.Variable).Type != factory.BooleanType ||
+            IrOpaqueCallSite.ScalarExceptionInitializationKind(factory, request.Site) is not { } kind)
+        { return null; }
+        ArgumentNullException.ThrowIfNull(observe);
+        try
+        {
+            if (!observe(kind))
+            { return null; }
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or OutOfMemoryException or System.Resources.MissingManifestResourceException)
+        { return null; }
+        return factory.CreateBooleanValue(false);
+    }
+
+    internal static bool ProbeScalarExceptionInitialization(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        ArgumentOutOfRangeException.ThrowIfNotEqual(kind, "MathAbsInt32");
+        // Observe this exact scalar fault without executing user culture
+        // callbacks or switching locale to manufacture a replay witness.
+        var ui = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        if (ui.GetType() != typeof(System.Globalization.CultureInfo) || culture.GetType() != typeof(System.Globalization.CultureInfo) ||
+            ui.Name.Length != 0 || culture.Name.Length != 0)
+        { return false; }
+        try
+        {
+            _ = Math.Abs(int.MinValue);
+            return false;
+        }
+        catch (OverflowException exception)
+        { return exception.GetType() == typeof(OverflowException); }
+    }
 
     internal static IrValue? ObserveExceptionResourceLock(IrFactory factory, IrHavocRequest request,
         Func<string, ResourceLockObservation?> observe)

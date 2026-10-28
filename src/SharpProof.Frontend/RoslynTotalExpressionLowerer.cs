@@ -1637,7 +1637,26 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (!ShadowCallSkeleton)
-        { return EmitOpaqueCall(operation, operation.TargetMethod, values, block, null, IrOpaqueCallEffects.All).Continuation; }
+        {
+            // This hook is reached only through an admitted scalar model. Its
+            // fault guard validates the input before a concrete runtime probe
+            // can select the already-completed resource path during replay.
+            if (operation.TargetMethod.GetDocumentationCommentId() == "M:System.Math.Abs(System.Int32)" &&
+                values.Length == 1 && values[0].Type == _factory.IntegerType)
+            {
+                var site = _factory.CreateOperation(IrOpaqueCallSite.ScalarExceptionInitialization("MathAbsInt32"),
+                    _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
+                var initialize = _context.Temporary(_factory.BooleanType);
+                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, initialize);
+                var runtime = _builder.CreateBlock("scalar:fault-resource-effects");
+                var done = _builder.CreateBlock("scalar:fault-resource-ready");
+                _builder.Branch(block, site, _factory.Variable(initialize), runtime, done);
+                var initialized = EmitOpaqueCall(operation, operation.TargetMethod, values, runtime, null, IrOpaqueCallEffects.All).Continuation;
+                _builder.Goto(initialized, site, done);
+                return done;
+            }
+            return EmitOpaqueCall(operation, operation.TargetMethod, values, block, null, IrOpaqueCallEffects.All).Continuation;
+        }
         // Shadow graphs retain scoped external effects without admitting a
         // metadata call. The same approximation also permits callback throws.
         var throws = _context.Temporary(_factory.BooleanType);
