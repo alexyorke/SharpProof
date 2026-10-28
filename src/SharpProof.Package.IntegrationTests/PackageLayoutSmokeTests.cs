@@ -2454,23 +2454,66 @@ public sealed class PackageLayoutSmokeTests
                 "buildTransitive/SharpProof.Verifier.props"),
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
-        foreach (var dependencies in ImmutableArray.Create("tools/net10/SharpProof.Worker.deps.json"))
-        {
-            Assert.That(
-                ReadArchiveText(archive, dependencies),
-                Does.Not.Contain("\"Microsoft.CodeAnalysis/\"")
-                    .And.Not.Contain("\"Microsoft.CodeAnalysis.CSharp/\"")
-                    .And.Not.Contain("SharpProof.Attributes")
-                    .And.Not.Contain("SharpProof.Compiler.Semantics")
-                    .And.Not.Contain("SharpProof.Frontend"),
-                dependencies);
-        }
+        using var dependencies = JsonDocument.Parse(
+            ReadArchiveText(archive, "tools/net10/SharpProof.Worker.deps.json"));
+        Assert.That(FindForbiddenWorkerDependencies(dependencies.RootElement), Is.Empty,
+            "The worker dependency manifest must not reference compiler or application API assemblies.");
 
         Assert.That(
             entries.Where(static entry =>
                 entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (IsNativeZ3(entry))),
             Is.EquivalentTo(ExpectedNativeZ3Entries));
         VerifyPinnedZ3Payload(archive);
+    }
+
+    [TestCase("Microsoft.CodeAnalysis/4.14.0", true)]
+    [TestCase("Microsoft.CodeAnalysis.Common/4.14.0", true)]
+    [TestCase("Microsoft.CodeAnalysis.CSharp/4.14.0", true)]
+    [TestCase("SharpProof.Attributes/1.0.0-preview.1", true)]
+    [TestCase("SharpProof.Compiler.Semantics/1.0.0-preview.1", true)]
+    [TestCase("SharpProof.Frontend/1.0.0-preview.1", true)]
+    [TestCase("Microsoft.Z3/4.12.2", false)]
+    [TestCase("SharpProof.CompilerArtifact/1.0.0-preview.1", false)]
+    public void WorkerDependencyGuardChecksVersionedLibraryAndTargetKeys(string dependency, bool forbidden)
+    {
+        ArgumentNullException.ThrowIfNull(dependency);
+        foreach (var section in ImmutableArray.Create("libraries", "targets"))
+        {
+            var library = JsonSerializer.Serialize(dependency) + ": {}";
+            var json = section == "libraries"
+                ? "{\"libraries\": {" + library + "}, \"targets\": {}}"
+                : "{\"libraries\": {}, \"targets\": {\".NETCoreApp,Version=v10.0\": {" + library + "}}}";
+            using var document = JsonDocument.Parse(json);
+            Assert.That(FindForbiddenWorkerDependencies(document.RootElement),
+                forbidden ? Is.EqualTo(new[] { dependency }) : Is.Empty, section);
+        }
+    }
+
+    private static ImmutableArray<string> FindForbiddenWorkerDependencies(JsonElement document)
+    {
+        var keys = ImmutableArray.CreateBuilder<string>();
+        foreach (var library in document.GetProperty("libraries").EnumerateObject())
+        {
+            keys.Add(library.Name);
+        }
+        foreach (var target in document.GetProperty("targets").EnumerateObject())
+        {
+            foreach (var library in target.Value.EnumerateObject())
+            {
+                keys.Add(library.Name);
+            }
+        }
+        var forbidden = ImmutableArray.CreateBuilder<string>();
+        foreach (var key in keys)
+        {
+            var id = key.Split('/')[0];
+            if (id == "Microsoft.CodeAnalysis" || id.StartsWith("Microsoft.CodeAnalysis.", StringComparison.Ordinal) ||
+                id is "SharpProof.Attributes" or "SharpProof.Compiler.Semantics" or "SharpProof.Frontend")
+            {
+                forbidden.Add(key);
+            }
+        }
+        return forbidden.Distinct(StringComparer.Ordinal).ToImmutableArray();
     }
 
     private static void VerifyPinnedZ3Payload(ZipArchive archive)
