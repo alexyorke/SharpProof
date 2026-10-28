@@ -224,7 +224,7 @@ internal static partial class WorkerProtocolJson
         claim = ArgumentNullGuard.NotNull(claim, nameof(claim));
         result = ArgumentNullGuard.NotNull(result, nameof(result));
         evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
-        if (evidence.MetadataAssumptions is not { Length: <= 16 } metadata || result.Assumptions.IsDefault)
+        if (evidence.MetadataAssumptions is not { Length: <= 16 } metadata || !AreValidAssumptions(result.Assumptions))
         { return false; }
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used &&
                 assumption.Kind == WorkerAssumptionKind.TrustedBoundary && assumption.Id.StartsWith("resource-metadata-", StringComparison.Ordinal))

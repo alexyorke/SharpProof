@@ -821,7 +821,7 @@ internal static partial class WorkerProtocolJson
         {
             return witness is not null && witness.Kind == "resource-bound-exceeded" && !string.IsNullOrWhiteSpace(witness.Detail) &&
                 witness.Effects is WorkerEffectSet.None or WorkerEffectSet.Allocates && witness.Capabilities == WorkerEffectCapabilitySet.None &&
-                witness.ExactExceptionTypeHierarchy is { Length: 0 };
+                !witness.ExactExceptionTypeHierarchy.IsDefault && witness.ExactExceptionTypeHierarchy.Length == 0;
         }
         if (witness == null || !WorkerProtocolMetadata.IsEffectWitnessValid(witness))
         {
@@ -1042,8 +1042,8 @@ internal static partial class WorkerProtocolJson
 
     private static bool HasProducerAssumptionKinds(ImmutableArray<WorkerAssumptionEvidence> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
-        return !values.IsDefault && values.All(static value =>
-            value is null ? throw new System.ArgumentNullException(nameof(value)) : (value != null && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind)));
+        return !values.IsDefault && values.All(static (WorkerAssumptionEvidence value) =>
+            value != null && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
     }
 
     private static void ValidateManifestAssumptionIdentity(
