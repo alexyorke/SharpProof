@@ -56,8 +56,8 @@ PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes,
 
 - `build`: `security`, the dependency audit plus the complete Release solution with all analyzers and `-warnaserror`, then `format-check`, which checks only whitespace and leaves code style to that build.
 - `worker-a1`, `worker-a4`, `worker-b`, `projects-a`, `projects-b`, `gates-corpus-a`, `gates-corpus-b`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`, where each `-a`/`-b` pair partitions one task group. Each lane builds only its task group's closure, without analyzers.
-- `package-0`..`package-3`: `coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition <n>`. Partitions hash each test's filter: a case renamed with `TestName=` is placed on its own, and a method's other parameter cases stay together.
-- `self-apply-sources`, `self-apply-samples`: SharpProof's own analyzer over `src/` and the package-backed samples. Both skip the .NET and code-style analyzers that `build` already enforces.
+- `package-0`..`package-5`: `coverage -CoveragePart Package -PackagePartitionCount 6 -PackagePartition <n>`. Each test filter, largest first, goes to the partition with the fewest cases of its class: a case renamed with `TestName=` is placed on its own, and a method's other parameter cases stay together.
+- `self-apply`: SharpProof's own analyzer over `src/`, then the package-backed samples. It skips the .NET and code-style analyzers that `build` already enforces.
 - `repository`: lint, `docs`, `layout`, and a Grype scan of the tooling image.
 - `evidence`: the API inventory and catalog evidence tests, and `coverage -CoveragePart Isolated`.
 

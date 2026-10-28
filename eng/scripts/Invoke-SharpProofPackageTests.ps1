@@ -7,9 +7,9 @@ param(
 
     [string]$PackageSource = '',
 
-    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+    [ValidateRange(0, 5)][int]$PackagePartition = 0,
 
-    [ValidateSet(1, 4)][int]$PackagePartitionCount = 1,
+    [ValidateSet(1, 6)][int]$PackagePartitionCount = 1,
 
     [switch]$NoBuild,
 
@@ -352,8 +352,8 @@ $canonicalPackageFilter =
 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
 $useDefaultShardPlan = [string]::IsNullOrWhiteSpace($TestFilter) -or
 $TestFilter -ceq $canonicalPackageFilter
-$timingStem = 'package-tests-' + $Configuration.ToLowerInvariant() + $(if ($PackagePartitionCount -eq 4) { '-partition-' + $PackagePartition } else { '' })
-if ($PackagePartitionCount -eq 4 -and -not $useDefaultShardPlan) { throw 'Package partitions require the default or canonical category filter.' }
+$timingStem = 'package-tests-' + $Configuration.ToLowerInvariant() + $(if ($PackagePartitionCount -gt 1) { '-partition-' + $PackagePartition } else { '' })
+if ($PackagePartitionCount -gt 1 -and -not $useDefaultShardPlan) { throw 'Package partitions require the default or canonical category filter.' }
 if ($PackagePartition -ge $PackagePartitionCount) { throw 'Package partition index exceeds the partition count.' }
 $timingSuffix = if ($coverageEnabled) { '-coverage' } else { '' }
 $canonicalTimingOutput = Join-Path $timingDirectory (
@@ -865,7 +865,7 @@ try {
     }
 
     $partitionEvidence = ''
-    if ($PackagePartitionCount -eq 4) {
+    if ($PackagePartitionCount -gt 1) {
         $testAssembly = Get-SharpProofTestAssemblyPath -ProjectPath $testProject -Configuration $Configuration
         $partitionEvidence = if ($coverageEnabled) { Join-Path $resolvedCoverageResults 'partition-evidence' } else { Join-Path $repositoryRoot "artifacts/package-partitions/$PackagePartition" }
         [IO.Directory]::CreateDirectory($partitionEvidence) | Out-Null
@@ -874,9 +874,9 @@ try {
         Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/Settings:' + $settings), ('/ListTestsTargetPath:' + (Join-Path $partitionEvidence 'discovered-tests.txt'))) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
         Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $testAssembly) ('Dump/D_' + [IO.Path]::GetFileName($testAssembly) + '.dump')) -Destination (Join-Path $partitionEvidence 'discovery.dump')
         $universe = @(Read-SharpProofPackageDiscovery -Dump (Join-Path $partitionEvidence 'discovery.dump') -Filter $TestFilter)
-        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackagePartition -Method $_.filter) -eq $PackagePartition })
-        if ($partitionCases.Count -eq 0) { throw 'Package partition selected no cases.' }
-        $partitionFilter = @($partitionCases | ForEach-Object { $_.filter } | Sort-Object -Unique -CaseSensitive) -join '|'
+        $partitionFilters = @(Get-SharpProofPackagePartitionFilters -Cases $universe -Partition $PackagePartition -Count $PackagePartitionCount)
+        if ($partitionFilters.Count -eq 0) { throw 'Package partition selected no cases.' }
+        $partitionFilter = $partitionFilters -join '|'
         $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
         foreach ($shard in $shardBuilder) {
             $filter = "($($shard.Filter))&($partitionFilter)"
