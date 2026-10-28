@@ -109,7 +109,7 @@ public sealed class WindowsHostPolicyTests
     {
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(directory);
-        Assert.That(PublicationPaths.IsWithin(path, directory), Is.EqualTo(expected));
+        Assert.That(PublicationPaths.IsWithin(path, directory, PublicationPaths.Comparison), Is.EqualTo(expected));
     }
 
     [Test]

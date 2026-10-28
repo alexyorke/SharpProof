@@ -170,6 +170,7 @@
         LauncherPath="$(_SharpProofLauncherPath)"
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
+        CompilerInputPaths="@(Compile);@(AdditionalFiles);@(ReferencePath);@(ReferencePathWithRefAssemblies);@(Analyzer);@(EditorConfigFiles);@(GlobalAnalyzerConfigFiles);$(MSBuildProjectFullPath);$(MSBuildAllProjects)"
         CachePath="$(_SharpProofActiveCacheDirectory)" />
   </Target>
 
@@ -320,9 +321,10 @@
         ResultPath="$(_SharpProofCleanResultFile)"
         ManifestPath="$(_SharpProofCleanManifestFile)"
         SarifPath="$(_SharpProofCleanSarifFile)"
+        WorkerPath="$(_SharpProofPackageWorkerPath)"
+        CompilerManifestStagingPath="$(_SharpProofCleanCompilerManifestStagingPath)"
+        CompilerCaptureRequestPath="$(_SharpProofCleanVerifyDirectory)/compiler-capture.request"
         ProjectDirectory="$(MSBuildProjectDirectory)" />
-    <Delete Files="$(_SharpProofCleanCompilerManifestStagingPath)" />
-    <Delete Files="$(_SharpProofCleanVerifyDirectory)/compiler-capture.request;$(_SharpProofCleanVerifyDirectory)/compiler-capture.request.completed" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"

@@ -41,9 +41,7 @@ internal sealed class PublicationLease : IDisposable
                 var directory = Path.GetDirectoryName(member) ??
                     throw new ArgumentException("A verification publication member must name a file, not a root directory.", nameof(paths));
                 Directory.CreateDirectory(directory);
-                var sidecar = Path.Combine(directory, ".sharpproof-publication-" +
-                    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-                        OperatingSystem.IsWindows() ? member.ToUpperInvariant() : member))) + ".lock");
+                var sidecar = Path.Combine(directory, LockFileName(member, PublicationPaths.Comparison));
                 while (true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -78,6 +76,13 @@ internal sealed class PublicationLease : IDisposable
             throw new ArgumentException("Verification publication members must be distinct canonical paths.", nameof(paths));
         }
         return members;
+    }
+
+    internal static string LockFileName(string member, StringComparison comparison)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var identity = comparison == StringComparison.OrdinalIgnoreCase ? member.ToUpperInvariant() : member;
+        return ".sharpproof-publication-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))) + ".lock";
     }
 
     internal static string CanonicalMember(string path)

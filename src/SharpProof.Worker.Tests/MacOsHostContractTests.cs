@@ -143,6 +143,28 @@ public sealed class MacOsHostContractTests
         }
     }
 
+    [Test]
+    public void LoaderUsesVerifiedSnapshotWhenThePackagePathIsReplaced()
+    {
+        string? loadedPath = null;
+        string? nativePath = null;
+        using var payload = new Payload(loadLibrary: path =>
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            loadedPath = path;
+            File.Move(nativePath!, nativePath + ".original");
+            File.WriteAllText(nativePath!, "replacement");
+            Assert.That(path, Is.Not.EqualTo(nativePath));
+            Assert.That(File.ReadAllText(path), Is.EqualTo("native payload"));
+            return new IntPtr(1);
+        });
+        nativePath = payload.NativePath;
+
+        Assert.That(payload.Contract.LoadZ3LibraryRequired(), Is.EqualTo(new IntPtr(1)));
+        Assert.That(File.ReadAllText(nativePath), Is.EqualTo("replacement"));
+        Assert.That(File.Exists(loadedPath), Is.False, "The loaded snapshot must not remain writable by pathname.");
+    }
+
     private sealed class Payload : IDisposable
     {
         private readonly string root = Path.Combine(Path.GetTempPath(), "SharpProof.MacHost." + Guid.NewGuid().ToString("N"));
@@ -151,7 +173,8 @@ public sealed class MacOsHostContractTests
         internal string NativeDigest { get; }
         internal MacOsHostContract Contract { get; }
 
-        internal Payload(Architecture architecture = Architecture.X64, ImmutableArray<byte>? nativeBytes = null)
+        internal Payload(Architecture architecture = Architecture.X64, ImmutableArray<byte>? nativeBytes = null,
+            Func<string, IntPtr>? loadLibrary = null)
         {
             var nativeImage = nativeBytes ?? Encoding.UTF8.GetBytes("native payload").ToImmutableArray();
             if (nativeImage.IsDefault)
@@ -179,7 +202,7 @@ public sealed class MacOsHostContractTests
             }).ToImmutableArray();
             Contract = new MacOsHostContract(true, architecture, architecture,
                 Path.Combine(root, "tools", "net10", "SharpProof.Host.dll"),
-                () => new MemoryStream(catalog.ToArray(), writable: false));
+                () => new MemoryStream(catalog.ToArray(), writable: false), loadLibrary);
         }
 
         public void Dispose()

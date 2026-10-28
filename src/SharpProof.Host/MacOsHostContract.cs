@@ -12,6 +12,7 @@ internal sealed class MacOsHostContract
     private readonly Architecture processArchitecture;
     private readonly string assemblyLocation;
     private readonly Func<Stream?> openToolchain;
+    private readonly Func<string, IntPtr> loadLibrary;
 
     internal static MacOsHostContract Current { get; } = new();
 
@@ -20,13 +21,15 @@ internal sealed class MacOsHostContract
         Architecture? hostArchitecture = null,
         Architecture? processArchitecture = null,
         string? assemblyLocation = null,
-        Func<Stream?>? openToolchain = null)
+        Func<Stream?>? openToolchain = null,
+        Func<string, IntPtr>? loadLibrary = null)
     {
         this.isMacOs = isMacOs ?? OperatingSystem.IsMacOS();
         this.hostArchitecture = hostArchitecture ?? RuntimeInformation.OSArchitecture;
         this.processArchitecture = processArchitecture ?? RuntimeInformation.ProcessArchitecture;
         this.assemblyLocation = assemblyLocation ?? typeof(MacOsHostContract).Assembly.Location;
         this.openToolchain = openToolchain ?? OpenEmbeddedToolchain;
+        this.loadLibrary = loadLibrary ?? NativeLibrary.Load;
     }
 
     internal ContainerContractInfo ValidateRequired()
@@ -71,7 +74,43 @@ internal sealed class MacOsHostContract
     internal IntPtr LoadZ3LibraryRequired()
     {
         var library = ResolveZ3LibraryRequired();
-        return NativeLibrary.Load(library);
+        var contract = ValidateRequired();
+        // Load a private snapshot, not the package pathname that another restore
+        // may replace after validation. Revalidate the copied bytes before dyld
+        // sees them, then remove the name once the image has been mapped.
+        var directory = Directory.CreateTempSubdirectory("sharpproof-native-");
+        var snapshot = Path.Combine(directory.FullName, "libz3.dylib");
+        try
+        {
+            using (var source = new FileStream(library, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var destination = new FileStream(snapshot, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                if (source.Length != contract.Z3LibraryBytes)
+                { throw new InvalidDataException("The SharpProof macOS Z3 native payload does not match its pinned length."); }
+                var remaining = contract.Z3LibraryBytes;
+                var buffer = new byte[81920];
+                while (remaining > 0)
+                {
+                    var count = source.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                    if (count == 0)
+                    { throw new InvalidDataException("The SharpProof macOS Z3 native payload changed during capture."); }
+                    destination.Write(buffer, 0, count);
+                    remaining -= count;
+                }
+                if (source.ReadByte() != -1)
+                { throw new InvalidDataException("The SharpProof macOS Z3 native payload changed during capture."); }
+                destination.Flush(flushToDisk: true);
+            }
+            ValidatePayload(snapshot, contract.Z3LibraryBytes, contract.Z3LibrarySha256, "native");
+            if (!OperatingSystem.IsWindows())
+            { File.SetUnixFileMode(snapshot, UnixFileMode.UserRead | UnixFileMode.UserExecute); }
+            return loadLibrary(snapshot);
+        }
+        finally
+        {
+            File.Delete(snapshot);
+            directory.Delete();
+        }
     }
 
     private string RequireRuntimeIdentifier()

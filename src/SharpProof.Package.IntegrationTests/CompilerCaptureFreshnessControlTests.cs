@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Worker.Protocol;
 
@@ -205,6 +207,37 @@ public sealed class CompilerCaptureFreshnessControlTests
         Assert.That(rejected.Output, Does.Contain("fresh final compiler manifest"));
         Assert.That(File.Exists(consumer.ResultPath), Is.False);
         Assert.That(File.Exists(consumer.StagingPath), Is.False);
+    }
+
+    [Test]
+    public async Task CaptureManifestCannotOverwriteAResolvedReference()
+    {
+        using var consumer = new Consumer(PureSource.Replace("=> 0", "=> Dependency.Value - 1", StringComparison.Ordinal));
+        var dependencyPath = Path.Combine(consumer.Root, "lib", "Dependency.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(dependencyPath)!);
+        var dependency = CSharpCompilation.Create("Dependency",
+            [CSharpSyntaxTree.ParseText("public static class Dependency { public const int Value = 1; }")],
+            TestMetadataReferences.Platform,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var emitted = dependency.Emit(dependencyPath);
+        Assert.That(emitted.Success, Is.True, string.Join("\n", emitted.Diagnostics));
+        var expected = (await File.ReadAllBytesAsync(dependencyPath)).ToImmutableArray();
+        var project = await File.ReadAllTextAsync(consumer.ProjectPath);
+        project = project.Replace("</Project>", """
+              <ItemGroup>
+                <Reference Include="Dependency"><HintPath>lib/Dependency.dll</HintPath></Reference>
+              </ItemGroup>
+            </Project>
+            """, StringComparison.Ordinal);
+        await File.WriteAllTextAsync(consumer.ProjectPath, project);
+        var baseline = await consumer.BuildAsync([]);
+        Assert.That(baseline.Code, Is.Zero, baseline.Output);
+
+        var rejected = await consumer.BuildAsync([("_SharpProofCompilerManifestPath", dependencyPath)]);
+
+        Assert.That(rejected.Code, Is.Not.Zero, rejected.Output);
+        Assert.That(rejected.Output, Does.Contain("must not alias compiler inputs"));
+        Assert.That(await File.ReadAllBytesAsync(dependencyPath), Is.EqualTo(expected));
     }
 
     private sealed class Consumer : IDisposable
