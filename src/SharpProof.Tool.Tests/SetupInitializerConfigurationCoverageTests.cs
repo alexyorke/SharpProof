@@ -209,6 +209,62 @@ public sealed class SetupInitializerConfigurationCoverageTests
         AssertRejected<InvalidOperationException>(fixture, "Existing package metadata conflicts");
     }
 
+    [TestCase("privateassets", "all", "public dependency", false)]
+    [TestCase("PRIVATEASSETS", "all", "public dependency", true)]
+    [TestCase("version", "0.0.0-conflict", "package versions conflict", false)]
+    [TestCase("VERSION", "0.0.0-conflict", "package versions conflict", true)]
+    [TestCase("versionoverride", "0.0.0-conflict", "package versions conflict", false)]
+    [TestCase("VERSIONOVERRIDE", "0.0.0-conflict", "package versions conflict", true)]
+    public async Task MetadataCasingCannotBypassPackageConflictChecks(string name, string value, string message, bool asElement)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentException.ThrowIfNullOrEmpty(message);
+        using var fixture = new ConfigurationFixture();
+        var reference = new XElement("PackageReference", new XAttribute("Include", "SharpProof"));
+        reference.Add(asElement ? (object)new XElement(name, value) : new XAttribute(name, value));
+        await fixture.WriteAsync("Consumer.csproj", new XDocument(new XElement("Project",
+            new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("ItemGroup", reference))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, message);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CaseDuplicateVersionMetadataRequiresManualResolution(bool secondAsElement)
+    {
+        using var fixture = new ConfigurationFixture();
+        var reference = new XElement("PackageReference", new XAttribute("Include", "SharpProof"),
+            new XAttribute("Version", SetupInitializer.PackageVersion));
+        reference.Add(secondAsElement ? (object)new XElement("version", "0.0.0-conflict") : new XAttribute("version", "0.0.0-conflict"));
+        await fixture.WriteAsync("Consumer.csproj", new XDocument(new XElement("Project",
+            new XAttribute("Sdk", "Microsoft.NET.Sdk"), new XElement("ItemGroup", reference))).ToString());
+        AssertRejected<InvalidOperationException>(fixture, "Ambiguous package metadata");
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CentralManagementRemovesCompatibleVersionMetadataRegardlessOfCasing(bool asElement)
+    {
+        using var fixture = new ConfigurationFixture();
+        var reference = new XElement("PackageReference", new XAttribute("Include", "SharpProof"));
+        reference.Add(asElement ? (object)new XElement("version", SetupInitializer.PackageVersion) : new XAttribute("version", SetupInitializer.PackageVersion));
+        await fixture.WriteAsync("Consumer.csproj", new XDocument(new XElement("Project",
+            new XAttribute("Sdk", "Microsoft.NET.Sdk"),
+            new XElement("PropertyGroup", new XElement("ManagePackageVersionsCentrally", "true")),
+            new XElement("ItemGroup", reference))).ToString());
+        _ = await fixture.InitializeAsync();
+        var updated = XDocument.Parse(await File.ReadAllTextAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken));
+        var facade = updated.Descendants("PackageReference").Single(static item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Attribute("Include")?.Value == "SharpProof");
+        Assert.That(facade.Attributes().Any(static attribute =>
+            (attribute ?? throw new ArgumentNullException(nameof(attribute))).Name.LocalName.Equals("Version", StringComparison.OrdinalIgnoreCase)), Is.False);
+        Assert.That(facade.Elements().Any(static element =>
+            (element ?? throw new ArgumentNullException(nameof(element))).Name.LocalName.Equals("Version", StringComparison.OrdinalIgnoreCase)), Is.False);
+        var before = fixture.Snapshot();
+        _ = await fixture.InitializeAsync();
+        Assert.That(fixture.Snapshot(), Is.EqualTo(before));
+    }
+
     private static void AssertRejected<TException>(ConfigurationFixture fixture, string message) where TException : Exception
     {
         ArgumentNullException.ThrowIfNull(fixture);

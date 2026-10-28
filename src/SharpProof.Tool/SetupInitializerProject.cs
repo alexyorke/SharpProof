@@ -97,8 +97,10 @@ internal static class SetupInitializerProject
             { throw new InvalidOperationException("SharpProof must remain a public dependency; review the existing PrivateAssets setting."); }
             if (managed)
             {
-                reference.Attribute("Version")?.Remove();
-                reference.Element("Version")?.Remove();
+                reference.Attributes().Where(static metadata =>
+                    (metadata ?? throw new ArgumentNullException(nameof(metadata))).Name.ToString().Equals("Version", StringComparison.OrdinalIgnoreCase)).Remove();
+                reference.Elements().Where(static metadata =>
+                    (metadata ?? throw new ArgumentNullException(nameof(metadata))).Name.ToString().Equals("Version", StringComparison.OrdinalIgnoreCase)).Remove();
                 SetMetadata(Reference(central!.Root!, "PackageVersion", name), "Version", version);
             }
             else
@@ -207,15 +209,18 @@ internal static class SetupInitializerProject
     {
         ArgumentNullException.ThrowIfNull(element);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        var attribute = element.Attribute(name);
-        var children = element.Elements(name).ToArray();
-        if (children.Length > 1 || attribute != null && children.Length > 0 || children.Any(static child =>
+        // MSBuild metadata names are case-insensitive, including attribute syntax.
+        var attributes = element.Attributes().Where(metadata =>
+            (metadata ?? throw new ArgumentNullException(nameof(metadata))).Name.ToString().Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var children = element.Elements().Where(metadata =>
+            (metadata ?? throw new ArgumentNullException(nameof(metadata))).Name.ToString().Equals(name, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (attributes.Length > 1 || children.Length > 1 || attributes.Length != 0 && children.Length > 0 || children.Any(static child =>
         {
             ArgumentNullException.ThrowIfNull(child);
             return child.Attribute("Condition") != null;
         }))
         { throw new InvalidOperationException("Ambiguous package metadata requires manual initialization."); }
-        return attribute?.Value ?? children.SingleOrDefault()?.Value;
+        return attributes.SingleOrDefault()?.Value ?? children.SingleOrDefault()?.Value;
     }
 
     private static void SetMetadata(XElement element, string name, string value)
