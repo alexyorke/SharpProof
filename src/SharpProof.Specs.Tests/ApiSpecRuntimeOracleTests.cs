@@ -199,10 +199,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static RowWitness CreateBclMathAbsInt32Witness()
     {
         return Row(
-            effects: Effect(
-                "negative, zero, and maximum inputs",
-                ObserveMathAbsEffect,
-                SpecEffect.WritesAmbientState),
             allocation: Allocation(
                 "negative, zero, and maximum inputs",
                 [
@@ -212,17 +208,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     RuntimeEdge.For(() => { try { AbsMinimum(); } catch (OverflowException) { } })
                 ],
                 SpecAllocationBehavior.None),
-            throws: Throws(
-                "negative, zero, maximum, and minimum inputs",
-                [
-                    RuntimeEdge.For(AbsNegative),
-                    RuntimeEdge.For(AbsZero),
-                    RuntimeEdge.For(AbsMaximum),
-                    RuntimeEdge.For(AbsMinimum)
-                ],
-                new ThrowClaim(
-                    SpecThrowBehavior.MayThrow,
-                    ["System.ArgumentException"])),
             postconditions: [
                 Postcondition(
                     0,
@@ -395,24 +380,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclNullableValueWitness()
     {
-        var edges = ImmutableArray.Create(
-            RuntimeEdge.For(() => s_integerSink = new int?(7).Value),
-            RuntimeEdge.For(() => s_integerSink = ReadNullableValue(false)));
         return Row(
-            effects: Effect(
-                "present and empty nullable integers",
-                () => ObserveReceiverReadBclEffects([edges[0]]),
-                SpecEffect.None),
             allocation: Allocation(
                 "present and empty nullable integers",
-                [edges[0], RuntimeEdge.For(() => { try { s_integerSink = ReadNullableValue(false); } catch (InvalidOperationException) { } })],
-                SpecAllocationBehavior.None),
-            throws: Throws(
-                "present and empty nullable integers",
-                edges,
-                DoesNotThrowMutation));
+                [RuntimeEdge.For(() => s_integerSink = new int?(7).Value),
+                    RuntimeEdge.For(() => { try { s_integerSink = ReadNullableValue(false); } catch (InvalidOperationException) { } })],
+                SpecAllocationBehavior.None));
     }
-
     private static RowWitness CreateBclExceptionCtorWitness()
     {
         return CreateBclConstructorWitness(
@@ -1051,10 +1025,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return ObserveNoEffects([StringConcatEdge]);
     }
 
-    private static SpecEffect ObserveMathAbsEffect()
-    {
-        return ObserveNoEffects([MathAbsNormalEdges]);
-    }
 
     private static SpecEffect ObserveStringLengthEffect()
     {
@@ -1767,13 +1737,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         s_list.Add(ListItem);
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool MathAbsNormalEdges()
-    {
-        return Math.Abs(-17) == 17 &&
-        Math.Abs(0) == 0 &&
-        Math.Abs(int.MaxValue) == int.MaxValue;
-    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void AbsNegative()

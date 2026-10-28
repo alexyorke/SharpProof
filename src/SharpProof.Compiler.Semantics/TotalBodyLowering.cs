@@ -103,7 +103,7 @@ internal static class TotalBodyLowering
         return spec.Template.Target.DocumentationCommentId switch
         {
             "M:System.Math.Abs(System.Int32)" =>
-                new TotalScalarCallModel(1, arguments => arguments.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(arguments)) : (CSharpOperationSemantics.Int32MathAbs(factory, arguments[0]))),
+                new TotalScalarCallModel(1, arguments => arguments.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(arguments)) : (CSharpOperationSemantics.Int32MathAbs(factory, arguments[0])), exceptionResourceEffects: true),
             "M:System.Array.Empty``1" when CSharpOperationSemantics.IsReferenceDomain(method.ReturnType) =>
                 new TotalScalarCallModel(0, _ => CSharpOperationSemantics.ArrayEmpty(factory,
                     new RoslynTypeMapper(factory).GetTypeId(method.ReturnType)), effects: IrOpaqueCallEffects.Allocates),

@@ -11,19 +11,17 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class CompilerValidatedSpecTermWorkflowTests
 {
-    [TestCase(int.MinValue, false)]
-    [TestCase(int.MinValue + 1, true)]
-    public void DefaultAbsNormalCompletionPreservesTheOverflowBoundary(int value, bool expected)
+    [Test]
+    public void DefaultAbsCatalogDoesNotCloseTheResourceCallbackExceptionSet()
     {
         var template = ApiSpecTable.Default.Templates.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Target.WitnessIdentifier == "bcl.math.abs.int32"));
         Assert.That(template.Target.DocumentationCommentId, Is.EqualTo("M:System.Math.Abs(System.Int32)"));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var integer = factory.GetOrCreateIntegerType(32, true);
-        var term = CompilerTotalSpecTermInstantiator.Instantiate(factory,
-            template.Facets.Throws.NormalCompletion!, [factory.Integer(integer, value)], integer, 0);
-        AssertBoolean(factory, term, expected);
+        Assert.That(template.Facets.Throws.Behavior, Is.EqualTo(SpecThrowBehavior.Unknown));
+        Assert.That(template.Facets.Throws.NormalCompletion, Is.Null);
+        // The compiler's scalar body model retains the overflow guard. The
+        // generic catalog cannot describe the callback's exception identity.
+        Assert.That(template.Postconditions, Has.Length.EqualTo(1));
     }
-
     [TestCase(true, false)]
     [TestCase(false, true)]
     public void ValidatedBooleanNegationPreservesItsValue(bool value, bool expected)

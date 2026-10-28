@@ -291,7 +291,7 @@ internal sealed class ApiSpecTemplate
 internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "10";
+    public const string DefaultTableVersion = "11";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -466,12 +466,12 @@ internal sealed partial class ApiSpecTable
                     true, 0, null, [IrTypeKind.Integer], IrTypeKind.Integer,
                     assemblySetFramework),
                 new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
-                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented, (new SpecBinaryDeclaration(IrBinaryOperator.NotEqual, new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer), new SpecIntegerDeclaration(-2147483648), IrTypeKind.Boolean))),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
                 [
                     new SpecPostconditionDeclaration(
                         new SpecBinaryDeclaration(IrBinaryOperator.GreaterThanOrEqual, new SpecVariableDeclaration(SpecVariableRole.Result, -1, IrTypeKind.Integer), new SpecIntegerDeclaration(0), IrTypeKind.Boolean),
@@ -566,12 +566,12 @@ internal sealed partial class ApiSpecTable
                     false, 0, IrTypeKind.Reference, [], null,
                     assemblySetFramework),
                 new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
+                    new SpecEffectFacet(SpecEffect.Unknown, evidenceExceptionCulture),
                     new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
-                    new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceDocumented),
+                    new SpecThrowFacet(SpecThrowBehavior.Unknown, [], evidenceExceptionCulture),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
-                    null),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Unknown, evidenceExceptionCulture)),
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
