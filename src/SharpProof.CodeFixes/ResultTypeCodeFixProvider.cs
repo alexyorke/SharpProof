@@ -43,7 +43,9 @@ public sealed class ResultTypeCodeFixProvider : CodeFixProvider
                 !IsContractMethod(intrinsic, "Result", model.Compilation) || intrinsic.TypeArguments.Length != 1 ||
                 invocation.ArgumentList.Arguments.Count != 0 ||
                 model.GetEnclosingSymbol(invocation.SpanStart, context.CancellationToken) is not IMethodSymbol callable ||
-                callable.ReturnsVoid || callable.IsAsync || callable.ReturnType.TypeKind == TypeKind.Error ||
+                callable.ReturnsVoid || callable.IsAsync ||
+                callable.ReturnType.TypeKind is TypeKind.Error or TypeKind.Pointer or TypeKind.FunctionPointer ||
+                callable.ReturnType.IsRefLikeType || callable.ReturnType is ITypeParameterSymbol { AllowsRefLikeType: true } ||
                 SymbolEqualityComparer.Default.Equals(intrinsic.TypeArguments[0], callable.ReturnType))
             {
                 continue;

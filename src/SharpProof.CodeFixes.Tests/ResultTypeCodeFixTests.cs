@@ -178,6 +178,27 @@ public sealed class ResultTypeCodeFixTests
         }
     }
 
+    [TestCase("Buffer")]
+    [TestCase("int*")]
+    [TestCase("delegate*<void>")]
+    public async Task DoesNotOfferAnUnusableGenericResultType(string returnType)
+    {
+        ArgumentNullException.ThrowIfNull(returnType);
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "true").WithText(SourceText.From(
+            "using SharpProof.Attributes; public ref struct Buffer { } public static class Fixture { " +
+            "public static unsafe " + returnType + " Run() { Contract.Ensures(Contract.Result<int>() >= 0); return default; } }"));
+        document = document.Project.WithCompilationOptions(
+            ((CSharpCompilationOptions)document.Project.CompilationOptions!).WithAllowUnsafe(true)).GetDocument(document.Id)!;
+        var compilation = await document.Project.GetCompilationAsync();
+        Assert.That(compilation!.GetDiagnostics().Where(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        var diagnostics = await AnalyzeAsync(document);
+        var diagnostic = diagnostics.Single(item => (item ?? throw new ArgumentNullException(nameof(item))).Properties.ContainsKey("SharpProof.FixKind"));
+        Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));
+        Assert.That(await GetFixesAsync(document, diagnostic), Is.Empty);
+    }
+
     private sealed class DocumentDiagnostics : FixAllContext.DiagnosticProvider
     {
         private readonly DocumentId _documentId;
