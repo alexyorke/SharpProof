@@ -13,7 +13,7 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 | Relational summary schema | `2` | Same compiler artifact model |
 | Specification pack schema | `1` | Same compiler artifact model |
 | Specification pack catalog version | `2` | Same compiler artifact model |
-| Default API table version | `6` | [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs) |
+| Default API table version | `11` | [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs) |
 | Canonical container platform | `linux/amd64` | [toolchain.json](../eng/container/toolchain.json) and [compose.yaml](../compose.yaml) |
 
 ## Coordinated changes
