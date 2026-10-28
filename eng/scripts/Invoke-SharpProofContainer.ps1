@@ -13,9 +13,9 @@ param(
 
     [ValidateSet('All', 'Sources', 'Samples')][string]$SelfApplicationPhase = 'All',
 
-    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+    [ValidateRange(0, 5)][int]$PackagePartition = 0,
 
-    [ValidateSet(1, 4)][int]$PackagePartitionCount = 1,
+    [ValidateSet(1, 6)][int]$PackagePartitionCount = 1,
 
     [string]$TestFilter = '',
 

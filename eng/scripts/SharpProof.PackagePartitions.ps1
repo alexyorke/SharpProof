@@ -1,13 +1,29 @@
 Set-StrictMode -Version Latest
 
-function Get-SharpProofPackagePartition {
-    param([string]$Method, [ValidateRange(1, 4)][int]$Count = 4)
-    # Interpret the entire SHA-256 digest as an unsigned big-endian integer.
-    $remainder = 0
-    foreach ($octet in [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($Method))) {
-        $remainder = ($remainder * 256 + [int]$octet) % $Count
+function Get-SharpProofPackagePartitionFilters {
+    param([object[]]$Cases, [int]$Partition, [int]$Count)
+    # Give each filter, largest first, to the partition with the fewest cases
+    # of its class, so every partition gets an even share of each class,
+    # including the heavy package-layout cases.
+    $classLoad = @{}
+    $load = [int[]]::new($Count)
+    $selected = [Collections.Generic.List[string]]::new()
+    $units = @($Cases | Group-Object { $_.filter } -CaseSensitive | ForEach-Object {
+            [pscustomobject]@{ filter = $_.Name; size = $_.Count; class = $_.Group[0].method -replace '\.[^.]+$', '' }
+        } | Sort-Object class, @{ Expression = 'size'; Descending = $true }, filter -CaseSensitive)
+    foreach ($unit in $units) {
+        if (-not $classLoad.ContainsKey($unit.class)) { $classLoad[$unit.class] = [int[]]::new($Count) }
+        $target = 0
+        for ($index = 1; $index -lt $Count; $index++) {
+            $better = $classLoad[$unit.class][$index] -lt $classLoad[$unit.class][$target] -or
+            ($classLoad[$unit.class][$index] -eq $classLoad[$unit.class][$target] -and $load[$index] -lt $load[$target])
+            if ($better) { $target = $index }
+        }
+        $classLoad[$unit.class][$target] += $unit.size
+        $load[$target] += $unit.size
+        if ($target -eq $Partition) { $selected.Add($unit.filter) }
     }
-    return $remainder
+    return $selected.ToArray()
 }
 
 function Read-SharpProofPackageDiscovery {
