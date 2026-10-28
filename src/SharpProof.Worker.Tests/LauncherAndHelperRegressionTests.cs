@@ -13,6 +13,50 @@ namespace SharpProof.Worker.Test;
 public sealed class LauncherAndHelperRegressionTests
 {
     [Test]
+    [NonParallelizable]
+    public async Task ConsoleScopeDisposalDoesNotWaitForRegisteredCancellationCallbacks()
+    {
+        using var scope = new ConsoleCancellationScope(handleTermination: true, TestContext.CurrentContext.CancellationToken);
+        var handler = (ConsoleCancelEventHandler)typeof(ConsoleCancellationScope)
+            .GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(scope)!;
+        var eventArgs = (ConsoleCancelEventArgs)Activator.CreateInstance(typeof(ConsoleCancelEventArgs),
+            BindingFlags.Instance | BindingFlags.NonPublic, binder: null,
+            args: [ConsoleSpecialKey.ControlC], culture: CultureInfo.InvariantCulture)!;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        using var registration = scope.Token.Register(() =>
+        {
+            entered.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(30)))
+            {
+                throw new TimeoutException("The cancellation test callback was not released.");
+            }
+        });
+        var cancel = Task.Run(() => handler(null, eventArgs));
+        Task? disposal = null;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.CurrentContext.CancellationToken);
+            disposal = Task.Run(scope.Dispose);
+            await disposal.WaitAsync(TimeSpan.FromSeconds(5), TestContext.CurrentContext.CancellationToken);
+            // A captured late event must be ignored even while the first callback is still active.
+            Assert.DoesNotThrow((Action)(() => handler(null, eventArgs)));
+            Assert.DoesNotThrow((Action)scope.Dispose);
+        }
+        finally
+        {
+            // Release before joining either task so the old blocking implementation fails boundedly.
+            release.Set();
+            await (disposal is null ? cancel : Task.WhenAll(cancel, disposal)).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        Assert.Throws<ObjectDisposedException>((Action)(() =>
+        {
+            _ = scope.Token;
+        }));
+        Assert.DoesNotThrow((Action)(() => handler(null, eventArgs)));
+    }
+
+    [Test]
     public void MissingReferenceCompilationCannotResolveTheOfficialContractType()
     {
         const string source = "internal sealed class Subject { }";

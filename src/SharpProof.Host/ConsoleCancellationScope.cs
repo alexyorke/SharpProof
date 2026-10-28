@@ -10,6 +10,7 @@ internal sealed class ConsoleCancellationScope : IDisposable
     private readonly ConsoleCancelEventHandler _handler;
     private readonly PosixSignalRegistration? _terminate;
     private bool _disposed;
+    private int _activeCancellations;
 
 #pragma warning disable SPINT005 // The executable entry point owns console cancellation; no caller token exists yet.
     public ConsoleCancellationScope() : this(handleTermination: false, CancellationToken.None)
@@ -44,17 +45,35 @@ internal sealed class ConsoleCancellationScope : IDisposable
     {
         lock (_gate)
         {
-            if (!_disposed)
+            if (_disposed)
             {
-                _source.Cancel();
+                return;
+            }
+            _activeCancellations++;
+        }
+        try
+        {
+            // Cancellation invokes registered callbacks; never hold our lifetime gate here.
+            _source.Cancel();
+        }
+        finally
+        {
+            bool disposeSource;
+            lock (_gate)
+            {
+                _activeCancellations--;
+                disposeSource = _disposed && _activeCancellations == 0;
+            }
+            if (disposeSource)
+            {
+                _source.Dispose();
             }
         }
     }
 
     public void Dispose()
     {
-        Console.CancelKeyPress -= _handler;
-        _terminate?.Dispose();
+        bool disposeSource;
         lock (_gate)
         {
             if (_disposed)
@@ -62,6 +81,12 @@ internal sealed class ConsoleCancellationScope : IDisposable
                 return;
             }
             _disposed = true;
+            disposeSource = _activeCancellations == 0;
+        }
+        Console.CancelKeyPress -= _handler;
+        _terminate?.Dispose();
+        if (disposeSource)
+        {
             _source.Dispose();
         }
     }
