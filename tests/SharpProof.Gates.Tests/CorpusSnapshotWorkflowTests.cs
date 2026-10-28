@@ -54,7 +54,7 @@ public sealed class CorpusSnapshotWorkflowTests
         {
             Assert.That(result.Passed, Is.False);
             Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(218));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
             Assert.That(result.UnknownReasons.Single(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
             Assert.That(result.Failures, Does.Contain("Corpus produced a new unreviewed Unknown reason 'silent-unclassified' (1 cases)."));

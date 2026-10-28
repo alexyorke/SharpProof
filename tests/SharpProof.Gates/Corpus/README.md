@@ -24,7 +24,15 @@ Source text is pinned with normalized LF line endings. At test time the runner a
 
 Portable diagnostics and native semantic outcomes are observed separately. Native verification consumes the compiler-produced artifact and runs the worker. Unsupported targets remain explicit; silence is not proof.
 
-The [ratchet](unknown-reason-ratchet.json) requires at least 240 supported cases overall and 14 supported OSS methods, with at most 222 total Unknown and independent reason-bucket caps. Support labels are reviewed evidence, not derived from the expected verdict.
+The [ratchet](unknown-reason-ratchet.json) requires at least 243 supported cases overall and 17 supported OSS methods, with at most 219 total Unknown and independent reason-bucket caps. Support labels are reviewed evidence, not derived from the expected verdict.
+
+### Reviewed exceptional-resource correction (BUG-007)
+
+`OSS0015.baseline` (`FindGCDEuclidean`) was previously classified Supported/Proven. Its unchanged upstream body calls `Math.Abs(a)` and `Math.Abs(b)` before checking either input. For `a == int.MinValue`, runtime exception-message lookup invokes the ambient culture's virtual `Name` getter, which can mutate observable state or throw another exception. The previous unrestricted purity claim was therefore unsound.
+
+Only this declaration is reclassified IntentionallyUnsupported/Unknown until exceptional resource callbacks have an exact purity model. Its source file hash `fd34466c9843b6b88c3f73cb71a18f6a2e9236393d4ceafaf1f1b3c8afce7f0f`, declaration hash `905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554`, signature, and body remain unchanged. `ResourceCallbackCorrectionRetainsPinnedGreatestCommonDivisorSource` executes that exact pinned source with a culture callback; `ExceptionalFrameworkCultureTests` also covers resource callback effects and exception substitution.
+
+The reviewed correction changes the supported-case floor 244→243, supported-OSS floor 18→17, total-Unknown ceiling 218→219, and SP0002 ceiling 121→122. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
 ## Reproduce or update
 

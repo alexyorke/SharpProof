@@ -36,7 +36,7 @@ The executable also accepts `exception-oracle`, `allocation-oracle`, `purity-ora
 
 Each case has reviewed `Supported` or `IntentionallyUnsupported` classification, independent of expected verdict and snapshot. Supported cases must yield accountable Proven or Refuted; supported Unknown is a failure.
 
-[unknown-reason-ratchet.json](Corpus/unknown-reason-ratchet.json) currently requires at least 240 supported cases and 14 supported OSS methods, and caps total Unknown at 222 with per-bucket maxima. These are floors/caps, not a claim that every run has exactly those counts.
+[unknown-reason-ratchet.json](Corpus/unknown-reason-ratchet.json) currently requires at least 243 supported cases and 17 supported OSS methods, and caps total Unknown at 219 with per-bucket maxima. These are floors/caps, not a claim that every run has exactly those counts. The [reviewed exceptional-resource correction](Corpus/README.md#reviewed-exceptional-resource-correction-bug-007) documents the single historical purity proof removed from this baseline without changing its pinned source.
 
 The gate rejects new Unknown buckets, reduced supported coverage, exceeded caps, and unexplained verdict changes. [proven-to-unknown.json](Corpus/proven-to-unknown.json) is the explicit allowance mechanism; stale, duplicate, unused, or unexplained entries fail. Snapshot refresh alone cannot expand the unsupported surface.
 
