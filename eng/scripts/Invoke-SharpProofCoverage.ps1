@@ -30,11 +30,11 @@ param(
     [string]$TaskGroup = 'All',
 
     [Parameter()]
-    [ValidateRange(0, 3)]
+    [ValidateRange(0, 5)]
     [int]$PackagePartition = 0,
 
     [Parameter()]
-    [ValidateSet(1, 4)]
+    [ValidateSet(1, 6)]
     [int]$PackagePartitionCount = 1
 )
 

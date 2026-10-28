@@ -7,7 +7,7 @@ param(
 
     [string]$PackageSource = '',
 
-    [ValidateRange(0, 3)][int]$PackagePartition = 0,
+    [ValidateRange(0, 5)][int]$PackagePartition = 0,
 
     [ValidateSet(1, 6)][int]$PackagePartitionCount = 1,
 
