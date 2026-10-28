@@ -1127,7 +1127,7 @@ public sealed class ApiSpecTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(resolved.IsPureAndAllocationFree(abs), Is.True);
+            Assert.That(resolved.IsPureAndAllocationFree(abs), Is.False);
             Assert.That(resolved.IsPureAndAllocationFree(concat), Is.False);
             Assert.That(
                 resolved.IsPureAndAllocationFree(arrayEmpty),

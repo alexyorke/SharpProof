@@ -17,7 +17,7 @@ public sealed class ApiSpecContentDigestTests
         {
             Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("10"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "176f07b7dfb4a0e7a8904b1000f08272eb16b1fc0b61b38a040aaa7a6fb5ef3e"));
+                "5407fe514a147a0a9f3005f93a1022f05ab0a9b4afa435ac5538358a8e59f4bc"));
         }
     }
 

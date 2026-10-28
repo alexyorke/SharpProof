@@ -467,7 +467,7 @@ internal sealed partial class ApiSpecTable
                     assemblySetFramework),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.None, evidenceObserved),
-                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.OverflowException"], evidenceDocumented, (new SpecBinaryDeclaration(IrBinaryOperator.NotEqual, new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer), new SpecIntegerDeclaration(-2147483648), IrTypeKind.Boolean))),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
@@ -567,7 +567,7 @@ internal sealed partial class ApiSpecTable
                     assemblySetFramework),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
-                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.InvalidOperationException"], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
@@ -631,7 +631,7 @@ internal sealed partial class ApiSpecTable
                     assemblySetFramework),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.ReadsReceiverState, evidenceDocumented),
-                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, evidenceObserved),
                     new SpecThrowFacet(SpecThrowBehavior.MayThrow, ["System.IndexOutOfRangeException"], evidenceDocumented),
                     new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),

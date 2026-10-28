@@ -208,9 +208,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 [
                     RuntimeEdge.For(AbsNegative),
                     RuntimeEdge.For(AbsZero),
-                    RuntimeEdge.For(AbsMaximum)
+                    RuntimeEdge.For(AbsMaximum),
+                    RuntimeEdge.For(() => { try { AbsMinimum(); } catch (OverflowException) { } })
                 ],
-                SpecAllocationBehavior.MayAllocate),
+                SpecAllocationBehavior.None),
             throws: Throws(
                 "negative, zero, maximum, and minimum inputs",
                 [
@@ -323,9 +324,9 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 () => ObserveReceiverReadBclEffects(edges),
                 SpecEffect.None),
             allocation: Allocation(
-                "valid indexes on non-empty strings",
-                edges,
-                SpecAllocationBehavior.MayAllocate),
+                "valid and out-of-range indexes",
+                [edges[0], RuntimeEdge.For(() => { try { s_integerSink = "text"[5]; } catch (IndexOutOfRangeException) { } })],
+                SpecAllocationBehavior.None),
             throws: Throws(
                 "valid and out-of-range indexes",
                 throwEdges,
@@ -404,8 +405,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 SpecEffect.None),
             allocation: Allocation(
                 "present and empty nullable integers",
-                [edges[0]],
-                SpecAllocationBehavior.MayAllocate),
+                [edges[0], RuntimeEdge.For(() => { try { s_integerSink = ReadNullableValue(false); } catch (InvalidOperationException) { } })],
+                SpecAllocationBehavior.None),
             throws: Throws(
                 "present and empty nullable integers",
                 edges,
