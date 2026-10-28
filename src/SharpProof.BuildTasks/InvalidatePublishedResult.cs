@@ -58,6 +58,17 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
+        ImmutableArray<string> ResolveCompilerInputPaths(string path)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            var member = ResolvePath(path);
+            var input = new FileInfo(member);
+            var target = input.LinkTarget == null ? null : input.ResolveLinkTarget(returnFinalTarget: true);
+            // Reads follow the final link, while atomic publication replaces
+            // its directory entry. Protect both names of a compiler input.
+            return target == null ? [member] : [member, PublicationLease.CanonicalMember(target.FullName)];
+        }
+
         var outputPaths = Present([ResultPath, SarifPath]).Select(ResolvePath).ToImmutableArray();
         var inputPaths = Present([
                 RequestPath,
@@ -76,7 +87,8 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             .ToImmutableArray();
         var compilerInputPaths = CompilerInputPaths
             .Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !string.IsNullOrWhiteSpace(item.ItemSpec))
-            .Select(item => item is null ? throw new ArgumentNullException(nameof(item)) : ResolvePath(item.ItemSpec)).ToImmutableArray();
+            .SelectMany(item => item is null ? throw new ArgumentNullException(nameof(item)) : ResolveCompilerInputPaths(item.ItemSpec))
+            .Distinct(PublicationPaths.Comparer).ToImmutableArray();
         var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
         var workerDirectory = workerFile != null && File.Exists(workerFile)
             ? Path.GetDirectoryName(workerFile)

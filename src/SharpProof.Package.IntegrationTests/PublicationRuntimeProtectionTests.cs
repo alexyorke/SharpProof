@@ -87,6 +87,30 @@ public sealed class PublicationRuntimeProtectionTests
         Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "result.json")), Is.EqualTo("result"));
     }
 
+    [TestCase("Subject.cs")]
+    [TestCase("Dependency.dll")]
+    [Platform("Linux")]
+    public void CaptureManifestCannotReplaceTheTargetOfACompilerInputSymlink(string inputName)
+    {
+        ArgumentNullException.ThrowIfNull(inputName);
+        using var fixture = new Fixture();
+        var target = Path.Combine(fixture.Root, "capture.json");
+        var input = Path.Combine(fixture.Root, inputName);
+        var original = new byte[] { 0, 1, 2, 127, 255 };
+        File.WriteAllBytes(target, original);
+        File.CreateSymbolicLink(input, "capture.json");
+        var task = fixture.Invalidation();
+        task.CompilerInputPaths = [new TaskItem(inputName)];
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(fixture.Engine.Errors.Single().Message,
+            Is.EqualTo("SharpProof publication and capture paths must not alias compiler inputs."));
+        Assert.That(File.ReadAllBytes(target), Is.EqualTo(original));
+        Assert.That(File.ReadAllBytes(input), Is.EqualTo(original));
+        Assert.That(new FileInfo(input).LinkTarget, Is.EqualTo("capture.json"));
+        Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "result.json")), Is.EqualTo("result"));
+    }
+
     [Test]
     [Platform("Linux")]
     public void CaptureNonceReplacesLeafSymlinkWithoutChangingCompilerSource()
