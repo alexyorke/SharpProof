@@ -388,19 +388,21 @@ internal sealed class MetadataTestSubject : IDisposable
 {
     private readonly TempDirectory _directory = new("sharpproof-typed-il-");
     private readonly AssemblyLoadContext _runtime = new("sharpproof-typed-il-oracle", isCollectible: true);
+    internal CSharpCompilation LibraryCompilation { get; }
     internal CSharpCompilation Compilation { get; }
     internal MethodInfo Method { get; }
     internal string ImagePath { get; }
     internal ImmutableArray<byte> Image { get; }
     internal MethodInfo RootMethod { get; }
 
-    internal MetadataTestSubject(string librarySource, string source, Platform platform = Platform.AnyCpu)
+    internal MetadataTestSubject(string librarySource, string source, Platform platform = Platform.AnyCpu,
+        bool includeSharpProofReference = false)
     {
         System.ArgumentNullException.ThrowIfNull(librarySource);
         System.ArgumentNullException.ThrowIfNull(source);
         try
         {
-            var implementation = TestCompilation.Create("TypedIlLibrary", librarySource, includeSharpProofReference: false)
+            var implementation = LibraryCompilation = TestCompilation.Create("TypedIlLibrary", librarySource, includeSharpProofReference: includeSharpProofReference)
                 .WithAssemblyName("TypedIlLibrary")
                 .WithOptions(TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary).WithOptimizationLevel(OptimizationLevel.Release).WithDeterministic(true).WithPlatform(platform));
             using var stream = new MemoryStream();

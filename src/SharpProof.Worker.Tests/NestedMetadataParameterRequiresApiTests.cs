@@ -21,7 +21,7 @@ public sealed class NestedMetadataParameterRequiresApiTests
             "public static int Target([Positive] int value) => Inner(value); " +
             "public static int Inner(" + innerParameter + ") => value + 1; }";
         const string source = "public static class Subject { public static int Target(int value) => Library.Target(value); }";
-        using var subject = new MetadataTestSubject(library, source);
+        using var subject = new MetadataTestSubject(library, source, includeSharpProofReference: true);
         var owner = subject.Compilation.GetTypeByMetadataName("Library")!;
         var target = owner.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var inner = owner.GetMembers("Inner").OfType<IMethodSymbol>().Single();

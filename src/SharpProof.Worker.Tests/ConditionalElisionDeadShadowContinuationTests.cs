@@ -24,7 +24,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         var source = "public static class Subject { public static int Target(int value) { if (" +
             (branchEnabled ? "true" : "false") + ") { Log(value > 0 ? true : false); } return Library.Target(value); } " +
             "[System.Diagnostics.Conditional(\"ABSENT\")] static void Log(bool argument) { } }";
-        using var subject = new MetadataTestSubject(library, source);
+        using var subject = new MetadataTestSubject(library, source, includeSharpProofReference: true);
         Assert.That(subject.Method.Invoke(null, [17]), Is.EqualTo(18));
         Assert.That(subject.RootMethod.Invoke(null, [17]), Is.EqualTo(18));
 

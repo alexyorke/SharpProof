@@ -35,7 +35,7 @@ public sealed class TypedMetadataReferenceTests
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ [return: Positive] public static int Target([{attribute}] {type} value) => 1; }}",
-            "public static class Subject { public static int Target(int value) => value; }");
+            "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
@@ -68,7 +68,7 @@ public sealed class TypedMetadataReferenceTests
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target([NotNull] {type} value) => 1; }}",
-            "public static class Subject { public static int Target(int value) => value; }");
+            "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
@@ -91,7 +91,7 @@ public sealed class TypedMetadataReferenceTests
         System.ArgumentNullException.ThrowIfNull(parameters);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target({parameters}) => 1; }}",
-            "public static class Subject { public static int Target(int value) => value; }");
+            "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
