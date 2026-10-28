@@ -40,7 +40,7 @@ esac
 # Lock the shared volume's directory inode, rather than a removable file in
 # one container's /tmp. Cloning into this directory does not replace its inode.
 mkdir -p -- "${target_root}"
-exec {loop_lock_fd}<"${target_root}"
+exec {loop_lock_fd}< "${target_root}"
 if ! flock --nonblock "${loop_lock_fd}"; then
   echo "Another SharpProof loop command owns the private build workspace." >&2
   exit 125

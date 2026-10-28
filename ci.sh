@@ -48,7 +48,7 @@ compose_run() {
     printf 'gitdir: /git-common/%s\n' "$relative" > "$pointer"
     chmod a+r "$pointer"
     mounts=(--volume "$(docker_host_path "$common"):/git-common:ro"
-      --volume "$(docker_host_path "$pointer"):/workspace/SharpProof/.git:ro")
+    --volume "$(docker_host_path "$pointer"):/workspace/SharpProof/.git:ro")
   fi
   docker compose run --rm "${mounts[@]}" "$@" || status=$?
   if [[ -n "$pointer" ]]; then rm -f -- "$pointer"; fi
