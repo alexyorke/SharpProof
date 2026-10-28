@@ -297,6 +297,7 @@ public sealed class SetupInitializerTests
             ["SharpProofFeatures"] = "all",
             ["SharpProofVerify"] = "true",
             ["SharpProofVerifyPolicy"] = "require-proven",
+            ["SharpProofAssumptionPolicy"] = "error",
             ["DefineConstants"] = string.Empty,
             ["ProjectAssetsFile"] = assetsPath,
             ["TargetFramework"] = "net10.0",
@@ -366,6 +367,143 @@ public sealed class SetupInitializerTests
         Assert.That(await File.ReadAllTextAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(originalProject));
         Assert.That(await File.ReadAllTextAsync(target, TestContext.CurrentContext.CancellationToken), Is.EqualTo(external));
         Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*"), Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LateVerificationFailureRollsBackEarlierCommits(bool firstExisted)
+    {
+        using var fixture = new InitFixture();
+        var first = firstExisted ? fixture.ProjectPath : Path.Combine(fixture.Root, "created.json");
+        var original = firstExisted ? await File.ReadAllBytesAsync(first, TestContext.CurrentContext.CancellationToken) : null;
+        var later = Path.Combine(fixture.Root, "NuGet.Config");
+        await fixture.WriteAsync("NuGet.Config", "<configuration />");
+        var plan = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
+        plan.Add(first, "planned-first-content");
+        plan.Add(later, "planned-later-content");
+        const string external = "externally-updated-configuration";
+        Assert.ThrowsAsync<IOException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
+            async path =>
+            {
+                ArgumentNullException.ThrowIfNull(path);
+                Assert.That(path, Is.EqualTo(first));
+                await File.WriteAllTextAsync(later, external, TestContext.CurrentContext.CancellationToken);
+            }, TestContext.CurrentContext.CancellationToken)));
+        if (firstExisted)
+        { Assert.That(await File.ReadAllBytesAsync(first, TestContext.CurrentContext.CancellationToken), Is.EqualTo(original)); }
+        else
+        { Assert.That(File.Exists(first), Is.False); }
+        Assert.That(await File.ReadAllTextAsync(later, TestContext.CurrentContext.CancellationToken), Is.EqualTo(external));
+        Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*"), Is.Empty);
+    }
+
+    [Test]
+    public async Task CancellationAfterACommitRestoresOriginalFilesWithoutTheCanceledToken()
+    {
+        using var fixture = new InitFixture();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CurrentContext.CancellationToken);
+        var original = await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken);
+        var later = Path.Combine(fixture.Root, "NuGet.Config");
+        var plan = new SetupInitializerFiles(cancellation.Token);
+        plan.Add(fixture.ProjectPath, "planned-project-content");
+        plan.Add(later, "planned-feed-content");
+        Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
+            async path =>
+            {
+                ArgumentNullException.ThrowIfNull(path);
+                Assert.That(path, Is.EqualTo(fixture.ProjectPath));
+                await cancellation.CancelAsync();
+            }, cancellation.Token)));
+        Assert.That(await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(original));
+        Assert.That(File.Exists(later), Is.False);
+        Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*"), Is.Empty);
+    }
+
+    [Test]
+    public async Task FailureAfterSeveralCommitsRestoresTheWholePlan()
+    {
+        using var fixture = new InitFixture();
+        var original = await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken);
+        var created = Path.Combine(fixture.Root, "NuGet.Config");
+        var plan = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
+        plan.Add(fixture.ProjectPath, "planned-project-content");
+        plan.Add(created, "planned-feed-content");
+        Assert.ThrowsAsync<IOException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
+            path =>
+            {
+                ArgumentNullException.ThrowIfNull(path);
+                if (path == created)
+                { throw new IOException("simulated late publication failure"); }
+                return Task.CompletedTask;
+            }, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(original));
+        Assert.That(File.Exists(created), Is.False);
+        Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*"), Is.Empty);
+    }
+
+    [Test]
+    public async Task RollbackPreservesConcurrentEditsAndRetainsTheOriginalRecoveryCopy()
+    {
+        using var fixture = new InitFixture();
+        var original = await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken);
+        var plan = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
+        plan.Add(fixture.ProjectPath, "planned-project-content");
+        const string external = "concurrent-project-edit";
+        var failure = Assert.ThrowsAsync<IOException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
+            async path =>
+            {
+                ArgumentNullException.ThrowIfNull(path);
+                await File.WriteAllTextAsync(path, external, TestContext.CurrentContext.CancellationToken);
+                throw new IOException("simulated failure after a concurrent edit");
+            }, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(await File.ReadAllTextAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(external));
+        var backup = Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*.backup").Single();
+        Assert.That(await File.ReadAllBytesAsync(backup, TestContext.CurrentContext.CancellationToken), Is.EqualTo(original));
+        Assert.That(failure!.Message, Does.Contain(backup));
+        Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*").Count(), Is.EqualTo(1));
+    }
+
+    [TestCase("empty")]
+    [TestCase("invalid-utf8")]
+    [TestCase("oversized")]
+    public async Task UnreadableConcurrentEditsRetainRecoveryCopiesAndDoNotStopOtherRollbacks(string kind)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(kind);
+        using var fixture = new InitFixture();
+        var originalProject = await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken);
+        var edited = Path.Combine(fixture.Root, "NuGet.Config");
+        await fixture.WriteAsync("NuGet.Config", "<configuration />");
+        var originalConfig = await File.ReadAllBytesAsync(edited, TestContext.CurrentContext.CancellationToken);
+        var external = kind switch
+        {
+            "empty" => Array.Empty<byte>(),
+            "invalid-utf8" => new byte[] { 0xff },
+            _ => new byte[1024 * 1024 + 1]
+        };
+        var plan = new SetupInitializerFiles(TestContext.CurrentContext.CancellationToken);
+        plan.Add(fixture.ProjectPath, "planned-project-content");
+        plan.Add(edited, "planned-config-content");
+        const string initiatingFailure = "simulated publication failure after a malformed concurrent edit";
+        var failure = Assert.ThrowsAsync<IOException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
+            async path =>
+            {
+                ArgumentNullException.ThrowIfNull(path);
+                if (path == edited)
+                {
+                    await File.WriteAllBytesAsync(edited, external, TestContext.CurrentContext.CancellationToken);
+                    throw new IOException(initiatingFailure);
+                }
+            }, TestContext.CurrentContext.CancellationToken)));
+        Assert.That(await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(originalProject));
+        Assert.That(await File.ReadAllBytesAsync(edited, TestContext.CurrentContext.CancellationToken), Is.EqualTo(external));
+        var backup = Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*.backup").Single();
+        Assert.That(await File.ReadAllBytesAsync(backup, TestContext.CurrentContext.CancellationToken), Is.EqualTo(originalConfig));
+        Assert.That(failure!.Message, Does.Contain(backup));
+        Assert.That(failure.InnerException, Is.TypeOf<AggregateException>());
+        var failures = ((AggregateException)failure.InnerException!).InnerExceptions;
+        Assert.That(failures, Has.Count.EqualTo(2));
+        Assert.That(failures[0].Message, Is.EqualTo(initiatingFailure));
+        Assert.That(Directory.EnumerateFiles(fixture.Root, ".sharpproof-init-*").Count(), Is.EqualTo(1));
     }
 
     [Test]

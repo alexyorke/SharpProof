@@ -95,8 +95,8 @@ internal static class TrustedChildEnvironment
             if (!Path.IsPathFullyQualified(dotNetRoot) ||
                 processRoot is null ||
                 !string.Equals(
-                    Path.GetFullPath(dotNetRoot),
-                    Path.GetFullPath(processRoot),
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(dotNetRoot)),
+                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(processRoot)),
                 DotNetMuxer.PathComparison(OperatingSystem.IsWindows())))
             {
                 return "DOTNET_ROOT";

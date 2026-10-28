@@ -63,6 +63,17 @@ public sealed class DirectConsoleWriteAnalyzer : DiagnosticAnalyzer
             receiver = conversion.Operand;
         }
 
+        if (receiver is IConditionalAccessInstanceOperation)
+        {
+            for (var parent = receiver.Parent; parent != null; parent = parent.Parent)
+            {
+                if (parent is IConditionalAccessOperation conditional)
+                {
+                    return IsConsoleWriter(conditional.Operation, console);
+                }
+            }
+        }
+
         return receiver is IPropertyReferenceOperation property &&
             (property.Property.Name is "Out" or "Error") &&
             SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, console);

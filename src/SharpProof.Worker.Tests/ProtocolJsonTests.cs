@@ -2387,6 +2387,90 @@ internal sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ManifestValidationRejectsNullAssumptionElementsWithoutThrowing()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].Assumptions = [null!];
+
+        var validation = WorkerProtocolJson.ValidateManifest(manifest);
+
+        Assert.That(validation.IsValid, Is.False);
+        Assert.That(validation.Errors.Select(static error => error is null
+            ? throw new ArgumentNullException(nameof(error)) : error.Code), Does.Contain("manifest.assumption_kind"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task CacheEvictionAccountsOnlyForSuccessfulDeletions(bool anotherEntryCanBeDeleted)
+    {
+        using var directory = new TempDirectory("sharpproof-cache-selective-eviction-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var initial = new VerificationCache(directory.FullName, 100_000);
+        var blockedHash = new string('a', 64);
+        var removableHash = new string('b', 64);
+        var newestHash = new string('c', 64);
+        var blocked = Path.Combine(directory.FullName, blockedHash + VerificationCache.CacheFileSuffix);
+        var removable = Path.Combine(directory.FullName, removableHash + VerificationCache.CacheFileSuffix);
+        Assert.That(await initial.TryWriteAsync(response, blockedHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
+        var entryBytes = new FileInfo(blocked).Length;
+        File.SetLastWriteTimeUtc(blocked, DateTime.UtcNow.AddDays(-2));
+        if (anotherEntryCanBeDeleted)
+        {
+            Assert.That(await initial.TryWriteAsync(response, removableHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
+            File.SetLastWriteTimeUtc(removable, DateTime.UtcNow.AddDays(-1));
+        }
+        var maximumBytes = entryBytes * (anotherEntryCanBeDeleted ? 2 : 1);
+        var attempted = new List<string>();
+        var cache = new VerificationCache(directory.FullName, maximumBytes, path =>
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            attempted.Add(path);
+            if (path == blocked)
+            { throw new UnauthorizedAccessException("The oldest entry belongs to another cache user."); }
+            File.Delete(path);
+        });
+
+        var written = await cache.TryWriteAsync(response, newestHash, manifest, TestContext.CurrentContext.CancellationToken);
+
+        Assert.That(written, Is.EqualTo(anotherEntryCanBeDeleted));
+        Assert.That(File.Exists(blocked), Is.True);
+        Assert.That(attempted, Does.Contain(blocked));
+        if (anotherEntryCanBeDeleted)
+        {
+            Assert.That(attempted, Does.Contain(removable));
+            Assert.That(File.Exists(removable), Is.False);
+            Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix)
+                .Sum(static path => path is null ? throw new ArgumentNullException(nameof(path)) : new FileInfo(path).Length),
+                Is.LessThanOrEqualTo(maximumBytes));
+        }
+    }
+
+    [Test]
+    public async Task CacheEvictionPreservesFilesWithOnlyACacheSuffix()
+    {
+        using var directory = new TempDirectory("sharpproof-cache-unowned-file-");
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var firstHash = new string('a', 64);
+        var secondHash = new string('b', 64);
+        var cache = new VerificationCache(directory.FullName, 100_000);
+        Assert.That(await cache.TryWriteAsync(response, firstHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
+        var first = Path.Combine(directory.FullName, firstHash + VerificationCache.CacheFileSuffix);
+        var capacity = new FileInfo(first).Length;
+        var foreign = Path.Combine(directory.FullName, "manifest" + VerificationCache.CacheFileSuffix);
+        await File.WriteAllTextAsync(foreign, "preserved input manifest");
+        File.SetLastWriteTimeUtc(foreign, DateTime.UtcNow.AddDays(-2));
+        File.SetLastWriteTimeUtc(first, DateTime.UtcNow.AddDays(-1));
+        cache = new VerificationCache(directory.FullName, capacity);
+
+        Assert.That(await cache.TryWriteAsync(response, secondHash, manifest, TestContext.CurrentContext.CancellationToken), Is.True);
+
+        Assert.That(File.Exists(first), Is.False);
+        Assert.That(await File.ReadAllTextAsync(foreign), Is.EqualTo("preserved input manifest"));
+    }
+
+    [Test]
     public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
     {
         var nullIdentity = CreateManifest();

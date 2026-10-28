@@ -7,7 +7,7 @@ namespace SharpProof.Analyzer.Test;
 public sealed class BclSpecificationRegressionTests
 {
     [Test]
-    public async Task CommonNullableAndPureFrameworkMembersArePure()
+    public async Task NonThrowingNullableAndPureFrameworkMembersArePure()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
@@ -23,8 +23,7 @@ public sealed class BclSpecificationRegressionTests
                     value.GetValueOrDefault(5);
 
                 [EnforcePure]
-                public static int CoalesceAndUnwrap(int? value) =>
-                    value.HasValue ? value.Value : 0;
+                public static int Coalesce(int? value) => value ?? 0;
 
                 [EnforcePure]
                 public static bool CommonMath(int left, int right) =>
@@ -39,5 +38,28 @@ public sealed class BclSpecificationRegressionTests
             ["SP0002"]);
 
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase("value.Value")]
+    [TestCase("value.HasValue ? value.Value : 0")]
+    public async Task NullableValueRemainsConservativeUntilItsGuardIsModeled(string expression)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(expression);
+        // Nullable.Value can consult resource-message culture callbacks on its
+        // empty path. The advisory effect model has no relationship between
+        // HasValue and Value, so even a guarded unwrap retains that boundary.
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            $$"""
+            using SharpProof.Attributes;
+            public static class Fixture {
+                [EnforcePure]
+                public static int Unwrap(int? value) => {{expression}};
+            }
+            """,
+            "effects",
+            ["SP0002"]);
+
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002", 1);
+        AnalyzerTestHost.AssertMessageContains(diagnostics.Single(), "Unwrap");
     }
 }

@@ -238,7 +238,7 @@ public sealed class Pr275BulkCoreApiTests
                 }
 
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(NullReferenceException) },
                     Complete = true)]
                 public static void WriteArgument(Box box) => box.Value = 1;
@@ -253,7 +253,7 @@ public sealed class Pr275BulkCoreApiTests
                 public static void AddToList(List<int> values) => values.Add(1);
 
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static int ReadListCount(List<int> values) => values.Count;
@@ -274,7 +274,7 @@ public sealed class Pr275BulkCoreApiTests
                 public static void AllowedThrow(Exception error) => throw error;
 
                 [EffectContract(
-                    SharpProofEffect.Throws,
+                    SharpProofEffect.Throws | SharpProofEffect.Allocates,
                     ThrownExceptions = new[] { typeof(Exception) },
                     Complete = true)]
                 public static void DeclaredThrow(Exception error) => throw error;

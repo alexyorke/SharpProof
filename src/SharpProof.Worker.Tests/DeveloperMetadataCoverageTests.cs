@@ -211,10 +211,16 @@ internal sealed class DeveloperMetadataCoverageTests
         var relative = CSharpSyntaxTree.ParseText(string.Empty, path: "Subject.cs");
         Assert.That(CompilerSourceLocationProjection.MappedPath(relative, default), Is.EqualTo("Subject.cs"));
         var absolute = CSharpSyntaxTree.ParseText(string.Empty, path: "/physical/Subject.cs");
+        Assert.That(CompilerSourceLocationProjection.MappedPath(absolute, default),
+            Is.EqualTo(Path.GetFullPath("/physical/Subject.cs")));
+        var mappedTree = CSharpSyntaxTree.ParseText("#line 5 \"MappedView.cs\"\nclass Subject {}",
+            path: "/physical/Subject.cs");
+        var mapped = mappedTree.GetMappedLineSpan(new TextSpan(mappedTree.GetText().Lines[1].Start, 1));
+        Assert.That(mapped.HasMappedPath, Is.True);
         var start = new LinePosition(4, 2);
         var end = new LinePosition(4, 3);
-        Assert.That(CompilerSourceLocationProjection.MappedPath(absolute,
-            new FileLinePositionSpan("MappedView.cs", start, end)), Is.EqualTo(Path.GetFullPath("/physical/MappedView.cs")));
+        Assert.That(CompilerSourceLocationProjection.MappedPath(mappedTree, mapped),
+            Is.EqualTo(Path.GetFullPath("/physical/MappedView.cs")));
         Assert.That(CompilerSourceLocationProjection.MappedPath(relative,
             new FileLinePositionSpan("/mapped/View.cs", start, end)), Is.EqualTo(Path.GetFullPath("/mapped/View.cs")));
         Assert.That(CompilerSourceLocationProjection.MappedPath(relative,

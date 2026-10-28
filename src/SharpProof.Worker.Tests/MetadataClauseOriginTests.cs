@@ -170,7 +170,8 @@ public sealed class MetadataClauseOriginTests
     {
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static int Target([InRange(1, 10)] int value) => value; }",
-            "public static class Subject { public static int Target(int value) => Library.Target(value); }");
+            "public static class Subject { public static int Target(int value) => Library.Target(value); }",
+            includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var il = new CompilerTotalIlBodyProvider(subject.Compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken)!;
         Assert.That(il, Is.Not.Null);

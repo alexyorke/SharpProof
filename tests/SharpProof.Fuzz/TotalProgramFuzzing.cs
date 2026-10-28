@@ -100,7 +100,7 @@ internal static class TotalProgramDifferentialOracle
             var members = membersBuilder.ToImmutable();
             var loops = loopsBuilder.ToImmutable();
             var batch = members.Select((member, index) =>
-                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]))))).ToImmutableArray();
+                ((index < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(index)) : (member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, inputs[index], loops[index]) { AbstractStringContents = (offset + index) / Types.Length % 5 == 3 && (offset + index) % 5 == 1 })))).ToImmutableArray();
             await replay.CompareBatchAsync(batch, offset, cancellationToken);
         }
         var result = replay.Result;
@@ -159,7 +159,7 @@ internal static class TotalProgramDifferentialOracle
         return ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
     }
 
-    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases)
+    internal static IrValue Value(IrFactory factory, IrTypeId type, object? value, ImmutableDictionary<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>.Builder aliases, bool abstractStringContents = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
@@ -178,20 +178,22 @@ internal static class TotalProgramDifferentialOracle
         { aliases.AddUnique(type, typed = ImmutableDictionary.CreateBuilder<object, IrValue>(ReferenceEqualityComparer.Instance)); }
         if (typed.TryGetValue(value, out var existing))
         { return existing; }
-        // Null/length cases use a valid same-length representative, including
-        // legal CLR inputs containing unpaired UTF-16 code units.
-        var result = value is string text ? factory.CreateStringValue(new string('\0', text.Length))
-            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases))))
+        // Only generated length-only cases may abstract malformed UTF-16.
+        // Source replay preserves exact text and rejects unrepresentable values.
+        var result = value is string text ? factory.CreateStringValue(abstractStringContents ? new string('\0', text.Length) : text)
+            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases, abstractStringContents))))
             : factory.CreateReferenceValue(type, value);
         typed.AddUnique(value, result);
         return result;
     }
 
-    internal static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value)
+    internal static IrTerm Observation(IrFactory factory, ScopedIrId<IrVariableTag> variable, IrValue value, bool abstractStringContents = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(variable.IsDefault, nameof(variable));
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var term = factory.Variable(variable);
+        if (value.Kind == IrValueKind.String && !abstractStringContents)
+        { return factory.Binary(IrBinaryOperator.Equal, term, factory.String(value.String)); }
         if (value.Kind is IrValueKind.Boolean or IrValueKind.Integer)
         { return factory.Binary(IrBinaryOperator.Equal, term, Term(factory, value)); }
         if (value.Kind == IrValueKind.Null)

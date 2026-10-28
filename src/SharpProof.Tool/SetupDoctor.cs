@@ -54,7 +54,7 @@ internal static class SetupDoctor
         try
         {
             var evaluation = await runProcess("dotnet", directory, cancellationToken, "msbuild", projectPath, "-nologo",
-                "-getProperty:NETCoreSdkVersion,SharpProofProfile,SharpProofFeatures,SharpProofVerify,SharpProofVerifyPolicy,DefineConstants,ProjectAssetsFile,TargetFramework,TargetFrameworks",
+                "-getProperty:NETCoreSdkVersion,SharpProofProfile,SharpProofFeatures,SharpProofVerify,SharpProofVerifyPolicy,SharpProofAssumptionPolicy,DefineConstants,ProjectAssetsFile,TargetFramework,TargetFrameworks",
                 "-getItem:PackageReference").ConfigureAwait(false);
             if (evaluation.ExitCode != 0)
             {
@@ -92,6 +92,9 @@ internal static class SetupDoctor
                 var policy = Property("SharpProofVerifyPolicy").Trim();
                 Check(policy.Equals("advisory", StringComparison.OrdinalIgnoreCase) || policy.Equals("warn-on-unknown", StringComparison.OrdinalIgnoreCase) ||
                     policy.Equals("require-proven", StringComparison.OrdinalIgnoreCase), "Verification policy", "Use advisory, warn-on-unknown, or require-proven.");
+                var assumptionPolicy = Property("SharpProofAssumptionPolicy").Trim();
+                Check(assumptionPolicy.Equals("allow", StringComparison.OrdinalIgnoreCase) || assumptionPolicy.Equals("warn", StringComparison.OrdinalIgnoreCase) ||
+                    assumptionPolicy.Equals("error", StringComparison.OrdinalIgnoreCase), "Assumption policy", "Use allow, warn, or error.");
             }
             Check(!Property("DefineConstants").Split([';', ',']).Any(static value =>
             {

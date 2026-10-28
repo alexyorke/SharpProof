@@ -4,6 +4,16 @@ namespace SharpProof.Analyzer.Test;
 
 public sealed partial class ResourceBoundsTests
 {
+    [Test]
+    public void NestedInvocationsOfTheSameConstructorKeepIndependentArgumentBindings()
+    {
+        var result = AnalyzeSource("public class Cell { public Cell(int count, Cell next) { var data=new int[count]; } } " +
+            "public static class Subject { public static Cell Root() { return new Cell(3, new Cell(5, null)); } }");
+        Assert.That(result.Proven, Is.True, result.UnknownReason);
+        Assert.That(result.Bounds!.Arrays.Text, Is.EqualTo("2"));
+        Assert.That(result.Bounds.Elements.Text, Is.EqualTo("8"));
+    }
+
     [TestCase("public class Cell { public int value; public Cell(int n) { value=n; for(int i=0;i<n;i++) { var a=new int[2]; } } }", "var cell=new Cell(n);", "max(0, n)", "max(0, n)", "(max(0, n) * 2)")]
     [TestCase("public class Cell { public int[] data=new int[3]; }", "var cell=new Cell();", "0", "1", "3")]
     [TestCase("public class Cell { public int[] Data { get; } = new int[3]; }", "var cell=new Cell();", "0", "1", "3")]

@@ -11,6 +11,8 @@ public sealed class CacheNullEvidenceBoundaryTests
     [TestCase("model")]
     [TestCase("claimAssumptions")]
     [TestCase("callableAssumptions")]
+    [TestCase("callableElement")]
+    [TestCase("claimElement")]
     [TestCase("valid")]
     [TestCase("inputHash")]
     public async Task CacheDoesNotRepairNullEvidenceIntoAHit(string shape)
@@ -62,6 +64,14 @@ public sealed class CacheNullEvidenceBoundaryTests
         var envelope = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
         switch (shape)
         {
+            case "callableElement":
+                response.CallableResults = [null!];
+                envelope["callableResults"]![0] = null;
+                break;
+            case "claimElement":
+                response.ClaimResults = [null!];
+                envelope["claimResults"]![0] = null;
+                break;
             case "inputHash":
                 envelope["inputHash"] = new string('b', 64);
                 break;
@@ -90,6 +100,7 @@ public sealed class CacheNullEvidenceBoundaryTests
         {
             Assert.That(cached, Is.Null, "Malformed evidence must be a miss before canonicalization repairs it.");
             Assert.That(File.Exists(path), Is.False);
+            Assert.That(cache.LastReadUnavailable, Is.False, "Invalid evidence is not a storage failure.");
         }
     }
 }

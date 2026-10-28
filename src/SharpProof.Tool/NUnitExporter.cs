@@ -464,13 +464,21 @@ internal static class NUnitExporter
         global::SharpProof.Internal.InputValidation.Require(oldDirectory, nameof(oldDirectory));
         global::SharpProof.Internal.InputValidation.Require(newDirectory, nameof(newDirectory));
         ArgumentException.ThrowIfNullOrEmpty(path);
+        return Remap(path, oldDirectory, newDirectory, OperatingSystem.IsWindows());
+    }
+
+    internal static string Remap(string path, string oldDirectory, string newDirectory, bool isWindows)
+    {
+        global::SharpProof.Internal.InputValidation.Require(oldDirectory, nameof(oldDirectory));
+        global::SharpProof.Internal.InputValidation.Require(newDirectory, nameof(newDirectory));
+        ArgumentException.ThrowIfNullOrEmpty(path);
         var normalized = path.Replace('\\', '/');
         var old = oldDirectory.Replace('\\', '/').TrimEnd('/') + "/";
-        if (normalized.StartsWith(old, StringComparison.Ordinal))
+        var comparison = isWindows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (normalized.StartsWith(old, comparison))
         {
             var mapped = Path.GetFullPath(Path.Combine(newDirectory, normalized[old.Length..]));
             var root = Path.GetFullPath(newDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             if (mapped.StartsWith(root, comparison) && File.Exists(mapped))
             {
                 return mapped;

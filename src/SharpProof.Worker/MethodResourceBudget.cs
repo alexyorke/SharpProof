@@ -11,10 +11,20 @@ internal sealed class MethodResourceBudget(
         throw new ArgumentOutOfRangeException(nameof(methodRlimit));
     private readonly long _startingResourceCount = RequireNonnegative(readConsumedResourceCount?.Invoke() ?? 0);
     private long _reservedResourceCount;
+    private long _completedResourceCount;
+    private readonly List<ResourceCounter> _resourceCounters = [];
+
+    internal IDisposable TrackConsumption(Func<long> readConsumedResourceCount)
+    {
+        ArgumentNullException.ThrowIfNull(readConsumedResourceCount);
+        var counter = new ResourceCounter(this, readConsumedResourceCount);
+        _resourceCounters.Add(counter);
+        return counter;
+    }
 
     // Keep the actual reservation boundary visible to native resource witnesses.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    internal bool TryStartQuery()
+    internal bool TryStartQuery(bool reserveResources = true)
     {
         var consumed = GetConsumedResourceCount();
         if (consumed > _methodRlimit || _methodRlimit - consumed < _queryRlimit)
@@ -22,7 +32,7 @@ internal sealed class MethodResourceBudget(
             return false;
         }
 
-        if (_readConsumedResourceCount == null)
+        if (reserveResources && _readConsumedResourceCount == null)
         {
             _reservedResourceCount += _queryRlimit;
         }
@@ -30,14 +40,15 @@ internal sealed class MethodResourceBudget(
         return true;
     }
 
-    internal bool IsExceeded => _readConsumedResourceCount != null && GetConsumedResourceCount() > _methodRlimit;
+    internal bool IsExceeded => GetConsumedResourceCount() > _methodRlimit;
 
     private long GetConsumedResourceCount()
     {
+        var additional = _completedResourceCount;
+        foreach (var counter in _resourceCounters)
+        { additional = checked(additional + counter.Consumed); }
         if (_readConsumedResourceCount == null)
-        {
-            return _reservedResourceCount;
-        }
+        { return checked(_reservedResourceCount + additional); }
 
         var current = _readConsumedResourceCount();
         if (current < _startingResourceCount)
@@ -45,7 +56,41 @@ internal sealed class MethodResourceBudget(
             throw new InvalidOperationException("The backend resource counter must be monotonic.");
         }
 
-        return current - _startingResourceCount;
+        return checked(current - _startingResourceCount + additional);
+    }
+
+    private sealed class ResourceCounter : IDisposable
+    {
+        private readonly MethodResourceBudget _owner;
+        private readonly Func<long> _read;
+        private readonly long _starting;
+        private bool _disposed;
+
+        internal ResourceCounter(MethodResourceBudget owner, Func<long> read)
+        {
+            _owner = ArgumentNullGuard.NotNull(owner, nameof(owner));
+            _read = ArgumentNullGuard.NotNull(read, nameof(read));
+            _starting = RequireNonnegative(_read());
+        }
+
+        internal long Consumed
+        {
+            get
+            {
+                var current = _read();
+                return current >= _starting ? current - _starting :
+                    throw new InvalidOperationException("The backend resource counter must be monotonic.");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            { return; }
+            _owner._completedResourceCount = checked(_owner._completedResourceCount + Consumed);
+            _owner._resourceCounters.Remove(this);
+            _disposed = true;
+        }
     }
 
     private static long RequireNonnegative(long count)

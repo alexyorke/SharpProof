@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -99,21 +98,15 @@ internal static class Program
             return 2;
         }
 
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var terminate = PosixSignalRegistration.Create(
-            PosixSignal.SIGTERM,
-            context =>
-            {
-                System.ArgumentNullException.ThrowIfNull(context);
-                context.Cancel = true;
-                cancellation.Cancel();
-            });
+        using var cancellation = new ConsoleCancellationScope(handleTermination: true, cancellationToken);
         try
         {
+#pragma warning disable SPINT003 // ConsoleCancellationScope links the caller token with owned console/SIGTERM cancellation.
             var response = await (verify != null
                     ? verify(request, cancellation.Token)
                     : WorkerHost.VerifyAsync(request, cancellation.Token, preparedInput, operationStarted))
                 .ConfigureAwait(false);
+#pragma warning restore SPINT003
             // The response may itself report cancellation; publish it after the
             // run token is canceled so the caller receives the typed result.
             using var resultPublication = new CancellationTokenSource(TimeSpan.FromMilliseconds(WorkerLauncherDefaults.ResultPublicationTimeoutMilliseconds));
@@ -172,8 +165,10 @@ internal static class Program
         {
             try
             {
+#pragma warning disable SPINT003 // The owned console scope token remains linked to caller cancellation during publication.
                 await PublishOutputsAsync(arguments, request, artifact, artifactBytes, expectedInputHash,
                     expectedVersions, validatedResponse!, cancellation.Token).ConfigureAwait(false);
+#pragma warning restore SPINT003
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -619,7 +614,7 @@ internal static class Program
                 ClaimResults.Length: 0,
                 Errors.Length: 1
             } ||
-            response.Errors[0].Code != WorkerProtocolErrorCodes.WorkerTimeout)
+            response.Errors[0] is not { Code: WorkerProtocolErrorCodes.WorkerTimeout })
         {
             return;
         }
@@ -782,14 +777,22 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         ];
-        // Linux reports canonical publication aliases through its structured
-        // failure path; Windows rejects filesystem aliases during admission.
         var paths = candidates.OfType<string>().Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : (OperatingSystem.IsWindows() ? PublicationLease.CanonicalMember(path) : path)).ToImmutableArray();
+            path is null ? throw new System.ArgumentNullException(nameof(path)) : PublicationLease.CanonicalMember(path)).ToImmutableArray();
         if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
                 "SharpProof I/O paths must be distinct.");
+        }
+        if (cacheDirectory is not null)
+        {
+            var cache = Path.GetDirectoryName(PublicationLease.CanonicalMember(
+                Path.Combine(cacheDirectory, ".sharpproof-cache-identity")))!;
+            if (paths.Skip(1).Any(path => path is null ? throw new ArgumentNullException(nameof(path)) :
+                PublicationPaths.IsWithin(path, cache, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cache, path, PublicationPaths.Comparison)))
+            {
+                throw new ArgumentException("SharpProof cache paths must not contain input or output paths.");
+            }
         }
     }
 

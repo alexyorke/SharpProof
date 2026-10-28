@@ -404,7 +404,8 @@ public sealed class GoldenWorkerTests
         const string boundaryMarker = "// golden-library:";
         var boundary = source.IndexOf(boundaryMarker, StringComparison.Ordinal);
         Assert.That(boundary, Is.GreaterThan(0));
-        using var subject = new MetadataTestSubject(source[(boundary + boundaryMarker.Length)..], source[..boundary]);
+        using var subject = new MetadataTestSubject(source[(boundary + boundaryMarker.Length)..], source[..boundary],
+            includeSharpProofReference: true);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,

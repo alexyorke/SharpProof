@@ -474,7 +474,7 @@ public sealed class ApiSpecTests
     }
 
     [Test]
-    public void MathAbsNormalCompletionConditionInstantiatesFromItsArgument()
+    public void MathAbsCatalogKeepsTheResultFactWithoutAClosedExceptionSet()
     {
         var template = ApiSpecTable.Default.Templates.Single(
             static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Target.WitnessIdentifier == "bcl.math.abs.int32"));
@@ -489,14 +489,10 @@ public sealed class ApiSpecTests
         Assert.That(
             instantiated.Status,
             Is.EqualTo(SpecInstantiationStatus.Succeeded));
-        Assert.That(instantiated.NormalCompletionCondition, Is.Not.Null);
-        Assert.That(
-            instantiated.NormalCompletionCondition!.Type,
-            Is.EqualTo(factory.BooleanType));
-        Assert.That(
-            new IrPrinter(factory).Print(
-                instantiated.NormalCompletionCondition),
-            Does.Contain("!= -2147483648"));
+        Assert.That(template.Facets.Throws.Behavior, Is.EqualTo(SpecThrowBehavior.Unknown));
+        Assert.That(instantiated.NormalCompletionCondition, Is.Null);
+        Assert.That(instantiated.Postconditions, Has.Length.EqualTo(1));
+        Assert.That(new IrPrinter(factory).Print(instantiated.Postconditions.Single()), Does.Contain(">= 0"));
     }
 
     [Test]
@@ -1127,7 +1123,7 @@ public sealed class ApiSpecTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(resolved.IsPureAndAllocationFree(abs), Is.True);
+            Assert.That(resolved.IsPureAndAllocationFree(abs), Is.False);
             Assert.That(resolved.IsPureAndAllocationFree(concat), Is.False);
             Assert.That(
                 resolved.IsPureAndAllocationFree(arrayEmpty),
@@ -1136,7 +1132,7 @@ public sealed class ApiSpecTests
                 resolved.IsPureAndAllocationFree(enumerableEmpty),
                 Is.False);
             Assert.That(resolved.IsPureAndAllocationFree(toUpper), Is.False);
-            Assert.That(resolved.IsSideEffectFree(abs), Is.True);
+            Assert.That(resolved.IsSideEffectFree(abs), Is.False);
             Assert.That(resolved.IsSideEffectFree(concat), Is.True);
             Assert.That(resolved.IsSideEffectFree(arrayEmpty), Is.False);
             Assert.That(resolved.IsSideEffectFree(enumerableEmpty), Is.False);

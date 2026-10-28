@@ -43,8 +43,12 @@ internal static partial class CallableVerificationPolicy
                     : CallableEntryFeasibility.Feasible;
                 PublishEntry(entry);
             }
-            foreach (var result in await NativeEffectClaims.VerifyAsync(target, entryFeasibility, budgets, methodBoundary.Token).ConfigureAwait(false))
-            { completed[result.ClaimId] = result; }
+            await NativeEffectClaims.VerifyAsync(target, entryFeasibility, budgets, methodBoundary.Token,
+                result =>
+                {
+                    ArgumentNullException.ThrowIfNull(result);
+                    completed[result.ClaimId] = result;
+                }, resourceBudget).ConfigureAwait(false);
             var records = Fill(target.IsSuccess ? WorkerClaimReason.UnsupportedBody : target.FailureReason);
             return Result(target, WorkerResultAssembler.ProjectCallableReasons(records).Reason, records);
         }

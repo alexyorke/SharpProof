@@ -4,27 +4,27 @@ namespace SharpProof.Worker;
 internal static class NativeEffectSiteVerifier
 {
     internal static Task<PassiveCallableCheckResult> VerifyAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken)
-    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, cancellationToken); }
+        WorkerBudgets budgets, CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
+    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.ZeroAllocations, resourceBudget, cancellationToken); }
 
     internal static Task<PassiveCallableCheckResult> VerifyPurityAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken)
-    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, cancellationToken); }
+        WorkerBudgets budgets, CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
+    { System.ArgumentNullException.ThrowIfNull(budgets, nameof(budgets)); System.ArgumentNullException.ThrowIfNull(preparation, nameof(preparation)); return VerifySitesAsync(preparation, budgets, WorkerEffectContractKind.EnforcePure, resourceBudget, cancellationToken); }
 
     // An AllowedCapabilities claim holds when no reachable lock or opaque call
     // uses a capability outside the allowed set.
     internal static async Task<PassiveCallableCheckResult> VerifyCapabilitiesAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken)
+        WorkerBudgets budgets, CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToImmutableArray();
         return claims.Length != 1 ? Unknown(WorkerClaimReason.UnsupportedContract)
-            : await VerifyCapabilityClaimAsync(preparation, claims[0].ClaimId, budgets, cancellationToken).ConfigureAwait(false);
+            : await VerifyCapabilityClaimAsync(preparation, claims[0].ClaimId, budgets, cancellationToken, resourceBudget).ConfigureAwait(false);
     }
 
     private static async Task<PassiveCallableCheckResult> VerifyCapabilityClaimAsync(CompilerCallablePreparation preparation,
-        string claimId, WorkerBudgets budgets, CancellationToken cancellationToken)
+        string claimId, WorkerBudgets budgets, CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
     {
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
@@ -37,13 +37,13 @@ internal static class NativeEffectSiteVerifier
         if (!preparation.Total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken)
+        return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken, resourceBudget)
             .ConfigureAwait(false);
     }
 
     internal static async Task<PassiveCallableCheckResult> VerifyCapabilityProjectionAsync(
         PassiveCallableCandidate candidate, WorkerEffectCapabilitySet allowed, WorkerBudgets budgets,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
     {
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -52,7 +52,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit, resourceBudget);
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
@@ -90,7 +90,7 @@ internal static class NativeEffectSiteVerifier
     // and element sites need every state flag of their kind. A modeled store
     // to the entry receiver or a parameter has a known owner.
     internal static async Task<PassiveCallableCheckResult> VerifyEffectContractAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, CancellationToken cancellationToken)
+        WorkerBudgets budgets, CancellationToken cancellationToken, MethodResourceBudget? resourceBudget = null)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -102,14 +102,15 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         return await VerifyEffectContractProjectionAsync(candidate, claims[0].Constraint, exceptions.AllowedKinds,
-            budgets, cancellationToken).ConfigureAwait(false);
+            budgets, cancellationToken, resourceBudget).ConfigureAwait(false);
     }
 
     // The enrolled module algorithm has no claim publication authority. The
     // compiler-facing entry above retains its complete admission checks.
     internal static async Task<PassiveCallableCheckResult> VerifyEffectContractProjectionAsync(
         PassiveCallableCandidate candidate, CompilerEffectConstraintArtifact constraint,
-        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken)
+        ImmutableArray<IrExceptionKind> allowedKinds, WorkerBudgets budgets, CancellationToken cancellationToken,
+        MethodResourceBudget? resourceBudget = null)
     {
 
         ArgumentNullGuard.NotNull(candidate, nameof(candidate));
@@ -141,7 +142,7 @@ internal static class NativeEffectSiteVerifier
         var factory = candidate.Program.Factory;
         var allowedTypes = constraint.AllowedExceptionTypes.ToImmutableHashSet(StringComparer.Ordinal);
         var throwsDeclared = (effects & WorkerEffectSet.Throws) != 0;
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit, resourceBudget);
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }
@@ -162,17 +163,26 @@ internal static class NativeEffectSiteVerifier
             }
             return thrown;
         }
+        var core = thrown.Core.ToImmutableHashSet(StringComparer.Ordinal);
+        var bodyAssumptions = thrown.BodyAssumptions.ToImmutableHashSet();
         if (!Allows(WorkerEffectSet.Allocates))
         {
             var allocated = await solver.VerifyAllocationsAsync(cancellationToken).ConfigureAwait(false);
             if (allocated.Outcome is not ProvenOutcome)
             { return allocated with { HasFeasibleEntryWitness = allocated.Outcome is RefutedOutcome }; }
+            core = core.Union(allocated.Core);
+            bodyAssumptions = bodyAssumptions.Union(allocated.BodyAssumptions);
         }
         const WorkerEffectSet readFlags = AnyStateReads;
         var locksViolate = !Allows(WorkerEffectSet.Synchronizes) || (capabilities & WorkerEffectCapabilitySet.Synchronization) == 0;
         var sites = await solver.VerifyEffectSitesAsync(WriteViolates, !Allows(readFlags), locksViolate, CallViolates, cancellationToken)
             .ConfigureAwait(false);
-        return sites with { EntryModel = sites.Outcome is ProvenOutcome ? entry.EntryModel : sites.EntryModel };
+        return sites.Outcome is ProvenOutcome ? sites with
+        {
+            EntryModel = entry.EntryModel,
+            Core = [.. core.Union(sites.Core).OrderBy(static label => label ?? throw new ArgumentNullException(nameof(label)), StringComparer.Ordinal)],
+            BodyAssumptions = [.. bodyAssumptions.Union(sites.BodyAssumptions).OrderBy(static operation => operation.IsDefault ? throw new ArgumentOutOfRangeException(nameof(operation)) : operation.Value)]
+        } : sites;
     }
 
     private const WorkerEffectSet AnyStateWrites = WorkerEffectSet.WritesReceiverState | WorkerEffectSet.WritesArgumentState |
@@ -241,7 +251,8 @@ internal static class NativeEffectSiteVerifier
     }
 
     private static async Task<PassiveCallableCheckResult> VerifySitesAsync(CompilerCallablePreparation preparation,
-        WorkerBudgets budgets, WorkerEffectContractKind contract, CancellationToken cancellationToken)
+        WorkerBudgets budgets, WorkerEffectContractKind contract, MethodResourceBudget? resourceBudget,
+        CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -261,7 +272,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }
         if (!PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken))
         { return Unknown(failure); }
-        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit);
+        using var solver = new PassiveCallableSolver(plan!, budgets.QueryRlimit, budgets.MethodRlimit, resourceBudget);
         var entry = await solver.VerifyEntryAsync(cancellationToken).ConfigureAwait(false);
         if (entry.Outcome is not RefutedOutcome)
         { return entry; }

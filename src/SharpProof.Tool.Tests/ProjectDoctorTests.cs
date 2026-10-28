@@ -226,6 +226,32 @@ public sealed class ProjectDoctorTests
         Assert.That(fixture.Commands, Has.Count.EqualTo(1));
     }
 
+    [TestCase("allow", 0)]
+    [TestCase(" WARN ", 0)]
+    [TestCase("error", 0)]
+    [TestCase("erorr", 1)]
+    [TestCase("", 1)]
+    public async Task ActiveVerificationValidatesAssumptionPolicy(string policy, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofVerify"] = "true";
+        fixture.Properties["SharpProofAssumptionPolicy"] = policy;
+        Assert.That(await fixture.RunAsync(null), Is.EqualTo(expected), fixture.Output.ToString());
+        Assert.That(fixture.Commands, Has.Count.EqualTo(1));
+        Assert.That(fixture.Commands[0], Does.Contain("SharpProofAssumptionPolicy"));
+        Assert.That(fixture.Output.ToString(), Does.Contain((expected == 0 ? "PASS" : "FAIL") + " Assumption policy"));
+    }
+
+    [Test]
+    public async Task InactiveVerificationDoesNotRejectAnUnusedAssumptionPolicy()
+    {
+        using var fixture = new DoctorFixture();
+        fixture.Properties["SharpProofAssumptionPolicy"] = "unused";
+        Assert.That(await fixture.RunAsync(null), Is.Zero, fixture.Output.ToString());
+        Assert.That(fixture.Output.ToString(), Does.Not.Contain("Assumption policy"));
+    }
+
     [Test]
     public async Task DisabledProfileDoesNotRequireAnAnalyzerSdkOrNativeHost()
     {
@@ -590,6 +616,7 @@ public sealed class ProjectDoctorTests
             Properties.Add("SharpProofFeatures", "all");
             Properties.Add("SharpProofVerify", "false");
             Properties.Add("SharpProofVerifyPolicy", "require-proven");
+            Properties.Add("SharpProofAssumptionPolicy", "error");
             Properties.Add("DefineConstants", "DEBUG;TRACE");
             Properties.Add("ProjectAssetsFile", Path.Combine(DirectoryPath, "project.assets.json"));
             Properties.Add("TargetFramework", "net10.0");

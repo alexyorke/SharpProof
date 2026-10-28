@@ -12,6 +12,85 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public void ResourceCallbackCorrectionRetainsPinnedGreatestCommonDivisorSource()
+    {
+        var document = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
+        var method = document.Methods.Single(static item => item is null
+            ? throw new ArgumentNullException(nameof(item)) : item.Id == "OSS0015");
+        var file = document.Files.Single(item => item is null
+            ? throw new ArgumentNullException(nameof(item)) : item.Path == method.Path);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(method.Support, Is.EqualTo(CorpusSupport.IntentionallyUnsupported));
+            Assert.That(method.ExpectedVerdict, Is.EqualTo(CorpusVerdict.Unknown));
+            Assert.That(method.DeclarationSha256, Is.EqualTo("905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554"));
+            Assert.That(file.ContentSha256, Is.EqualTo("fd34466c9843b6b88c3f73cb71a18f6a2e9236393d4ceafaf1f1b3c8afce7f0f"));
+            Assert.That(OpenSourceCorpusCatalog.ComputeNormalizedSha256(file.Content), Is.EqualTo(file.ContentSha256));
+        }
+
+        var compilation = AnalyzerGateHost.CreateCompilation(file.Content,
+            "PinnedGcdResourceWitness", includeExternalEffectsFixture: false);
+        using var image = new MemoryStream();
+        Assert.That(compilation.Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("PinnedGcdResourceWitness", isCollectible: true);
+        var previous = System.Globalization.CultureInfo.CurrentUICulture;
+        var culture = new GcdCallbackCulture();
+        var normalResult = 0;
+        var normalReads = 0;
+        var faultReads = 0;
+        OverflowException? observed = null;
+        try
+        {
+            var target = context.LoadFromStream(image).GetType("Algorithms.Numeric.GreatestCommonDivisor")!
+                .GetMethod("FindGCDEuclidean")!.CreateDelegate<Func<int, int, int>>();
+            System.Globalization.CultureInfo.CurrentUICulture = culture;
+            culture.Armed = true;
+            normalResult = target(24, 18);
+            normalReads = culture.Reads;
+            try
+            {
+                _ = target(int.MinValue, 1);
+            }
+            catch (OverflowException exception)
+            {
+                observed = exception;
+            }
+            faultReads = culture.Reads;
+        }
+        finally
+        {
+            culture.Armed = false;
+            System.Globalization.CultureInfo.CurrentUICulture = previous;
+            context.Unload();
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(normalResult, Is.EqualTo(6));
+            Assert.That(normalReads, Is.Zero);
+            Assert.That(observed, Is.Not.Null);
+            Assert.That(faultReads, Is.GreaterThan(0),
+                "The pinned method mutates the caller's ambient culture object on its exceptional path.");
+        }
+    }
+
+    private sealed class GcdCallbackCulture() : System.Globalization.CultureInfo("en-US")
+    {
+        internal bool Armed { get; set; }
+        internal int Reads { get; private set; }
+
+        public override string Name
+        {
+            get
+            {
+                if (Armed)
+                { Reads++; }
+                return base.Name;
+            }
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void NativeContractCoverageUsesCompanionTreeIdentity(bool collidingPaths)
@@ -835,7 +914,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 document.Methods.Count(static method =>
                     method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Supported)),
-                Is.EqualTo(18));
+                Is.EqualTo(17));
             Assert.That(
                 document.Methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support)),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
@@ -878,23 +957,23 @@ public sealed class CorpusGateTests
             Assert.That(result.CaseCount, Is.EqualTo(462));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
-            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(18));
+            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(17));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(244));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(243));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(218));
+                Is.EqualTo(219));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(218));
+            Assert.That(result.UnknownCount, Is.EqualTo(219));
             Assert.That(result.SilentUnknownCount, Is.Zero);
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(218));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
 , static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Reason), static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Count)),
                 Is.EquivalentTo(
                     ImmutableDictionaryCapture.Create(ImmutableArray.Create(
-                        new KeyValuePair<string, int>("SP0002", 121),
+                        new KeyValuePair<string, int>("SP0002", 122),
                         new KeyValuePair<string, int>("SP0016", 18),
                         new KeyValuePair<string, int>("SP0045", 9),
                         new KeyValuePair<string, int>("SP0046", 9),

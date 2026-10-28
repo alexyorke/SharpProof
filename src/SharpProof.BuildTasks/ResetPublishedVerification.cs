@@ -19,14 +19,26 @@ public sealed class ResetPublishedVerification : CancelableBuildTask
 
     public string? ProjectDirectory { get; set; }
 
+    public string? WorkerPath { get; set; }
+
+    public string? CompilerManifestStagingPath { get; set; }
+
+    public string? CompilerCaptureRequestPath { get; set; }
+
     protected override bool ExecuteCore(CancellationToken cancellationToken)
     {
         try
         {
             var paths = Present([RequestPath, ResultPath, ManifestPath, SarifPath])
                 .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ResolveProjectRelativePath(ProjectDirectory, path))).ToImmutableArray();
+            var capturePaths = Present([CompilerManifestStagingPath, CompilerCaptureRequestPath,
+                string.IsNullOrWhiteSpace(CompilerCaptureRequestPath) ? null : CompilerCaptureRequestPath + ".completed"])
+                .Select(path => path is null ? throw new ArgumentNullException(nameof(path)) : ResolveProjectRelativePath(ProjectDirectory, path));
+            var allPaths = paths.Concat(capturePaths).ToImmutableArray();
+            PublicationPaths.ValidateWorkerRuntime(allPaths, string.IsNullOrWhiteSpace(WorkerPath)
+                ? null : ResolveProjectRelativePath(ProjectDirectory, WorkerPath));
             using var lease = PublicationLease.Acquire(paths, cancellationToken);
-            foreach (var path in paths)
+            foreach (var path in allPaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (File.Exists(path))

@@ -319,7 +319,7 @@ internal static class PartialTermSmtDifferentialOracle
         return value.Kind switch
         {
             IrValueKind.Boolean => factory.Boolean(value.Boolean),
-            IrValueKind.Integer => factory.Integer(value.Type, value.Integer),
+            IrValueKind.Integer => factory.IntegerBits(value.Type, value.IntegerBits),
             _ => throw new ArgumentException(
                 "Partial-term scenarios support only Boolean and integer values.",
                 nameof(value))

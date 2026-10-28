@@ -10,12 +10,12 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerReachableSourceTests
 {
-    [TestCase("int Root(int x) => System.Math.Abs(x);", false)]
-    [TestCase("int[] Root() => System.Array.Empty<int>();", true)]
-    [TestCase("string Root(string x) => string.Concat(x, \"x\");", false)]
-    [TestCase("string Root(string x, string y) => x + y;", false)]
-    [TestCase("int[] Root(int n) => new int[n];", false)]
-    public void ApprovedScalarApiModelsRetainOnlyTheirDeclaredEffectBoundary(string method, bool cacheAllocation)
+    [TestCase("int Root(int x) => System.Math.Abs(x);", false, true)]
+    [TestCase("int[] Root() => System.Array.Empty<int>();", true, false)]
+    [TestCase("string Root(string x) => string.Concat(x, \"x\");", false, false)]
+    [TestCase("string Root(string x, string y) => x + y;", false, false)]
+    [TestCase("int[] Root(int n) => new int[n];", false, false)]
+    public void ApprovedScalarApiModelsRetainTheirRuntimeEffectBoundaries(string method, bool cacheAllocation, bool exceptionResources)
     {
         System.ArgumentNullException.ThrowIfNull(method);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
@@ -28,12 +28,21 @@ public sealed class CompilerReachableSourceTests
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken).ReachableSource!;
         var summary = EffectSummaryFixpoint.ComputeValidated(decoded, cancellationToken: TestContext.CurrentContext.CancellationToken).Values.Single();
         Assert.That(summary.UnknownEffects,
-            Is.EqualTo(cacheAllocation ? SourceMayEffect.Allocation : SourceMayEffect.None));
+            Is.EqualTo(exceptionResources ? SourceMayEffect.All : cacheAllocation ? SourceMayEffect.Allocation : SourceMayEffect.None));
         if (cacheAllocation)
         {
             Assert.That(summary.MayEffects, Is.EqualTo(SourceMayEffect.None));
             Assert.That(summary.UnknownExceptions, Is.False);
             Assert.That(summary.MayDiverge, Is.False);
+        }
+        if (exceptionResources)
+        {
+            // Math.Abs is exact on normal paths, but its overflow message can
+            // invoke arbitrary culture callbacks. A whole-body may summary
+            // includes that guarded resource boundary.
+            Assert.That(summary.UnknownExceptions, Is.True);
+            Assert.That(summary.MayDiverge, Is.True);
+            Assert.That(summary.ExceptionKinds & (1 << (int)IrExceptionKind.Overflow), Is.Not.Zero);
         }
     }
 

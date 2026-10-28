@@ -61,13 +61,15 @@ public sealed class MissingCompanionMemberCodeFixProvider : CodeFixProvider
         if (!await CompanionScaffolding.HasNullableContextAsync(target, context.Document.Project, annotationsEnabled, context.CancellationToken).ConfigureAwait(false))
         { return; }
         var companionRoot = await document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-        var updated = declaration.AddMembers(missing.Select(static method => (MemberDeclarationSyntax)CompanionScaffolding.Method(method ?? throw new ArgumentNullException(nameof(method)))).ToArray());
+        var members = missing.Select(static method => (MemberDeclarationSyntax)CompanionScaffolding.Method(method ?? throw new ArgumentNullException(nameof(method)))).ToArray();
+        // Insert at the closing brace's lexical position, after its directives.
+        // In particular, a trailing #endif must precede the generated methods.
+        members[0] = members[0].WithLeadingTrivia(declaration.CloseBraceToken.LeadingTrivia.AddRange(members[0].GetLeadingTrivia()));
+        var updated = declaration.WithCloseBraceToken(declaration.CloseBraceToken.WithLeadingTrivia(default(SyntaxTriviaList))).AddMembers(members);
         var updatedRoot = companionRoot!.ReplaceNode(declaration, updated);
         var changedDocument = document.WithSyntaxRoot(updatedRoot);
-        var tree = await changedDocument.GetSyntaxTreeAsync(context.CancellationToken).ConfigureAwait(false);
-        var changedCompilation = await changedDocument.Project.GetCompilationAsync(context.CancellationToken).ConfigureAwait(false);
-        if (tree == null || changedCompilation == null || changedCompilation.GetDiagnostics(context.CancellationToken).Any(diagnostic =>
-            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error && diagnostic.Location.SourceTree == tree))
+        if (await CodeFixCompilationValidation.HasNewErrorsAsync(document.Project, changedDocument.Project,
+                context.CancellationToken).ConfigureAwait(false))
         { return; }
         context.RegisterCodeFix(CodeAction.Create("Add missing SharpProof companion members", async cancellationToken =>
         {

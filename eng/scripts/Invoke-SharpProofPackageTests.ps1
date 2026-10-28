@@ -695,6 +695,7 @@ try {
                     'NaNPublicBuildWorkflowAuditTests',
                     'VerifierPackageDefaultsTests',
                     'VerificationPublicationNullArgumentTests',
+                    'PublicationRuntimeProtectionTests',
                     'FinalCompilationProbeTests')))
         $plannedFixtureBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
             [StringComparer]::Ordinal)

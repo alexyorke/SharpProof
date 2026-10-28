@@ -197,6 +197,41 @@ public sealed class ExporterRegressionTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void WindowsCaseAliasesCannotBypassSelectedConsumerRemapping(bool consumerInputExists)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sharpproof-export-case-" + Guid.NewGuid().ToString("N"));
+        var original = Path.Combine(root, "original");
+        var consumer = Path.Combine(root, "consumer");
+        Directory.CreateDirectory(original);
+        Directory.CreateDirectory(consumer);
+        try
+        {
+            var originalInput = Path.Combine(original, "Api.cs");
+            var consumerInput = Path.Combine(consumer, "Api.cs");
+            File.WriteAllText(originalInput, "original source");
+            if (consumerInputExists)
+            {
+                File.WriteAllText(consumerInput, "changed consumer source");
+                Assert.That(NUnitExporter.Remap(originalInput, original.ToUpperInvariant(), consumer, isWindows: true), Is.EqualTo(consumerInput));
+            }
+            else
+            {
+                Assert.Throws<FileNotFoundException>(new Action(() =>
+                {
+                    _ = NUnitExporter.Remap(originalInput, original.ToUpperInvariant(), consumer, isWindows: true);
+                }));
+            }
+            // Unix path spelling remains significant, even when Windows matching is tested on Linux.
+            Assert.That(NUnitExporter.Remap(originalInput, original.ToUpperInvariant(), consumer, isWindows: false), Is.EqualTo(originalInput));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Test]
     public void ExistingExternalInputsRemainAvailableButProjectTraversalIsRejected()
     {

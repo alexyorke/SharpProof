@@ -111,6 +111,11 @@ internal sealed partial class ResourceBoundsAnalysis
         foreach (var argument in creation.Arguments)
         {
             arguments = arguments.Add(Visit(argument.Value, depth + 1));
+        }
+        // Argument evaluation can construct another instance using this same
+        // constructor. Finish it before installing this invocation's bindings.
+        foreach (var argument in creation.Arguments)
+        {
             if (argument.Parameter is not { } parameter)
             { return Unknown("UnboundConstructorArgument"); }
             _scalarArguments.Add(parameter, Size(argument.Value));

@@ -25,7 +25,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
     public void NaturalMetadataDivisionStopsAtTheDefaultFaultWorkBoundary()
     {
         const string caller = "public static class Subject { public static int Target(int x,int y) => Library.Target(x,y); }";
-        using var candidate = new MetadataTestSubject(DivisionLibrary(125), caller);
+        using var candidate = new MetadataTestSubject(DivisionLibrary(125), caller, includeSharpProofReference: true);
         Assert.That(candidate.Method.Invoke(null, [3, 2]), Is.EqualTo(-2));
         Assert.That(candidate.RootMethod.Invoke(null, [3, 2]), Is.EqualTo(-2));
         var fault = Assert.Throws<TargetInvocationException>(new Action(() => candidate.RootMethod.Invoke(null, [3, 0])));
@@ -39,7 +39,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
 
         // An odd number of unchecked negations has the same integer semantics.
         // This cheap control must complete, not merely fail at a later debit.
-        using var control = new MetadataTestSubject(DivisionLibrary(1), caller);
+        using var control = new MetadataTestSubject(DivisionLibrary(1), caller, includeSharpProofReference: true);
         Assert.That(control.Method.Invoke(null, [3, 2]), Is.EqualTo(-2));
         Assert.That(control.RootMethod.Invoke(null, [3, 2]), Is.EqualTo(-2));
         AssertCompleteControl(control, DivisionInputs, -2);
@@ -49,7 +49,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
     public void NaturalMetadataRequiresStopsAtTheDefaultClauseWorkBoundary()
     {
         const string caller = "public static class Subject { public static int Target(int x) { Library.Target(x); return x; } }";
-        using var candidate = new MetadataTestSubject(MetadataLibrary(168), caller);
+        using var candidate = new MetadataTestSubject(MetadataLibrary(168), caller, includeSharpProofReference: true);
         Assert.That(candidate.Method.Invoke(null, [3]), Is.EqualTo(171));
         Assert.That(candidate.RootMethod.Invoke(null, [3]), Is.EqualTo(3));
         AssertCallerShape(candidate.Compilation, discarded: true);
@@ -59,7 +59,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(body.MaximumStack, Is.EqualTo(2));
         AssertRejected(candidate.Compilation, references);
 
-        using var control = new MetadataTestSubject(MetadataLibrary(1), caller);
+        using var control = new MetadataTestSubject(MetadataLibrary(1), caller, includeSharpProofReference: true);
         Assert.That(control.Method.Invoke(null, [3]), Is.EqualTo(4));
         Assert.That(control.RootMethod.Invoke(null, [3]), Is.EqualTo(3));
         AssertCompleteControl(control, MetadataInputs, 3);

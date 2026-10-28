@@ -85,6 +85,7 @@ if ($Part -ne 'Merge') {
     if ($Part -eq 'Package' -or ($Part -eq 'All' -and [string]::IsNullOrWhiteSpace($TestFilter))) {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
             -Configuration Release @buildSwitch -TimeoutSeconds $TimeoutSeconds `
+            -TestFilter $TestFilter `
             -PackagePartition $PackagePartition -PackagePartitionCount $PackagePartitionCount `
             -CoverageSettings $managedSettings `
             -CoverageResultsDirectory (Join-Path $results 'package')

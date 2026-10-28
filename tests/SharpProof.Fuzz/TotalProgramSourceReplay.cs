@@ -16,6 +16,7 @@ namespace SharpProof.Fuzz;
 
 internal sealed record TotalProgramSourceCase(string Member, ImmutableArray<object?> Arguments, bool IsLoop)
 {
+    internal bool AbstractStringContents { get; init; }
     public string Member { get; init; } = Member ?? throw new System.ArgumentNullException(nameof(Member));
     public ImmutableArray<object?> Arguments { get; init; } = Arguments.IsDefault ? throw new System.ArgumentNullException(nameof(Arguments)) : Arguments;
 }
@@ -107,8 +108,8 @@ internal sealed class TotalProgramSourceReplay
                 { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
                 var aliases = TotalProgramDifferentialOracle.CreateAliases();
                 var entries = ImmutableDictionaryCapture.Create(context.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
-                    parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, nativeArguments[parameter.Parameter.Ordinal], aliases)));
-                var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases) : null;
+                    parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(parameter.Entry).Type, nativeArguments[parameter.Parameter.Ordinal], aliases, cases[index].AbstractStringContents)));
+                var observed = expectedException == null ? TotalProgramDifferentialOracle.Value(factory, factory.GetVariableInfo(context.Result!.Value).Type, expected, aliases, cases[index].AbstractStringContents) : null;
                 var original = new IrProgramInterpreter(factory).Execute(lower.Program,
                     entries, maximumSteps: FuzzExecutionDefaults.MaximumReplaySteps, cancellationToken: cancellationToken);
                 var matches = expectedException == null
@@ -122,7 +123,7 @@ internal sealed class TotalProgramSourceReplay
                 var requirements = ImmutableArray.CreateBuilder<PassiveContractClause>(context.Parameters.Length);
                 foreach (var parameter in context.Parameters)
                 {
-                    requirements.Add(new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, parameter.Entry, entries[parameter.Entry]), factory.Boolean(true), site));
+                    requirements.Add(new PassiveContractClause(TotalProgramDifferentialOracle.Observation(factory, parameter.Entry, entries[parameter.Entry], cases[index].AbstractStringContents), factory.Boolean(true), site));
                 }
                 var referenceParameters = context.Parameters.Where(parameter =>
                     parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (factory.GetVariableInfo(parameter.Entry).Type == factory.ObjectType)).ToImmutableArray();

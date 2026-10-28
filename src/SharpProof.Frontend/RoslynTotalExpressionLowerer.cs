@@ -1623,7 +1623,48 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         var rule = model.Apply(boundArguments);
         if (model.StringConcatenation && rule.Classification.IsExact)
         { return CaptureStringConcatenation(invocation, boundArguments, block); }
-        return ApplyClassifiedRule(invocation, rule, block);
+        return ApplyClassifiedRule(invocation, rule, block, beforeThrow: model.ExceptionResourceEffects
+            ? thrown => thrown.IsDefault ? throw new ArgumentOutOfRangeException(nameof(thrown))
+                : ScalarExceptionResourceEffects(invocation, boundArguments, thrown) : null);
+    }
+
+    // A modeled scalar fault can obtain its exception message from resources.
+    // Resource lookup can run arbitrary culture callbacks before the typed
+    // exception is thrown. Keep these effects inside the scalar fault guard.
+    private IrBlockId ScalarExceptionResourceEffects(IInvocationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (!ShadowCallSkeleton)
+        {
+            // This hook is reached only through an admitted scalar model. Its
+            // fault guard validates the input before a concrete runtime probe
+            // can select the already-completed resource path during replay.
+            if (operation.TargetMethod.GetDocumentationCommentId() == "M:System.Math.Abs(System.Int32)" &&
+                values.Length == 1 && values[0].Type == _factory.IntegerType)
+            {
+                var site = _factory.CreateOperation(IrOpaqueCallSite.ScalarExceptionInitialization("MathAbsInt32"),
+                    _factory.GetOperationInfo(_context.Site(operation)).SourceSpan);
+                var initialize = _context.Temporary(_factory.BooleanType);
+                _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, initialize);
+                var runtime = _builder.CreateBlock("scalar:fault-resource-effects");
+                var done = _builder.CreateBlock("scalar:fault-resource-ready");
+                _builder.Branch(block, site, _factory.Variable(initialize), runtime, done);
+                var initialized = EmitOpaqueCall(operation, operation.TargetMethod, values, runtime, null, IrOpaqueCallEffects.All).Continuation;
+                _builder.Goto(initialized, site, done);
+                return done;
+            }
+            return EmitOpaqueCall(operation, operation.TargetMethod, values, block, null, IrOpaqueCallEffects.All).Continuation;
+        }
+        // Shadow graphs retain scoped external effects without admitting a
+        // metadata call. The same approximation also permits callback throws.
+        var throws = _context.Temporary(_factory.BooleanType);
+        _builder!.Havoc(block, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.All,
+            CompilerIdentityBridge.CreateSymbolDisplay(operation.TargetMethod)),
+            IrHavocKind.Variables, IrHavocOrigin.Approximation, throws);
+        return ApplyRule(operation, new TotalScalarRule(_factory.Boolean(false),
+            [new(IrExceptionKind.Unknown, _factory.Variable(throws))], FrontendSubsetClassification.Exact), block).Continuation;
     }
 
     // The cached value can be exact even when initializing its runtime cache
@@ -1694,17 +1735,18 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     }
 
     private TotalBodyValue ApplyClassifiedRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
-        IOperation? abstentionOperation = null)
+        IOperation? abstentionOperation = null, Func<IrBlockId, IrBlockId>? beforeThrow = null)
     {
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return rule.Classification.IsExact ? ApplyRule(operation, rule, block)
+        return rule.Classification.IsExact ? ApplyRule(operation, rule, block, beforeThrow)
             : Approximate(abstentionOperation ?? operation, block, rule.Classification.Abstention);
     }
 
-    private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block)
+    private TotalBodyValue ApplyRule(IOperation operation, TotalScalarRule rule, IrBlockId block,
+        Func<IrBlockId, IrBlockId>? beforeThrow = null)
     {
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
@@ -1716,6 +1758,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var normal = _builder.CreateBlock("normal");
             var site = _context.Site(operation);
             _builder.Branch(block, site, fault.Condition, thrown, normal);
+            thrown = beforeThrow?.Invoke(thrown) ?? thrown;
             _builder.Throw(thrown, site, fault.Kind, ExceptionTarget?.Invoke(fault.Kind, site) ?? _exceptionalExit);
             block = normal;
         }

@@ -19,6 +19,8 @@ namespace SharpProof.DeveloperExperience.Tests;
 [TestFixture]
 public sealed class CompanionScaffoldingTests
 {
+    private static readonly ImmutableArray<string> DebugSymbols = ["DEBUG"];
+
     [TestCase("public static class Api { public static int Read(int value) => value; }")]
     [TestCase("internal interface Api { int Read(int value); }")]
     public void StaticAndInternalTargetsProduceCompilableCompanions(string source)
@@ -236,6 +238,83 @@ public sealed class CompanionScaffoldingTests
         Assert.That(await MissingMemberFixesAsync(document, diagnostic), Is.Empty);
     }
 
+    [Test]
+    public async Task GenerationDeclinesATypeThatWouldBreakAnExistingDocument()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "namespace N { public interface Api { void Read(); } }");
+        document = document.Project.AddDocument("Existing.cs", SourceText.From(
+            "using Other; namespace Other { public class ApiContracts { } } " +
+            "namespace N { public class Existing { public ApiContracts Value = new ApiContracts(); } }"))
+            .Project.GetDocument(document.Id)!;
+        Assert.That(await CompilerErrorsAsync(document), Is.Empty);
+        Assert.That(await RefactoringsAsync(document), Is.Empty);
+    }
+
+    [Test]
+    public async Task GenerationAllowsUnrelatedExistingCompilerErrors()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "public interface Api { void Read(); }");
+        document = document.Project.AddDocument("Existing.cs", SourceText.From(
+            "public static class Existing { public static int Error() => missing; }"))
+            .Project.GetDocument(document.Id)!;
+        var fixes = await RefactoringsAsync(document);
+        Assert.That(fixes, Has.Length.EqualTo(1));
+        var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
+        var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        Assert.That((await CompilerErrorsAsync(changed)).Single().Id, Is.EqualTo("CS0103"));
+    }
+
+    [Test]
+    public async Task MissingMemberRepairDeclinesAnEditThatBreaksAnotherPartialDeclaration()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace,
+            "public interface Api { void Read(); int Existing(); }",
+            "[SharpProof.Attributes.ContractFor(typeof(Api))] public static partial class ApiContracts { }");
+        document = document.Project.AddDocument("OtherPart.cs", SourceText.From(
+            "using static Helpers; public static class Helpers { public static int Read() => 1; } " +
+            "public static partial class ApiContracts { public static int Existing(Api receiver) => Read(); }"))
+            .Project.GetDocument(document.Id)!;
+        Assert.That(await CompilerErrorsAsync(document), Is.Empty);
+        var diagnostic = (await CompanionDiagnosticsAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Id == "SPCF0004");
+        Assert.That(await MissingMemberFixesAsync(document, diagnostic), Is.Empty);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task MissingMemberRepairKeepsNewMethodsOutsideATrailingConditionalRegion(bool debug)
+    {
+        const string companion = """
+            [SharpProof.Attributes.ContractFor(typeof(Api))]
+            public static class ApiContracts {
+            #if DEBUG
+                public const int DebugOnly = 1;
+            #endif
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "public interface Api { void Read(); }", companion);
+        document = document.Project.WithParseOptions(new CSharpParseOptions(LanguageVersion.Preview,
+            preprocessorSymbols: debug ? DebugSymbols : ImmutableArray<string>.Empty)).GetDocument(document.Id)!;
+        var diagnostic = (await CompanionDiagnosticsAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Id == "SPCF0004");
+        var fixes = await MissingMemberFixesAsync(document, diagnostic);
+        Assert.That(fixes, Has.Length.EqualTo(1));
+        var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
+        var solution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
+        foreach (var symbols in new[] { DebugSymbols, ImmutableArray<string>.Empty })
+        {
+            var changed = solution.GetProject(document.Project.Id)!.WithParseOptions(
+                new CSharpParseOptions(LanguageVersion.Preview, preprocessorSymbols: symbols)).GetDocument(document.Id)!;
+            Assert.That(await CompilerErrorsAsync(changed), Is.Empty);
+            Assert.That(await CompanionDiagnosticsAsync(changed), Is.Empty);
+            Assert.That((await changed.Project.GetCompilationAsync())!.GetTypeByMetadataName("ApiContracts")!.GetMembers("Read"),
+                Has.Length.EqualTo(1));
+        }
+    }
     [Test]
     public void ExportLiteralsPreserveSignedAndUnsignedBoundaries()
     {

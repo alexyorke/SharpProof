@@ -190,7 +190,7 @@ internal sealed partial class BvEncoder
         _stringLiterals.AddUnique(term.Value, value);
         _stringLiteralOrder.Add(new(term.Value, value));
         if (_text != null)
-        { AddLiteralText(value, factory.GetString(term.Value), meter); }
+        { EnsureText(meter); }
         return value;
     }
 

@@ -6,13 +6,14 @@ namespace SharpProof.Worker;
 // API-spec table, protocol version, and budgets, so an entry can be reused
 // verbatim. Writes are atomic renames; eviction is oldest-first. Cache
 // failures never change semantic outcomes: they only turn into misses.
-internal sealed partial class VerificationCache(string directory, long maximumBytes)
+internal sealed partial class VerificationCache(string directory, long maximumBytes, Action<string>? deleteFile = null)
 {
     internal const string CacheFileSuffix = ".sharp-proof-cache.json";
     private readonly string _directory = Path.GetFullPath(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
+    private readonly Action<string> _deleteFile = deleteFile ?? File.Delete;
 
     // Set by the most recent read so the worker can distinguish an
     // operational cache failure from an ordinary miss.
@@ -53,8 +54,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 callables.IsDefault || claims.IsDefault ||
                 !string.Equals(entry.InputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(entry.ManifestHash, manifest.Hash, StringComparison.Ordinal) ||
-                callables.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)) ||
-                claims.Any(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result == null)))
+                callables.Any(static (WorkerCallableResult result) => result is null) ||
+                claims.Any(static (WorkerClaimResult result) => result is null))
             {
                 TryDelete(path);
                 return null;
@@ -115,8 +116,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             Directory.CreateDirectory(_directory);
             var path = GetPath(inputHash);
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
-            EvictOldest(path);
-            return true;
+            return EvictOldest(path);
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException or
@@ -153,11 +153,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 !detail.StartsWith(IrOpaqueCallSite.ExceptionResourceLockPrefix, StringComparison.Ordinal));
     }
 
-    private void EvictOldest(string protectedPath)
+    private bool EvictOldest(string protectedPath)
     {
         System.ArgumentNullException.ThrowIfNull(protectedPath);
         var entries = new DirectoryInfo(_directory)
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
+            .Where(static file => file is not null && IsCacheFileName(file.Name))
             .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.LastWriteTimeUtc))
             .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Name), StringComparer.Ordinal)
             .ToImmutableArray();
@@ -166,27 +167,41 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         {
             if (total <= _maximumBytes)
             {
-                return;
+                return true;
             }
             if (string.Equals(file.FullName, protectedPath, StringComparison.Ordinal))
             {
                 continue;
             }
-            total -= file.Length;
-            TryDelete(file.FullName);
+            var length = file.Length;
+            if (TryDelete(file.FullName))
+            {
+                total -= length;
+            }
         }
+        return total <= _maximumBytes;
     }
 
-    private static void TryDelete(string path)
+    private static bool IsCacheFileName(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return name.Length == 64 + CacheFileSuffix.Length &&
+            name.EndsWith(CacheFileSuffix, StringComparison.Ordinal) &&
+            WorkerProtocolJson.IsSha256(name.Substring(0, 64));
+    }
+
+    private bool TryDelete(string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         try
         {
-            File.Delete(path);
+            _deleteFile(path);
+            return true;
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException)
         {
+            return false;
         }
     }
 

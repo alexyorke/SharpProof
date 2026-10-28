@@ -13,7 +13,8 @@ internal static class NativeEffectClaims
     }
 
     internal static async Task<ImmutableArray<WorkerClaimResult>> VerifyAsync(CompilerCallablePreparation target,
-        CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
+        CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken,
+        Action<WorkerClaimResult>? publish = null, MethodResourceBudget? resourceBudget = null)
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullException.ThrowIfNull(target);
@@ -26,46 +27,78 @@ internal static class NativeEffectClaims
         bool Invalid(CompilerEffectClaimArtifact claim)
         { System.ArgumentNullException.ThrowIfNull(claim, nameof(claim)); return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
         var invalid = claims.Where(Invalid).Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract))).ToImmutableArray();
+        foreach (var result in invalid)
+        { publish?.Invoke(result); }
         var validClaims = claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (!Invalid(claim))).ToImmutableArray();
         if (validClaims.Length == 0)
         { return [.. invalid]; }
-        return [.. invalid, .. await VerifyValidAsync(target, validClaims, entry, budgets, cancellationToken).ConfigureAwait(false)];
+        resourceBudget ??= new MethodResourceBudget(null, budgets.QueryRlimit, budgets.MethodRlimit);
+        return [.. invalid, .. await VerifyValidAsync(target, validClaims, entry, budgets, publish, resourceBudget, cancellationToken).ConfigureAwait(false)];
     }
 
     private static async Task<ImmutableArray<WorkerClaimResult>> VerifyValidAsync(CompilerCallablePreparation target,
-        ImmutableArray<CompilerEffectClaimArtifact> claims, CallableEntryFeasibility entry, WorkerBudgets budgets, CancellationToken cancellationToken)
+        ImmutableArray<CompilerEffectClaimArtifact> claims, CallableEntryFeasibility entry, WorkerBudgets budgets,
+        Action<WorkerClaimResult>? publish, MethodResourceBudget resourceBudget, CancellationToken cancellationToken)
     {
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         System.ArgumentNullException.ThrowIfNull(budgets);
         System.ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(resourceBudget);
+        var results = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         if (entry.IsContradictory)
         {
-            return [.. claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (CallableClaimResultAssembler.Contradictory(target, claim.ClaimId,
-                WorkerEffectEvidenceCertainty.VacuousEntry, entry.ProofCore, entry.UsedAssumptionIds)))];
+            foreach (var claim in claims)
+            {
+                Publish(CallableClaimResultAssembler.Contradictory(target, claim.ClaimId,
+                    WorkerEffectEvidenceCertainty.VacuousEntry, entry.ProofCore, entry.UsedAssumptionIds));
+            }
+            return OrderedResults();
         }
         if (entry.IsUnknown)
-        { return [.. claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (Unknown(target, claim.ClaimId, entry.Reason)))]; }
-        var exceptions = await NativeExceptionEffectVerifier.VerifyClaimsAsync(target, budgets, cancellationToken).ConfigureAwait(false);
-        var results = ImmutableArray.CreateBuilder<WorkerClaimResult>(claims.Length);
+        {
+            foreach (var claim in claims)
+            { Publish(Unknown(target, claim.ClaimId, entry.Reason)); }
+            return OrderedResults();
+        }
+        await NativeExceptionEffectVerifier.VerifyClaimsAsync(target, budgets, cancellationToken, resourceBudget,
+            (claimId, check) =>
+            {
+                ArgumentNullException.ThrowIfNull(claimId);
+                ArgumentNullException.ThrowIfNull(check);
+                if (claims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId == claimId))
+                { Publish(Project(target, claimId, check)); }
+            }).ConfigureAwait(false);
         foreach (var claim in claims)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (results.ContainsKey(claim.ClaimId))
+            { continue; }
             if (claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound)
             {
-                results.Add(await NativeResourceContractVerifier.VerifyAsync(target, claim, budgets, cancellationToken).ConfigureAwait(false));
+                Publish(await NativeResourceContractVerifier.VerifyAsync(target, claim, budgets, cancellationToken, resourceBudget).ConfigureAwait(false));
                 continue;
             }
             var check = claim.ContractKind switch
             {
-                WorkerEffectContractKind.ZeroAllocations => await NativeEffectSiteVerifier.VerifyAsync(target, budgets, cancellationToken).ConfigureAwait(false),
-                WorkerEffectContractKind.EnforcePure => await NativeEffectSiteVerifier.VerifyPurityAsync(target, budgets, cancellationToken).ConfigureAwait(false),
-                WorkerEffectContractKind.AllowedCapabilities => await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(target, budgets, cancellationToken).ConfigureAwait(false),
-                WorkerEffectContractKind.EffectContract => await NativeEffectSiteVerifier.VerifyEffectContractAsync(target, budgets, cancellationToken).ConfigureAwait(false),
-                _ => exceptions[claim.ClaimId]
+                WorkerEffectContractKind.ZeroAllocations => await NativeEffectSiteVerifier.VerifyAsync(target, budgets, cancellationToken, resourceBudget).ConfigureAwait(false),
+                WorkerEffectContractKind.EnforcePure => await NativeEffectSiteVerifier.VerifyPurityAsync(target, budgets, cancellationToken, resourceBudget).ConfigureAwait(false),
+                WorkerEffectContractKind.AllowedCapabilities => await NativeEffectSiteVerifier.VerifyCapabilitiesAsync(target, budgets, cancellationToken, resourceBudget).ConfigureAwait(false),
+                WorkerEffectContractKind.EffectContract => await NativeEffectSiteVerifier.VerifyEffectContractAsync(target, budgets, cancellationToken, resourceBudget).ConfigureAwait(false),
+                _ => throw new InvalidOperationException("A native effect claim has no checker.")
             };
-            results.Add(Project(target, claim.ClaimId, check));
+            Publish(Project(target, claim.ClaimId, check));
         }
-        return results.MoveToImmutable();
+        return OrderedResults();
+
+        void Publish(WorkerClaimResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            results.Add(result.ClaimId, result);
+            publish?.Invoke(result);
+        }
+
+        ImmutableArray<WorkerClaimResult> OrderedResults()
+        { return [.. claims.Select(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : results[claim.ClaimId])]; }
     }
 
     internal static WorkerClaimResult Unknown(CompilerCallablePreparation target, string claimId, WorkerClaimReason reason)
@@ -84,7 +117,7 @@ internal static class NativeEffectClaims
             var record = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Proven,
                 WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, projectAssumptions: false);
             record = record with { ProofCore = ["native-effect:" + claimId] };
-            record = record with { Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedRequires(target, check.Core)) };
+            record = record with { Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(target, UsedAssumptions(target, check)) };
             return record;
         }
         if (check.Outcome is RefutedOutcome && check.Reason == WorkerClaimReason.None && Witness(target, check) is { } witness)
@@ -98,15 +131,22 @@ internal static class NativeEffectClaims
     }
 
     // Requires clauses are labelled by ordinal in the passive VC.
-    private static ImmutableHashSet<string> UsedRequires(CompilerCallablePreparation target, ImmutableArray<string> core)
+    private static ImmutableHashSet<string> UsedAssumptions(CompilerCallablePreparation target, PassiveCallableCheckResult check)
     {
-
+        ArgumentNullException.ThrowIfNull(check);
+        var core = check.Core;
         RepositoryParameterGuard.RequireInitialized(core.IsDefault, nameof(core), "Array must be initialized.");
         var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
         var used = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
             if (core.Contains("requires:" + ordinal.ToString(CultureInfo.InvariantCulture)) && requires[ordinal].AssumptionId is { } id)
+            { used.Add(id); }
+        }
+        foreach (var clause in target.Total!.Clauses)
+        {
+            if (clause.Kind == CompilerContractKind.Assume && check.BodyAssumptions.Contains(clause.Operation) &&
+                clause.AssumptionId is { } id)
             { used.Add(id); }
         }
         return used.ToImmutable();

@@ -367,6 +367,8 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
+        var aliases = new Dictionary<ISymbol, bool>(SymbolEqualityComparer.Default);
+        var writesByScope = new Dictionary<SyntaxNode, ImmutableHashSet<ISymbol>>();
         // A nullable reference explicitly admits null. The compiler checks
         // dereferences; a suppression operator opts out of that check and
         // therefore still needs a visible runtime guard.
@@ -375,7 +377,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             .Where(static expression =>
                 expression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             .Any(expression => IsDereferenceReceiver(expression) &&
-                MentionsWithoutNestedCallables(expression.Operand, parameter, model, cancellationToken));
+                MentionsThroughAliasesWithoutNestedCallables(expression.Operand, parameter, model, aliases, writesByScope, cancellationToken));
     }
     private static bool IsDereferenceReceiver(ExpressionSyntax expression)
     {
@@ -421,11 +423,12 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
+        var aliases = new Dictionary<ISymbol, bool>(SymbolEqualityComparer.Default);
+        var writesByScope = new Dictionary<SyntaxNode, ImmutableHashSet<ISymbol>>();
         foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(
-                model.GetSymbolInfo(identifier, cancellationToken).Symbol, parameter))
+            if (!MentionsThroughAliasesWithoutNestedCallables(identifier, parameter, model, aliases, writesByScope, cancellationToken))
             {
                 continue;
             }
@@ -640,16 +643,141 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                name is "Requires" or "NotNull";
     }
 
-    private static bool MentionsWithoutNestedCallables(
+    private static bool MentionsThroughAliasesWithoutNestedCallables(
         SyntaxNode expression,
         IParameterSymbol parameter,
         SemanticModel model,
+        Dictionary<ISymbol, bool> aliases,
+        Dictionary<SyntaxNode, ImmutableHashSet<ISymbol>> writesByScope,
         CancellationToken cancellationToken)
     {
-        return expression.DescendantNodesAndSelf(node => ReferenceEquals(node, expression) || DescendIntoCallable(node))
-            .OfType<IdentifierNameSyntax>().Any(identifier =>
-                SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, parameter));
+        return expression.DescendantNodesAndSelf(DescendIntoCallable).OfType<IdentifierNameSyntax>()
+            .Any(identifier => IsParameterValueAlias(identifier, parameter, model,
+                aliases, writesByScope, cancellationToken));
     }
+
+    private static bool IsParameterValueAlias(ExpressionSyntax expression, IParameterSymbol parameter,
+        SemanticModel model, Dictionary<ISymbol, bool> aliases,
+        Dictionary<SyntaxNode, ImmutableHashSet<ISymbol>> writesByScope, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (true)
+        {
+            if (expression is ParenthesizedExpressionSyntax parentheses)
+            {
+                expression = parentheses.Expression;
+            }
+            else if (expression is CastExpressionSyntax cast &&
+                model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: null })
+            {
+                expression = cast.Expression;
+            }
+            else if (expression is PostfixUnaryExpressionSyntax suppression &&
+                suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+            {
+                expression = suppression.Operand;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (expression is not IdentifierNameSyntax identifier)
+        {
+            return false;
+        }
+        var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
+        if (SymbolEqualityComparer.Default.Equals(symbol, parameter))
+        {
+            return true;
+        }
+        if (symbol is not ILocalSymbol local)
+        {
+            return false;
+        }
+        if (aliases.TryGetValue(local, out var known))
+        {
+            return known;
+        }
+
+        // Cache failures too, and break cycles before following an initializer.
+        aliases[local] = false;
+        if (local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is
+                VariableDeclaratorSyntax { Initializer.Value: { } initializer } &&
+            IsParameterValueAlias(initializer, parameter, model, aliases, writesByScope, cancellationToken) &&
+            !IsValueAliasReassigned(local, model, writesByScope, cancellationToken))
+        {
+            aliases[local] = true;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool IsValueAliasReassigned(ILocalSymbol local, SemanticModel model,
+        Dictionary<SyntaxNode, ImmutableHashSet<ISymbol>> writesByScope, CancellationToken cancellationToken)
+    {
+        var scope = local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken).Ancestors()
+            .FirstOrDefault(static node => node is BaseMethodDeclarationSyntax or
+                LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax);
+        if (scope == null)
+        {
+            return true;
+        }
+        if (!writesByScope.TryGetValue(scope, out var writes))
+        {
+            var builder = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+            foreach (var node in scope.DescendantNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ExpressionSyntax? target = node switch
+                {
+                    AssignmentExpressionSyntax assignment => assignment.Left,
+                    PrefixUnaryExpressionSyntax prefix when
+                        prefix.IsKind(SyntaxKind.PreIncrementExpression) || prefix.IsKind(SyntaxKind.PreDecrementExpression) => prefix.Operand,
+                    PostfixUnaryExpressionSyntax postfix when
+                        postfix.IsKind(SyntaxKind.PostIncrementExpression) || postfix.IsKind(SyntaxKind.PostDecrementExpression) => postfix.Operand,
+                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                    RefExpressionSyntax reference => reference.Expression,
+                    _ => null
+                };
+                if (target != null)
+                {
+                    AddWrittenLocals(model.GetOperation(target, cancellationToken), builder);
+                }
+            }
+            writes = builder.ToImmutable();
+            writesByScope.Add(scope, writes);
+        }
+        return writes.Contains(local);
+    }
+
+    private static void AddWrittenLocals(IOperation? target, ImmutableHashSet<ISymbol>.Builder writes)
+    {
+        switch (target)
+        {
+            case ILocalReferenceOperation local:
+                writes.Add(local.Local);
+                break;
+            case ITupleOperation tuple:
+                foreach (var element in tuple.Elements)
+                {
+                    AddWrittenLocals(element, writes);
+                }
+                break;
+            case IDeclarationExpressionOperation declaration:
+                AddWrittenLocals(declaration.Expression, writes);
+                break;
+            case IConversionOperation conversion:
+                AddWrittenLocals(conversion.Operand, writes);
+                break;
+            case IParenthesizedOperation parentheses:
+                AddWrittenLocals(parentheses.Operand, writes);
+                break;
+        }
+    }
+
+
     private static bool Mentions(
         SyntaxNode expression,
         IParameterSymbol parameter,

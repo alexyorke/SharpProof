@@ -27,7 +27,8 @@ public sealed class NativeMetadataReferenceOwnerTests
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static {type} Target([NotNull] {type} value) => value; }}",
-            $"public static class Subject {{ public static {type} Target({type} value) {{ {(guarded ? "if (value == null) return null;" : "")} return Library.Target(value); }} }}");
+            $"public static class Subject {{ public static {type} Target({type} value) {{ {(guarded ? "if (value == null) return null;" : "")} return Library.Target(value); }} }}",
+            includeSharpProofReference: true);
         var references = Capture(subject);
         var legacy = Prepare(subject, references, false);
         Assert.That(legacy.Callers, Is.Empty);
@@ -76,7 +77,8 @@ public sealed class NativeMetadataReferenceOwnerTests
     {
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static int Target([NotNull] string value) => 7; }",
-            "public static class Subject { public static int Target(string value) => Library.Target(value.Length == 0 ? null : value); }");
+            "public static class Subject { public static int Target(string value) => Library.Target(value.Length == 0 ? null : value); }",
+            includeSharpProofReference: true);
         var references = Capture(subject);
         var batch = Prepare(subject, references, true);
         Assert.That(batch.Gaps, Is.Empty);
@@ -102,7 +104,8 @@ public sealed class NativeMetadataReferenceOwnerTests
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static object Target([NotNull] object value) => value; }",
-            $"public struct ValueToken {{ }} public class Subject {{ public static object Target({type} value) => Library.Target(value); }}");
+            $"public struct ValueToken {{ }} public class Subject {{ public static object Target({type} value) => Library.Target(value); }}",
+            includeSharpProofReference: true);
         var batch = Prepare(subject, Capture(subject), true);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("UnsupportedSignature"));

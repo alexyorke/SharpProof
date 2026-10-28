@@ -46,13 +46,27 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         Justification = "MSBuild task item parameters use ITaskItem arrays.")]
     public ITaskItem[] CompilerOutputPaths { get; set; } = [];
 
+    [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
+        Justification = "MSBuild task item parameters use ITaskItem arrays.")]
+    public ITaskItem[] CompilerInputPaths { get; set; } = [];
+
     protected override bool ExecuteCore(CancellationToken cancellationToken)
     {
-        ContainerContract.ValidateRequired();
         string ResolvePath(string path)
         {
             System.ArgumentNullException.ThrowIfNull(path);
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
+        }
+
+        ImmutableArray<string> ResolveCompilerInputPaths(string path)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            var member = ResolvePath(path);
+            var input = new FileInfo(member);
+            var target = input.LinkTarget == null ? null : input.ResolveLinkTarget(returnFinalTarget: true);
+            // Reads follow the final link, while atomic publication replaces
+            // its directory entry. Protect both names of a compiler input.
+            return target == null ? [member] : [member, PublicationLease.CanonicalMember(target.FullName)];
         }
 
         var outputPaths = Present([ResultPath, SarifPath]).Select(ResolvePath).ToImmutableArray();
@@ -71,6 +85,10 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!string.IsNullOrWhiteSpace(item.ItemSpec)))
             .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ResolvePath(item.ItemSpec)))
             .ToImmutableArray();
+        var compilerInputPaths = CompilerInputPaths
+            .Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .SelectMany(item => item is null ? throw new ArgumentNullException(nameof(item)) : ResolveCompilerInputPaths(item.ItemSpec))
+            .Distinct(PublicationPaths.Comparer).ToImmutableArray();
         var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
         var workerDirectory = workerFile != null && File.Exists(workerFile)
             ? Path.GetDirectoryName(workerFile)
@@ -82,6 +100,8 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         ImmutableArray<string> capturePaths = string.IsNullOrWhiteSpace(CompilerCaptureRequestPath)
             ? []
             : [ResolvePath(CompilerCaptureRequestPath), ResolvePath(CompilerCaptureRequestPath + ".completed")];
+        var captureManifestPaths = Present([InvocationManifestPath]).Select(ResolvePath).ToImmutableArray();
+        var writtenPaths = publicationPaths.Concat(capturePaths).Concat(captureManifestPaths).ToImmutableArray();
 
         if (outputPaths.Distinct(PublicationPaths.Comparer).Count() != outputPaths.Length)
         {
@@ -93,22 +113,31 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
         }
         try
         {
-            PublicationPaths.ValidateWorkerRuntime(publicationPaths.Concat(capturePaths), workerFile);
+            PublicationPaths.ValidateWorkerRuntime(writtenPaths, workerFile);
         }
         catch (ArgumentException exception)
         {
             Log.LogError("{0}", exception.Message);
         }
         if (cachePath != null &&
-            (publicationPaths.Any(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (PublicationPaths.IsWithin(path, cachePath) || PublicationPaths.IsWithin(cachePath, path))) ||
-             workerDirectory != null && PublicationPaths.IsWithin(cachePath, workerDirectory)))
+            (writtenPaths.Any(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (PublicationPaths.IsWithin(path, cachePath, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cachePath, path, PublicationPaths.Comparison))) ||
+             workerDirectory != null && PublicationPaths.IsWithin(cachePath, workerDirectory, PublicationPaths.Comparison)))
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
         }
-        if (publicationPaths.Intersect(compilerOutputPaths, PublicationPaths.Comparer).Any())
+        if (publicationPaths.Concat(captureManifestPaths).Intersect(compilerOutputPaths, PublicationPaths.Comparer).Any())
         {
             Log.LogError(
                 "SharpProof publication paths must not alias compiler-owned outputs.");
+        }
+        if (captureManifestPaths.Intersect(publicationPaths.Concat(capturePaths)
+                .Concat(Present([InvocationRequestPath, InvocationResultPath]).Select(ResolvePath)), PublicationPaths.Comparer).Any())
+        {
+            Log.LogError("SharpProof compiler capture must not alias publication or invocation paths.");
+        }
+        if (writtenPaths.Intersect(compilerInputPaths, PublicationPaths.Comparer).Any())
+        {
+            Log.LogError("SharpProof publication and capture paths must not alias compiler inputs.");
         }
         if (!string.IsNullOrWhiteSpace(CompilerCaptureRequestPath) &&
             (!Guid.TryParseExact(CompilerCaptureNonce, "N", out var nonce) ||
@@ -137,7 +166,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             Directory.CreateDirectory(Path.GetDirectoryName(capturePath)!);
             // Token contents stay outside compiler inputs so skipped compilations
             // can reuse their capture. Write only after ownership checks succeed.
-            File.WriteAllText(capturePath, CompilerCaptureNonce);
+            PublicationFile.WriteUtf8(capturePath, CompilerCaptureNonce!, cancellationToken);
         }
         return true;
     }

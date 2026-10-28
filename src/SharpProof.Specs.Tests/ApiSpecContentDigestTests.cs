@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 10 adds immutable KeyValuePair getter effect evidence.
+        // Version 11 accounts for resource callbacks on exceptional framework calls.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("10"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("11"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "176f07b7dfb4a0e7a8904b1000f08272eb16b1fc0b61b38a040aaa7a6fb5ef3e"));
+                "e51f8d0c55a9d624c595147ce3523d813cd0608f76b0401a3697efe2716a33e3"));
         }
     }
 

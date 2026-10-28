@@ -62,6 +62,8 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeLocalFunction, SyntaxKind.LocalFunctionStatement);
         context.RegisterSyntaxNodeAction(AnalyzeParameter, SyntaxKind.Parameter);
+        context.RegisterSyntaxNodeAction(AnalyzeAnonymousFunction, SyntaxKind.SimpleLambdaExpression,
+            SyntaxKind.ParenthesizedLambdaExpression, SyntaxKind.AnonymousMethodExpression);
         context.RegisterOperationAction(AnalyzeNoToken, OperationKind.PropertyReference);
     }
 
@@ -123,12 +125,33 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             local, isLocalFunction: true);
     }
 
+    private static void AnalyzeAnonymousFunction(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+            context.SemanticModel.GetOperation(context.Node, context.CancellationToken) is not IAnonymousFunctionOperation operation)
+        {
+            return;
+        }
+        var body = context.Node switch
+        {
+            SimpleLambdaExpressionSyntax lambda => lambda.Body,
+            ParenthesizedLambdaExpressionSyntax lambda => lambda.Body,
+            AnonymousMethodExpressionSyntax anonymous => (CSharpSyntaxNode)anonymous.Body,
+            _ => null
+        };
+        if (body != null)
+        {
+            AnalyzeCallable(context, operation.Symbol, default, body, context.Node.GetLocation(),
+                context.Node, isLocalFunction: false, isAnonymous: true);
+        }
+    }
+
     private static void AnalyzeCallable(SyntaxNodeAnalysisContext context, IMethodSymbol symbol,
         SyntaxTokenList modifiers, SyntaxNode body, Location identifierLocation,
-        SyntaxNode declaration, bool isLocalFunction)
+        SyntaxNode declaration, bool isLocalFunction, bool isAnonymous = false)
     {
         var tokenType = context.Compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
-        if (tokenType == null || !IsAsyncApi(symbol, modifiers, context.Compilation))
+        if (tokenType == null || !IsAsyncApi(symbol, modifiers, context.Compilation, isAnonymous))
         {
             return;
         }
@@ -136,23 +159,18 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         var tokenBuilder = ImmutableArray.CreateBuilder<IParameterSymbol>();
         tokenBuilder.AddRange(symbol.Parameters.Where(parameter =>
             SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
-        if (isLocalFunction && !modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.StaticKeyword)))
+        if ((isLocalFunction || isAnonymous) && !symbol.IsStatic)
         {
             foreach (var ancestor in declaration.Ancestors())
             {
-                if (ancestor is not MethodDeclarationSyntax and not LocalFunctionStatementSyntax)
+                var enclosing = GetCallableSymbol(ancestor, context.SemanticModel, context.CancellationToken);
+                if (enclosing == null)
                 {
                     continue;
                 }
-
-                if (context.SemanticModel.GetDeclaredSymbol(ancestor, context.CancellationToken) is IMethodSymbol enclosing)
-                {
-                    tokenBuilder.AddRange(enclosing.Parameters.Where(parameter =>
-                        SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
-                }
-                if (ancestor is MethodDeclarationSyntax ||
-                    ancestor is LocalFunctionStatementSyntax parentLocal &&
-                    parentLocal.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.StaticKeyword)))
+                tokenBuilder.AddRange(enclosing.Parameters.Where(parameter =>
+                    SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)));
+                if (ancestor is BaseMethodDeclarationSyntax || enclosing.IsStatic)
                 {
                     break;
                 }
@@ -162,7 +180,9 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         var tokens = tokenBuilder.ToImmutable();
         if (tokens.IsEmpty)
         {
-            if (isLocalFunction || !IsFixedSignature(symbol, context.Compilation, context.CancellationToken))
+            // Delegate signatures are owned by the caller; only forwarding is
+            // checked inside anonymous functions with available tokens.
+            if (!isAnonymous && (isLocalFunction || !IsFixedSignature(symbol, context.Compilation, context.CancellationToken)))
             {
                 context.ReportDiagnostic(Diagnostic.Create(MissingToken,
                     identifierLocation, symbol.Name));
@@ -173,37 +193,51 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         foreach (var node in body.DescendantNodesAndSelf(DescendIntoCurrentMethod))
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            if (node is not InvocationExpressionSyntax invocation ||
-                context.SemanticModel.GetOperation(invocation, context.CancellationToken) is not IInvocationOperation operation ||
-                !HasDroppedToken(operation, tokenType, tokens, context.SemanticModel,
-                    context.CancellationToken))
+            if (node is InvocationExpressionSyntax invocation &&
+                context.SemanticModel.GetOperation(invocation, context.CancellationToken) is IInvocationOperation operation &&
+                HasDroppedToken(operation, tokenType, tokens, context.SemanticModel, context.CancellationToken))
             {
-                continue;
+                context.ReportDiagnostic(Diagnostic.Create(DroppedToken,
+                    invocation.GetLocation(), operation.TargetMethod.Name));
             }
-
-            context.ReportDiagnostic(Diagnostic.Create(DroppedToken,
-                invocation.GetLocation(), operation.TargetMethod.Name));
+            else if (node is CommonForEachStatementSyntax loop && !loop.AwaitKeyword.IsKind(SyntaxKind.None) &&
+                RequiresEnumerationToken(loop, tokenType, tokens, context.SemanticModel, context.CancellationToken))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(DroppedToken,
+                    loop.Expression.GetLocation(), "GetAsyncEnumerator"));
+            }
         }
     }
 
-    private static bool IsAsyncApi(IMethodSymbol symbol, SyntaxTokenList modifiers,
-        Compilation compilation)
+    private static IMethodSymbol? GetCallableSymbol(SyntaxNode node, SemanticModel model, CancellationToken cancellationToken)
     {
-        if (modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.AsyncKeyword)))
+        return node switch
+        {
+            BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax =>
+                model.GetDeclaredSymbol(node, cancellationToken) as IMethodSymbol,
+            AnonymousFunctionExpressionSyntax =>
+                (model.GetOperation(node, cancellationToken) as IAnonymousFunctionOperation)?.Symbol,
+            _ => null
+        };
+    }
+
+    private static bool IsAsyncApi(IMethodSymbol symbol, SyntaxTokenList modifiers,
+        Compilation compilation, bool isAnonymous)
+    {
+        if (symbol.IsAsync || modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.AsyncKeyword)))
         {
             return true;
         }
+        return (isAnonymous || symbol.Name.EndsWith("Async", StringComparison.Ordinal)) &&
+            IsTaskLike(symbol.ReturnType, compilation);
+    }
 
-        if (!symbol.Name.EndsWith("Async", StringComparison.Ordinal))
+    private static bool IsTaskLike(ITypeSymbol type, Compilation compilation)
+    {
+        if (type is not INamedTypeSymbol named)
         {
             return false;
         }
-
-        if (symbol.ReturnType is not INamedTypeSymbol named)
-        {
-            return false;
-        }
-
         var definition = named.OriginalDefinition;
         return SymbolEqualityComparer.Default.Equals(definition,
                 compilation.GetTypeByMetadataName("System.Threading.Tasks.Task")) ||
@@ -221,7 +255,10 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         CancellationToken cancellationToken)
     {
         return method.IsOverride || method.ExplicitInterfaceImplementations.Length != 0 ||
-            SymbolEqualityComparer.Default.Equals(method, compilation.GetEntryPoint(cancellationToken));
+            SymbolEqualityComparer.Default.Equals(method, compilation.GetEntryPoint(cancellationToken)) ||
+            method.ContainingType.AllInterfaces.SelectMany(static contract => contract.GetMembers())
+                .OfType<IMethodSymbol>().Any(member => SymbolEqualityComparer.Default.Equals(
+                    method.ContainingType.FindImplementationForInterfaceMember(member), method));
     }
 
     private static bool DescendIntoCurrentMethod(SyntaxNode node)
@@ -245,18 +282,110 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                     ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), 0, cancellationToken));
         }
 
-        // The selected overload omitted cancellation entirely. Match only an
-        // overload with the same leading parameter types and a trailing token.
-        return target.ContainingType.GetMembers(target.Name).OfType<IMethodSymbol>().Any(candidate =>
-            candidate.Parameters.Length == target.Parameters.Length + 1 &&
-            SymbolEqualityComparer.Default.Equals(candidate.Parameters[candidate.Parameters.Length - 1].Type, tokenType) &&
-            target.Parameters.Zip(candidate.Parameters, (selected, cancellable) =>
-                SymbolEqualityComparer.Default.Equals(selected.Type, cancellable.Type)).All(static same => same));
+        if (invocation.Syntax is not InvocationExpressionSyntax syntax)
+        {
+            return false;
+        }
+
+        // Ask the compiler to bind the actual call with an added named token.
+        // This preserves inference, ref kinds, accessibility and receiver rules.
+        var tokenNames = semanticModel.GetMemberGroup(syntax.Expression, cancellationToken)
+            .OfType<IMethodSymbol>().SelectMany(static method => method.Parameters)
+            .Where(parameter => SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType))
+            .Select(static parameter => parameter.Name).Distinct(StringComparer.Ordinal);
+        foreach (var name in tokenNames)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var tokenName = SyntaxFactory.QualifiedName(
+                SyntaxFactory.QualifiedName(
+                    SyntaxFactory.AliasQualifiedName(SyntaxFactory.IdentifierName(SyntaxFactory.Token(SyntaxKind.GlobalKeyword)),
+                        SyntaxFactory.IdentifierName("System")),
+                    SyntaxFactory.IdentifierName("Threading")),
+                SyntaxFactory.IdentifierName("CancellationToken"));
+            var parameterName = SyntaxFactory.IdentifierName(
+                SyntaxFactory.Identifier(default, SyntaxKind.IdentifierToken, "@" + name, name, default));
+            var argument = SyntaxFactory.Argument(SyntaxFactory.DefaultExpression(tokenName))
+                .WithNameColon(SyntaxFactory.NameColon(parameterName));
+            var replacement = syntax.WithArgumentList(syntax.ArgumentList.AddArguments(argument));
+            var binding = semanticModel.GetSpeculativeSymbolInfo(syntax.SpanStart, replacement, SpeculativeBindingOption.BindAsExpression);
+            if (binding.Symbol is IMethodSymbol bound &&
+                semanticModel.IsAccessible(syntax.SpanStart, bound) &&
+                bound.Parameters.Any(parameter => parameter.Name == name &&
+                    SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool RequiresEnumerationToken(CommonForEachStatementSyntax loop, ITypeSymbol tokenType,
+        ImmutableArray<IParameterSymbol> availableTokens, SemanticModel model, CancellationToken cancellationToken)
+    {
+        var enumerator = model.GetForEachStatementInfo(loop).GetEnumeratorMethod;
+        if (enumerator == null)
+        {
+            return false;
+        }
+        var collection = model.GetOperation(loop.Expression, cancellationToken);
+        var configured = model.Compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable`1");
+        if (!enumerator.Parameters.Any(parameter => SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)) &&
+            !SymbolEqualityComparer.Default.Equals(collection?.Type?.OriginalDefinition, configured))
+        {
+            return false;
+        }
+        return !HasEnumerationCancellation(collection, tokenType, availableTokens, model,
+            ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), 0, cancellationToken);
+    }
+
+    private static bool HasEnumerationCancellation(IOperation? collection, ITypeSymbol tokenType,
+        ImmutableArray<IParameterSymbol> availableTokens, SemanticModel model,
+        ImmutableHashSet<ISymbol>.Builder visited, int depth, CancellationToken cancellationToken)
+    {
+        if (collection == null || depth >= 16)
+        {
+            return false;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (collection is IConversionOperation conversion)
+        {
+            return HasEnumerationCancellation(conversion.Operand, tokenType, availableTokens, model, visited, depth + 1, cancellationToken);
+        }
+        if (collection is ILocalReferenceOperation local && visited.Add(local.Local) &&
+            !IsReassigned(local.Local, local.Syntax, model, cancellationToken) &&
+            local.Local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is
+                VariableDeclaratorSyntax { Initializer.Value: { } initializer })
+        {
+            return HasEnumerationCancellation(model.GetOperation(initializer, cancellationToken), tokenType,
+                availableTokens, model, visited, depth + 1, cancellationToken);
+        }
+        if (collection is not IInvocationOperation invocation)
+        {
+            return false;
+        }
+
+        var owner = invocation.TargetMethod.ContainingType.OriginalDefinition;
+        var isEnumerableWrapper = SymbolEqualityComparer.Default.Equals(owner,
+                model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.TaskAsyncEnumerableExtensions")) ||
+            SymbolEqualityComparer.Default.Equals(owner,
+                model.Compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable`1"));
+        if (isEnumerableWrapper && invocation.TargetMethod.Name == "ConfigureAwait")
+        {
+            return HasEnumerationCancellation(invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value,
+                tokenType, availableTokens, model, visited, depth + 1, cancellationToken);
+        }
+
+        // Explicit token-bearing producer/WithCancellation calls are already
+        // checked by HasDroppedToken. Do not duplicate their diagnostics here.
+        return invocation.TargetMethod.Parameters.Any(parameter =>
+                SymbolEqualityComparer.Default.Equals(parameter.Type, tokenType)) ||
+            HasDroppedToken(invocation, tokenType, availableTokens, model, cancellationToken);
     }
 
     private static bool FlowsFromAvailableToken(IOperation value,
         ImmutableArray<IParameterSymbol> availableTokens, SemanticModel semanticModel,
-        ImmutableHashSet<ISymbol>.Builder visited, int depth, CancellationToken cancellationToken)
+        ImmutableHashSet<ISymbol>.Builder visited, int depth, CancellationToken cancellationToken,
+        SyntaxNode? arrayObservation = null)
     {
         if (depth >= 16)
         {
@@ -268,11 +397,11 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         {
             case IConversionOperation conversion:
                 return FlowsFromAvailableToken(conversion.Operand, availableTokens,
-                    semanticModel, visited, depth + 1, cancellationToken);
-            // C# operation trees omit parentheses; conversions are handled above.
+                    semanticModel, visited, depth + 1, cancellationToken, arrayObservation);
             case IParameterReferenceOperation parameter:
                 return availableTokens.Any(candidate =>
-                    SymbolEqualityComparer.Default.Equals(candidate, parameter.Parameter));
+                    SymbolEqualityComparer.Default.Equals(candidate, parameter.Parameter)) &&
+                    !IsReassigned(parameter.Parameter, parameter.Syntax, semanticModel, cancellationToken);
             case ILocalReferenceOperation local:
                 if (!visited.Add(local.Local))
                 {
@@ -280,7 +409,9 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                 }
                 try
                 {
-                    if (IsReassigned(local.Local, semanticModel, cancellationToken) ||
+                    if (IsReassigned(local.Local, local.Syntax, semanticModel, cancellationToken) ||
+                        local.Local.Type is IArrayTypeSymbol && HasArrayMutationOrEscape(local.Local, arrayObservation ?? local.Syntax,
+                            semanticModel, ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), cancellationToken) ||
                         local.Local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)
                             is not VariableDeclaratorSyntax { Initializer: { Value: var initializer } })
                     {
@@ -288,7 +419,8 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                     }
                     var initialValue = semanticModel.GetOperation(initializer, cancellationToken);
                     return initialValue != null && FlowsFromAvailableToken(initialValue, availableTokens,
-                        semanticModel, visited, depth + 1, cancellationToken);
+                        semanticModel, visited, depth + 1, cancellationToken,
+                        local.Local.Type is IArrayTypeSymbol ? arrayObservation ?? local.Syntax : null);
                 }
                 finally
                 {
@@ -301,11 +433,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
                 property.Instance != null:
                 return FlowsFromAvailableToken(property.Instance, availableTokens,
                     semanticModel, visited, depth + 1, cancellationToken);
-            case IInvocationOperation invocation when
-                invocation.TargetMethod.IsStatic &&
-                invocation.TargetMethod.Name == "CreateLinkedTokenSource" &&
-                SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType,
-                    semanticModel.Compilation.GetTypeByMetadataName("System.Threading.CancellationTokenSource")):
+            case IInvocationOperation invocation when IsLinkedTokenSource(invocation.TargetMethod, semanticModel.Compilation):
                 return invocation.Arguments.Any(argument =>
                     FlowsFromAvailableToken(argument.Value, availableTokens,
                         semanticModel, visited, depth + 1, cancellationToken));
@@ -316,20 +444,68 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
             case IConditionalOperation conditional:
                 return conditional.WhenFalse is { } whenFalse &&
                     FlowsFromAvailableToken(conditional.WhenTrue, availableTokens,
-                        semanticModel, visited, depth + 1, cancellationToken) &&
+                        semanticModel, visited, depth + 1, cancellationToken, arrayObservation) &&
                     FlowsFromAvailableToken(whenFalse, availableTokens,
-                        semanticModel, visited, depth + 1, cancellationToken);
+                        semanticModel, visited, depth + 1, cancellationToken, arrayObservation);
             default:
                 return false;
         }
     }
 
-    private static bool IsReassigned(ILocalSymbol local, SemanticModel semanticModel,
+    private static bool IsLinkedTokenSource(IMethodSymbol method, Compilation compilation)
+    {
+        return method.IsStatic && method.Name == "CreateLinkedTokenSource" &&
+            SymbolEqualityComparer.Default.Equals(method.ContainingType,
+                compilation.GetTypeByMetadataName("System.Threading.CancellationTokenSource"));
+    }
+
+    private static SyntaxNode? GetCallableScope(SyntaxNode node)
+    {
+        return node.Ancestors().FirstOrDefault(static ancestor =>
+            ancestor is BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax);
+    }
+
+    private static bool MayRunBefore(SyntaxNode mutation, SyntaxNode use, SyntaxNode scope)
+    {
+        if (mutation.SpanStart < use.SpanStart ||
+            !ReferenceEquals(GetCallableScope(use), scope) ||
+            !ReferenceEquals(GetCallableScope(mutation), scope))
+        {
+            return true;
+        }
+        // A later write in the same loop can precede the next iteration's read.
+        return use.Ancestors().TakeWhile(ancestor => !ReferenceEquals(ancestor, scope)).Any(ancestor =>
+            ancestor is ForStatementSyntax or CommonForEachStatementSyntax or WhileStatementSyntax or DoStatementSyntax &&
+            ancestor.Span.Contains(mutation.Span));
+    }
+
+    private static bool RefersToSymbol(SyntaxNode expression, ISymbol symbol, SemanticModel model, CancellationToken cancellationToken)
+    {
+        return TargetsSymbol(model.GetOperation(expression, cancellationToken), symbol);
+    }
+
+    private static bool TargetsSymbol(IOperation? target, ISymbol symbol)
+    {
+        return target switch
+        {
+            ILocalReferenceOperation local => SymbolEqualityComparer.Default.Equals(local.Local, symbol),
+            IParameterReferenceOperation parameter => SymbolEqualityComparer.Default.Equals(parameter.Parameter, symbol),
+            ITupleOperation tuple => tuple.Elements.Any(element => TargetsSymbol(element, symbol)),
+            IDeclarationExpressionOperation declaration => TargetsSymbol(declaration.Expression, symbol),
+            IConversionOperation conversion => TargetsSymbol(conversion.Operand, symbol),
+            IParenthesizedOperation parentheses => TargetsSymbol(parentheses.Operand, symbol),
+            // Element stores invalidate array contents, but evaluating an index
+            // or a property receiver does not write the symbols read there.
+            IArrayElementReferenceOperation element => TargetsSymbol(element.ArrayReference, symbol),
+            _ => false
+        };
+    }
+
+    private static bool IsReassigned(ISymbol symbol, SyntaxNode use, SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
-        var declaration = local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
-        var scope = declaration?.Ancestors().FirstOrDefault(node =>
-            node is MethodDeclarationSyntax or LocalFunctionStatementSyntax);
+        var declaration = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        var scope = declaration == null ? null : GetCallableScope(declaration);
         if (scope == null)
         {
             return true;
@@ -338,18 +514,82 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
         foreach (var node in scope.DescendantNodes())
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (node is not AssignmentExpressionSyntax and not RefExpressionSyntax &&
+                !(node is ArgumentSyntax candidateArgument &&
+                    candidateArgument.RefKindKeyword.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword))
+            {
+                continue;
+            }
+            if (!MayRunBefore(node, use, scope))
+            {
+                continue;
+            }
             if (node is AssignmentExpressionSyntax assignment &&
-                semanticModel.GetOperation(assignment.Left, cancellationToken) is ILocalReferenceOperation target &&
-                SymbolEqualityComparer.Default.Equals(target.Local, local))
+                RefersToSymbol(assignment.Left, symbol, semanticModel, cancellationToken) ||
+                node is ArgumentSyntax argument && argument.RefKindKeyword.Kind() is SyntaxKind.RefKeyword or SyntaxKind.OutKeyword &&
+                RefersToSymbol(argument.Expression, symbol, semanticModel, cancellationToken) ||
+                node is RefExpressionSyntax reference &&
+                RefersToSymbol(reference.Expression, symbol, semanticModel, cancellationToken))
             {
                 return true;
             }
-            if (node is ArgumentSyntax argument && !argument.RefKindKeyword.IsKind(SyntaxKind.None) &&
-                semanticModel.GetOperation(argument.Expression, cancellationToken) is ILocalReferenceOperation reference &&
-                SymbolEqualityComparer.Default.Equals(reference.Local, local))
+        }
+        return false;
+    }
+
+    private static bool HasArrayMutationOrEscape(ILocalSymbol array, SyntaxNode use, SemanticModel model,
+        ImmutableHashSet<ISymbol>.Builder visited, CancellationToken cancellationToken)
+    {
+        if (!visited.Add(array))
+        {
+            return false;
+        }
+        var declaration = array.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken);
+        var scope = declaration == null ? null : GetCallableScope(declaration);
+        if (scope == null)
+        {
+            return true;
+        }
+        foreach (var identifier in scope.DescendantNodes().OfType<IdentifierNameSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, array) ||
+                !MayRunBefore(identifier, use, scope))
             {
-                return true;
+                continue;
             }
+            SyntaxNode value = identifier;
+            while (value.Parent is ParenthesizedExpressionSyntax or CastExpressionSyntax)
+            {
+                value = value.Parent;
+            }
+            if (value.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax aliasDeclaration } &&
+                model.GetDeclaredSymbol(aliasDeclaration, cancellationToken) is ILocalSymbol alias &&
+                alias.Type is IArrayTypeSymbol)
+            {
+                if (IsReassigned(alias, use, model, cancellationToken) ||
+                    HasArrayMutationOrEscape(alias, use, model, visited, cancellationToken))
+                {
+                    return true;
+                }
+                continue;
+            }
+            if (value.Parent is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Length" or "LongLength" })
+            {
+                continue;
+            }
+            if (value.Parent is ElementAccessExpressionSyntax element &&
+                element.Parent is not AssignmentExpressionSyntax and not RefExpressionSyntax)
+            {
+                continue;
+            }
+            if (value.Parent is ArgumentSyntax { Parent.Parent: InvocationExpressionSyntax call } &&
+                model.GetSymbolInfo(call, cancellationToken).Symbol is IMethodSymbol method &&
+                IsLinkedTokenSource(method, model.Compilation))
+            {
+                continue;
+            }
+            return true;
         }
         return false;
     }

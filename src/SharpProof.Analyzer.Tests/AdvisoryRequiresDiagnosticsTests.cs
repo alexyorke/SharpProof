@@ -8,6 +8,50 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class AdvisoryRequiresDiagnosticsTests
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LocalFunctionSuppressionAppliesToDirectAndInlinedCallSites(bool invoked)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes; public static class Subject { " +
+            "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
+            "public static int Caller() { " +
+            "[SharpProofSuppress(\"Reviewed local call site.\")] static int Local() => Need(0); " +
+            (invoked ? "return Local();" : "return 1;") + " } }",
+            "contracts", ["SP0027", "SP0024"]);
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LocalFunctionViolationRemainsVisibleWithoutAValidSuppression(bool emptyReason)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes; public static class Subject { " +
+            "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
+            "public static int Caller() { " + (emptyReason ? "[SharpProofSuppress(\"\")] " : "") +
+            "static int Local() => Need(0); return Local(); } }",
+            "contracts", ["SP0027", "SP0024"]);
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0027")), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(emptyReason ? 1 : 0));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task LocalFunctionSuppressionPreservesExecutionAndCallerPreconditions(bool localPrecondition)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes; public static class Subject { " +
+            "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
+            "public static int Caller() { [SharpProofSuppress(\"Reviewed local implementation.\")] " +
+            (localPrecondition
+                ? "static int Local(int value) { Contract.Requires(value > 0); return value; } return Local(0);"
+                : "static int Local() => 0; return Need(Local());") + " } }",
+            "contracts", ["SP0027", "SP0024"]);
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0027"]);
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "Call to '" + (localPrecondition ? "Local" : "Need") + "'");
+    }
+
     [TestCase("return Need(0);", "Call to 'Need' violates precondition 'value > 0'")]
     [TestCase("var x = -3; return Need(x + 1);", "Call to 'Need' violates precondition 'value > 0'")]
     [TestCase("return Need(1);", null)]

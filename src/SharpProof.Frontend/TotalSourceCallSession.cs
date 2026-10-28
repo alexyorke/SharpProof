@@ -4,12 +4,13 @@ using SharpProof.Frontend.Host;
 namespace SharpProof.Frontend;
 
 internal sealed class TotalScalarCallModel(int parameterCount, Func<ImmutableArray<IrTerm>, TotalScalarRule> apply,
-    bool stringConcatenation = false, IrOpaqueCallEffects effects = IrOpaqueCallEffects.None)
+    bool stringConcatenation = false, IrOpaqueCallEffects effects = IrOpaqueCallEffects.None, bool exceptionResourceEffects = false)
 {
     private readonly Func<ImmutableArray<IrTerm>, TotalScalarRule> _apply = ArgumentNullGuard.NotNull(apply, nameof(apply));
     internal int ParameterCount { get; } = parameterCount;
     internal bool StringConcatenation { get; } = stringConcatenation;
     internal IrOpaqueCallEffects Effects { get; } = effects;
+    internal bool ExceptionResourceEffects { get; } = exceptionResourceEffects;
     internal TotalScalarRule Apply(ImmutableArray<IrTerm> arguments) { RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized."); return _apply(arguments); }
 }
 

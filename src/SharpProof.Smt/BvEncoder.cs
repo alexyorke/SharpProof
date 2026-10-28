@@ -17,6 +17,10 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             GetVariable(variable, meter);
         }
+        // Cached selectors can skip Encode entirely. Complete any text facts
+        // interrupted by a previous query before reusing those selectors.
+        if (_text != null)
+        { EnsureText(meter); }
     }
 
     internal Expr GetVariable(IrVarId variable, SmtQueryResourceMeter meter)

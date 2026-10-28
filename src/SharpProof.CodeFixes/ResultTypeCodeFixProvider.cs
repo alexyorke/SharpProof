@@ -43,8 +43,10 @@ public sealed class ResultTypeCodeFixProvider : CodeFixProvider
                 !IsContractMethod(intrinsic, "Result", model.Compilation) || intrinsic.TypeArguments.Length != 1 ||
                 invocation.ArgumentList.Arguments.Count != 0 ||
                 model.GetEnclosingSymbol(invocation.SpanStart, context.CancellationToken) is not IMethodSymbol callable ||
-                callable.ReturnsVoid || callable.IsAsync || callable.ReturnType.TypeKind == TypeKind.Error ||
-                SymbolEqualityComparer.Default.Equals(intrinsic.TypeArguments[0], callable.ReturnType))
+                callable.ReturnsVoid || callable.IsAsync ||
+                callable.ReturnType.TypeKind is TypeKind.Error or TypeKind.Pointer or TypeKind.FunctionPointer ||
+                callable.ReturnType.IsRefLikeType || callable.ReturnType is ITypeParameterSymbol { AllowsRefLikeType: true } ||
+                SymbolEqualityComparer.IncludeNullability.Equals(intrinsic.TypeArguments[0], callable.ReturnType))
             {
                 continue;
             }
@@ -63,14 +65,21 @@ public sealed class ResultTypeCodeFixProvider : CodeFixProvider
             var name = invocation.Expression is GenericNameSyntax direct
                 ? direct
                 : (GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name;
+            var argumentType = name.TypeArgumentList.Arguments[0];
+            // Directives inside a compound type can pair with trivia outside it.
+            // Exterior trivia alone cannot safely preserve that conditional text.
+            if (argumentType.ContainsDirectives)
+            { continue; }
             var replacement = SyntaxGenerator.GetGenerator(context.Document).TypeExpression(callable.ReturnType)
-                .WithTriviaFrom(name.TypeArgumentList.Arguments[0])
+                .WithTriviaFrom(argumentType)
                 .WithAdditionalAnnotations(Simplifier.Annotation);
+            var changedDocument = document.WithSyntaxRoot(root.ReplaceNode(argumentType, replacement));
+            if (await CodeFixCompilationValidation.HasNewErrorsAsync(document.Project, changedDocument.Project, context.CancellationToken).ConfigureAwait(false))
+            { continue; }
             context.RegisterCodeFix(
                 CodeAction.Create(
                     "Match Contract.Result type to the callable return type",
-                    _ => Task.FromResult(context.Document.WithSyntaxRoot(root.ReplaceNode(
-                        name.TypeArgumentList.Arguments[0], replacement))),
+                    _ => Task.FromResult(changedDocument),
                     EquivalenceKey),
                 diagnostic);
         }

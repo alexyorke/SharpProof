@@ -69,8 +69,10 @@ internal static class AdvisoryEffectClaims
             // Declare supplies the six defined claim kinds; the remaining kind is EffectContract.
             default:
                 var effects = Effects(site) & ~constraint.Effects;
-                if (site.Escapes && (constraint.Effects & EffectContractKind.Throws) != 0 && Allowed(site, constraint.ExceptionTypes, compilation))
-                { effects &= ~EffectContractKind.Throws; }
+                // Declaring Throws permits only the listed exception types;
+                // masking the effect bit must not erase that separate check.
+                if (site.Escapes && !Allowed(site, constraint.ExceptionTypes, compilation))
+                { effects |= EffectContractKind.Throws; }
                 var capabilities = Capabilities(site) & ~constraint.Capabilities;
                 return effects != EffectContractKind.None || capabilities != EffectContractCapabilityKind.None
                     ? "may have undeclared effects: " + string.Join(", ", ImmutableArray.Create(effects.ToString(), capabilities.ToString())
@@ -87,7 +89,8 @@ internal static class AdvisoryEffectClaims
             AdvisoryEffectSiteKind.Allocation => EffectContractKind.Allocates,
             AdvisoryEffectSiteKind.Lock => EffectContractKind.Synchronizes,
             AdvisoryEffectSiteKind.Read => AnyStateReads,
-            AdvisoryEffectSiteKind.Throw => site.Escapes ? EffectContractKind.Throws : EffectContractKind.None,
+            AdvisoryEffectSiteKind.Throw => EffectContractKind.Allocates |
+                (site.Escapes ? EffectContractKind.Throws : EffectContractKind.None),
             AdvisoryEffectSiteKind.Write => site.Region switch
             {
                 IrWriteRegion.Local => EffectContractKind.None,

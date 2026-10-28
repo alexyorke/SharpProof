@@ -38,7 +38,8 @@ public sealed class NativeMetadataNominalOwnerTests
             "using SharpProof.Attributes; public static class Library { public static object Target([NotNull] object value) => value; }";
         var body = nominalReturn ? "Library.Target(value); return value;" : "return Library.Target(value);";
         using var subject = new MetadataTestSubject(library,
-            $"{definition} public static class Subject {{ public static {(nominalReturn ? type : "object")} Target({type} value) {{ {body} }} }}");
+            $"{definition} public static class Subject {{ public static {(nominalReturn ? type : "object")} Target({type} value) {{ {body} }} }}",
+            includeSharpProofReference: true);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var originalManifest = JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest);
@@ -98,7 +99,7 @@ public sealed class NativeMetadataNominalOwnerTests
                     return Library.Target(alias);
                 }
             }
-            """);
+            """, includeSharpProofReference: true);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,
@@ -142,7 +143,8 @@ public sealed class NativeMetadataNominalOwnerTests
                 public static int Target(object value) => Leaf(value);
                 private static int Leaf([NotNull] object value) => 7;
             }
-            """, "public sealed class Token { } public static class Subject { public static int Target(Token value) => Library.Target(value); }");
+            """, "public sealed class Token { } public static class Subject { public static int Target(Token value) => Library.Target(value); }",
+            includeSharpProofReference: true);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(subject.Compilation, WorkerFeatureSet.All,

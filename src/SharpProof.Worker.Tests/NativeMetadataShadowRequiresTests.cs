@@ -35,7 +35,8 @@ public sealed class NativeMetadataShadowRequiresTests
         var argument = type == "string" ? "value == 0 ? null : \"hello\"" : "value";
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target([{attribute}] {type} value) => {body}; }}",
-            $"public static class Subject {{ public static int Target({callerType} value) => Library.Target({argument}); }}");
+            $"public static class Subject {{ public static int Target({callerType} value) => Library.Target({argument}); }}",
+            includeSharpProofReference: true);
         var baseline = JsonSerializer.Serialize(new ClaimManifestBuilder(subject.Compilation).Build().Manifest);
         var references = Capture(subject.Compilation);
         var batch = Prepare(subject.Compilation, references, true);
@@ -74,7 +75,8 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
             $"using SharpProof.Attributes; public static class Library {{ public static int Target([{attribute}] {type} value) => 7; }}",
-            $"public static class Subject {{ public static int Target(int value) => Library.Target({argument}); }}");
+            $"public static class Subject {{ public static int Target(int value) => Library.Target({argument}); }}",
+            includeSharpProofReference: true);
         var references = Capture(subject.Compilation);
         var batch = Prepare(subject.Compilation, references, true);
         Assert.That(batch.Gaps, Is.Empty);
@@ -92,7 +94,8 @@ public sealed class NativeMetadataShadowRequiresTests
         System.ArgumentNullException.ThrowIfNull(input);
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static int Target([Positive] int value) => 10 / value; }",
-            $"public static class Subject {{ public static int Target(int value) {{ {caller} }} }}");
+            $"public static class Subject {{ public static int Target(int value) {{ {caller} }} }}",
+            includeSharpProofReference: true);
         var references = Capture(subject.Compilation);
         var batch = Prepare(subject.Compilation, references, true);
         Assert.That(batch.Gaps, Is.Empty);
@@ -117,7 +120,8 @@ public sealed class NativeMetadataShadowRequiresTests
     {
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static int Target([InRange(1, 1)] int first, int second) => first * 10 + second; }",
-            "public static class Subject { public static int Target(int value) => Library.Target(value, value = 2); }");
+            "public static class Subject { public static int Target(int value) => Library.Target(value, value = 2); }",
+            includeSharpProofReference: true);
         var references = Capture(subject.Compilation);
         var batch = Prepare(subject.Compilation, references, true);
         Assert.That(batch.Gaps, Is.Empty);
@@ -155,7 +159,8 @@ public sealed class NativeMetadataShadowRequiresTests
     {
         using var subject = new MetadataTestSubject(
             "using SharpProof.Attributes; public static class Library { public static int Target([Positive] int value) => value; }",
-            "public static class Subject { public static int Target(int value) => Library.Target(value); }");
+            "public static class Subject { public static int Target(int value) => Library.Target(value); }",
+            includeSharpProofReference: true);
         var batch = Prepare(subject.Compilation, null, true);
         Assert.That(batch.Callers, Is.Empty);
         Assert.That(batch.Gaps.Single().Reason, Is.EqualTo("MissingMetadataOwnership"));

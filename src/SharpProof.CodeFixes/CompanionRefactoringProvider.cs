@@ -40,10 +40,8 @@ public sealed class CompanionRefactoringProvider : CodeRefactoringProvider
             .NormalizeWhitespace()
             .WithAdditionalAnnotations(Formatter.Annotation);
         var generatedDocument = context.Document.Project.AddDocument(target.Name + "Contracts.cs", compilation.GetText());
-        var tree = await generatedDocument.GetSyntaxTreeAsync(context.CancellationToken).ConfigureAwait(false);
-        var generatedCompilation = await generatedDocument.Project.GetCompilationAsync(context.CancellationToken).ConfigureAwait(false);
-        if (tree == null || generatedCompilation == null || generatedCompilation.GetDiagnostics(context.CancellationToken).Any(diagnostic =>
-            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error && diagnostic.Location.SourceTree == tree))
+        if (await CodeFixCompilationValidation.HasNewErrorsAsync(context.Document.Project, generatedDocument.Project,
+                context.CancellationToken).ConfigureAwait(false))
         { return; }
         context.RegisterRefactoring(CodeAction.Create("Generate SharpProof contract companion", async cancellationToken =>
         {

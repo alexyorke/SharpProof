@@ -59,10 +59,10 @@ public sealed class AnalyzerCoreEffectCoverageTests
     }
 
     [TestCase("var value = new object(); return x;", "Allocates", "SharpProofEffect.Throws")]
-    [TestCase("lock (gate) { } return x;", "Synchronizes", "SharpProofEffect.Throws")]
+    [TestCase("lock (gate) { } return x;", "Synchronizes", "SharpProofEffect.Throws | SharpProofEffect.Allocates")]
     [TestCase("return State;", "ReadsReceiverState", "SharpProofEffect.Throws")]
     [TestCase("values[0] = x; return x;", "WritesArgumentState",
-        "SharpProofEffect.Throws | SharpProofEffect.ReadsReceiverState | SharpProofEffect.ReadsArgumentState | " +
+        "SharpProofEffect.Throws | SharpProofEffect.Allocates | SharpProofEffect.ReadsReceiverState | SharpProofEffect.ReadsArgumentState | " +
         "SharpProofEffect.ReadsCapturedState | SharpProofEffect.ReadsStaticState | SharpProofEffect.ReadsAmbientState")]
     [TestCase("State = x; return x;", "WritesStaticState", "SharpProofEffect.Throws")]
     [TestCase("throw new System.InvalidOperationException();", "Allocates", "SharpProofEffect.Throws")]

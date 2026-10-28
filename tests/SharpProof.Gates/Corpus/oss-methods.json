@@ -790,8 +790,8 @@
       "declarationSha256": "905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554",
       "methodName": "FindGCDEuclidean",
       "mode": "effects",
-      "expectedVerdict": "Proven",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0016",

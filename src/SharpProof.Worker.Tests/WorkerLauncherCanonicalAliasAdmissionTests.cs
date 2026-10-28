@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Host;
-using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
@@ -51,24 +50,13 @@ internal sealed partial class WorkerTests
             {
                 Console.SetError(originalError);
             }
-            var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(privateResult))
-                ?? throw new AssertionException("The actual worker did not publish its private response.");
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-            Assert.That(exitCode, Is.EqualTo(3));
-            Assert.That(diagnostic.ToString(), Does.Contain("SharpProof worker result could not be published."));
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(diagnostic.ToString(), Does.Contain("SharpProof I/O paths must be distinct."));
             Assert.That(await File.ReadAllBytesAsync(sourceRequest.CompilerManifest.Path), Is.EqualTo(originalManifest));
+            Assert.That(File.Exists(privateRequest), Is.False);
+            Assert.That(File.Exists(privateResult), Is.False);
             Assert.That(File.Exists(publishedResult), Is.False);
             Assert.That(File.Exists(publishedManifest), Is.False);
-            var requestBytes = (await File.ReadAllBytesAsync(privateRequest)).ToImmutableArray();
-            Assert.That(await File.ReadAllBytesAsync(aliasRequest), Is.EqualTo(requestBytes));
-            var request = WorkerProtocolJson.DeserializeRequest(System.Text.Encoding.UTF8.GetString(requestBytes.AsSpan()))
-                ?? throw new AssertionException("The private request was not preserved.");
-            Assert.That(request.CompilerManifest.Path, Is.EqualTo(sourceRequest.CompilerManifest.Path));
-            Assert.That(request.CompilerManifest.Sha256, Is.EqualTo(sourceRequest.CompilerManifest.Sha256));
         }
         finally
         {
