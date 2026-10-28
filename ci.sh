@@ -21,8 +21,8 @@ image="${SHARPPROOF_TOOLING_IMAGE:-${project}-tooling:local}"
 lanes=(
   build
   worker-a1 worker-a4 worker-b projects-a projects-b gates-corpus-a gates-corpus-b gates-shards
-  package-0 package-1 package-2 package-3
-  self-apply-sources self-apply-samples repository evidence
+  package-0 package-1 package-2 package-3 package-4 package-5
+  self-apply repository evidence
 )
 
 docker_host_path() {
@@ -254,9 +254,8 @@ run_lane() {
     gates-corpus-a) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusA ;;
     gates-corpus-b) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusB ;;
     gates-shards) coverage_shard -CoveragePart Semantic -TaskGroup GatesShards ;;
-    package-[0-3]) coverage_shard -CoveragePart Package -PackagePartitionCount 4 -PackagePartition "${1#package-}" ;;
-    self-apply-sources) tooling self-apply -Configuration Release -SelfApplicationPhase Sources ;;
-    self-apply-samples) tooling self-apply -Configuration Release -SelfApplicationPhase Samples ;;
+    package-[0-5]) coverage_shard -CoveragePart Package -PackagePartitionCount 6 -PackagePartition "${1#package-}" ;;
+    self-apply) tooling self-apply -Configuration Release ;;
     repository)
       local status=0
       all_of lint docs layout tooling_regressions scan_image || status=$?
