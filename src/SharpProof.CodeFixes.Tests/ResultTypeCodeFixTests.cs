@@ -199,6 +199,113 @@ public sealed class ResultTypeCodeFixTests
         Assert.That(await GetFixesAsync(document, diagnostic), Is.Empty);
     }
 
+    [TestCase("Contract.Result<string>().Length > 0")]
+    [TestCase("Contract.Result<string>()[0] == 'x'")]
+    public async Task DeclinesReplacementThatInvalidatesTheSurroundingPredicate(string expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, expression);
+        var compilation = (await document.Project.GetCompilationAsync())!;
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        var diagnostic = (await AnalyzeAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Properties.ContainsKey("SharpProof.FixKind"));
+        Assert.That(await GetFixesAsync(document, diagnostic), Is.Empty);
+    }
+
+    [Test]
+    public async Task DeclinesReplacementContainingAnInternalConditionalDirective()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            using System.Collections.Generic;
+            public static class Fixture {
+                public static object Run() {
+                    Contract.Ensures(Contract.Result<List<
+            #if true
+                        int>>() != null);
+            #endif
+                    return new object();
+                }
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "true").WithText(SourceText.From(source));
+        var compilation = (await document.Project.GetCompilationAsync())!;
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        var diagnostic = (await AnalyzeAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Properties.ContainsKey("SharpProof.FixKind"));
+        Assert.That(await GetFixesAsync(document, diagnostic), Is.Empty);
+    }
+
+    [Test]
+    public async Task PreservesConditionalDirectivesOutsideTheReplacedType()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Fixture {
+                public static int Run() {
+            #if true
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+            #endif
+                    return 1;
+                }
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "true").WithText(SourceText.From(source));
+        var fixes = await GetFixesAsync(document, (await AnalyzeAsync(document)).Single());
+        Assert.That(fixes, Has.Length.EqualTo(1));
+        var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
+        var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        Assert.That((await changed.GetTextAsync()).ToString(), Does.Contain("#if true").And.Contain("#endif"));
+        Assert.That(await AnalyzeAsync(changed), Is.Empty);
+        Assert.That((await changed.Project.GetCompilationAsync())!.GetDiagnostics().Where(static diagnostic =>
+            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+    }
+
+    [TestCase("string?", "string")]
+    [TestCase("string", "string?")]
+    [TestCase("System.Collections.Generic.List<string?>", "System.Collections.Generic.List<string>")]
+    public async Task CorrectsNullableResultTypeAnnotations(string returnType, string resultType)
+    {
+        ArgumentNullException.ThrowIfNull(returnType);
+        ArgumentNullException.ThrowIfNull(resultType);
+        using var workspace = new AdhocWorkspace();
+        var source = "#nullable enable\nusing SharpProof.Attributes; public static class Fixture { public static " + returnType +
+            " Run() { Contract.Ensures(Contract.Result<" + resultType + ">() == null); return default!; } }";
+        var document = CreateDocument(workspace, "true").WithText(SourceText.From(source));
+        var diagnostic = (await AnalyzeAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Properties.ContainsKey("SharpProof.FixKind"));
+        var fixes = await GetFixesAsync(document, diagnostic);
+        Assert.That(fixes, Has.Length.EqualTo(1));
+        var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
+        var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        var compilation = (await changed.Project.GetCompilationAsync())!;
+        Assert.That(compilation.GetDiagnostics().Where(static item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(await AnalyzeAsync(changed), Is.Empty);
+    }
+
+    [Test]
+    public async Task CorrectionAllowsAnUnrelatedExistingCompilerErrorAfterTheEdit()
+    {
+        using var workspace = new AdhocWorkspace();
+        var document = CreateDocument(workspace, "Contract.Result<long>() >= 0");
+        document = document.WithText(SourceText.From((await document.GetTextAsync()).ToString() +
+            " public static class Unrelated { public static int Error() => missing; }"));
+        var diagnostic = (await AnalyzeAsync(document)).Single(item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Properties.ContainsKey("SharpProof.FixKind"));
+        var fixes = await GetFixesAsync(document, diagnostic);
+        Assert.That(fixes, Has.Length.EqualTo(1));
+        var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
+        var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
+        Assert.That((await changed.Project.GetCompilationAsync())!.GetDiagnostics().Where(static item =>
+            (item ?? throw new ArgumentNullException(nameof(item))).Severity == DiagnosticSeverity.Error).Single().Id,
+            Is.EqualTo("CS0103"));
+    }
     private sealed class DocumentDiagnostics : FixAllContext.DiagnosticProvider
     {
         private readonly DocumentId _documentId;
