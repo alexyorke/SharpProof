@@ -46,6 +46,7 @@ internal static class ProcessRunner
         ProcessStartInfo startInfo,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException(
                 "The process did not start: " + startInfo.FileName);

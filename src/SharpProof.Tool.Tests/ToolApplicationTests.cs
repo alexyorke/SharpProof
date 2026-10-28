@@ -71,6 +71,8 @@ public sealed class ToolApplicationTests
         handler!(null, eventArgs!);
         Assert.That(eventArgs!.Cancel, Is.True);
         Assert.That(scope.Token.IsCancellationRequested, Is.True);
+        scope.Dispose();
+        Assert.DoesNotThrow((Action)(() => handler!(null, eventArgs!)));
     }
 
     [TestCase(false)]

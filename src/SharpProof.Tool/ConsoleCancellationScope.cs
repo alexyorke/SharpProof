@@ -2,6 +2,8 @@ namespace SharpProof.Tool;
 
 internal sealed class ConsoleCancellationScope : IDisposable
 {
+    private readonly object _gate = new();
+    private bool _disposed;
     private readonly CancellationTokenSource _source = new();
     private readonly ConsoleCancelEventHandler _handler;
 
@@ -11,7 +13,13 @@ internal sealed class ConsoleCancellationScope : IDisposable
         {
             ArgumentNullException.ThrowIfNull(eventArgs);
             eventArgs.Cancel = true;
-            _source.Cancel();
+            lock (_gate)
+            {
+                if (!_disposed)
+                {
+                    _source.Cancel();
+                }
+            }
         };
         Console.CancelKeyPress += _handler;
     }
@@ -21,6 +29,14 @@ internal sealed class ConsoleCancellationScope : IDisposable
     public void Dispose()
     {
         Console.CancelKeyPress -= _handler;
-        _source.Dispose();
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            _source.Dispose();
+        }
     }
 }

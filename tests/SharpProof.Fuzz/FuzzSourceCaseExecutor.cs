@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -111,15 +112,56 @@ internal static class FuzzSourceCaseExecutor
         {
             using var scope = CreateFinite(null, cancellationToken);
             scope.RequireSafety(cancellationToken);
-            return await SmtFailureRetention.RetainFiniteDomainAsync(
+            var failure = await SmtFailureRetention.RetainFiniteDomainAsync(
                 scope.Factory, scope.Formula, index, seed, cancellationToken).ConfigureAwait(false);
+            if (_source is null) { return failure; }
+            var observed = BooleanSourceScope.Invoke(scope.Target!, _source.FiniteArguments);
+            return failure with { Original = DescribeSource(scope.Factory, scope.Formula,
+                normalCompletion: null, expectedOutcomes: [], observed.Value, observed.Exception?.GetType().FullName) };
         }
 
         internal async Task<FuzzFailure> RetainPartialAsync(int index, int seed, CancellationToken cancellationToken)
         {
             using var scope = CreatePartial(null, cancellationToken);
-            return await SmtFailureRetention.RetainPartialTermAsync(
+            var failure = await SmtFailureRetention.RetainPartialTermAsync(
                 scope.Factory, scope.Case, index, seed, cancellationToken).ConfigureAwait(false);
+            return _source is null ? failure : failure with { Original = DescribeSource(scope.Factory,
+                scope.Case.Formula, scope.Case.NormalCompletion, scope.Case.ExpectedOutcomes, null, null) };
+        }
+
+        private string DescribeSource(IrFactory factory, IrTerm formula, IrTerm? normalCompletion,
+            ImmutableArray<PartialTermSemanticOutcome> expectedOutcomes, bool? observedValue, string? observedException)
+        {
+            ArgumentNullException.ThrowIfNull(factory);
+            ArgumentNullException.ThrowIfNull(formula);
+            if (expectedOutcomes.IsDefault) { throw new ArgumentException("Array must be initialized.", nameof(expectedOutcomes)); }
+            var source = _source ?? throw new InvalidOperationException("Source replay inputs are unavailable.");
+            var printer = new IrPrinter(factory);
+            return JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                source.FiniteMembers,
+                FiniteArguments = source.FiniteArguments.Select(CaptureArgument).ToImmutableArray(),
+                source.PartialMembers,
+                PartialScenarios = source.PartialScenarios.Select(arguments =>
+                    arguments.IsDefault ? throw new ArgumentException("Scenario must be initialized.", nameof(arguments)) :
+                    arguments.Select(CaptureArgument).ToImmutableArray()).ToImmutableArray(),
+                Formula = printer.Print(formula),
+                NormalCompletion = normalCompletion is null ? null : printer.Print(normalCompletion),
+                ExpectedOutcomes = expectedOutcomes.Select(static outcome => outcome.ToString()).ToImmutableArray(),
+                ObservedValue = observedValue,
+                ObservedException = observedException
+            });
+        }
+
+        private static object CaptureArgument(object? value)
+        {
+            return new
+            {
+                Type = value?.GetType().FullName,
+                Value = value is char character ? ((ushort)character).ToString(CultureInfo.InvariantCulture)
+                    : Convert.ToString(value, CultureInfo.InvariantCulture)
+            };
         }
 
         private FiniteScope CreateFinite(IrFactory? generatedFactory, CancellationToken cancellationToken)
@@ -444,6 +486,7 @@ internal static class FuzzSourceCaseExecutor
                 var input = inputs[parameter.Ordinal];
                 var type = Factory.GetVariableInfo(binding.Variable).Type;
                 var value = input is bool boolean ? Factory.CreateBooleanValue(boolean)
+                    : input is ulong unsigned ? Factory.CreateIntegerValue(type, unsigned)
                     : Factory.CreateIntegerValue(type, Convert.ToInt64(input, CultureInfo.InvariantCulture));
                 result.Add(binding.Variable, value);
             }

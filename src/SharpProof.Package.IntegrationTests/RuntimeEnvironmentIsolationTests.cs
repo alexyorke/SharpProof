@@ -37,6 +37,8 @@ namespace SharpProof.Package.Test
         [TestCase("dotnet", false, true)]
         [TestCase("dotnet.exe", false, false)]
         [TestCase("dotnet.exe", true, true)]
+        [TestCase("DOTNET.EXE", true, true)]
+        [TestCase("DOTNET", false, false)]
         [TestCase("dotnet", true, false)]
         [TestCase("other.exe", true, false)]
         public void DirectMuxerNameMatchesTheHostPlatform(
@@ -44,6 +46,16 @@ namespace SharpProof.Package.Test
         {
             System.ArgumentNullException.ThrowIfNull(fileName);
             Assert.That(DotNetMuxer.IsFileName(fileName, isWindows), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void DotNetRootAcceptsItsTrailingSeparatorAndRejectsOtherDirectories()
+        {
+            var root = Path.GetDirectoryName(Environment.ProcessPath)!;
+            Assert.That(TrustedChildEnvironment.FindUnsafeRuntimeVariable(name =>
+                name == "DOTNET_ROOT" ? Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar : null), Is.Null);
+            Assert.That(TrustedChildEnvironment.FindUnsafeRuntimeVariable(name =>
+                name == "DOTNET_ROOT" ? Path.Combine(root, "different") : null), Is.EqualTo("DOTNET_ROOT"));
         }
 
         [Test]

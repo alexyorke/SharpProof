@@ -119,7 +119,7 @@ internal static class TestCompilation
                 source.FileName)),
             includeSharpProofReference
                 ? TestMetadataReferences.WithSharpProof
-                : TestMetadataReferences.Platform,
+                : TestMetadataReferences.WithoutSharpProof,
             new CSharpCompilationOptions(
                 outputKind,
                 nullableContextOptions: NullableContextOptions.Enable,
