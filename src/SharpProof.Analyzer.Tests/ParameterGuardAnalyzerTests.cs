@@ -624,6 +624,95 @@ public sealed class ParameterGuardAnalyzerTests
         Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'text' has no explicit guard", "Parameter 'value' has no explicit guard")));
     }
 
+    [Test]
+    public async Task CopiedNumericInputsStillRequireGuardsForHazardousUses()
+    {
+        const string source = """
+            public static class Sample
+            {
+                public static int Allocate(int length)
+                {
+                    var alias = length;
+                    return new int[alias].Length;
+                }
+                public static int Divide(int divisor)
+                {
+                    var first = divisor;
+                    var second = first;
+                    return 1 / second;
+                }
+                public static int PassThrough(int value)
+                {
+                    var alias = value;
+                    return alias;
+                }
+            }
+            """;
+        Assert.That(Messages(await Analyze(source, validateCompilation: true)), Is.EquivalentTo(ImmutableArray.Create(
+            "Parameter 'length' has no explicit guard",
+            "Parameter 'divisor' has no explicit guard")));
+    }
+
+    [Test]
+    public async Task CopiedNullableInputsStillRequireGuardsBeforeSuppressedDereferences()
+    {
+        const string source = """
+            #nullable enable
+            public static class Sample
+            {
+                public static int Missing(string? text)
+                {
+                    var first = text;
+                    var alias = first;
+                    return alias!.Length;
+                }
+                public static int Guarded(string? text)
+                {
+                    var alias = text;
+                    System.ArgumentNullException.ThrowIfNull(alias);
+                    return alias.Length;
+                }
+                public static int Independent(string? text)
+                {
+                    var alias = text;
+                    alias = "replacement";
+                    return alias!.Length;
+                }
+            }
+            """;
+        Assert.That(Messages(await Analyze(source, validateCompilation: true)),
+            Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
+    }
+
+    [Test]
+    public async Task OpaqueCallResultsAreNotParameterValueAliases()
+    {
+        const string source = """
+            #nullable enable
+            public static class Sample
+            {
+                public static int Numeric(int value)
+                {
+                    var result = Compute(value);
+                    return result.Value;
+                }
+                public static int Nullable(string? text)
+                {
+                    var result = Create(() => text);
+                    return result!.Length;
+                }
+                private static int? Compute(int value) => value;
+                private static string? Create(System.Func<string?> callback)
+                {
+                    System.ArgumentNullException.ThrowIfNull(callback);
+                    return "";
+                }
+            }
+            """;
+        Assert.That(await Analyze(source, validateCompilation: true), Is.Empty);
+    }
+
+
     private static ImmutableArray<string> Messages(IEnumerable<Diagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
@@ -631,7 +720,7 @@ public sealed class ParameterGuardAnalyzerTests
             (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source, string path = "input.cs", bool testAssembly = false)
+    private static async Task<ImmutableArray<Diagnostic>> Analyze(string source, string path = "input.cs", bool testAssembly = false, bool validateCompilation = false)
     {
         System.ArgumentNullException.ThrowIfNull(path);
         System.ArgumentNullException.ThrowIfNull(source);
@@ -642,8 +731,15 @@ public sealed class ParameterGuardAnalyzerTests
         {
             compilation = compilation.WithAssemblyName("AnalyzerFixture.Test");
         }
+        if (validateCompilation)
+        {
+            Assert.That(compilation.GetDiagnostics().Where(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
+        }
         var analyzers = compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
-        return await analyzers.GetAnalyzerDiagnosticsAsync();
+        var diagnostics = await analyzers.GetAnalyzerDiagnosticsAsync();
+        Assert.That(diagnostics.Any(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id == "AD0001"), Is.False,
+            string.Join(Environment.NewLine, diagnostics));
+        return diagnostics;
     }
 
 }

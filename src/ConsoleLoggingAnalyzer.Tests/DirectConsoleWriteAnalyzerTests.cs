@@ -13,6 +13,9 @@ public sealed class DirectConsoleWriteAnalyzerTests
     [TestCase("System.Console.Out.WriteLine(1);")]
     [TestCase("((System.IO.TextWriter)System.Console.Out).WriteLine(1);")]
     [TestCase("System.Console.Error.WriteLineAsync(\"failure\");")]
+    [TestCase("System.Console.Out?.WriteLine(\"line\");")]
+    [TestCase("System.Console.Error?.WriteLineAsync(\"failure\");")]
+    [TestCase("((System.IO.TextWriter)System.Console.Out)?.WriteLine(1);")]
     public async Task DirectConsoleLineWritesAreRejected(string call)
     {
         System.ArgumentNullException.ThrowIfNull(call);
@@ -47,6 +50,8 @@ public sealed class DirectConsoleWriteAnalyzerTests
                 void Run(TextWriter writer) {
                     writer.WriteLine("line");
                     writer.WriteLineAsync("line");
+                    writer?.WriteLine("line");
+                    writer?.WriteLineAsync("line");
                     new Logger(writer).Info("line");
                 }
             }

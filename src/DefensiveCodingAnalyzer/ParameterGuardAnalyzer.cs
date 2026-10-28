@@ -375,7 +375,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             .Where(static expression =>
                 expression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
             .Any(expression => IsDereferenceReceiver(expression) &&
-                MentionsWithoutNestedCallables(expression.Operand, parameter, model, cancellationToken));
+                MentionsThroughAliasesWithoutNestedCallables(expression.Operand, parameter, model, cancellationToken));
     }
     private static bool IsDereferenceReceiver(ExpressionSyntax expression)
     {
@@ -424,8 +424,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!SymbolEqualityComparer.Default.Equals(
-                model.GetSymbolInfo(identifier, cancellationToken).Symbol, parameter))
+            if (!MentionsThroughAliasesWithoutNestedCallables(identifier, parameter, model, cancellationToken))
             {
                 continue;
             }
@@ -640,16 +639,57 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                name is "Requires" or "NotNull";
     }
 
-    private static bool MentionsWithoutNestedCallables(
+    private static bool MentionsThroughAliasesWithoutNestedCallables(
         SyntaxNode expression,
         IParameterSymbol parameter,
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        return expression.DescendantNodesAndSelf(node => ReferenceEquals(node, expression) || DescendIntoCallable(node))
-            .OfType<IdentifierNameSyntax>().Any(identifier =>
-                SymbolEqualityComparer.Default.Equals(model.GetSymbolInfo(identifier, cancellationToken).Symbol, parameter));
+        return expression.DescendantNodesAndSelf(DescendIntoCallable).OfType<IdentifierNameSyntax>()
+            .Any(identifier => IsParameterValueAlias(identifier, parameter, model,
+                ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default), cancellationToken));
     }
+    private static bool IsParameterValueAlias(ExpressionSyntax expression, IParameterSymbol parameter,
+        SemanticModel model, ImmutableHashSet<ISymbol>.Builder visited, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            if (expression is ParenthesizedExpressionSyntax parentheses)
+            {
+                expression = parentheses.Expression;
+            }
+            else if (expression is CastExpressionSyntax cast &&
+                model.GetOperation(cast, cancellationToken) is IConversionOperation { OperatorMethod: null })
+            {
+                expression = cast.Expression;
+            }
+            else if (expression is PostfixUnaryExpressionSyntax suppression &&
+                suppression.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+            {
+                expression = suppression.Operand;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (expression is not IdentifierNameSyntax identifier)
+        {
+            return false;
+        }
+        var symbol = model.GetSymbolInfo(identifier, cancellationToken).Symbol;
+        if (SymbolEqualityComparer.Default.Equals(symbol, parameter))
+        {
+            return true;
+        }
+        return symbol is ILocalSymbol local && visited.Add(local) &&
+            local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is
+                VariableDeclaratorSyntax { Initializer.Value: { } initializer } &&
+            IsParameterValueAlias(initializer, parameter, model, visited, cancellationToken) &&
+            Mentions(identifier, parameter, model, cancellationToken);
+    }
+
     private static bool Mentions(
         SyntaxNode expression,
         IParameterSymbol parameter,
