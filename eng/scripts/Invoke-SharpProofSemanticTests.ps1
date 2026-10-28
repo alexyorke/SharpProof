@@ -27,10 +27,10 @@ param(
     [switch]$AttributesCollectedSeparately,
 
     # Coverage may split the original corpus selection into snapshot workflows
-    # and its complete complement. Analyzer, ProjectsRest, and Extras partition
-    # the original Projects group; the isolated collectors run in Extras.
+    # and its complete complement. ProjectsA and ProjectsB partition the
+    # Projects group, and WorkerA1 and WorkerA4 partition WorkerA.
     # Legacy groups and All preserve the existing local task selections.
-    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerA4A', 'WorkerA4B', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'Analyzer', 'ProjectsRest', 'Extras')]
+    [ValidateSet('All', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerA4A', 'WorkerA4B', 'WorkerB', 'WorkerB2', 'WorkerB3', 'Projects', 'ProjectsA', 'ProjectsB')]
     [string]$TaskGroup = 'All'
 )
 
@@ -447,6 +447,11 @@ if ($TaskGroup -ne 'All') {
     # other Worker task, so a new remainder shard still runs exactly once.
     $workerBTaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
         'worker-remainder-2', 'worker-remainder-3')
+    # ProjectsA takes the four slowest suites outside Worker and Gates;
+    # ProjectsB takes the rest of Projects, so a new suite runs exactly once.
+    $projectsATaskNames = [Collections.Immutable.ImmutableArray]::Create[string](
+        'semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests',
+        'semantic-sharpproof.developerexperience.tests', 'semantic-sharpproof.tool.tests')
     # Capture the name first: inside switch, $_ is the switch value.
     $taskSnapshot = $taskBuilder.ToImmutable()
     $selectedTasks = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($taskSnapshot | Where-Object {
@@ -459,16 +464,15 @@ if ($TaskGroup -ne 'All') {
                     'Worker' { $taskName -cin $workerTaskNames }
                     'WorkerA' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames }
                     'WorkerB' { $taskName -cin $workerBTaskNames }
-                    'WorkerA1' { $taskName -cin @('worker-remainder-1', 'worker-fixed-checksum') }
+                    'WorkerA1' { $taskName -cin $workerTaskNames -and $taskName -cnotin $workerBTaskNames -and $taskName -cne 'worker-remainder-4' }
                     'WorkerA4' { $taskName -ceq 'worker-remainder-4' }
                     'WorkerA4A' { $taskName -ceq 'worker-remainder-4' }
                     'WorkerA4B' { $taskName -ceq 'worker-remainder-4' }
                     'WorkerB2' { $taskName -ceq 'worker-remainder-2' }
                     'WorkerB3' { $taskName -ceq 'worker-remainder-3' }
                     'Projects' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames }
-                    'Analyzer' { $taskName -cin @('semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
-                    'ProjectsRest' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin @('architecture', 'semantic-sharpproof.analyzer.tests', 'semantic-sharpproof.fuzz.tests') }
-                    'Extras' { $taskName -ceq 'architecture' }
+                    'ProjectsA' { $taskName -cin $projectsATaskNames }
+                    'ProjectsB' { $taskName -cne 'gates-corpus' -and $taskName -cnotin $gatesRemainderTaskNames -and $taskName -cnotin $workerTaskNames -and $taskName -cnotin $projectsATaskNames }
                 }
             }))
     $taskBuilder = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()

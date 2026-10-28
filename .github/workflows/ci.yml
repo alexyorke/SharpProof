@@ -40,6 +40,10 @@ jobs:
   lanes:
     name: ${{ matrix.lane }}
     needs: plan
+    # setup-tooling pulls the tooling image from GHCR, and master pushes publish it.
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:

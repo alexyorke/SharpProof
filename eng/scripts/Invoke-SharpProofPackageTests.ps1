@@ -874,10 +874,9 @@ try {
         Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/Settings:' + $settings), ('/ListTestsTargetPath:' + (Join-Path $partitionEvidence 'discovered-tests.txt'))) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
         Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $testAssembly) ('Dump/D_' + [IO.Path]::GetFileName($testAssembly) + '.dump')) -Destination (Join-Path $partitionEvidence 'discovery.dump')
         $universe = @(Read-SharpProofPackageDiscovery -Dump (Join-Path $partitionEvidence 'discovery.dump') -Filter $TestFilter)
-        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackagePartition -Method $_.method) -eq $PackagePartition })
+        $partitionCases = @($universe | Where-Object { (Get-SharpProofPackagePartition -Method $_.filter) -eq $PackagePartition })
         if ($partitionCases.Count -eq 0) { throw 'Package partition selected no cases.' }
-        $partitionMethods = @($partitionCases | ForEach-Object { $_.method } | Sort-Object -Unique -CaseSensitive)
-        $partitionFilter = @($partitionMethods | ForEach-Object { 'FullyQualifiedName~' + $_ }) -join '|'
+        $partitionFilter = @($partitionCases | ForEach-Object { $_.filter } | Sort-Object -Unique -CaseSensitive) -join '|'
         $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
         foreach ($shard in $shardBuilder) {
             $filter = "($($shard.Filter))&($partitionFilter)"

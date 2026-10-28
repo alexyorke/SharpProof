@@ -16,6 +16,11 @@ dotnet_diagnostic.IDE0060.severity = warning
 # CA1508 is prohibitively expensive on several analyzer control-flow routines
 # and has produced false positives for nullable values assigned across branches.
 dotnet_diagnostic.CA1508.severity = none
+# CA5390 and CA5403 taint-track every value in search of hard-coded keys and
+# certificates; on the artifact codecs they took 3.5 of a 4-minute build, and
+# the repository uses no symmetric crypto or certificates.
+dotnet_diagnostic.CA5390.severity = none
+dotnet_diagnostic.CA5403.severity = none
 
 # CA1062 (validate arguments of public methods) is enabled explicitly so the
 # defensive-coding audit keeps its null guards visible in the build.

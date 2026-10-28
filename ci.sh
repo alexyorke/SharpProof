@@ -3,8 +3,8 @@
 # runner by calling this script; nothing else in .github decides what runs.
 #
 #   ./ci.sh                 build the image, run every lane in order, merge coverage
-#   ./ci.sh build format    run the named lanes
-#   ./ci.sh image           build the tooling image
+#   ./ci.sh build projects  run the named lanes
+#   ./ci.sh image           build the tooling image (or pull it; see pull_or_build_image)
 #   ./ci.sh coverage        merge artifacts/coverage/**/lines.tsv into summary.md
 #   ./ci.sh nightly fuzz-0  scheduled lanes (nightly.yml); release-packages (release.yml)
 #   ./ci.sh --list          print the lane names as JSON (the CI matrix)
@@ -20,9 +20,9 @@ image="${project}-tooling:local"
 
 lanes=(
   build
-  worker-a worker-b projects gates-corpus gates-shards
+  worker-a1 worker-a4 worker-b projects-a projects-b gates-corpus-a gates-corpus-b gates-shards
   package-0 package-1 package-2 package-3
-  self-apply-sources self-apply-samples format repository
+  self-apply-sources self-apply-samples repository evidence
 )
 
 tooling() {
@@ -66,6 +66,29 @@ build_image() {
     container="$(docker create "$image")"
     docker cp "$container:/opt/sharpproof/windows-native" "$cache/payload"
     docker rm "$container" > /dev/null
+  fi
+}
+
+# With SHARPPROOF_IMAGE_REGISTRY set (CI sets ghcr.io/<owner>/sharpproof-tooling),
+# reuse the image published for this exact eng/container tree, or build it.
+# The Dockerfile pins every base image and download by digest, so the tree's
+# git hash identifies the image. SHARPPROOF_IMAGE_PUSH=1 publishes a fresh build.
+pull_or_build_image() {
+  local registry="${SHARPPROOF_IMAGE_REGISTRY:-}"
+  if [[ -z "$registry" ]]; then
+    build_image
+    return
+  fi
+  local remote
+  remote="$registry:$(git ls-files --stage eng/container | sha256sum | cut -c1-64)"
+  if docker pull --quiet --platform linux/amd64 "$remote"; then
+    docker tag "$remote" "$image"
+    return
+  fi
+  build_image
+  if [[ "${SHARPPROOF_IMAGE_PUSH:-}" == 1 ]]; then
+    docker tag "$image" "$remote"
+    docker push --quiet "$remote" || echo "::warning::Could not publish $remote."
   fi
 }
 
@@ -185,28 +208,41 @@ isolated_coverage() { tooling coverage -CoveragePart Isolated; }
 
 run_lane() {
   case "$1" in
-    build) tooling security -Configuration Release ;; # dependency audit + full analyzer build
-    worker-a) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA ;;
+    # Dependency audit, then the full analyzer build with -warnaserror, which
+    # format-check relies on for everything beyond whitespace.
+    build) tooling security -Configuration Release && tooling format-check ;;
+    # Each pair below partitions one task group, split to keep lanes near 5 minutes.
+    worker-a1) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA1 ;;
+    worker-a4) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA4 ;;
     worker-b) coverage_shard -CoveragePart Semantic -TaskGroup WorkerB ;;
-    projects) coverage_shard -CoveragePart Semantic -TaskGroup Projects ;;
-    gates-corpus) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpus ;;
+    projects-a) coverage_shard -CoveragePart Semantic -TaskGroup ProjectsA ;;
+    projects-b) coverage_shard -CoveragePart Semantic -TaskGroup ProjectsB ;;
+    gates-corpus-a) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusA ;;
+    gates-corpus-b) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusB ;;
     gates-shards) coverage_shard -CoveragePart Semantic -TaskGroup GatesShards ;;
     package-[0-3]) coverage_shard -CoveragePart Package -PackagePartitionCount 4 -PackagePartition "${1#package-}" ;;
     self-apply-sources) tooling self-apply -Configuration Release -SelfApplicationPhase Sources ;;
     self-apply-samples) tooling self-apply -Configuration Release -SelfApplicationPhase Samples ;;
-    format) tooling format-check ;;
     repository)
       local status=0
-      all_of lint docs layout api_evidence isolated_coverage scan_image || status=$?
+      all_of lint docs layout scan_image || status=$?
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-        cat artifacts/lint/summary.md artifacts/api-coverage/*.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+        cat artifacts/lint/summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+      fi
+      return "$status"
+      ;;
+    evidence)
+      local status=0
+      all_of api_evidence isolated_coverage || status=$?
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        cat artifacts/api-coverage/*.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
       fi
       return "$status"
       ;;
     nightly) tooling nightly ;;
     fuzz-[0-9]*) fuzz_shard "${1#fuzz-}" ;;
     release-packages) release_packages ;;
-    image) build_image ;;
+    image) pull_or_build_image ;;
     image-key) image_key ;;
     coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge ;;
     *)
