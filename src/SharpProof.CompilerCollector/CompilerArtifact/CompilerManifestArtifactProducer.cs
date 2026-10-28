@@ -33,7 +33,7 @@ internal static class CompilerManifestArtifactProducer
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error &&
                 !item.IsSuppressed))
-            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (CreateDiagnostic(item, snapshot)));
+            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (CreateDiagnostic(item, compilation, snapshot)));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
@@ -156,8 +156,10 @@ internal static class CompilerManifestArtifactProducer
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(
         Diagnostic diagnostic,
+        CSharpCompilation sourceCompilation,
         CompilerCompilationSnapshot compilation)
     {
+        sourceCompilation = RepositoryParameterGuard.NotNull(sourceCompilation, nameof(sourceCompilation));
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
@@ -168,6 +170,14 @@ internal static class CompilerManifestArtifactProducer
         var sourceLineMapSha256 = string.Empty;
         if (source)
         {
+            if (diagnostic.Location.SourceTree is { } sourceTree)
+            {
+                var ordinal = sourceCompilation.SyntaxTrees.IndexOf(sourceTree);
+                if (ordinal >= 0)
+                {
+                    CompilerSourceCoordinates.RememberTree(location, ordinal);
+                }
+            }
             CompilerSourceCoordinates.Bind(
                 location,
                 compilation,

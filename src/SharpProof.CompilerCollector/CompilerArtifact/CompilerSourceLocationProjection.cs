@@ -59,9 +59,13 @@ internal static class CompilerSourceLocationProjection
         var sourceDirectory = string.IsNullOrEmpty(sourcePath)
             ? null
             : Path.GetDirectoryName(sourceDirectoryPath);
+        // An unmapped relative path already includes its source directory.
+        // Only an explicit #line filename is relative to that directory.
         return string.IsNullOrEmpty(sourceDirectory)
             ? normalizedPath
-            : Path.GetFullPath(Path.Combine(sourceDirectory, normalizedPath));
+            : mapped.HasMappedPath
+                ? Path.GetFullPath(Path.Combine(sourceDirectory, normalizedPath))
+                : Path.GetFullPath(normalizedPath);
     }
 
     private static bool IsWindowsDriveAbsolute(string path)

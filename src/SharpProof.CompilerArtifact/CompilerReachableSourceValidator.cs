@@ -51,7 +51,7 @@ internal static class CompilerReachableSourceValidator
                 !bodyBuilder.ContainsKey(body.BodyId) && !body.Callees.IsDefault && body.Callees.Length <= 4096 &&
                 !body.SourceCalls.IsDefault && body.SourceCalls.Length <= 4096 &&
                 !body.ParameterTypes.IsDefault && body.ParameterTypes.Length <= 4096 &&
-                body.ParameterTypes.All(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (!string.IsNullOrWhiteSpace(type))));
+                body.ParameterTypes.All(type => type != null && !string.IsNullOrWhiteSpace(type)));
             bodyBuilder.AddUnique(body.BodyId, body);
             if (body.Graph != null)
             {
@@ -82,7 +82,7 @@ internal static class CompilerReachableSourceValidator
         }
         foreach (var body in artifact.Bodies)
         {
-            Require(body.Callees.All(callee => callee is null ? throw new System.ArgumentNullException(nameof(callee)) : (callee != null && bodies.ContainsKey(callee))) &&
+            Require(body.Callees.All(callee => callee != null && bodies.ContainsKey(callee)) &&
                 body.Callees.Distinct(StringComparer.Ordinal).Count() == body.Callees.Length);
             if (artifact.CollectionComplete)
             { Require(body.CallsComplete); }

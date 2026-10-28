@@ -382,6 +382,7 @@ internal static class CompilerManifestArtifactJson
     {
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return !callables.IsDefault && callables.Length == manifest.Callables.Length &&
+        callables.All(static item => item != null) &&
         callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
             manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
             StringComparer.Ordinal);
@@ -392,14 +393,14 @@ internal static class CompilerManifestArtifactJson
         bool hasCompilerDiagnostics)
     {
         return !callables.IsDefault && callables.All(callable =>
-            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable != null &&
+            callable != null &&
             (!hasCompilerDiagnostics ||
              (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason && callable.Total == null)) &&
             (callable.FailureReason ==
                 CompilerCallableArtifactReasonCatalog.SuccessReason ||
              CompilerCallableArtifactReasonCatalog.IsFailureReason(
-                 callable.FailureReason)))) == true;
+                 callable.FailureReason))) == true;
     }
 
 }
