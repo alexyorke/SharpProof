@@ -74,6 +74,56 @@ public sealed class AdvisoryEffectDiagnosticsTests
         }
     }
 
+    [TestCase("System.ArgumentException", "return 10 / x;", true)]
+    [TestCase("System.ArithmeticException", "return 10 / x;", false)]
+    [TestCase("System.Exception", "return 10 / x;", false)]
+    [TestCase("System.ArgumentException", "throw new System.InvalidOperationException(\"message\");", true)]
+    [TestCase("System.InvalidOperationException", "throw new System.InvalidOperationException(\"message\");", false)]
+    public async Task EffectContractChecksExceptionTypesAfterPermittingThrows(string allowed, string body, bool warns)
+    {
+        System.ArgumentNullException.ThrowIfNull(allowed);
+        System.ArgumentNullException.ThrowIfNull(body);
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            Source("[EffectContract(SharpProofEffect.Throws | SharpProofEffect.Allocates, " +
+                $"ThrownExceptions = new[] {{ typeof({allowed}) }}, Complete = true)]", body),
+            "effects", ["SP0052", "SP0047", "SP0024"], new SharpProofAnalyzer(factory));
+        AnalyzerTestHost.AssertIds(diagnostics, warns ? ["SP0052"] : []);
+        if (warns)
+        { AnalyzerTestHost.AssertMessageContains(diagnostics[0], "undeclared effects: Throws"); }
+        Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task EffectContractAccountsForCaughtAndEscapingFaultAllocations(bool declaresAllocation, bool catchesException)
+    {
+        var effects = "SharpProofEffect.Throws" + (declaresAllocation ? " | SharpProofEffect.Allocates" : "");
+        var body = catchesException
+            ? "try { return 10 / x; } catch (System.Exception) { return 0; }"
+            : "return 10 / x;";
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            Source("[EffectContract(" + effects + ", ThrownExceptions = new[] { typeof(System.Exception) }, Complete = true)]", body),
+            "effects", ["SP0052", "SP0047", "SP0024"], new SharpProofAnalyzer(factory));
+        AnalyzerTestHost.AssertIds(diagnostics, declaresAllocation ? [] : ["SP0052"]);
+        if (!declaresAllocation)
+        { AnalyzerTestHost.AssertMessageContains(diagnostics[0], "undeclared effects: Allocates"); }
+        Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task CaughtFaultNeedsAllocationPermissionWithoutAnEscapingThrowPermission()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            Source("[EffectContract(SharpProofEffect.Allocates, Complete = true)]",
+                "try { return 10 / x; } catch (System.Exception) { return 0; }"),
+            "effects", ["SP0052", "SP0047", "SP0024"]);
+        Assert.That(diagnostics, Is.Empty);
+    }
+
     [TestCase("SharpProofEffect.None", true)]
     [TestCase("SharpProofEffect.Throws, ThrownExceptions = new[] { typeof(System.InvalidOperationException) }", false)]
     public async Task ATrustedBoundaryDecidesTheClaimsItsContractSatisfies(string effects, bool proven)

@@ -63,6 +63,15 @@ internal static class AdvisoryRequiresDiagnostics
         {
             var call = calls[snapshot.Marker];
             var location = body.Locate(snapshot.Marker.Operation) ?? Location.None;
+            // Source calls can inline a suppressed local or ordinary method.
+            // Keep its execution and preconditions in the IR, but apply the
+            // reporting policy of the declaration that owns this call site.
+            if (location.SourceTree is { } tree &&
+                Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree)
+                    .GetEnclosingSymbol(location.SourceSpan.Start, cancellationToken) is IMethodSymbol owner &&
+                SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+                    owner, session, reportDiagnostic, cancellationToken))
+            { continue; }
             reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.RequiresNotProvenRule, location,
                 CalleeName(compilation, location, call.CalleeIdentity, cancellationToken),
                 ClauseText(body.Locate(call.ClauseSite))));
