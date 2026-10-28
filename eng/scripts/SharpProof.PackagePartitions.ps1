@@ -13,7 +13,7 @@ function Get-SharpProofPackagePartition {
 function Read-SharpProofPackageDiscovery {
     param([string]$Dump, [string]$Filter = '')
     [xml]$document = Get-Content -LiteralPath $Dump -Raw
-    $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $found = [Collections.Generic.List[object]]::new()
     foreach ($test in $document.SelectNodes('//*[local-name()="test-case"]')) {
         $categories = @($test.SelectNodes('ancestor-or-self::*/*[local-name()="properties"]/*[local-name()="property"][@name="Category"]') | ForEach-Object { [string]$_.value })
         if ($Filter -ne '' -and @($categories | Where-Object { $_ -in @('Performance', 'Coverage', 'Corpus') }).Count -gt 0) { continue }
@@ -21,16 +21,29 @@ function Read-SharpProofPackageDiscovery {
         if ($method -notmatch '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*\.[A-Za-z_][A-Za-z0-9_]*$' -or [string]::IsNullOrWhiteSpace([string]$test.fullname)) {
             throw 'Package discovery has an invalid method or case name.'
         }
-        # Cases renamed with TestName= have a plain, unique name and are
-        # partitioned one by one; a method's other cases stay together.
         $name = [string]$test.fullname
-        $filter = if ($name -ne $method -and $name -match '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*$') {
-            'FullyQualifiedName=' + $name
+        $found.Add([pscustomobject]@{ method = $method; name = $name; renamed = $name -ne $method -and $name -match '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*$' })
+    }
+    # Cases renamed with TestName= are partitioned one by one. NUnit matches
+    # FullyQualifiedName~Method against the method's suite and runs all of its
+    # cases, renamed ones included, so the other cases of such a method get
+    # exact filters too; every other method's cases stay together.
+    $split = [Collections.Generic.HashSet[string]]::new([string[]]@($found | Where-Object renamed | ForEach-Object method), [StringComparer]::Ordinal)
+    $cases = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    foreach ($case in $found) {
+        $filter = if ($case.renamed) {
+            'FullyQualifiedName=' + $case.name
+        }
+        elseif ($split.Contains($case.method)) {
+            if ($case.name -notmatch '^SharpProof\.[A-Za-z0-9_.+`]*\([A-Za-z0-9_.,\- ]*\)$') {
+                throw "Package case $($case.name) needs a TestName to be partitioned with its renamed siblings."
+            }
+            'FullyQualifiedName=' + ($case.name -replace '([()])', '\$1')
         }
         else {
-            'FullyQualifiedName~' + $method
+            'FullyQualifiedName~' + $case.method
         }
-        $cases.Add(([ordered]@{ method = $method; name = $name; filter = $filter }).AsReadOnly())
+        $cases.Add(([ordered]@{ method = $case.method; name = $case.name; filter = $filter }).AsReadOnly())
     }
     if ($cases.Count -eq 0) { throw 'Package partition discovery is empty.' }
     return $cases.ToImmutable()

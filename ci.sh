@@ -20,9 +20,9 @@ image="${project}-tooling:local"
 
 lanes=(
   build
-  worker-a worker-b projects gates-corpus gates-shards
+  worker-a1 worker-a4 worker-b projects-a projects-b gates-corpus-a gates-corpus-b gates-shards
   package-0 package-1 package-2 package-3
-  self-apply-sources self-apply-samples repository
+  self-apply-sources self-apply-samples repository evidence
 )
 
 tooling() {
@@ -211,19 +211,31 @@ run_lane() {
     # Dependency audit, then the full analyzer build with -warnaserror, which
     # format-check relies on for everything beyond whitespace.
     build) tooling security -Configuration Release && tooling format-check ;;
-    worker-a) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA ;;
+    # Each pair below partitions one task group, split to keep lanes near 5 minutes.
+    worker-a1) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA1 ;;
+    worker-a4) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA4 ;;
     worker-b) coverage_shard -CoveragePart Semantic -TaskGroup WorkerB ;;
-    projects) coverage_shard -CoveragePart Semantic -TaskGroup Projects ;;
-    gates-corpus) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpus ;;
+    projects-a) coverage_shard -CoveragePart Semantic -TaskGroup ProjectsA ;;
+    projects-b) coverage_shard -CoveragePart Semantic -TaskGroup ProjectsB ;;
+    gates-corpus-a) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusA ;;
+    gates-corpus-b) coverage_shard -CoveragePart Semantic -TaskGroup GatesCorpusB ;;
     gates-shards) coverage_shard -CoveragePart Semantic -TaskGroup GatesShards ;;
     package-[0-3]) coverage_shard -CoveragePart Package -PackagePartitionCount 4 -PackagePartition "${1#package-}" ;;
     self-apply-sources) tooling self-apply -Configuration Release -SelfApplicationPhase Sources ;;
     self-apply-samples) tooling self-apply -Configuration Release -SelfApplicationPhase Samples ;;
     repository)
       local status=0
-      all_of lint docs layout api_evidence isolated_coverage scan_image || status=$?
+      all_of lint docs layout scan_image || status=$?
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-        cat artifacts/lint/summary.md artifacts/api-coverage/*.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+        cat artifacts/lint/summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+      fi
+      return "$status"
+      ;;
+    evidence)
+      local status=0
+      all_of api_evidence isolated_coverage || status=$?
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        cat artifacts/api-coverage/*.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
       fi
       return "$status"
       ;;

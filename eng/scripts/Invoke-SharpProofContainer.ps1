@@ -24,7 +24,7 @@ param(
 
     # CI runs the Remaining cohort's Worker remainder shards and its other
     # tasks on separate runners; the cohort gate requires every part.
-    [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerB', 'Projects', 'GatesCorpus', 'GatesShards')]
+    [ValidateSet('All', 'Worker', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerB', 'Projects', 'ProjectsA', 'ProjectsB', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards')]
     [string]$TaskGroup = 'All',
 
     [string]$TestResultsDirectory = '',
