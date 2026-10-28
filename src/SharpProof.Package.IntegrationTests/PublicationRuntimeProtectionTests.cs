@@ -53,6 +53,73 @@ public sealed class PublicationRuntimeProtectionTests
         Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "result.json")), Is.EqualTo("result"));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MissingStandaloneWorkerDoesNotClaimItsParentDirectory(bool clean)
+    {
+        using var fixture = new Fixture();
+        var worker = Path.Combine(fixture.Root, "missing-worker.dll");
+        var invalidation = fixture.Invalidation();
+        invalidation.WorkerPath = worker;
+        var succeeded = clean
+            ? new ResetPublishedVerification
+            {
+                BuildEngine = fixture.Engine,
+                ProjectDirectory = fixture.Root,
+                RequestPath = "request.json",
+                ResultPath = "result.json",
+                ManifestPath = "manifest.json",
+                WorkerPath = worker
+            }.Execute()
+            : invalidation.Execute();
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(fixture.Engine.Errors, Is.Empty);
+        Assert.That(File.Exists(Path.Combine(fixture.Root, "result.json")), Is.False);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void MissingPackageWorkerStillProtectsNativePayloads(bool clean)
+    {
+        using var fixture = new Fixture();
+        File.Delete(fixture.Worker);
+        var invalidation = fixture.Invalidation();
+        invalidation.InvocationManifestPath = fixture.Native;
+        var succeeded = clean
+            ? new ResetPublishedVerification
+            {
+                BuildEngine = fixture.Engine,
+                ProjectDirectory = fixture.Root,
+                RequestPath = "request.json",
+                ResultPath = fixture.Native,
+                ManifestPath = "manifest.json",
+                WorkerPath = fixture.Worker
+            }.Execute()
+            : invalidation.Execute();
+
+        Assert.That(succeeded, Is.False);
+        Assert.That(fixture.Engine.Errors.Single().Message, Does.Contain("inside the worker runtime"));
+        Assert.That(File.ReadAllText(fixture.Native), Is.EqualTo("runtime"));
+        Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "request.json")), Is.EqualTo("request"));
+        Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "result.json")), Is.EqualTo("result"));
+    }
+
+    [Test]
+    public void ExistingStandaloneWorkerStillProtectsItsParentDirectory()
+    {
+        using var fixture = new Fixture();
+        var worker = Path.Combine(fixture.Root, "standalone-worker.dll");
+        File.WriteAllText(worker, "runtime");
+        var task = fixture.Invalidation();
+        task.WorkerPath = worker;
+
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(fixture.Engine.Errors.Single().Message, Does.Contain("inside the worker runtime"));
+        Assert.That(File.ReadAllText(worker), Is.EqualTo("runtime"));
+        Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "result.json")), Is.EqualTo("result"));
+    }
+
     [TestCase("compiler")]
     [TestCase("source")]
     [TestCase("publication")]

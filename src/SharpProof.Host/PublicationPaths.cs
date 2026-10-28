@@ -25,10 +25,9 @@ internal static class PublicationPaths
         var worker = PublicationLease.CanonicalMember(workerPath);
         var workerFile = new FileInfo(worker);
         var workerTarget = workerFile.LinkTarget == null ? null : workerFile.ResolveLinkTarget(returnFinalTarget: true);
-        var directories = ImmutableArray.Create(Path.GetDirectoryName(worker)!,
-            Path.GetDirectoryName(PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker)) ??
-                throw new InvalidDataException("The worker runtime link target must name a file."))
-            .Select(RuntimeDirectory).Distinct(Comparer).ToImmutableArray();
+        var directories = ImmutableArray.Create(worker,
+            PublicationLease.CanonicalMember(workerTarget?.FullName ?? worker))
+            .Select(RuntimeDirectory).OfType<string>().Distinct(Comparer).ToImmutableArray();
         foreach (var path in paths)
         {
             var member = PublicationLease.CanonicalMember(path);
@@ -42,15 +41,21 @@ internal static class PublicationPaths
         }
     }
 
-    private static string RuntimeDirectory(string managedDirectory)
+    private static string? RuntimeDirectory(string workerPath)
     {
-        ArgumentNullException.ThrowIfNull(managedDirectory);
-        // Package runtimes include native payloads beside tools/net10. Other
-        // worker layouts retain their existing containing-directory boundary.
-        var directory = new DirectoryInfo(managedDirectory);
-        return Comparer.Equals(directory.Name, "net10") &&
-            directory.Parent is { } parent && Comparer.Equals(parent.Name, "tools")
-            ? parent.FullName : directory.FullName;
+        ArgumentNullException.ThrowIfNull(workerPath);
+        var directory = new DirectoryInfo(Path.GetDirectoryName(workerPath) ??
+            throw new InvalidDataException("The worker runtime path must name a file."));
+        // Package runtimes include native payloads beside tools/net10, even
+        // when the managed payload is missing from a partial installation.
+        if (Comparer.Equals(directory.Name, "net10") &&
+            directory.Parent is { } parent && Comparer.Equals(parent.Name, "tools"))
+        {
+            return parent.FullName;
+        }
+        // An inactive verifier may use a missing standalone override in the
+        // project directory. It does not establish a runtime directory there.
+        return File.Exists(workerPath) ? directory.FullName : null;
     }
 
     internal static bool IsWithin(string path, string directory)

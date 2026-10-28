@@ -694,7 +694,8 @@ try {
                     'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
                     'NaNPublicBuildWorkflowAuditTests',
                     'VerifierPackageDefaultsTests',
-                    'VerificationPublicationNullArgumentTests|PublicationRuntimeProtectionTests',
+                    'VerificationPublicationNullArgumentTests',
+                    'PublicationRuntimeProtectionTests',
                     'FinalCompilationProbeTests')))
         $plannedFixtureBuilder = [Collections.Immutable.ImmutableHashSet]::CreateBuilder[string](
             [StringComparer]::Ordinal)
