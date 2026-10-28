@@ -26,7 +26,7 @@ param(
     [string]$Part = 'All',
 
     [Parameter()]
-    [ValidateSet('All', 'WorkerA', 'WorkerB', 'Projects', 'GatesCorpus', 'GatesShards')]
+    [ValidateSet('All', 'WorkerA', 'WorkerA1', 'WorkerA4', 'WorkerB', 'Projects', 'ProjectsA', 'ProjectsB', 'GatesCorpus', 'GatesCorpusA', 'GatesCorpusB', 'GatesShards')]
     [string]$TaskGroup = 'All',
 
     [Parameter()]
