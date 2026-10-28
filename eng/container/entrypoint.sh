@@ -17,6 +17,11 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof > /dev/null 2>&1; then
   if [[ "${command_name}" != "dev" && "${command_name}" != "doctor" ]]; then
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts"
   fi
+  if [[ "${SHARPPROOF_LONGFUZZ_OUTPUT:-}" = /workspace/LongFuzzOutput ]]; then
+    # CI supplies a fresh dedicated bind mount so progress is visible before
+    # the private task workspace exports its other evidence.
+    install -d -o sharpproof -g sharpproof /workspace/LongFuzzOutput
+  fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
     /usr/local/bin/sharpproof-container "${command_name}" "$@"

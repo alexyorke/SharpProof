@@ -243,8 +243,7 @@ foreach ($relativePath in $projectPaths) {
 
 $projects = $projects.ToImmutable()
 $testProjects = [Collections.Immutable.ImmutableList[object]]::Empty.AddRange([object[]](@($projects.Values | Where-Object {
-                $_.RelativePath -match '(^|/)SharpProof\.[^/]+\.(Tests|IntegrationTests)/' -or
-                $_.RelativePath -match '(^|/)SharpProof\.ArchitectureTest/'
+                $_.RelativePath -match '\.(Tests|UnitTests|IntegrationTests|PerformanceTests)\.csproj$'
             })))
 $validationConsumersByPath = [Collections.Immutable.ImmutableDictionary[string, object]]::Empty.WithComparers([StringComparer]::OrdinalIgnoreCase)
 $explicitValidationProjects = [Collections.Immutable.ImmutableHashSet[string]]::Empty.WithComparer([StringComparer]::Ordinal).ToBuilder()

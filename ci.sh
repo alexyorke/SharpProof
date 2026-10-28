@@ -16,7 +16,7 @@ export MSYS_NO_PATHCONV=1
 # lowercased directory name.
 project="${COMPOSE_PROJECT_NAME:-$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')}"
 export COMPOSE_PROJECT_NAME="$project"
-image="${project}-tooling:local"
+image="${SHARPPROOF_TOOLING_IMAGE:-${project}-tooling:local}"
 
 lanes=(
   build
@@ -25,8 +25,38 @@ lanes=(
   self-apply-sources self-apply-samples format repository
 )
 
+docker_host_path() {
+  if command -v cygpath > /dev/null 2>&1; then
+    cygpath -m "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+compose_run() {
+  local common git_directory relative pointer="" status=0 mounts=()
+  common="$(git rev-parse --path-format=absolute --git-common-dir)" || return
+  git_directory="$(git rev-parse --absolute-git-dir)" || return
+  common="${common%/}"
+  if [[ "$git_directory" != "$common" ]]; then
+    relative="${git_directory#"$common/"}"
+    if [[ "$relative" == "$git_directory" ]]; then
+      echo "Worktree metadata must be inside its Git common directory." >&2
+      return 2
+    fi
+    pointer="$(mktemp)" || return
+    printf 'gitdir: /git-common/%s\n' "$relative" > "$pointer"
+    chmod a+r "$pointer"
+    mounts=(--volume "$(docker_host_path "$common"):/git-common:ro"
+      --volume "$(docker_host_path "$pointer"):/workspace/SharpProof/.git:ro")
+  fi
+  docker compose run --rm "${mounts[@]}" "$@" || status=$?
+  if [[ -n "$pointer" ]]; then rm -f -- "$pointer"; fi
+  return "$status"
+}
+
 tooling() {
-  docker compose run --rm -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling "$@"
+  compose_run -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA tooling "$@"
 }
 
 # Instrumented test runs stay below a hosted runner's 16 GB of RAM.
@@ -75,7 +105,7 @@ lint() {
   docker buildx build --platform linux/amd64 --file eng/lint/Dockerfile --load \
     --tag "${project}-lint:local" --build-context "canonical_tooling=docker-image://$image" \
     --progress plain . &&
-    docker compose run --rm -e GITHUB_TOKEN lint
+    compose_run -e GITHUB_TOKEN lint
 }
 
 api_evidence() {
@@ -112,7 +142,7 @@ all_of() {
 # One LongFuzz shard: a disjoint 250,000-seed range from LONGFUZZ_SEED_BASE
 # (random by default) for LONGFUZZ_MINUTES (default 300, at most 320).
 fuzz_shard() {
-  local shard="$1" out=artifacts/long-fuzz per_shard=250000
+  local shard="$1" out per_shard=250000
   local minutes="${LONGFUZZ_MINUTES:-300}" base="${LONGFUZZ_SEED_BASE:-$((RANDOM * 32768 + RANDOM))}"
   if ! [[ "$minutes" =~ ^[0-9]+$ ]] || ((minutes < 1 || minutes > 320)); then
     echo "::error::LONGFUZZ_MINUTES must be an integer from 1 to 320." >&2
@@ -124,9 +154,12 @@ fuzz_shard() {
   fi
   local start=$((base + shard * per_shard))
   local end=$((start + per_shard))
+  mkdir -p artifacts/long-fuzz
+  out="$(mktemp -d "$PWD/artifacts/long-fuzz/shard-${shard}.XXXXXXXX")"
   echo "LongFuzz shard $shard: seeds [$start, $end), $minutes minutes."
-  docker compose run --rm -e SHARPPROOF_LONGFUZZ_SEED_START="$start" -e SHARPPROOF_LONGFUZZ_SEED_END="$end" \
-    -e SHARPPROOF_LONGFUZZ_MINUTES="$minutes" -e SHARPPROOF_LONGFUZZ_OUTPUT="$out" \
+  compose_run --volume "$(docker_host_path "$out"):/workspace/LongFuzzOutput" \
+    -e SHARPPROOF_LONGFUZZ_SEED_START="$start" -e SHARPPROOF_LONGFUZZ_SEED_END="$end" \
+    -e SHARPPROOF_LONGFUZZ_MINUTES="$minutes" -e SHARPPROOF_LONGFUZZ_OUTPUT=/workspace/LongFuzzOutput \
     tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter TestCategory=LongFuzz &
   local fuzz_pid=$! status=0
   # vstest does not stream test output, so follow the harness event log;
@@ -153,7 +186,7 @@ fuzz_shard() {
       jq -rs 'group_by([.Harness, .Kind, .Severity])[]
         | "| \(.[0].Harness) | \(.[0].Kind) | \(.[0].Severity) | \(length) |"' "$hits"
       echo
-      echo "First findings (full sources are in artifacts/long-fuzz):"
+      echo "First findings (full sources are in ${out#"$PWD/"}):"
       echo
       jq -rs '.[0:25][]
         | "- `\(.Harness)` seed \(.Seed) **\(.Kind)** \(.Claim | gsub("[`|\n]"; " ") | .[0:120]) -> `\(.SourceFile)`"' "$hits"
@@ -181,6 +214,7 @@ release_packages() {
 
 docs() { tooling docs; }
 layout() { tooling layout; }
+tooling_regressions() { bash tests/tooling/run.sh -v; }
 isolated_coverage() { tooling coverage -CoveragePart Isolated; }
 
 run_lane() {
@@ -197,7 +231,7 @@ run_lane() {
     format) tooling format-check ;;
     repository)
       local status=0
-      all_of lint docs layout api_evidence isolated_coverage scan_image || status=$?
+      all_of lint docs layout tooling_regressions api_evidence isolated_coverage scan_image || status=$?
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         cat artifacts/lint/summary.md artifacts/api-coverage/*.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
       fi

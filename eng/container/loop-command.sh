@@ -37,27 +37,21 @@ case "${target_root}" in
     ;;
 esac
 
-lock_directory="/tmp/sharpproof-loop.lock"
-lock_owner="${lock_directory}/owner"
-if ! mkdir "${lock_directory}" 2> /dev/null; then
-  owner_pid="$(cat "${lock_owner}" 2> /dev/null || true)"
-  if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" 2> /dev/null; then
-    echo "Another SharpProof loop command owns the private build workspace." >&2
-    exit 125
-  fi
-  rm -f -- "${lock_owner}"
-  if ! rmdir "${lock_directory}" 2> /dev/null ||
-    ! mkdir "${lock_directory}" 2> /dev/null; then
-    echo "Another SharpProof loop command owns the private build workspace." >&2
-    exit 125
-  fi
+# Lock the shared volume's directory inode, rather than a removable file in
+# one container's /tmp. Cloning into this directory does not replace its inode.
+mkdir -p -- "${target_root}"
+exec {loop_lock_fd}<"${target_root}"
+if ! flock --nonblock "${loop_lock_fd}"; then
+  echo "Another SharpProof loop command owns the private build workspace." >&2
+  exit 125
 fi
-printf '%s\n' "$$" > "${lock_owner}"
 release_lock() {
-  rm -f -- "${lock_owner}"
-  rmdir "${lock_directory}" 2> /dev/null || true
+  exec {loop_lock_fd}<&-
 }
-trap release_lock EXIT HUP INT TERM
+trap release_lock EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 trust_git_directory() {
   local path="$1"
