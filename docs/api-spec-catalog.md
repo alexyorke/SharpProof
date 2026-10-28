@@ -12,7 +12,7 @@ The catalog matches exact member shape, containing type, generic arity, paramete
 
 Each declaration has independently reviewed effect, allocation, exception, nullness, cardinality, optional termination, and postcondition facets. An Unknown facet stays Unknown. A result relation does not follow from exception freedom, and a Throws permission does not imply allocation permission.
 
-Exceptional paths through `Math.Abs(int)` and `Nullable<T>.Value` can consult runtime resources and invoke ambient culture callbacks. Their catalog effects, exception behavior, and termination are therefore conservative. Scalar lowering keeps the normal `Math.Abs(int)` arithmetic path precise and places the resource boundary only on overflow. `Nullable<T>.Value` remains opaque, including after a `HasValue` check; its purity may remain unproved. Nonthrowing `GetValueOrDefault` retains its separate specification.
+Exceptional paths through `Math.Abs(int)` and `Nullable<T>.Value` can consult runtime resources and invoke ambient culture callbacks. Their catalog effects, exception behavior, and termination are therefore conservative. Scalar lowering keeps the normal `Math.Abs(int)` arithmetic path precise and places the resource boundary only on overflow. `Nullable<T>.Value` remains opaque, including after a `HasValue` check; its purity may remain unproved. `GetValueOrDefault` retains its separate specification.
 
 Evidence distinguishes documented contracts, supported-runtime observations, type-initialization boundaries, and compiler-bound ghost contract semantics. These are assumptions with provenance, not universal implementation proofs. Consult each declaration in the source for the complete current facets and domain conditions.
 

@@ -163,19 +163,25 @@ public sealed class PublicationRuntimeProtectionTests
             File.WriteAllText(Path.Combine(Root, "result.json"), "result");
         }
 
-        internal InvalidatePublishedResult Invalidation() => new()
+        internal InvalidatePublishedResult Invalidation()
         {
-            BuildEngine = Engine,
-            ProjectDirectory = Root,
-            RequestPath = "request.json",
-            ResultPath = "result.json",
-            ManifestPath = "manifest.json",
-            InvocationManifestPath = "capture.json",
-            WorkerPath = Worker,
-            LauncherPath = Worker,
-            WorkerProtocolPath = Path.Combine(Root, "tools", "net10", "SharpProof.Worker.Protocol.dll")
-        };
+            return new()
+            {
+                BuildEngine = Engine,
+                ProjectDirectory = Root,
+                RequestPath = "request.json",
+                ResultPath = "result.json",
+                ManifestPath = "manifest.json",
+                InvocationManifestPath = "capture.json",
+                WorkerPath = Worker,
+                LauncherPath = Worker,
+                WorkerProtocolPath = Path.Combine(Root, "tools", "net10", "SharpProof.Worker.Protocol.dll")
+            };
+        }
 
-        public void Dispose() => directory.Dispose();
+        public void Dispose()
+        {
+            directory.Dispose();
+        }
     }
 }

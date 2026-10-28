@@ -2491,6 +2491,8 @@ public sealed class PackageLayoutSmokeTests
 
     private static ImmutableArray<string> FindForbiddenWorkerDependencies(JsonElement document)
     {
+        if (document.ValueKind != JsonValueKind.Object)
+        { throw new ArgumentException("Dependency document must be an object.", nameof(document)); }
         var keys = ImmutableArray.CreateBuilder<string>();
         foreach (var library in document.GetProperty("libraries").EnumerateObject())
         {
