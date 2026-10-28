@@ -22,7 +22,7 @@ lanes=(
   build
   worker-a worker-b projects gates-corpus gates-shards
   package-0 package-1 package-2 package-3
-  self-apply-sources self-apply-samples format repository
+  self-apply-sources self-apply-samples repository
 )
 
 tooling() {
@@ -185,7 +185,9 @@ isolated_coverage() { tooling coverage -CoveragePart Isolated; }
 
 run_lane() {
   case "$1" in
-    build) tooling security -Configuration Release ;; # dependency audit + full analyzer build
+    # Dependency audit, then the full analyzer build with -warnaserror, which
+    # format-check relies on for everything beyond whitespace.
+    build) tooling security -Configuration Release && tooling format-check ;;
     worker-a) coverage_shard -CoveragePart Semantic -TaskGroup WorkerA ;;
     worker-b) coverage_shard -CoveragePart Semantic -TaskGroup WorkerB ;;
     projects) coverage_shard -CoveragePart Semantic -TaskGroup Projects ;;
@@ -194,7 +196,6 @@ run_lane() {
     package-[0-3]) coverage_shard -CoveragePart Package -PackagePartitionCount 4 -PackagePartition "${1#package-}" ;;
     self-apply-sources) tooling self-apply -Configuration Release -SelfApplicationPhase Sources ;;
     self-apply-samples) tooling self-apply -Configuration Release -SelfApplicationPhase Samples ;;
-    format) tooling format-check ;;
     repository)
       local status=0
       all_of lint docs layout api_evidence isolated_coverage scan_image || status=$?

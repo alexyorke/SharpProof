@@ -38,11 +38,6 @@ try {
         throw 'Formatting requires a Git checkout with tracked C# sources.'
     }
 
-    & $wrapperPath -TimeoutSeconds 900 restore SharpProof.slnx --locked-mode
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Solution restore failed before formatting.'
-    }
-
     # Folder mode covers every tracked C# file, including samples, templates,
     # script helpers and golden fixtures outside the main solution. Restrict
     # generated formatting to tracked source so bin/obj output stays excluded.
@@ -74,7 +69,16 @@ try {
     [void]$solutionArgumentsBuilder.AddRange([string[]]@($sourcePaths))
     $solutionArguments = $solutionArgumentsBuilder.ToImmutable()
     Invoke-DotnetFormat -Arguments $whitespaceArguments
-    Invoke-DotnetFormat -Arguments $solutionArguments
+    # Verification stops at whitespace: the security build compiles with
+    # EnforceCodeStyleInBuild and -warnaserror, so it already fails on every
+    # diagnostic the solution pass would fix, without a second analyzer run.
+    if (-not $VerifyNoChanges) {
+        & $wrapperPath -TimeoutSeconds 900 restore SharpProof.slnx --locked-mode
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Solution restore failed before formatting.'
+        }
+        Invoke-DotnetFormat -Arguments $solutionArguments
+    }
 }
 finally {
     Pop-Location

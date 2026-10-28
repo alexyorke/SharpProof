@@ -48,16 +48,16 @@ All of CI is in [ci.sh](../ci.sh). The workflows only build the tooling image, h
 
 ```text
 ./ci.sh                 # build the image, every PR lane in order, then the coverage merge
-./ci.sh build format    # just these lanes
+./ci.sh build projects  # just these lanes
 ./ci.sh --list          # the PR lanes (ci.yml's matrix)
 ```
 
 PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes, weekly, on demand):
 
-- `build`: `security`, the dependency audit plus the complete Release solution with all analyzers.
+- `build`: `security`, the dependency audit plus the complete Release solution with all analyzers and `-warnaserror`, then `format-check`, which checks only whitespace and leaves code style to that build.
 - `worker-a`, `worker-b`, `projects`, `gates-corpus`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`. Each lane builds only its task group's closure, without analyzers.
-- `package-0`..`package-3`: `coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition <n>`. Partitions hash the fully qualified method identity, so all parameter cases of a method stay together.
-- `self-apply-sources`, `self-apply-samples`, `format`.
+- `package-0`..`package-3`: `coverage -CoveragePart Package -PackagePartitionCount 4 -PackagePartition <n>`. Partitions hash each test's filter: a case renamed with `TestName=` is placed on its own, and a method's other parameter cases stay together.
+- `self-apply-sources`, `self-apply-samples`: SharpProof's own analyzer over `src/` and the package-backed samples. Both skip the .NET and code-style analyzers that `build` already enforces.
 - `repository`: lint, `docs`, `layout`, the API inventory and catalog evidence tests, `coverage -CoveragePart Isolated`, and a Grype scan of the tooling image. It runs every check and then fails if any failed.
 
 Then `coverage` merges every shard's `lines.tsv`, and `build-and-test`, the single required check, succeeds only when every lane, the merge, and (on pull requests) GitHub's dependency review succeeded. Each test suite runs once, under the coverage collector, with the filter `TestCategory!=Performance&TestCategory!=Coverage`, so CI also runs `Corpus` tests.

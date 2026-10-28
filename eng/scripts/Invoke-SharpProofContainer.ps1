@@ -371,9 +371,11 @@ switch ($Command) {
     }
     'security' {
         Invoke-DependencyAudit
+        # Every warning fails, so this build also enforces the code-style and
+        # analyzer rules that format-check leaves to it.
         Invoke-SharpProofRequiredDotnet @(
             'build', 'SharpProof.slnx', '--configuration', 'Release',
-            '--no-restore')
+            '--no-restore', '-warnaserror')
     }
     'layout' {
         & (Join-Path $repositoryRoot 'eng/scripts/Test-SharpProofRepositoryLayout.ps1') -EvaluateProjects
@@ -416,8 +418,8 @@ switch ($Command) {
 
             # Build the complete source tree once with the self lane disabled so
             # every analyzer and generator output is available as a stable input.
-            # Analyzer diagnostics are not needed here: each per-project
-            # self-application build below runs every analyzer again.
+            # Analyzer diagnostics are not needed here: the build lane already
+            # enforces them, and the per-project builds below add SharpProof's.
             Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
             Invoke-SharpProofRequiredDotnet @(
                 'build', 'SharpProof.slnx', '--configuration', $Configuration,
@@ -437,6 +439,8 @@ switch ($Command) {
                 Invoke-SharpProofRequiredDotnet @(
                     'build', $project, '--configuration', $Configuration,
                     '--no-restore', '--no-dependencies', '--nologo',
+                    '-p:EnableNETAnalyzers=false',
+                    '-p:EnforceCodeStyleInBuild=false',
                     '-p:SharpProofSelfApplication=true',
                     '-p:SharpProofProfile=advisory',
                     '-p:SharpProofFeatures=all',

@@ -249,6 +249,7 @@ function New-LocalPackageFeed {
         $projectPath = Join-Path $repositoryRoot ([string]$project)
         $build = Invoke-CapturedDotNet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
                     'build', $projectPath, '--configuration', $Configuration, '--nologo',
+                    '-p:RunAnalyzersDuringBuild=false',
                     '-p:GeneratePackageOnBuild=false')))
         Assert-ExitCode $build $true "Building $projectPath before symbol extraction"
     }

@@ -21,7 +21,16 @@ function Read-SharpProofPackageDiscovery {
         if ($method -notmatch '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*\.[A-Za-z_][A-Za-z0-9_]*$' -or [string]::IsNullOrWhiteSpace([string]$test.fullname)) {
             throw 'Package discovery has an invalid method or case name.'
         }
-        $cases.Add(([ordered]@{ method = $method; name = [string]$test.fullname }).AsReadOnly())
+        # Cases renamed with TestName= have a plain, unique name and are
+        # partitioned one by one; a method's other cases stay together.
+        $name = [string]$test.fullname
+        $filter = if ($name -ne $method -and $name -match '^SharpProof\.[A-Za-z_][A-Za-z0-9_.+`]*$') {
+            'FullyQualifiedName=' + $name
+        }
+        else {
+            'FullyQualifiedName~' + $method
+        }
+        $cases.Add(([ordered]@{ method = $method; name = $name; filter = $filter }).AsReadOnly())
     }
     if ($cases.Count -eq 0) { throw 'Package partition discovery is empty.' }
     return $cases.ToImmutable()
