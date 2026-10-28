@@ -146,10 +146,16 @@ class ToolingTests(unittest.TestCase):
         self.git("worktree", "add", "--detach", str(linked), "HEAD")
         self.repo = linked
         self.evidence()
-        result = self.ci("build", "repository", "fuzz-0")
+        result = self.ci("build", "repository", "evidence", "fuzz-0")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         calls = [call for call in self.calls() if call["args"][:2] == ["compose", "run"]]
-        self.assertGreaterEqual(len(calls), 7)
+        commands = [call["args"][call["args"].index("tooling") + 1:]
+                    if "tooling" in call["args"] else [call["args"][-1]] for call in calls]
+        self.assertEqual({"security", "format-check", "lint", "docs", "layout", "test", "coverage"},
+                         {command[0] for command in commands})
+        self.assertIn(["coverage", "-CoveragePart", "Isolated"], commands)
+        self.assertEqual({"FullyQualifiedName~DotnetApiInventoryTests", "FullyQualifiedName~ApiSpecRuntimeOracleTests", "TestCategory=LongFuzz"},
+                         {command[command.index("-TestFilter") + 1] for command in commands if "-TestFilter" in command})
         for call in calls:
             self.assertIn(str(common) + ":/git-common:ro", call["args"])
             self.assertEqual(1, len(call["pointers"]))
