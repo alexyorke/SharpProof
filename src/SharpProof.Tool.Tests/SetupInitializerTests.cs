@@ -408,12 +408,11 @@ public sealed class SetupInitializerTests
         plan.Add(fixture.ProjectPath, "planned-project-content");
         plan.Add(later, "planned-feed-content");
         Assert.ThrowsAsync<OperationCanceledException>(new Func<Task>(async () => await plan.ApplyAsync(static _ => Task.CompletedTask,
-            path =>
+            async path =>
             {
                 ArgumentNullException.ThrowIfNull(path);
                 Assert.That(path, Is.EqualTo(fixture.ProjectPath));
-                cancellation.Cancel();
-                return Task.CompletedTask;
+                await cancellation.CancelAsync();
             }, cancellation.Token)));
         Assert.That(await File.ReadAllBytesAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken), Is.EqualTo(original));
         Assert.That(File.Exists(later), Is.False);

@@ -114,10 +114,16 @@ internal static class FuzzSourceCaseExecutor
             scope.RequireSafety(cancellationToken);
             var failure = await SmtFailureRetention.RetainFiniteDomainAsync(
                 scope.Factory, scope.Formula, index, seed, cancellationToken).ConfigureAwait(false);
-            if (_source is null) { return failure; }
+            if (_source is null)
+            {
+                return failure;
+            }
             var observed = BooleanSourceScope.Invoke(scope.Target!, _source.FiniteArguments);
-            return failure with { Original = DescribeSource(scope.Factory, scope.Formula,
-                normalCompletion: null, expectedOutcomes: [], observed.Value, observed.Exception?.GetType().FullName) };
+            return failure with
+            {
+                Original = DescribeSource(scope.Factory, scope.Formula,
+                    normalCompletion: null, expectedOutcomes: [], observed.Value, observed.Exception?.GetType().FullName)
+            };
         }
 
         internal async Task<FuzzFailure> RetainPartialAsync(int index, int seed, CancellationToken cancellationToken)
@@ -125,8 +131,15 @@ internal static class FuzzSourceCaseExecutor
             using var scope = CreatePartial(null, cancellationToken);
             var failure = await SmtFailureRetention.RetainPartialTermAsync(
                 scope.Factory, scope.Case, index, seed, cancellationToken).ConfigureAwait(false);
-            return _source is null ? failure : failure with { Original = DescribeSource(scope.Factory,
-                scope.Case.Formula, scope.Case.NormalCompletion, scope.Case.ExpectedOutcomes, null, null) };
+            if (_source is null)
+            {
+                return failure;
+            }
+            return failure with
+            {
+                Original = DescribeSource(scope.Factory, scope.Case.Formula,
+                    scope.Case.NormalCompletion, scope.Case.ExpectedOutcomes, null, null)
+            };
         }
 
         private string DescribeSource(IrFactory factory, IrTerm formula, IrTerm? normalCompletion,
@@ -134,7 +147,10 @@ internal static class FuzzSourceCaseExecutor
         {
             ArgumentNullException.ThrowIfNull(factory);
             ArgumentNullException.ThrowIfNull(formula);
-            if (expectedOutcomes.IsDefault) { throw new ArgumentException("Array must be initialized.", nameof(expectedOutcomes)); }
+            if (expectedOutcomes.IsDefault)
+            {
+                throw new ArgumentException("Array must be initialized.", nameof(expectedOutcomes));
+            }
             var source = _source ?? throw new InvalidOperationException("Source replay inputs are unavailable.");
             var printer = new IrPrinter(factory);
             return JsonSerializer.Serialize(new

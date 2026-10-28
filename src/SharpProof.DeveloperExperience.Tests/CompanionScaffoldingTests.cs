@@ -19,6 +19,8 @@ namespace SharpProof.DeveloperExperience.Tests;
 [TestFixture]
 public sealed class CompanionScaffoldingTests
 {
+    private static readonly ImmutableArray<string> DebugSymbols = ["DEBUG"];
+
     [TestCase("public static class Api { public static int Read(int value) => value; }")]
     [TestCase("internal interface Api { int Read(int value); }")]
     public void StaticAndInternalTargetsProduceCompilableCompanions(string source)
@@ -261,8 +263,7 @@ public sealed class CompanionScaffoldingTests
         Assert.That(fixes, Has.Length.EqualTo(1));
         var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
         var changed = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution.GetDocument(document.Id)!;
-        Assert.That((await CompilerErrorsAsync(changed)).Select(static diagnostic =>
-            (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id), Is.EqualTo(new[] { "CS0103" }));
+        Assert.That((await CompilerErrorsAsync(changed)).Single().Id, Is.EqualTo("CS0103"));
     }
 
     [Test]
@@ -297,14 +298,14 @@ public sealed class CompanionScaffoldingTests
         using var workspace = new AdhocWorkspace();
         var document = CreateDocument(workspace, "public interface Api { void Read(); }", companion);
         document = document.Project.WithParseOptions(new CSharpParseOptions(LanguageVersion.Preview,
-            preprocessorSymbols: debug ? new[] { "DEBUG" } : Array.Empty<string>())).GetDocument(document.Id)!;
+            preprocessorSymbols: debug ? DebugSymbols : ImmutableArray<string>.Empty)).GetDocument(document.Id)!;
         var diagnostic = (await CompanionDiagnosticsAsync(document)).Single(item =>
             (item ?? throw new ArgumentNullException(nameof(item))).Id == "SPCF0004");
         var fixes = await MissingMemberFixesAsync(document, diagnostic);
         Assert.That(fixes, Has.Length.EqualTo(1));
         var operations = await fixes[0].GetOperationsAsync(TestContext.CurrentContext.CancellationToken);
         var solution = operations.OfType<ApplyChangesOperation>().Single().ChangedSolution;
-        foreach (var symbols in new[] { new[] { "DEBUG" }, Array.Empty<string>() })
+        foreach (var symbols in new[] { DebugSymbols, ImmutableArray<string>.Empty })
         {
             var changed = solution.GetProject(document.Project.Id)!.WithParseOptions(
                 new CSharpParseOptions(LanguageVersion.Preview, preprocessorSymbols: symbols)).GetDocument(document.Id)!;
