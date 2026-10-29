@@ -11,11 +11,21 @@ namespace SharpProof.Ir;
 internal static class HashEncoding
 #endif
 {
+    private const string LowerHexDigits = "0123456789abcdef";
+
+    // Digests are formatted on hot paths, so this writes two characters per
+    // byte into one buffer instead of a string per byte.
     internal static string ToLowerHex(IEnumerable<byte> bytes)
     {
         bytes = RepositoryParameterGuard.NotNull(bytes, nameof(bytes));
-        return string.Concat(bytes.Select(static value => value.ToString(
-            "x2", System.Globalization.CultureInfo.InvariantCulture)));
+        var values = bytes as byte[] ?? bytes.ToArray();
+        var characters = new char[values.Length * 2];
+        for (var index = 0; index < values.Length; index++)
+        {
+            characters[2 * index] = LowerHexDigits[values[index] >> 4];
+            characters[(2 * index) + 1] = LowerHexDigits[values[index] & 0xF];
+        }
+        return new string(characters);
     }
 
     internal static string ComputeSha256Hex(ImmutableArray<byte> bytes)
