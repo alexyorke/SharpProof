@@ -29,22 +29,24 @@ public sealed class VerifierPackageDefaultsTests
         s_packageCache.Dispose();
     }
 
-    [TestCase("SharpProof", "net461")]
-    [TestCase("SharpProof", "net462")]
-    [TestCase("SharpProof", "net472")]
-    [TestCase("SharpProof", "net48")]
-    [TestCase("SharpProof", "net481")]
-    [TestCase("SharpProof", "netstandard2.0")]
-    [TestCase("SharpProof", "netcoreapp2.0")]
-    [TestCase("SharpProof", "netcoreapp3.1")]
-    [TestCase("SharpProof", "net5.0")]
-    [TestCase("SharpProof", "net6.0")]
-    [TestCase("SharpProof", "net7.0")]
-    [TestCase("SharpProof", "net9.0")]
-    [TestCase("SharpProof", "net8.0")]
-    [TestCase("SharpProof", "net10.0")]
-    [TestCase("SharpProof.Verifier", "net8.0")]
-    [TestCase("SharpProof.Verifier", "net10.0")]
+    // Each case restores and builds its own consumer. Naming the cases lets CI
+    // package partitions split them instead of running all of them in one lane.
+    [TestCase("SharpProof", "net461", TestName = "StrictDefaultSharpProofNet461")]
+    [TestCase("SharpProof", "net462", TestName = "StrictDefaultSharpProofNet462")]
+    [TestCase("SharpProof", "net472", TestName = "StrictDefaultSharpProofNet472")]
+    [TestCase("SharpProof", "net48", TestName = "StrictDefaultSharpProofNet48")]
+    [TestCase("SharpProof", "net481", TestName = "StrictDefaultSharpProofNet481")]
+    [TestCase("SharpProof", "netstandard2.0", TestName = "StrictDefaultSharpProofNetStandard20")]
+    [TestCase("SharpProof", "netcoreapp2.0", TestName = "StrictDefaultSharpProofNetCoreApp20")]
+    [TestCase("SharpProof", "netcoreapp3.1", TestName = "StrictDefaultSharpProofNetCoreApp31")]
+    [TestCase("SharpProof", "net5.0", TestName = "StrictDefaultSharpProofNet5")]
+    [TestCase("SharpProof", "net6.0", TestName = "StrictDefaultSharpProofNet6")]
+    [TestCase("SharpProof", "net7.0", TestName = "StrictDefaultSharpProofNet7")]
+    [TestCase("SharpProof", "net9.0", TestName = "StrictDefaultSharpProofNet9")]
+    [TestCase("SharpProof", "net8.0", TestName = "StrictDefaultSharpProofNet8")]
+    [TestCase("SharpProof", "net10.0", TestName = "StrictDefaultSharpProofNet10")]
+    [TestCase("SharpProof.Verifier", "net8.0", TestName = "StrictDefaultVerifierNet8")]
+    [TestCase("SharpProof.Verifier", "net10.0", TestName = "StrictDefaultVerifierNet10")]
     public async Task OnePackageReferenceRunsStrictVerificationWithoutSharpProofProperties(string packageId, string framework)
     {
         ArgumentNullException.ThrowIfNull(packageId);
@@ -63,10 +65,10 @@ public sealed class VerifierPackageDefaultsTests
         Assert.That(result.RootElement.GetProperty("claimResults")[0].GetProperty("vacuity").GetString(), Is.EqualTo("None"));
     }
 
-    [TestCase("SharpProof", "advisory")]
-    [TestCase("SharpProof", "off")]
-    [TestCase("SharpProof.Verifier", "advisory")]
-    [TestCase("SharpProof.Verifier", "off")]
+    [TestCase("SharpProof", "advisory", TestName = "ExplicitProfileSharpProofAdvisory")]
+    [TestCase("SharpProof", "off", TestName = "ExplicitProfileSharpProofOff")]
+    [TestCase("SharpProof.Verifier", "advisory", TestName = "ExplicitProfileVerifierAdvisory")]
+    [TestCase("SharpProof.Verifier", "off", TestName = "ExplicitProfileVerifierOff")]
     public async Task ExplicitProfileOverridesCompletePackageDefaults(string packageId, string profile)
     {
         ArgumentNullException.ThrowIfNull(packageId);
@@ -80,13 +82,13 @@ public sealed class VerifierPackageDefaultsTests
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")), Is.False);
     }
 
-    [TestCase("SharpProof", "net461")]
-    [TestCase("SharpProof", "net472")]
-    [TestCase("SharpProof", "net481")]
-    [TestCase("SharpProof", "netstandard2.0")]
-    [TestCase("SharpProof", "netcoreapp2.0")]
-    [TestCase("SharpProof", "net10.0")]
-    [TestCase("SharpProof.Verifier", "net10.0")]
+    [TestCase("SharpProof", "net461", TestName = "RefutedDefaultSharpProofNet461")]
+    [TestCase("SharpProof", "net472", TestName = "RefutedDefaultSharpProofNet472")]
+    [TestCase("SharpProof", "net481", TestName = "RefutedDefaultSharpProofNet481")]
+    [TestCase("SharpProof", "netstandard2.0", TestName = "RefutedDefaultSharpProofNetStandard20")]
+    [TestCase("SharpProof", "netcoreapp2.0", TestName = "RefutedDefaultSharpProofNetCoreApp20")]
+    [TestCase("SharpProof", "net10.0", TestName = "RefutedDefaultSharpProofNet10")]
+    [TestCase("SharpProof.Verifier", "net10.0", TestName = "RefutedDefaultVerifierNet10")]
     public async Task OnePackageReferenceFailsTheBuildForARefutedClaimByDefault(string packageId, string framework)
     {
         ArgumentNullException.ThrowIfNull(packageId);
