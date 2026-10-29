@@ -75,20 +75,27 @@ internal static class CompilerCompilationCapture
 
     // GetMetadata returns a new copy on every call, but every copy reads through
     // the one MetadataReader of the image the compiler loaded. Compilations that
-    // share a reference therefore share that reader. A later capture of the same
-    // path still hashes the file, and when the digest is unchanged the bytes are
-    // the ones that already matched this reader, so their metadata match, name,
-    // MVID and identity are reused instead of read again. Timestamps are not
-    // trusted: any other digest takes the full capture.
+    // share a reference therefore share that reader. A full capture keeps the
+    // exact bytes it matched and hashed, and a later capture of the same path
+    // compares the file with them: equal bytes already matched this reader, so
+    // their metadata match, name, MVID, digest and identity are reused instead
+    // of computed again. Timestamps are not trusted: any other content takes
+    // the full capture. The cost is one copy of each referenced file for as
+    // long as the compiler keeps its image loaded; comparing is several times
+    // cheaper than hashing.
     private sealed class CapturedModuleFile
     {
+        private readonly byte[] _content;
+
         internal CapturedModuleFile(
             string path,
             bool isAssembly,
+            byte[] content,
             CompilerReferenceModuleSnapshot snapshot,
             string identity)
         {
             ModulePath = RepositoryParameterGuard.NotNull(path, nameof(path));
+            _content = RepositoryParameterGuard.NotNull(content, nameof(content));
             Snapshot = RepositoryParameterGuard.NotNull(snapshot, nameof(snapshot));
             Identity = RepositoryParameterGuard.NotNull(identity, nameof(identity));
             IsAssembly = isAssembly;
@@ -107,10 +114,34 @@ internal static class CompilerCompilationCapture
         {
             path = RepositoryParameterGuard.NotNull(path, nameof(path));
             content = RepositoryParameterGuard.NotNull(content, nameof(content));
-            return IsAssembly == expectAssembly &&
-                string.Equals(path, ModulePath, StringComparison.Ordinal) &&
-                content.Length == Snapshot.SizeBytes &&
-                string.Equals(Hash(content, cancellationToken), Snapshot.Sha256, StringComparison.Ordinal);
+            if (IsAssembly != expectAssembly ||
+                !string.Equals(path, ModulePath, StringComparison.Ordinal) ||
+                content.Length != _content.Length)
+            {
+                return false;
+            }
+            content.Position = 0;
+            var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(81920);
+            try
+            {
+                var offset = 0;
+                int count;
+                while ((count = content.Read(buffer, 0, buffer.Length)) != 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (count > _content.Length - offset ||
+                        !buffer.AsSpan(0, count).SequenceEqual(_content.AsSpan(offset, count)))
+                    {
+                        return false;
+                    }
+                    offset += count;
+                }
+                return offset == _content.Length;
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 
@@ -442,10 +473,28 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 modules.Add(captured.Snapshot);
                 continue;
             }
-            // PEReader takes the image from the current position, which a
-            // rejected cache entry left at the end of the file.
+            // Match, hash and keep one in-memory copy, so the digest and the
+            // cached bytes describe exactly the image that matched the reader.
             stream.Position = 0;
-            using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
+            var content = new byte[sizeBytes];
+            var read = 0;
+            while (read < content.Length)
+            {
+                var count = stream.Read(content, read, content.Length - read);
+                if (count == 0)
+                {
+                    throw new InvalidDataException(
+                        "A compiler reference changed while it was captured.");
+                }
+                read += count;
+            }
+            if (stream.ReadByte() != -1)
+            {
+                throw new InvalidDataException(
+                    "A compiler reference changed while it was captured.");
+            }
+            using var contentStream = new MemoryStream(content, writable: false);
+            using var image = new PEReader(contentStream, PEStreamOptions.LeaveOpen);
             if (!image.HasMetadata)
             {
                 throw new InvalidDataException(
@@ -474,11 +523,11 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 Name = fileIdentity.Name,
                 Mvid = fileIdentity.Mvid.ToString("D"),
                 Path = CompilerCaptureIdentity.NormalizePath(modulePath),
-                Sha256 = Hash(stream, cancellationToken),
+                Sha256 = Hash(contentStream, cancellationToken),
                 SizeBytes = sizeBytes
             };
             modules.Add(snapshot);
-            slot.Latest = new CapturedModuleFile(modulePath, fileReader.IsAssembly, snapshot, moduleIdentity);
+            slot.Latest = new CapturedModuleFile(modulePath, fileReader.IsAssembly, content, snapshot, moduleIdentity);
         }
         return (new CompilerReferenceSnapshot
         {
@@ -611,20 +660,42 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
     }
 
+    // Reference capture hashes every module of every compilation. A new SHA-256
+    // object and read buffer per file were most of the analyzer's allocations,
+    // so each thread keeps one hash state and reads through pooled buffers.
+    [ThreadStatic]
+    private static System.Security.Cryptography.IncrementalHash? t_sha256;
+
     internal static string Hash(Stream stream, CancellationToken cancellationToken)
     {
         stream = RepositoryParameterGuard.NotNull(stream, nameof(stream));
         stream.Position = 0;
-        using var hash = System.Security.Cryptography.SHA256.Create();
-        var buffer = new byte[81920];
-        int count;
-        while ((count = stream.Read(buffer, 0, buffer.Length)) != 0)
+        // The state leaves the thread slot while in use, so a digest that
+        // throws part way is disposed instead of reused.
+        var hash = t_sha256 ?? System.Security.Cryptography.IncrementalHash.CreateHash(
+            System.Security.Cryptography.HashAlgorithmName.SHA256);
+        t_sha256 = null;
+        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(81920);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            hash.TransformBlock(buffer, 0, count, buffer, 0);
+            int count;
+            while ((count = stream.Read(buffer, 0, buffer.Length)) != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                hash.AppendData(buffer, 0, count);
+            }
+            var digest = hash.GetHashAndReset();
+            t_sha256 = hash;
+            return HashEncoding.ToLowerHex(digest);
         }
-        hash.TransformFinalBlock([], 0, 0);
-        return HashEncoding.ToLowerHex(
-            hash.Hash ?? throw new InvalidOperationException("The SHA-256 digest is unavailable."));
+        catch
+        {
+            hash.Dispose();
+            throw;
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 }
