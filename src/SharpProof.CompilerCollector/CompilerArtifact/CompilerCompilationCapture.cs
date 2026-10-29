@@ -73,6 +73,62 @@ internal static class CompilerCompilationCapture
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, ResolverDirectiveCache>
         ResolverDirectiveCaches = new();
 
+    // GetMetadata returns a new copy on every call, but every copy reads through
+    // the one MetadataReader of the image the compiler loaded. Compilations that
+    // share a reference therefore share that reader, and later captures of an
+    // unchanged file reuse its evidence instead of re-reading, re-matching and
+    // re-hashing it. A different path, length or write time takes the full
+    // capture again.
+    private sealed class CapturedModuleFile
+    {
+        internal CapturedModuleFile(
+            FileInfo file,
+            bool isAssembly,
+            CompilerReferenceModuleSnapshot snapshot,
+            string? identity)
+        {
+            file = RepositoryParameterGuard.NotNull(file, nameof(file));
+            snapshot = RepositoryParameterGuard.NotNull(snapshot, nameof(snapshot));
+            FullPath = file.FullName;
+            SizeBytes = file.Length;
+            LastWriteTimeUtc = file.LastWriteTimeUtc;
+            IsAssembly = isAssembly;
+            Snapshot = snapshot;
+            Identity = identity;
+        }
+
+        private string FullPath { get; }
+        private long SizeBytes { get; }
+        private DateTime LastWriteTimeUtc { get; }
+        private bool IsAssembly { get; }
+        internal CompilerReferenceModuleSnapshot Snapshot { get; }
+        internal string? Identity { get; }
+
+        internal bool Describes(FileInfo file, bool expectAssembly)
+        {
+            file = RepositoryParameterGuard.NotNull(file, nameof(file));
+            return IsAssembly == expectAssembly &&
+                file.Exists &&
+                string.Equals(file.FullName, FullPath, StringComparison.Ordinal) &&
+                file.Length == SizeBytes &&
+                file.LastWriteTimeUtc == LastWriteTimeUtc;
+        }
+    }
+
+    private sealed class CapturedModuleFileSlot
+    {
+        private volatile CapturedModuleFile? _latest;
+
+        internal CapturedModuleFile? Latest
+        {
+            get => _latest;
+            set => _latest = value;
+        }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<MetadataReader, CapturedModuleFileSlot>
+        CapturedModuleFiles = new();
+
     internal static ImmutableList<CompilerSyntaxTreeSnapshot> CaptureTrees(
         CSharpCompilation compilation,
         CancellationToken cancellationToken,
@@ -364,6 +420,25 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             var modulePath = index == 0
                 ? Path.GetFullPath(path)
                 : ResolveSiblingModule(path, backingName);
+            // Read the file's length and write time before its bytes, so a
+            // write during the capture leaves a stale key that never matches.
+            var file = new FileInfo(modulePath);
+            file.Refresh();
+            var slot = CapturedModuleFiles.GetValue(
+                backingReader,
+                static _ => new CapturedModuleFileSlot());
+            if (slot.Latest is { } captured && captured.Describes(
+                    file,
+                    index == 0 && reference.Properties.Kind == MetadataImageKind.Assembly))
+            {
+                budget = budget.Consume(captured.Snapshot.SizeBytes);
+                if (index == 0)
+                {
+                    identity = captured.Identity;
+                }
+                modules.Add(captured.Snapshot);
+                continue;
+            }
             using var stream = new FileStream(
                 modulePath,
                 FileMode.Open,
@@ -388,18 +463,24 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             var fileIdentity = CompilerReferenceModuleEvidence.Match(
                 new CompilerReferenceModuleEvidence(backingReader, backingName, backingReader.GetModuleDefinition().Mvid),
                 CompilerReferenceModuleEvidence.Capture(fileReader));
+            var moduleIdentity = index == 0 ? Identity(fileReader) : null;
             if (index == 0)
             {
-                identity = Identity(fileReader);
+                identity = moduleIdentity;
             }
-            modules.Add(new CompilerReferenceModuleSnapshot
+            var snapshot = new CompilerReferenceModuleSnapshot
             {
                 Name = fileIdentity.Name,
                 Mvid = fileIdentity.Mvid.ToString("D"),
                 Path = CompilerCaptureIdentity.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
-            });
+            };
+            modules.Add(snapshot);
+            if (file.Exists && file.Length == sizeBytes)
+            {
+                slot.Latest = new CapturedModuleFile(file, fileReader.IsAssembly, snapshot, moduleIdentity);
+            }
         }
         return (new CompilerReferenceSnapshot
         {
