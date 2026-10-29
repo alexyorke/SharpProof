@@ -11,7 +11,7 @@ internal static class AdvisoryRequiresDiagnostics
     // A call site reached both in a local function's own body and inlined
     // into its caller is reported once.
     internal static AnalyzerSemanticOutcome Analyze(IMethodSymbol method, SyntaxNode declaration, AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+        Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, (AdvisoryLoweredBody? Body, string? Gap)? lowered = null)
     {
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -35,18 +35,18 @@ internal static class AdvisoryRequiresDiagnostics
             if (model.GetDeclaredSymbol(local, cancellationToken) is IMethodSymbol function)
             { _ = AnalyzeBody(compilation, function, local, session, reportDiagnostic, cancellationToken); }
         }
-        return AnalyzeBody(compilation, method, declaration, session, reportDiagnostic, cancellationToken);
+        return AnalyzeBody(compilation, method, declaration, session, reportDiagnostic, cancellationToken, lowered);
     }
 
     private static AnalyzerSemanticOutcome AnalyzeBody(CSharpCompilation compilation, IMethodSymbol method, SyntaxNode declaration,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken)
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, (AdvisoryLoweredBody? Body, string? Gap)? lowered = null)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
-        var (body, _) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
+        var body = (lowered ?? AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken)).Body;
         if (body == null)
         { return CallsPreconditions(compilation, declaration, session, cancellationToken) ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable; }
         var calls = body.Lowering.CallPreconditions;

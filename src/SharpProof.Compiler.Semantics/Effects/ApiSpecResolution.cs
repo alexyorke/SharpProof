@@ -119,12 +119,14 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
         var resolved = ImmutableArray.CreateBuilder<(ApiSpecTemplate Template, ISymbol Symbol)>();
         var containingTypes = ImmutableDictionary.CreateBuilder<string, ContainingTypeLookup>(StringComparer.Ordinal);
+        var referenceFamilies = ImmutableDictionary.CreateBuilder<IAssemblySymbol, (ApiSpecReferenceFamily Family, string Path)>(SymbolEqualityComparer.Default);
         foreach (var template in _table.Templates)
         {
             var candidate = ResolveTemplate(
                 compilation,
                 template,
-                containingTypes);
+                containingTypes,
+                referenceFamilies);
             if (candidate.Failure == null)
             {
                 resolved.Add((template, candidate.Symbol ?? throw new InvalidOperationException(
@@ -166,10 +168,12 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     private static (ISymbol? Symbol, ApiSpecResolutionFailure? Failure) ResolveTemplate(
         Compilation compilation,
         ApiSpecTemplate template,
-        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
+        ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes,
+        ImmutableDictionary<IAssemblySymbol, (ApiSpecReferenceFamily Family, string Path)>.Builder referenceFamilies)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         containingTypes = RepositoryParameterGuard.NotNull(containingTypes, nameof(containingTypes));
+        referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
         template = RepositoryParameterGuard.NotNull(template, nameof(template));
         var target = template.Target;
         var containingTypeLookup = ResolveContainingType(
@@ -192,7 +196,8 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         var assemblyMatch = MatchAssembly(
             compilation,
             containingType.ContainingAssembly,
-            target);
+            target,
+            referenceFamilies);
         if (!assemblyMatch.IdentityApproved)
         {
             return Unresolved(
@@ -302,11 +307,13 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
 
     private static (bool IdentityApproved, bool FamilyApproved,
         ApiSpecReferenceFamily ReferenceFamily, string ReferencePath) MatchAssembly(
-        Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target)
+        Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target,
+        ImmutableDictionary<IAssemblySymbol, (ApiSpecReferenceFamily Family, string Path)>.Builder referenceFamilies)
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
         var identity = assembly.Identity;
         var token = HashEncoding.ToLowerHex(identity.PublicKeyToken);
         bool IdentityMatches(ApiSpecAssemblyIdentity approved)
@@ -324,14 +331,21 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
             return (false, false, ApiSpecReferenceFamily.Unspecified, string.Empty);
         }
 
-        var reference = compilation.GetMetadataReference(assembly) as PortableExecutableReference;
-        var path = reference?.FilePath ?? string.Empty;
-        var family = ClassifyReferenceFamily(
-            compilation,
-            identity.Name,
-            assembly,
-            reference,
-            path);
+        // Many templates share a containing assembly; its reference family
+        // depends only on the assembly, so classify it once per table.
+        if (!referenceFamilies.TryGetValue(assembly, out var classified))
+        {
+            var reference = compilation.GetMetadataReference(assembly) as PortableExecutableReference;
+            var referencePath = reference?.FilePath ?? string.Empty;
+            classified = (ClassifyReferenceFamily(
+                compilation,
+                identity.Name,
+                assembly,
+                reference,
+                referencePath), referencePath);
+            referenceFamilies.Add(assembly, classified);
+        }
+        var (family, path) = classified;
         return (
             true,
             identityMatches.Any(approved =>

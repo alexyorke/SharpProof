@@ -2,12 +2,44 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class TotalLoweringContext
 {
+    private (ControlFlowGraph Graph, bool Dictionaries, bool HashSets, bool Lists)? _freshCollectionBases;
+
+    // Which base cases Resolve below can reach in a graph: an empty default
+    // collection creation, a list range, or for hash sets a null reference.
+    // One scan of the operations the passes walk serves all four passes.
+    private (bool Dictionaries, bool HashSets, bool Lists) FreshCollectionBases(ControlFlowGraph graph)
+    {
+        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        if (_freshCollectionBases is { } known && ReferenceEquals(known.Graph, graph))
+        { return (known.Dictionaries, known.HashSets, known.Lists); }
+        bool dictionaries = false, hashSets = false, lists = false;
+        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
+            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf());
+        foreach (var operation in graph.OriginalOperation.DescendantsAndSelf().Concat(operations))
+        {
+            dictionaries |= CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
+            hashSets |= CSharpOperationSemantics.IsEmptyDefaultHashSetCreation(operation) ||
+                operation.Type?.IsReferenceType == true && operation.ConstantValue is { HasValue: true, Value: null };
+            lists |= CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation);
+            if (dictionaries && hashSets && lists)
+            { break; }
+        }
+        _freshCollectionBases = (graph, dictionaries, hashSets, lists);
+        return (dictionaries, hashSets, lists);
+    }
+
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false, bool hashSetOrigins = false)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var identityOnly = lists || dictionaryOrigins || hashSetOrigins;
         var tracked = hashSetOrigins ? _defaultHashSetOrigins : lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
         var trackedCaptures = hashSetOrigins ? _defaultHashSetOriginCaptures : lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
+        // Every proof ends at a base case or, by identity, at a parameter the
+        // caller already proved. Without either, the pass would track nothing.
+        var bases = FreshCollectionBases(graph);
+        if (!(hashSetOrigins ? bases.HashSets : lists ? bases.Lists : bases.Dictionaries) &&
+            !(identityOnly && tracked.Any(static symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : symbol is IParameterSymbol)))
+        { return; }
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToImmutableArray();
         var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);

@@ -23,6 +23,25 @@ internal sealed record AdvisoryLoweredBody(FrontendProgramLoweringResult Lowerin
 
 internal static class AdvisoryLowering
 {
+    // Each tree's document path is its ordinal in the compilation; every
+    // callable of a compilation shares the two maps.
+    private sealed class Documents
+    {
+        internal Documents(CSharpCompilation compilation)
+        {
+            compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+            var documents = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture))))
+                .ToImmutableArray();
+            Paths = ImmutableDictionaryCapture.Create(documents, item => item.Tree, item => item.Path);
+            Trees = documents.ToImmutableDictionary(item => item.Path, item => item.Tree, StringComparer.Ordinal);
+        }
+
+        internal ImmutableDictionary<SyntaxTree, string> Paths { get; }
+        internal ImmutableDictionary<string, SyntaxTree> Trees { get; }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, Documents> DocumentMaps = new();
+
     // Lowers the body the worker would verify, or names why it cannot.
     internal static (AdvisoryLoweredBody? Body, string? Gap) Lower(CSharpCompilation compilation, IMethodSymbol method,
         SyntaxNode declaration, CancellationToken cancellationToken)
@@ -31,13 +50,12 @@ internal static class AdvisoryLowering
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         cancellationToken.ThrowIfCancellationRequested();
-        if (!compilation.SyntaxTrees.Contains(declaration.SyntaxTree))
+        var documents = DocumentMaps.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : new Documents(value));
+        if (!documents.Paths.ContainsKey(declaration.SyntaxTree))
         { return (null, "SourceOwnership"); }
         if (!TotalSourceCallSession.IsBodyDeclaration(declaration))
         { return (null, "UnsupportedCallable"); }
-        var documents = compilation.SyntaxTrees.Select((tree, ordinal) => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: ordinal.ToString(CultureInfo.InvariantCulture))))
-            .ToImmutableArray();
-        var paths = ImmutableDictionaryCapture.Create(documents, item => item.Tree, item => item.Path);
+        var paths = documents.Paths;
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
             tree => paths.TryGetValue(tree, out var path) ? path : throw new InvalidOperationException("The syntax tree is not part of the compilation."));
         FrontendProgramLoweringResult? lowering;
@@ -60,6 +78,6 @@ internal static class AdvisoryLowering
         { return (null, "UnsupportedCallable"); }
         if (!lowering.IsExact)
         { return (null, "Lowering:" + lowering.Classification.Abstention); }
-        return (new(lowering, clauses, documents.ToImmutableDictionary(item => item.Path, item => item.Tree, StringComparer.Ordinal)), null);
+        return (new(lowering, clauses, documents.Trees), null);
     }
 }

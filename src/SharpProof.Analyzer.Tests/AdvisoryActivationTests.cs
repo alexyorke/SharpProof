@@ -179,6 +179,37 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task NamespaceAliasWithAttributeSuffixActivatesAdvisoryAnalysis()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            namespace Outer {
+                namespace Inner {
+                    using PureAttribute = SharpProof.Attributes.EnforcePureAttribute;
+
+                    internal static class Subject {
+                        private static int state;
+
+                        [Pure]
+                        internal static void Mutate() {
+                            state++;
+                        }
+                    }
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0002"],
+            analyzer: new SharpProofAnalyzer(factory),
+            profile: "advisory",
+            features: "effects");
+
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0002"]);
+        Assert.That(factory.CreateCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task AliasedClosedAndExceptionAttributesActivateAdvisoryAnalysis()
     {
         var closedContractDiagnostics = await AnalyzerTestHost.AnalyzeAsync(

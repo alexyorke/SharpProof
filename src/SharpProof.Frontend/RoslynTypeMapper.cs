@@ -8,6 +8,9 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
     internal Func<ITypeSymbol?, ITypeSymbol?> TypeSpecializer = static type => type;
     private readonly ImmutableDictionary<ITypeSymbol, bool>.Builder _closedSealedTypes = ImmutableDictionary.CreateBuilder<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
     private readonly ImmutableHashSet<ITypeSymbol>.Builder _classTypesChecked = ImmutableHashSet.CreateBuilder<ITypeSymbol>(SymbolEqualityComparer.Default);
+    // A type maps to the same IR type every time, and the factory keeps what
+    // the first mapping registered. Equal symbols intern to one identity.
+    private readonly Dictionary<ITypeSymbol, IrTypeId> _mapped = new(SymbolEqualityComparer.Default);
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
     {
@@ -23,7 +26,16 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
         {
             return _factory.ObjectType;
         }
+        if (!_mapped.TryGetValue(type, out var mapped))
+        {
+            mapped = Map(type);
+            _mapped[type] = mapped;
+        }
+        return mapped;
+    }
 
+    private IrTypeId Map(ITypeSymbol type)
+    {
         if (type.TypeKind == TypeKind.Error)
         {
             return _factory.GetOrCreateReferenceType(
