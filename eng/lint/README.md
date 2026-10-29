@@ -64,6 +64,8 @@ directly. This avoids markdownlint-cli2's unpatched globbing dependency while
 preserving the same lint rules. It checks authored Markdown and rejects empty input.
 The KaTeX override pins a patched transitive version used by math parsing; regression
 fixtures exercise inline and block math as well as Markdown error detection.
+The `re2js` override replaces the vulnerable version that markdownlint pins exactly
+with the first patched release for `GHSA-gg6h-894w-4m9c`.
 
 One zizmor rule is disabled with an inline explanation in `zizmor.yml`:
 actionlint 1.7.12 rejects the newer self-repository syntax suggested by zizmor.
