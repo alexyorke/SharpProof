@@ -75,43 +75,42 @@ internal static class CompilerCompilationCapture
 
     // GetMetadata returns a new copy on every call, but every copy reads through
     // the one MetadataReader of the image the compiler loaded. Compilations that
-    // share a reference therefore share that reader, and later captures of an
-    // unchanged file reuse its evidence instead of re-reading, re-matching and
-    // re-hashing it. A different path, length or write time takes the full
-    // capture again.
+    // share a reference therefore share that reader. A later capture of the same
+    // path still hashes the file, and when the digest is unchanged the bytes are
+    // the ones that already matched this reader, so their metadata match, name,
+    // MVID and identity are reused instead of read again. Timestamps are not
+    // trusted: any other digest takes the full capture.
     private sealed class CapturedModuleFile
     {
         internal CapturedModuleFile(
-            FileInfo file,
+            string path,
             bool isAssembly,
             CompilerReferenceModuleSnapshot snapshot,
-            string? identity)
+            string identity)
         {
-            file = RepositoryParameterGuard.NotNull(file, nameof(file));
-            snapshot = RepositoryParameterGuard.NotNull(snapshot, nameof(snapshot));
-            FullPath = file.FullName;
-            SizeBytes = file.Length;
-            LastWriteTimeUtc = file.LastWriteTimeUtc;
+            ModulePath = RepositoryParameterGuard.NotNull(path, nameof(path));
+            Snapshot = RepositoryParameterGuard.NotNull(snapshot, nameof(snapshot));
+            Identity = RepositoryParameterGuard.NotNull(identity, nameof(identity));
             IsAssembly = isAssembly;
-            Snapshot = snapshot;
-            Identity = identity;
         }
 
-        private string FullPath { get; }
-        private long SizeBytes { get; }
-        private DateTime LastWriteTimeUtc { get; }
+        private string ModulePath { get; }
         private bool IsAssembly { get; }
         internal CompilerReferenceModuleSnapshot Snapshot { get; }
-        internal string? Identity { get; }
+        internal string Identity { get; }
 
-        internal bool Describes(FileInfo file, bool expectAssembly)
+        internal bool Describes(
+            string path,
+            bool expectAssembly,
+            Stream content,
+            CancellationToken cancellationToken)
         {
-            file = RepositoryParameterGuard.NotNull(file, nameof(file));
+            path = RepositoryParameterGuard.NotNull(path, nameof(path));
+            content = RepositoryParameterGuard.NotNull(content, nameof(content));
             return IsAssembly == expectAssembly &&
-                file.Exists &&
-                string.Equals(file.FullName, FullPath, StringComparison.Ordinal) &&
-                file.Length == SizeBytes &&
-                file.LastWriteTimeUtc == LastWriteTimeUtc;
+                string.Equals(path, ModulePath, StringComparison.Ordinal) &&
+                content.Length == Snapshot.SizeBytes &&
+                string.Equals(Hash(content, cancellationToken), Snapshot.Sha256, StringComparison.Ordinal);
         }
     }
 
@@ -420,25 +419,6 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             var modulePath = index == 0
                 ? Path.GetFullPath(path)
                 : ResolveSiblingModule(path, backingName);
-            // Read the file's length and write time before its bytes, so a
-            // write during the capture leaves a stale key that never matches.
-            var file = new FileInfo(modulePath);
-            file.Refresh();
-            var slot = CapturedModuleFiles.GetValue(
-                backingReader,
-                static _ => new CapturedModuleFileSlot());
-            if (slot.Latest is { } captured && captured.Describes(
-                    file,
-                    index == 0 && reference.Properties.Kind == MetadataImageKind.Assembly))
-            {
-                budget = budget.Consume(captured.Snapshot.SizeBytes);
-                if (index == 0)
-                {
-                    identity = captured.Identity;
-                }
-                modules.Add(captured.Snapshot);
-                continue;
-            }
             using var stream = new FileStream(
                 modulePath,
                 FileMode.Open,
@@ -446,6 +426,25 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 FileShare.Read);
             var sizeBytes = stream.Length;
             budget = budget.Consume(sizeBytes);
+            var slot = CapturedModuleFiles.GetValue(
+                backingReader,
+                static _ => new CapturedModuleFileSlot());
+            if (slot.Latest is { } captured && captured.Describes(
+                    modulePath,
+                    index == 0 && reference.Properties.Kind == MetadataImageKind.Assembly,
+                    stream,
+                    cancellationToken))
+            {
+                if (index == 0)
+                {
+                    identity = captured.Identity;
+                }
+                modules.Add(captured.Snapshot);
+                continue;
+            }
+            // PEReader takes the image from the current position, which a
+            // rejected cache entry left at the end of the file.
+            stream.Position = 0;
             using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
             if (!image.HasMetadata)
             {
@@ -463,7 +462,9 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             var fileIdentity = CompilerReferenceModuleEvidence.Match(
                 new CompilerReferenceModuleEvidence(backingReader, backingName, backingReader.GetModuleDefinition().Mvid),
                 CompilerReferenceModuleEvidence.Capture(fileReader));
-            var moduleIdentity = index == 0 ? Identity(fileReader) : null;
+            // Every module records its identity: the reader of a module linked
+            // into an assembly can later be referenced as a netmodule itself.
+            var moduleIdentity = Identity(fileReader);
             if (index == 0)
             {
                 identity = moduleIdentity;
@@ -477,10 +478,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 SizeBytes = sizeBytes
             };
             modules.Add(snapshot);
-            if (file.Exists && file.Length == sizeBytes)
-            {
-                slot.Latest = new CapturedModuleFile(file, fileReader.IsAssembly, snapshot, moduleIdentity);
-            }
+            slot.Latest = new CapturedModuleFile(modulePath, fileReader.IsAssembly, snapshot, moduleIdentity);
         }
         return (new CompilerReferenceSnapshot
         {

@@ -1414,6 +1414,86 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task ReferenceReplacedWithItsLengthAndWriteTimeIsMatchedAgain()
+    {
+        using var workspace = new CollectorWorkspace();
+        var image = EmitImage(
+            "internal static class OriginalMarker { const int Value = 1; }",
+            "PatchedReference");
+        var path = Path.Combine(workspace.Path, "PatchedReference.dll");
+        await File.WriteAllBytesAsync(path, image.ToArray());
+        var written = File.GetLastWriteTimeUtc(path);
+        ImmutableArray<MetadataReference> references = [MetadataReference.CreateFromImage(image, filePath: path)];
+        var first = CompilerCompilationCapture.CaptureReferences(
+            references,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken).Single();
+        var repeated = CompilerCompilationCapture.CaptureReferences(
+            references,
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken).Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Modules[0].Sha256, Is.EqualTo(ReadSha256(path)));
+            Assert.That(repeated.Modules[0], Is.EqualTo(first.Modules[0]));
+            Assert.That(repeated.Identity, Is.EqualTo(first.Identity));
+        }
+
+        await File.WriteAllBytesAsync(path, PatchAscii(image, "OriginalMarker", "XriginalMarker").ToArray());
+        File.SetLastWriteTimeUtc(path, written);
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+        {
+            _ = CompilerCompilationCapture.CaptureReferences(
+                references,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+                TestContext.CurrentContext.CancellationToken);
+        }));
+        Assert.That(exception!.Message, Is.EqualTo("A compiler reference path does not match its loaded metadata."));
+    }
+
+    [Test]
+    public async Task LinkedNetmoduleKeepsItsIdentityWhenReferencedDirectly()
+    {
+        using var workspace = new CollectorWorkspace();
+        var modulePath = Path.Combine(workspace.Path, "A.netmodule");
+        var manifestPath = Path.Combine(workspace.Path, "Linked.dll");
+        var moduleImage = EmitImage(
+            "public static class A { public static int Value => 1; }",
+            "A",
+            OutputKind.NetModule);
+        await File.WriteAllBytesAsync(modulePath, moduleImage.ToArray());
+        var manifestImage = AnalyzerTestHost.EmitImage(CreateCompilation(
+                "public static class Linked { public static int Value => A.Value; }")
+            .WithAssemblyName("Linked")
+            .AddReferences(MetadataReference.CreateFromImage(
+                moduleImage,
+                new MetadataReferenceProperties(MetadataImageKind.Module),
+                filePath: modulePath)));
+        await File.WriteAllBytesAsync(manifestPath, manifestImage.ToArray());
+        using var module = ModuleMetadata.CreateFromImage(moduleImage);
+        using var assembly = AssemblyMetadata.Create(
+            ModuleMetadata.CreateFromImage(manifestImage),
+            module);
+
+        var linked = CompilerCompilationCapture.CaptureReferences(
+            [assembly.GetReference(filePath: manifestPath)],
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken).Single();
+        var direct = CompilerCompilationCapture.CaptureReferences(
+            [module.GetReference(filePath: modulePath)],
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            TestContext.CurrentContext.CancellationToken).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(linked.Modules[1], Is.EqualTo(direct.Modules[0]));
+            Assert.That(direct.Kind, Is.EqualTo(nameof(MetadataImageKind.Module)));
+            Assert.That(direct.Identity, Is.EqualTo("A.netmodule"));
+        }
+    }
+
+    [Test]
     public async Task LinkedNetmoduleProvenanceCapturesCompleteClosure()
     {
         using var workspace = new CollectorWorkspace();
