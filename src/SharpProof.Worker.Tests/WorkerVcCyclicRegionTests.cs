@@ -13,7 +13,6 @@ using System.Text.Json;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcCyclicRegionTests
 {
     internal const string RepeatedFilterSource = """

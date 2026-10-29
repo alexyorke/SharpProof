@@ -3,7 +3,6 @@ using NUnit.Framework;
 namespace SharpProof.Worker.Test.LongFuzz;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class LongFuzzRefStateOracleTests
 {
     [Test]

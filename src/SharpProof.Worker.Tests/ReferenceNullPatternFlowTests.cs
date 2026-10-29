@@ -7,7 +7,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 internal sealed class ReferenceNullPatternFlowTests
 {
     [Test]

@@ -13,7 +13,6 @@ namespace SharpProof.Worker.Test;
 // discard, `not`, `and` and `or` patterns are pure comparisons of the tested
 // value with constants; each outcome is checked against CLR execution.
 [TestFixture]
-[NonParallelizable]
 internal sealed class ScalarPatternFlowTests
 {
     private const string Prelude = "using SharpProof.Attributes; public static class C { public static int State; ";

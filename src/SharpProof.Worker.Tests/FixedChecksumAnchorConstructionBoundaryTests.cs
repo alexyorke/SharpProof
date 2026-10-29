@@ -15,6 +15,7 @@ namespace SharpProof.Worker.Test;
 
 // Prospective fixed construction-boundary regression. No native/Houdini execution claim.
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class FixedChecksumAnchorConstructionBoundaryTests
 {
     private const string Source =

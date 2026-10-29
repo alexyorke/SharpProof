@@ -51,10 +51,12 @@ jobs:
       matrix:
         lane: ${{ fromJSON(needs.plan.outputs.lanes) }}
     steps:
+      # Full history cost 10-50 seconds per lane. Only repository needs it: the
+      # package compatibility check reads the API baseline commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: ${{ matrix.lane == 'repository' && '0' || '1' }}
           persist-credentials: false
-          fetch-depth: 0
       - uses: ./.github/actions/setup-tooling
       - name: ./ci.sh ${{ matrix.lane }}
         env:

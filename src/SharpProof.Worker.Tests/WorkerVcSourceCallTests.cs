@@ -11,7 +11,6 @@ using System.Text.Json;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcSourceCallTests
 {
     [Test]

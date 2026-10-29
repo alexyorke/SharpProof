@@ -11,6 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 internal sealed partial class NativeResourceContractTests
 {
     [TestCase("ordinal", "ResourceLowerInputMismatch")]

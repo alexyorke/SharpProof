@@ -776,6 +776,7 @@ try {
                         else {
                             1
                         }
+                        ChildPool             = $fixtureClass -ceq 'FinalCompilationProbeTests'
                     }).AsReadOnly())
         }
         $shardBuilder.Add(([ordered]@{
@@ -822,6 +823,7 @@ try {
                         # scheduler so the package-layout host does not oversubscribe
                         # the integration-test wave alongside worker shards.
                         Slots                 = [Math]::Min(4, $parallelism)
+                        ChildPool             = $true
                     }).AsReadOnly())
         }
         foreach ($bucket in @($workerBuckets | Where-Object {
@@ -878,15 +880,39 @@ try {
         $partitionFilters = @(Get-SharpProofPackagePartitionFilters -Cases $universe -Partition $PackagePartition -Count $PackagePartitionCount)
         if ($partitionFilters.Count -eq 0) { throw 'Package partition selected no cases.' }
         $partitionFilter = $partitionFilters -join '|'
-        $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        # List every shard's share of the partition at once; one listing is a
+        # second of mostly testhost startup, and they ran one after another.
+        $listings = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
         foreach ($shard in $shardBuilder) {
-            $filter = "($($shard.Filter))&($partitionFilter)"
-            $listing = Join-Path $partitionEvidence ($shard.Name + '.txt')
-            Invoke-SharpProofRequiredDotnet -Arguments @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/ListTestsTargetPath:' + $listing), ('/TestCaseFilter:' + $filter)) -TimeoutSeconds $TimeoutSeconds -Quiet:$Quiet | Out-Host
-            if (@(Get-Content -LiteralPath $listing).Count -eq 0) { continue }
+            $listings.Add(([ordered]@{
+                        Name    = $shard.Name
+                        Filter  = "($($shard.Filter))&($partitionFilter)"
+                        Listing = Join-Path $partitionEvidence ($shard.Name + '.txt')
+                    }).AsReadOnly())
+        }
+        $prepareListing = {
+            param([object]$entry)
+            return ([ordered]@{
+                    Arguments = @('vstest', $testAssembly, '/ListFullyQualifiedTests', ('/ListTestsTargetPath:' + $entry.Listing), ('/TestCaseFilter:' + $entry.Filter))
+                }).AsReadOnly()
+        }.GetNewClosure()
+        $listingRun = Invoke-SharpProofParallelDotnetTests -Tests $listings.ToImmutable() -RepositoryRoot $repositoryRoot `
+            -Parallelism $parallelism -TimeoutSeconds $TimeoutSeconds -Prepare $prepareListing -Label 'Package listing' -Quiet
+        if ($listingRun.Failures.Length -ne 0) { throw "Package partition listing failed: $($listingRun.Failures -join ' ')" }
+        $partitionShards = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+        for ($index = 0; $index -lt $shardBuilder.Count; $index++) {
+            $shard = $shardBuilder[$index]
+            $caseCount = @(Get-Content -LiteralPath $listings[$index].Listing).Count
+            if ($caseCount -eq 0) { continue }
             $copy = [ordered]@{}
             foreach ($entry in $shard.GetEnumerator()) { $copy[$entry.Key] = $entry.Value }
-            $copy['Filter'] = $filter
+            $copy['Filter'] = $listings[$index].Filter
+            # A partition often holds one or two cases of a fixture whose slots
+            # reserve a four-worker NUnit pool; such a shard would otherwise wait
+            # for an idle container and then run nearly alone.
+            if ($copy.Contains('ChildPool') -and [bool]$copy['ChildPool']) {
+                $copy['Slots'] = [Math]::Min([int]$copy['Slots'], $caseCount)
+            }
             $partitionShards.Add($copy.AsReadOnly())
         }
         $shards = $partitionShards.ToImmutable()

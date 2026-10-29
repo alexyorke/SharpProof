@@ -7,7 +7,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcRegionTests
 {
     internal const string CapturedReturnSource = """

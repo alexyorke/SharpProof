@@ -7,7 +7,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcMetadataCallTests
 {
     internal const string LibrarySource = """
