@@ -131,11 +131,11 @@ lint() {
     compose_run -e GITHUB_TOKEN lint
 }
 
+# One container builds both evidence projects; their dependency closures
+# almost coincide, so separate containers built them twice.
 api_evidence() {
-  tooling test -Target src/SharpProof.Effects.Tests/SharpProof.Effects.Tests.csproj \
-    -TestFilter FullyQualifiedName~DotnetApiInventoryTests &&
-    tooling test -Target src/SharpProof.Specs.Tests/SharpProof.Specs.Tests.csproj \
-      -TestFilter FullyQualifiedName~ApiSpecRuntimeOracleTests &&
+  tooling test -Target SharpProof.ApiEvidence.Tests.slnf \
+    -TestFilter 'FullyQualifiedName~DotnetApiInventoryTests|FullyQualifiedName~ApiSpecRuntimeOracleTests' &&
     test -s artifacts/api-coverage/catalog-test-evidence.json &&
     test -s artifacts/api-coverage/intrinsic-test-evidence.json
 }
