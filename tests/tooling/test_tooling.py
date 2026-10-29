@@ -154,7 +154,7 @@ class ToolingTests(unittest.TestCase):
         self.assertEqual({"security", "format-check", "lint", "docs", "layout", "test", "coverage"},
                          {command[0] for command in commands})
         self.assertIn(["coverage", "-CoveragePart", "Isolated"], commands)
-        self.assertEqual({"FullyQualifiedName~DotnetApiInventoryTests", "FullyQualifiedName~ApiSpecRuntimeOracleTests", "TestCategory=LongFuzz"},
+        self.assertEqual({"FullyQualifiedName~DotnetApiInventoryTests|FullyQualifiedName~ApiSpecRuntimeOracleTests", "TestCategory=LongFuzz"},
                          {command[command.index("-TestFilter") + 1] for command in commands if "-TestFilter" in command})
         for call in calls:
             self.assertIn(str(common) + ":/git-common:ro", call["args"])
