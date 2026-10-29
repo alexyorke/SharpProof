@@ -460,10 +460,7 @@ internal sealed class NativeTaskEmittedFaultSiteTests
             (second is null ? "Child" : "Other") + "(3)))" + (configured ? ".ConfigureAwait(false)" : "") +
             ";static void Child(int n){" + first + "}" + (second is null ? "" : "static void Other(int n){" + second + "}") + "}";
         var initial = TestCompilation.Create("EmittedFaultSites", [("Subject.cs", source)]);
-        const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-        var compilation = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-            .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)))
+        var compilation = initial.WithReferences(ReviewedRuntimeReferences.Net8)
             .WithOptions(initial.Options.WithPlatform(Platform.X64).WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;

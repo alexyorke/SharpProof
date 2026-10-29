@@ -263,10 +263,7 @@ internal sealed class NativeTaskRuntimeCostTests
             (configured ? ".ConfigureAwait(false)" : "") + ";static void Child(int n){for(int i=0;i<n;i++){var values=new int[3];}}" +
             (distinctLastChild ? "static void Other(int n){for(int i=0;i<n;i++){var values=new int[3];}}" : "") + "}";
         var initial = TestCompilation.Create("TaskRuntimeCost", [("Subject.cs", source)]);
-        const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-        var compilation = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-            .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)))
+        var compilation = initial.WithReferences(ReviewedRuntimeReferences.Net8)
             .WithOptions(initial.Options.WithPlatform(Platform.X64).WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var token = TestContext.CurrentContext.CancellationToken;

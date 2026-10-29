@@ -302,10 +302,7 @@ internal sealed class NativeTaskRuntimeAdmissionGapTests
             "L)] public static Task Target(int n)=>Task.WhenAll(Task.Run(()=>Child(n)),Task.Run(()=>Child(n)));" +
             "static void Child(int n){var values=new int[3];}}";
         var initial = Compile(source);
-        const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-        var compilation = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-            .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)))
+        var compilation = initial.WithReferences(ReviewedRuntimeReferences.Net8)
             .WithOptions(initial.Options.WithPlatform(Platform.X64).WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;

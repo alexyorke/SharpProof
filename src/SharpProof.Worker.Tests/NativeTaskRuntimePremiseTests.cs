@@ -200,10 +200,7 @@ internal sealed class NativeTaskRuntimePremiseTests
     {
         ArgumentNullException.ThrowIfNull(mutation);
         var initial = TestCompilation.Create("ConfiguredRuntimeManifest", [("Subject.cs", Source(Attributes("complete"), true, 1000000))]);
-        const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-        var compilation = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-            .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)))
+        var compilation = initial.WithReferences(ReviewedRuntimeReferences.Net8)
             .WithOptions(initial.Options.WithPlatform(Platform.X64).WithOptimizationLevel(OptimizationLevel.Release));
         TestCompilation.AssertNoErrors(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;
@@ -546,10 +543,7 @@ internal sealed class NativeTaskRuntimePremiseTests
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentOutOfRangeException.ThrowIfNegative(upper);
         var initial = TestCompilation.Create("TaskRuntimePremises", [("Subject.cs", Source(attributes, configured, upper))]);
-        const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-        var compilation = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-            .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)))
+        var compilation = initial.WithReferences(ReviewedRuntimeReferences.Net8)
             .WithOptions(initial.Options.WithPlatform(Platform.X64).WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;

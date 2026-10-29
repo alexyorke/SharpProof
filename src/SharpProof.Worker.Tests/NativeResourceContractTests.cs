@@ -62,10 +62,7 @@ internal sealed partial class NativeResourceContractTests
         var initial = TestCompilation.Create("ResourceContract", [("Subject.cs", source)]);
         if (reviewedRuntime)
         {
-            const string references = "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32/ref/net8.0";
-            initial = initial.WithReferences(Directory.GetFiles(references, "*.dll")
-                .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-                .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)));
+            initial = initial.WithReferences(ReviewedRuntimeReferences.Net8);
         }
         if (x64)
         { initial = initial.WithOptions(initial.Options.WithPlatform(Microsoft.CodeAnalysis.Platform.X64)); }
