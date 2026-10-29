@@ -4,25 +4,28 @@ internal sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private readonly ImmutableDictionary<ExternalIdentityBucketKey, ExternalIdentityBucket>.Builder _externalIdentityBuckets = ImmutableDictionary.CreateBuilder<ExternalIdentityBucketKey, ExternalIdentityBucket>(ExternalIdentityBucketKeyComparer.Instance);
-    private readonly ImmutableDictionary<string, IrStringId>.Builder _stringIds = ImmutableDictionary.CreateBuilder<string, IrStringId>(StringComparer.Ordinal);
-    private readonly ImmutableList<string>.Builder _strings = ImmutableList.CreateBuilder<string>();
-    private readonly ImmutableDictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>.Builder _typeIds = ImmutableDictionary.CreateBuilder<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId>();
-    private readonly ImmutableList<IrTypeInfo>.Builder _types = ImmutableList.CreateBuilder<IrTypeInfo>();
-    private readonly ImmutableHashSet<IrTypeId>.Builder _closedSealedReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
-    private readonly ImmutableList<IrVariableInfo>.Builder _variables = ImmutableList.CreateBuilder<IrVariableInfo>();
-    private readonly ImmutableDictionary<StructuralKey, IrMemberId>.Builder _memberIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrMemberId>(StructuralKeyComparer.Instance);
-    private readonly ImmutableList<IrMemberInfo>.Builder _members = ImmutableList.CreateBuilder<IrMemberInfo>();
-    private readonly ImmutableList<IrOperationInfo>.Builder _operations = ImmutableList.CreateBuilder<IrOperationInfo>();
-    private readonly ImmutableDictionary<StructuralKey, IrTerm>.Builder _termIds = ImmutableDictionary.CreateBuilder<StructuralKey, IrTerm>(StructuralKeyComparer.Instance);
-    private readonly ImmutableList<IrTerm>.Builder _terms = ImmutableList.CreateBuilder<IrTerm>();
-    private readonly ImmutableDictionary<IrTypeId, IrValue>.Builder _emptyArrays = ImmutableDictionary.CreateBuilder<IrTypeId, IrValue>();
-    private readonly ImmutableDictionary<IrTypeId, IrTypeId?>.Builder _closedClassReferenceBases = ImmutableDictionary.CreateBuilder<IrTypeId, IrTypeId?>();
-    private readonly ImmutableHashSet<IrTypeId>.Builder _interfaceReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
-    private readonly ImmutableDictionary<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>.Builder _implementedReferenceInterfaces = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableHashSet<IrTypeId>.Builder>();
-    private readonly ImmutableHashSet<IrTypeId>.Builder _delegateReferenceTypes = ImmutableHashSet.CreateBuilder<IrTypeId>();
-    private readonly ImmutableDictionary<IrTypeId, ImmutableArray<ResourceStorageKind>>.Builder _closureFrameTypes = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableArray<ResourceStorageKind>>();
-    private readonly ImmutableDictionary<IrTypeId, ImmutableArray<ResourceStorageKind>>.Builder _objectStorageTypes = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableArray<ResourceStorageKind>>();
+    // Every table below is read and written only under _gate and is never
+    // enumerated in an order-dependent way, so hashed and array-backed
+    // collections give the same results as persistent ones, in O(1).
+    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = new(ExternalIdentityBucketKeyComparer.Instance);
+    private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
+    private readonly List<string> _strings = [];
+    private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
+    private readonly List<IrTypeInfo> _types = [];
+    private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
+    private readonly List<IrVariableInfo> _variables = [];
+    private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
+    private readonly List<IrMemberInfo> _members = [];
+    private readonly List<IrOperationInfo> _operations = [];
+    private readonly Dictionary<StructuralKey, IrTerm> _termIds = new(StructuralKeyComparer.Instance);
+    private readonly List<IrTerm> _terms = [];
+    private readonly Dictionary<IrTypeId, IrValue> _emptyArrays = [];
+    private readonly Dictionary<IrTypeId, IrTypeId?> _closedClassReferenceBases = [];
+    private readonly HashSet<IrTypeId> _interfaceReferenceTypes = [];
+    private readonly Dictionary<IrTypeId, HashSet<IrTypeId>> _implementedReferenceInterfaces = [];
+    private readonly HashSet<IrTypeId> _delegateReferenceTypes = [];
+    private readonly Dictionary<IrTypeId, ImmutableArray<ResourceStorageKind>> _closureFrameTypes = [];
+    private readonly Dictionary<IrTypeId, ImmutableArray<ResourceStorageKind>> _objectStorageTypes = [];
     private readonly long _scope;
     private int _identityCount;
 
@@ -344,7 +347,7 @@ internal sealed class IrFactory
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closureFrameTypes.ContainsKey(type) || !_interfaceReferenceTypes.Contains(interfaceType))
             { throw new ArgumentException("An implemented interface requires certified nominal views.", nameof(interfaceType)); }
             if (!_implementedReferenceInterfaces.TryGetValue(type, out var interfaces))
-            { _implementedReferenceInterfaces.AddUnique(type, interfaces = ImmutableHashSet.CreateBuilder<IrTypeId>()); }
+            { _implementedReferenceInterfaces.Add(type, interfaces = []); }
             interfaces.Add(interfaceType);
         }
     }
@@ -1241,7 +1244,7 @@ internal sealed class IrFactory
         return term;
     }
 
-    private T GetScoped<T>(long scope, int value, ImmutableList<T>.Builder items, string parameterName)
+    private T GetScoped<T>(long scope, int value, List<T> items, string parameterName)
     {
         EnsureScope(scope, parameterName);
         return items[ArgumentNullGuard.RequireIndex(

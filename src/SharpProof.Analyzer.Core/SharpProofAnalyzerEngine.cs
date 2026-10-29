@@ -252,6 +252,7 @@ internal sealed partial class SharpProofAnalyzerEngine
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var hasContractApiCandidate = false;
+        ImmutableHashSet<string>? aliases = null;
         foreach (var tree in PotentiallyActivatedTrees(
                      compilation,
                      cancellationToken))
@@ -269,7 +270,12 @@ internal sealed partial class SharpProofAnalyzerEngine
                         return AdvisoryActivation.Full;
                     }
 
-                    if (attribute.Name is IdentifierNameSyntax name)
+                    // Binding the name is needed only when some using
+                    // directive could make it an alias.
+                    if (attribute.Name is IdentifierNameSyntax name &&
+                        MayNameAlias(
+                            aliases ??= AliasNames(compilation, cancellationToken),
+                            name))
                     {
                         semanticModel ??=
                             SharpProof.Frontend.Host.CompilationModelProvider
@@ -643,6 +649,43 @@ internal sealed partial class SharpProofAnalyzerEngine
                     0,
                     descriptor.TypeName.Length - "Attribute".Length),
                 StringComparison.Ordinal));
+    }
+
+    // Every alias any tree of the compilation declares. Only using directives
+    // declare aliases, and they sit in compilation units and namespaces.
+    private static ImmutableHashSet<string> AliasNames(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        var names = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            foreach (var node in tree.GetRoot(cancellationToken).DescendantNodes(
+                         static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (node is UsingDirectiveSyntax { Alias: { } alias })
+                {
+                    names.Add(alias.Name.Identifier.ValueText);
+                }
+            }
+        }
+
+        return names.ToImmutable();
+    }
+
+    // An attribute name binds to an alias spelled as written or with the
+    // Attribute suffix.
+    private static bool MayNameAlias(
+        ImmutableHashSet<string> aliases,
+        IdentifierNameSyntax name)
+    {
+        aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        var text = name.Identifier.ValueText;
+        return aliases.Contains(text) ||
+            aliases.Contains(text + "Attribute");
     }
 
     private static bool IsSharpProofAttributeAlias(

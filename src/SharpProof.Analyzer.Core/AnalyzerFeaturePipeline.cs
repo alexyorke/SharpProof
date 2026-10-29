@@ -308,6 +308,7 @@ internal static partial class AnalyzerFeaturePipeline
         }
 
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        (AdvisoryLoweredBody? Body, string? Gap)? lowered = null;
         if (selection.Effects)
         {
             outcome = EffectContractDiagnostics.Analyze(
@@ -320,16 +321,25 @@ internal static partial class AnalyzerFeaturePipeline
         // A body the IR cannot lower leaves its postconditions unknown.
         else if (selection.Contracts && !hasInvalidContractClauses &&
             !method.IsAbstract && !method.IsExtern &&
-            context.Compilation is CSharpCompilation compilation &&
-            AdvisoryLowering.Lower(compilation, method, declaration, context.CancellationToken).Gap is { } gap)
+            context.Compilation is CSharpCompilation compilation)
         {
-            ReportSelectedAnalysisIncomplete(
-                context.ReportDiagnostic,
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
-                    declaration),
-                method.Name,
-                "Advisory:" + gap);
-            outcome = AnalyzerSemanticOutcome.Abstained;
+            var result = AdvisoryLowering.Lower(compilation, method, declaration, context.CancellationToken);
+            // The requires analysis lowers the same body of the session's
+            // compilation; reuse this lowering rather than repeat it.
+            if (ReferenceEquals(compilation, session.Compilation))
+            {
+                lowered = result;
+            }
+            if (result.Gap is { } gap)
+            {
+                ReportSelectedAnalysisIncomplete(
+                    context.ReportDiagnostic,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                        declaration),
+                    method.Name,
+                    "Advisory:" + gap);
+                outcome = AnalyzerSemanticOutcome.Abstained;
+            }
         }
 
         if (session.Configuration.ContractsEnabled &&
@@ -342,7 +352,8 @@ internal static partial class AnalyzerFeaturePipeline
                     declaration,
                     session,
                     context.ReportDiagnostic,
-                    context.CancellationToken));
+                    context.CancellationToken,
+                    lowered));
         }
 
         session.RecordSemanticOutcome(method, outcome);
