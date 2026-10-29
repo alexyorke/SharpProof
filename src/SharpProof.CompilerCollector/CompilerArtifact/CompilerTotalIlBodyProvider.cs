@@ -77,6 +77,8 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         return true;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "The metadata resolution caches the backing module and returns it to every lookup; disposing it here would invalidate later reads.")]
     private TotalIlBody? Read(IMethodSymbol method, CancellationToken cancellationToken)
     {
         if (!_resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name, cancellationToken,

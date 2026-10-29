@@ -73,6 +73,61 @@ internal static class CompilerCompilationCapture
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, ResolverDirectiveCache>
         ResolverDirectiveCaches = new();
 
+    // GetMetadata returns a new copy on every call, but every copy reads through
+    // the one MetadataReader of the image the compiler loaded. Compilations that
+    // share a reference therefore share that reader. A later capture of the same
+    // path still hashes the file, and when the digest is unchanged the bytes are
+    // the ones that already matched this reader, so their metadata match, name,
+    // MVID and identity are reused instead of read again. Timestamps are not
+    // trusted: any other digest takes the full capture.
+    private sealed class CapturedModuleFile
+    {
+        internal CapturedModuleFile(
+            string path,
+            bool isAssembly,
+            CompilerReferenceModuleSnapshot snapshot,
+            string identity)
+        {
+            ModulePath = RepositoryParameterGuard.NotNull(path, nameof(path));
+            Snapshot = RepositoryParameterGuard.NotNull(snapshot, nameof(snapshot));
+            Identity = RepositoryParameterGuard.NotNull(identity, nameof(identity));
+            IsAssembly = isAssembly;
+        }
+
+        private string ModulePath { get; }
+        private bool IsAssembly { get; }
+        internal CompilerReferenceModuleSnapshot Snapshot { get; }
+        internal string Identity { get; }
+
+        internal bool Describes(
+            string path,
+            bool expectAssembly,
+            Stream content,
+            CancellationToken cancellationToken)
+        {
+            path = RepositoryParameterGuard.NotNull(path, nameof(path));
+            content = RepositoryParameterGuard.NotNull(content, nameof(content));
+            return IsAssembly == expectAssembly &&
+                string.Equals(path, ModulePath, StringComparison.Ordinal) &&
+                content.Length == Snapshot.SizeBytes &&
+                string.Equals(Hash(content, cancellationToken), Snapshot.Sha256, StringComparison.Ordinal);
+        }
+    }
+
+    private sealed class CapturedModuleFileSlot
+    {
+        private volatile CapturedModuleFile? _latest;
+
+        internal CapturedModuleFile? Latest
+        {
+            get => _latest;
+            set => _latest = value;
+        }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<MetadataReader, CapturedModuleFileSlot>
+        CapturedModuleFiles = new();
+
     internal static ImmutableList<CompilerSyntaxTreeSnapshot> CaptureTrees(
         CSharpCompilation compilation,
         CancellationToken cancellationToken,
@@ -371,6 +426,25 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 FileShare.Read);
             var sizeBytes = stream.Length;
             budget = budget.Consume(sizeBytes);
+            var slot = CapturedModuleFiles.GetValue(
+                backingReader,
+                static _ => new CapturedModuleFileSlot());
+            if (slot.Latest is { } captured && captured.Describes(
+                    modulePath,
+                    index == 0 && reference.Properties.Kind == MetadataImageKind.Assembly,
+                    stream,
+                    cancellationToken))
+            {
+                if (index == 0)
+                {
+                    identity = captured.Identity;
+                }
+                modules.Add(captured.Snapshot);
+                continue;
+            }
+            // PEReader takes the image from the current position, which a
+            // rejected cache entry left at the end of the file.
+            stream.Position = 0;
             using var image = new PEReader(stream, PEStreamOptions.LeaveOpen);
             if (!image.HasMetadata)
             {
@@ -388,18 +462,23 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             var fileIdentity = CompilerReferenceModuleEvidence.Match(
                 new CompilerReferenceModuleEvidence(backingReader, backingName, backingReader.GetModuleDefinition().Mvid),
                 CompilerReferenceModuleEvidence.Capture(fileReader));
+            // Every module records its identity: the reader of a module linked
+            // into an assembly can later be referenced as a netmodule itself.
+            var moduleIdentity = Identity(fileReader);
             if (index == 0)
             {
-                identity = Identity(fileReader);
+                identity = moduleIdentity;
             }
-            modules.Add(new CompilerReferenceModuleSnapshot
+            var snapshot = new CompilerReferenceModuleSnapshot
             {
                 Name = fileIdentity.Name,
                 Mvid = fileIdentity.Mvid.ToString("D"),
                 Path = CompilerCaptureIdentity.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
-            });
+            };
+            modules.Add(snapshot);
+            slot.Latest = new CapturedModuleFile(modulePath, fileReader.IsAssembly, snapshot, moduleIdentity);
         }
         return (new CompilerReferenceSnapshot
         {

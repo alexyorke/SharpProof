@@ -111,6 +111,8 @@ internal sealed class PackagedProductFeed : IDisposable
         _ownedDirectory?.Dispose();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "CreateValidated takes ownership of the temporary feed directory; the catch block disposes it when packing fails.")]
     private static async Task<PackagedProductFeed> CreateAsync()
     {
         var suppliedSource = Environment.GetEnvironmentVariable(

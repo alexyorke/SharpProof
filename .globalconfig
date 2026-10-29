@@ -21,6 +21,13 @@ dotnet_diagnostic.CA1508.severity = none
 # the repository uses no symmetric crypto or certificates.
 dotnet_diagnostic.CA5390.severity = none
 dotnet_diagnostic.CA5403.severity = none
+# CA2000 followed every disposable through its callees, which was 128 of the 270
+# analyzer seconds in a full Release build. Checking each method on its own keeps
+# the rule enforced. Owning wrappers take their resources through constructors,
+# so a constructor argument transfers ownership; any other method that leaves
+# ownership with its caller or a cache names that with a justified suppression.
+dotnet_code_quality.CA2000.interprocedural_analysis_kind = None
+dotnet_code_quality.CA2000.dispose_ownership_transfer_at_constructor = true
 
 # CA1062 (validate arguments of public methods) is enabled explicitly so the
 # defensive-coding audit keeps its null guards visible in the build.
