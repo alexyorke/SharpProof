@@ -8,7 +8,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcCheckedArithmeticTests
 {
     [TestCase("int", "int.MinValue % -1")]

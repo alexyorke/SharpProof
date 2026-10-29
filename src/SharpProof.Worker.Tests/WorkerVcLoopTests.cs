@@ -8,7 +8,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 internal sealed class WorkerVcLoopTests
 {
     internal const string AssumeLoopSource = """

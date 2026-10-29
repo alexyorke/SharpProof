@@ -9,6 +9,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 internal sealed class NativeWorkerRoutingTests
 {
     [TestCase(false)]

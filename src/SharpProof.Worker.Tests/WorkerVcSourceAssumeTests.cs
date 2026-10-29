@@ -9,7 +9,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 internal sealed class WorkerVcSourceAssumeTests
 {
     internal const string Source = """

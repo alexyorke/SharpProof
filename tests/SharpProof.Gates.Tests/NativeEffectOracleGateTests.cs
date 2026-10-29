@@ -12,6 +12,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 internal sealed class NativeEffectOracleGateTests
 {
     // The receipt hashes the complete manifest, including review metadata.

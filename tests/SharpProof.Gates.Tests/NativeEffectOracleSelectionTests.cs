@@ -8,6 +8,7 @@ using SharpProof.Gates.Corpus;
 namespace SharpProof.Gates.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class NativeEffectOracleSelectionTests
 {
     [TestCase(1, false)]

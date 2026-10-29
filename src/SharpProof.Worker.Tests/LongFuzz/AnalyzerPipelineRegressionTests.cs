@@ -6,7 +6,6 @@ namespace SharpProof.Worker.Test.LongFuzz;
 // Finite regression controls run in the ordinary Worker suite. The generated
 // campaign remains explicit in AnalyzerPipelineLongFuzzTests.
 [TestFixture]
-[NonParallelizable]
 public sealed class AnalyzerPipelineRegressionTests
 {
     [Test]

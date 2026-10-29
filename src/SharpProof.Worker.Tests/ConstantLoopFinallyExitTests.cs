@@ -7,7 +7,6 @@ namespace SharpProof.Worker.Test;
 // false edge. With a finally region, the region lowerer must still give that
 // impossible exit a typed return, or the whole manifest fails to decode.
 [TestFixture]
-[NonParallelizable]
 internal sealed class ConstantLoopFinallyExitTests
 {
     [TestCase("[DoesNotThrow]", "", "while (true) { try { return x; } finally { x = 1; } }", WorkerClaimOutcome.Proven)]

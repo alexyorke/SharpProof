@@ -7,7 +7,6 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
-[NonParallelizable]
 public sealed class WorkerVcReferenceTests
 {
     [TestCase("string", "x != null && x.Length == 3", "return x.Length;", 3)]

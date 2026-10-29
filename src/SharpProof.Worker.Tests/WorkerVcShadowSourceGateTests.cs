@@ -9,7 +9,7 @@ namespace SharpProof.Worker.Test;
 // This is an explicit native source-worker universe. The inherited analyzer
 // corpus has no postconditions and cannot establish native postcondition coverage.
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class WorkerVcShadowSourceGateTests
 {
     internal static readonly ImmutableArray<ShadowSourceCase> Universe =
