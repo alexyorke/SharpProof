@@ -27,7 +27,7 @@ internal sealed partial class TotalLoweringContext
 {
     internal static bool IsStackReceiverType(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol named &&
+        return type is INamedTypeSymbol { Name: "Stack", Arity: 1 } named &&
             named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Stack`1" &&
             named.GetMembers().Any(CSharpOperationSemantics.IsStackStateDeclaration);
     }

@@ -53,7 +53,7 @@ internal sealed partial class TotalLoweringContext
 
     internal static bool IsHashSetReceiverType(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol named &&
+        return type is INamedTypeSymbol { Name: "HashSet" or "ICollection", Arity: 1 } named &&
             named.OriginalDefinition.GetDocumentationCommentId() is "T:System.Collections.Generic.HashSet`1" or "T:System.Collections.Generic.ICollection`1" &&
             named.GetMembers("Count").Any(member => member is null ? throw new ArgumentNullException(nameof(member)) :
                 CSharpOperationSemantics.IsHashSetStateDeclaration(member) || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(member));

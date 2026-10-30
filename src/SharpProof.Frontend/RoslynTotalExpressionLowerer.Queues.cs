@@ -6,7 +6,7 @@ internal static partial class CSharpOperationSemantics
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return IsFrameworkCollectionMember(method) && !method.IsStatic && !method.IsVirtual &&
-            method.ContainingType is { TypeArguments.Length: 1 } type &&
+            method.ContainingType is { Name: "Queue", TypeArguments.Length: 1 } type &&
             type.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1" &&
             (method.AssociatedSymbol ?? (ISymbol)method).OriginalDefinition.GetDocumentationCommentId() is
                 "M:System.Collections.Generic.Queue`1.#ctor" or "M:System.Collections.Generic.Queue`1.#ctor(System.Int32)" or
@@ -14,6 +14,17 @@ internal static partial class CSharpOperationSemantics
                 "P:System.Collections.Generic.Queue`1.Count" &&
             (method.MethodKind == MethodKind.Constructor || method.AssociatedSymbol is IPropertySymbol { Name: "Count" } ||
                 IsValueDomain(knownElement ?? type.TypeArguments[0]));
+    }
+}
+
+internal sealed partial class TotalLoweringContext
+{
+    // A type's documentation ID ends in its name and arity, so comparing those
+    // first rejects other types without building the ID string.
+    internal static bool IsQueueReceiverType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol { Name: "Queue", Arity: 1 } named &&
+            named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1";
     }
 }
 

@@ -86,12 +86,22 @@ internal static partial class CSharpOperationSemantics
         if (!method.DeclaringSyntaxReferences.IsEmpty)
         { return false; }
         var identity = method.ContainingAssembly.Identity;
-        var token = string.Concat(identity.PublicKeyToken.Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
-        return (identity.Name, token) is
-            ("System.Private.CoreLib", "7cec85d7bea7798e") or ("mscorlib", "b77a5c561934e089") or
-            ("System.Runtime", "b03f5f7f11d50a3a") or ("System.Collections", "b03f5f7f11d50a3a") or
-            ("System", "b77a5c561934e089") or ("netstandard", "cc7b13ffcd2ddd51");
+        return identity.Name switch
+        {
+            "System.Private.CoreLib" => identity.PublicKeyToken.SequenceEqual(CoreLibToken),
+            "mscorlib" or "System" => identity.PublicKeyToken.SequenceEqual(EcmaToken),
+            "System.Runtime" or "System.Collections" => identity.PublicKeyToken.SequenceEqual(MicrosoftToken),
+            "netstandard" => identity.PublicKeyToken.SequenceEqual(NetStandardToken),
+            _ => false
+        };
     }
+
+    // Public key tokens 7cec85d7bea7798e, b77a5c561934e089, b03f5f7f11d50a3a
+    // and cc7b13ffcd2ddd51, compared as bytes so no hex text is built.
+    private static readonly byte[] CoreLibToken = [0x7c, 0xec, 0x85, 0xd7, 0xbe, 0xa7, 0x79, 0x8e];
+    private static readonly byte[] EcmaToken = [0xb7, 0x7a, 0x5c, 0x56, 0x19, 0x34, 0xe0, 0x89];
+    private static readonly byte[] MicrosoftToken = [0xb0, 0x3f, 0x5f, 0x7f, 0x11, 0xd5, 0x0a, 0x3a];
+    private static readonly byte[] NetStandardToken = [0xcc, 0x7b, 0x13, 0xff, 0xcd, 0x2d, 0xdd, 0x51];
 
     internal static IrTerm IntegerComparison(IrFactory factory, IrTerm left, IrTerm right)
     {

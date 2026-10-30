@@ -201,13 +201,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return false; }
         // Scalar, reference and opaque specialization belongs to a supported collection
         // boundary. Other generic source calls retain their existing scalar domain.
-        var collectionElementSpecialization = method.OriginalDefinition.Parameters.Any(parameter =>
-            parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
-                TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
-                TotalLoweringContext.IsHashSetReceiverType(parameter.Type) ||
-                parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1");
+        // Most attempts are rejected before any type is specialized, so the
+        // collection-parameter scan runs only when a type is first asked for.
+        bool? collectionElementSpecialization = null;
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
-        { return collectionElementSpecialization ? caller.KnownValueType(type) : caller.KnownScalarType(type); }
+        {
+            collectionElementSpecialization ??= method.OriginalDefinition.Parameters.Any(parameter =>
+                parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
+                    TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
+                    TotalLoweringContext.IsHashSetReceiverType(parameter.Type) || TotalLoweringContext.IsQueueReceiverType(parameter.Type));
+            return collectionElementSpecialization.Value ? caller.KnownValueType(type) : caller.KnownScalarType(type);
+        }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
             KnownSourceValue(method.ReturnType) != null;
         if (!contractOnly && IsActive(method) ||
@@ -337,8 +341,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             TotalLoweringContext.IsDictionaryReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
             TotalLoweringContext.IsStackReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
             TotalLoweringContext.IsHashSetReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type) ||
-            method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type is INamedTypeSymbol queueReceiver &&
-            queueReceiver.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1").ToImmutableArray();
+            TotalLoweringContext.IsQueueReceiverType(method.OriginalDefinition.Parameters[argument.Parameter.Ordinal].Type)).ToImmutableArray();
         ImmutableArray<IOperation> declarationOperations = [];
         if (receiverArguments.Length != 0)
         {
@@ -364,7 +367,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             }
             if ((TotalLoweringContext.IsListReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
                 TotalLoweringContext.IsHashSetReceiverType(parameter.Type) ||
-                parameter.Type is INamedTypeSymbol queueType && queueType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Queue`1") && parameter.Type is INamedTypeSymbol declaredList &&
+                TotalLoweringContext.IsQueueReceiverType(parameter.Type)) && parameter.Type is INamedTypeSymbol declaredList &&
                 declaredList.TypeArguments[0] is ITypeParameterSymbol element && argument.Parameter.Type is INamedTypeSymbol actualList &&
                 KnownSourceValue(actualList.TypeArguments[0]) is { } actualElement)
             { frame.SpecializeTypeParameter(element, actualElement); }

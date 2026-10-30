@@ -144,6 +144,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                 if (localInitialization == (source, ordinal))
                 { InitializeRegionLocals(block, structural); }
                 block = Statement(source.Operations[ordinal], block);
+                StopIfAbstained();
             }
             if (localInitialization == (source, source.Operations.Length))
             { InitializeRegionLocals(block, structural); }

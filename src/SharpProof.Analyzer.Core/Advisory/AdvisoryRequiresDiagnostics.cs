@@ -46,7 +46,7 @@ internal static class AdvisoryRequiresDiagnostics
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
-        var body = (lowered ?? AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken)).Body;
+        var body = (lowered ?? AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken, stopAtFirstAbstention: true)).Body;
         if (body == null)
         { return CallsPreconditions(compilation, declaration, session, cancellationToken) ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable; }
         var calls = body.Lowering.CallPreconditions;

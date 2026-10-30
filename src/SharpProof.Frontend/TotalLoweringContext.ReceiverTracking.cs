@@ -19,6 +19,10 @@ internal sealed partial class TotalLoweringContext
     internal void TrackArrayReceivers(ControlFlowGraph graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
+        // Every resolution ends at a scalar array value or at a receiver
+        // already known; with neither, the pass would record nothing.
+        if (!TrackingBases(graph).Arrays && _arrayReceivers.Count == 0 && _arrayCaptures.Count == 0)
+        { return; }
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
             .Concat(block.BranchValue is { } branchValue ? ImmutableArray.Create(branchValue) : ImmutableArray<IOperation>.Empty)))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).ToImmutableArray();
@@ -339,7 +343,7 @@ internal sealed partial class TotalLoweringContext
 
     internal bool IsIntegerComparerType(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol { TypeArguments.Length: 1 } named &&
+        return type is INamedTypeSymbol { Name: "Comparer", TypeArguments.Length: 1 } named &&
             named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
             CSharpOperationSemantics.IsComparisonIntegerType(SpecializeReceiverElement(named.TypeArguments[0])) &&
             named.GetMembers("Compare").OfType<IMethodSymbol>().Any(CSharpOperationSemantics.IsIntegerComparerDeclaration);
@@ -580,7 +584,7 @@ internal sealed partial class TotalLoweringContext
 
     internal static bool IsArrayInterface(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol named && named.OriginalDefinition.GetDocumentationCommentId() is
+        return type is INamedTypeSymbol { Name: "IList" or "ICollection", Arity: 1 } named && named.OriginalDefinition.GetDocumentationCommentId() is
             "T:System.Collections.Generic.IList`1" or "T:System.Collections.Generic.ICollection`1" &&
             named.GetMembers().OfType<IPropertySymbol>().Any(CSharpOperationSemantics.IsArrayCollectionDeclaration);
     }

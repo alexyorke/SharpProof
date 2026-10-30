@@ -16,27 +16,27 @@ internal static class TotalBodyLowering
         TotalLoweringContext context, CancellationToken cancellationToken, ResolveTotalIlBody? resolveIl = null,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<INamedTypeSymbol, bool>? initializationFree = null,
-        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false)
+        Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false, bool stopAtFirstAbstention = false)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
         var lowering = LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
-            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: false, cancellationToken);
+            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: false, stopAtFirstAbstention, cancellationToken);
         if (!opaqueCalls || !lowering.IsExact || !MutatesElements(lowering.Program) ||
             !ReadsElements(context.Factory, BodyTerms(lowering.Program)))
         { return lowering; }
         // Every read is captured where it executes. The native heap records
         // unknown writes at their own reach, rather than erasing earlier reads.
         return LowerOnce(compilation, graph, context, resolveIl, resolveScalarModel,
-            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: true, cancellationToken);
+            initializationFree, prepareMetadata, opaqueCalls, approximateElementReads: false, pinElementReads: true, stopAtFirstAbstention, cancellationToken);
     }
 
     private static FrontendProgramLoweringResult LowerOnce(CSharpCompilation compilation, ControlFlowGraph graph,
         TotalLoweringContext context, ResolveTotalIlBody? resolveIl,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel, Func<INamedTypeSymbol, bool>? initializationFree,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata, bool opaqueCalls, bool approximateElementReads,
-        bool pinElementReads, CancellationToken cancellationToken)
+        bool pinElementReads, bool stopAtFirstAbstention, CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
@@ -44,12 +44,15 @@ internal static class TotalBodyLowering
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var contracts = new ExternalEffectResolver(compilation, apiSpecs);
         var invocationEmission = new InvocationEmissionPolicy(compilation);
+        // Every frame shares this lowering's factory, and total binding keeps
+        // no per-call state, so one binder serves all inlined callees.
+        ContractBinder? binder = null;
         return new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (initializationFree != null && !initializationFree(frame.Target.ContainingType))
             { return false; }
-            var contracts = new ContractBinder(compilation, context.Factory).BindTotalRequires(frame,
+            var contracts = (binder ??= new ContractBinder(compilation, context.Factory)).BindTotalRequires(frame,
                 cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
             { return false; }
@@ -87,7 +90,7 @@ internal static class TotalBodyLowering
         }, resolveIl == null ? null : (method, token) => method is null ? throw new System.ArgumentNullException(nameof(method)) : (TrustedContractEffects(contracts, method) == null ? resolveIl(method, token) : null),
             cancellationToken,
             method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ResolveScalarModel(method, context.Factory, apiSpecs) ?? resolveScalarModel?.Invoke(method)),
-            prepareMetadata, opaqueCalls, method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpaqueEffects(contracts, apiSpecs, method)), approximateElementReads, pinElementReads);
+            prepareMetadata, opaqueCalls, method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpaqueEffects(contracts, apiSpecs, method)), approximateElementReads, pinElementReads, stopAtFirstAbstention);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory, ResolvedApiSpecTable apiSpecs)

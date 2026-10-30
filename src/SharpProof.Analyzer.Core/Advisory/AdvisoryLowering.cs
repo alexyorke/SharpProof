@@ -42,9 +42,11 @@ internal static class AdvisoryLowering
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, Documents> DocumentMaps = new();
 
-    // Lowers the body the worker would verify, or names why it cannot.
+    // Lowers the body the worker would verify, or names why it cannot. A
+    // caller that needs only the body may stop lowering at its first
+    // abstention; the gap it then names can differ from the full lowering.
     internal static (AdvisoryLoweredBody? Body, string? Gap) Lower(CSharpCompilation compilation, IMethodSymbol method,
-        SyntaxNode declaration, CancellationToken cancellationToken)
+        SyntaxNode declaration, CancellationToken cancellationToken, bool stopAtFirstAbstention = false)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         method = ArgumentNullGuard.NotNull(method, nameof(method));
@@ -71,7 +73,7 @@ internal static class AdvisoryLowering
             clauses = binding.Clauses;
             var graph = TotalSourceCallSession.CreateGraph(declaration, method,
                 Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree), cancellationToken);
-            lowering = graph == null ? null : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true);
+            lowering = graph == null ? null : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true, stopAtFirstAbstention: stopAtFirstAbstention);
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (lowering == null)

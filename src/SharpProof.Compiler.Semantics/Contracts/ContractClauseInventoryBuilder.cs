@@ -125,6 +125,19 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         CancellationToken cancellationToken)
     {
         callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
+        // Only Requires, Ensures and Assume calls are clauses or rejected
+        // clause calls, and a call to one names it. A body that names none
+        // has an empty inventory; bind it only when its operation is read.
+        if (implementationBody == null)
+        {
+            var declared = GetBodies(callable, null, cancellationToken);
+            if (declared.All(static body => body is null ? throw new System.ArgumentNullException(nameof(body)) : !NamesClauseMethod(body)) &&
+                declared.All(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : TryGetSemanticModel(body.SyntaxTree, out _)))
+            {
+                return new ContractClauseInventory(callable, _api != null,
+                    new Lazy<IOperation?>(() => BindFirstBody(declared), LazyThreadSafetyMode.ExecutionAndPublication));
+            }
+        }
         var found = ImmutableArray.CreateBuilder<(
             ContractClauseClassification Classification,
             ContractClausePlacement Placement,
@@ -209,6 +222,41 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
             hasRejectedContractApiUsage,
             resolvedBody,
             clauses);
+    }
+
+    private static bool NamesClauseMethod(SyntaxNode body)
+    {
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        foreach (var token in body.DescendantTokens())
+        {
+            if (token.ValueText is ContractApiMetadata.RequiresMethodName or
+                ContractApiMetadata.EnsuresMethodName or
+                ContractApiMetadata.AssumeMethodName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // The operation the eager inventory records: the first body that binds.
+    // A later reader may not own the creating caller's token, so binding
+    // here is bounded the way other token-free contract work is.
+    private IOperation? BindFirstBody(ImmutableArray<SyntaxNode> bodies)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(bodies.IsDefault, nameof(bodies));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(SharpProof.Ir.AnalysisDefaults.OperationTimeoutMinutes));
+        foreach (var body in bodies)
+        {
+            if (TryGetSemanticModel(body.SyntaxTree, out var model) &&
+                model.GetOperation(body, cancellation.Token) is { } root)
+            {
+                return root;
+            }
+        }
+
+        return null;
     }
 
     private bool TryGetSemanticModel(
