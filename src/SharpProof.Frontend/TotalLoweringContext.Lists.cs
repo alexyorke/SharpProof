@@ -57,7 +57,7 @@ internal sealed partial class TotalLoweringContext
 
     internal static bool IsListReceiverType(ITypeSymbol? type)
     {
-        return IsArrayInterface(type) || type is INamedTypeSymbol named &&
+        return IsArrayInterface(type) || type is INamedTypeSymbol { Name: "List", Arity: 1 } named &&
             named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.List`1" &&
             named.GetMembers().Any(CSharpOperationSemantics.IsListStateDeclaration);
     }

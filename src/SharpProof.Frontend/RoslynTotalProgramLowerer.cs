@@ -28,6 +28,17 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private CompilerElisionContinuationPlanner _compilerElision = null!;
     private readonly TotalRegionWork _regionWork = new(cancellationToken, calls);
 
+    // Set for a caller that only asks whether the body lowers exactly. An
+    // abstention is never withdrawn, so once one is recorded the result is
+    // inexact whatever the rest of the body lowers to; stop there.
+    internal bool StopAtFirstAbstention { get; init; }
+
+    private void StopIfAbstained()
+    {
+        if (StopAtFirstAbstention && _abstentions.Count != 0)
+        { throw new RegionIncompleteException(); }
+    }
+
     internal FrontendProgramLoweringResult Lower(ControlFlowGraph graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
@@ -188,6 +199,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             foreach (var operation in source.Operations)
             {
                 block = Statement(operation, block);
+                StopIfAbstained();
             }
             var site = source.BranchValue == null ? structural : _context.Site(source.BranchValue);
             var branch = source.FallThroughSuccessor;

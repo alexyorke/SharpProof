@@ -98,7 +98,7 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false,
         Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null, bool approximateElementReads = false,
-        bool pinElementReads = false)
+        bool pinElementReads = false, bool stopAtFirstAbstention = false)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -111,6 +111,6 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
             cancellationToken, resolveScalarModel, prepareMetadata, opaqueCalls: opaqueCalls,
             opaqueEffects: opaqueEffects, approximateElementReads: approximateElementReads, pinElementReads: pinElementReads,
             captureResourceLoopEntries: context.CaptureResourceLoopEntries);
-        return new RoslynTotalProgramLowerer(context, cancellationToken, calls).Lower(graph);
+        return new RoslynTotalProgramLowerer(context, cancellationToken, calls) { StopAtFirstAbstention = stopAtFirstAbstention }.Lower(graph);
     }
 }

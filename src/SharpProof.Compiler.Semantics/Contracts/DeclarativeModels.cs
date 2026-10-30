@@ -40,14 +40,29 @@ internal sealed partial class ContractClauseInventory
         Callable = callable;
         ContractApiAvailable = contractApiAvailable;
         HasRejectedContractApiUsage = hasRejectedContractApiUsage;
-        ImplementationBody = implementationBody;
+        _implementationBody = implementationBody;
         Clauses = clauses;
         _hasValidClause = ComputeHasValidClause(clauses);
     }
+
+    // A clause-free body is bound only when its operation is first read.
+    internal ContractClauseInventory(
+        IMethodSymbol callable,
+        bool contractApiAvailable,
+        Lazy<IOperation?> implementationBody
+    )
+        : this(callable, contractApiAvailable, hasRejectedContractApiUsage: false, implementationBody: null, clauses: [])
+    {
+        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
+        _lazyImplementationBody = RepositoryParameterGuard.NotNull(implementationBody, nameof(implementationBody));
+    }
+
+    private readonly IOperation? _implementationBody;
+    private readonly Lazy<IOperation?>? _lazyImplementationBody;
     public IMethodSymbol Callable { get; }
     public bool ContractApiAvailable { get; }
     public bool HasRejectedContractApiUsage { get; }
-    public IOperation? ImplementationBody { get; }
+    public IOperation? ImplementationBody => _lazyImplementationBody is { } lazy ? lazy.Value : _implementationBody;
     public ImmutableArray<ContractClauseOccurrence> Clauses { get; }
 }
 

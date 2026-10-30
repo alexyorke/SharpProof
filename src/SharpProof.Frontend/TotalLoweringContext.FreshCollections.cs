@@ -2,30 +2,32 @@ namespace SharpProof.Frontend;
 
 internal sealed partial class TotalLoweringContext
 {
-    private (ControlFlowGraph Graph, bool Dictionaries, bool HashSets, bool Lists)? _freshCollectionBases;
+    private (ControlFlowGraph Graph, bool Arrays, bool Dictionaries, bool HashSets, bool Lists)? _trackingBases;
 
-    // Which base cases Resolve below can reach in a graph: an empty default
-    // collection creation, a list range, or for hash sets a null reference.
-    // One scan of the operations the passes walk serves all four passes.
-    private (bool Dictionaries, bool HashSets, bool Lists) FreshCollectionBases(ControlFlowGraph graph)
+    // Which base cases the tracking passes can reach in a graph: a scalar
+    // array value, an empty default collection creation, a list range, or for
+    // hash sets a null reference. One scan of the operations the passes walk
+    // serves all of them.
+    private (bool Arrays, bool Dictionaries, bool HashSets, bool Lists) TrackingBases(ControlFlowGraph graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        if (_freshCollectionBases is { } known && ReferenceEquals(known.Graph, graph))
-        { return (known.Dictionaries, known.HashSets, known.Lists); }
-        bool dictionaries = false, hashSets = false, lists = false;
+        if (_trackingBases is { } known && ReferenceEquals(known.Graph, graph))
+        { return (known.Arrays, known.Dictionaries, known.HashSets, known.Lists); }
+        bool arrays = false, dictionaries = false, hashSets = false, lists = false;
         var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
             .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf());
         foreach (var operation in graph.OriginalOperation.DescendantsAndSelf().Concat(operations))
         {
+            arrays |= operation.Type is IArrayTypeSymbol { IsSZArray: true } array && CSharpOperationSemantics.IsScalar(array.ElementType);
             dictionaries |= CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation);
             hashSets |= CSharpOperationSemantics.IsEmptyDefaultHashSetCreation(operation) ||
                 operation.Type?.IsReferenceType == true && operation.ConstantValue is { HasValue: true, Value: null };
             lists |= CSharpOperationSemantics.IsEmptyListCreation(operation) || IsListRangeAllocation(operation);
-            if (dictionaries && hashSets && lists)
+            if (arrays && dictionaries && hashSets && lists)
             { break; }
         }
-        _freshCollectionBases = (graph, dictionaries, hashSets, lists);
-        return (dictionaries, hashSets, lists);
+        _trackingBases = (graph, arrays, dictionaries, hashSets, lists);
+        return (arrays, dictionaries, hashSets, lists);
     }
 
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false, bool hashSetOrigins = false)
@@ -36,7 +38,7 @@ internal sealed partial class TotalLoweringContext
         var trackedCaptures = hashSetOrigins ? _defaultHashSetOriginCaptures : lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
         // Every proof ends at a base case or, by identity, at a parameter the
         // caller already proved. Without either, the pass would track nothing.
-        var bases = FreshCollectionBases(graph);
+        var bases = TrackingBases(graph);
         if (!(hashSetOrigins ? bases.HashSets : lists ? bases.Lists : bases.Dictionaries) &&
             !(identityOnly && tracked.Any(static symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : symbol is IParameterSymbol)))
         { return; }

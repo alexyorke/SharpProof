@@ -895,11 +895,19 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                 var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                     _compilation,
                     tree);
+                var scoped = assemblySelected || selectedTrees.Contains(tree);
                 foreach (var node in root.DescendantNodesAndSelf())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     switch (node)
                     {
+                        // Outside a trusted or rejected scope, a lambda or local
+                        // function is selected only by its own attributes or
+                        // clause calls. One with neither has no manifest identity,
+                        // ordinal or target, so it is not bound for its symbol.
+                        case LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax
+                            when !scoped && !MaySelectNestedCallable(node):
+                            break;
                         case TypeDeclarationSyntax type
                             when PrimaryConstructorCallableInventory.TryGet(
                                 type,
@@ -972,6 +980,21 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         }
 
         return methods.ToImmutableArray();
+
+        static bool MaySelectNestedCallable(SyntaxNode callable)
+        {
+            if (callable.DescendantNodesAndSelf().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is AttributeListSyntax)))
+            { return true; }
+            foreach (var token in callable.DescendantTokens())
+            {
+                if (token.ValueText is
+                    SharpProof.Frontend.ContractApiMetadata.RequiresMethodName or
+                    SharpProof.Frontend.ContractApiMetadata.EnsuresMethodName or
+                    SharpProof.Frontend.ContractApiMetadata.AssumeMethodName)
+                { return true; }
+            }
+            return false;
+        }
 
         static bool MayContainSharpProofSyntax(SyntaxNode root)
         {

@@ -61,7 +61,7 @@ internal sealed partial class TotalLoweringContext
 
     internal static bool IsDictionaryReceiverType(ITypeSymbol? type)
     {
-        return type is INamedTypeSymbol named &&
+        return type is INamedTypeSymbol { Name: "Dictionary", Arity: 2 } named &&
             named.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Dictionary`2" &&
             named.GetMembers("Count").Any(CSharpOperationSemantics.IsDictionaryStateDeclaration);
     }
