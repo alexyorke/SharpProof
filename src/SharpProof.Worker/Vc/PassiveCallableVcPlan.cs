@@ -12,7 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
-    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
@@ -213,10 +213,12 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
-    internal bool IsReceiverWrite(IrInstructionId instruction)
+    // Replay runs the original program, but a loop plan encodes a cut copy with
+    // new instruction ids. The source site survives the cut.
+    internal bool IsReceiverWrite(OperationId site)
     {
-        RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
-        var matches = _writes.Where(write => write.Instruction == instruction).ToImmutableArray();
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var matches = _writes.Where(write => write.Site == site).ToImmutableArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 

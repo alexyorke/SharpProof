@@ -21,7 +21,7 @@ public sealed class IrSequenceReadFlowTests
         else
         { builder.Assign(entry, factory.CreateOperation(), input, factory.EmptyArray(type)); }
         builder.Return(entry, factory.CreateOperation(), factory.Length(factory.Variable(input)));
-        Assert.That(IrSequenceReads.Readers(builder.Build()), Is.EquivalentTo(new[] { before.Id }));
+        Assert.That(IrSequenceReads.Readers(builder.Build(), TestContext.CurrentContext.CancellationToken), Is.EquivalentTo(new[] { before.Id }));
     }
 
     [TestCase(false)]
@@ -44,7 +44,7 @@ public sealed class IrSequenceReadFlowTests
         { builder.Allocate(second, factory.CreateOperation(), type, input, factory.Integer(2)); }
         builder.Goto(second, factory.CreateOperation(), join);
         var read = builder.Return(join, factory.CreateOperation(), factory.Length(factory.Variable(input)));
-        Assert.That(IrSequenceReads.Readers(builder.Build()), both ? Is.Empty : Is.EquivalentTo(new[] { read.Id }));
+        Assert.That(IrSequenceReads.Readers(builder.Build(), TestContext.CurrentContext.CancellationToken), both ? Is.Empty : Is.EquivalentTo(new[] { read.Id }));
     }
 
     [Test]
@@ -59,7 +59,7 @@ public sealed class IrSequenceReadFlowTests
         builder.Assign(entry, factory.CreateOperation(), alias, factory.Variable(input));
         builder.Allocate(entry, factory.CreateOperation(), type, input, factory.Integer(1));
         var read = builder.Return(entry, factory.CreateOperation(), factory.Length(factory.Variable(alias)));
-        Assert.That(IrSequenceReads.Readers(builder.Build()), Is.EquivalentTo(new[] { read.Id }));
+        Assert.That(IrSequenceReads.Readers(builder.Build(), TestContext.CurrentContext.CancellationToken), Is.EquivalentTo(new[] { read.Id }));
     }
 
     [TestCase(false)]
@@ -82,6 +82,6 @@ public sealed class IrSequenceReadFlowTests
         builder.Allocate(loop, factory.CreateOperation(), type, input, factory.Integer(1));
         builder.Branch(loop, factory.CreateOperation(), factory.Variable(flag), loop, exit);
         builder.Return(exit, factory.CreateOperation());
-        Assert.That(IrSequenceReads.Readers(builder.Build()), allocatedOnEntry ? Is.Empty : Is.EquivalentTo(new[] { read.Id }));
+        Assert.That(IrSequenceReads.Readers(builder.Build(), TestContext.CurrentContext.CancellationToken), allocatedOnEntry ? Is.Empty : Is.EquivalentTo(new[] { read.Id }));
     }
 }

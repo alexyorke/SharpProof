@@ -349,6 +349,14 @@ internal sealed partial class TotalLoweringContext
         return Factory.CreateOperation("StaticFieldReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
+    // A captured field is read through its flow capture, but the effect is
+    // still a field read.
+    internal OperationId CapturedFieldReadSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation("FieldReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
     internal OperationId SyntaxSite(OperationKind kind, SyntaxNode syntax)
     {
         syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));

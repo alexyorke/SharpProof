@@ -7,8 +7,25 @@ internal static class IrFieldSites
 {
     internal const string Prefix = "field:";
 
+    private static readonly ImmutableArray<string> CollectionPrefixes =
+        [Prefix + "list:", Prefix + "stack:", Prefix + "queue:", Prefix + "dictionary:", Prefix + "hash-set:"];
+
     internal static bool IsField(IrFactory factory, IrMemberId member)
     { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member)); return factory.GetString(factory.GetMemberInfo(member).Name).StartsWith(Prefix, StringComparison.Ordinal); }
+
+    // Framework collection state, which has one member per element type.
+    internal static bool IsCollectionStorage(IrFactory factory, IrMemberId member)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        var name = factory.GetString(factory.GetMemberInfo(member).Name);
+        foreach (var prefix in CollectionPrefixes)
+        {
+            if (name.StartsWith(prefix, StringComparison.Ordinal))
+            { return true; }
+        }
+        return false;
+    }
 
     internal static bool IsFieldRead(IrFactory factory, IrTerm term)
     {

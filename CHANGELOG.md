@@ -4,6 +4,16 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ## Unreleased
 
+### Verification
+
+- Route `new string(char, int)` faults through surrounding handlers and model its
+  maximum length, so a handled negative length is no longer treated as escaping.
+- Record a captured instance field read as a read for effect contracts.
+- Treat collection stores as possible aliases when either element type is open, so
+  `List<T>` and `List<int>` can no longer be assumed independent.
+- Match receiver writes by source site, so an allowed receiver write inside a loop no
+  longer becomes a false refutation.
+
 ### Developer experience
 
 - Add a workspace template with pinned local tools, optional editor assistance,

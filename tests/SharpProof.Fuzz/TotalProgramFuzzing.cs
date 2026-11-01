@@ -113,8 +113,12 @@ internal static class TotalProgramDifferentialOracle
 
         random = RepositoryParameterGuard.NotNull(random, nameof(random));
         var name = ordinal.ToString(CultureInfo.InvariantCulture);
+        // A fault inside an operation must reach the surrounding handler.
+        var caught = ordinal / 10 % 2 == 0 ? "System.ArgumentOutOfRangeException" : "System.ArgumentException";
         return (ordinal % 5) switch
         {
+            0 when ordinal / 5 % 2 == 1 => ($"public static int Target{name}(int n) {{ try {{ return new string('x', n).Length; }} catch ({caught}) {{ return -1; }} }}",
+                [random.Next(-3, 4)], 1 << 10),
             0 => ($"public static int Target{name}(string x) {{ return x.Length; }}", [null], 1 << 10),
             1 => ($"public static int Target{name}(string x) {{ return Length{name}(x); }} private static int Length{name}(string x) {{ return x.Length; }}", ["a\ud800b"], 1 << 10),
             2 => ($"public static int Target{name}(int[] x, uint index) {{ return x[index]; }}",
