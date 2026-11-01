@@ -558,6 +558,26 @@ public sealed class CallPreconditionClaimTests
     }
 
     [Test]
+    public void CompanionForAnotherAssemblyIsCountedButNotChecked()
+    {
+        using var directory = new TempDirectory("sharpproof-call-library-");
+        var library = Library(directory, "public static class Remote { public static int M(int n) => n; }");
+        var (_, artifact) = Census("""
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Remote))]
+            public static class RemoteContracts {
+                public static int M(int n) { Contract.Requires(n > 0); return 0; }
+            }
+            public static class Consumer { public static int Caller() => Remote.M(0); }
+            """, library);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
+        }
+    }
+
+    [Test]
     public void DeclaredClaimsRunBeforeCallersSelectedOnlyForTheirCalls()
     {
         using var project = new ShadowTestProject("""
