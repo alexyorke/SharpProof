@@ -16,13 +16,15 @@ internal static class CompilerCallPreconditionClaims
 
     internal static (WorkerClaimManifest Manifest, ImmutableArray<LoweredCallable> Callables) Attach(CSharpCompilation compilation,
         ImmutableArray<CompilerSyntaxTreeSnapshot> trees, WorkerClaimManifest manifest, ImmutableArray<LoweredCallable> lowered,
-        ImmutableHashSet<ManifestCallableTarget> contractCallers, CancellationToken cancellationToken)
+        ImmutableHashSet<ManifestCallableTarget> contractCallers, ImmutableArray<WorkerSourceLocation> callSites,
+        CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         contractCallers = RepositoryParameterGuard.NotNull(contractCallers, nameof(contractCallers));
         RepositoryParameterGuard.RequireInitialized(trees.IsDefault, nameof(trees), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(lowered.IsDefault, nameof(lowered), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(callSites.IsDefault, nameof(callSites), "Array must be initialized.");
         var documents = ImmutableDictionary.CreateBuilder<string, SyntaxTree>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < compilation.SyntaxTrees.Length; ordinal++)
         {
@@ -55,8 +57,10 @@ internal static class CompilerCallPreconditionClaims
                 }
             });
         }
+        var checkedSites = claims.Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Location).ToImmutableHashSet();
         var result = manifest with
         {
+            UncheckedCallSites = callSites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : !checkedSites.Contains(site)),
             Callables = [.. published.Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.Preparation.Entry)],
             Claims = [.. manifest.Claims, .. claims]
         };

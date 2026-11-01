@@ -13,6 +13,10 @@ internal sealed partial record ClaimManifestBuildResult(
     // Bodies that call a method with a Requires and declare nothing themselves.
     // Lowering decides which of them have an obligation to publish.
     internal ImmutableArray<ManifestCallableTarget> ContractCallers { get; init; } = [];
+    // Every source call whose callee declares a precondition the compiler can see.
+    internal ImmutableArray<WorkerSourceLocation> PreconditionCallSites { get; init; } = [];
+    // What that census bound. A body with no node here stayed unbound.
+    internal ImmutableArray<SyntaxNode> BoundCallSyntax { get; init; } = [];
 }
 
 // The first source census covers outer static scalar methods. It is separate

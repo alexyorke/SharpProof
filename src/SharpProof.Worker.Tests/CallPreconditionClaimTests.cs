@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
@@ -414,6 +416,145 @@ public sealed class CallPreconditionClaimTests
             return CompilerTotalCallableArtifactTests.CreateArtifact(source).Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition)).ClaimId;
         }
         Assert.That(ClaimId("2.0.0.0"), Is.EqualTo(ClaimId("1.0.0.0")));
+    }
+
+    // A real build leaves SHARPPROOF_CONTRACTS undefined, so clauses are not emitted.
+    private static CSharpCompilation ConsumerCompilation(string name, string path, string source, params MetadataReference[] references)
+    {
+        System.ArgumentNullException.ThrowIfNull(name);
+        System.ArgumentNullException.ThrowIfNull(path);
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(references);
+        var compilation = CSharpCompilation.Create(name, [CSharpSyntaxTree.ParseText(source, path: path)],
+            TestMetadataReferences.WithSharpProof.AddRange(references), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        TestCompilation.AssertNoErrors(compilation);
+        return compilation;
+    }
+
+    private static (ClaimManifestBuildResult Discovery, CompilerManifestArtifact Artifact) Census(string source, params MetadataReference[] references)
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        System.ArgumentNullException.ThrowIfNull(references);
+        var compilation = ConsumerCompilation("CallCensus", "Subject.cs", source, references);
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        return (discovery, CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken));
+    }
+
+    [Test]
+    public void BodyThatNamesNoCalleeWithAPreconditionStaysUnbound()
+    {
+        var (discovery, _) = Census(Subject("""
+            public static int Caller() { return F(1); }
+            public static int Unrelated(int x) { var y = x + 1; return System.Math.Max(y, 2); }
+            """));
+        var compilation = discovery.Targets.Keys.First(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "F")).ContainingAssembly;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(compilation.Name, Is.EqualTo("CallCensus"));
+            Assert.That(discovery.BoundCallSyntax, Is.Not.Empty);
+            Assert.That(discovery.BoundCallSyntax.Select(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.ToString())), Has.None.Contains("Max"));
+            Assert.That(discovery.BoundCallSyntax.Select(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Ancestors().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().First().Identifier.ValueText)), Has.All.EqualTo("Caller"));
+        }
+    }
+
+    [Test]
+    public void ProjectWithoutPreconditionsBindsNothing()
+    {
+        var (discovery, artifact) = Census("public static class Subject { public static int F(int x) => x; public static int Caller() => F(1); }");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(discovery.BoundCallSyntax, Is.Empty);
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.Zero);
+        }
+    }
+
+    [TestCase("public sealed class C { public C(int n) { Contract.Requires(n > 0); } public static C Caller() { return new(0); } }", TestName = "TargetTypedConstruction")]
+    [TestCase("using Alias = C; public sealed class C { public C(int n) { Contract.Requires(n > 0); } public static C Caller() { return new Alias(0); } }", TestName = "AliasedConstruction")]
+    public void CallThatDoesNotSpellItsCalleeIsStillFound(string body)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        var usings = body.StartsWith("using ", StringComparison.Ordinal) ? "using SharpProof.Attributes; " : "using SharpProof.Attributes;\n";
+        var (discovery, _) = Census(usings + body);
+        Assert.That(discovery.PreconditionCallSites, Has.Length.EqualTo(1));
+    }
+
+    [TestCase("public static int Caller() { return F(1); }", 0, TestName = "Checked")]
+    [TestCase("public static System.Func<int> Caller() { return () => F(-1); }", 1, TestName = "Lambda")]
+    [TestCase("public static async System.Threading.Tasks.Task<int> Caller() { await System.Threading.Tasks.Task.Yield(); return F(-1); }", 1, TestName = "AsyncCaller")]
+    [TestCase("public static int First() { return F(1); } public static System.Func<int> Second() { return () => F(1) + F(2); }", 2, TestName = "CheckedAndUnchecked")]
+    public void SummaryCountsVisibleCallsNoClaimChecks(string members, int expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        var (_, artifact) = Census(Subject(members));
+        Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void CallToAVirtualCalleeIsCountedAsUnchecked()
+    {
+        var (_, artifact) = Census("""
+            using SharpProof.Attributes;
+            public class C {
+                public virtual int M(int n) { Contract.Requires(n > 0); return n; }
+                public static int Caller(C c) { return c.M(0); }
+            }
+            """);
+        Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SameNameWithoutAPreconditionIsNotCounted()
+    {
+        var (_, artifact) = Census("""
+            using SharpProof.Attributes;
+            public static class Own { public static int Add(int n) { Contract.Requires(n > 0); return n; } }
+            public static class Consumer {
+                public static void Fill(System.Collections.Generic.List<int> list) { list.Add(1); }
+            }
+            """);
+        Assert.That(artifact.Manifest.UncheckedCallSites, Is.Zero);
+    }
+
+    private static PortableExecutableReference Library(TempDirectory directory, string source)
+    {
+        System.ArgumentNullException.ThrowIfNull(directory);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var path = Path.Combine(directory.FullName, "CallLibrary.dll");
+        Assert.That(ConsumerCompilation("CallLibrary", "Library.cs", source).Emit(path).Success, Is.True);
+        return MetadataReference.CreateFromFile(path);
+    }
+
+    [Test]
+    public void ClosedAttributeInAnotherAssemblyIsCountedAsUnchecked()
+    {
+        using var directory = new TempDirectory("sharpproof-call-library-");
+        var library = Library(directory, """
+            using SharpProof.Attributes;
+            public static class Remote { public static int M([Positive] int n) => n; }
+            """);
+        var (_, artifact) = Census("public static class Consumer { public static int Caller() => Remote.M(0); }", library);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void ContractRequiresInAnotherAssemblyIsInvisible()
+    {
+        using var directory = new TempDirectory("sharpproof-call-library-");
+        var library = Library(directory, """
+            using SharpProof.Attributes;
+            public static class Remote { public static int M(int n) { Contract.Requires(n > 0); return n; } }
+            """);
+        var (_, artifact) = Census("public static class Consumer { public static int Caller() => Remote.M(0); }", library);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.Zero);
+            Assert.That(artifact.Manifest.Claims, Is.Empty);
+        }
     }
 
     [Test]

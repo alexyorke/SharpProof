@@ -33,7 +33,9 @@ Entries describe repository changes, not package publication. Confirm available 
   contract of its own is selected automatically when it makes such a call. This can fail
   existing builds: a method that forwards its input to a `Requires` without restating it is
   now refuted with SP0051 under every verifier policy, and a call that cannot be proven
-  fails `require-proven`. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
+  fails `require-proven`. Calls in bodies that do not lower exactly, and calls to virtual,
+  interface or other-assembly callees, stay unchecked; the build summary counts the ones the
+  compiler can see. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
 
 ### Resource bounds
 

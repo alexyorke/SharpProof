@@ -100,6 +100,14 @@ internal sealed class ReportingTests
     }
 
     [Test]
+    public void SummaryDisclosesUncheckedCalls()
+    {
+        var response = Response(WorkerClaimOutcome.Proven);
+        Assert.That(VerificationReport.Summary(response with { Manifest = response.Manifest with { UncheckedCallSites = 4 } }),
+            Does.Contain("Unchecked calls to methods with preconditions: 4."));
+    }
+
+    [Test]
     public void CounterexampleUsesSourceParameterNamesWithoutChangingModelIdentity()
     {
         var response = Response(WorkerClaimOutcome.Refuted);

@@ -86,7 +86,7 @@ internal static class SarifProjection
             invocations = ImmutableArray.Create(new
             {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
-                properties = new { RunStatus = runStatus, FailureReason = failureReason },
+                properties = new { RunStatus = runStatus, FailureReason = failureReason, manifest.UncheckedCallSites },
                 toolExecutionNotifications = notificationBuilder.ToImmutable()
             }),
             results,

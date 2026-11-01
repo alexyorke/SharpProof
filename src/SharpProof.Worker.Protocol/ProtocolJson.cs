@@ -605,7 +605,8 @@ internal static partial class WorkerProtocolJson
             return;
         }
         var initialErrors = errors.Count;
-        errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema");
+        errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema")
+            .Check(manifest.UncheckedCallSites >= 0, prefix + ".unchecked_call_sites");
         callables = Present(manifest.Callables, prefix + ".callables", errors);
         claims = Present(manifest.Claims, prefix + ".claims", errors);
         allClaimsPostconditions = !manifest.Claims.IsDefaultOrEmpty &&

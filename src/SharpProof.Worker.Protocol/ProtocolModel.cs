@@ -420,6 +420,11 @@ internal sealed record WorkerClaimManifest
 {
     [JsonRequired]
     public int SchemaVersion { get; init; } = WorkerManifestVersions.Current;
+    // Source calls whose callee declares a precondition the compiler can see
+    // and that no claim checks. Contract.Requires in another assembly is not
+    // in its binary, so calls to it are not counted.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int UncheckedCallSites { get; init; }
     [JsonRequired]
     public string Hash { get; set; } = string.Empty;
     [JsonRequired]

@@ -9,7 +9,7 @@ internal static class VerificationReport
     {
         ArgumentNullException.ThrowIfNull(response);
 
-        return string.Format(CultureInfo.InvariantCulture, "SharpProof: {0} selected callables, {1} claims: {2} Proven, {3} Refuted, {4} Unknown; {5} incomplete callables, {6} vacuous claims, {7} declared user/trust assumptions. Run: {8} ({11}); cache: {9}; {10} ms. Unselected methods are not proved.", response.Manifest.Callables.Length, response.Manifest.Claims.Length, response.ClaimResults.Count(static claim =>
+        return string.Format(CultureInfo.InvariantCulture, "SharpProof: {0} selected callables, {1} claims: {2} Proven, {3} Refuted, {4} Unknown; {5} incomplete callables, {6} vacuous claims, {7} declared user/trust assumptions. Run: {8} ({11}); cache: {9}; {10} ms. Unselected methods are not proved. Unchecked calls to methods with preconditions: {12}.", response.Manifest.Callables.Length, response.Manifest.Claims.Length, response.ClaimResults.Count(static claim =>
         {
             global::SharpProof.Internal.InputValidation.Require(claim, nameof(claim));
             return claim.Outcome == WorkerClaimOutcome.Proven;
@@ -41,7 +41,7 @@ internal static class VerificationReport
         {
             global::SharpProof.Internal.InputValidation.Require(assumption, nameof(assumption));
             return (assumption.Kind, assumption.Id);
-        }).Distinct().Count(), response.RunStatus, response.Summary.CacheStatus, response.Summary.ElapsedMilliseconds, response.FailureReason);
+        }).Distinct().Count(), response.RunStatus, response.Summary.CacheStatus, response.Summary.ElapsedMilliseconds, response.FailureReason, response.Manifest.UncheckedCallSites);
     }
 
     internal static void Write(TextWriter writer, WorkerVerifyResponse response, string? claimId = null)

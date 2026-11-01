@@ -81,95 +81,10 @@ internal sealed partial class ClaimManifestBuilder(
                     .Concat(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry)))))]
         };
         WorkerProtocolJson.SealManifest(manifest);
-        var result = new ClaimManifestBuildResult(manifest, targets.ToImmutable())
-        { ContractCallers = DiscoverContractCallers(targets.ToImmutable()) };
+        var result = WithContractCalls(new ClaimManifestBuildResult(manifest, targets.ToImmutable()));
         return includePotentialCallShadow
             ? result with { PotentialCalls = DiscoverPotentialCallShadow(result.Targets) }
             : result;
-    }
-
-    // A project with no Requires pays nothing here. Lambdas and local functions
-    // are not roots: giving them manifest identity would renumber their siblings.
-    private ImmutableArray<ManifestCallableTarget> DiscoverContractCallers(
-        ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> selected)
-    {
-        selected = RepositoryParameterGuard.NotNull(selected, nameof(selected));
-        if (!ContractsEnabled || !selected.Values.Any(static target => target is null ? throw new ArgumentNullException(nameof(target)) :
-            target.Entry.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                assumption.Kind == WorkerAssumptionKind.Precondition)))
-        { return []; }
-        var preconditions = ImmutableDictionary.CreateBuilder<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
-        var seen = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
-        var callers = ImmutableArray.CreateBuilder<ManifestCallableTarget>();
-        foreach (var tree in _compilation.SyntaxTrees)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var remainingNodes = int.MaxValue;
-            // Semantic-model creation binds every nested local function; a tree
-            // too deep to walk here would exhaust Roslyn's binder stack there.
-            if (!TryCollectPotentialSyntax(tree.GetRoot(cancellationToken), ref remainingNodes, out var nodes, maximumNodes: int.MaxValue))
-            { continue; }
-            SemanticModel? model = null;
-            foreach (var node in nodes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (node is not BaseMethodDeclarationSyntax { } declaration || declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax) ||
-                    declaration.Body == null && declaration.ExpressionBody == null)
-                { continue; }
-                model ??= SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, tree);
-                if (model.GetDeclaredSymbol(declaration, cancellationToken) is not { } symbol)
-                { continue; }
-                var method = ContractClauseInventoryBuilder.NormalizeCallable(symbol);
-                if (selected.ContainsKey(method) || !seen.Add(method) ||
-                    method.MethodKind is not (MethodKind.Ordinary or MethodKind.Constructor or MethodKind.ExplicitInterfaceImplementation) ||
-                    !CallableSubset.IsSupported(method, declaration) ||
-                    ContractForSymbolMatcher.IsCompanionType(_contractSources.Companions, method.ContainingType) ||
-                    model.GetOperation(declaration, cancellationToken) is not { } body ||
-                    !body.Descendants().Any(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : CallsPrecondition(operation, preconditions)))
-                { continue; }
-                callers.Add(CreateContractCaller(method));
-            }
-        }
-        return callers.ToImmutable();
-    }
-
-    private bool CallsPrecondition(IOperation operation, ImmutableDictionary<IMethodSymbol, bool>.Builder known)
-    {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        known = RepositoryParameterGuard.NotNull(known, nameof(known));
-        return operation switch
-        {
-            IInvocationOperation invocation => Has(invocation.TargetMethod),
-            IObjectCreationOperation { Constructor: { } constructor } => Has(constructor),
-            IPropertyReferenceOperation property => property.Property.GetMethod is { } getter && Has(getter) ||
-                property.Property.SetMethod is { } setter && Has(setter),
-            _ => false
-        };
-
-        bool Has(IMethodSymbol method)
-        {
-            method = RepositoryParameterGuard.NotNull(method, nameof(method));
-            if (!known.TryGetValue(method, out var result))
-            {
-                result = _effectSession.HasPotentialCallPreconditions(method);
-                known.Add(method, result);
-            }
-            return result;
-        }
-    }
-
-    private ManifestCallableTarget CreateContractCaller(IMethodSymbol method)
-    {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        var seed = CreateSeed(method);
-        var entry = new WorkerCallableManifestEntry
-        {
-            CallableId = SemanticClaimIdentity.CreateCallableId(seed.Method),
-            SelectedFeatures = [WorkerSelectedFeature.Contracts],
-            SelectionReasons = [WorkerSelectionReason.DiscoveredCallPrecondition],
-            Location = ToSourceLocation(CallableLocation(seed.Method, seed.Declaration))
-        };
-        return new ManifestCallableTarget(seed.Method, seed.Declaration, seed.Model, entry, [], [], true);
     }
 
     internal CompilerPotentialCallInventory BuildPotentialCallShadow(bool allowReferenceOwners = false)

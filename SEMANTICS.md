@@ -18,7 +18,7 @@ Worker run status, callable coverage, and claim outcome are distinct. A complete
 
 Direct `Requires`, `Ensures`, and `Assume` calls form a contiguous prologue. They are compiler-bound to the verified Attributes API. A source lookalike or an unverified assembly contributes no contract evidence.
 
-`Requires` restricts a callee's entry domain and creates obligations at modeled calls. `Ensures` applies on normal return. `Result<T>` names that return value and `Old<T>` names entry state. `Assume` adds explicit user evidence; it is not independently proven.
+`Requires` restricts a callee's entry domain and creates obligations at modeled calls only; [Calls and loops](#calls-and-loops) lists the calls that stay unchecked. `Ensures` applies on normal return. `Result<T>` names that return value and `Old<T>` names entry state. `Assume` adds explicit user evidence; it is not independently proven.
 
 Direct and companion clauses are alternative effective sources. Valid direct clauses take precedence for the member; a valid companion supplies clauses when there are no valid direct clauses. Invalid or misplaced clauses remain usage errors. Compiler-elided clause invocations, including their argument evaluation, are omitted from executable body semantics.
 
@@ -58,7 +58,17 @@ Natural loops use cut encodings and invariant candidates. Candidate invariants m
 
 Call preconditions and body checkpoints are obligations, not unchecked assumptions. Each clause of a modeled call's `Requires`, including closed parameter attributes and companion clauses, is a `CallPrecondition` claim of the caller. The caller must establish the clause from its own entry domain on every path that reaches the call, so a caller with no `Requires` of its own must establish it for every input. A body that declares nothing is selected automatically when it makes a modeled call. The callee's `Requires` is not assumed after the call. A call inside an inlined callee belongs to that callee when it is verified on its own, so one violation is reported once.
 
-A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a nonvirtual source callee in the same compilation with by-value parameters. Calls that are not modeled carry no obligation and no claim: calls in a body that does not lower exactly or is abstracted, calls in lambdas and top-level statements, calls in property accessors and operators unless a selected caller inlines them, and calls to virtual, interface, abstract, async, extern or by-reference callees, to a callee whose type has a non-constant static initializer, or to a callee in another assembly. The advisory SP0027 can still report a definite violation there; its silence is not proof.
+A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a nonvirtual source callee in the same compilation with by-value parameters. Nothing else is checked. A passing build says nothing about these calls:
+
+- Calls in a body that does not lower exactly or is abstracted.
+- Calls in lambdas, and in local functions that a selected body does not inline. Lambdas and local functions are not selected as roots.
+- Calls in top-level statements, and in property accessors and operators unless a selected caller inlines them.
+- Calls to virtual, interface and abstract callees. A `Requires` on an interface or base method is therefore not checked at its dispatched calls.
+- Calls to async and extern callees, and to callees with `ref`, `in` or `out` parameters.
+- Calls to a callee whose type has a non-constant static initializer.
+- Calls to a callee in another assembly. This is the main public-API case: a library's `Contract.Requires` is compiled out of its binary, so its callers cannot see the clause, let alone check it. A companion in the calling project is not checked at those calls either. Closed parameter attributes survive in metadata, but they are not checked at these calls.
+
+The verifier reports `UncheckedCallSites`, the number of source calls whose callee declares a precondition the compiler can see and that no claim checks. It counts every case above except a `Contract.Requires` in another assembly, which the compiler cannot see. It also counts calls in dead code. Zero therefore means no visible call was missed; it does not mean every precondition in the program was checked. The advisory SP0027 can still report a definite violation at an unchecked call; its silence is not proof.
 
 General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
 

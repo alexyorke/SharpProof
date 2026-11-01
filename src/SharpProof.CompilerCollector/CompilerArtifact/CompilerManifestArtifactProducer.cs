@@ -74,7 +74,7 @@ internal static class CompilerManifestArtifactProducer
             if (features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All)
             {
                 (manifest, lowered) = CompilerCallPreconditionClaims.Attach(compilation, snapshot.SyntaxTrees, manifest, lowered,
-                    [.. discovery.ContractCallers], cancellationToken);
+                    [.. discovery.ContractCallers], discovery.PreconditionCallSites, cancellationToken);
                 targets = [.. lowered.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.Target)];
             }
             callables = [.. lowered.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : CompilerLoweredArtifact.Encode(item.Preparation, cancellationToken).AttachEffectEvidence(item.Target))];

@@ -124,6 +124,22 @@ internal sealed class CallPreconditionReportingTests
         }
     }
 
+    [Test]
+    public void PassReportsTheCallsNoClaimChecked()
+    {
+        var response = CreateResponse(WorkerClaimOutcome.Proven);
+        var manifest = response.Manifest with { UncheckedCallSites = 3 };
+        WorkerProtocolJson.SealManifest(manifest);
+        var (exitCode, output, _) = Report(response with { Manifest = manifest }, WorkerVerifyPolicy.RequireProven);
+        using var document = JsonDocument.Parse(SarifProjection.Serialize(new WorkerVerifyRequest(), response with { Manifest = manifest }, "/workspace/consumer"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(output, Does.Contain("unchecked calls to methods with preconditions=3;"));
+            Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("invocations")[0].GetProperty("properties").GetProperty("uncheckedCallSites").GetInt32(), Is.EqualTo(3));
+        }
+    }
+
     [TestCase(WorkerVerifyPolicy.Advisory, 0)]
     [TestCase(WorkerVerifyPolicy.WarnOnUnknown, 0)]
     [TestCase(WorkerVerifyPolicy.RequireProven, 6)]
