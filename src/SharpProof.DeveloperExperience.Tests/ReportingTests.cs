@@ -112,6 +112,22 @@ internal sealed class ReportingTests
     }
 
     [Test]
+    public void CallPreconditionNamesTheCalleeClause()
+    {
+        var response = Response(WorkerClaimOutcome.Refuted);
+        var location = new WorkerSourceLocation { Path = "Example.cs", Start = 1, Length = 1, Line = 3, Column = 9 };
+        response.Manifest.Claims = [response.Manifest.Claims[0] with
+        {
+            Kind = WorkerClaimKind.CallPrecondition,
+            Evidence = WorkerClaimEvidence.CallSite,
+            CallPrecondition = new() { Callee = "Example.F(int)", ClauseOrdinal = 2, ClauseLocation = location }
+        }];
+        using var writer = new StringWriter();
+        VerificationReport.Write(writer, response);
+        Assert.That(writer.ToString(), Does.Contain("[CallPrecondition]").And.Contain("Call to Example.F(int), clause 2 at Example.cs(3,9)"));
+    }
+
+    [Test]
     public async Task InvalidCommandsFailBeforeReadingEvidence()
     {
         string[][] cases = [["explain", "--result"], ["explain", "--result", "a", "--result", "b"], ["explain", "--typo", "a"]];

@@ -17,6 +17,16 @@ internal static partial class SemanticClaimIdentity
             "spc1:", ClaimDomain, assemblyName, callableId, "postcondition", predicateFingerprint, duplicateRank);
     }
 
+    internal static string CreateCallPrecondition(
+        string assemblyName, string callableId, string callee, int clauseOrdinal, int duplicateRank)
+    {
+        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
+        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
+        callee = RepositoryParameterGuard.NotNull(callee, nameof(callee));
+        return CreateEvidenceId("spc1:", ClaimDomain, assemblyName, callableId, "call-precondition",
+            callee + "#" + clauseOrdinal.ToString(CultureInfo.InvariantCulture), duplicateRank);
+    }
+
     internal static string CreateAssumption(
         string assemblyName, string callableId, WorkerAssumptionKind kind, string evidenceFingerprint, int duplicateRank)
     {

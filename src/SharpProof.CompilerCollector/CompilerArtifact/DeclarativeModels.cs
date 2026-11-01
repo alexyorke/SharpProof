@@ -10,6 +10,9 @@ internal sealed partial record ClaimManifestBuildResult(
     public ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> Targets { get; init; } = Targets ?? throw new ArgumentNullException(nameof(Targets));
     // Null means the optional source census was not requested.
     internal CompilerPotentialCallInventory? PotentialCalls { get; init; }
+    // Bodies that call a method with a Requires and declare nothing themselves.
+    // Lowering decides which of them have an obligation to publish.
+    internal ImmutableArray<ManifestCallableTarget> ContractCallers { get; init; } = [];
 }
 
 // The first source census covers outer static scalar methods. It is separate

@@ -675,6 +675,7 @@ internal static partial class WorkerProtocolJson
             callable.ClaimIds.Length == expected.Length;
         var claimOrder = true;
         var effectSeen = false;
+        var callSeen = false;
         for (var index = 0; index < expected.Length; index++)
         {
             var claim = expected[index];
@@ -689,6 +690,14 @@ internal static partial class WorkerProtocolJson
                 effectSeen = true;
             }
             else if (effectSeen && claim.Kind == WorkerClaimKind.Postcondition)
+            {
+                claimOrder = false;
+            }
+            if (claim.Kind == WorkerClaimKind.CallPrecondition)
+            {
+                callSeen = true;
+            }
+            else if (callSeen)
             {
                 claimOrder = false;
             }

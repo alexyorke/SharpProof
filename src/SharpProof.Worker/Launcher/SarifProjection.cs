@@ -200,6 +200,7 @@ internal static class SarifProjection
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId +
                 implementationIlAssumption + reason + vacuity + witness + resource +
+                LauncherPresentation.CallPreconditionDetail(claim) +
                 (outcome == WorkerClaimOutcome.Unknown ? ". " + LauncherPresentation.UnknownGuidance(reasonValue) : string.Empty),
             effectWitness?.Location ?? claim.Location,
             result.ClaimId,

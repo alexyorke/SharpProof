@@ -1,0 +1,44 @@
+run: Complete
+claim: M:Subject.Contradictory(System.Int32)~System.Int32#0
+  call: 29:16
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Proven
+  reason: None
+  vacuity: ContradictoryPreconditions
+claim: M:Subject.Established(System.Int32)~System.Int32#0
+  call: 19:16
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Proven
+  reason: None
+  vacuity: None
+claim: M:Subject.Forward(System.Int32)~System.Int32#0
+  call: 14:45
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Refuted
+  reason: None
+  vacuity: None
+  model: parameter:0
+claim: M:Subject.Guarded(System.Int32)~System.Int32#0
+  call: 22:57
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Proven
+  reason: None
+  vacuity: None
+claim: M:Subject.Literal~System.Int32#0
+  call: 12:36
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Refuted
+  reason: None
+  vacuity: None
+claim: M:Subject.Unbounded~System.Int32#0
+  call: 24:38
+  callee: M:Subject.Positive(System.Int32)~System.Int32
+  clause: 0 at line 8
+  outcome: Unknown
+  reason: CounterexampleNotReplayable
+  vacuity: None

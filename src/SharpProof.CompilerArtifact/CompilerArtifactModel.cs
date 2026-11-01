@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 56;
+    internal const int Current = 57;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -132,6 +132,9 @@ internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction
     public IrTerm Value { get; init; } = Value ?? throw new ArgumentNullException(nameof(Value));
     public IrTerm Safe { get; init; } = Safe ?? throw new ArgumentNullException(nameof(Safe));
     internal ImmutableArray<CompilerShadowCallHop> Ancestry { get; init; } = [];
+    // The call-precondition claim that checks this row. A row without one
+    // belongs to a callee verified on its own.
+    internal string? ClaimId { get; init; }
 }
 
 internal sealed record CompilerShadowCallHop(string CallerIdentity, string CalleeIdentity, IrSourceSpan Site)
@@ -203,6 +206,8 @@ internal sealed record CompilerTotalCallPreconditionArtifact
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompilerMetadataClauseOrigin? MetadataClause { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClaimId { get; init; }
 
     public int InstructionIndex { get; init; } = -1;
     public string CalleeIdentity { get; init; } = string.Empty;

@@ -6,18 +6,18 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "45";
+    public const string Current = "46";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 68;
+    public const int Current = 69;
 }
 
 internal static class WorkerManifestVersions
 {
-    public const int Current = 6;
+    public const int Current = 7;
 }
 
 internal static class WorkerLauncherDefaults
@@ -122,14 +122,16 @@ internal enum WorkerSelectionReason
 {
     Unspecified = 0,
     ExplicitAnnotation = 1,
-    DiscoveredPostcondition = 2
+    DiscoveredPostcondition = 2,
+    DiscoveredCallPrecondition = 3
 }
 
 internal enum WorkerClaimKind
 {
     Unspecified = 0,
     Postcondition = 1,
-    Effect = 2
+    Effect = 2,
+    CallPrecondition = 3
 }
 
 internal enum WorkerClaimEvidence
@@ -138,7 +140,8 @@ internal enum WorkerClaimEvidence
     DirectClause = 1,
     CompanionClause = 2,
     ReturnAttribute = 3,
-    Attribute = 4
+    Attribute = 4,
+    CallSite = 5
 }
 
 internal enum WorkerEffectContractKind
@@ -351,6 +354,26 @@ internal sealed record WorkerSourceLocation
     public int Column { get; init; }
 }
 
+// The callee clause a call-precondition claim checks. The claim's own location
+// is the call.
+internal sealed record WorkerCallPreconditionTarget
+{
+    [JsonRequired]
+    public string Callee { get; init; } = string.Empty;
+    [JsonRequired]
+    public int ClauseOrdinal { get; init; }
+    [JsonRequired]
+    public WorkerSourceLocation ClauseLocation { get; init; } = new();
+
+    // The callee without its assembly identity, which carries a version.
+    internal static string StableCallee(string callee)
+    {
+        callee = RepositoryParameterGuard.NotNull(callee, nameof(callee));
+        var separator = callee.LastIndexOf("::", StringComparison.Ordinal);
+        return separator < 0 ? callee : callee.Substring(separator + 2);
+    }
+}
+
 internal sealed record WorkerCallableManifestEntry
 {
     [JsonRequired]
@@ -387,6 +410,8 @@ internal sealed record WorkerClaimManifestEntry
     public WorkerEffectContractKind EffectContractKind { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkerResourceConstraint? ResourceUpperBound { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerCallPreconditionTarget? CallPrecondition { get; init; }
     [JsonRequired]
     public WorkerSourceLocation Location { get; init; } = new();
 }
@@ -739,10 +764,10 @@ internal static class WorkerProtocolMetadata
         WorkerVerifyPolicy.Unspecified, WorkerVerifyPolicy.Advisory, WorkerVerifyPolicy.WarnOnUnknown, WorkerVerifyPolicy.RequireProven,
         WorkerAssumptionPolicy.Unspecified, WorkerAssumptionPolicy.Allow, WorkerAssumptionPolicy.Warn, WorkerAssumptionPolicy.Error,
         WorkerSelectedFeature.Unspecified, WorkerSelectedFeature.Effects, WorkerSelectedFeature.Contracts,
-        WorkerSelectionReason.Unspecified, WorkerSelectionReason.ExplicitAnnotation, WorkerSelectionReason.DiscoveredPostcondition,
-        WorkerClaimKind.Unspecified, WorkerClaimKind.Postcondition, WorkerClaimKind.Effect,
+        WorkerSelectionReason.Unspecified, WorkerSelectionReason.ExplicitAnnotation, WorkerSelectionReason.DiscoveredPostcondition, WorkerSelectionReason.DiscoveredCallPrecondition,
+        WorkerClaimKind.Unspecified, WorkerClaimKind.Postcondition, WorkerClaimKind.Effect, WorkerClaimKind.CallPrecondition,
         WorkerClaimEvidence.Unspecified, WorkerClaimEvidence.DirectClause, WorkerClaimEvidence.CompanionClause,
-        WorkerClaimEvidence.ReturnAttribute, WorkerClaimEvidence.Attribute,
+        WorkerClaimEvidence.ReturnAttribute, WorkerClaimEvidence.Attribute, WorkerClaimEvidence.CallSite,
         WorkerEffectContractKind.Unspecified, WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.ZeroAllocations,
         WorkerEffectContractKind.AllowedCapabilities, WorkerEffectContractKind.DoesNotThrow, WorkerEffectContractKind.AllowedExceptions,
         WorkerEffectContractKind.EffectContract, WorkerEffectContractKind.ResourceUpperBound,
@@ -780,6 +805,7 @@ internal static class WorkerProtocolMetadata
             WorkerSelectionReason.Unspecified => nameof(WorkerSelectionReason.Unspecified),
             WorkerSelectionReason.ExplicitAnnotation => nameof(WorkerSelectionReason.ExplicitAnnotation),
             WorkerSelectionReason.DiscoveredPostcondition => nameof(WorkerSelectionReason.DiscoveredPostcondition),
+            WorkerSelectionReason.DiscoveredCallPrecondition => nameof(WorkerSelectionReason.DiscoveredCallPrecondition),
             _ => null
         };
     }
@@ -812,6 +838,7 @@ internal static class WorkerProtocolMetadata
                 (WorkerClaimKind.Postcondition, WorkerClaimEvidence.DirectClause, WorkerEffectContractKind.Unspecified)
                 or (WorkerClaimKind.Postcondition, WorkerClaimEvidence.CompanionClause, WorkerEffectContractKind.Unspecified)
                 or (WorkerClaimKind.Postcondition, WorkerClaimEvidence.ReturnAttribute, WorkerEffectContractKind.Unspecified)
+                or (WorkerClaimKind.CallPrecondition, WorkerClaimEvidence.CallSite, WorkerEffectContractKind.Unspecified)
                 or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.EnforcePure)
                 or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.ZeroAllocations)
                 or (WorkerClaimKind.Effect, WorkerClaimEvidence.Attribute, WorkerEffectContractKind.AllowedCapabilities)
@@ -915,6 +942,7 @@ internal static class WorkerProtocolMetadata
                 (_, _, WorkerVacuityKind.None)
                 or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions)
                 or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.NoModeledNormalReturn)
+                or (WorkerClaimKind.CallPrecondition, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions)
                 or (WorkerClaimKind.Effect, WorkerClaimOutcome.Proven, WorkerVacuityKind.ContradictoryPreconditions);
     }
     internal static bool MatchesRunFailure(WorkerRunStatus status, WorkerRunFailureReason reason)
@@ -1002,8 +1030,16 @@ internal static class WorkerProtocolMetadata
             constraint.CostModel == (constraint.Metric == WorkerResourceMetric.AllocatedBytes ? WorkerResourceModels.AllocationCostModel : constraint.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes ? WorkerResourceModels.LifetimeCostModel : constraint.Metric is WorkerResourceMetric.SourceActivationDepth or WorkerResourceMetric.SourceStackBytes ? WorkerResourceModels.StackCostModel : WorkerResourceModels.CostModel) && constraint.ExpressionModel == WorkerResourceModels.Expression &&
             constraint.UpperBound is { Length: > 0 and <= WorkerResourceModels.MaximumExpressionBytes };
     }
+    internal static bool HasValidCallPrecondition(WorkerClaimKind kind, WorkerCallPreconditionTarget? target)
+    {
+        if (kind != WorkerClaimKind.CallPrecondition)
+        { return target is null; }
+        return target is not null && !string.IsNullOrWhiteSpace(target.Callee) && target.ClauseOrdinal >= 0 &&
+            target.ClauseLocation is not null && IsSourceLocationValid(target.ClauseLocation);
+    }
     internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimManifestEntry>> ManifestClaimRules = [
         new("claim_resource_constraint", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => HasValidResourceConstraint(value.EffectContractKind, value.ResourceUpperBound)),
+        new("claim_call_precondition", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => HasValidCallPrecondition(value.Kind, value.CallPrecondition)),
         new("claim_ordinal", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.Ordinal >= 0),
         new("claim_kind", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Kind, WorkerClaimKind.Unspecified)),
         new("claim_evidence", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => WorkerProtocolJson.IsDefined(value.Evidence, WorkerClaimEvidence.Unspecified)),

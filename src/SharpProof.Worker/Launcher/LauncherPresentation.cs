@@ -29,8 +29,20 @@ internal static partial class LauncherPresentation
         {
             SharpProof.Worker.Protocol.WorkerClaimKind.Postcondition => "Postcondition",
             SharpProof.Worker.Protocol.WorkerClaimKind.Effect => "effect:" + EffectKind(claim.EffectContractKind),
+            SharpProof.Worker.Protocol.WorkerClaimKind.CallPrecondition => "CallPrecondition",
             _ => throw new ArgumentOutOfRangeException(nameof(claim))
         };
+    }
+
+    // Names the callee clause a call-precondition claim checks; the claim's
+    // location is the call.
+    internal static string CallPreconditionDetail(
+        SharpProof.Worker.Protocol.WorkerClaimManifestEntry claim
+    )
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        return claim.CallPrecondition is not { } call ? string.Empty
+            : FormattableString.Invariant($" Call to {SharpProof.Worker.Protocol.WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} at {SourcePrefix(call.ClauseLocation)}.");
     }
 
     private static string EffectKind(

@@ -18,7 +18,8 @@ internal static partial class CallableVerificationPolicy
         var completed = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         var pending = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         var effects = ImmutableDictionaryCapture.Create(target.EffectClaims, evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId), static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : evidence, StringComparer.Ordinal);
-        var hasPostconditions = target.Entry.ClaimIds.Any(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!effects.ContainsKey(id)));
+        var calls = NativeCallPreconditionClaims.ClaimIds(target);
+        var hasPostconditions = target.Entry.ClaimIds.Any(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!effects.ContainsKey(id) && !calls.Contains(id)));
         var entryPublished = false;
         var entryFeasibility = CallableEntryFeasibility.Feasible;
         try
@@ -49,6 +50,12 @@ internal static partial class CallableVerificationPolicy
                     ArgumentNullException.ThrowIfNull(result);
                     completed[result.ClaimId] = result;
                 }, resourceBudget).ConfigureAwait(false);
+            await NativeCallPreconditionClaims.VerifyAsync(target, entryFeasibility, budgets,
+                result =>
+                {
+                    ArgumentNullException.ThrowIfNull(result);
+                    completed[result.ClaimId] = result;
+                }, resourceBudget, methodBoundary.Token).ConfigureAwait(false);
             var records = Fill(target.IsSuccess ? WorkerClaimReason.UnsupportedBody : target.FailureReason);
             return Result(target, WorkerResultAssembler.ProjectCallableReasons(records).Reason, records);
         }

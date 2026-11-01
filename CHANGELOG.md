@@ -28,6 +28,12 @@ Entries describe repository changes, not package publication. Confirm available 
   handler that runs for some instantiation is no longer treated as unreachable.
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
+- Check `Requires` at modeled calls in the strict worker path, as `SEMANTICS.md` promised.
+  Each clause of a call is a `CallPrecondition` claim of the caller, and a body with no
+  contract of its own is selected automatically when it makes such a call. This can fail
+  existing builds: a method that forwards its input to a `Requires` without restating it is
+  now refuted with SP0051 under every verifier policy, and a call that cannot be proven
+  fails `require-proven`. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
 
 ### Resource bounds
 

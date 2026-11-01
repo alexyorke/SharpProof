@@ -92,7 +92,7 @@ internal static class CompilerTotalCallableArtifactCodec
             CallPreconditions = [.. calls.Select((call, ordinal) => call is null ? throw new System.ArgumentNullException(nameof(call)) : (new CompilerTotalCallPreconditionArtifact
             {
                 InstructionIndex = encoded.InstructionIndices[call.Instruction], CalleeIdentity = call.CalleeIdentity,
-                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite], MetadataClause = call.MetadataClause,
+                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite], MetadataClause = call.MetadataClause, ClaimId = call.ClaimId,
                 ValueRoot = clauses.Length * 2 + ordinal * 2, SafeRoot = clauses.Length * 2 + ordinal * 2 + 1
             }))]
         };
@@ -373,15 +373,19 @@ internal static class CompilerTotalCallableArtifactCodec
             artifact.ValidEffectClaimIds.All(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!string.IsNullOrWhiteSpace(id) &&
                 effectOwners.Contains(id))),
             "Validated effect claims must be canonical and owned by this callable.");
-        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities.ToImmutable(), metadataReferences, cancellationToken);
+        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities.ToImmutable(), claims, metadataReferences, cancellationToken);
         return new(factory, decoded.Program, parameters.ToImmutable(), result, clauses.ToImmutable(), exceptionConstraints, callPreconditions, disjointInputs.ToImmutable());
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
-        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
+        DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, ImmutableArray<WorkerClaimManifestEntry> claims,
+        ImmutableArray<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
     {
+        var callClaims = ImmutableDictionaryCapture.Create(claims.Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind == WorkerClaimKind.CallPrecondition),
+            claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId, claim => claim ?? throw new ArgumentNullException(nameof(claim)), StringComparer.Ordinal);
         if (artifact.CallPreconditions.Length == 0)
         {
+            Require(callClaims.Count == 0, "A call-precondition claim has no obligation row.");
             Require(!decoded.Variables.Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (IrCallPreconditionMarker.IsReservedName(
                 decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name)))),
                 "Every reserved call-precondition marker must own exactly one obligation row.");
@@ -389,6 +393,7 @@ internal static class CompilerTotalCallableArtifactCodec
         }
         var calls = ImmutableArray.CreateBuilder<CompilerTotalCallPrecondition>();
         var targets = ImmutableHashSet.CreateBuilder<IrVarId>();
+        var boundClaims = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var reads = artifact.Graph.Terms.Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Variable))
             .Select(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (decoded.Variables[term.A])).ToImmutableHashSet();
         var writers = ImmutableDictionary.CreateBuilder<IrVarId, int>();
@@ -445,8 +450,17 @@ internal static class CompilerTotalCallableArtifactCodec
                 string.Equals(factory.GetString(factory.GetVariableInfo(marker.Target).Name), name, StringComparison.Ordinal),
                 "A Total call precondition must match its independently owned marker identity.");
             targets.Add(marker.Target);
-            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause));
+            if (row.ClaimId != null)
+            {
+                var span = factory.GetOperationInfo(marker.Operation).SourceSpan!;
+                Require(row.MetadataClause == null && boundClaims.Add(row.ClaimId) && callClaims.TryGetValue(row.ClaimId, out var claim) &&
+                    claim.CallPrecondition is { } target && target.Callee == row.CalleeIdentity && target.ClauseOrdinal == row.ClauseOrdinal &&
+                    claim.Location.Start == span.Start && claim.Location.Length == span.Length,
+                    "A Total call precondition does not equal its manifest claim.");
+            }
+            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause) { ClaimId = row.ClaimId });
         }
+        Require(boundClaims.Count == callClaims.Count, "A call-precondition claim has no obligation row.");
         Require(targets.SetEquals(decoded.Variables.Where(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (IrCallPreconditionMarker.IsReservedName(
             decoded.Factory.GetString(decoded.Factory.GetVariableInfo(variable).Name))))),
             "Every reserved call-precondition marker must own exactly one obligation row.");

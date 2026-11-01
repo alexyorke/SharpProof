@@ -63,6 +63,8 @@ A modeled call violates a bound `Requires` predicate after concrete replay. For 
 
 The message identifies the callee and precondition. Constructor and reduced extension-method binding must preserve actual argument/receiver ordinals.
 
+SP0027 is the advisory report of a definite violation. Under full verification the same call also has a `CallPrecondition` claim, which reports SP0051 for any replayed violating input. See [call preconditions](verification-results.md#call-preconditions).
+
 ## SP0030
 
 Reserved for an exception-violation descriptor. The portable analyzer currently reports unestablished exception contracts through SP0046. Native worker exception claims have separate structured results.
@@ -176,7 +178,7 @@ The launcher reports each claim's typed outcome, reason, and vacuity. The verifi
 | --- | --- |
 | SP0047 | Incomplete selected callable coverage, with policy-dependent level |
 | SP0048 | Declared user assumption or trusted boundary, with assumption-policy-dependent level |
-| SP0051 | Replayed refuted contract; reported as an error |
+| SP0051 | Replayed refuted contract, or a call that violates its callee's `Requires`; reported as an error at the claim's location |
 
 These codes are owned by [VerifierDiagnosticCodes.cs](../src/SharpProof.Host/VerifierDiagnosticCodes.cs). A Refuted claim remains an error even under advisory verifier policy.
 

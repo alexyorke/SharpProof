@@ -36,7 +36,8 @@ internal static class CompilerManifestArtifactProducer
             .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (CreateDiagnostic(item, compilation, snapshot)));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
-        var targets = discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal);
+        ImmutableArray<ManifestCallableTarget> targets = [.. discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal)];
+        var manifest = discovery.Manifest;
         ImmutableArray<CompilerCallableArtifact> callables;
         if (diagnosticArtifacts.Length != 0)
         {
@@ -54,7 +55,7 @@ internal static class CompilerManifestArtifactProducer
         }
         else
         {
-            callables = [.. targets.Select(item => {
+            ImmutableArray<CompilerCallPreconditionClaims.LoweredCallable> lowered = [.. targets.Concat(discovery.ContractCallers).OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal).Select(item => {
                 // Each encoded callable is a self-contained IR graph. Keep its
                 // lowering factory self-contained too: contract binding and
                 // body lowering may request the same symbol with different
@@ -68,10 +69,15 @@ internal static class CompilerManifestArtifactProducer
                     specificationPackAuthority,
                     snapshot.SyntaxTrees,
                     snapshot.References);
-                var artifact = CompilerLoweredArtifact.Encode(
-                    lowerer.Prepare(item, cancellationToken), cancellationToken);
-                return artifact.AttachEffectEvidence(item);
+                return new CompilerCallPreconditionClaims.LoweredCallable(item, lowerer.Prepare(item, cancellationToken));
             })];
+            if (features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All)
+            {
+                (manifest, lowered) = CompilerCallPreconditionClaims.Attach(compilation, snapshot.SyntaxTrees, manifest, lowered,
+                    [.. discovery.ContractCallers], cancellationToken);
+                targets = [.. lowered.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.Target)];
+            }
+            callables = [.. lowered.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : CompilerLoweredArtifact.Encode(item.Preparation, cancellationToken).AttachEffectEvidence(item.Target))];
         }
         // Preserve only reference evidence actually needed by resource metadata
         // leaves. General compiler reference snapshots remain build-time data.
@@ -84,7 +90,7 @@ internal static class CompilerManifestArtifactProducer
             { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
             if (callable.ForkJoinProjection is { } forkPayload)
             {
-                var entry = discovery.Manifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+                var entry = manifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
                     candidate.CallableId == callable.CallableId);
                 var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
                     ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
@@ -103,7 +109,7 @@ internal static class CompilerManifestArtifactProducer
                 { pending.Push(child); }
             }
         }
-        if (discovery.Manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+        if (manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
         {
             snapshot = snapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
@@ -123,7 +129,7 @@ internal static class CompilerManifestArtifactProducer
                 specificationPackAuthority.SpecificationPackCatalogSha256,
             Features = features,
             Compilation = snapshot,
-            Manifest = discovery.Manifest,
+            Manifest = manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables,

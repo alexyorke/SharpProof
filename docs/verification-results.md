@@ -21,7 +21,7 @@ After validating a worker response, the build prints a readable summary: run/fai
 | Run | `RunStatus`, `FailureReason`, `Errors` | Whether the worker completed, timed out, was canceled, or failed; a completed run can still contain Unknown claims |
 | Selection | `Manifest.Callables`, `Manifest.Claims` | What this compilation selected, where, why, and with which contract evidence |
 | Callable | `CallableResults`: `Coverage`, `Reason`, `Assumptions` | Whether selected analysis was accounted for completely; incomplete analysis is visible even when no ordinary claim diagnostic would explain it |
-| Claim | `ClaimResults`: `Outcome`, `Reason` | Proven, Refuted, or Unknown for one selected postcondition or effect contract |
+| Claim | `ClaimResults`: `Outcome`, `Reason` | Proven, Refuted, or Unknown for one selected postcondition, effect contract or call precondition |
 | Evidence | `Vacuity`, `ProofCore`, `Model`, `EffectCertainty`, `EffectWitness`, `Assumptions` | Conditions, dependencies, counterexample inputs, and source sites needed to interpret that outcome |
 | Execution | `Summary`: `Versions`, `Budgets`, `ElapsedMilliseconds`, `CacheStatus`, `CacheHit` | The worker/specification identity, configured limits, timing, and reuse status |
 
@@ -31,11 +31,29 @@ The table uses C# protocol member names; JSON properties use camel case (`runSta
 
 ## Selection and individual claims
 
-A callable can be selected for effects, contracts, or both. Selection reasons include explicit annotations and discovered postconditions. Claim evidence distinguishes direct clauses, companion clauses, return attributes, and attributes. One callable can have multiple independently reported claims. A Proven postcondition therefore does not establish its allocation, exception, purity, or capability contracts.
+A callable can be selected for effects, contracts, or both. Selection reasons include explicit annotations, discovered postconditions, and discovered call preconditions. Claim evidence distinguishes direct clauses, companion clauses, return attributes, attributes, and call sites. One callable can have multiple independently reported claims. A Proven postcondition therefore does not establish its allocation, exception, purity, capability, or call-precondition claims.
 
-`Requires` restricts entry and produces obligations at modeled calls. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
+`Requires` restricts entry and produces obligations at modeled calls, reported as described below. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
 
 See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../src/SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs), and [manifest regression tests](../src/SharpProof.Worker.Tests/ClaimManifestBuilderTests.cs).
+
+## Call preconditions
+
+Each clause of a modeled call's `Requires` is one `CallPrecondition` claim owned by the caller. The claim's `Location` is the call. Its `CallPrecondition` field names the callee, the clause ordinal and the clause location. The ID does not depend on the line, so moving a call keeps its claim. [Semantics](../SEMANTICS.md#calls-and-loops) defines which calls are modeled.
+
+A body that declares nothing is selected automatically, with reason `DiscoveredCallPrecondition`, when it makes a modeled call. A project with no `Requires` selects nothing this way. Every other body remains unselected, and the report's "Unselected methods are not proved" applies to it.
+
+| Outcome | Meaning | Build result |
+| --- | --- | --- |
+| `Proven` | The clause holds at every occurrence of the call | None |
+| `Refuted` | A concrete caller input in `Model` reaches the call with the clause false, and replay used no approximated value | `SP0051` at the call under every verifier policy; exit code 5 |
+| `Unknown` | The solver or replay could not decide it, for the typed `Reason` | `SP0047` on the caller and exit code 6 under `require-proven`, a warning under `warn-on-unknown`, information under `advisory` |
+
+A satisfiable query that does not replay stays Unknown with `CounterexampleNotReplayable`; it never becomes Refuted. SARIF reports both Refuted and Unknown call-precondition claims at the call.
+
+A caller that forwards its input without restating the clause is refuted, because the input it accepts can violate the callee's `Requires`: `int Root(int value) => Positive(value);` fails with `value = 0`. This holds for private helpers too, since each body is checked alone. Add the clause to the caller or guard the call. An argument the solver cannot bound stays Unknown, and `Assume` does not help under the strict assumption policy, so guard the call or relax `SharpProofVerifyPolicy`.
+
+See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallPreconditionClaims.cs).
 
 ## Proofs, models, and replay
 

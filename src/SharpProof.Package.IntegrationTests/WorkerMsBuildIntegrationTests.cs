@@ -2805,6 +2805,53 @@ public sealed class WorkerMsBuildIntegrationTests
             Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
+    [TestCase("public static int Caller() { return F(-1); }", "error SP0051", TestName = "StrictBuildFailsWhenACallViolatesItsCallee")]
+    [TestCase("public static int Forward(int value) { return F(value); }", "error SP0051", TestName = "StrictBuildFailsWhenACallerForwardsItsInput")]
+    [TestCase("public static int Caller() { return F(System.Environment.TickCount); }", "error SP0047", TestName = "StrictBuildFailsWhenACallCannotBeProven")]
+    public async Task StrictBuildRejectsAnUnestablishedCallPrecondition(string caller, string expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(caller);
+        System.ArgumentNullException.ThrowIfNull(expected);
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(CallPreconditionSource(caller));
+        var build = await project.BuildAsync(verify: null, [("SharpProofProfile", "strict")]);
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain(expected), build.Output);
+            Assert.That(response.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)),
+                Has.Member(WorkerClaimKind.CallPrecondition));
+        }
+    }
+
+    [Test]
+    public async Task StrictBuildPassesWhenTheCallerSatisfiesItsCallee()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(CallPreconditionSource("""
+            public static int Caller(int value) { return value > 0 ? F(value) : 0; }
+            public static int Forward(int value) { Contract.Requires(value > 0); return F(value); }
+            """));
+        var build = await project.BuildAsync(verify: null, [("SharpProofProfile", "strict")]);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Is.All.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    private static string CallPreconditionSource(string members)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        return $$"""
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int F(int x) { Contract.Requires(x > 0); return x; }
+                {{members}}
+            }
+            """;
+    }
+
     [Test]
     public async Task RefutationAndHardBoundaryFailuresFailClosed()
     {

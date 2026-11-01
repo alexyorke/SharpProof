@@ -430,7 +430,7 @@ internal sealed partial class NativeSpecifiedCallTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
-        Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(expected), response.ClaimResults.Single().Reason.ToString());
+        Assert.That(response.DeclaredClaims().Single().Outcome, Is.EqualTo(expected), response.DeclaredClaims().Single().Reason.ToString());
     }
 
     private static async Task CheckInterfaceArrayEffects(string attributes, string parameters, string body,

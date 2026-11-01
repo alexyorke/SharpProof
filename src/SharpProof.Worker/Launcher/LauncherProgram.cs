@@ -324,7 +324,8 @@ internal static class Program
             if (result.Outcome == WorkerClaimOutcome.Unknown)
             {
                 Log.Info(LauncherPresentation.SourcePrefix(claim.Location) + ": Unknown " +
-                    result.ClaimId + " (" + result.Reason + "). " +
+                    result.ClaimId + " (" + result.Reason + ")." +
+                    LauncherPresentation.CallPreconditionDetail(claim) + " " +
                     LauncherPresentation.UnknownGuidance(result.Reason));
             }
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
@@ -394,6 +395,7 @@ internal static class Program
         System.ArgumentNullException.ThrowIfNull(result);
         var message = "Refuted " + LauncherPresentation.ClaimKind(claim) +
             " claim " + result.ClaimId + " for " + claim.CallableId + "." +
+            LauncherPresentation.CallPreconditionDetail(claim) +
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
                     ", ", result.Model.Select(value =>

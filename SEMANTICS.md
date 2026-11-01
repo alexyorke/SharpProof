@@ -56,7 +56,11 @@ Source and admissible metadata calls are resolved through compiler evidence and 
 
 Natural loops use cut encodings and invariant candidates. Candidate invariants must pass establishment and preservation checks before use in a proof. Bounded witness search is separate from the proof encoding; finite unrolling cannot prove an arbitrary loop or termination. Unsupported CFG shapes or exhausted construction limits produce Unknown.
 
-Call preconditions and body checkpoints are obligations, not unchecked assumptions. General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
+Call preconditions and body checkpoints are obligations, not unchecked assumptions. Each clause of a modeled call's `Requires`, including closed parameter attributes and companion clauses, is a `CallPrecondition` claim of the caller. The caller must establish the clause from its own entry domain on every path that reaches the call, so a caller with no `Requires` of its own must establish it for every input. A body that declares nothing is selected automatically when it makes a modeled call. The callee's `Requires` is not assumed after the call. A call inside an inlined callee belongs to that callee when it is verified on its own, so one violation is reported once.
+
+A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a nonvirtual source callee in the same compilation with by-value parameters. Calls that are not modeled carry no obligation and no claim: calls in a body that does not lower exactly or is abstracted, calls in lambdas and top-level statements, calls in property accessors and operators unless a selected caller inlines them, and calls to virtual, interface, abstract, async, extern or by-reference callees, to a callee whose type has a non-constant static initializer, or to a callee in another assembly. The advisory SP0027 can still report a definite violation there; its silence is not proof.
+
+General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
 
 The [language reference](docs/language-reference.md) distinguishes admitted operations, modeled call boundaries, and opaque or unsupported cases, with implementation and behavioral test references. A supported operator does not imply that every operand type, lifted form, or containing callable is admitted.
 
@@ -78,6 +82,8 @@ A body proof carries `CompleteMayEffectSummary`. A trusted external declaration 
 Replay validates a candidate against the owned program, entry values, path, and claim. Solver-chosen values for unconstrained results or approximated reads are not arbitrary executable inputs. Undefined postconditions, unsupported replay operations, and missing source-site evidence cannot produce a definite refutation.
 
 Heap witness decoding also checks the closed compiler type evidence. Distinct non-null references from incompatible sealed runtime types cannot be assigned one object token. Impossible aliases downgrade a candidate to Unknown; this witness filter adds no SMT premise. Compatible aliases and null remain allowed. Unused observations can still make a witness conservatively unreplayable, and reference-valued array accesses remain a current admission limit.
+
+A call-precondition refutation is a concrete entry that reaches the call with the clause false and with no approximated value. Replay starts after entry initialization, so a type or module initializer that is not proved free of observable effects leaves the claim Unknown.
 
 Effect witnesses identify the violating allocation, throw, write, or synchronization site. An inlined metadata site without a source position is insufficient for an emitted definite violation.
 

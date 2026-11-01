@@ -91,6 +91,10 @@ internal static class VerificationReport
                 var label = result.Outcome == WorkerClaimOutcome.Refuted ? "Counterexample" : "Candidate model";
                 writer.WriteLine($"  {label} {VariableName(result, value.Variable)}: {value.Value} ({value.Kind})");
             }
+            if (claim.CallPrecondition is { } call)
+            {
+                writer.WriteLine($"  Call to {WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} at {call.ClauseLocation.Path}({call.ClauseLocation.Line},{call.ClauseLocation.Column})");
+            }
             if (claim.Kind == WorkerClaimKind.Effect)
             {
                 writer.WriteLine("  Effect evidence: " + result.EffectCertainty);
