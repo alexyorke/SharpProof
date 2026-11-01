@@ -4,6 +4,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ## Unreleased
 
+### Resource bounds
+
+- Stop reporting false `Proven` resource bounds. A local written anywhere in an
+  enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
+  start or array dimension can no longer allocate without being charged. Both
+  shapes, and methods in a type with a static initializer, are now Unknown.
+
 ### Developer experience
 
 - Add a workspace template with pinned local tools, optional editor assistance,
