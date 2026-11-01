@@ -15,7 +15,8 @@ public sealed class FuzzResultValidationTests
         TestRepository.RequireCanonicalContainer();
         using var temporaryDirectory = new TempDirectory("SharpProof.FuzzValidation.");
         var summary = new FuzzSummary(7, 1000, 23063, 4, 1000, 0, 1000, 1000, 1000,
-            new(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+            // Generated casts take string operands, so real runs report no InvalidCast results.
+            new(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0),
             new(1000, 1000, 1000, 900, 200, 200, 200, 100, 100, 100, 100, 100, 8191, 40), new(1000, 1000, 1000, 1000, 1023, 127), true, []);
         var valid = JsonSerializer.Serialize(summary);
         await File.WriteAllTextAsync(Path.Combine(temporaryDirectory.FullName, "valid.json"), valid);
@@ -24,6 +25,9 @@ public sealed class FuzzResultValidationTests
             root => { System.ArgumentNullException.ThrowIfNull(root); root["SchemaVersion"] = 4; },
             root => { System.ArgumentNullException.ThrowIfNull(root); root["SchemaVersion"] = 5; },
             root => { System.ArgumentNullException.ThrowIfNull(root); root["SchemaVersion"] = 6; },
+            root => { System.ArgumentNullException.ThrowIfNull(root); root["FrontendCoverage"]!["IndexOutOfRangeExceptions"] = 0; },
+            root => { System.ArgumentNullException.ThrowIfNull(root); root["FrontendCoverage"]!["TextParameters"] = 0; },
+            root => { System.ArgumentNullException.ThrowIfNull(root); root["FrontendCoverage"]!["InvalidCastExceptions"] = -1; },
             root => { System.ArgumentNullException.ThrowIfNull(root); root.Remove("MetadataProgramCoverage"); },
             root => { System.ArgumentNullException.ThrowIfNull(root); root["MetadataProgramCoverage"] = null; },
             root => { System.ArgumentNullException.ThrowIfNull(root); root["MetadataProgramCoverage"]!["Cases"] = 999; },

@@ -164,7 +164,10 @@ function Assert-SharpProofFuzzRunnerResult {
         foreach ($name in $coverageProperties) {
             $count = Get-ExactJsonInt32 $coverage $name
             $coverageValuesBuilder[$name] = $count
-            if ($count -lt 0 -or ($cases -ge 1000 -and $count -eq 0)) {
+            # Generated casts take string operands, so a run may report no
+            # InvalidCast results. This matches HasExpandedCategories in FuzzRunner.cs.
+            $mustBeExercised = $name -ne 'InvalidCastExceptions'
+            if ($count -lt 0 -or ($mustBeExercised -and $cases -ge 1000 -and $count -eq 0)) {
                 throw "Frontend coverage '$name' is invalid for the executed case count."
             }
             if ($name -in @(
