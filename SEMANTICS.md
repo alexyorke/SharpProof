@@ -58,11 +58,11 @@ Natural loops use cut encodings and invariant candidates. Candidate invariants m
 
 Call preconditions and body checkpoints are obligations, not unchecked assumptions. Each clause of a modeled call's `Requires`, including closed parameter attributes and companion clauses, is a `CallPrecondition` claim of the caller. The caller must establish the clause from its own entry domain on every path that reaches the call, so a caller with no `Requires` of its own must establish it for every input. A body that declares nothing is selected automatically when it makes a modeled call. The callee's `Requires` is not assumed after the call. A call inside an inlined callee belongs to that callee when it is verified on its own, so one violation is reported once.
 
-A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a nonvirtual source callee in the same compilation with by-value parameters. Nothing else is checked. A passing build says nothing about these calls:
+A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a non-virtual source callee in the same compilation with by-value parameters. Nothing else is checked. A passing build says nothing about these calls:
 
 - Calls in a body that does not lower exactly or is abstracted.
 - Calls in lambdas, and in local functions that a selected body does not inline. Lambdas and local functions are not selected as roots.
-- Calls in top-level statements, and in property accessors and operators unless a selected caller inlines them.
+- Calls in top-level statements, and in property accessors and operators unless a selected caller lowers them inline.
 - Calls to virtual, interface and abstract callees. A `Requires` on an interface or base method is therefore not checked at its dispatched calls.
 - Calls to async and extern callees, and to callees with `ref`, `in` or `out` parameters.
 - Calls to a callee whose type has a non-constant static initializer.
