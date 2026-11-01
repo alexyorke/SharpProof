@@ -558,6 +558,20 @@ public sealed class CallPreconditionClaimTests
     }
 
     [Test]
+    public void DeclaredClaimsRunBeforeCallersSelectedOnlyForTheirCalls()
+    {
+        using var project = new ShadowTestProject("""
+            using SharpProof.Attributes;
+            public static class A { public static int Caller() { return Z.F(1); } }
+            public static class B { public static int Declared(int x) { Contract.Ensures(Contract.Result<int>() == x); return x; } }
+            public static class Z { public static int F(int x) { Contract.Requires(x > 0); return x; } }
+            """);
+        ImmutableArray<CompilerCallablePreparation> targets = [.. project.Snapshot.Callables.OrderBy(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal)];
+        Assert.That(targets[0].Entry.CallableId, Does.Contain("A.Caller"));
+        Assert.That(SharpProofWorker.VerificationOrder(targets).Select(index => targets[index].Entry.CallableId).Last(), Does.Contain("A.Caller"));
+    }
+
+    [Test]
     public void EffectsOnlyFeaturesPublishNoCallClaim()
     {
         var compilation = TestCompilation.CreateExact("EffectsOnly", [("Subject.cs", Subject("[DoesNotThrow] public static int Caller() { return F(-1); }"))]);
