@@ -588,7 +588,7 @@ public sealed class CallPreconditionClaimTests
             """);
         ImmutableArray<CompilerCallablePreparation> targets = [.. project.Snapshot.Callables.OrderBy(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal)];
         Assert.That(targets[0].Entry.CallableId, Does.Contain("A.Caller"));
-        Assert.That(SharpProofWorker.VerificationOrder(targets).Select(index => targets[index].Entry.CallableId).Last(), Does.Contain("A.Caller"));
+        Assert.That(targets[SharpProofWorker.VerificationOrder(targets)[^1]].Entry.CallableId, Does.Contain("A.Caller"));
     }
 
     [Test]
