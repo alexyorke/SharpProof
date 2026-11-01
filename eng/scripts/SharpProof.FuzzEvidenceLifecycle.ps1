@@ -234,7 +234,7 @@ function Initialize-SharpProofFuzzEvidence {
             continue
         }
         if ($name -cmatch `
-                '^(?:rotating|retained)-(?<seed>-?[0-9]+)\.(?:stdout\.json|stderr\.txt)$') {
+                '^(?:rotating|retained|resource-bounds)-(?<seed>-?[0-9]+)\.(?:stdout\.json|stderr\.txt)$') {
             $seed = 0
             $seedToken = $Matches.seed
             if ([int]::TryParse(

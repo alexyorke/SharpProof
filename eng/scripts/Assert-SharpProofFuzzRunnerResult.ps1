@@ -77,6 +77,61 @@ function Get-ExactJsonBoolean {
     return $property.GetBoolean()
 }
 
+function Assert-SharpProofFuzzFailureArray {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Text.Json.JsonElement]$Failures
+    )
+    if ($Failures.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
+        throw 'Fuzz failures must be a non-null JSON array.'
+    }
+    foreach ($failure in $Failures.EnumerateArray()) {
+        if ($failure.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Fuzz failure must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($failure.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -Description 'Fuzz failure' `
+            -RejectDuplicates `
+            -Expected @(
+            'Case', 'Seed', 'Oracle', 'Original', 'Minimized',
+            'Detail', 'Term')
+        [void](Get-ExactJsonInt32 $failure 'Case')
+        [void](Get-ExactJsonInt32 $failure 'Seed')
+        foreach ($name in @(
+                'Oracle', 'Original', 'Minimized', 'Detail', 'Term')) {
+            if ($failure.GetProperty($name).ValueKind -ne
+                [Text.Json.JsonValueKind]::String) {
+                throw "Fuzz failure '$name' must be a string."
+            }
+        }
+    }
+}
+
+# The validator owns the bytes it accepted.  Re-seal them over the validated
+# path so a replacement during validation cannot become the artifact cited by
+# the campaign summary.  Move the snapshot into place atomically and clean up
+# on failure.
+function Save-SharpProofValidatedFuzzResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]$Bytes
+    )
+    $temporary = Join-Path ([IO.Path]::GetDirectoryName(
+            [IO.Path]::GetFullPath($Path))) (
+        '.' + [IO.Path]::GetFileName($Path) + '.' +
+        [Guid]::NewGuid().ToString('N') + '.validated.tmp')
+    try {
+        [IO.File]::WriteAllBytes($temporary, [byte[]]@($Bytes))
+        [IO.File]::Move($temporary, $Path, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporary)) {
+            [IO.File]::Delete($temporary)
+        }
+    }
+}
+
 function Assert-SharpProofFuzzRunnerResult {
     [CmdletBinding()]
     param(
@@ -237,30 +292,7 @@ function Assert-SharpProofFuzzRunnerResult {
         }
 
         $failures = $root.GetProperty('Failures')
-        if ($failures.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
-            throw 'Fuzz failures must be a non-null JSON array.'
-        }
-        foreach ($failure in $failures.EnumerateArray()) {
-            if ($failure.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
-                throw 'Fuzz failure must be a JSON object.'
-            }
-            Assert-SharpProofExactJsonProperties `
-                -Actual @($failure.EnumerateObject() | ForEach-Object { $_.Name }) `
-                -Description 'Fuzz failure' `
-                -RejectDuplicates `
-                -Expected @(
-                'Case', 'Seed', 'Oracle', 'Original', 'Minimized',
-                'Detail', 'Term')
-            [void](Get-ExactJsonInt32 $failure 'Case')
-            [void](Get-ExactJsonInt32 $failure 'Seed')
-            foreach ($name in @(
-                    'Oracle', 'Original', 'Minimized', 'Detail', 'Term')) {
-                if ($failure.GetProperty($name).ValueKind -ne
-                    [Text.Json.JsonValueKind]::String) {
-                    throw "Fuzz failure '$name' must be a string."
-                }
-            }
-        }
+        Assert-SharpProofFuzzFailureArray -Failures $failures
         if ($failures.GetArrayLength() -ne 0 -or
             -not $coverageSatisfied -or -not $passed) {
             throw 'The fuzz runner did not produce a passing result.'
@@ -294,23 +326,122 @@ function Assert-SharpProofFuzzRunnerResult {
         & $AfterValidation $Path
     }
 
-    # The validator owns the bytes it accepted.  Re-seal them over the
-    # validated path after the callback so a replacement during validation
-    # cannot become the artifact cited by the campaign summary.  Move the
-    # snapshot into place atomically and clean up on failure.
-    $temporary = Join-Path ([IO.Path]::GetDirectoryName(
-            [IO.Path]::GetFullPath($Path))) (
-        '.' + [IO.Path]::GetFileName($Path) + '.' +
-        [Guid]::NewGuid().ToString('N') + '.validated.tmp')
+    Save-SharpProofValidatedFuzzResult -Path $Path -Bytes $bytes
+
+    return $result
+}
+
+function Assert-SharpProofResourceBoundFuzzRunnerResult {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][int]$ExpectedCases,
+        [Parameter(Mandatory = $true)][int]$ExpectedSeed,
+        [Parameter(Mandatory = $true)][int]$ExpectedMaximumParallelism
+    )
+
+    $document = $null
+    $bytes = $null
     try {
-        [IO.File]::WriteAllBytes($temporary, [byte[]]@($bytes))
-        [IO.File]::Move($temporary, $Path, $true)
+        $validation = Read-SharpProofBoundedJsonDocument -Path $Path `
+            -ByteLimitMessage 'The resource bound fuzz result exceeds its byte limit.' `
+            -ShortReadMessage 'The resource bound fuzz result ended before its declared length.' `
+            -GrowthMessage 'The resource bound fuzz result changed during validation.'
+        $document = $validation.Document
+        $bytes = $validation.Bytes
+        $root = $document.RootElement
+        if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Resource bound fuzz result must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($root.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -Description 'Resource bound fuzz result' `
+            -RejectDuplicates `
+            -Expected @(
+            'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
+            'Coverage', 'CoverageSatisfied', 'Failures', 'Passed')
+
+        $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
+        $cases = Get-ExactJsonInt32 $root 'Cases'
+        $seed = Get-ExactJsonInt32 $root 'Seed'
+        $maximumParallelism = Get-ExactJsonInt32 $root 'MaximumParallelism'
+        $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
+        $passed = Get-ExactJsonBoolean $root 'Passed'
+        if ($schema -ne 1) { throw "Unsupported resource bound fuzz schema '$schema'." }
+        if ($cases -lt 1) {
+            throw 'The resource bound fuzz case count must be positive.'
+        }
+        if ($maximumParallelism -lt 1 -or $maximumParallelism -gt 4) {
+            throw 'The resource bound fuzz maximum parallelism must be between 1 and 4.'
+        }
+        if ($cases -ne $ExpectedCases -or $seed -ne $ExpectedSeed -or
+            $maximumParallelism -ne $ExpectedMaximumParallelism) {
+            throw 'The resource bound fuzz invocation identity does not match its result.'
+        }
+
+        $coverage = $root.GetProperty('Coverage')
+        $coverageProperties = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                'Cases', 'ProvenCases', 'UnknownCases', 'ViolatingCases', 'TightCases',
+                'NativeBounds', 'Executions', 'ExceptionalExecutions', 'SkippedInputs',
+                'ShapeMask', 'ProvenShapeMask'))
+        if ($coverage.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+            throw 'Resource bound coverage must be a JSON object.'
+        }
+        Assert-SharpProofExactJsonProperties `
+            -Actual @($coverage.EnumerateObject() | ForEach-Object { $_.Name }) `
+            -Description 'Resource bound coverage' -RejectDuplicates `
+            -Expected ([string[]]@($coverageProperties))
+        $valuesBuilder = [ordered]@{}
+        foreach ($name in $coverageProperties) {
+            $count = Get-ExactJsonInt32 $coverage $name
+            if ($count -lt 0) { throw "Resource bound coverage '$name' is negative." }
+            $valuesBuilder[$name] = $count
+        }
+        $values = $valuesBuilder.AsReadOnly()
+        if ($values.Cases -ne $cases -or
+            [long]$values.ProvenCases + $values.UnknownCases -ne $cases -or
+            $values.ViolatingCases -gt $values.ProvenCases -or
+            $values.TightCases -gt $values.ProvenCases -or
+            $values.NativeBounds -gt $values.ProvenCases -or
+            $values.ExceptionalExecutions -gt $values.Executions -or
+            $values.ShapeMask -lt 1 -or $values.ShapeMask -gt 1023 -or
+            ($values.ProvenShapeMask -band -bnot $values.ShapeMask) -ne 0) {
+            throw 'Resource bound coverage does not form a complete case partition.'
+        }
+        # The first four shapes must keep proving. Without them the oracle
+        # would compare nothing and still pass.
+        if ($cases -ge 1000 -and ($values.ShapeMask -ne 1023 -or
+                ($values.ProvenShapeMask -band 15) -ne 15 -or
+                $values.TightCases -eq 0 -or $values.NativeBounds -eq 0 -or
+                $values.Executions -eq 0 -or $values.ExceptionalExecutions -eq 0)) {
+            throw 'Resource bound coverage does not cover the required shapes.'
+        }
+
+        $failures = $root.GetProperty('Failures')
+        Assert-SharpProofFuzzFailureArray -Failures $failures
+        if ($failures.GetArrayLength() -ne 0 -or $values.ViolatingCases -ne 0 -or
+            -not $coverageSatisfied -or -not $passed) {
+            throw 'The resource bound fuzz runner did not produce a passing result.'
+        }
+        $result = ([ordered]@{
+                SchemaVersion      = $schema
+                Cases              = $cases
+                Seed               = $seed
+                MaximumParallelism = $maximumParallelism
+                Coverage           = $values
+                CoverageSatisfied  = $coverageSatisfied
+                Failures           = [Collections.Immutable.ImmutableArray[object]]::Empty
+                Passed             = $passed
+            }).AsReadOnly()
+    }
+    catch {
+        throw "Invalid resource bound fuzz result: $($_.Exception.Message)"
     }
     finally {
-        if ([IO.File]::Exists($temporary)) {
-            [IO.File]::Delete($temporary)
-        }
+        if ($null -ne $document) { $document.Dispose() }
     }
+
+    Save-SharpProofValidatedFuzzResult -Path $Path -Bytes $bytes
 
     return $result
 }

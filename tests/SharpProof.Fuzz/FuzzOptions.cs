@@ -3,8 +3,11 @@ using System.Globalization;
 
 namespace SharpProof.Fuzz;
 
-internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
+// ResourceBoundsOnly is off by default, so the runs in pull request lanes never
+// pay for the resource oracle. The nightly campaign selects it as its own run.
+internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism, bool ResourceBoundsOnly = false)
 {
+    public const string ResourceBoundsOracle = "resource-bounds";
     public const int DefaultCases = 1000;
     public const int MaximumCases = 1_000_000;
     public const int DefaultSeed = 0x5A17;
@@ -21,6 +24,7 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
         var cases = DefaultCases;
         var seed = DefaultSeed;
         var maximumParallelism = DefaultMaximumParallelism;
+        var resourceBoundsOnly = false;
 
         for (var index = 0; index < arguments.Length; index++)
         {
@@ -68,12 +72,20 @@ internal sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
                     }
 
                     break;
+                case "--oracle":
+                    if (value != ResourceBoundsOracle)
+                    {
+                        throw new FuzzUsageException("--oracle requires " + ResourceBoundsOracle + ".");
+                    }
+
+                    resourceBoundsOnly = true;
+                    break;
                 default:
                     throw new FuzzUsageException("Unknown option: " + argument + ".");
             }
         }
 
-        return new FuzzOptions(cases, seed, maximumParallelism);
+        return new FuzzOptions(cases, seed, maximumParallelism, resourceBoundsOnly);
     }
 
     private static int ParsePositive(string value, string option)
