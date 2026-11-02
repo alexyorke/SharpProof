@@ -148,7 +148,13 @@ A companion cannot target itself. Point it at the distinct interface or class wh
 
 Companion relationships must be acyclic. Remove the reported cycle; otherwise the relationship cannot provide an effective contract source.
 
+## SP0060
+
+Disabled by default. When enabled, it reports a proven upper bound on loop body entries, primitive-array allocations and elements, or the reason a bound is Unknown. Bounds are conditional on the runtime model in [resource bounds](resource-bounds.md); an Unknown is not a failure.
+
 ## Optional editor diagnostics
+
+### SPED0001
 
 The matching optional `SharpProof.CodeFixes` package supplies SPED0001 at Info severity
 by default: **Generate SharpProof contract companion**. It is authoring assistance,
