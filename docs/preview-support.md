@@ -32,7 +32,7 @@ The standard `SharpProof` reference automatically enables strict full verificati
 - Docker Engine or Docker Desktop with Compose v2, running the pinned Linux amd64 container.
 - Core MSBuild and `dotnet build` inside that canonical container.
 - Native Linux x64 or ARM64 Core MSBuild and `dotnet build` on a .NET 10-supported glibc distribution with SDK 10.0.100+ and the native runtime dependencies below.
-- Native Windows x64 or ARM64 Core MSBuild and `dotnet build` with SDK 10.0.100 or later, consuming the architecture-matched packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier-plan.md).
+- Native Windows x64 or ARM64 Core MSBuild and `dotnet build` with SDK 10.0.100 or later, consuming the architecture-matched packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier.md).
 - Native Core MSBuild and `dotnet build` on macOS ARM64 or x64, using the architecture-matched pinned Z3 payload in the verifier package.
 - Packaged portable analyzer and bounded out-of-process verifier, cache, and optional SARIF.
 - Local publication paths, including spaces, percent characters, Unicode, and long paths.

@@ -7,6 +7,10 @@ Enable the experimental, opt-in SP0060 diagnostic in `.editorconfig`:
 dotnet_diagnostic.SP0060.severity = suggestion
 ```
 
+Bounds that depend on runtime layout, reviewed metadata costs or task premises are
+conditional on CoreCLR 8.0.32 and `net8.0` consumers. .NET 8 leaves support on
+2026-11-10, and these facts have not been re-audited for a later runtime.
+
 Use SharpProof's advisory or strict profile. The off profile disables this feature.
 SP0060 reports one result per handwritten ordinary method declaration. It does
 not require a contract attribute. Constructors, accessors and local functions do
