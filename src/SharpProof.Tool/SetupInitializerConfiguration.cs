@@ -61,9 +61,14 @@ internal static class SetupInitializerConfiguration
             return ((string?)element.Attribute("value"))?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
         }))
         { throw new InvalidOperationException("The nuget.org source is explicitly disabled."); }
-        var hadMappingSection = root.Element("packageSourceMapping") != null;
-        var mapping = Section(root, "packageSourceMapping");
-        foreach (var mapped in mapping.Elements("packageSource"))
+        // Read an existing mapping without creating one: a section added and
+        // then removed would leave whitespace behind and break repeat runs.
+        var mappingSections = root.Elements("packageSourceMapping").ToArray();
+        if (mappingSections.Length > 1)
+        { throw new InvalidOperationException("Repeated NuGet configuration sections require manual initialization."); }
+        var existingMapping = mappingSections.SingleOrDefault();
+        var feedMapping = existingMapping == null ? null : Entries(existingMapping, "packageSource", "key", FeedName).SingleOrDefault();
+        foreach (var mapped in existingMapping?.Elements("packageSource") ?? [])
         {
             if (string.Equals((string?)mapped.Attribute("key"), FeedName, StringComparison.OrdinalIgnoreCase))
             { continue; }
@@ -113,7 +118,7 @@ internal static class SetupInitializerConfiguration
         // package. With it, SharpProof packages must map there explicitly.
         if (effectiveMapping.IsEnabled)
         {
-            var feedMapping = Entries(mapping, "packageSource", "key", FeedName).SingleOrDefault();
+            var mapping = existingMapping ?? Section(root, "packageSourceMapping");
             if (feedMapping == null)
             {
                 feedMapping = new XElement("packageSource", new XAttribute("key", FeedName));
@@ -126,8 +131,6 @@ internal static class SetupInitializerConfiguration
             }))
             { SetupInitializerFiles.Append(feedMapping, new XElement("package", new XAttribute("pattern", "SharpProof*"))); }
         }
-        if (!hadMappingSection && !mapping.HasElements)
-        { mapping.Remove(); }
         files.Add(path, SetupInitializerFiles.Serialize(document));
     }
 
