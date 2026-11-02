@@ -459,6 +459,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     // chooses either way. An explicit exception of static type S is caught by
     // a handler for T when S derives from T. A narrower T may match only
     // when the runtime type is not known exactly (for example, `throw e`).
+    // Declaration symbols compare open types as written: E<U> looks unrelated
+    // to E<int> yet is that type when U is int, so only closed types exclude.
     private bool? Catches(ControlFlowRegion handler, RegionExceptionToken token)
     {
         handler = RepositoryParameterGuard.NotNull(handler, nameof(handler));
@@ -469,6 +471,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             var caught = handler.ExceptionType;
             if (caught == null || caught.SpecialType == SpecialType.System_Object || CSharpOperationSemantics.DerivesFrom(thrown, caught))
             { return true; }
+            if (!CompilerIdentityBridge.IsClosedReferenceType(thrown, _cancellationToken) ||
+                !CompilerIdentityBridge.IsClosedReferenceType(caught, _cancellationToken))
+            { return null; }
             if (!explicitThrow.Exact && CSharpOperationSemantics.DerivesFrom(caught, thrown))
             { return null; }
             return false;

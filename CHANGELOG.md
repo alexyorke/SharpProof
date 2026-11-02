@@ -11,6 +11,8 @@ Entries describe repository changes, not package publication. Confirm available 
 - Record a captured instance field read as a read for effect contracts.
 - Treat collection stores as possible aliases when either element type is open, so
   `List<T>` and `List<int>` can no longer be assumed independent.
+- Stop an open generic thrown or caught type from excluding a `catch` handler, so a
+  handler that runs for some instantiation is no longer treated as unreachable.
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
 
