@@ -14,7 +14,7 @@ Add the single standard reference to the consuming SDK project. Full strict veri
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
 </ItemGroup>
 ```
 

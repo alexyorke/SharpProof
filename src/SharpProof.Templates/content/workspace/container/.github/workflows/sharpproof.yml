@@ -25,7 +25,6 @@ jobs:
       mode: report
       initialize-baseline: ${{ github.event_name == 'workflow_dispatch' && inputs.initialize-baseline || false }}
       registry-username: ${{ github.actor }}
-      package-feed-url: https://nuget.pkg.github.com/alexyorke/index.json
+      package-feed-url: https://api.nuget.org/v3/index.json
     secrets:
       container-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}
-      package-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}

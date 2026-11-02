@@ -4,7 +4,7 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 
 | Value | Current value | Owner |
 | --- | --- | --- |
-| Package version | `1.0.0-preview.1` | [eng/Versions.props](../eng/Versions.props) |
+| Package version | `1.0.0-preview.2` | [eng/Versions.props](../eng/Versions.props) |
 | Assembly version | `1.0.0.0` | [eng/Versions.props](../eng/Versions.props) |
 | Worker protocol | `45` | [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) |
 | Worker manifest schema | `6` | Same protocol model |

@@ -10,7 +10,7 @@ The standard setup is `dotnet add package SharpProof` using your configured feed
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
 </ItemGroup>
 ```
 
@@ -30,7 +30,7 @@ The consumer application can retain a compatible older target framework. For set
 
 See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
 
-The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
+The checked-in package version is `1.0.0-preview.2`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
 ## A minimal contract
 

@@ -30,8 +30,8 @@ public sealed class SetupInitializerConfigurationCoverageTests
         using var fixture = new ConfigurationFixture();
         await fixture.WriteAsync("NuGet.Config", """
             <configuration>
-              <packageSources><add key="SharpProofPreview" value="https://nuget.pkg.github.com/alexyorke/index.json" /></packageSources>
-              <disabledPackageSources><add key="SharpProofPreview" value="TRUE" /></disabledPackageSources>
+              <packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources>
+              <disabledPackageSources><add key="nuget.org" value="TRUE" /></disabledPackageSources>
             </configuration>
             """);
         AssertRejected<InvalidOperationException>(fixture, "explicitly disabled");
@@ -113,10 +113,10 @@ public sealed class SetupInitializerConfigurationCoverageTests
         using var fixture = new ConfigurationFixture();
         var entries = kind == "sources"
             ? new XElement("packageSources",
-                new XElement("add", new XAttribute("key", "SharpProofPreview"), new XAttribute("value", "https://nuget.pkg.github.com/alexyorke/index.json")),
-                new XElement("add", new XAttribute("key", "sharpproofpreview"), new XAttribute("value", "https://nuget.pkg.github.com/alexyorke/index.json")))
-            : new XElement("packageSourceMapping", new XElement("packageSource", new XAttribute("key", "SharpProofPreview")),
-                new XElement("packageSource", new XAttribute("key", "SHARPPROOFPREVIEW")));
+                new XElement("add", new XAttribute("key", "nuget.org"), new XAttribute("value", "https://api.nuget.org/v3/index.json")),
+                new XElement("add", new XAttribute("key", "NuGet.Org"), new XAttribute("value", "https://api.nuget.org/v3/index.json")))
+            : new XElement("packageSourceMapping", new XElement("packageSource", new XAttribute("key", "nuget.org")),
+                new XElement("packageSource", new XAttribute("key", "NUGET.ORG")));
         await fixture.WriteAsync("NuGet.Config", new XDocument(new XElement("configuration", entries)).ToString());
         AssertRejected<InvalidOperationException>(fixture, "Repeated setup entries");
     }
@@ -465,7 +465,7 @@ public sealed class SetupInitializerConfigurationCoverageTests
         var sources = disabled
             ? "<disabledPackageSources><add key=\"Company\" value=\"true\" /></disabledPackageSources><packageSources>"
             : "<packageSources><clear/>";
-        await fixture.WriteAsync("app/NuGet.Config", "<configuration>" + sources + "<add key=\"SharpProofPreview\" value=\"https://nuget.pkg.github.com/alexyorke/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"SharpProofPreview\"><package pattern=\"SharpProof*\" /></packageSource></packageSourceMapping></configuration>");
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration>" + sources + "<add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" /></packageSources><packageSourceMapping><packageSource key=\"nuget.org\"><package pattern=\"SharpProof*\" /></packageSource></packageSourceMapping></configuration>");
         await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
         _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
         Assert.That(await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken), Is.EqualTo(parent));
@@ -491,7 +491,7 @@ public sealed class SetupInitializerConfigurationCoverageTests
     {
         using var fixture = new ConfigurationFixture();
         // An environment reference supplies no credential and makes no request.
-        const string inherited = "<configuration><packageSources><add key=\"SharpProofPreview\" value=\"https://nuget.pkg.github.com/alexyorke/index.json\" /></packageSources><packageSourceCredentials><SharpProofPreview><add key=\"Username\" value=\"fixture\" /><add key=\"ClearTextPassword\" value=\"%SHARPPROOF_TEST_PASSWORD_REFERENCE%\" /></SharpProofPreview></packageSourceCredentials></configuration>";
+        const string inherited = "<configuration><packageSources><add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" /></packageSources><packageSourceCredentials><nuget.org><add key=\"Username\" value=\"fixture\" /><add key=\"ClearTextPassword\" value=\"%SHARPPROOF_TEST_PASSWORD_REFERENCE%\" /></nuget.org></packageSourceCredentials></configuration>";
         await fixture.WriteAsync("NuGet.Config", inherited);
         await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
         await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
@@ -601,9 +601,9 @@ public sealed class SetupInitializerConfigurationCoverageTests
     public async Task ConflictingInheritedPreviewSourcesRejectBeforeWrites(bool disabled)
     {
         using var fixture = new ConfigurationFixture();
-        var address = disabled ? "https://nuget.pkg.github.com/alexyorke/index.json" : "https://other.example.test/v3/index.json";
-        var disabledSettings = disabled ? "<disabledPackageSources><add key=\"SharpProofPreview\" value=\"true\" /></disabledPackageSources>" : string.Empty;
-        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"SharpProofPreview\" value=\"" + address + "\" /></packageSources>" + disabledSettings + "</configuration>");
+        var address = disabled ? "https://api.nuget.org/v3/index.json" : "https://other.example.test/v3/index.json";
+        var disabledSettings = disabled ? "<disabledPackageSources><add key=\"nuget.org\" value=\"true\" /></disabledPackageSources>" : string.Empty;
+        await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"nuget.org\" value=\"" + address + "\" /></packageSources>" + disabledSettings + "</configuration>");
         await fixture.WriteAsync("app/NuGet.Config", "<configuration />");
         await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
         var before = fixture.Snapshot();

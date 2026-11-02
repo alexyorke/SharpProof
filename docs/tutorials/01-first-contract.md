@@ -18,7 +18,7 @@ For a new class library, use this complete project file. The explicit advisory/v
     <SharpProofVerify>false</SharpProofVerify>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+    <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
   </ItemGroup>
 </Project>
 ```

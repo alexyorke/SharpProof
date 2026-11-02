@@ -5,13 +5,10 @@ tool is optional. Its read-only commands inspect setup and stored evidence; `ini
 can apply a reviewed setup plan, and `export-test` writes a new regression project.
 Neither command runs verification or executes consumer code.
 
-Install the matching version from your configured feed. The official
-`1.0.0-preview.1` path is the private `alexyorke/SharpProof-preview` release, with
-NuGet source `https://nuget.pkg.github.com/alexyorke/index.json` and initial owner-only
-access. Configure the named `SharpProofPreview` source and read-only credentials
-through your credential provider or process environment; do not commit credentials.
-Publication and real-editor qualification are pending, and public CI validation
-versions are distinct from official private-preview artifacts.
+Install the matching version from nuget.org. The first public version is
+`1.0.0-preview.2`; until it is published, pack this checkout instead. Real-editor
+qualification is pending, and public CI validation versions are distinct from
+release artifacts.
 
 Generated templates already pin the matching local tool: use `dotnet tool restore`.
 For an existing project, create a manifest only if one does not already exist, then
@@ -19,7 +16,7 @@ install the matching tool. Teammates restore that manifest with `dotnet tool res
 
 ```sh
 dotnet new tool-manifest
-dotnet tool install SharpProof.Tool --version 1.0.0-preview.1
+dotnet tool install SharpProof.Tool --version 1.0.0-preview.2
 dotnet sharpproof doctor
 dotnet sharpproof doctor --format json
 dotnet sharpproof explain --result obj/Debug/net10.0/SharpProof/result.json
@@ -55,7 +52,8 @@ dotnet sharpproof init --project MyLibrary.csproj --verification portable --appl
 
 Portable is the default; omit `--apply` to leave files unchanged. The plan pins
 the public facade, private editor reference, and local tool to the installed tool's
-version and configures the credential-free private feed. It may reuse ancestor
+version and names the nuget.org source, mapping `SharpProof*` to it when the
+configuration already uses package source mapping. It may reuse ancestor
 NuGet/tool/central-version files, so review every listed path. Conflicting versions,
 ambiguous imports/settings, inline feed credentials, or linked targets are rejected.
 Initialization does not restore, build, pull images, or rewrite the selected SDK.

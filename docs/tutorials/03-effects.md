@@ -10,7 +10,7 @@ The executable tutorial deliberately exercises separate profile and worker polic
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
 </ItemGroup>
 <PropertyGroup>
   <SharpProofProfile>advisory</SharpProofProfile>

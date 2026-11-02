@@ -6,6 +6,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Restore SharpProof from nuget.org. Templates, `init` and the consumer workflow no
+  longer need the private GitHub feed or its credentials; the workflow still accepts
+  that feed with `package-read-token`. The package version moves to
+  `1.0.0-preview.2`, the first public version.
 - Keep strict verification with the project that references SharpProof. The
   package's MSBuild files now ship in `build/`, passed to the direct consumer by
   `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of

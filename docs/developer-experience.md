@@ -67,9 +67,10 @@ local feeds, and supply private-feed credentials through your usual secret mecha
 A local feed outside the project needs an explicit read-only bind mount. The generated
 CI workflow likewise needs registry/feed access configured before its restore/build
 steps. Keep credentials out of the committed configuration.
-Generated configuration names the private source `SharpProofPreview`; Compose forwards
-the process variable `NuGetPackageSourceCredentials_SharpProofPreview` without storing
-its value. Authenticate private GHCR reads through your Docker credential store.
+Generated configuration restores SharpProof from nuget.org without credentials. Compose
+still forwards `NuGetPackageSourceCredentials_SharpProofPreview`, unset by default, for
+projects that add the GitHub preview feed themselves. Authenticate private GHCR reads
+through your Docker credential store.
 
 For the single-project container starter, restore the local tool and inspect setup through the same
 service so evaluation uses its container-owned restore assets:
@@ -108,8 +109,8 @@ establish a proof, install an SDK, authenticate a feed, or replace review of exi
 project policy. Keep secret values in your normal secret mechanism.
 
 The supported plan pins the facade, private CodeFixes reference, and local tool to the
-installed tool's version, selects the requested profile, and adds the credential-free
-`SharpProofPreview` source/mapping. It can reuse ancestor NuGet/tool/central-version
+installed tool's version, selects the requested profile, and names the nuget.org source,
+mapping `SharpProof*` to it when package source mapping is already in use. It can reuse ancestor NuGet/tool/central-version
 configuration, so inspect every listed path. Container mode also plans Compose,
 isolated compiler outputs, and retained evidence paths. Conflicting versions/settings,
 ambiguous imports/configuration, inline preview credentials, and linked targets are
@@ -220,13 +221,13 @@ a moving branch or the separate private release workflow SHA.
 | `caller-workflow` | Exact caller path, generated as `.github/workflows/sharpproof.yml` |
 | `registry-username` | Account authorized to read the private image/feed |
 | `compose-file`, `service`, `evidence-directory` | Defaults: `compose.yaml`, `verify`, `artifacts/sharpproof` |
-| `package-feed-url` | Defaults to the private GitHub NuGet feed |
+| `package-feed-url` | nuget.org by default; the private GitHub NuGet feed is also accepted |
 | `mode` | `report` by default; `enforce` adds the comparison regression gate |
 | `initialize-baseline` | Default false; explicit reviewed default-branch manual initialization only |
 
-The required `container-read-token` and `package-read-token` secrets are explicit
-read-only package credentials; the generated caller maps `SHARPPROOF_PREVIEW_TOKEN`
-to them. Keep publisher/signing credentials out of consumer CI. Fork PRs and
+The `container-read-token` secret is a required read-only credential for the private
+image; the generated caller maps `SHARPPROOF_PREVIEW_TOKEN` to it. `package-read-token`
+is needed only with the GitHub feed. Keep publisher/signing credentials out of consumer CI. Fork PRs and
 `pull_request_target` are rejected before credential-bearing work. Reports go to
 the Markdown job summary and retained evidence artifact, not PR comments.
 
