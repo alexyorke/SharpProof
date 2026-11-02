@@ -5,8 +5,13 @@ description: Pull or build the tooling image with ./ci.sh image, caching the Win
 # pull-request entries stay scoped to their own branch. Scheduled runs and
 # release tags always build the image and compile Z3 from source, so the
 # recipe keeps proving it reproduces the pins and releases never ship a
-# cached payload. Only master pushes publish the image to GHCR, so a pull
-# request can read it but never replace it.
+# cached payload. Only the master image job publishes to GHCR, with the one
+# packages: write token in CI, so a pull request can read the image but never
+# replace it.
+inputs:
+  publish:
+    description: Push a fresh build to GHCR. Only the master image job sets it.
+    default: "false"
 runs:
   using: composite
   steps:
@@ -39,7 +44,7 @@ runs:
       env:
         SHARPPROOF_WINDOWS_NATIVE_CACHE: ${{ steps.key.outputs.path }}
         SHARPPROOF_IMAGE_REGISTRY: ${{ steps.registry.outputs.registry }}
-        SHARPPROOF_IMAGE_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && '1' || '' }}
+        SHARPPROOF_IMAGE_PUSH: ${{ inputs.publish == 'true' && '1' || '' }}
       run: ./ci.sh image
     # Concurrent jobs may race to save the same key; a failed save never
     # fails the job.

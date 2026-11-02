@@ -37,13 +37,33 @@ jobs:
       - id: lanes
         run: echo "lanes=$(./ci.sh --list)" >> "$GITHUB_OUTPUT"
 
-  lanes:
-    name: ${{ matrix.lane }}
-    needs: plan
-    # setup-tooling pulls the tooling image from GHCR, and master pushes publish it.
+  # The only job that may write packages: it runs master's own code, then the
+  # lanes pull what it published instead of each racing to push.
+  image:
+    name: Publish tooling image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: read
       packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-tooling
+        with:
+          publish: "true"
+
+  lanes:
+    name: ${{ matrix.lane }}
+    needs: [plan, image]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.image.result != 'failure' }}
+    # setup-tooling pulls the tooling image from GHCR. Pull requests run their
+    # own code here, so these jobs can read packages but never publish them.
+    permissions:
+      contents: read
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:

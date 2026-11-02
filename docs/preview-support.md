@@ -45,7 +45,7 @@ The Linux x64 solver payload requires glibc 2.31+. The ARM64 solver payload requ
 
 ## Trusted host assumptions
 
-The canonical image, build process, source workspace, package cache, and local filesystem namespace are trusted while a build runs.
+The canonical image, build process, source workspace, package cache, and local filesystem namespace are trusted while a build runs. The verification cache belongs to that namespace: cache entries are not authenticated, so anyone who can write to a `SharpProofVerifyCacheDirectory` can supply results, including `Proven` ones. Share a cache directory only among users you would trust to edit the build itself.
 
 Publication validates path ownership and identity, symlink/alias restrictions, regular files, and local filesystem capabilities. It locks the canonical request/result/manifest/optional SARIF set and uses atomic publication. Recognized network filesystems and unsupported locking/rename behavior are rejected.
 

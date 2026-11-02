@@ -12,7 +12,7 @@ Security fixes target the current development line and the most recent published
 
 ## Scope
 
-Reports about analyzer isolation, native payload loading, verifier containment, malformed protocol handling, cache/artifact integrity, and soundness failures producing false Proven or false definite Refuted results are in scope.
+Reports about analyzer isolation, native payload loading, verifier containment, malformed protocol handling, cache/artifact integrity, and soundness failures producing false Proven or false definite Refuted results are in scope. Cache entries are not authenticated against someone who can already write the cache directory; see [trusted host assumptions](docs/preview-support.md#trusted-host-assumptions).
 
 Unsupported constructs that correctly produce visible Unknown/incomplete evidence are normally correctness reports. Report a claimed violation with its actual artifact, budgets, structured result, and reproduction when possible.
 
