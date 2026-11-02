@@ -7,8 +7,8 @@ on:
   push:
     branches: [master]
   pull_request:
-  # Weekly: compile the Windows Z3 payload from source (setup-tooling skips
-  # its cache on schedules) and pick up new advisories and broken links.
+  # Weekly: compile the Windows Z3 payload from source (in the build lane,
+  # which skips its cache) and pick up new advisories and broken links.
   schedule:
     - cron: "41 7 * * 3"
   workflow_dispatch:
@@ -78,6 +78,9 @@ jobs:
           fetch-depth: ${{ matrix.lane == 'repository' && '0' || '1' }}
           persist-credentials: false
       - uses: ./.github/actions/setup-tooling
+        with:
+          # One weekly lane proves the Windows Z3 payload still builds from source.
+          from-source: ${{ github.event_name == 'schedule' && matrix.lane == 'build' }}
       - name: ./ci.sh ${{ matrix.lane }}
         env:
           LANE: ${{ matrix.lane }}
