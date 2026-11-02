@@ -32,7 +32,9 @@
   },
   "fuzz": {
     "nightlyCases": 10000,
+    "nightlyResourceBoundCases": 50000,
     "rotatingRunWallSeconds": 1200,
+    "resourceBoundRunWallSeconds": 900,
     "maximumCampaignCases": 1000000,
     "maximumParallelism": 4
   }

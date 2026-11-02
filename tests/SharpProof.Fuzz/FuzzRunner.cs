@@ -163,7 +163,7 @@ internal static class FuzzRunner
         output = RepositoryParameterGuard.NotNull(output, nameof(output));
         var log = new RepositoryLogger(output, error);
         var usage =
-            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1.." + FuzzOptions.MaximumAllowedParallelism.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]";
+            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1.." + FuzzOptions.MaximumAllowedParallelism.ToString(System.Globalization.CultureInfo.InvariantCulture) + "] [--oracle " + FuzzOptions.ResourceBoundsOracle + "]";
         FuzzOptions options;
         try
         {
@@ -182,6 +182,12 @@ internal static class FuzzRunner
 
         try
         {
+            if (options.ResourceBoundsOnly)
+            {
+                var resourceBounds = await ResourceBoundRuntimeOracle.RunAsync(options.Cases, options.Seed, options.MaximumParallelism, cancellationToken);
+                log.Info(JsonSerializer.Serialize(resourceBounds, SharpProofJsonDefaults.Indented));
+                return resourceBounds.Passed ? 0 : 1;
+            }
             var summary = await RunAsync(options, cancellationToken);
             log.Info(JsonSerializer.Serialize(
                 summary,
@@ -214,7 +220,7 @@ internal static class FuzzRunner
             PartialResult ?? throw new ArgumentNullException(nameof(PartialResult));
     }
 
-    private static async Task<ImmutableArray<T>> RunIndexedAsync<T>(
+    internal static async Task<ImmutableArray<T>> RunIndexedAsync<T>(
         int count, int maximumParallelism,
         Func<int, CancellationToken, ValueTask<T>> execute, CancellationToken cancellationToken)
     {

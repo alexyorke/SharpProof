@@ -29,7 +29,7 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             var stringArguments = Sequence(creation.Arguments.Select(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Value), depth + 1);
             var count = creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 1).Value;
-            var size = Size(count);
+            var size = Size(count, charged: true);
             if (size is null)
             { return Unknown("UnsupportedStringAllocationSize"); }
             var allocation = count.ConstantValue is { HasValue: true, Value: int constant } && constant <= 0
@@ -118,9 +118,9 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             if (argument.Parameter is not { } parameter)
             { return Unknown("UnboundConstructorArgument"); }
-            _scalarArguments.Add(parameter, Size(argument.Value));
-            _arrayArguments.Add(parameter, ArraySize(argument.Value));
-            _stringArguments.Add(parameter, StringSize(argument.Value));
+            _scalarArguments.Add(parameter, Size(argument.Value, charged: true));
+            _arrayArguments.Add(parameter, ArraySize(argument.Value, charged: true));
+            _stringArguments.Add(parameter, StringSize(argument.Value, charged: true));
         }
         _activeMethods.Add(constructor);
         try

@@ -88,8 +88,7 @@ internal sealed partial class ResourceBoundsAnalysis
         { return Unknown("UnprovedLoopProgress"); }
         // Every continuing path must reach this tail update. The closed body
         // visitor rejects other counter writes, aliases, jumps and continues.
-        _localProgress.Remove(counter.Local);
-        _localInitialConstants.Remove(counter.Local);
+        ForgetWrittenLocals(loop.Body);
         _counters.Add(counter.Local, new Bound(envelope.Expression, ResourceExpression.Zero));
         var body = Sequence(operations.Take(operations.Length - 1), depth + 1);
         _counters.Remove(counter.Local);
@@ -120,10 +119,7 @@ internal sealed partial class ResourceBoundsAnalysis
         { return Unknown("UnprovedLoopProgress"); }
         // Each continuing branch changes only its selected positive counter.
         // The other phase's initial value therefore remains a valid envelope.
-        _localProgress.Remove(left);
-        _localProgress.Remove(right);
-        _localInitialConstants.Remove(left);
-        _localInitialConstants.Remove(right);
+        ForgetWrittenLocals(loop.Body);
         _counters.Add(left, new Bound(leftInitial.Expression, ResourceExpression.Zero));
         _counters.Add(right, new Bound(rightInitial.Expression, ResourceExpression.Zero));
         try
@@ -145,6 +141,29 @@ internal sealed partial class ResourceBoundsAnalysis
             _localProgress.Remove(right);
             _localInitialConstants.Remove(left);
             _localInitialConstants.Remove(right);
+        }
+    }
+
+    // A fact recorded before a loop holds only until the first write, and any
+    // iteration can reach a read after a write that the visitor has not seen
+    // yet. Run this after reading the loop's own header facts.
+    private void ForgetWrittenLocals(IOperation body)
+    {
+        body = ArgumentNullGuard.NotNull(body, nameof(body));
+        foreach (var operation in body.DescendantsAndSelf())
+        {
+            _cancellation.ThrowIfCancellationRequested();
+            var target = operation switch
+            {
+                IAssignmentOperation assignment => assignment.Target,
+                IIncrementOrDecrementOperation update => update.Target,
+                _ => null
+            };
+            if (target is ILocalReferenceOperation written)
+            {
+                _localProgress.Remove(written.Local);
+                _localInitialConstants.Remove(written.Local);
+            }
         }
     }
 
@@ -331,7 +350,10 @@ internal sealed partial class ResourceBoundsAnalysis
         try
         {
             var accounted = CreditLoop(loop.Body, rank, count, depth);
-            return accounted ?? Visit(loop.Body, depth + 1).Scale(count, rank, ResourceRepeatKind.Loop);
+            if (accounted is not null)
+            { return accounted; }
+            ForgetWrittenLocals(loop.Body);
+            return Visit(loop.Body, depth + 1).Scale(count, rank, ResourceRepeatKind.Loop);
         }
         finally
         { _counters.Remove(declaration.Symbol); }

@@ -2,7 +2,7 @@ namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ResourceBoundsAnalysis
 {
-    private Bound? ArraySize(IOperation operation)
+    private Bound? ArraySize(IOperation operation, bool charged = false)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (operation is IParameterReferenceOperation parameter && parameter.Parameter.Type is IArrayTypeSymbol)
@@ -10,12 +10,12 @@ internal sealed partial class ResourceBoundsAnalysis
             return _arrayArguments.TryGetValue(parameter.Parameter, out var argument) ? argument :
                 Bound.Parameter(parameter.Parameter, ResourceInputKind.ArrayLength);
         }
-        if (operation is IArrayCreationOperation { DimensionSizes.Length: 1, Initializer: null } array)
+        if (charged && operation is IArrayCreationOperation { DimensionSizes.Length: 1, Initializer: null } array)
         { return Size(array.DimensionSizes[0]); }
         return null;
     }
 
-    private Bound? StringSize(IOperation operation)
+    private Bound? StringSize(IOperation operation, bool charged = false)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
         if (operation.Type?.SpecialType != SpecialType.System_String)
@@ -27,10 +27,10 @@ internal sealed partial class ResourceBoundsAnalysis
         }
         if (operation.ConstantValue is { HasValue: true } constant)
         { return constant.Value is string text ? Bound.Number(text.Length) : constant.Value is null ? Bound.Zero : null; }
-        if (operation is IObjectCreationOperation creation && CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
+        if (charged && operation is IObjectCreationOperation creation && CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
         {
             return Size(creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) :
-                argument.Parameter!.Ordinal == 1).Value);
+                argument.Parameter!.Ordinal == 1).Value, charged);
         }
         return null;
     }
@@ -82,9 +82,9 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             if (argument.Parameter is not { } parameter)
             { return Unknown("UnboundCallArgument"); }
-            _scalarArguments.Add(parameter, Size(argument.Value));
-            _arrayArguments.Add(parameter, ArraySize(argument.Value));
-            _stringArguments.Add(parameter, StringSize(argument.Value));
+            _scalarArguments.Add(parameter, Size(argument.Value, charged: true));
+            _arrayArguments.Add(parameter, ArraySize(argument.Value, charged: true));
+            _stringArguments.Add(parameter, StringSize(argument.Value, charged: true));
         }
         _activeMethods.Add(target);
         try

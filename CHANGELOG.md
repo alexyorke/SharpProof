@@ -14,6 +14,17 @@ Entries describe repository changes, not package publication. Confirm available 
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
 
+### Resource bounds
+
+- Stop reporting false `Proven` resource bounds. A local written anywhere in an
+  enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
+  start or array dimension can no longer allocate without being charged. Both
+  shapes, and methods in a type with a static initializer, are now Unknown.
+- Add a nightly runtime oracle for resource bounds. It generates methods, then
+  fails if a compiled method's loop entries, arrays, elements or allocated bytes
+  exceed the bound proved by SP0060 or the worker. Its run result has its own
+  schema, and the campaign summary moves to schema 6.
+
 ### Developer experience
 
 - Add a workspace template with pinned local tools, optional editor assistance,
