@@ -16,7 +16,8 @@ internal sealed class CallPreconditionReportingTests
     private static readonly WorkerSourceLocation Declaration = new() { Path = "Subject.cs", Start = 80, Length = 40, Line = 8, Column = 5 };
     private static readonly WorkerSourceLocation Clause = new() { Path = "Subject.cs", Start = 20, Length = 22, Line = 3, Column = 34 };
 
-    private static WorkerVerifyResponse CreateResponse(WorkerClaimOutcome outcome)
+    private static WorkerVerifyResponse CreateResponse(WorkerClaimOutcome outcome,
+        WorkerClaimReason reason = WorkerClaimReason.CounterexampleNotReplayable)
     {
         var manifest = new WorkerClaimManifest
         {
@@ -49,14 +50,20 @@ internal sealed class CallPreconditionReportingTests
             RequestHash = new('b', 64),
             InputHash = new('a', 64),
             Manifest = manifest,
-            RunStatus = WorkerRunStatus.Complete,
+            RunStatus = unknown && reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout
+                ? WorkerRunStatus.TimedOut : WorkerRunStatus.Complete,
             FailureReason = WorkerRunFailureReason.None,
             CallableResults = [
                 new WorkerCallableResult
                 {
                     CallableId = "M:Subject.Caller",
                     Coverage = unknown ? WorkerCallableCoverage.Incomplete : WorkerCallableCoverage.Complete,
-                    Reason = unknown ? WorkerCallableCoverageReason.SemanticUnknown : WorkerCallableCoverageReason.None
+                    Reason = !unknown ? WorkerCallableCoverageReason.None : reason switch
+                    {
+                        WorkerClaimReason.MethodTimeout => WorkerCallableCoverageReason.MethodTimeout,
+                        WorkerClaimReason.ProjectTimeout => WorkerCallableCoverageReason.ProjectTimeout,
+                        _ => WorkerCallableCoverageReason.SemanticUnknown
+                    }
                 }
             ],
             ClaimResults = [
@@ -64,7 +71,7 @@ internal sealed class CallPreconditionReportingTests
                 {
                     ClaimId = "claim-1",
                     Outcome = outcome,
-                    Reason = unknown ? WorkerClaimReason.CounterexampleNotReplayable : WorkerClaimReason.None,
+                    Reason = unknown ? reason : WorkerClaimReason.None,
                     Model = outcome == WorkerClaimOutcome.Refuted
                         ? [new WorkerModelValue { Variable = "parameter:0", Kind = "Int32", Value = "0" }] : []
                 }
@@ -151,6 +158,93 @@ internal sealed class CallPreconditionReportingTests
             Assert.That(exitCode, Is.EqualTo(expected));
             Assert.That(output, Does.Contain("Call to M:Subject.F, clause 1 at Subject.cs(3,34)"));
             Assert.That(error, Does.Not.Contain("SP0051"));
+        }
+    }
+
+    private static IEnumerable<JsonElement> Diagnostics(string error)
+    {
+        System.ArgumentNullException.ThrowIfNull(error);
+        return error.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : line.StartsWith(VerifierDiagnosticTransport.Prefix, StringComparison.Ordinal))
+            .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : JsonDocument.Parse(line[VerifierDiagnosticTransport.Prefix.Length..]).RootElement.Clone());
+    }
+
+    private static List<string?> Property(IEnumerable<JsonElement> elements, string name)
+    {
+        System.ArgumentNullException.ThrowIfNull(elements);
+        System.ArgumentNullException.ThrowIfNull(name);
+        var values = new List<string?>();
+        foreach (var element in elements)
+        { values.Add(element.GetProperty(name).GetString()); }
+        return values;
+    }
+
+    // Machine load alone must not decide a strict build.
+    [TestCase(WorkerClaimReason.MethodTimeout)]
+    [TestCase(WorkerClaimReason.ProjectTimeout)]
+    public void TimedOutCallDoesNotFailRequireProven(WorkerClaimReason reason)
+    {
+        var response = CreateResponse(WorkerClaimOutcome.Unknown, reason);
+        var (exitCode, output, error) = Report(response, WorkerVerifyPolicy.RequireProven);
+        var diagnostic = Diagnostics(error).Single();
+        using var document = JsonDocument.Parse(SarifProjection.Serialize(new WorkerVerifyRequest { VerifyPolicy = WorkerVerifyPolicy.RequireProven },
+            response, "/workspace/consumer"));
+        var run = document.RootElement.GetProperty("runs")[0];
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(diagnostic.GetProperty("code").GetString(), Is.EqualTo("SP0047"));
+            Assert.That(diagnostic.GetProperty("severity").GetString(), Is.EqualTo("warning"));
+            Assert.That(diagnostic.GetProperty("message").GetString(), Does.Contain("do not fail require-proven"));
+            Assert.That(output, Does.Contain("unchecked calls to methods with preconditions=1;"));
+            Assert.That(Property(run.GetProperty("results").EnumerateArray(), "level"), Is.All.EqualTo("warning"));
+            Assert.That(run.GetProperty("invocations")[0].GetProperty("properties").GetProperty("uncheckedCallSites").GetInt32(), Is.EqualTo(1));
+        }
+    }
+
+    [TestCase(WorkerVerifyPolicy.Advisory, "info")]
+    [TestCase(WorkerVerifyPolicy.WarnOnUnknown, "warning")]
+    public void TimedOutCallReportsAtItsPolicyLevel(WorkerVerifyPolicy policy, string severity)
+    {
+        System.ArgumentNullException.ThrowIfNull(severity);
+        var (exitCode, output, error) = Report(CreateResponse(WorkerClaimOutcome.Unknown, WorkerClaimReason.MethodTimeout), policy);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(output, Does.Contain(": " + severity + " SP0047:"));
+            Assert.That(Property(Diagnostics(error), "severity"), severity == "info" ? Is.Empty : Is.EqualTo(new[] { severity }));
+        }
+    }
+
+    [Test]
+    public void DeclaredClaimThatTimesOutStillFailsRequireProven()
+    {
+        var response = CreateResponse(WorkerClaimOutcome.Unknown, WorkerClaimReason.MethodTimeout);
+        var callable = response.Manifest.Callables[0];
+        var manifest = response.Manifest with
+        {
+            Callables = [callable with { SelectionReasons = [WorkerSelectionReason.DiscoveredPostcondition, WorkerSelectionReason.DiscoveredCallPrecondition], ClaimIds = ["claim-0", "claim-1"] }],
+            Claims = [
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "claim-0",
+                    CallableId = callable.CallableId,
+                    Kind = WorkerClaimKind.Postcondition,
+                    Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = Declaration
+                },
+                response.Manifest.Claims[0] with { Ordinal = 1 }
+            ]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var declared = response.ClaimResults[0] with { ClaimId = "claim-0" };
+        var (exitCode, output, error) = Report(response with { Manifest = manifest, ClaimResults = [declared, response.ClaimResults[0]] },
+            WorkerVerifyPolicy.RequireProven);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.EqualTo(6));
+            Assert.That(Diagnostics(error).Single().GetProperty("severity").GetString(), Is.EqualTo("error"));
+            Assert.That(output, Does.Contain("unchecked calls to methods with preconditions=1;"));
         }
     }
 

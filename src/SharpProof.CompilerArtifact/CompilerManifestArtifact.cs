@@ -411,6 +411,10 @@ internal static class CompilerManifestArtifactFile
     // so they need a larger bounded envelope than ordinary worker JSON files.
     internal const int MaximumBytes = 32 * 1024 * 1024;
 
+    // Callers selected only for their calls stop being added past this size,
+    // which leaves headroom under MaximumBytes for everything else.
+    internal const int CallerSelectionBytes = MaximumBytes / 4 * 3;
+
     internal static ImmutableArray<byte> ReadAllBytes(
         string path,
         int maximumBytes,

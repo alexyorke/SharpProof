@@ -36,6 +36,10 @@ Entries describe repository changes, not package publication. Confirm available 
   fails `require-proven`. Calls in bodies that do not lower exactly, and calls to virtual,
   interface or other-assembly callees, stay unchecked; the build summary counts the ones the
   compiler can see. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
+- Keep those call claims from failing a build on size or timing alone. Bodies selected only
+  for their calls are left out once the compiler artifact reaches 24 MiB, instead of
+  raising SP0049, and a call claim that runs out of time does not fail `require-proven`.
+  Both cases count as unchecked calls. Declared claims are unaffected.
 
 ### Resource bounds
 

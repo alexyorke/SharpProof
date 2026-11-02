@@ -1,4 +1,6 @@
 // This producer runs only in the build-time compiler collector.
+using System.Text.Json;
+
 namespace SharpProof.CompilerCollector;
 
 internal static class CompilerManifestArtifactProducer
@@ -7,7 +9,8 @@ internal static class CompilerManifestArtifactProducer
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
         ImmutableArray<AdditionalText> additionalFiles = default,
-        ImmutableArray<string> specificationPacks = default)
+        ImmutableArray<string> specificationPacks = default,
+        long callerSelectionBytes = CompilerManifestArtifactFile.CallerSelectionBytes)
     {
 
 
@@ -79,65 +82,103 @@ internal static class CompilerManifestArtifactProducer
             }
             callables = [.. lowered.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : CompilerLoweredArtifact.Encode(item.Preparation, cancellationToken).AttachEffectEvidence(item.Target))];
         }
-        // Preserve only reference evidence actually needed by resource metadata
-        // leaves. General compiler reference snapshots remain build-time data.
-        var resourceAssemblies = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var callable in callables)
+        var resourceSnapshot = snapshot;
+        var artifact = Compose(manifest, callables, targets);
+        // Past the cap, callers selected only for their calls leave the
+        // artifact, last callable id first, and their calls count as
+        // unchecked. Declared claims always stay.
+        while (!discovery.ContractCallers.IsEmpty)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var pending = new Stack<ResourceProgram>();
-            if (callable.ResourceProgram is { } payload)
-            { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
-            if (callable.ForkJoinProjection is { } forkPayload)
+            var excess = JsonSerializer.SerializeToUtf8Bytes(artifact, WorkerProtocolJson.SharedOptions).LongLength + 1 - callerSelectionBytes;
+            if (excess <= 0)
+            { break; }
+            var callOnly = CompilerCallPreconditionClaims.SelectedOnlyForCalls(manifest);
+            var dropped = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            for (var index = callables.Length - 1; index >= 0 && excess > 0; index--)
             {
-                var entry = manifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-                    candidate.CallableId == callable.CallableId);
-                var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
-                    ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
-                var projection = CompilerForkJoinProjectionCodec.Decode(forkPayload, root, cancellationToken);
-                resourceAssemblies.Add(projection.FrameworkAssemblyIdentity);
-                foreach (var child in projection.Children)
-                { pending.Push(child.Cost); }
+                if (callOnly.Contains(callables[index].CallableId))
+                {
+                    dropped.Add(callables[index].CallableId);
+                    excess -= JsonSerializer.SerializeToUtf8Bytes(callables[index], WorkerProtocolJson.SharedOptions).LongLength;
+                }
             }
-            while (pending.Count > 0)
+            if (dropped.Count == 0)
+            { break; }
+            var removed = dropped.ToImmutable();
+            manifest = CompilerCallPreconditionClaims.Drop(manifest, removed, discovery.PreconditionCallSites);
+            callables = [.. callables.Where(callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : !removed.Contains(callable.CallableId))];
+            targets = [.. targets.Where(target => target is null ? throw new ArgumentNullException(nameof(target)) : !removed.Contains(target.Entry.CallableId))];
+            artifact = Compose(manifest, callables, targets);
+        }
+        return artifact;
+
+        CompilerManifestArtifact Compose(WorkerClaimManifest composedManifest, ImmutableArray<CompilerCallableArtifact> composedCallables,
+            ImmutableArray<ManifestCallableTarget> composedTargets)
+        {
+            composedManifest = RepositoryParameterGuard.NotNull(composedManifest, nameof(composedManifest));
+            RepositoryParameterGuard.RequireInitialized(composedCallables.IsDefault, nameof(composedCallables), "Array must be initialized.");
+            RepositoryParameterGuard.RequireInitialized(composedTargets.IsDefault, nameof(composedTargets), "Array must be initialized.");
+            var composedSnapshot = resourceSnapshot;
+            // Preserve only reference evidence actually needed by resource metadata
+            // leaves. General compiler reference snapshots remain build-time data.
+            var resourceAssemblies = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var callable in composedCallables)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var program = pending.Pop();
-                if (program.Metadata is { } reference)
-                { resourceAssemblies.Add(reference.AssemblyIdentity); }
-                foreach (var child in program.Children)
-                { pending.Push(child); }
+                var pending = new Stack<ResourceProgram>();
+                if (callable.ResourceProgram is { } payload)
+                { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
+                if (callable.ForkJoinProjection is { } forkPayload)
+                {
+                    var entry = composedManifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
+                        candidate.CallableId == callable.CallableId);
+                    var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
+                        ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
+                    var projection = CompilerForkJoinProjectionCodec.Decode(forkPayload, root, cancellationToken);
+                    resourceAssemblies.Add(projection.FrameworkAssemblyIdentity);
+                    foreach (var child in projection.Children)
+                    { pending.Push(child.Cost); }
+                }
+                while (pending.Count > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var program = pending.Pop();
+                    if (program.Metadata is { } reference)
+                    { resourceAssemblies.Add(reference.AssemblyIdentity); }
+                    foreach (var child in program.Children)
+                    { pending.Push(child); }
+                }
             }
+            if (composedManifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+                claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+            {
+                composedSnapshot = composedSnapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
+                resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
+            }
+            composedSnapshot = composedSnapshot with
+            {
+                ResourceMetadataReferences = composedSnapshot.References.Where(reference =>
+                reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
+            };
+            return new CompilerManifestArtifact
+            {
+                SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
+                SpecificationPackCatalogVersion =
+                    specificationPackAuthority.SpecificationPackCatalogVersion,
+                SpecificationPackCatalogSha256 =
+                    specificationPackAuthority.SpecificationPackCatalogSha256,
+                Features = features,
+                Compilation = composedSnapshot,
+                Manifest = composedManifest,
+                MaximumExpressionDepth = maximumExpressionDepth,
+                CompilerDiagnostics = diagnosticArtifacts,
+                Callables = composedCallables,
+                ReachableSource = diagnosticArtifacts.Length == 0
+                    ? CompilerReachableSourceCollector.Collect(compilation, composedTargets, composedSnapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
+                    : null
+            };
         }
-        if (manifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
-        {
-            snapshot = snapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
-            resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
-        }
-        snapshot = snapshot with
-        {
-            ResourceMetadataReferences = snapshot.References.Where(reference =>
-            reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
-        };
-        var artifact = new CompilerManifestArtifact
-        {
-            SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
-            SpecificationPackCatalogVersion =
-                specificationPackAuthority.SpecificationPackCatalogVersion,
-            SpecificationPackCatalogSha256 =
-                specificationPackAuthority.SpecificationPackCatalogSha256,
-            Features = features,
-            Compilation = snapshot,
-            Manifest = manifest,
-            MaximumExpressionDepth = maximumExpressionDepth,
-            CompilerDiagnostics = diagnosticArtifacts,
-            Callables = callables,
-            ReachableSource = diagnosticArtifacts.Length == 0
-                ? CompilerReachableSourceCollector.Collect(compilation, targets, snapshot.SyntaxTrees, specificationPackAuthority, cancellationToken)
-                : null
-        };
-        return artifact;
     }
 
     private static CompilerCallableArtifact AttachEffectEvidence(

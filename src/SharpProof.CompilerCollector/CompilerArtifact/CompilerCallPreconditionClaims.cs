@@ -68,6 +68,39 @@ internal static class CompilerCallPreconditionClaims
         return (result, published.ToImmutable());
     }
 
+    internal static ImmutableHashSet<string> SelectedOnlyForCalls(WorkerClaimManifest manifest)
+    {
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
+        return manifest.Callables
+            .Where(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) :
+                callable.SelectionReasons.Length == 1 && callable.SelectionReasons[0] == WorkerSelectionReason.DiscoveredCallPrecondition)
+            .Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+    }
+
+    // Removes whole callers. Their calls are no longer checked, so their sites
+    // join the unchecked count.
+    internal static WorkerClaimManifest Drop(WorkerClaimManifest manifest, ImmutableHashSet<string> callers,
+        ImmutableArray<WorkerSourceLocation> callSites)
+    {
+        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
+        callers = RepositoryParameterGuard.NotNull(callers, nameof(callers));
+        RepositoryParameterGuard.RequireInitialized(callSites.IsDefault, nameof(callSites), "Array must be initialized.");
+        ImmutableArray<WorkerClaimManifestEntry> claims = [.. manifest.Claims.Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
+            !callers.Contains(claim.CallableId))];
+        var checkedSites = claims.Where(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind == WorkerClaimKind.CallPrecondition)
+            .Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Location).ToImmutableHashSet();
+        var result = manifest with
+        {
+            UncheckedCallSites = callSites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : !checkedSites.Contains(site)),
+            Callables = [.. manifest.Callables.Where(callable => callable is null ? throw new ArgumentNullException(nameof(callable)) :
+                !callers.Contains(callable.CallableId))],
+            Claims = claims
+        };
+        WorkerProtocolJson.SealManifest(result);
+        return result;
+    }
+
     // A callable's rows are checked only where its own body can be trusted to
     // carry them all.
     private static bool IsVerified(LoweredCallable callable)

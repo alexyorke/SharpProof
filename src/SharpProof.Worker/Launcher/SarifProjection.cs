@@ -34,6 +34,7 @@ internal static class SarifProjection
         var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
             static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId,
             static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable, StringComparer.Ordinal);
+        var timingOnly = WorkerCallPreconditionCoverage.TimingOnlyCallables(response);
         var resultBuilder = ImmutableArray.CreateBuilder<object>();
         resultBuilder.AddRange(claimResults
             .Select(result => ClaimResult(
@@ -41,7 +42,8 @@ internal static class SarifProjection
         resultBuilder.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete))
             .Select(result => IncompleteResult(
-                request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
+                request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory,
+                timingOnly.Contains(result.CallableId))));
         resultBuilder.AddRange(callableResults
             .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(IsPolicyAssumption)))
             .Select(result => AssumptionResult(
@@ -86,7 +88,7 @@ internal static class SarifProjection
             invocations = ImmutableArray.Create(new
             {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
-                properties = new { RunStatus = runStatus, FailureReason = failureReason, manifest.UncheckedCallSites },
+                properties = new { RunStatus = runStatus, FailureReason = failureReason, UncheckedCallSites = WorkerCallPreconditionCoverage.UncheckedCallSites(response) },
                 toolExecutionNotifications = notificationBuilder.ToImmutable()
             }),
             results,
@@ -192,7 +194,8 @@ internal static class SarifProjection
         }
         if (result.ResourceBound is { ExecutionScope: WorkerResourceModels.TaskJoinScope or WorkerResourceModels.TaskSourceAllocationScope or WorkerResourceModels.TaskStorageScope or WorkerResourceModels.TaskRuntimeScope } scoped)
         { resource += " [scope: " + scoped.ExecutionScope + "]"; }
-        var presentation = PresentOutcome(outcome, result.Vacuity, request.VerifyPolicy);
+        var presentation = PresentOutcome(outcome, result.Vacuity, WorkerCallPreconditionCoverage.IsTimingOnly(claim, result)
+            ? LauncherPresentation.TimingOnlyPolicy(request.VerifyPolicy) : request.VerifyPolicy);
         return Result(
             "SharpProof." + outcome,
             presentation.Kind,
@@ -213,7 +216,7 @@ internal static class SarifProjection
 
     private static object IncompleteResult(
         WorkerVerifyRequest request, WorkerCallableResult result,
-        WorkerCallableManifestEntry callable, string projectDirectory)
+        WorkerCallableManifestEntry callable, string projectDirectory, bool timedOutCalls)
     {
         System.ArgumentNullException.ThrowIfNull(callable);
         System.ArgumentNullException.ThrowIfNull(projectDirectory);
@@ -221,13 +224,14 @@ internal static class SarifProjection
         System.ArgumentNullException.ThrowIfNull(result);
         var callableId = result.CallableId;
         var reason = result.Reason;
-        var presentation = UnknownPresentation(request.VerifyPolicy);
+        var presentation = UnknownPresentation(timedOutCalls ? LauncherPresentation.TimingOnlyPolicy(request.VerifyPolicy) : request.VerifyPolicy);
         return Result(
             VerifierDiagnosticCodes.IncompleteSelectedCallable,
             presentation.Kind,
             presentation.Level,
             "Selected analysis is incomplete for " + callableId +
-                " (" + reason + "). " + LauncherPresentation.IncompleteGuidance(reason),
+                " (" + reason + "). " + LauncherPresentation.IncompleteGuidance(reason) +
+                (timedOutCalls ? LauncherPresentation.TimingOnlyNote : string.Empty),
             callable.Location, callableId,
             new
             {

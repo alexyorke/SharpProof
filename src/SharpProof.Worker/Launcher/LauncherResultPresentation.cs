@@ -39,7 +39,7 @@ internal static partial class LauncherPresentation
             FormattableString.Invariant($"selected callables={selectedCount}, claims={claimCount}; ") +
             FormattableString.Invariant($"Proven={proven}, Refuted={refuted}, Unknown={unknown}; ") +
             FormattableString.Invariant($"incomplete callables={incomplete}, vacuous claims={vacuous}; ") +
-            FormattableString.Invariant($"unchecked calls to methods with preconditions={response.Manifest.UncheckedCallSites}; ") +
+            FormattableString.Invariant($"unchecked calls to methods with preconditions={SharpProof.Worker.Protocol.WorkerCallPreconditionCoverage.UncheckedCallSites(response)}; ") +
             FormattableString.Invariant($"declared user/trusted assumptions={assumptions.Length}, used={usedCount}; ") +
             FormattableString.Invariant($"elapsed={response.Summary.ElapsedMilliseconds} ms, cache={response.Summary.CacheStatus}.");
     }

@@ -43,19 +43,24 @@ Each clause of a modeled call's `Requires` is one `CallPrecondition` claim owned
 
 A body that declares nothing is selected automatically, with reason `DiscoveredCallPrecondition`, when it makes a modeled call. A project with no `Requires` selects nothing this way. Every other body remains unselected, and the report's "Unselected methods are not proved" applies to it.
 
-Read a pass together with `Manifest.UncheckedCallSites`. The build summary prints it as `unchecked calls to methods with preconditions`, and SARIF records it in the invocation properties. It counts source calls whose callee declares a precondition the compiler can see and that no claim checks, including calls in dead code. It cannot count a `Contract.Requires` in a referenced assembly, because the compiler removes that clause from the binary. [Semantics](../SEMANTICS.md#calls-and-loops) lists what stays unchecked.
+Read a pass together with the count of unchecked calls. The build summary prints it as `unchecked calls to methods with preconditions`, the tool report prints it, and SARIF records it as `uncheckedCallSites` in the invocation properties. It counts source calls whose callee declares a precondition the compiler can see and that no claim checks, including calls in dead code. `Manifest.UncheckedCallSites` is the part known at compile time; the reports add calls whose claims ran out of time. It cannot count a `Contract.Requires` in a referenced assembly, because the compiler removes that clause from the binary. [Semantics](../SEMANTICS.md#calls-and-loops) lists what stays unchecked.
 
 | Outcome | Meaning | Build result |
 | --- | --- | --- |
 | `Proven` | The clause holds at every occurrence of the call | None |
 | `Refuted` | A concrete caller input in `Model` reaches the call with the clause false, and replay used no approximated value | `SP0051` at the call under every verifier policy; exit code 5 |
 | `Unknown` | The solver or replay could not decide it, for the typed `Reason` | `SP0047` on the caller and exit code 6 under `require-proven`, a warning under `warn-on-unknown`, information under `advisory` |
+| `Unknown`, `MethodTimeout` or `ProjectTimeout` | The claim ran out of time | A warning under `require-proven` and `warn-on-unknown`, information under `advisory`; no exit code 6. The call counts as unchecked |
+
+A timed-out call claim does not fail `require-proven`, so a strict build cannot pass or fail on machine load alone. The exception covers only these claims and only their caller's gaps: if a declared claim in the same caller is also Unknown, for any reason, the caller still fails.
+
+A body selected only for its calls is left out once the compiler artifact reaches 24 MiB, last callable ID first, and its calls count as unchecked. Declared claims are never left out, so this cap cannot turn a large project's build into an SP0049 failure on its own.
 
 A satisfiable query that does not replay stays Unknown with `CounterexampleNotReplayable`; it never becomes Refuted. SARIF reports both Refuted and Unknown call-precondition claims at the call.
 
 A caller that forwards its input without restating the clause is refuted, because the input it accepts can violate the callee's `Requires`: `int Root(int value) => Positive(value);` fails with `value = 0`. This holds for private helpers too, since each body is checked alone. Add the clause to the caller or guard the call. An argument the solver cannot bound stays Unknown, and `Assume` does not help under the strict assumption policy, so guard the call or relax `SharpProofVerifyPolicy`.
 
-See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallPreconditionClaims.cs).
+See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs), [limit tests](../src/SharpProof.Worker.Tests/CallPreconditionLimitTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallPreconditionClaims.cs).
 
 ## Proofs, models, and replay
 

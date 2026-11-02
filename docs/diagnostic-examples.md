@@ -79,7 +79,7 @@ A `[DoesNotThrow]` or `[AllowedExceptions]` contract could not be established. A
 
 ## SP0047
 
-A selected callable is outside the portable analyzer's admitted subset or analysis is incomplete. Unannotated unsupported methods can remain quiet; silence must not be counted as proof. Worker callable coverage is a separate accountability record.
+A selected callable is outside the portable analyzer's admitted subset or analysis is incomplete. Unannotated unsupported methods can remain quiet; silence must not be counted as proof. Worker callable coverage is a separate accountability record. When a callable's only gaps are call-precondition claims that ran out of time, SP0047 is a warning even under `require-proven`, and those calls count as unchecked.
 
 ## SP0049
 

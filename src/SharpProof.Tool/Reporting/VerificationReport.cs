@@ -41,7 +41,7 @@ internal static class VerificationReport
         {
             global::SharpProof.Internal.InputValidation.Require(assumption, nameof(assumption));
             return (assumption.Kind, assumption.Id);
-        }).Distinct().Count(), response.RunStatus, response.Summary.CacheStatus, response.Summary.ElapsedMilliseconds, response.FailureReason, response.Manifest.UncheckedCallSites);
+        }).Distinct().Count(), response.RunStatus, response.Summary.CacheStatus, response.Summary.ElapsedMilliseconds, response.FailureReason, WorkerCallPreconditionCoverage.UncheckedCallSites(response));
     }
 
     internal static void Write(TextWriter writer, WorkerVerifyResponse response, string? claimId = null)

@@ -76,6 +76,19 @@ internal static partial class LauncherPresentation
         };
     }
 
+    // A callable whose only gaps are timed-out call-precondition claims reports
+    // as warn-on-unknown would, so require-proven does not fail on machine load.
+    internal static SharpProof.Worker.Protocol.WorkerVerifyPolicy TimingOnlyPolicy(
+        SharpProof.Worker.Protocol.WorkerVerifyPolicy policy
+    )
+    {
+        return policy == SharpProof.Worker.Protocol.WorkerVerifyPolicy.RequireProven
+            ? SharpProof.Worker.Protocol.WorkerVerifyPolicy.WarnOnUnknown : policy;
+    }
+
+    internal const string TimingOnlyNote =
+        " Only call-precondition claims ran out of time here, and those do not fail require-proven; their calls count as unchecked.";
+
     internal static SharpProof.Worker.Protocol.WorkerVerifyPolicy ParseVerifyPolicy(
         string value
     )
