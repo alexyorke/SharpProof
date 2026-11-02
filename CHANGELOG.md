@@ -4,6 +4,19 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ## Unreleased
 
+### Packaging
+
+- Keep strict verification with the project that references SharpProof. The
+  package's MSBuild files now ship in `build/`, passed to the direct consumer by
+  `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of
+  `buildTransitive/`. A project that references a verified library, or a package
+  that depends on SharpProof, gets the contract API but no longer inherits strict
+  verification, the worker run or the SDK 10 requirement.
+- Smoke-test the packed packages on Windows and macOS in the release workflow, and
+  attest package provenance before publishing.
+- Move to SDK 10.0.403 (.NET 10.0.14, a security release) and re-audit the
+  pinned CoreLib facts; patch `libbrotli1` in the tooling image.
+
 ### Verification
 
 - Route `new string(char, int)` faults through surrounding handlers and model its

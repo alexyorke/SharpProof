@@ -37,7 +37,7 @@ budgets, fuzz campaign limits, and independently frozen worker/cache expectation
 interprets automation settings. Its named missing-contract timeout fallback is
 retained for minimal changed-test fixtures.
 
-[Verifier defaults](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props)
+[Verifier defaults](../src/SharpProof.Verifier/build/SharpProof.Verifier.defaults.props)
 are the conditional MSBuild representation of worker defaults. The
 [MSBuild integration tests](../src/SharpProof.Package.IntegrationTests/WorkerMsBuildIntegrationTests.cs)
 evaluate those defaults and compare them with runtime constants. Keep both the

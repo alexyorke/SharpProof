@@ -37,7 +37,7 @@ public static class Counter
 }
 ```
 
-The default is full verification with `strict`, `require-proven`, and assumption policy `error`. The build automatically selects the packaged worker and architecture-matched solver. Keep the single standard reference without `PrivateAssets="all"` so the contract API's application/runtime dependency can propagate when your project is consumed or packed.
+The default is full verification with `strict`, `require-proven`, and assumption policy `error`. The build automatically selects the packaged worker and architecture-matched solver. Keep the single standard reference without `PrivateAssets="all"` so the contract API's application/runtime dependency can propagate when your project is consumed or packed. Only that propagates: a project that reaches SharpProof through another project or package gets the contract API, not verification, analyzers or the SDK 10 requirement. Reference SharpProof directly in each project you want verified.
 
 ## Your first proof
 

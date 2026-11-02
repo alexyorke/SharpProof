@@ -779,14 +779,14 @@ public sealed class PackageLayoutSmokeTests
         var packageRoot = Directory.CreateDirectory(
             Path.Combine(root, "package;layout"));
         var packageBuild = Directory.CreateDirectory(
-            Path.Combine(packageRoot.FullName, "buildTransitive"));
+            Path.Combine(packageRoot.FullName, "build"));
         foreach (var fileName in ImmutableArray.Create("SharpProof.ConsumerContract.props", "SharpProof.props", "SharpProof.targets"))
         {
             File.Copy(
                 Path.Combine(
                     repository,
                     "src/SharpProof.Package",
-                    "buildTransitive",
+                    "build",
                     fileName),
                 Path.Combine(packageBuild.FullName, fileName));
         }
@@ -839,12 +839,12 @@ public sealed class PackageLayoutSmokeTests
         var sourcePackageBuild = Directory.CreateDirectory(Path.Combine(
             sourceRoot.FullName,
             "src/SharpProof.Package",
-            "buildTransitive"));
+            "build"));
         File.Copy(
             Path.Combine(
                 repository,
                 "src/SharpProof.Package",
-                "buildTransitive",
+                "build",
                 "SharpProof.ConsumerContract.props"),
             Path.Combine(
                 sourcePackageBuild.FullName,
@@ -1280,7 +1280,7 @@ public sealed class PackageLayoutSmokeTests
         var feed = await PackagedProductFeed.GetAsync();
         using var archive = await ZipFile.OpenReadAsync(
             feed.GetPackagePath(PackagedProductFeed.VerifierPackageId), TestContext.CurrentContext.CancellationToken);
-        var targets = XDocument.Parse(ReadArchiveText(archive, "buildTransitive/SharpProof.Verifier.targets"));
+        var targets = XDocument.Parse(ReadArchiveText(archive, "build/SharpProof.Verifier.targets"));
         var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
         var registrations = root.Elements("UsingTask").ToImmutableArray();
         Assert.That(registrations, Has.Length.EqualTo(8));
@@ -2009,15 +2009,20 @@ public sealed class PackageLayoutSmokeTests
                     Version: dependency.Attribute("version")?.Value))),
                 Is.EqualTo(expectedDependencies[package.Id]),
                 package.Id);
+            // The main package hands the verifier's build files to its direct
+            // consumer only: include="All" widens that one edge, and no
+            // dependency filters assets.
+            var main = package.Id == PackagedProductFeed.MainPackageId;
             foreach (var dependency in dependencies)
             {
                 Assert.That(
                     dependency.Attributes()
                         .Select(static attribute =>
                             attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Name.LocalName)),
-                    Is.EquivalentTo(ExpectedDependencyAttributes),
+                    Is.EquivalentTo(main ? [.. ExpectedDependencyAttributes, "include"] : ExpectedDependencyAttributes),
                     package.Id +
                     " dependency metadata must not filter assets.");
+                Assert.That(dependency.Attribute("include")?.Value, Is.EqualTo(main ? "All" : null), package.Id);
             }
         }
     }
@@ -2065,12 +2070,12 @@ public sealed class PackageLayoutSmokeTests
             [
                 "_rels/.rels",
                 "[Content_Types].xml",
-                "buildTransitive/SharpProof.ConsumerContract.props",
-                "buildTransitive/SharpProof.props",
-                "buildTransitive/SharpProof.targets",
-                "buildTransitive/SharpProof.Verifier.props",
-                "buildTransitive/SharpProof.Verifier.defaults.props",
-                "buildTransitive/SharpProof.Verifier.targets",
+                "build/SharpProof.ConsumerContract.props",
+                "build/SharpProof.props",
+                "build/SharpProof.targets",
+                "build/SharpProof.Verifier.props",
+                "build/SharpProof.Verifier.defaults.props",
+                "build/SharpProof.Verifier.targets",
                 "LICENSE",
                 "icon.png",
                 "package/services/metadata/core-properties/" +
@@ -2371,17 +2376,17 @@ public sealed class PackageLayoutSmokeTests
 
         Assert.That(
             entries,
-            Does.Contain("buildTransitive/SharpProof.ConsumerContract.props"));
+            Does.Contain("build/SharpProof.ConsumerContract.props"));
         Assert.That(
             entries,
-            Does.Contain("buildTransitive/SharpProof.props"));
+            Does.Contain("build/SharpProof.props"));
         Assert.That(
             entries,
-            Does.Contain("buildTransitive/SharpProof.targets"));
+            Does.Contain("build/SharpProof.targets"));
         Assert.That(
             ReadArchiveText(
                 archive,
-                "buildTransitive/SharpProof.props"),
+                "build/SharpProof.props"),
             Does.Contain(
                     "$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs")
                 .And.Contain(
@@ -2392,7 +2397,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             ReadArchiveText(
                 archive,
-                "buildTransitive/SharpProof.targets"),
+                "build/SharpProof.targets"),
             Does.Not.Contain("*.dll")
                 .And.Contain(
                     "<SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>")
@@ -2439,11 +2444,11 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             entries,
             Does.Contain(
-                "buildTransitive/SharpProof.Verifier.defaults.props"));
+                "build/SharpProof.Verifier.defaults.props"));
         Assert.That(
             ReadArchiveText(
                 archive,
-                "buildTransitive/SharpProof.Verifier.defaults.props"),
+                "build/SharpProof.Verifier.defaults.props"),
             Does.Contain(
                 "<SharpProofVerifyQueryRlimit")
                 .And.Contain(
@@ -2451,7 +2456,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             ReadArchiveText(
                 archive,
-                "buildTransitive/SharpProof.Verifier.props"),
+                "build/SharpProof.Verifier.props"),
             Does.Contain(
                 "$(MSBuildThisFileDirectory)SharpProof.Verifier.defaults.props"));
         using var dependencies = JsonDocument.Parse(

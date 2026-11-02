@@ -10,7 +10,7 @@ Finite repository tooling tasks use disposable private source copies. Retain exp
 
 The three JSON files form one evidence set. The request binds the compiler artifact path and hash; the response binds the request and input identities and embeds its selected manifest. A result copied from another compilation, worker, or budget is insufficient. Stable output is published after invocation validation; an old file's existence does not establish that the latest build succeeded.
 
-Source: [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), [publication](../src/SharpProof.BuildTasks/VerificationPublication.cs), and [published-result validation](../src/SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs). Regression evidence includes [actual result-file admission](../src/SharpProof.Worker.Tests/ActualLauncherResultFileAdmissionTests.cs) and [compiler capture/cache workflows](../src/SharpProof.Worker.Tests/Pr275ActualCompilerCaptureCacheTests.cs).
+Source: [verifier targets](../src/SharpProof.Verifier/build/SharpProof.Verifier.targets), [publication](../src/SharpProof.BuildTasks/VerificationPublication.cs), and [published-result validation](../src/SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs). Regression evidence includes [actual result-file admission](../src/SharpProof.Worker.Tests/ActualLauncherResultFileAdmissionTests.cs) and [compiler capture/cache workflows](../src/SharpProof.Worker.Tests/Pr275ActualCompilerCaptureCacheTests.cs).
 
 ## Read results in this order
 
