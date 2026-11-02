@@ -26,6 +26,10 @@ Entries describe repository changes, not package publication. Confirm available 
   `List<T>` and `List<int>` can no longer be assumed independent.
 - Stop an open generic thrown or caught type from excluding a `catch` handler, so a
   handler that runs for some instantiation is no longer treated as unreachable.
+- Match `catch` handlers by runtime type, so tuple element names no longer make
+  `E<(int a, int b)>` and `E<(int, int)>` look unrelated.
+- State the assumption that the ambient culture has no user-defined callbacks when
+  the CLR raises an index or division fault.
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
 
