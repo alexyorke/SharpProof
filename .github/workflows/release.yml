@@ -21,6 +21,7 @@ jobs:
   package:
     name: Pack and test packages
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,11 +50,60 @@ jobs:
             artifacts/tool-packages/*.nupkg
           if-no-files-found: error
 
-  publish:
-    name: Publish to nuget.org and GitHub
+  # Every other job runs on Linux; these load the Windows and macOS payloads.
+  native-smoke:
+    name: Native smoke (${{ matrix.os }})
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
+          path: nupkgs
+
+      - name: Prove and refute one contract with the packed packages
+        shell: pwsh
+        run: ./eng/scripts/Test-SharpProofNativeSmoke.ps1 -PackageSource nupkgs/container-packages
+
+  attest:
+    name: Attest package provenance
     needs: package
     if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
+          path: nupkgs
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: nupkgs/**/*.nupkg
+
+  publish:
+    name: Publish to nuget.org and GitHub
+    needs: [package, native-smoke, attest]
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: nuget.org
     permissions:
       contents: write
