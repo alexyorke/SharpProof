@@ -15,7 +15,7 @@ COPY eng/lint/package*.json /opt/sharpproof/lint/
 RUN export HOME=/tmp/lint-home DOTNET_CLI_HOME=/tmp/lint-dotnet NUGET_PACKAGES=/tmp/lint-nuget \
     && node /usr/local/lib/node_modules/npm/bin/npm-cli.js ci --prefix /opt/sharpproof/lint --ignore-scripts --no-audit --no-fund \
     && pwsh -NoLogo -NoProfile -Command 'Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Path /opt/sharpproof/modules -Repository PSGallery -Force' \
-    && dotnet tool install Microsoft.DotNet.ApiCompat.Tool --version 10.0.402 --tool-path /opt/sharpproof/tools
+    && dotnet tool install Microsoft.DotNet.ApiCompat.Tool --version 10.0.403 --tool-path /opt/sharpproof/tools
 ENV PATH="/opt/sharpproof/lint/node_modules/.bin:/opt/sharpproof/tools:${PATH}" \
     PSModulePath="/opt/sharpproof/modules:/opt/microsoft/powershell/7/Modules"
 USER sharpproof

@@ -45,7 +45,7 @@ Effect contracts separate read/write regions, allocations, exceptions, capabilit
 ## API specifications
 
 CI resolves the default catalog and audited intrinsics against the pinned
-.NET 10 framework surface (`Microsoft.NETCore.App.Ref` 10.0.13, `net10.0`)
+.NET 10 framework surface (`Microsoft.NETCore.App.Ref` 10.0.14, `net10.0`)
 and requires executed runtime evidence for every modeled facet.
 This is separate from executable line coverage and does not imply full API semantics.
 The same gate publishes an API/facet-to-test matrix and requires executed behavioral
