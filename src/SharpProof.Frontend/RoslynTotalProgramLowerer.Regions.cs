@@ -469,12 +469,16 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             var thrown = explicitThrow.Type;
             var caught = handler.ExceptionType;
-            if (caught == null || caught.SpecialType == SpecialType.System_Object || CSharpOperationSemantics.DerivesFrom(thrown, caught))
+            if (caught == null || caught.SpecialType == SpecialType.System_Object)
             { return true; }
-            if (!CompilerIdentityBridge.IsClosedReferenceType(thrown, _cancellationToken) ||
+            // Runtime identity: E<(int a, int b)> is E<(int, int)> on the CLR.
+            var derives = CompilerIdentityBridge.DerivesAtRuntime(thrown, caught);
+            if (derives == true)
+            { return true; }
+            if (derives == null || !CompilerIdentityBridge.IsClosedReferenceType(thrown, _cancellationToken) ||
                 !CompilerIdentityBridge.IsClosedReferenceType(caught, _cancellationToken))
             { return null; }
-            if (!explicitThrow.Exact && CSharpOperationSemantics.DerivesFrom(caught, thrown))
+            if (!explicitThrow.Exact && CompilerIdentityBridge.DerivesAtRuntime(caught, thrown) != false)
             { return null; }
             return false;
         }

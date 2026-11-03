@@ -2474,11 +2474,11 @@ public sealed class PackageLayoutSmokeTests
     [TestCase("Microsoft.CodeAnalysis/4.14.0", true)]
     [TestCase("Microsoft.CodeAnalysis.Common/4.14.0", true)]
     [TestCase("Microsoft.CodeAnalysis.CSharp/4.14.0", true)]
-    [TestCase("SharpProof.Attributes/1.0.0-preview.1", true)]
-    [TestCase("SharpProof.Compiler.Semantics/1.0.0-preview.1", true)]
-    [TestCase("SharpProof.Frontend/1.0.0-preview.1", true)]
+    [TestCase("SharpProof.Attributes/1.0.0-preview.2", true)]
+    [TestCase("SharpProof.Compiler.Semantics/1.0.0-preview.2", true)]
+    [TestCase("SharpProof.Frontend/1.0.0-preview.2", true)]
     [TestCase("Microsoft.Z3/4.12.2", false)]
-    [TestCase("SharpProof.CompilerArtifact/1.0.0-preview.1", false)]
+    [TestCase("SharpProof.CompilerArtifact/1.0.0-preview.2", false)]
     public void WorkerDependencyGuardChecksVersionedLibraryAndTargetKeys(string dependency, bool forbidden)
     {
         ArgumentNullException.ThrowIfNull(dependency);

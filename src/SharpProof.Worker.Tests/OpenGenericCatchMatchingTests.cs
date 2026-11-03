@@ -52,7 +52,14 @@ public sealed class OpenGenericCatchMatchingTests
         Case("open-handler-in-callee-frame", Subject("public static int Target(E<int> e, int x) { " + Postcondition + "if (x > 0) return 0; return Helper<int>(e); } " +
             "static int Helper<T>(E<int> e) { try { throw e; } catch (E<T>) { return 1; } }" + Run("Target(new E<int>(), 0)"))),
         Case("open-handler-in-caller-frame", Subject("public static int Target<T>(E<int> e, int x) { " + Postcondition + "if (x > 0) return 0; " +
-            "try { Helper(e); return 0; } catch (E<T>) { return 1; } } static void Helper(E<int> e) { throw e; }" + Run("Target<int>(new E<int>(), 0)")))
+            "try { Helper(e); return 0; } catch (E<T>) { return 1; } } static void Helper(E<int> e) { throw e; }" + Run("Target<int>(new E<int>(), 0)"))),
+        // The CLR erases tuple element names, dynamic and native-integer
+        // spellings, so these closed types are one runtime type.
+        Case("tuple-names-on-thrown", Claim("Target(E<(int a, int b)> e, int x)", "try { throw e; } catch (E<(int, int)>) { return 1; }", "Target(new E<(int a, int b)>(), 0)")),
+        Case("tuple-names-on-handler", Claim("Target(E<(int, int)> e, int x)", "try { throw e; } catch (E<(int a, int b)>) { return 1; }", "Target(new E<(int, int)>(), 0)")),
+        Case("nested-tuple-names", Claim("Target(E<E<(int a, int b)>> e, int x)", "try { throw e; } catch (E<E<(int, int)>>) { return 1; }", "Target(new E<E<(int a, int b)>>(), 0)")),
+        Case("dynamic-and-object", Claim("Target(E<dynamic> e, int x)", "try { throw e; } catch (E<object>) { return 1; }", "Target(new E<object>(), 0)")),
+        Case("nint-and-intptr", Claim("Target(E<nint> e, int x)", "try { throw e; } catch (E<System.IntPtr>) { return 1; }", "Target(new E<nint>(), 0)"))
     ];
 
     // TryCatchKinds does not admit a type-parameter handler, so these never
@@ -158,6 +165,7 @@ public sealed class OpenGenericCatchMatchingTests
     [TestCase("Target(Sub e, int x)", "try { throw e; } catch (E<string>) { return 1; }", "Target(new Sub(), 0)")]
     [TestCase("Target(Outer<string>.N e, int x)", "try { throw e; } catch (Outer<int>.N) { return 1; }", "Target(new Outer<string>.N(), 0)")]
     [TestCase("Target(X e, int x)", "try { throw e; } catch (E<int>) { return 1; }", "Target(new X(), 0)")]
+    [TestCase("Target(E<(int a, string b)> e, int x)", "try { throw e; } catch (E<(int, int)>) { return 1; }", "Target(new E<(int a, string b)>(), 0)")]
     [TestCase("Target(int x)", "try { throw new System.Exception(); } catch (E<int>) { return 1; }", "Target(0)")]
     [TestCase("Target(int x)", "try { throw new System.Exception(); } catch (System.ArgumentException) { return 1; }", "Target(0)")]
     public async Task ClosedUnrelatedHandlerStaysExcluded(string signature, string body, string call)

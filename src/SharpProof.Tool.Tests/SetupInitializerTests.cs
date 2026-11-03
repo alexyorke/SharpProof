@@ -42,14 +42,11 @@ public sealed class SetupInitializerTests
         Assert.That(config.Descendants("add").Any(static element =>
         {
             ArgumentNullException.ThrowIfNull(element);
-            return (string?)element.Attribute("key") == "SharpProofPreview" &&
-                (string?)element.Attribute("value") == "https://nuget.pkg.github.com/alexyorke/index.json";
+            return (string?)element.Attribute("key") == "nuget.org" &&
+                (string?)element.Attribute("value") == "https://api.nuget.org/v3/index.json";
         }), Is.True);
-        Assert.That(config.Descendants("package").Any(static element =>
-        {
-            ArgumentNullException.ThrowIfNull(element);
-            return (string?)element.Attribute("pattern") == "SharpProof*";
-        }), Is.True);
+        // No mapping was in effect, so NuGet already searches nuget.org for SharpProof.
+        Assert.That(config.Descendants("packageSourceMapping"), Is.Empty);
         Assert.That(config.Descendants("packageSourceCredentials"), Is.Empty);
         using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(fixture.Root, ".config", "dotnet-tools.json"), TestContext.CurrentContext.CancellationToken));
         var tool = manifest.RootElement.GetProperty("tools").GetProperty("sharpproof.tool");
@@ -145,7 +142,7 @@ public sealed class SetupInitializerTests
         switch (kind)
         {
             case "feed":
-                await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"SharpProofPreview\" value=\"https://other.example.test/feed\" /></packageSources></configuration>");
+                await fixture.WriteAsync("NuGet.Config", "<configuration><packageSources><add key=\"nuget.org\" value=\"https://other.example.test/feed\" /></packageSources></configuration>");
                 break;
             case "mapping":
                 await fixture.WriteAsync("NuGet.Config", "<configuration><packageSourceMapping><packageSource key=\"Other\"><package pattern=\"SharpProof*\" /></packageSource></packageSourceMapping></configuration>");
@@ -154,7 +151,7 @@ public sealed class SetupInitializerTests
                 await fixture.WriteAsync(".config/dotnet-tools.json", "{\"version\":1,\"isRoot\":true,\"tools\":{\"sharpproof.tool\":{\"version\":\"0.1.0\",\"commands\":[\"dotnet-sharpproof\"]}}}");
                 break;
             case "credentials":
-                await fixture.WriteAsync("NuGet.Config", "<configuration><packageSourceCredentials><SharpProofPreview /></packageSourceCredentials></configuration>");
+                await fixture.WriteAsync("NuGet.Config", "<configuration><packageSourceCredentials><nuget.org /></packageSourceCredentials></configuration>");
                 break;
             default:
                 throw new AssertionException("Unknown fixture.");

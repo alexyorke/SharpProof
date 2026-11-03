@@ -17,7 +17,7 @@ Targeting an older application framework does not require running the verifier o
 
    ```xml
    <ItemGroup>
-     <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+     <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
    </ItemGroup>
    ```
 
@@ -72,7 +72,7 @@ For deliberate analysis without native proofs, opt out explicitly on the same si
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
 </ItemGroup>
 <PropertyGroup>
   <SharpProofProfile>advisory</SharpProofProfile>

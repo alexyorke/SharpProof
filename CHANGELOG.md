@@ -6,6 +6,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Restore SharpProof from nuget.org. Templates, `init` and the consumer workflow no
+  longer need the private GitHub feed or its credentials; the workflow still accepts
+  that feed with `package-read-token`. The package version moves to
+  `1.0.0-preview.2`, the first public version.
 - Keep strict verification with the project that references SharpProof. The
   package's MSBuild files now ship in `build/`, passed to the direct consumer by
   `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of
@@ -26,6 +30,10 @@ Entries describe repository changes, not package publication. Confirm available 
   `List<T>` and `List<int>` can no longer be assumed independent.
 - Stop an open generic thrown or caught type from excluding a `catch` handler, so a
   handler that runs for some instantiation is no longer treated as unreachable.
+- Match `catch` handlers by runtime type, so tuple element names no longer make
+  `E<(int a, int b)>` and `E<(int, int)>` look unrelated.
+- State the assumption that the ambient culture has no user-defined callbacks when
+  the CLR raises an index or division fault.
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
 - Check `Requires` at modeled calls in the strict worker path, as `SEMANTICS.md` promised.

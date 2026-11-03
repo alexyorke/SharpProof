@@ -55,7 +55,7 @@ internal sealed class SetupInitializerXmlIdempotenceTests
         var bytes = await File.ReadAllBytesAsync(configPath, TestContext.CurrentContext.CancellationToken);
         Assert.That(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble), Is.EqualTo(bom));
         Assert.That(config.Replace("\r\n", "\n", StringComparison.Ordinal),
-            Does.Contain("<packageSource key=\"nuget.org\"><package pattern=\"*\" /></packageSource>"));
+            Does.Contain("<packageSource key=\"nuget.org\"><package pattern=\"*\" /><package pattern=\"SharpProof*\" /></packageSource>"));
         Assert.That(Directory.GetFiles(fixture.Root, ".sharpproof-init-*", SearchOption.AllDirectories), Is.Empty);
         Assert.That(Directory.Exists(Path.Combine(fixture.Root, "obj")), Is.False);
         Assert.That(Directory.Exists(Path.Combine(fixture.Root, "bin")), Is.False);
