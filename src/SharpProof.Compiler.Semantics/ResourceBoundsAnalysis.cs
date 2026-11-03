@@ -131,6 +131,12 @@ internal sealed partial class ResourceBoundsAnalysis
         {
             return new(null, "MissingBody");
         }
+        // The body alone does not show what its type's initializer costs when
+        // a call runs it. Source callees apply the same rule.
+        if (!method.ContainingType.StaticConstructors.IsEmpty)
+        {
+            return new(null, "EntryTypeInitializationUnknown");
+        }
         return AnalyzeInputModel(method, body, cancellation);
     }
 
@@ -225,7 +231,7 @@ internal sealed partial class ResourceBoundsAnalysis
                     var constant = IntegerConstant(progressInitializer.Value);
                     if (constant is { } exact)
                     { _localInitialConstants[variable.Symbol] = exact; }
-                    var progress = constant is { } integer ? Bound.Number(BigInteger.Max(0, integer)) : Size(progressInitializer.Value);
+                    var progress = constant is { } integer ? Bound.Number(BigInteger.Max(0, integer)) : Size(progressInitializer.Value, charged: true);
                     if (progress is not null)
                     { _localProgress[variable.Symbol] = progress; }
                 }
@@ -386,7 +392,10 @@ internal sealed partial class ResourceBoundsAnalysis
         return property.Instance?.Type?.SpecialType == SpecialType.System_String && CSharpOperationSemantics.IsLength(property);
     }
 
-    private Bound? Size(IOperation operation)
+    // Reading a size charges nothing, and loop headers and array dimensions are
+    // never visited, so an operand may allocate only if the caller has already
+    // charged its evaluation.
+    private Bound? Size(IOperation operation, bool charged = false)
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
         return operation switch
@@ -403,12 +412,12 @@ internal sealed partial class ResourceBoundsAnalysis
                 Bound.Parameter(parameter.Parameter, ResourceInputKind.NonNegativeScalar),
             IParameterReferenceOperation parameter when parameter.Parameter.Type.SpecialType == SpecialType.System_Int64 =>
                 Bound.Parameter(parameter.Parameter, ResourceInputKind.NonNegativeScalar),
-            IPropertyReferenceOperation property when IsArrayLength(property) => ArraySize(property.Instance!),
-            IPropertyReferenceOperation property when IsStringLength(property) => StringSize(property.Instance!),
+            IPropertyReferenceOperation property when IsArrayLength(property) => ArraySize(property.Instance!, charged),
+            IPropertyReferenceOperation property when IsStringLength(property) => StringSize(property.Instance!, charged),
             ILocalReferenceOperation local when _counters.TryGetValue(local.Local, out var bound) => bound,
             IConversionOperation conversion when conversion.Conversion.IsNumeric && !conversion.Conversion.IsUserDefined &&
                 conversion.Type?.SpecialType == SpecialType.System_Int64 &&
-                conversion.Operand.Type?.SpecialType == SpecialType.System_Int32 => Size(conversion.Operand),
+                conversion.Operand.Type?.SpecialType == SpecialType.System_Int32 => Size(conversion.Operand, charged),
             _ => null
         };
     }

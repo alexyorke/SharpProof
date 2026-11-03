@@ -60,6 +60,22 @@ internal static class CompilerIdentityBridge
         return factory.InternExternalIdentity<ITypeSymbol>(type, RuntimeTypeComparer.Instance);
     }
 
+    // Whether type is ancestor, or derives from it, as runtime types: tuple
+    // element names and dynamic erase. Null when a comparison hit its limit.
+    internal static bool? DerivesAtRuntime(ITypeSymbol? type, ITypeSymbol? ancestor)
+    {
+        if (ancestor == null)
+        { return false; }
+        var incomplete = false;
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            if (RuntimeTypeComparer.Compare(current, ancestor, out var limited))
+            { return true; }
+            incomplete |= limited;
+        }
+        return incomplete ? null : false;
+    }
+
     internal static bool SameRuntimeType(ITypeSymbol left, ITypeSymbol right)
     {
         left = ArgumentNullGuard.NotNull(left, nameof(left));

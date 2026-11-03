@@ -53,7 +53,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly ImmutableArray<Exit>.Builder _returns = ImmutableArray.CreateBuilder<Exit>();
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)>.Builder _exceptions = ImmutableArray.CreateBuilder<(IrTerm Reach, IrTerm Kind)>();
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _allocations = ImmutableArray.CreateBuilder<(IrTerm Reach, OperationId Site)>();
-    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)>.Builder _writes = ImmutableArray.CreateBuilder<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)>();
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region, bool Receiver, int FactCount)>.Builder _writes = ImmutableArray.CreateBuilder<(IrTerm Reach, OperationId Site, IrWriteRegion Region, bool Receiver, int FactCount)>();
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)>.Builder _locks = ImmutableArray.CreateBuilder<(IrTerm Reach, OperationId Site)>();
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>.Builder _callPreconditions = ImmutableArray.CreateBuilder<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)>();
     private readonly ImmutableDictionary<IrInstructionId, int> _callMarkers;
@@ -104,7 +104,7 @@ internal sealed class PassiveCallableVcBuilder
     private readonly ImmutableArray<OperationId>.Builder _explicitSites = ImmutableArray.CreateBuilder<OperationId>();
     internal ImmutableArray<OperationId> ExplicitSites => _explicitSites.ToImmutable();
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Allocations => _allocations.ToImmutable();
-    internal ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> Writes => _writes.ToImmutable();
+    internal ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region, bool Receiver, int FactCount)> Writes => _writes.ToImmutable();
     internal ImmutableArray<(IrTerm Reach, OperationId Site)> Locks => _locks.ToImmutable();
     internal ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> CallPreconditions =>
         _callPreconditions.ToImmutable();
@@ -123,7 +123,7 @@ internal sealed class PassiveCallableVcBuilder
         _candidate = candidate;
         _factory = candidate.Factory;
         _program = encoding?.Program ?? candidate.Program;
-        _sequenceReaders = IrSequenceReads.Readers(_program);
+        _sequenceReaders = IrSequenceReads.Readers(_program, cancellationToken);
         _stops = encoding?.Stops ?? [];
         var originalMarkers = candidate.CallPreconditions.Select((clause, ordinal) => ((clause.Value is null || clause.Safe is null || clause.Marker.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : ((clause.Marker, Ordinal: ordinal))))
             .ToImmutableDictionary(row => row.Marker, row => row.Ordinal);
@@ -440,7 +440,7 @@ internal sealed class PassiveCallableVcBuilder
                         { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false, blockId, null)) }; }
                         if (!IrWriteSites.IsLoopCell(_factory, write))
                         {
-                            _writes.Add((reach, write.Id,
+                            _writes.Add((reach, write.Operation,
                                 IrWriteSites.IsObservable(_factory, write) ? write.Region : IrWriteRegion.Local,
                                 receiverWrite, _facts.Count));
                         }
@@ -785,7 +785,16 @@ internal sealed class PassiveCallableVcBuilder
                     continue;
                 }
                 if (store.Field != field.Member && store.Value != null)
-                { continue; }
+                {
+                    if (store.Field is { } other && MayShareCollectionStorage(other, field.Member))
+                    {
+                        if (store.Target.Type != receiver.Type)
+                        { consistent = false; }
+                        else
+                        { read = _factory.Conditional(And(store.Reach, Equal(receiver, store.Target)), Fresh(original.Type), read); }
+                    }
+                    continue;
+                }
                 var stored = store.Value;
                 if (stored == null)
                 {
@@ -918,6 +927,41 @@ internal sealed class PassiveCallableVcBuilder
     // compound assignment, are approximations at these sites.
     private string Describe(OperationId site)
     { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return _factory.GetOperationInfo(site).Description is { } id ? _factory.GetString(id) : ""; }
+
+    // Collection contents have one member per element type, but List<T> and
+    // List<int> can be one object. Two closed instantiations cannot.
+    private bool MayShareCollectionStorage(IrMemberId first, IrMemberId second)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(first.IsDefault, nameof(first));
+        RepositoryParameterGuard.ThrowIfInvalid(second.IsDefault, nameof(second));
+        var left = _factory.GetMemberInfo(first);
+        var right = _factory.GetMemberInfo(second);
+        return left.Name == right.Name && IrFieldSites.IsCollectionStorage(_factory, first) &&
+            left.ParameterTypes.Length == right.ParameterTypes.Length && MayUnify(left.ReturnType, right.ReturnType) &&
+            left.ParameterTypes.Zip(right.ParameterTypes).All(pair => MayUnify(pair.First, pair.Second));
+    }
+
+    private bool MayUnify(IrTypeId first, IrTypeId second)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(first.IsDefault, nameof(first));
+        RepositoryParameterGuard.ThrowIfInvalid(second.IsDefault, nameof(second));
+        return first == second || !IsClosedElement(first) || !IsClosedElement(second);
+    }
+
+    // A type parameter maps to a reference type with no closed class facts, and
+    // a reference-constrained one can map to object.
+    private bool IsClosedElement(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        var info = _factory.GetTypeInfo(type);
+        return info.Kind switch
+        {
+            IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.String => true,
+            IrTypeKind.Sequence => info.ElementType is { } element && IsClosedElement(element),
+            _ => type != _factory.ObjectType && (_factory.IsClosedSealedReferenceType(type) ||
+                _factory.TryGetClosedClassReferenceBase(type, out _))
+        };
+    }
 
     private bool ReadsState(OperationId site)
     {

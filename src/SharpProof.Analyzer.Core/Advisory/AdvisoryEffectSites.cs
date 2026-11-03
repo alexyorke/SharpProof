@@ -61,7 +61,7 @@ internal static class AdvisoryEffectSites
         var reachable = Reachable(program, [program.Entry]);
         var escapes = Escaping(program);
         var factory = program.Factory;
-        var sequenceReaders = IrSequenceReads.Readers(program);
+        var sequenceReaders = IrSequenceReads.Readers(program, cancellationToken);
         var sites = ImmutableArray.CreateBuilder<AdvisoryEffectSite>();
         foreach (var block in program.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (reachable.Contains(block.Id))))
         {

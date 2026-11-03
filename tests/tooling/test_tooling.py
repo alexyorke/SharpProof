@@ -47,6 +47,7 @@ class ToolingTests(unittest.TestCase):
                         LONGFUZZ_MINUTES="1", LONGFUZZ_SEED_BASE="1")
         self.copy("ci.sh")
         self.write("tests/tooling/run.sh", 'docker mocked-tooling-regressions "$@"\n')
+        self.write("eng/scripts/Test-SharpProofConsumerBaseline.sh", 'docker mocked-consumer-baseline "$@"\n')
         self.command("docker", r'''
             import json, os, pathlib, sys, time
             args = sys.argv[1:]
@@ -131,6 +132,7 @@ class ToolingTests(unittest.TestCase):
         self.assertTrue(any("canonical_tooling=docker-image://example.invalid/custom:tested" in a for a in calls))
         self.assertTrue(any("docker:example.invalid/custom:tested" in a for a in calls))
         self.assertIn(["mocked-tooling-regressions", "-v"], calls)
+        self.assertIn(["mocked-consumer-baseline"], calls)
 
     def test_default_image_and_ordinary_checkout(self):
         self.initialize_git()

@@ -32,7 +32,8 @@ on:
         required: true
         type: string
       package-feed-url:
-        default: https://nuget.pkg.github.com/alexyorke/index.json
+        description: nuget.org, or the private GitHub feed with package-read-token.
+        default: https://api.nuget.org/v3/index.json
         type: string
       mode:
         description: report records regressions; enforce fails on regressions. Evidence errors always fail.
@@ -47,8 +48,8 @@ on:
         description: Explicit read-only read:packages credential for the private preview image.
         required: true
       package-read-token:
-        description: Explicit read-only read:packages credential for the private SharpProofPreview feed.
-        required: true
+        description: Read-only read:packages credential, required only with the private GitHub feed.
+        required: false
     outputs:
       evidence-artifact-id:
         description: Numeric artifact ID for this run's complete evidence.
@@ -210,7 +211,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$COMPARISON_MODE" = report || test "$COMPARISON_MODE" = enforce
-          test "$PACKAGE_FEED_URL" = https://nuget.pkg.github.com/alexyorke/index.json
+          test "$PACKAGE_FEED_URL" = https://api.nuget.org/v3/index.json ||
+            test "$PACKAGE_FEED_URL" = https://nuget.pkg.github.com/alexyorke/index.json
           [[ "$REGISTRY_USERNAME" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]
           extra=()
           if [[ "$INITIALIZE_BASELINE" = true ]]; then extra+=(--initialize); fi
@@ -257,8 +259,11 @@ jobs:
           PACKAGE_READ_TOKEN: ${{ secrets.package-read-token }}
         run: |
           set -euo pipefail
-          test -n "$PACKAGE_READ_TOKEN"
-          export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          # Only the private GitHub feed needs a credential; nuget.org takes none.
+          if [[ "$PACKAGE_FEED_URL" != https://api.nuget.org/v3/index.json ]]; then
+            test -n "$PACKAGE_READ_TOKEN"
+            export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          fi
           docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps \
             -e NuGetPackageSourceCredentials_SharpProofPreview "$VERIFY_SERVICE" tool restore
       - name: Build fresh complete proof evidence
@@ -269,7 +274,9 @@ jobs:
           PACKAGE_READ_TOKEN: ${{ secrets.package-read-token }}
         run: |
           set -euo pipefail
-          export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          if [[ "$PACKAGE_FEED_URL" != https://api.nuget.org/v3/index.json ]]; then
+            export NuGetPackageSourceCredentials_SharpProofPreview="Username=${REGISTRY_USERNAME};Password=${PACKAGE_READ_TOKEN};ValidAuthenticationTypes=Basic"
+          fi
           docker compose -f "$COMPOSE_FILE_PATH" run --rm --no-deps \
             -e NuGetPackageSourceCredentials_SharpProofPreview "$VERIFY_SERVICE" build "$PROJECT" --configuration Release \
             -p:SharpProofVerify=true \

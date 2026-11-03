@@ -22,6 +22,9 @@ Implementation assemblies add no supported application API.
 | `AllowedExceptionsAttribute` | Constructor, method, property | `params Type[] exceptionTypes`; exposes `ExceptionTypes`; repeatable |
 | `EffectContractAttribute` | Constructor, method, property | `SharpProofEffect effects` plus named properties below; repeatable |
 | `ResourceUpperBoundAttribute` | Method | `ResourceMetric metric, long constant, string? sizeParameter = null, long coefficient = 0`; repeatable native cumulative bounds; see [resource bounds](resource-bounds.md#native-resource-contracts) |
+| `ResourceBooleanInputAttribute` | Parameter | `int trueWeight, int falseWeight`; a conditional probability model for a Boolean entry parameter; see [resource bounds](resource-bounds.md) |
+| `ResourceTaskDeploymentAttribute` | Method | `ResourceTaskDeploymentProfile profile, string deploymentManifestSha256, string evidence`; declares the deployment premise for task resource proofs; see [task runtime premises](resource-task-runtime-premises.md) |
+| `ResourceTaskRuntimeUpperBoundAttribute` | Method | `ResourceTaskRuntimeQuantity quantity, long upperBound, string evidence`; repeatable caller-supplied runtime bound for task resource proofs |
 | `SharpProofSuppressAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason`; repeatable |
 | `SharpProofTrustedAttribute` | Assembly, class, struct, interface, constructor, method, property | Nonempty `string reason`; exposes `Reason` |
 

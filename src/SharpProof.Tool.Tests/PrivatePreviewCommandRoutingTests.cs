@@ -150,12 +150,12 @@ public sealed class PrivatePreviewCommandRoutingTests
             static cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return Task.FromResult("10.0.402");
+                return Task.FromResult("10.0.403");
             }, TestContext.CurrentContext.CancellationToken), Is.Zero);
         using var document = JsonDocument.Parse(output.ToString());
         Assert.That(document.RootElement.GetProperty("schema").GetString(), Is.EqualTo("SharpProof.CommandPresentation"));
         Assert.That(document.RootElement.GetProperty("command").GetString(), Is.EqualTo("doctor"));
-        Assert.That(output.ToString(), Does.Contain("10.0.402"));
+        Assert.That(output.ToString(), Does.Contain("10.0.403"));
         Assert.That(error.ToString(), Is.Empty);
     }
 

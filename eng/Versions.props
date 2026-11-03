@@ -4,7 +4,7 @@
     <SharpProofCopyright>Copyright (c) $(SharpProofPublisher)</SharpProofCopyright>
     <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
-    <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
+    <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.2</SharpProofPackageVersion>
     <SharpProofPackageVersion Condition="'$(SHARPPROOF_CI_PACKAGE_VERSION)' != ''">$(SHARPPROOF_CI_PACKAGE_VERSION)</SharpProofPackageVersion>
     <Version>$(SharpProofPackageVersion)</Version>
     <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
@@ -14,7 +14,7 @@
     <!-- Arcade features and repository dependency versions are centralized here. -->
     <VersionPrefix>$(SharpProofVersionPrefix)</VersionPrefix>
     <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
-    <PreReleaseVersionIteration>1</PreReleaseVersionIteration>
+    <PreReleaseVersionIteration>2</PreReleaseVersionIteration>
     <UsingToolXliff>false</UsingToolXliff>
     <UsingToolPdbConverter>false</UsingToolPdbConverter>
     <ExcludeMicrosoftNetTestSdk>true</ExcludeMicrosoftNetTestSdk>
@@ -28,7 +28,7 @@
     <MicrosoftCodeAnalysisPublicApiAnalyzersVersion>5.6.0</MicrosoftCodeAnalysisPublicApiAnalyzersVersion>
     <MicrosoftBuildFrameworkVersion>17.7.2</MicrosoftBuildFrameworkVersion>
     <MicrosoftBuildUtilitiesCoreVersion>17.7.2</MicrosoftBuildUtilitiesCoreVersion>
-    <MicrosoftNETTestSdkVersion>18.8.1</MicrosoftNETTestSdkVersion>
+    <MicrosoftNETTestSdkVersion>18.11.0</MicrosoftNETTestSdkVersion>
     <DotNetCoverageToolVersion>18.8.0</DotNetCoverageToolVersion>
     <MicrosoftNETFrameworkReferenceAssembliesnet472Version>1.0.3</MicrosoftNETFrameworkReferenceAssembliesnet472Version>
     <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>

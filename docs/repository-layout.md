@@ -1,9 +1,18 @@
 # Repository layout
 
 SharpProof adopts the [Arcade SDK repository requirements](https://github.com/dotnet/arcade/blob/ca4c91e56da9ae88fc62578058d8aee531679dba/Documentation/ArcadeSdk.md).
-`global.json` pins .NET SDK `10.0.402` and Arcade `9.0.0-beta.26507.8`, the
+`global.json` pins .NET SDK `10.0.403` and Arcade `9.0.0-beta.26507.8`, the
 Arcade version used by Microsoft's .NET 9 release branch when this integration
 was prepared.
+
+Several test projects stay on `net8.0` after .NET 8 leaves support. They
+certify facts about the runtime they run on: they assert CoreCLR 8.0.32 and its
+`System.Private.CoreLib` identity directly, and the resource-bound model they
+check is conditional on that runtime. Moving them to a newer runtime means
+re-auditing those facts, not changing a target framework. The worker's
+resource-lock witness is pinned the same way, to the CoreLib module of the
+pinned .NET 10 runtime. Each runtime patch bump updates that pin after
+checking that no CoreLib source changed.
 
 ```text
 build.cmd / build.ps1 / build.sh Thin build entrypoint wrappers

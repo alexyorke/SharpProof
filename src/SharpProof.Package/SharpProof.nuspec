@@ -16,7 +16,7 @@
     <repository type="$repositorytype$" url="$repositoryurl$" commit="$repositorycommit$" />
     <dependencies>
       <group targetFramework=".NETStandard2.0">
-        <dependency id="SharpProof.Verifier" version="[$version$]" />
+        <dependency id="SharpProof.Verifier" version="[$version$]" include="All" />
       </group>
     </dependencies>
   </metadata>

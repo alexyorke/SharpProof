@@ -68,3 +68,27 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 30
+
+  # Nothing reviews a scheduled run, so keep one open issue while it fails.
+  report-failure:
+    needs: lanes
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Nightly is failing"
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\"))[0].number // empty")
+          if [[ -n "$number" ]]; then
+            gh issue comment "$number" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --body "First failure: $RUN_URL"
+          fi

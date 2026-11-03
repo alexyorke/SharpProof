@@ -238,6 +238,8 @@ release_packages() {
 docs() { tooling docs; }
 layout() { tooling layout; }
 tooling_regressions() { bash tests/tooling/run.sh -v; }
+# The consumer workflow's baseline helper; nothing else runs its tests.
+consumer_baseline() { bash eng/scripts/Test-SharpProofConsumerBaseline.sh; }
 isolated_coverage() { tooling coverage -CoveragePart Isolated; }
 
 run_lane() {
@@ -258,7 +260,7 @@ run_lane() {
     self-apply) tooling self-apply -Configuration Release ;;
     repository)
       local status=0
-      all_of lint docs layout tooling_regressions scan_image || status=$?
+      all_of lint docs layout tooling_regressions consumer_baseline scan_image || status=$?
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         cat artifacts/lint/summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
       fi

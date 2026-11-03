@@ -293,6 +293,18 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 arguments[argument.Parameter!.Ordinal] = pinned.Value;
                 block = pinned.Continuation;
             }
+            // These faults must reach a surrounding handler, so they are explicit
+            // branches rather than the allocation's own length check.
+            var rule = new TotalScalarRule(arguments[1],
+                [new(IrExceptionKind.ArgumentOutOfRange, _factory.Binary(IrBinaryOperator.LessThan, arguments[1], _factory.Integer(0)))],
+                FrontendSubsetClassification.Exact);
+            block = ApplyRule(operation, rule, block).Continuation;
+            var count = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 1).Value;
+            if (count.ConstantValue is not { HasValue: true, Value: <= MaximumStringLength })
+            {
+                block = MayFault(operation, _factory.Binary(IrBinaryOperator.GreaterThan, arguments[1],
+                    _factory.Integer(MaximumStringLength)), "string:beyond-maximum-length", block);
+            }
             var target = _context.Temporary(_factory.StringType);
             var character = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
             var fill = _factory.Integer(_context.Type(character.Type), (char)character.ConstantValue.Value!);
@@ -1331,7 +1343,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             return PinElementReads && read.Classification.IsExact ? Pin(operation, read) : read;
         }
         var value = _context.Temporary(_context.Type(field.Type));
-        _builder!.Havoc(block, field.IsStatic ? _context.StaticReadSite(operation) : _context.Site(operation),
+        _builder!.Havoc(block, field.IsStatic ? _context.StaticReadSite(operation) :
+            captured ? _context.CapturedFieldReadSite(operation) : _context.Site(operation),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
     }

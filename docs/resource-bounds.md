@@ -7,6 +7,10 @@ Enable the experimental, opt-in SP0060 diagnostic in `.editorconfig`:
 dotnet_diagnostic.SP0060.severity = suggestion
 ```
 
+Bounds that depend on runtime layout, reviewed metadata costs or task premises are
+conditional on CoreCLR 8.0.32 and `net8.0` consumers. .NET 8 leaves support on
+2026-11-10, and these facts have not been re-audited for a later runtime.
+
 Use SharpProof's advisory or strict profile. The off profile disables this feature.
 SP0060 reports one result per handwritten ordinary method declaration. It does
 not require a contract attribute. Constructors, accessors and local functions do
@@ -52,7 +56,11 @@ execution prefix, including early returns and exceptional exits.
   unchanged primitive one-dimensional array parameter, or an enclosing counter's
   proven nonnegative envelope. Dependent inner bounds and allocation sizes use
   that envelope, which may be loose. Arbitrary arithmetic bounds and other local
-  values, do/foreach, break, continue and goto remain Unknown.
+  values, do/foreach, break, continue and goto remain Unknown. A loop bound, loop
+  start or array dimension is read without being charged, so an allocating
+  operand such as `new int[k].Length` is Unknown there. Sizes of allocating
+  operands remain available where the operand is charged once: source-call and
+  constructor arguments, local initializers and repeated-character string counts.
 - Top-tested `while` loops can use increasing or decreasing local ranks.
   Increasing `<` loops require an unchanged, exact nonnegative constant start,
   with a final `++`, `+= positiveConstant`, or `*= factor` (start one and factor
@@ -60,9 +68,12 @@ execution prefix, including early returns and exceptional exits.
   ends the bounded execution prefix. Decreasing `>` loops start from a supported
   size and use final `--`/`-= positiveConstant` with a nonnegative constant lower
   bound, or `/= factor` toward zero. The prefix rejects other counter writes,
-  aliases and jumps. Earlier mutation invalidates the initial-value fact. A
-  negative or symbolic initial value cannot be clamped into an increasing rank.
-  These rules do not infer ranks for arbitrary while loops.
+  aliases and jumps. Earlier mutation invalidates the initial-value fact, and so
+  does a write anywhere in an enclosing loop body, because a later iteration can
+  observe it. A nested while's own update counts, so its counter must be declared
+  inside the enclosing loop's body; this rejects some sound shapes. A negative or
+  symbolic initial value cannot be clamped into an increasing rank. These rules do
+  not infer ranks for arbitrary while loops.
 - A two-phase `while (left > 0 || right > 0)` can select `if (left > 0)`
   followed by an else phase. Both counters must be distinct Int32/Int64 locals
   initialized from supported sizes. Each phase ends with its own decrement,
@@ -104,7 +115,11 @@ Source calls share the root operation/depth budget. Unproved recursion returns
 `RecursiveCostUnknown`, unspecified metadata calls return `OpaqueCall`, and unsupported
 dispatch/signatures return `UnsupportedCall`. A possible static type initializer
 returns `CallTypeInitializationUnknown`; the callee body alone cannot establish
-its allocation or callback costs.
+its allocation or callback costs. The analyzed method follows the same rule: a
+containing type with any static constructor or non-constant static initializer,
+including a compile-time constant stored in a `static readonly` field, returns
+`EntryTypeInitializationUnknown`. Module initializers are not part of the SP0060
+check. The native entry check covers them and returns `ResourceEntryUnavailable`.
 
 Static void tail recursion is supported for a first `if (n <= 0) return` guard,
 a final self-call using `n - positiveConstant` or `n / divisorGreaterThanOne`,
@@ -828,6 +843,8 @@ The compiler admits an outer ranked for-loop whose first statement deposits a
 fixed positive amount into a nonnegative local integer credit. Its final
 statement is a guarded unit-decrement while-loop, optionally selected by an if
 without an else. Other credit writes, aliases and unsupported exits are rejected.
+A credit written in an enclosing loop body has no known initial value, so it must
+be declared inside that body.
 Prefix work and the drain body remain subject to the ordinary closed resource
 rules. The credit is protected from mutation while those regions are analyzed.
 

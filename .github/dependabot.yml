@@ -54,8 +54,22 @@ updates:
       default-days: 7
     schedule:
       interval: "weekly"
+  # Lint stages use literal digest-pinned images. eng/container selects its SDK
+  # images through ARG defaults, which Dependabot does not update; bump those
+  # with toolchain.json by hand.
+  - package-ecosystem: "docker"
+    directory: "/eng/lint"
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: "weekly"
+    groups:
+      lint-images:
+        patterns: ["*"]
   - package-ecosystem: "docker"
     directory: "/eng/container"
+    cooldown:
+      default-days: 7
     schedule:
       interval: "weekly"
     groups:

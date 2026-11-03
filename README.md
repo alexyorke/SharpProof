@@ -4,27 +4,13 @@ SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style pro
 
 **This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
-## Repository checks
-
-Run all repository lint, spelling, package compatibility, and link checks with one
-Docker command:
-
-```sh
-docker compose run --rm --build lint
-```
-
-It builds the pinned toolchain and lint tools automatically, writes reports under
-`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
-`pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](eng/lint/README.md)
-for scope and individual checks.
-
 ## Packages
 
 The standard setup is `dotnet add package SharpProof` using your configured feed, or this one reference with no SharpProof configuration properties:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="SharpProof" Version="1.0.0-preview.1" />
+  <PackageReference Include="SharpProof" Version="1.0.0-preview.2" />
 </ItemGroup>
 ```
 
@@ -44,7 +30,7 @@ The consumer application can retain a compatible older target framework. For set
 
 See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
 
-The checked-in package version is `1.0.0-preview.1`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
+The checked-in package version is `1.0.0-preview.2`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
 ## A minimal contract
 
@@ -89,6 +75,20 @@ docker compose run --rm tooling pr
 - Inspect [typed Unknown reasons](docs/unknown-reasons.md) before adjusting a budget or changing a contract.
 - Review trusted boundaries and API specifications as assumptions. Suppression affects reporting, not evidence.
 - Loops, calls, exceptions, and heap operations have modeled cases and conservative limits; language admission does not guarantee a proof.
+
+## Repository checks
+
+Run all repository lint, spelling, package compatibility, and link checks with one
+Docker command:
+
+```sh
+docker compose run --rm --build lint
+```
+
+It builds the pinned toolchain and lint tools automatically, writes reports under
+`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
+`pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](eng/lint/README.md)
+for scope and individual checks.
 
 ## Documentation
 

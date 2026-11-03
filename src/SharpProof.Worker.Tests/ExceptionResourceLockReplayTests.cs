@@ -156,7 +156,7 @@ internal sealed class ExceptionResourceLockReplayTests
         }
         Assert.That(PassiveCallableVcPlan.ObserveResourceLockModule(Guid.Empty, Observe), Is.Null);
         Assert.That(invoked, Is.False);
-        Assert.That(PassiveCallableVcPlan.ObserveResourceLockModule(new Guid("9f81bf37-7ee9-46d6-8148-5938d2a8d041"), Observe), Is.SameAs(synchronization));
+        Assert.That(PassiveCallableVcPlan.ObserveResourceLockModule(new Guid("a3899d31-fe2e-4ae3-b87c-22172033e1b4"), Observe), Is.SameAs(synchronization));
         Assert.That(invoked, Is.True);
     }
 

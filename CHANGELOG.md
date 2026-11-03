@@ -4,6 +4,50 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ## Unreleased
 
+### Packaging
+
+- Restore SharpProof from nuget.org. Templates, `init` and the consumer workflow no
+  longer need the private GitHub feed or its credentials; the workflow still accepts
+  that feed with `package-read-token`. The package version moves to
+  `1.0.0-preview.2`, the first public version.
+- Keep strict verification with the project that references SharpProof. The
+  package's MSBuild files now ship in `build/`, passed to the direct consumer by
+  `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of
+  `buildTransitive/`. A project that references a verified library, or a package
+  that depends on SharpProof, gets the contract API but no longer inherits strict
+  verification, the worker run or the SDK 10 requirement.
+- Smoke-test the packed packages on Windows and macOS in the release workflow, and
+  attest package provenance before publishing.
+- Move to SDK 10.0.403 (.NET 10.0.14, a security release) and re-audit the
+  pinned CoreLib facts; patch `libbrotli1` in the tooling image.
+
+### Verification
+
+- Route `new string(char, int)` faults through surrounding handlers and model its
+  maximum length, so a handled negative length is no longer treated as escaping.
+- Record a captured instance field read as a read for effect contracts.
+- Treat collection stores as possible aliases when either element type is open, so
+  `List<T>` and `List<int>` can no longer be assumed independent.
+- Stop an open generic thrown or caught type from excluding a `catch` handler, so a
+  handler that runs for some instantiation is no longer treated as unreachable.
+- Match `catch` handlers by runtime type, so tuple element names no longer make
+  `E<(int a, int b)>` and `E<(int, int)>` look unrelated.
+- State the assumption that the ambient culture has no user-defined callbacks when
+  the CLR raises an index or division fault.
+- Match receiver writes by source site, so an allowed receiver write inside a loop no
+  longer becomes a false refutation.
+
+### Resource bounds
+
+- Stop reporting false `Proven` resource bounds. A local written anywhere in an
+  enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
+  start or array dimension can no longer allocate without being charged. Both
+  shapes, and methods in a type with a static initializer, are now Unknown.
+- Add a nightly runtime oracle for resource bounds. It generates methods, then
+  fails if a compiled method's loop entries, arrays, elements or allocated bytes
+  exceed the bound proved by SP0060 or the worker. Its run result has its own
+  schema, and the campaign summary moves to schema 6.
+
 ### Developer experience
 
 - Add a workspace template with pinned local tools, optional editor assistance,

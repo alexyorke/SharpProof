@@ -82,6 +82,57 @@ public sealed class ExceptionalFrameworkCultureTests
         }
     }
 
+    [TestCase("string-index")]
+    [TestCase("array-index")]
+    [TestCase("divide")]
+    public void RuntimeFaultsConsultAmbientCulture(string fault)
+    {
+        ArgumentNullException.ThrowIfNull(fault);
+        var previous = CultureInfo.CurrentUICulture;
+        var culture = new CallbackCulture(false);
+        Exception? observed = null;
+        try
+        {
+            CultureInfo.CurrentUICulture = culture;
+            culture.Armed = true;
+            observed = Fault(fault);
+        }
+        finally
+        {
+            culture.Armed = false;
+            CultureInfo.CurrentUICulture = previous;
+        }
+        Assert.That(observed, Is.Not.Null);
+        Assert.That(culture.Reads, Is.GreaterThan(0), observed!.GetType().Name);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Exception? Fault(string fault)
+    {
+        ArgumentNullException.ThrowIfNull(fault);
+        var text = new string('x', 1);
+        var values = new int[1];
+        var divisor = text.Length - 1;
+        try
+        {
+            _ = fault switch
+            {
+                "string-index" => text[text.Length],
+                "array-index" => values[values.Length],
+                _ => 1 / divisor
+            };
+        }
+        catch (IndexOutOfRangeException exception)
+        {
+            return exception;
+        }
+        catch (DivideByZeroException exception)
+        {
+            return exception;
+        }
+        return null;
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int NullableValue(bool present)
     {

@@ -24,7 +24,7 @@ case "$(uname -s)" in
     export MSYS_NO_PATHCONV=1
     ;;
 esac
-tooling_image="${COMPOSE_PROJECT_NAME}-tooling:local"
+tooling_image="${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}"
 test_image="${COMPOSE_PROJECT_NAME}-consumer-baseline-tests:local"
 if [[ "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$tooling_image")" != linux/amd64 ]]; then
   echo 'Prepare the canonical Linux amd64 tooling image before baseline regressions.' >&2
