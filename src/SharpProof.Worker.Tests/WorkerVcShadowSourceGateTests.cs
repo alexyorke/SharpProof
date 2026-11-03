@@ -267,14 +267,15 @@ public sealed class WorkerVcShadowSourceGateTests
 
     internal static ImmutableArray<ShadowSourceCase> QualificationCases()
     {
-        // Reachable-source, synchronization projection, metadata Requires and direct IR replay cases qualify through
-        // dedicated drivers. They are outside the frozen Phase 2 callable
+        // Reachable-source, synchronization projection, metadata Requires, call preconditions and direct IR replay
+        // cases qualify through dedicated drivers. They are outside the frozen Phase 2 callable
         // authority baseline; retain every original baseline case.
         var goldenNames = GoldenTest.Cases("worker").Where(name =>
         {
             System.ArgumentNullException.ThrowIfNull(name);
             var source = GoldenTest.Load("worker", name).Source;
             return !source.StartsWith("// golden-scenario: reachable-source\n", StringComparison.Ordinal) &&
+                !source.StartsWith("// golden-scenario: call-precondition-claims\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: synchronization-projection\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: typed-il-call-requires\n", StringComparison.Ordinal) &&
                 !source.StartsWith("// golden-scenario: shadow-call-ancestry-tampered-predicate\n", StringComparison.Ordinal) &&

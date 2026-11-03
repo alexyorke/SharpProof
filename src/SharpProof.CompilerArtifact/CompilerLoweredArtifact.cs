@@ -121,6 +121,8 @@ internal static partial class CompilerLoweredArtifact
         }
 
         var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken);
+        if (total == null && claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind == WorkerClaimKind.CallPrecondition))
+        { throw new InvalidDataException("A call-precondition claim has no Total program."); }
         var resource = DecodeResource(artifact, entry, claims, total, cancellationToken);
         var totalEntry = CompilerTotalCallableArtifactCodec.DecodeEntry(artifact.TotalEntry, entry, cancellationToken);
         CompilerForkJoinProjection? forkJoin = null;

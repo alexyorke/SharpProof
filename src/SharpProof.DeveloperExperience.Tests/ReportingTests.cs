@@ -100,6 +100,14 @@ internal sealed class ReportingTests
     }
 
     [Test]
+    public void SummaryDisclosesUncheckedCalls()
+    {
+        var response = Response(WorkerClaimOutcome.Proven);
+        Assert.That(VerificationReport.Summary(response with { Manifest = response.Manifest with { UncheckedCallSites = 4 } }),
+            Does.Contain("Unchecked calls to methods with preconditions: 4."));
+    }
+
+    [Test]
     public void CounterexampleUsesSourceParameterNamesWithoutChangingModelIdentity()
     {
         var response = Response(WorkerClaimOutcome.Refuted);
@@ -109,6 +117,22 @@ internal sealed class ReportingTests
         VerificationReport.Write(writer, response);
         Assert.That(writer.ToString(), Does.Contain("Example.Next(value)").And.Contain("Counterexample value: 0"));
         Assert.That(response.ClaimResults[0].Model[0].Variable, Is.EqualTo("parameter:0"));
+    }
+
+    [Test]
+    public void CallPreconditionNamesTheCalleeClause()
+    {
+        var response = Response(WorkerClaimOutcome.Refuted);
+        var location = new WorkerSourceLocation { Path = "Example.cs", Start = 1, Length = 1, Line = 3, Column = 9 };
+        response.Manifest.Claims = [response.Manifest.Claims[0] with
+        {
+            Kind = WorkerClaimKind.CallPrecondition,
+            Evidence = WorkerClaimEvidence.CallSite,
+            CallPrecondition = new() { Callee = "Example.F(int)", ClauseOrdinal = 2, ClauseLocation = location }
+        }];
+        using var writer = new StringWriter();
+        VerificationReport.Write(writer, response);
+        Assert.That(writer.ToString(), Does.Contain("[CallPrecondition]").And.Contain("Call to Example.F(int), clause 2 at Example.cs(3,9)"));
     }
 
     [Test]

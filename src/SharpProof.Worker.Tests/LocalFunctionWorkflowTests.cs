@@ -88,7 +88,7 @@ internal sealed class LocalFunctionWorkflowTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
-        var claim = response.ClaimResults.Single();
+        var claim = response.DeclaredClaims().Single();
         return (claim.Outcome, claim.Reason.ToString());
     }
 }

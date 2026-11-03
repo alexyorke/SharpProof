@@ -118,12 +118,15 @@ internal sealed partial class TotalLoweringContext
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
     internal bool CaptureShadowCallAncestry { get; init; }
+    // Records the inlined frames each call precondition sits in, without the
+    // shadow lowering of dead code.
+    internal bool CaptureCallFrames { get; init; }
     internal bool CaptureResourceLoopEntries { get; init; }
     internal object Origin { get; } = new();
     internal TotalLoweringContext CreateFrame(IMethodSymbol target)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        return new(Factory, target, _document, 0, allowGenericContainer: true) { _sourceTypeCompilation = Compilation ?? _sourceTypeCompilation };
+        return new(Factory, target, _document, 0, allowGenericContainer: true) { _sourceTypeCompilation = Compilation ?? _sourceTypeCompilation, CaptureCallFrames = CaptureCallFrames };
     }
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {

@@ -14,6 +14,8 @@ SharpProof verifies a bounded C# model. This guide separates modeled behavior fr
 
 A callable may be admitted while a specific claim is Unknown. A method with one Proven claim is not automatically verified for every effect or exceptional behavior.
 
+Call-precondition claims cover invocations, constructions and accessor calls from bodies that lower exactly to non-virtual source callees in the same compilation with by-value parameters. Every other call can violate a `Requires` without failing a build, including every call into another assembly. [Semantics](../SEMANTICS.md#calls-and-loops) lists them, and the build summary counts the ones the compiler can see. That count also includes calls left out by the 24 MiB artifact cap and calls whose claims ran out of time, which do not fail `require-proven`. A tree nested too deeply to walk is skipped entirely, so its calls are neither checked nor counted.
+
 ## Callable and body admission
 
 Modeled cases include branches, local variables, multiple returns, exact bounded integral arithmetic, conversions, reference/null conditions, strings, selected array and field operations, exception flow, source calls, and natural loops.

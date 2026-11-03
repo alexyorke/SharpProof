@@ -29,8 +29,20 @@ internal static partial class LauncherPresentation
         {
             SharpProof.Worker.Protocol.WorkerClaimKind.Postcondition => "Postcondition",
             SharpProof.Worker.Protocol.WorkerClaimKind.Effect => "effect:" + EffectKind(claim.EffectContractKind),
+            SharpProof.Worker.Protocol.WorkerClaimKind.CallPrecondition => "CallPrecondition",
             _ => throw new ArgumentOutOfRangeException(nameof(claim))
         };
+    }
+
+    // Names the callee clause a call-precondition claim checks; the claim's
+    // location is the call.
+    internal static string CallPreconditionDetail(
+        SharpProof.Worker.Protocol.WorkerClaimManifestEntry claim
+    )
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        return claim.CallPrecondition is not { } call ? string.Empty
+            : FormattableString.Invariant($" Call to {SharpProof.Worker.Protocol.WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} at {SourcePrefix(call.ClauseLocation)}.");
     }
 
     private static string EffectKind(
@@ -63,6 +75,19 @@ internal static partial class LauncherPresentation
             _ => throw new InvalidOperationException("The policy was not validated.")
         };
     }
+
+    // A callable whose only gaps are timed-out call-precondition claims reports
+    // as warn-on-unknown would, so require-proven does not fail on machine load.
+    internal static SharpProof.Worker.Protocol.WorkerVerifyPolicy TimingOnlyPolicy(
+        SharpProof.Worker.Protocol.WorkerVerifyPolicy policy
+    )
+    {
+        return policy == SharpProof.Worker.Protocol.WorkerVerifyPolicy.RequireProven
+            ? SharpProof.Worker.Protocol.WorkerVerifyPolicy.WarnOnUnknown : policy;
+    }
+
+    internal const string TimingOnlyNote =
+        " Only call-precondition claims ran out of time here, and those do not fail require-proven; their calls count as unchecked.";
 
     internal static SharpProof.Worker.Protocol.WorkerVerifyPolicy ParseVerifyPolicy(
         string value

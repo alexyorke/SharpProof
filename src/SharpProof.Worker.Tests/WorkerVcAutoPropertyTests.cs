@@ -246,6 +246,6 @@ public sealed class WorkerVcAutoPropertyTests
         var callable = response.Manifest.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == name ||
             callable.CallableId.StartsWith(name + "(", StringComparison.Ordinal) ||
             callable.CallableId.StartsWith(name + "~", StringComparison.Ordinal)));
-        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
+        return response.DeclaredClaims().Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
     }
 }

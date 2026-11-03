@@ -131,7 +131,7 @@ internal static class NativeEffectClaims
     }
 
     // Requires clauses are labelled by ordinal in the passive VC.
-    private static ImmutableHashSet<string> UsedAssumptions(CompilerCallablePreparation target, PassiveCallableCheckResult check)
+    internal static ImmutableHashSet<string> UsedAssumptions(CompilerCallablePreparation target, PassiveCallableCheckResult check)
     {
         ArgumentNullException.ThrowIfNull(check);
         var core = check.Core;

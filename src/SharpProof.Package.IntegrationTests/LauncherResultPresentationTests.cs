@@ -32,7 +32,7 @@ public sealed class LauncherResultPresentationTests
             Summary = new() { ElapsedMilliseconds = 1234, CacheStatus = WorkerCacheStatus.Hit }
         };
         Assert.That(LauncherPresentation.HumanSummary(response), Is.EqualTo(
-            "SharpProof results: run=Complete (None); selected callables=3, claims=3; Proven=1, Refuted=1, Unknown=1; incomplete callables=1, vacuous claims=1; declared user/trusted assumptions=1, used=1; elapsed=1234 ms, cache=Hit."));
+            "SharpProof results: run=Complete (None); selected callables=3, claims=3; Proven=1, Refuted=1, Unknown=1; incomplete callables=1, vacuous claims=1; unchecked calls to methods with preconditions=0; declared user/trusted assumptions=1, used=1; elapsed=1234 ms, cache=Hit."));
     }
 
     [Test]

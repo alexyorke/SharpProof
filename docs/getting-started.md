@@ -45,7 +45,7 @@ Inspect the build summary and its published evidence paths. Require a completed 
 
 Change the postcondition's `+ 1` to `+ 2` and rebuild: the incorrect claim must fail strict verification. Restore the correct claim and rebuild. Contracts describe static obligations; they do not insert runtime guards. Keep normal input validation where unverified callers can supply invalid values. Do not define `SHARPPROOF_CONTRACTS`.
 
-`Requires` states the entry domain and caller obligation. `Ensures` describes normal return; it does not prove termination. Put clauses in a contiguous method prologue. `Old` refers to entry state and `Result` to the normal return value.
+`Requires` states the entry domain and caller obligation: a caller that violates it, or that strict verification cannot show satisfies it for a reason other than running out of time, fails the build. See [call preconditions](verification-results.md#call-preconditions). `Ensures` describes normal return; it does not prove termination. Put clauses in a contiguous method prologue. `Old` refers to entry state and `Result` to the normal return value.
 
 ## Obtain this checkout's packages
 

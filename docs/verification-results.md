@@ -14,14 +14,14 @@ Source: [verifier targets](../src/SharpProof.Verifier/build/SharpProof.Verifier.
 
 ## Read results in this order
 
-After validating a worker response, the build prints a readable summary: run/failure status, selected callables and claims, Proven/Refuted/Unknown counts, incomplete callables, vacuous claims, distinct declared user/trusted assumptions and used count, elapsed milliseconds, and cache status. After successful publication it prints the evidence paths. Individual Unknown diagnostics include source locations and a typed next action where available. Use this summary to find the relevant evidence; it does not replace the authoritative JSON or establish that an old report belongs to the current build.
+After validating a worker response, the build prints a readable summary: run/failure status, selected callables and claims, Proven/Refuted/Unknown counts, incomplete callables, vacuous claims, unchecked calls to methods with preconditions, distinct declared user/trusted assumptions and used count, elapsed milliseconds, and cache status. After successful publication it prints the evidence paths. Individual Unknown diagnostics include source locations and a typed next action where available. Use this summary to find the relevant evidence; it does not replace the authoritative JSON or establish that an old report belongs to the current build.
 
 | Layer | Fields | Interpretation |
 | --- | --- | --- |
 | Run | `RunStatus`, `FailureReason`, `Errors` | Whether the worker completed, timed out, was canceled, or failed; a completed run can still contain Unknown claims |
-| Selection | `Manifest.Callables`, `Manifest.Claims` | What this compilation selected, where, why, and with which contract evidence |
+| Selection | `Manifest.Callables`, `Manifest.Claims`, `Manifest.UncheckedCallSites` | What this compilation selected, where, why, and with which contract evidence, and how many visible calls to methods with preconditions no claim checks |
 | Callable | `CallableResults`: `Coverage`, `Reason`, `Assumptions` | Whether selected analysis was accounted for completely; incomplete analysis is visible even when no ordinary claim diagnostic would explain it |
-| Claim | `ClaimResults`: `Outcome`, `Reason` | Proven, Refuted, or Unknown for one selected postcondition or effect contract |
+| Claim | `ClaimResults`: `Outcome`, `Reason` | Proven, Refuted, or Unknown for one selected postcondition, effect contract or call precondition |
 | Evidence | `Vacuity`, `ProofCore`, `Model`, `EffectCertainty`, `EffectWitness`, `Assumptions` | Conditions, dependencies, counterexample inputs, and source sites needed to interpret that outcome |
 | Execution | `Summary`: `Versions`, `Budgets`, `ElapsedMilliseconds`, `CacheStatus`, `CacheHit` | The worker/specification identity, configured limits, timing, and reuse status |
 
@@ -31,11 +31,36 @@ The table uses C# protocol member names; JSON properties use camel case (`runSta
 
 ## Selection and individual claims
 
-A callable can be selected for effects, contracts, or both. Selection reasons include explicit annotations and discovered postconditions. Claim evidence distinguishes direct clauses, companion clauses, return attributes, and attributes. One callable can have multiple independently reported claims. A Proven postcondition therefore does not establish its allocation, exception, purity, or capability contracts.
+A callable can be selected for effects, contracts, or both. Selection reasons include explicit annotations, discovered postconditions, and discovered call preconditions. Claim evidence distinguishes direct clauses, companion clauses, return attributes, attributes, and call sites. One callable can have multiple independently reported claims. A Proven postcondition therefore does not establish its allocation, exception, purity, capability, or call-precondition claims.
 
-`Requires` restricts entry and produces obligations at modeled calls. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
+`Requires` restricts entry and produces obligations at modeled calls, reported as described below. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
 
 See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../src/SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs), and [manifest regression tests](../src/SharpProof.Worker.Tests/ClaimManifestBuilderTests.cs).
+
+## Call preconditions
+
+Each clause of a modeled call's `Requires` is one `CallPrecondition` claim owned by the caller. The claim's `Location` is the call. Its `CallPrecondition` field names the callee, the clause ordinal and the clause location. The ID does not depend on the line, so moving a call keeps its claim. [Semantics](../SEMANTICS.md#calls-and-loops) defines which calls are modeled.
+
+A body that declares nothing is selected automatically, with reason `DiscoveredCallPrecondition`, when it makes a modeled call. A project with no `Requires` selects nothing this way. Every other body remains unselected, and the report's "Unselected methods are not proved" applies to it.
+
+Read a pass together with the count of unchecked calls. The build summary prints it as `unchecked calls to methods with preconditions`, the tool report prints it, and SARIF records it as `uncheckedCallSites` in the invocation properties. It counts source calls whose callee declares a precondition the compiler can see and that no claim checks, including calls in dead code. `Manifest.UncheckedCallSites` is the part known at compile time; the reports add calls whose claims ran out of time. It cannot count a `Contract.Requires` in a referenced assembly, because the compiler removes that clause from the binary. [Semantics](../SEMANTICS.md#calls-and-loops) lists what stays unchecked.
+
+| Outcome | Meaning | Build result |
+| --- | --- | --- |
+| `Proven` | The clause holds at every occurrence of the call | None |
+| `Refuted` | A concrete caller input in `Model` reaches the call with the clause false, and replay used no approximated value | `SP0051` at the call under every verifier policy; exit code 5 |
+| `Unknown` | The solver or replay could not decide it, for the typed `Reason` | `SP0047` on the caller and exit code 6 under `require-proven`, a warning under `warn-on-unknown`, information under `advisory` |
+| `Unknown`, `MethodTimeout` or `ProjectTimeout` | The claim ran out of time | A warning under `require-proven` and `warn-on-unknown`, information under `advisory`; no exit code 6. The call counts as unchecked |
+
+A timed-out call claim does not fail `require-proven`, so a strict build cannot pass or fail on machine load alone. The exception covers only these claims and only their caller's gaps: if a declared claim in the same caller is also Unknown, for any reason, the caller still fails.
+
+A body selected only for its calls is left out once the compiler artifact reaches 24 MiB, last callable ID first, and its calls count as unchecked. Declared claims are never left out, so this cap cannot turn a large project's build into an SP0049 failure on its own.
+
+A satisfiable query that does not replay stays Unknown with `CounterexampleNotReplayable`; it never becomes Refuted. SARIF reports both Refuted and Unknown call-precondition claims at the call.
+
+A caller that forwards its input without restating the clause is refuted, because the input it accepts can violate the callee's `Requires`: `int Root(int value) => Positive(value);` fails with `value = 0`. This holds for private helpers too, since each body is checked alone. Add the clause to the caller or guard the call. An argument the solver cannot bound stays Unknown, and `Assume` does not help under the strict assumption policy, so guard the call or relax `SharpProofVerifyPolicy`.
+
+See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs), [limit tests](../src/SharpProof.Worker.Tests/CallPreconditionLimitTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallPreconditionClaims.cs).
 
 ## Proofs, models, and replay
 

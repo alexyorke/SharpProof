@@ -605,7 +605,8 @@ internal static partial class WorkerProtocolJson
             return;
         }
         var initialErrors = errors.Count;
-        errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema");
+        errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema")
+            .Check(manifest.UncheckedCallSites >= 0, prefix + ".unchecked_call_sites");
         callables = Present(manifest.Callables, prefix + ".callables", errors);
         claims = Present(manifest.Claims, prefix + ".claims", errors);
         allClaimsPostconditions = !manifest.Claims.IsDefaultOrEmpty &&
@@ -675,6 +676,7 @@ internal static partial class WorkerProtocolJson
             callable.ClaimIds.Length == expected.Length;
         var claimOrder = true;
         var effectSeen = false;
+        var callSeen = false;
         for (var index = 0; index < expected.Length; index++)
         {
             var claim = expected[index];
@@ -689,6 +691,14 @@ internal static partial class WorkerProtocolJson
                 effectSeen = true;
             }
             else if (effectSeen && claim.Kind == WorkerClaimKind.Postcondition)
+            {
+                claimOrder = false;
+            }
+            if (claim.Kind == WorkerClaimKind.CallPrecondition)
+            {
+                callSeen = true;
+            }
+            else if (callSeen)
             {
                 claimOrder = false;
             }
