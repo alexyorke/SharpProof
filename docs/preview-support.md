@@ -19,7 +19,7 @@ This document defines the current verifier's qualified host/filesystem boundary.
 | IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
 | musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
 
-The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.319 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.402. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
+The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.319 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.403. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
 
 Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
 
@@ -32,7 +32,7 @@ The standard `SharpProof` reference automatically enables strict full verificati
 - Docker Engine or Docker Desktop with Compose v2, running the pinned Linux amd64 container.
 - Core MSBuild and `dotnet build` inside that canonical container.
 - Native Linux x64 or ARM64 Core MSBuild and `dotnet build` on a .NET 10-supported glibc distribution with SDK 10.0.100+ and the native runtime dependencies below.
-- Native Windows x64 or ARM64 Core MSBuild and `dotnet build` with SDK 10.0.100 or later, consuming the architecture-matched packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier-plan.md).
+- Native Windows x64 or ARM64 Core MSBuild and `dotnet build` with SDK 10.0.100 or later, consuming the architecture-matched packaged verifier on fixed local NTFS volumes. See [native Windows verification](windows-native-verifier.md).
 - Native Core MSBuild and `dotnet build` on macOS ARM64 or x64, using the architecture-matched pinned Z3 payload in the verifier package.
 - Packaged portable analyzer and bounded out-of-process verifier, cache, and optional SARIF.
 - Local publication paths, including spaces, percent characters, Unicode, and long paths.
@@ -45,7 +45,7 @@ The Linux x64 solver payload requires glibc 2.31+. The ARM64 solver payload requ
 
 ## Trusted host assumptions
 
-The canonical image, build process, source workspace, package cache, and local filesystem namespace are trusted while a build runs.
+The canonical image, build process, source workspace, package cache, and local filesystem namespace are trusted while a build runs. The verification cache belongs to that namespace: cache entries are not authenticated, so anyone who can write to a `SharpProofVerifyCacheDirectory` can supply results, including `Proven` ones. Share a cache directory only among users you would trust to edit the build itself.
 
 Publication validates path ownership and identity, symlink/alias restrictions, regular files, and local filesystem capabilities. It locks the canonical request/result/manifest/optional SARIF set and uses atomic publication. Recognized network filesystems and unsupported locking/rename behavior are rejected.
 

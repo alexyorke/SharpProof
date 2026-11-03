@@ -3,7 +3,7 @@
   <PropertyGroup>
     <_SharpProofAnalyzerConsumerPresent>true</_SharpProofAnalyzerConsumerPresent>
     <_SharpProofAnalyzerConsumerDirectory>$([MSBuild]::Escape($([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..'))))</_SharpProofAnalyzerConsumerDirectory>
-    <_SharpProofConsumerContractPath>$([MSBuild]::Escape('$(MSBuildThisFileDirectory)../src/SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props'))</_SharpProofConsumerContractPath>
+    <_SharpProofConsumerContractPath>$([MSBuild]::Escape('$(MSBuildThisFileDirectory)../src/SharpProof.Package/build/SharpProof.ConsumerContract.props'))</_SharpProofConsumerContractPath>
   </PropertyGroup>
 
   <Import Project="$(_SharpProofConsumerContractPath)" />

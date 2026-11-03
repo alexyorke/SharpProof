@@ -8,11 +8,8 @@ analyzers, and verifier. The matching local tool is pinned in
 The optional editor package is included by default; use `--editor false` when
 generating a project to omit it.
 
-`NuGet.config` maps only `SharpProof*` to the private `SharpProofPreview` feed at
-`https://nuget.pkg.github.com/alexyorke/index.json`. Supply read-only credentials
-with a credential provider or `NuGetPackageSourceCredentials_SharpProofPreview`
-in the process environment. Credentials are not stored in generated files.
-Authenticate Docker to `ghcr.io/alexyorke/sharpproof-preview` using your
+`NuGet.config` restores every package, SharpProof included, from nuget.org and
+needs no credentials. Authenticate Docker to `ghcr.io/alexyorke/sharpproof-preview` using your
 credential store before pulling the private container image.
 
 The portable variant explicitly disables native verification; the container

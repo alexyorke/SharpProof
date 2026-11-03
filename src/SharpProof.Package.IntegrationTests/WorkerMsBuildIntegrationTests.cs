@@ -2377,17 +2377,17 @@ public sealed class WorkerMsBuildIntegrationTests
         var portableProps = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Package",
-            "buildTransitive",
+            "build",
             "SharpProof.props"));
         var verifierProps = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Verifier",
-            "buildTransitive",
+            "build",
             "SharpProof.Verifier.props"));
         var verifierDefaults = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Verifier",
-            "buildTransitive",
+            "build",
             "SharpProof.Verifier.defaults.props"));
         var properties = verifierDefaults
             .Descendants()
@@ -2471,12 +2471,12 @@ public sealed class WorkerMsBuildIntegrationTests
         var packageProps = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Verifier",
-            "buildTransitive",
+            "build",
             "SharpProof.Verifier.props"));
         var portableTargets = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Package",
-            "buildTransitive",
+            "build",
             "SharpProof.targets"));
         var analyzerConsumerProps = XDocument.Load(Path.Combine(
             repository,
@@ -2484,7 +2484,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var targets = XDocument.Load(Path.Combine(
             repository,
             "src/SharpProof.Verifier",
-            "buildTransitive",
+            "build",
             "SharpProof.Verifier.targets"));
         var initialize = targets
             .Descendants("Target")
@@ -3856,8 +3856,8 @@ public sealed class WorkerMsBuildIntegrationTests
             var repository = TestRepository.FindRoot();
             var nativeZ3Path = EscapePath([ContainerContract.ResolveZ3LibraryRequired()]);
             var attributes = EscapePath([ProductBuildOutputs.AttributesAssemblyPath()]);
-            var props = EscapePath([repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.props"]);
-            var verifierProps = EscapePath([repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.props"]);
+            var props = EscapePath([repository, "src/SharpProof.Package", "build", "SharpProof.props"]);
+            var verifierProps = EscapePath([repository, "src/SharpProof.Verifier", "build", "SharpProof.Verifier.props"]);
             var testConfiguration = new DirectoryInfo(
                 Path.GetDirectoryName(
                     typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
@@ -3866,8 +3866,8 @@ public sealed class WorkerMsBuildIntegrationTests
                     "The test build configuration was not found.");
             var analyzerDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.Analyzer", testConfiguration, "netstandard2.0"]);
             var collectorDirectory = EscapePath([repository, "artifacts", "bin", "SharpProof.CompilerCollector", testConfiguration, "netstandard2.0"]);
-            var targets = EscapePath([repository, "src/SharpProof.Package", "buildTransitive", "SharpProof.targets"]);
-            var verifierTargets = EscapePath([repository, "src/SharpProof.Verifier", "buildTransitive", "SharpProof.Verifier.targets"]);
+            var targets = EscapePath([repository, "src/SharpProof.Package", "build", "SharpProof.targets"]);
+            var verifierTargets = EscapePath([repository, "src/SharpProof.Verifier", "build", "SharpProof.Verifier.targets"]);
             var worker = EscapePath([repository, "artifacts", "bin", "SharpProof.Worker", testConfiguration, "net10.0", "SharpProof.Worker.dll"]);
             var launcher = worker;
             var protocol = EscapePath([repository, "artifacts", "bin", "SharpProof.Worker.Protocol", testConfiguration, "netstandard2.0", "SharpProof.Worker.Protocol.dll"]);

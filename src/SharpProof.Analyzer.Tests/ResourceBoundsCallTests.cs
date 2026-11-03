@@ -104,7 +104,8 @@ public sealed partial class ResourceBoundsTests
     [TestCase("public static void Root() { System.Console.WriteLine(1); }", "OpaqueCall")]
     [TestCase("public void Root() { Leaf(); } public virtual void Leaf() {}", "UnsupportedCall")]
     [TestCase("public void Root(C target) { target.Leaf(); } void Leaf() {}", "UnsupportedCall")]
-    [TestCase("static int[] Hidden = new int[4]; public static void Root() { Leaf(); } static void Leaf() {}", "CallTypeInitializationUnknown")]
+    [TestCase("public static class D { static int[] Hidden = new int[4]; public static void Leaf() {} } public static void Root() { D.Leaf(); }", "CallTypeInitializationUnknown")]
+    [TestCase("static int[] Hidden = new int[4]; public static void Root() { Leaf(); } static void Leaf() {}", "EntryTypeInitializationUnknown")]
     [TestCase("public static void Root(int n) { Leaf(n+1); } static void Leaf(int x) { for(int i=0; i<x; i++) {} }", "UnsupportedLoopBound")]
     [TestCase("public static void Root(int n) { Leaf(ref n); } static void Leaf(ref int x) {}", "UnsupportedCall")]
     public void UnsupportedCallBoundariesStayExplicit(string methods, string reason)

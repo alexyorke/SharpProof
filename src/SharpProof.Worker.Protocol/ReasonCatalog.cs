@@ -35,7 +35,7 @@ internal static class ReasonCatalog
             WorkerClaimReason.MethodTimeout => new("Resource limit", "This method reached its wall-clock limit.", "Reproduce with the same inputs, then inspect SharpProofVerifyMethodWallTimeMilliseconds and container contention."),
             WorkerClaimReason.ProjectTimeout => new("Resource limit", "The project reached its wall-clock limit.", "Inspect the slow methods and SharpProofVerifyProjectWallTimeMilliseconds; retain the incomplete coverage report."),
             WorkerClaimReason.Canceled => new("Cancellation", "The verification was canceled.", "Run verification again when the build can complete."),
-            WorkerClaimReason.BackendUnavailable => Infrastructure("The native solver backend was unavailable.", "Run sharpproof doctor --verification container and check the canonical image and matching Verifier package."),
+            WorkerClaimReason.BackendUnavailable => Infrastructure("The native solver backend was unavailable.", "Run sharpproof doctor --project <csproj> --verification container and check the canonical image and matching Verifier package."),
             WorkerClaimReason.InfrastructureFailure => Infrastructure("Verification failed outside the modeled program.", "Inspect the run errors and retained request, result, and compiler manifest before retrying."),
             WorkerClaimReason.MalformedBackendResult => Infrastructure("Solver evidence failed validation.", "Preserve the evidence and report a reproducible issue; do not treat the candidate result as a proof."),
             WorkerClaimReason.CounterexampleReplayFailed => Replay("The candidate violation failed replay validation."),

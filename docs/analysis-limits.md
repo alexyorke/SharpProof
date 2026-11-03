@@ -6,7 +6,7 @@ Shipping worker budgets, fixed construction bounds, and repository acceptance fl
 
 The standard single `SharpProof` reference enables full verification automatically with profile `strict`, features `all`, policy `require-proven`, and assumption policy `error`; no activation properties are needed. `SharpProof.Verifier` remains a compatibility entrypoint with the same defaults. Portable-only operation requires an explicit advisory profile, which defaults verification to false; the default installation requires SDK 10. Profiles remain `advisory`, `strict`, or `off`; features remain `effects`, `contracts`, or `all`. An explicit advisory rollout can enable verification deliberately. Strict requires verification; unsupported selected claims remain Unknown/incomplete rather than becoming successful proofs.
 
-Worker defaults are owned by [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and mirrored in [SharpProof.Verifier.defaults.props](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props).
+Worker defaults are owned by [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and mirrored in [SharpProof.Verifier.defaults.props](../src/SharpProof.Verifier/build/SharpProof.Verifier.defaults.props).
 
 See [configuration](configuration.md) for activation, policy, cache-directory and report-path controls, plus a complete consumer example.
 
@@ -15,7 +15,7 @@ See [configuration](configuration.md) for activation, policy, cache-directory an
 | `SharpProofVerifyQueryRlimit` | 3000000 | Z3 resource units per query |
 | `SharpProofVerifyMethodRlimit` | 20000000 | Accumulated method resource units |
 | `SharpProofVerifyMethodWallTimeMilliseconds` | 10000 | Milliseconds per method |
-| `SharpProofVerifyProjectWallTimeMilliseconds` | 300000 | Milliseconds per project |
+| `SharpProofVerifyProjectWallTimeMilliseconds` | 300000 | Milliseconds per project and target framework; each target framework runs its own worker |
 | `SharpProofVerifyMaxParallelism` | 4 | Maximum concurrent method lanes |
 | `SharpProofVerifyMaximumExpressionDepth` | 64 | Maximum expression depth |
 | `SharpProofVerifyTerminationGraceMilliseconds` | 1000 | Launcher termination grace in milliseconds |

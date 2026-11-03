@@ -135,6 +135,108 @@ public sealed class VerifierPackageDefaultsTests
         Assert.That(File.Exists(Path.Combine(directory.FullName, "obj", "Release", "net10.0", "SharpProof", "result.json")), Is.False);
     }
 
+    // Projects that reach SharpProof only through a library did not ask for
+    // verification, so the package's build files stay with the direct consumer.
+    [Test]
+    public async Task ProjectReferencingAVerifiedLibraryDoesNotInheritVerification()
+    {
+        using var directory = new TempDirectory("sharpproof-verifier-transitive-");
+        var library = Directory.CreateDirectory(Path.Combine(directory.FullName, "Library")).FullName;
+        var application = Directory.CreateDirectory(Path.Combine(directory.FullName, "Application")).FullName;
+        await WriteConsumerAsync(library, "net10.0", profile: null, Source, "SharpProof");
+        IsolatedPackageFeedConfiguration.Write(directory.FullName, (await PackagedProductFeed.GetAsync()).Source);
+        await WriteApplicationAsync(application, new XElement("ProjectReference", new XAttribute("Include", "../Library/Consumer.csproj")));
+        var restore = await RunDotNetAsync(application, ["restore", "Application.csproj", "--packages", s_packageCache.FullName, "--nologo"]);
+        Assert.That(restore.ExitCode, Is.Zero, restore.CombinedOutput);
+        await AssertPropertiesAsync(library, "strict", verify: true, "SharpProof");
+        await AssertNoSharpProofBuildAsync(application);
+        var libraryResult = Path.Combine(library, "obj", "Release", "net10.0", "SharpProof", "result.json");
+        using var result = JsonDocument.Parse(await File.ReadAllTextAsync(libraryResult));
+        Assert.That(result.RootElement.GetProperty("claimResults")[0].GetProperty("outcome").GetString(), Is.EqualTo("Proven"));
+    }
+
+    [Test]
+    public async Task PackageDependingOnSharpProofDoesNotPassOnVerification()
+    {
+        using var directory = new TempDirectory("sharpproof-verifier-packed-library-");
+        var library = Directory.CreateDirectory(Path.Combine(directory.FullName, "Library")).FullName;
+        var application = Directory.CreateDirectory(Path.Combine(directory.FullName, "Application")).FullName;
+        var libraryFeed = Directory.CreateDirectory(Path.Combine(directory.FullName, "feed")).FullName;
+        await WriteConsumerAsync(library, "net10.0", profile: null, Source, "SharpProof");
+        var libraryProject = Path.Combine(library, "Consumer.csproj");
+        var project = XDocument.Load(libraryProject);
+        project.Root!.Element("PropertyGroup")!.Add(new XElement("PackageId", "TransitiveLibrary"), new XElement("Version", "1.0.0"));
+        project.Save(libraryProject);
+        await RestoreAsync(library);
+        var pack = await RunDotNetAsync(library, ["pack", "Consumer.csproj", "-c", "Release", "--no-restore", "--nologo", "-o", libraryFeed]);
+        Assert.That(pack.ExitCode, Is.Zero, pack.CombinedOutput);
+        await WriteLibraryFeedConfigurationAsync(application, (await PackagedProductFeed.GetAsync()).Source, libraryFeed);
+        await WriteApplicationAsync(application, new XElement("PackageReference", new XAttribute("Include", "TransitiveLibrary"), new XAttribute("Version", "1.0.0")));
+        var restore = await RunDotNetAsync(application, ["restore", "Application.csproj", "--packages", s_packageCache.FullName, "--nologo"]);
+        Assert.That(restore.ExitCode, Is.Zero, restore.CombinedOutput);
+        // The contract runtime still flows; only the build integration stops.
+        var assets = await File.ReadAllTextAsync(Path.Combine(application, "obj", "project.assets.json"));
+        Assert.That(assets, Does.Contain("\"SharpProof.Attributes/"));
+        await AssertNoSharpProofBuildAsync(application);
+    }
+
+    private static async Task WriteApplicationAsync(string root, XElement reference)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(reference);
+        var project = new XElement("Project", new XAttribute("Sdk", "Microsoft.NET.Sdk"),
+            new XElement("PropertyGroup", new XElement("TargetFramework", "net10.0"), new XElement("NuGetAudit", "false")),
+            new XElement("ItemGroup", reference));
+        await File.WriteAllTextAsync(Path.Combine(root, "Application.csproj"), project.ToString(), new UTF8Encoding(false));
+        await File.WriteAllTextAsync(Path.Combine(root, "Program.cs"), "public static class Program { public static int Main() => Subject.Identity(1) == 1 ? 0 : 1; }\n", new UTF8Encoding(false));
+    }
+
+    private static async Task WriteLibraryFeedConfigurationAsync(string root, string productSource, string librarySource)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(productSource);
+        ArgumentNullException.ThrowIfNull(librarySource);
+        var product = PackageTestXml.EscapeOrThrow(Path.GetFullPath(productSource), "Failed to escape the product source.");
+        var library = PackageTestXml.EscapeOrThrow(Path.GetFullPath(librarySource), "Failed to escape the library source.");
+        await File.WriteAllTextAsync(Path.Combine(root, "NuGet.config"), $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="SharpProofLocal" value="{product}" />
+                <add key="LibraryLocal" value="{library}" />
+                <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+              </packageSources>
+              <packageSourceMapping>
+                <packageSource key="SharpProofLocal"><package pattern="SharpProof*" /></packageSource>
+                <packageSource key="LibraryLocal"><package pattern="TransitiveLibrary" /></packageSource>
+                <packageSource key="nuget.org">
+                  <package pattern="Microsoft.*" />
+                  <package pattern="NETStandard.*" />
+                  <package pattern="runtime.*" />
+                  <package pattern="System.*" />
+                </packageSource>
+              </packageSourceMapping>
+            </configuration>
+            """, new UTF8Encoding(false));
+    }
+
+    private static async Task AssertNoSharpProofBuildAsync(string root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        var evaluation = await RunDotNetAsync(root, ["msbuild", "Application.csproj", "--nologo",
+            "-getProperty:SharpProofProfile,SharpProofVerify,_SharpProofVerifierPackagePresent"]);
+        Assert.That(evaluation.ExitCode, Is.Zero, evaluation.CombinedOutput);
+        using var document = JsonDocument.Parse(evaluation.Output);
+        foreach (var property in document.RootElement.GetProperty("Properties").EnumerateObject())
+        {
+            Assert.That(property.Value.GetString(), Is.Empty, property.Name);
+        }
+        var build = await RunDotNetAsync(root, ["build", "Application.csproj", "-c", "Release", "--no-restore", "--nologo"]);
+        Assert.That(build.ExitCode, Is.Zero, build.CombinedOutput);
+        Assert.That(Directory.Exists(Path.Combine(root, "obj", "Release", "net10.0", "SharpProof")), Is.False, build.CombinedOutput);
+    }
+
     private static async Task WriteConsumerAsync(string root, string framework, string? profile, string source, string packageId)
     {
         ArgumentNullException.ThrowIfNull(root);

@@ -21,7 +21,8 @@ public sealed class CompanionSuggestionAnalyzer : DiagnosticAnalyzer
         "SharpProof.Editor",
         DiagnosticSeverity.Info,
         isEnabledByDefault: true,
-        description: "Creates an editable companion with matching signatures and throwing placeholders. Add contract clauses explicitly.");
+        description: "Creates an editable companion with matching signatures and throwing placeholders. Add contract clauses explicitly.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sped0001");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
 

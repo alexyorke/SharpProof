@@ -8,8 +8,8 @@ internal static class SetupInitializerConfiguration
 {
     private static readonly JsonSerializerOptions ManifestJsonOptions = new() { WriteIndented = true };
     private static readonly string[] NuGetNames = ["NuGet.Config", "nuget.config", "NuGet.config"];
-    private const string FeedName = "SharpProofPreview";
-    private const string FeedUrl = "https://nuget.pkg.github.com/alexyorke/index.json";
+    private const string FeedName = "nuget.org";
+    private const string FeedUrl = "https://api.nuget.org/v3/index.json";
 
     internal static void Plan(SetupInitializerFiles files, string directory, string version)
     {
@@ -49,20 +49,26 @@ internal static class SetupInitializerConfiguration
             ArgumentNullException.ThrowIfNull(element);
             return element.Name.LocalName.Equals(FeedName, StringComparison.OrdinalIgnoreCase);
         }) == true)
-        { throw new InvalidOperationException("Keep SharpProofPreview credentials in a credential provider or environment, outside the generated configuration."); }
+        { throw new InvalidOperationException("Keep nuget.org credentials in a credential provider or environment, outside the generated configuration."); }
         var sources = Section(root, "packageSources");
         var source = Entries(sources, "add", "key", FeedName).SingleOrDefault();
         if (source != null && !string.Equals((string?)source.Attribute("value"), FeedUrl, StringComparison.Ordinal))
-        { throw new InvalidOperationException("The existing SharpProofPreview source points to a different location."); }
+        { throw new InvalidOperationException("The existing nuget.org source points to a different location."); }
         var disabled = root.Element("disabledPackageSources");
         if (disabled != null && Entries(disabled, "add", "key", FeedName).Any(static element =>
         {
             ArgumentNullException.ThrowIfNull(element);
             return ((string?)element.Attribute("value"))?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
         }))
-        { throw new InvalidOperationException("The SharpProofPreview source is explicitly disabled."); }
-        var mapping = Section(root, "packageSourceMapping");
-        foreach (var mapped in mapping.Elements("packageSource"))
+        { throw new InvalidOperationException("The nuget.org source is explicitly disabled."); }
+        // Read an existing mapping without creating one: a section added and
+        // then removed would leave whitespace behind and break repeat runs.
+        var mappingSections = root.Elements("packageSourceMapping").ToArray();
+        if (mappingSections.Length > 1)
+        { throw new InvalidOperationException("Repeated NuGet configuration sections require manual initialization."); }
+        var existingMapping = mappingSections.SingleOrDefault();
+        var feedMapping = existingMapping == null ? null : Entries(existingMapping, "packageSource", "key", FeedName).SingleOrDefault();
+        foreach (var mapped in existingMapping?.Elements("packageSource") ?? [])
         {
             if (string.Equals((string?)mapped.Attribute("key"), FeedName, StringComparison.OrdinalIgnoreCase))
             { continue; }
@@ -85,9 +91,9 @@ internal static class SetupInitializerConfiguration
             if (!inheritedSource.Name.Equals(FeedName, StringComparison.OrdinalIgnoreCase))
             { continue; }
             if (inheritedSource.Source != FeedUrl)
-            { throw new InvalidOperationException("The existing SharpProofPreview source points to a different location."); }
+            { throw new InvalidOperationException("The existing nuget.org source points to a different location."); }
             if (!inheritedSource.IsEnabled)
-            { throw new InvalidOperationException("The SharpProofPreview source is explicitly disabled."); }
+            { throw new InvalidOperationException("The nuget.org source is explicitly disabled."); }
         }
         foreach (var inheritedMapping in new NuGet.Configuration.PackageSourceMappingProvider(settings).GetPackageSourceMappingItems())
         {
@@ -104,53 +110,29 @@ internal static class SetupInitializerConfiguration
                 }))
             { throw new InvalidOperationException("SharpProof packages are already mapped to another package source."); }
         }
+        // Name the source locally even when user settings have it, so a
+        // project with <clear /> above it still restores SharpProof.
         if (source == null)
         { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", FeedName), new XAttribute("value", FeedUrl))); }
-        if (!effectiveSources.Any(static packageSource =>
+        // Without source mapping, NuGet already searches nuget.org for every
+        // package. With it, SharpProof packages must map there explicitly.
+        if (effectiveMapping.IsEnabled)
         {
-            ArgumentNullException.ThrowIfNull(packageSource);
-            return packageSource.IsEnabled && !packageSource.Name.Equals(FeedName, StringComparison.OrdinalIgnoreCase);
-        }) && !sources.Elements("add").Any(static element =>
-        {
-            ArgumentNullException.ThrowIfNull(element);
-            return !string.Equals((string?)element.Attribute("key"), FeedName, StringComparison.OrdinalIgnoreCase);
-        }))
-        { SetupInitializerFiles.Append(sources, new XElement("add", new XAttribute("key", "nuget.org"), new XAttribute("value", "https://api.nuget.org/v3/index.json"))); }
-        var hadMapping = effectiveMapping.IsEnabled;
-        if (!hadMapping)
-        {
-            foreach (var key in effectiveSources.Where(static packageSource =>
+            var mapping = existingMapping ?? Section(root, "packageSourceMapping");
+            if (feedMapping == null)
             {
-                ArgumentNullException.ThrowIfNull(packageSource);
-                return packageSource.IsEnabled;
-            }).Select(static packageSource =>
-            {
-                ArgumentNullException.ThrowIfNull(packageSource);
-                return packageSource.Name;
-            })
-                .Concat(sources.Elements("add").Select(static element =>
-                {
-                    ArgumentNullException.ThrowIfNull(element);
-                    return (string?)element.Attribute("key");
-                }))
-                .Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                if (!string.IsNullOrEmpty(key) && !key.Equals(FeedName, StringComparison.OrdinalIgnoreCase))
-                { SetupInitializerFiles.Append(mapping, new XElement("packageSource", new XAttribute("key", key), new XElement("package", new XAttribute("pattern", "*")))); }
+                feedMapping = new XElement("packageSource", new XAttribute("key", FeedName));
+                SetupInitializerFiles.Append(mapping, feedMapping);
             }
+            if (!feedMapping.Elements("package").Any(static package =>
+            {
+                ArgumentNullException.ThrowIfNull(package);
+                // Not "*": NuGet prefers a longer prefix such as Sharp* mapped
+                // elsewhere, and only an explicit SharpProof* outranks it.
+                return (string?)package.Attribute("pattern") == "SharpProof*";
+            }))
+            { SetupInitializerFiles.Append(feedMapping, new XElement("package", new XAttribute("pattern", "SharpProof*"))); }
         }
-        var previewMapping = Entries(mapping, "packageSource", "key", FeedName).SingleOrDefault();
-        if (previewMapping == null)
-        {
-            previewMapping = new XElement("packageSource", new XAttribute("key", FeedName));
-            SetupInitializerFiles.Append(mapping, previewMapping);
-        }
-        if (!previewMapping.Elements("package").Any(static package =>
-        {
-            ArgumentNullException.ThrowIfNull(package);
-            return (string?)package.Attribute("pattern") == "SharpProof*";
-        }))
-        { SetupInitializerFiles.Append(previewMapping, new XElement("package", new XAttribute("pattern", "SharpProof*"))); }
         files.Add(path, SetupInitializerFiles.Serialize(document));
     }
 

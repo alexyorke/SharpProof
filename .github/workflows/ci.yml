@@ -7,8 +7,8 @@ on:
   push:
     branches: [master]
   pull_request:
-  # Weekly: compile the Windows Z3 payload from source (setup-tooling skips
-  # its cache on schedules) and pick up new advisories and broken links.
+  # Weekly: compile the Windows Z3 payload from source (in the build lane,
+  # which skips its cache) and pick up new advisories and broken links.
   schedule:
     - cron: "41 7 * * 3"
   workflow_dispatch:
@@ -37,13 +37,33 @@ jobs:
       - id: lanes
         run: echo "lanes=$(./ci.sh --list)" >> "$GITHUB_OUTPUT"
 
-  lanes:
-    name: ${{ matrix.lane }}
-    needs: plan
-    # setup-tooling pulls the tooling image from GHCR, and master pushes publish it.
+  # The only job that may write packages: it runs master's own code, then the
+  # lanes pull what it published instead of each racing to push.
+  image:
+    name: Publish tooling image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: read
       packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-tooling
+        with:
+          publish: "true"
+
+  lanes:
+    name: ${{ matrix.lane }}
+    needs: [plan, image]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.image.result != 'failure' }}
+    # setup-tooling pulls the tooling image from GHCR. Pull requests run their
+    # own code here, so these jobs can read packages but never publish them.
+    permissions:
+      contents: read
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -58,6 +78,9 @@ jobs:
           fetch-depth: ${{ matrix.lane == 'repository' && '0' || '1' }}
           persist-credentials: false
       - uses: ./.github/actions/setup-tooling
+        with:
+          # One weekly lane proves the Windows Z3 payload still builds from source.
+          from-source: ${{ github.event_name == 'schedule' && matrix.lane == 'build' }}
       - name: ./ci.sh ${{ matrix.lane }}
         env:
           LANE: ${{ matrix.lane }}
@@ -91,6 +114,9 @@ jobs:
 
   coverage:
     needs: lanes
+    # The image job is skipped outside master pushes; without an explicit
+    # condition that skip would propagate through lanes and skip this job.
+    if: ${{ !cancelled() && needs.lanes.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

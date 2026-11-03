@@ -133,12 +133,12 @@ internal sealed class PassiveCallableSolver : IDisposable
             {
                 System.ArgumentNullException.ThrowIfNull(instruction);
                 if (!approximation && IrWriteSites.IsObservable(_plan.Factory, instruction) &&
-                    writeViolates(instruction.Region, _plan.IsReceiverWrite(instruction.Id)))
+                    writeViolates(instruction.Region, _plan.IsReceiverWrite(instruction.Operation)))
                 {
                     if (write == null)
                     {
                         write = instruction.Operation;
-                        receiverWriteWitness = _plan.IsReceiverWrite(instruction.Id);
+                        receiverWriteWitness = _plan.IsReceiverWrite(instruction.Operation);
                     }
                 }
             },
@@ -482,7 +482,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         { return []; }
         ImmutableArray<VerificationQuery> clauses = [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)];
         var proposals = HornInvariantSearch.Propose(factory, clauses,
-            states.ToImmutable(), WorkerBudgets.DefaultQueryRlimit, cancellationToken);
+            states.ToImmutable(), _queryRlimit, cancellationToken);
         return [.. relations.SelectMany(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
             ? Conjuncts(invariant).Select(conjunct => conjunct is null ? throw new System.ArgumentNullException(nameof(conjunct)) : (new PassiveLoopCutter.Invariant(relation.Header, conjunct)))
             : []))];

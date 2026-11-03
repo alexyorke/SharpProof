@@ -8,10 +8,8 @@ Application source lives in `src/app/`; generated NUnit regressions belong under
 both projects and the pinned local tool remain visible. Compiler outputs, NuGet
 packages, and the local tool resolver cache use private named volumes.
 
-`NuGet.config` sends only `SharpProof*` to the private `SharpProofPreview` feed.
-Supply read-only credentials through your credential provider or the process
-environment variable `NuGetPackageSourceCredentials_SharpProofPreview`.
-Credentials are not stored in this workspace. Authenticate Docker to the private
+`NuGet.config` restores every package, SharpProof included, from nuget.org and
+needs no credentials. Authenticate Docker to the private
 `ghcr.io/alexyorke/sharpproof-preview` image using your credential store.
 
 For portable analysis:

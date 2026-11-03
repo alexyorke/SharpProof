@@ -4,7 +4,7 @@ namespace SharpProof.Ir;
 // the particular value with a local allocation or literal.
 internal static class IrSequenceReads
 {
-    internal static ImmutableHashSet<IrInstructionId> Readers(IrProgram program)
+    internal static ImmutableHashSet<IrInstructionId> Readers(IrProgram program, CancellationToken cancellationToken)
     {
         ArgumentNullGuard.NotNull(program, nameof(program));
         var variables = program.Blocks.SelectMany(block => block is null
@@ -34,6 +34,7 @@ internal static class IrSequenceReads
             changed = false;
             foreach (var block in program.Blocks)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var fresh = Incoming(block.Id);
                 foreach (var instruction in block.Instructions)
                 { Transfer(instruction, fresh); }
@@ -48,6 +49,7 @@ internal static class IrSequenceReads
         var readers = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         foreach (var block in program.Blocks)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var fresh = Incoming(block.Id);
             foreach (var instruction in block.Instructions)
             {

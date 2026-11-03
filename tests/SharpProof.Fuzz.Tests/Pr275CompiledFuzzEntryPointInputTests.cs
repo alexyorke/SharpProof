@@ -17,7 +17,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
         var result = InvokeCompiledEntryPoint([option]);
         Assert.That(result.Exit, Is.Zero);
         Assert.That(result.Output, Is.Empty);
-        Assert.That(result.Error, Is.EqualTo("Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]" + Environment.NewLine));
+        Assert.That(result.Error, Is.EqualTo("Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4] [--oracle resource-bounds]" + Environment.NewLine));
     }
 
     [TestCase("--cases")]
@@ -85,7 +85,7 @@ public sealed class Pr275CompiledFuzzEntryPointInputTests
         Assert.That(result.Exit, Is.EqualTo(2));
         Assert.That(result.Output, Is.Empty);
         Assert.That(result.Error, Is.EqualTo(message + Environment.NewLine +
-            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]" + Environment.NewLine));
+            "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4] [--oracle resource-bounds]" + Environment.NewLine));
     }
 
     private static (int Exit, string Output, string Error) InvokeCompiledEntryPoint(ImmutableArray<string> arguments)

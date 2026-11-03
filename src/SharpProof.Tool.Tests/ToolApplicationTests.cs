@@ -91,6 +91,31 @@ public sealed class ToolApplicationTests
         Assert.That(output.ToString(), Does.Contain("explain --result <result.json>").And.Contain("does not verify current source"));
     }
 
+    [TestCase("-h")]
+    [TestCase("doctor --help")]
+    [TestCase("explain -h")]
+    public async Task CommandHelpPrintsUsageInsteadOfAnArgumentError(string command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        Assert.That(await ToolApplication.RunAsync([.. command.Split(' ')], output, error,
+            static _ => throw new AssertionException("Discovery must not start."), TestContext.CurrentContext.CancellationToken), Is.Zero);
+        Assert.That(output.ToString(), Does.Contain("dotnet sharpproof doctor"));
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
+    [Test]
+    public async Task VersionPrintsTheToolVersion()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var error = new StringWriter(CultureInfo.InvariantCulture);
+        Assert.That(await ToolApplication.RunAsync(["--version"], output, error,
+            static _ => throw new AssertionException("Discovery must not start."), TestContext.CurrentContext.CancellationToken), Is.Zero);
+        Assert.That(output.ToString(), Does.Match(@"^\d+\.\d+\.\d+"));
+        Assert.That(error.ToString(), Is.Empty);
+    }
+
     [Test]
     public async Task EntrypointReturnsConventionalCancellationExitCode()
     {
@@ -127,7 +152,7 @@ public sealed class ToolApplicationTests
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         Assert.That(await ToolApplication.RunAsync(json ? ["doctor", "--format", "json"] : ["doctor"],
             output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.Zero);
-        Assert.That(output.ToString(), Does.Contain("10.0.402").And.Contain("no project evaluation"));
+        Assert.That(output.ToString(), Does.Contain("10.0.403").And.Contain("no project evaluation"));
         if (json)
         {
             using var report = JsonDocument.Parse(output.ToString());
@@ -265,7 +290,7 @@ public sealed class ToolApplicationTests
     private static Task<string> DiscoverSdk(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult("10.0.402\n");
+        return Task.FromResult("10.0.403\n");
     }
 
     private static void CreateOversizedEvidence(string path)

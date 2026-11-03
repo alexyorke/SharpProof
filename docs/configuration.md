@@ -4,7 +4,7 @@ Maintainers: see [configuration ownership](configuration-ownership.md) for runti
 
 The standard SDK-style consumer needs one `SharpProof` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 
-The implementation authority is [the consumer contract](../src/SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props), [portable targets](../src/SharpProof.Package/buildTransitive/SharpProof.targets), [verifier targets](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets), and [verifier defaults](../src/SharpProof.Verifier/buildTransitive/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
+The implementation authority is [the consumer contract](../src/SharpProof.Package/build/SharpProof.ConsumerContract.props), [portable targets](../src/SharpProof.Package/build/SharpProof.targets), [verifier targets](../src/SharpProof.Verifier/build/SharpProof.Verifier.targets), and [verifier defaults](../src/SharpProof.Verifier/build/SharpProof.Verifier.defaults.props). Properties beginning with `_SharpProof` are implementation details.
 
 ## Activation and claim selection
 

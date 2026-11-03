@@ -53,9 +53,9 @@ contract checks or vulnerability gate to accept a refresh.
 
 The `repository` job in `ci.yml` scans the actual assembled Linux amd64 tooling image on PRs,
 master pushes, weekly schedules and manual dispatch. Fixed high/critical findings
-fail the job; the JSON report is retained for 30 days. Findings without a published
-fix remain in the report for triage. Scanner/SBOM action SHAs and Grype/Syft versions
-are pinned. Review those tool versions during image servicing; add reviewed,
+fail the job; the JSON report is retained for 14 days with the lane's evidence. Findings
+without a published fix remain in the report for triage. `ci.sh` pins the Grype image by
+version and digest; no SBOM is generated yet. Review those tool versions during image servicing; add reviewed,
 expiring exceptions only with a documented rationale and remediation owner.
 
 The serviced minimum-host fixture uses SDK 9.0.319 in the same 9.0.3xx/Roslyn 4.14 feature band; consumer version eligibility remains 9.0.300. .NET 8 fixtures use 8.0.32 servicing packs/runtime. The explicitly pinned PowerShell 7.5 Ubuntu image replaces the stale Debian copy, and the unused SDK-bundled PowerShell tool store is removed. The sole scanner exception is GO-2026-6604 for the exact Linux shfmt binary: the upstream advisory affects Windows junction handling only. Review it when servicing shfmt.

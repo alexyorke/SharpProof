@@ -81,6 +81,17 @@ try {
         -RotatingCases $effectiveRotatingCases `
         -RetainedCases $effectiveRetainedCases `
         -MaximumCases $maximumCampaignCases
+    # The resource oracle is its own run, on the rotating seed and every retained
+    # seed. It has its own wall budget and evidence file, so it cannot push the
+    # runs above out of theirs, and the runner never pays for it unless asked.
+    $resourceBoundCases = Assert-SharpProofFuzzCaseBudget `
+        -Value $contract.fuzz.nightlyResourceBoundCases `
+        -Name 'contract.fuzz.nightlyResourceBoundCases'
+    $requestedResourceBoundCases = Assert-SharpProofFuzzCampaignBudget `
+        -RotatingCases $resourceBoundCases `
+        -RetainedCases $effectiveRetainedCases `
+        -RetainedRunCount $schedule.RetainedRunSeeds.Length `
+        -MaximumCases ($maximumCampaignCases - $schedule.RequestedCases)
     $dotnetWrapper = Get-SharpProofDotnetWrapperPath
     $fuzzProject = Join-Path `
         $repositoryRoot 'tests\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
@@ -171,7 +182,9 @@ try {
             [int]$Seed,
 
             [Parameter(Mandatory = $true)]
-            [int]$TimeoutSeconds
+            [int]$TimeoutSeconds,
+
+            [switch]$ResourceBounds
         )
 
         $standardOutput = Join-Path $resolvedOutput "$Name.stdout.json"
@@ -184,6 +197,10 @@ try {
                 [string]$Seed,
                 '--max-parallelism',
                 [string]$contract.fuzz.maximumParallelism
+                if ($ResourceBounds) {
+                    '--oracle'
+                    'resource-bounds'
+                }
             ))
         $process = Start-SharpProofEncodedPowerShell `
             -WrapperPath $dotnetWrapper `
@@ -205,15 +222,26 @@ try {
             if (-not (Test-Path -LiteralPath $standardOutput -PathType Leaf)) {
                 throw 'runner did not emit a JSON result'
             }
-            $result = Assert-SharpProofFuzzRunnerResult `
-                -Path $standardOutput `
-                -ExpectedCases $Cases `
-                -ExpectedSeed $Seed `
-                -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism)
+            if ($ResourceBounds) {
+                $result = Assert-SharpProofResourceBoundFuzzRunnerResult `
+                    -Path $standardOutput `
+                    -ExpectedCases $Cases `
+                    -ExpectedSeed $Seed `
+                    -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism)
+                $agreements = [int]$result.Coverage.ProvenCases
+                $abstentions = [int]$result.Coverage.UnknownCases
+            }
+            else {
+                $result = Assert-SharpProofFuzzRunnerResult `
+                    -Path $standardOutput `
+                    -ExpectedCases $Cases `
+                    -ExpectedSeed $Seed `
+                    -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism)
+                $agreements = [int]$result.Agreements
+                $abstentions = [int]$result.Abstentions
+            }
             $runnerSchemaVersion = [int]$result.SchemaVersion
             $observedCases = [int]$result.Cases
-            $agreements = [int]$result.Agreements
-            $abstentions = [int]$result.Abstentions
             $runnerPassed = [bool]$result.Passed
         }
         catch {
@@ -249,6 +277,20 @@ try {
                     -Seed ([int]$seed) `
                     -TimeoutSeconds ([int]$contract.worker.maximumProjectWallSeconds)))
     }
+    $runs.Add((Invoke-FuzzRun `
+                -Name "resource-bounds-$RotatingSeed" `
+                -Cases $resourceBoundCases `
+                -Seed $RotatingSeed `
+                -TimeoutSeconds ([int]$contract.fuzz.resourceBoundRunWallSeconds) `
+                -ResourceBounds))
+    foreach ($seed in $schedule.RetainedRunSeeds) {
+        $runs.Add((Invoke-FuzzRun `
+                    -Name "resource-bounds-$seed" `
+                    -Cases $effectiveRetainedCases `
+                    -Seed ([int]$seed) `
+                    -TimeoutSeconds ([int]$contract.fuzz.resourceBoundRunWallSeconds) `
+                    -ResourceBounds))
+    }
     $completedCommit = Get-SharpProofCleanFuzzSourceCommit `
         -RepositoryRoot $repositoryRoot
     if ($completedCommit -cne $sourceCommit) {
@@ -264,7 +306,7 @@ try {
             }))
     $campaignPassed = $failedRuns.Length -eq 0
     $summary = ([ordered]@{
-            schemaVersion          = 5
+            schemaVersion          = 6
             status                 = if ($campaignPassed) { 'passed' } else { 'failed' }
             commit                 = $sourceCommit
             rotatingSeed           = $RotatingSeed
@@ -272,7 +314,8 @@ try {
             requestedRotatingCases = $schedule.RequestedRotatingCases
             retainedCasesPerSeed   = $schedule.RetainedCasesPerSeed
             retainedSeeds          = $schedule.RetainedSeeds
-            requestedCases         = $schedule.RequestedCases
+            resourceBoundCases     = $resourceBoundCases
+            requestedCases         = $schedule.RequestedCases + $requestedResourceBoundCases
             totalCases             = [int](@($runSnapshot |
                         Measure-Object -Property { $_.observedCases } -Sum).Sum)
             runs                   = $runSnapshot

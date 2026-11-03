@@ -12,7 +12,7 @@ internal sealed class PassiveCallableVcPlan
     private readonly ImmutableArray<(IrTerm Reach, IrTerm Kind)> _exceptions;
     private readonly ImmutableArray<OperationId> _explicitSites;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _allocations;
-    private readonly ImmutableArray<(IrTerm Reach, IrInstructionId Instruction, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
+    private readonly ImmutableArray<(IrTerm Reach, OperationId Site, IrWriteRegion Region, bool Receiver, int FactCount)> _writes;
     private readonly ImmutableArray<(IrTerm Reach, OperationId Site)> _locks;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _callPreconditions;
     private readonly ImmutableArray<(int Ordinal, IrTerm Reach, IrTerm Predicate, ImmutableArray<Assumption> Facts)> _checkpoints;
@@ -213,10 +213,12 @@ internal sealed class PassiveCallableVcPlan
             ProofDiagnosticKind.EffectContract, new SourceLocationId(0)), _model);
     }
 
-    internal bool IsReceiverWrite(IrInstructionId instruction)
+    // Replay runs the original program, but a loop plan encodes a cut copy with
+    // new instruction ids. The source site survives the cut.
+    internal bool IsReceiverWrite(OperationId site)
     {
-        RepositoryParameterGuard.ThrowIfInvalid(instruction.IsDefault, nameof(instruction));
-        var matches = _writes.Where(write => write.Instruction == instruction).ToImmutableArray();
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        var matches = _writes.Where(write => write.Site == site).ToImmutableArray();
         return matches.Length != 0 && matches.All(write => write.Receiver);
     }
 
@@ -494,11 +496,11 @@ internal sealed class PassiveCallableVcPlan
     internal static object? ObserveResourceLockModule(Guid module, Func<object?> observe)
     {
         ArgumentNullException.ThrowIfNull(observe);
-        // Audited .NET 10.0.13 linux-amd64 CoreLib. For nonempty resource keys,
+        // Audited .NET 10.0.14 linux-amd64 CoreLib. For nonempty resource keys,
         // SR.InternalGetResourceString enters SR._lock before all culture calls.
         // Other modules retain the existing normal-completion replay projection
         // but cannot certify this additional synchronization witness.
-        return module == new Guid("9f81bf37-7ee9-46d6-8148-5938d2a8d041") ? observe() : null;
+        return module == new Guid("a3899d31-fe2e-4ae3-b87c-22172033e1b4") ? observe() : null;
     }
 
     internal static IrValue? ObserveExceptionInitialization(IrFactory factory, IrHavocRequest request, Func<string, bool> observe)

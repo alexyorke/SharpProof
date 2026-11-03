@@ -58,8 +58,7 @@ internal sealed partial class ResourceBoundsAnalysis
         var budget = Bound.Add(Bound.Number(initial), Bound.Multiply(count, Bound.Number(amount)));
         if (initial > maximum || amount > maximum || !checkedDeposit && (budget.Maximum is not { } bound || bound > maximum))
         { return Unknown("ResourceCreditMayOverflow"); }
-        _localProgress.Remove(credit);
-        _localInitialConstants.Remove(credit);
+        ForgetWrittenLocals(body);
         _counters.Add(credit, new Bound(budget.Expression, ResourceExpression.Zero));
         try
         {
