@@ -114,6 +114,9 @@ jobs:
 
   coverage:
     needs: lanes
+    # The image job is skipped outside master pushes; without an explicit
+    # condition that skip would propagate through lanes and skip this job.
+    if: ${{ !cancelled() && needs.lanes.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
