@@ -471,6 +471,24 @@ public sealed class SetupInitializerConfigurationCoverageTests
         Assert.That(await File.ReadAllTextAsync(Path.Combine(fixture.Root, "NuGet.Config"), TestContext.CurrentContext.CancellationToken), Is.EqualTo(parent));
     }
 
+    // NuGet prefers the longest matching prefix, so "*" on nuget.org does not
+    // outrank Sharp* on another feed; only an explicit SharpProof* entry does.
+    [Test]
+    public async Task WildcardMappingStillGetsAnExplicitSharpProofEntry()
+    {
+        using var fixture = new ConfigurationFixture();
+        await fixture.WriteAsync("app/NuGet.Config", "<configuration><packageSources><clear/><add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />" +
+            "<add key=\"Company\" value=\"https://packages.example.test/v3/index.json\" /></packageSources><packageSourceMapping>" +
+            "<packageSource key=\"nuget.org\"><package pattern=\"*\" /></packageSource><packageSource key=\"Company\"><package pattern=\"Sharp*\" /></packageSource>" +
+            "</packageSourceMapping></configuration>");
+        await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
+        var mapped = XDocument.Load(Path.Combine(fixture.Root, "app/NuGet.Config")).Descendants("packageSource")
+            .Single(static source => source is null ? throw new ArgumentNullException(nameof(source)) : (string?)source.Attribute("key") == "nuget.org")
+            .Elements("package").Select(static package => package is null ? throw new ArgumentNullException(nameof(package)) : (string?)package.Attribute("pattern"));
+        Assert.That(mapped, Is.EquivalentTo(ImmutableArray.Create("*", "SharpProof*")));
+    }
+
     [Test]
     public async Task ActiveInheritedSharpProofMappingsStillRejectBeforeWrites()
     {

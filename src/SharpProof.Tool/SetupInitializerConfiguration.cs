@@ -127,7 +127,9 @@ internal static class SetupInitializerConfiguration
             if (!feedMapping.Elements("package").Any(static package =>
             {
                 ArgumentNullException.ThrowIfNull(package);
-                return (string?)package.Attribute("pattern") is "SharpProof*" or "*";
+                // Not "*": NuGet prefers a longer prefix such as Sharp* mapped
+                // elsewhere, and only an explicit SharpProof* outranks it.
+                return (string?)package.Attribute("pattern") == "SharpProof*";
             }))
             { SetupInitializerFiles.Append(feedMapping, new XElement("package", new XAttribute("pattern", "SharpProof*"))); }
         }
