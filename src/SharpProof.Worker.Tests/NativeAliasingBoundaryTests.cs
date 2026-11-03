@@ -289,6 +289,6 @@ internal sealed class NativeAliasingBoundaryTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
-        return response.ClaimResults.Single().Outcome;
+        return response.DeclaredClaims().Single().Outcome;
     }
 }

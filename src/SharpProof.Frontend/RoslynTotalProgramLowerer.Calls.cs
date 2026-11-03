@@ -412,7 +412,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (constructedReceiver?.Invoke() is { } freshReceiver && callee.Receiver is { } constructorReceiver)
         { _builder.Assign(block, site, constructorReceiver.Entry, Bridge(freshReceiver, _context.Factory.GetVariableInfo(constructorReceiver.Entry).Type)); }
         ImmutableArray<TotalShadowCallHop> callAncestry = [];
-        if (_captureShadowCallAncestry)
+        if (_captureShadowCallAncestry || _context.CaptureCallFrames)
         {
             _cancellationToken.ThrowIfCancellationRequested();
             var callSpan = _context.Factory.GetOperationInfo(site).SourceSpan!;

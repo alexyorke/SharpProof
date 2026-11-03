@@ -66,10 +66,10 @@ internal sealed partial class NativeSpecifiedCallTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
-        var declaration = response.Manifest.Claims.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.CallableId.Contains(".Target", StringComparison.Ordinal));
+        var declaration = response.Manifest.Claims.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind != WorkerClaimKind.CallPrecondition && claim.CallableId.Contains(".Target", StringComparison.Ordinal));
         var target = response.ClaimResults.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId == declaration.ClaimId);
         Assert.That(target.Outcome, Is.EqualTo(expected), target.Reason.ToString());
-        Assert.That(response.ClaimResults.Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId != declaration.ClaimId)
+        Assert.That(response.DeclaredClaims().Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId != declaration.ClaimId)
             .All(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Outcome == WorkerClaimOutcome.Unknown), Is.True);
     }
 }

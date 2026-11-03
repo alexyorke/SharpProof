@@ -3690,11 +3690,11 @@ internal sealed partial class WorkerTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(response.Errors, Is.Empty);
-        Assert.That(response.ClaimResults, Has.Length.EqualTo(6));
+        Assert.That(response.DeclaredClaims(), Has.Length.EqualTo(6));
         WorkerClaimResult ResultFor(string methodName)
         {
             System.ArgumentNullException.ThrowIfNull(methodName);
-            return response.ClaimResults.Single(result =>
+            return response.DeclaredClaims().Single(result =>
                 result is null ? throw new System.ArgumentNullException(nameof(result)) : (GetCallableId(response, result).Contains(
                     methodName,
                     StringComparison.Ordinal)));

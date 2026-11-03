@@ -73,6 +73,7 @@ internal static class CompilerTotalCallableLowerer
             , static item => item.Tree, static item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
         {
+            CaptureCallFrames = true,
             CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
             claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
         };

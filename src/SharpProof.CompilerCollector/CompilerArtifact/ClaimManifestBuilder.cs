@@ -81,7 +81,7 @@ internal sealed partial class ClaimManifestBuilder(
                     .Concat(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry)))))]
         };
         WorkerProtocolJson.SealManifest(manifest);
-        var result = new ClaimManifestBuildResult(manifest, targets.ToImmutable());
+        var result = WithContractCalls(new ClaimManifestBuildResult(manifest, targets.ToImmutable()));
         return includePotentialCallShadow
             ? result with { PotentialCalls = DiscoverPotentialCallShadow(result.Targets) }
             : result;
@@ -289,10 +289,9 @@ internal sealed partial class ClaimManifestBuilder(
     }
 
     private bool TryCollectPotentialSyntax(SyntaxNode root, ref int remainingNodes,
-        out ImmutableArray<SyntaxNode> nodes)
+        out ImmutableArray<SyntaxNode> nodes, int maximumNodes = 65_536)
     {
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        const int maximumNodes = 65_536;
         var pending = ImmutableArray.CreateBuilder<(SyntaxNode Node, int Depth)>();
         var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
         pending.Add((root, 0));

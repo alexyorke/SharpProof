@@ -10,6 +10,7 @@ internal static partial class WorkerProtocolJson
         var payload = new WorkerClaimManifest
         {
             SchemaVersion = manifest.SchemaVersion,
+            UncheckedCallSites = manifest.UncheckedCallSites,
             Hash = string.Empty,
             Callables = [.. (EmptyIfDefault(manifest.Callables)).Select(static entry =>
                 entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry == null ? null! : new WorkerCallableManifestEntry

@@ -40,37 +40,42 @@ internal static class CallableClaimResultAssembler
                 record = record with { ProofCore = [.. check.Evidence.Core.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] };
                 break;
             case RefutedOutcome when check.Vacuity == WorkerVacuityKind.None:
-                // These variables belong to the Total factory. Legacy variable
-                // ids and integer domains cannot name or format this model.
-                if (check.Evidence.EntryModel.Count != total.Parameters.Length ||
-                    total.Parameters.Any(parameter => !check.Evidence.EntryModel.TryGetValue(parameter.Entry, out var value) ||
-                        value.Type != total.Program.Factory.GetVariableInfo(parameter.Entry).Type))
+                if (ProjectModel(total, check.Evidence.EntryModel) is not { } model)
                 { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; break; }
                 record = record with { Outcome = WorkerClaimOutcome.Refuted, Diagnostic = null };
                 record = record with { Reason = WorkerClaimReason.None };
-                record = record with
-                {
-                    Model = [.. total.Parameters.Select((parameter, ordinal) =>
-                {
-RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault, nameof(parameter), "Value must be initialized.");
-
-                    var value = check.Evidence.EntryModel[parameter.Entry];
-                    var formatted = WorkerProjections.FormatTotalValue(value);
-                    return new WorkerModelValue
-                    {
-                        Variable = total.HasReceiver && ordinal == total.Parameters.Length - 1 ? "this"
-                            : "parameter:" + ordinal.ToString(CultureInfo.InvariantCulture),
-                        Kind = formatted.Kind,
-                        Value = formatted.Value
-                    };
-                }).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable), StringComparer.Ordinal)]
-                };
+                record = record with { Model = model };
                 break;
             case UnknownOutcome:
             case null when check.Evidence.QueryCompleted && check.Evidence.Reason != WorkerClaimReason.None:
                 break;
         }
         return record;
+    }
+
+    // These variables belong to the Total factory. Legacy variable ids and
+    // integer domains cannot name or format this model.
+    internal static ImmutableArray<WorkerModelValue>? ProjectModel(CompilerTotalCallablePreparation total,
+        ImmutableDictionary<IrVarId, IrValue> model)
+    {
+        ArgumentNullGuard.NotNull(total, nameof(total));
+        ArgumentNullGuard.NotNull(model, nameof(model));
+        if (model.Count != total.Parameters.Length ||
+            total.Parameters.Any(parameter => !model.TryGetValue(parameter.Entry, out var value) ||
+                value.Type != total.Program.Factory.GetVariableInfo(parameter.Entry).Type))
+        { return null; }
+        return [.. total.Parameters.Select((parameter, ordinal) =>
+        {
+            RepositoryParameterGuard.RequireInitialized(parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault, nameof(parameter), "Value must be initialized.");
+            var formatted = WorkerProjections.FormatTotalValue(model[parameter.Entry]);
+            return new WorkerModelValue
+            {
+                Variable = total.HasReceiver && ordinal == total.Parameters.Length - 1 ? "this"
+                    : "parameter:" + ordinal.ToString(CultureInfo.InvariantCulture),
+                Kind = formatted.Kind,
+                Value = formatted.Value
+            };
+        }).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable), StringComparer.Ordinal)];
     }
 
     private static ImmutableArray<WorkerAssumptionEvidence> ProjectAssumptions(

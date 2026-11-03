@@ -114,6 +114,16 @@ internal sealed class PassiveCallableVcPlan
                 ProofDiagnosticKind.Precondition, new SourceLocationId(ordinal)), _model))];
     }
 
+    // One occurrence, for a plan with assumed loop invariants. A plan whose
+    // occurrences differ from the expected count proves nothing.
+    internal VerificationQuery CallPreconditionQuery(int ordinal, int occurrence, int occurrences)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(occurrence);
+        var queries = CallPreconditionQueries(ordinal);
+        return queries.Length == occurrences ? queries[occurrence]
+            : new(Factory, _entry, new Goal(Factory, Factory.Boolean(false), ProofDiagnosticKind.Precondition, new SourceLocationId(ordinal)), _model);
+    }
+
     internal OperationId? ReplayCallPrecondition(int ordinal, ImmutableDictionary<IrVarId, IrValue> inputs, CancellationToken cancellationToken)
     {
         if (ordinal < 0 || ordinal >= CallPreconditionCount)

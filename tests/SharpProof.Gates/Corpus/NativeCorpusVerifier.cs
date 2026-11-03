@@ -48,12 +48,11 @@ internal static class NativeCorpusVerifier
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
             var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal);
-            return [.. discovery.Targets.Values
+            return [.. discovery.Targets.Values.Concat(discovery.ContractCallers)
                 .Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (claimsByCallable[target.Entry.CallableId].Any()))
                 .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (new NativeCorpusVerdict(target.Declaration, target.Method,
                     Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results.TryGetValue(claim.ClaimId, out var result)
-                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + ".")))))),
-                .. await VerifyCallPreconditionsAsync(compilation, cancellationToken).ConfigureAwait(false)];
+                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + "."))))))];
         }
         finally
         { directory.Delete(recursive: true); }
@@ -98,57 +97,6 @@ internal static class NativeCorpusVerifier
                 .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
                 .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { ClaimId = result.ClaimId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() }))
         });
-    }
-
-    // A callable without claims of its own is decided by the preconditions of
-    // the calls it makes.
-    private static async Task<ImmutableArray<NativeCorpusVerdict>> VerifyCallPreconditionsAsync(CSharpCompilation compilation,
-        CancellationToken cancellationToken)
-    {
-        System.ArgumentNullException.ThrowIfNull(compilation);
-        var batch = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation, WorkerFeatureSet.All,
-            CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray(), null,
-            CompilerSpecificationPackProvider.ResolveConfiguration([]), cancellationToken);
-        var methodBuilder = ImmutableDictionary.CreateBuilder<string, IMethodSymbol>(StringComparer.Ordinal);
-        foreach (var tree in compilation.SyntaxTrees)
-        {
-            var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-            foreach (var declaration in (await tree.GetRootAsync(cancellationToken).ConfigureAwait(false)).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>())
-            {
-                if (model.GetDeclaredSymbol(declaration, cancellationToken) is { } method)
-                { methodBuilder[SemanticClaimIdentity.CreateCallableId(method)] = method; }
-            }
-        }
-        var methods = methodBuilder.ToImmutable();
-        var verdicts = ImmutableArray.CreateBuilder<NativeCorpusVerdict>();
-        foreach (var caller in batch.Callers)
-        {
-            if (!methods.TryGetValue(caller.Body.CallableId, out var method))
-            { continue; }
-            var encoded = CompilerTotalCallableArtifactCodec.Encode(caller.Body, cancellationToken)
-                ?? throw new InvalidOperationException("The shadow caller body cannot be encoded.");
-            var detached = CompilerTotalCallableArtifactCodec.DecodeShadowBody(caller.Body.CallableId,
-                encoded, cancellationToken);
-            var outcomes = ImmutableArray.CreateBuilder<WorkerClaimOutcome>();
-            if (PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.EnrollShadow(detached), out var plan, out _, cancellationToken))
-            {
-                using var solver = new PassiveCallableSolver(plan!);
-                for (var ordinal = 0; ordinal < detached.Body.CallPreconditions.Length; ordinal++)
-                {
-                    outcomes.Add((await solver.VerifyCallPreconditionAsync(ordinal, cancellationToken).ConfigureAwait(false)).Outcome switch
-                    {
-                        Verify.ProvenOutcome => WorkerClaimOutcome.Proven,
-                        Verify.RefutedOutcome => WorkerClaimOutcome.Refuted,
-                        _ => WorkerClaimOutcome.Unknown
-                    });
-                }
-            }
-            var syntax = method.DeclaringSyntaxReferences.FirstOrDefault() is { } reference
-                ? await reference.GetSyntaxAsync(cancellationToken).ConfigureAwait(false) : null;
-            verdicts.Add(new(syntax, method,
-                outcomes.Count == 0 ? WorkerClaimOutcome.Unknown : Combine(outcomes.ToImmutable())));
-        }
-        return verdicts.ToImmutable();
     }
 
     // A callable is refuted by any refuted claim and proven only when every
