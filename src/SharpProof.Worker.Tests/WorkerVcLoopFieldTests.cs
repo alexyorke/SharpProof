@@ -74,6 +74,10 @@ public sealed class WorkerVcLoopFieldTests
     {
         using var project = WorkerTests.TestProject.Create(Source);
         var request = project.CreateRequest(cacheEnabled: false);
+        // These tests ask whether the loop proofs succeed, not how fast. A
+        // loaded CI runner took FillAndAdd past the default 10 s wall clock;
+        // the resource limits still bound the search.
+        request.Budgets.MethodWallTimeMilliseconds = 60000;
         using var worker = SharpProofWorker.Create(request.Budgets);
         s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(s_response.Errors, Is.Empty);
