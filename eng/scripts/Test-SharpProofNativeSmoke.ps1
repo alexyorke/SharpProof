@@ -66,7 +66,11 @@ function Assert-SmokeBuild {
     param([string]$Text, [string]$Outcome, [bool]$Succeeds)
     Set-Content -LiteralPath $counter -Value $Text
     Remove-Item -LiteralPath $result -ErrorAction SilentlyContinue
-    & dotnet build $consumer -c Release -nologo | Out-Host
+    # The SDK is chosen from the working directory, so build from the consumer
+    # to use the host SDK rather than the checkout's pinned global.json.
+    Push-Location -LiteralPath $consumer
+    try { & dotnet build -c Release -nologo | Out-Host }
+    finally { Pop-Location }
     $built = $LASTEXITCODE -eq 0
     if (-not (Test-Path -LiteralPath $result -PathType Leaf)) { throw "The build published no verification result." }
     $response = Get-Content -LiteralPath $result -Raw | ConvertFrom-Json
@@ -79,3 +83,6 @@ function Assert-SmokeBuild {
 Assert-SmokeBuild -Text $program -Outcome 'Proven' -Succeeds $true
 Assert-SmokeBuild -Text $program.Replace('Contract.Old(value) + 1', 'Contract.Old(value) + 2') -Outcome 'Refuted' -Succeeds $false
 Write-Output "Native smoke passed for SharpProof $version."
+# The expected failing build leaves $LASTEXITCODE nonzero, and the Actions
+# pwsh wrapper exits with it, so succeed explicitly once every check passes.
+exit 0
