@@ -321,11 +321,13 @@ internal sealed class SharpProofWorker : IDisposable
                 }
             }
             var scheduler = new VerificationTargetScheduler(orderedTargets.Length);
+            var verificationOrder = VerificationOrder(orderedTargets);
             async Task RunLane(VerificationLane lane)
             {
                 System.ArgumentNullException.ThrowIfNull(lane);
-                while (scheduler.TryClaim(out var index))
+                while (scheduler.TryClaim(out var position))
                 {
+                    var index = verificationOrder[position];
                     if (!CanVerifyTarget(orderedTargets[index]))
                     {
                         continue;
@@ -612,6 +614,14 @@ internal sealed class SharpProofWorker : IDisposable
     {
         System.ArgumentNullException.ThrowIfNull(targets);
         return targets.Count(CanVerifyTarget);
+    }
+
+    // A callable selected only for its calls runs after every declared claim,
+    // so claims nobody wrote cannot spend the project budget first.
+    internal static ImmutableArray<int> VerificationOrder(ImmutableArray<CompilerCallablePreparation> targets)
+    {
+        RepositoryParameterGuard.RequireInitialized(targets.IsDefault, nameof(targets), "Array must be initialized.");
+        return [.. Enumerable.Range(0, targets.Length).OrderBy(index => targets[index].Entry.SelectionReasons is [WorkerSelectionReason.DiscoveredCallPrecondition])];
     }
 
     private static bool CanVerifyTarget(CompilerCallablePreparation target)

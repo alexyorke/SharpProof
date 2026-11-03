@@ -309,7 +309,35 @@ internal sealed class PassiveCallableSolver : IDisposable
                 }
             }
         }
-        return incomplete ?? Inconclusive();
+        var unresolved = incomplete ?? Inconclusive();
+        return await ProveCallPreconditionWithInvariantsAsync(ordinal, queries.Length, unresolved, cancellationToken).ConfigureAwait(false) ?? unresolved;
+    }
+
+    // A call in a loop usually needs the loop's invariant. Every occurrence
+    // must hold under the same checked invariants, as Ensures does.
+    private async Task<PassiveCallableCheckResult?> ProveCallPreconditionWithInvariantsAsync(int ordinal, int occurrences,
+        PassiveCallableCheckResult witness, CancellationToken cancellationToken)
+    {
+        System.ArgumentNullException.ThrowIfNull(witness);
+        PassiveCallableCheckResult? proven = null;
+        var cores = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var assumptions = ImmutableHashSet.CreateBuilder<OperationId>();
+        for (var occurrence = 0; occurrence < occurrences; occurrence++)
+        {
+            var current = occurrence;
+            var evidence = await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) :
+                plan.CallPreconditionQuery(ordinal, current, occurrences), cancellationToken).ConfigureAwait(false);
+            if (evidence == null)
+            { return null; }
+            proven ??= evidence;
+            cores.UnionWith(evidence.Core);
+            assumptions.UnionWith(evidence.BodyAssumptions);
+        }
+        return proven == null ? null : proven with
+        {
+            Core = [.. cores.OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            BodyAssumptions = [.. assumptions.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
+        };
     }
 
     internal async Task<PassiveCallableCheckResult> VerifyEnsuresAsync(int ordinal, CancellationToken cancellationToken)

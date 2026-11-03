@@ -124,6 +124,11 @@ internal sealed class CommandPresentation
             var details = ImmutableArray.CreateBuilder<CommandDetail>();
             details.Add(new("callableId", claim.CallableId));
             details.Add(new("claimKind", claim.Kind.ToString()));
+            if (claim.CallPrecondition is { } call)
+            {
+                details.Add(new("callee", WorkerCallPreconditionTarget.StableCallee(call.Callee)));
+                details.Add(new("calleeClause", call.ClauseOrdinal.ToString(CultureInfo.InvariantCulture)));
+            }
             details.Add(new("vacuity", result.Vacuity.ToString()));
             details.Add(new("effectCertainty", result.EffectCertainty.ToString()));
             if (result.Presentation is { } presentation)

@@ -46,6 +46,7 @@ public sealed class GoldenWorkerTests
             : scenario == "total-artifact" ? await TotalArtifact(fixture.Source)
             : scenario == "reachable-source" ? await ReachableSource(fixture.Source)
             : scenario == "total-claim-results" ? await TotalClaimResults(fixture.Source)
+            : scenario == "call-precondition-claims" ? await CallPreconditionClaims(fixture.Source)
             : scenario == "artifact-passive-enrollment" ? await ArtifactPassiveEnrollment(fixture.Source)
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
             : scenario == "vc-shadow-reference" ? await NativeVc(fixture.Source)
@@ -179,6 +180,30 @@ public sealed class GoldenWorkerTests
                 output.AppendLine((array ? "array" : "field") + (restore ? "-restored" : "-unknown") + ": " +
                     heapResult.Outcome!.GetType().Name + "/" + heapResult.Reason);
             }
+        }
+        return output.ToString();
+    }
+
+    private static async Task<string> CallPreconditionClaims(string source)
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        using var project = new ShadowTestProject(source);
+        using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
+        var output = new StringBuilder();
+        output.AppendLine("run: " + response.RunStatus);
+        foreach (var claim in response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition)))
+        {
+            var result = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId));
+            output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal.ToString(CultureInfo.InvariantCulture));
+            output.AppendLine(FormattableString.Invariant($"  call: {claim.Location.Line}:{claim.Location.Column}"));
+            output.AppendLine("  callee: " + WorkerCallPreconditionTarget.StableCallee(claim.CallPrecondition!.Callee));
+            output.AppendLine(FormattableString.Invariant($"  clause: {claim.CallPrecondition.ClauseOrdinal} at line {claim.CallPrecondition.ClauseLocation.Line}"));
+            output.AppendLine("  outcome: " + result.Outcome);
+            output.AppendLine("  reason: " + result.Reason);
+            output.AppendLine("  vacuity: " + result.Vacuity);
+            foreach (var value in result.Model)
+            { output.AppendLine("  model: " + value.Variable); }
         }
         return output.ToString();
     }

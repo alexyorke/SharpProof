@@ -305,6 +305,7 @@ internal static class Program
                 response.RunStatus == WorkerRunStatus.TimedOut &&
                 response.FailureReason == WorkerRunFailureReason.None;
         var timeoutAttributedToCoverage = projectTimedOut || hasMethodTimeoutCoverage;
+        var timingOnly = WorkerCallPreconditionCoverage.TimingOnlyCallables(response);
 
         var refuted = false;
         for (var index = 0; index < response.ClaimResults.Length; index++)
@@ -324,7 +325,8 @@ internal static class Program
             if (result.Outcome == WorkerClaimOutcome.Unknown)
             {
                 Log.Info(LauncherPresentation.SourcePrefix(claim.Location) + ": Unknown " +
-                    result.ClaimId + " (" + result.Reason + "). " +
+                    result.ClaimId + " (" + result.Reason + ")." +
+                    LauncherPresentation.CallPreconditionDetail(claim) + " " +
                     LauncherPresentation.UnknownGuidance(result.Reason));
             }
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
@@ -344,15 +346,17 @@ internal static class Program
             }
 
             var callable = callablesById[result.CallableId];
+            var timedOutCalls = timingOnly.Contains(result.CallableId);
             ReportDiagnostic(
                 callable.Location,
-                LauncherPresentation.Level(request.VerifyPolicy, "info"),
+                LauncherPresentation.Level(timedOutCalls ? LauncherPresentation.TimingOnlyPolicy(request.VerifyPolicy) : request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
                 (result.Reason == WorkerCallableCoverageReason.ProjectTimeout
                     ? FormattableString.Invariant(
                         $"Project analysis timed out for {result.CallableId} ({result.Reason}).")
                     : FormattableString.Invariant(
-                        $"Selected analysis is incomplete for {result.CallableId} ({result.Reason}).")) + " " + LauncherPresentation.IncompleteGuidance(result.Reason));
+                        $"Selected analysis is incomplete for {result.CallableId} ({result.Reason}).")) + " " + LauncherPresentation.IncompleteGuidance(result.Reason) +
+                    (timedOutCalls ? LauncherPresentation.TimingOnlyNote : string.Empty));
         }
         if (incompleteCount == 0 && projectTimedOut)
         {
@@ -363,7 +367,8 @@ internal static class Program
                 "Project analysis timed out before selected callable coverage was published.");
         }
 
-        var incompleteError = (incompleteCount != 0 || projectTimedOut) &&
+        // Once coverage is published, every gap is an incomplete callable.
+        var incompleteError = (incompleteCount - timingOnly.Count != 0 || projectTimedOut && response.CallableResults.Length == 0) &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
         Log.Info(LauncherPresentation.HumanSummary(response));
@@ -394,6 +399,7 @@ internal static class Program
         System.ArgumentNullException.ThrowIfNull(result);
         var message = "Refuted " + LauncherPresentation.ClaimKind(claim) +
             " claim " + result.ClaimId + " for " + claim.CallableId + "." +
+            LauncherPresentation.CallPreconditionDetail(claim) +
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
                     ", ", result.Model.Select(value =>

@@ -78,13 +78,13 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
         var actual = await solver.VerifyCallPreconditionAsync(0, TestContext.CurrentContext.CancellationToken);
-        Assert.That(actual.Outcome, Is.Null);
-        Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
+        Assert.That(actual.Outcome, Is.TypeOf<SharpProof.Verify.ProvenOutcome>());
+        Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actual.CallPreconditionWitness, Is.Null);
 
         var verdicts = await NativeCorpusVerifier.VerifyAsync(compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(verdicts.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Marker")).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(verdicts.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Root")).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(verdicts.Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Root")).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(verdicts.Count(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Root")), Is.EqualTo(1));
     }
 }

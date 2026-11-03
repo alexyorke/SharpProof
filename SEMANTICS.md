@@ -18,7 +18,7 @@ Worker run status, callable coverage, and claim outcome are distinct. A complete
 
 Direct `Requires`, `Ensures`, and `Assume` calls form a contiguous prologue. They are compiler-bound to the verified Attributes API. A source lookalike or an unverified assembly contributes no contract evidence.
 
-`Requires` restricts a callee's entry domain and creates obligations at modeled calls. `Ensures` applies on normal return. `Result<T>` names that return value and `Old<T>` names entry state. `Assume` adds explicit user evidence; it is not independently proven.
+`Requires` restricts a callee's entry domain and creates obligations at modeled calls only; [Calls and loops](#calls-and-loops) lists the calls that stay unchecked. `Ensures` applies on normal return. `Result<T>` names that return value and `Old<T>` names entry state. `Assume` adds explicit user evidence; it is not independently proven.
 
 Direct and companion clauses are alternative effective sources. Valid direct clauses take precedence for the member; a valid companion supplies clauses when there are no valid direct clauses. Invalid or misplaced clauses remain usage errors. Compiler-elided clause invocations, including their argument evaluation, are omitted from executable body semantics.
 
@@ -56,7 +56,23 @@ Source and admissible metadata calls are resolved through compiler evidence and 
 
 Natural loops use cut encodings and invariant candidates. Candidate invariants must pass establishment and preservation checks before use in a proof. Bounded witness search is separate from the proof encoding; finite unrolling cannot prove an arbitrary loop or termination. Unsupported CFG shapes or exhausted construction limits produce Unknown.
 
-Call preconditions and body checkpoints are obligations, not unchecked assumptions. General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
+Call preconditions and body checkpoints are obligations, not unchecked assumptions. Each clause of a modeled call's `Requires`, including closed parameter attributes and companion clauses, is a `CallPrecondition` claim of the caller. The caller must establish the clause from its own entry domain on every path that reaches the call, so a caller with no `Requires` of its own must establish it for every input. A body that declares nothing is selected automatically when it makes a modeled call. A `Refuted` claim fails the build under every policy, and an `Unknown` one fails `require-proven`, except that a claim that ran out of time does not (see below). The callee's `Requires` is not assumed after the call. A call inside an inlined callee belongs to that callee when it is verified on its own, so one violation is reported once.
+
+A modeled call is an invocation, construction or accessor call, from a body that lowers exactly, to a non-virtual source callee in the same compilation with by-value parameters. Nothing else is checked. A passing build says nothing about these calls:
+
+- Calls in a body that does not lower exactly or is abstracted.
+- Calls in lambdas, and in local functions that a selected body does not inline. Lambdas and local functions are not selected as roots.
+- Calls in top-level statements, and in property accessors and operators unless a selected caller lowers them inline.
+- Calls to virtual, interface and abstract callees. A `Requires` on an interface or base method is therefore not checked at its dispatched calls.
+- Calls to async and extern callees, and to callees with `ref`, `in` or `out` parameters.
+- Calls to a callee whose type has a non-constant static initializer.
+- Calls in a body selected only for its calls, once the compiler artifact reaches 24 MiB. Such bodies are left out, last callable ID first, so the artifact stays under its 32 MiB limit. A body with a declared claim is never left out, so a project its declared claims alone push past the limit still fails with SP0049.
+- Calls whose claim ran out of time, with reason `MethodTimeout` or `ProjectTimeout`. The claim reports `Unknown`, but it does not fail `require-proven`: its caller's SP0047 is a warning there, as under `warn-on-unknown`, because machine load alone must not decide a strict build. Any other `Unknown` reason still fails `require-proven`, and so does a declared claim that runs out of time, including one in the same caller.
+- Calls to a callee in another assembly. This is the main public-API case: a library's `Contract.Requires` is compiled out of its binary, so its callers cannot see the clause, let alone check it. A companion in the calling project is not checked at those calls either. Closed parameter attributes survive in metadata, but they are not checked at these calls.
+
+The build summary, the tool report and SARIF report the number of source calls whose callee declares a precondition the compiler can see and that no claim checks. The manifest's `UncheckedCallSites` holds the part known at compile time, and the reports add the calls whose claims ran out of time. The count covers every case above except a `Contract.Requires` in another assembly, which the compiler cannot see. It also counts calls in dead code. Zero therefore means no visible call was missed; it does not mean every precondition in the program was checked. The advisory SP0027 can still report a definite violation at an unchecked call; its silence is not proof.
+
+General virtual dispatch, recursion, async execution, and arbitrary metadata bodies are not blanket supported just because a related form can be lowered. See [coverage and limits](docs/coverage-and-limits.md).
 
 The [language reference](docs/language-reference.md) distinguishes admitted operations, modeled call boundaries, and opaque or unsupported cases, with implementation and behavioral test references. A supported operator does not imply that every operand type, lifted form, or containing callable is admitted.
 
@@ -80,6 +96,8 @@ A body proof carries `CompleteMayEffectSummary`. A trusted external declaration 
 Replay validates a candidate against the owned program, entry values, path, and claim. Solver-chosen values for unconstrained results or approximated reads are not arbitrary executable inputs. Undefined postconditions, unsupported replay operations, and missing source-site evidence cannot produce a definite refutation.
 
 Heap witness decoding also checks the closed compiler type evidence. Distinct non-null references from incompatible sealed runtime types cannot be assigned one object token. Impossible aliases downgrade a candidate to Unknown; this witness filter adds no SMT premise. Compatible aliases and null remain allowed. Unused observations can still make a witness conservatively unreplayable, and reference-valued array accesses remain a current admission limit.
+
+A call-precondition refutation is a concrete entry that reaches the call with the clause false and with no approximated value. Replay starts after entry initialization, so a type or module initializer that is not proved free of observable effects leaves the claim Unknown.
 
 Effect witnesses identify the violating allocation, throw, write, or synchronization site. An inlined metadata site without a source position is insufficient for an emitted definite violation.
 

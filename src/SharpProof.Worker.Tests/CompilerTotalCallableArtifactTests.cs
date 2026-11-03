@@ -388,7 +388,8 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
         var callable = artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }));
-        var total = callable.Total!;
+        // A shadow body has no manifest, so it cannot own a claim.
+        var total = callable.Total! with { CallPreconditions = [.. callable.Total!.CallPreconditions.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row with { ClaimId = null }))] };
         {
             total = total with { EffectsCompleteAtEntry = false };
             callable = callable with { Total = total };

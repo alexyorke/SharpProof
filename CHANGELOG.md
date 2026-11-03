@@ -36,6 +36,18 @@ Entries describe repository changes, not package publication. Confirm available 
   the CLR raises an index or division fault.
 - Match receiver writes by source site, so an allowed receiver write inside a loop no
   longer becomes a false refutation.
+- Check `Requires` at modeled calls in the strict worker path, as `SEMANTICS.md` promised.
+  Each clause of a call is a `CallPrecondition` claim of the caller, and a body with no
+  contract of its own is selected automatically when it makes such a call. This can fail
+  existing builds: a method that forwards its input to a `Requires` without restating it is
+  now refuted with SP0051 under every verifier policy, and a call that cannot be proven
+  fails `require-proven`. Calls in bodies that do not lower exactly, and calls to virtual,
+  interface or other-assembly callees, stay unchecked; the build summary counts the ones the
+  compiler can see. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
+- Keep those call claims from failing a build on size or timing alone. Bodies selected only
+  for their calls are left out once the compiler artifact reaches 24 MiB, instead of
+  raising SP0049, and a call claim that runs out of time does not fail `require-proven`.
+  Both cases count as unchecked calls. Declared claims are unaffected.
 
 ### Resource bounds
 
