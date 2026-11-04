@@ -543,6 +543,18 @@ public sealed class ContractMatrixLongFuzzTests
         return string.Join(" ", clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ("Contract.Requires(" + clause + ");")));
     }
 
+    internal static async Task<(WorkerClaimResult Claim, bool HasWitness)> ProbeContractCase(int slot, int rewrite)
+    {
+        if (slot < 0 || slot >= 48)
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot));
+        }
+        var item = BuildCase(slot, rewrite);
+        var observed = ObserveClr(item);
+        ValidateOracle(item, observed);
+        return (await Verify(item.Source), observed.Witness is not null);
+    }
+
     private static async Task RunCase(LongFuzzSession session, int seed, GeneratedCase item)
     {
         System.ArgumentNullException.ThrowIfNull(session);
@@ -964,31 +976,23 @@ public sealed class ContractMatrixLongFuzzTests
             throw new InvalidOperationException("Worker errors: " +
                 string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))));
         }
-        if (scalarPack || exactTargetPostcondition)
+        // Calls also produce precondition-obligation claims for Target. Select
+        // the generated Ensures by kind, then join its response by claim ID.
+        var targetClaims = artifact.Manifest.Claims.Where(claim =>
+            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
+            claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
+        if (targetClaims.Length != 1)
         {
-            var targetClaims = artifact.Manifest.Claims.Where(claim =>
-                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
-                claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
-            if (targetClaims.Length != 1)
-            {
-                throw new InvalidOperationException("Expected exactly one Target Ensures claim, got " +
-                    targetClaims.Length);
-            }
-            var matchingResults = response.ClaimResults.Where(result =>
-                result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targetClaims[0].ClaimId)).ToImmutableArray();
-            if (matchingResults.Length != 1)
-            {
-                throw new InvalidOperationException("Expected exactly one response for Target Ensures ClaimId, got " +
-                    matchingResults.Length);
-            }
-            return matchingResults[0];
+            throw new InvalidOperationException("Expected exactly one Target Ensures claim, got " +
+                targetClaims.Length);
         }
-        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId && claim.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
-        if (claims.Length != 1)
+        var matchingResults = response.ClaimResults.Where(result =>
+            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targetClaims[0].ClaimId)).ToImmutableArray();
+        if (matchingResults.Length != 1)
         {
-            throw new InvalidOperationException("Expected one Target claim, got " + claims.Length);
+            throw new InvalidOperationException("Expected exactly one response for Target Ensures ClaimId, got " +
+                matchingResults.Length);
         }
-        return claims[0];
+        return matchingResults[0];
     }
 }
