@@ -24,9 +24,10 @@
    the same archives. NuGet and GitHub publication are separate operations: a GitHub
    release failure after the NuGet push does not roll back published packages.
 
-Manual workflow dispatch exercises packaging and native smoke tests without
-publishing. A passing workflow definition or source version is not evidence that
-the corresponding packages have reached NuGet.org.
+Manual dispatch on a branch exercises packaging and native smoke tests without
+publishing. Dispatch against a `v*` tag still satisfies the workflow's tag-gated
+publication conditions. A passing workflow definition or source version is not
+evidence that the corresponding packages have reached NuGet.org.
 
 For a published package, verify the original `.nupkg` against its GitHub build
 provenance and inspect the attested source and workflow identity:
