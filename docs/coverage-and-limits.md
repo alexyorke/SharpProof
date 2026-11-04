@@ -10,7 +10,7 @@ SharpProof verifies a bounded C# model. This guide separates modeled behavior fr
 | Compiler collector | Final-compilation selection and closed typed artifact |
 | Native worker | Bounded postcondition, call-precondition, exception and effect claim checks |
 | Replay | Concrete validation of candidate paths, values and violating sites |
-| Package consumers | Portable analyzer checks and full canonical-container verifier checks |
+| Package consumers | Portable analyzer and canonical-container verifier checks; release smoke tests also run the packed verifier on Windows and macOS |
 
 A callable may be admitted while a specific claim is Unknown. A method with one Proven claim is not automatically verified for every effect or exceptional behavior.
 

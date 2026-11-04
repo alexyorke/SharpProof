@@ -44,7 +44,7 @@ pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofDevCheck.ps1 -Configu
 
 ## CI
 
-All of CI is in [ci.sh](../ci.sh). The workflows only build the tooling image, hand each `ci.sh` lane to a runner, and upload `artifacts/`. Run the same thing locally:
+Repository validation lanes are implemented in [ci.sh](../ci.sh). The workflows fan them out to runners, manage the tooling image and artifacts, and coordinate dependency review, coverage merging and the final required check. Run the same validation lanes locally:
 
 ```text
 ./ci.sh                 # build the image, every PR lane in order, then the coverage merge
@@ -55,13 +55,13 @@ All of CI is in [ci.sh](../ci.sh). The workflows only build the tooling image, h
 PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes, weekly, on demand):
 
 - `build`: `security`, the dependency audit plus the complete Release solution with all analyzers and `-warnaserror`, then `format-check`, which checks only whitespace and leaves code style to that build.
-- `worker-a1`, `worker-a4`, `worker-b`, `projects-a`, `projects-b`, `gates-corpus-a`, `gates-corpus-b`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`, where each `-a`/`-b` pair partitions one task group. Each lane builds only its task group's closure, without analyzers.
+- `worker-a1`, `worker-a4`, `worker-b`, `projects-a`, `projects-b`, `gates-corpus-a`, `gates-corpus-b`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`. The lane-to-group mapping is in `ci.sh`; WorkerA is split further into WorkerA1 and WorkerA4. Each lane builds only its task group's closure, without analyzers.
 - `package-0`..`package-5`: `coverage -CoveragePart Package -PackagePartitionCount 6 -PackagePartition <n>`. Each test filter, largest first, goes to the partition with the fewest cases of its class: a case renamed with `TestName=` is placed on its own, and a method's other parameter cases stay together.
 - `self-apply`: SharpProof's own analyzer over `src/`, then the package-backed samples. It skips the .NET and code-style analyzers that `build` already enforces.
-- `repository`: lint, `docs`, `layout`, and a Grype scan of the tooling image.
+- `repository`: lint, `docs`, `layout`, the tooling and consumer-baseline regression suites, and a Grype scan of the tooling image.
 - `evidence`: the API inventory and catalog evidence tests, and `coverage -CoveragePart Isolated`.
 
-Both run every check and then fail if any failed.
+The `repository` and `evidence` lanes run every component check and then fail if any failed.
 
 Then `coverage` merges every shard's `lines.tsv`, and `build-and-test`, the single required check, succeeds only when every lane, the merge, and (on pull requests) GitHub's dependency review succeeded. Each test suite runs once, under the coverage collector, with the filter `TestCategory!=Performance&TestCategory!=Coverage`, so CI also runs `Corpus` tests.
 

@@ -62,7 +62,7 @@ Finite Docker tasks keep these build directories inside their private workspace.
 They export evidence and packages on completion, including failed runs, while
 compiler intermediates and restored build tools remain private. Explicit consumer
 fixtures and coverage runs may choose an isolated temporary artifact root. The
-three published package IDs and preview version format remain unchanged.
+three product package IDs and preview version format remain unchanged.
 
 Arcade's custom test-runner extension retains the centrally pinned NUnit
 dependencies. Microsoft signing, Visual Studio insertion, localization, Helix

@@ -63,7 +63,7 @@ Entries describe repository changes, not package publication. Confirm available 
 ### Developer experience
 
 - Add a workspace template with pinned local tools, optional editor assistance,
-  private-feed configuration, and portable/container profiles; add preview-first
+  feed configuration defaulting to nuget.org, and portable/container profiles; add preview-first
   `init` for existing projects and text/JSON/Markdown command reports.
 - Add exact-base-SHA consumer CI comparison with report mode by default and an
   explicit enforcement mode. Baselines come from trusted successful source-bound

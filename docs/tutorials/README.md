@@ -42,7 +42,7 @@ Each run creates `artifacts/tutorials/<run-id>/` containing:
 - `*-build.log` and `*-restore.log`: complete captured .NET output.
 - `*-result.json`: native manifest, callable coverage, claim results, assumptions, and summary.
 - `*-result.sarif`: the corresponding SARIF.
-- `pack-*.log` and `source-commit.txt`: package build logs and snapshot base commit.
+- `build-*.log`, `pack-*.log`, and `source-commit.txt`: package build/pack logs and snapshot base commit. Packing extracts the embedded PDBs from those same built assemblies before creating the archives.
 
 Transcript claim columns are: callable identity, claim kind/effect kind, outcome, reason, effect certainty, and vacuity. `Unspecified` in an effect-kind or effect-certainty column on a postcondition is not an Unknown reason; those effect fields do not apply to that claim.
 
@@ -56,7 +56,7 @@ The full series runner exits successfully only when those expected build results
 
 ## Use the examples in your application
 
-Each lesson's C# fence is a complete compilation unit. Its identical runnable source is under [code](code/). Begin with the Attributes API and portable analyzer. Add Verifier in canonical-container CI when you want proof gates. Keep tool packages private and keep runtime checks where your application's input/security boundary needs them.
+Each lesson's C# fence is a complete compilation unit. Its identical runnable source is under [code](code/). Use the single `SharpProof` reference throughout. The first lessons deliberately select portable-only feedback; remove those overrides to restore default strict verification on a supported host. Keep optional editor packages private and keep runtime checks where your application's input/security boundary needs them.
 
 Contract statements are static declarations, normally elided by the C# compiler. They are not runtime validation. Do not define `SHARPPROOF_CONTRACTS`.
 

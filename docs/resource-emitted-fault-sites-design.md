@@ -1,6 +1,15 @@
 # Owned emitted fault sites: implementation design
 
-Status: implemented; combined local validation passed. This slice continues the checked CLR/helper-frame bridge in the resource-analysis roadmap. It does not choose between explicit reported runtime assumptions and derivation from a closed program entrypoint. Cumulative task runtime bytes remain Unknown.
+Status: historical implementation design and original validation record for the
+emitted-fault-site milestone. The baseline versions, source line ranges, ownership
+assignments and future-tense instructions below describe that delivery, not the
+current branch state. Current wire versions are in [release constants](release-constants.md).
+
+The structural scanner and helper bridge remain separate from a source-derived
+closed runtime allocation proof. Later work added [explicit task runtime premises](resource-task-runtime-premises.md):
+complete caller declarations can now support conditional cumulative-byte proofs.
+Without those premises, cumulative task runtime bytes remain Unknown. The design
+below does not close the remaining derivation obligations.
 
 ## Outcome and smallest useful slice
 
@@ -161,7 +170,7 @@ The implementation adds 55 emitted-site test cases covering the producer, strict
 
 ## Compatibility and model versions
 
-The current uncommitted implementation uses nested codec 12 and response cache 66. Protocol 43, manifest 6 and outer artifact 55 are unchanged. New production paths are classified in the acceptance contract. The following baseline transition rationale remains applicable:
+The implementation at this milestone used nested codec 12 and response cache 66. Protocol 43, manifest 6 and outer artifact 55 are unchanged. New production paths are classified in the acceptance contract. The following baseline transition rationale remains applicable:
 
 The checked baseline is nested fork/join codec 11, response cache 65, protocol 43, manifest 6, outer compiler artifact 55. Adding `faultBodies` changes the exact nested property set: advance nested codec to 12 and reject codec 11 for the new shape. The real worker Unknown path changes, so advance the response cache to the next available version (66 if no concurrent allocation has occurred). The coordinator must serialize/reserve version edits and re-read current values first.
 
@@ -192,4 +201,4 @@ The compiler-to-helper boundary is useful progress, not closure of the roadmap i
 
 For example, `Task.ExecuteWithThreadLocal` chooses direct or execution-context execution and catches at `Task.cs:2334-2356`; the execution-context runner catches the first pass, captures, restores, and rethrows at `ExecutionContext.cs:261-289`. CLR trace appends occur in explicit-frame and managed-frame first-pass processing at `exceptionhandling.cpp:2323-2324` and `:2601-2606`. Counting one completed source pass cannot replace a bound on those cumulative events.
 
-The pending human policy decision remains a real blocker for binding caller-stack and initialization premises to a public root proof. Nothing in this design selects a numeric premise, sets a stack/frame cap, discards cold execution, or turns private component success into root proof authority.
+At this milestone, the pending policy decision blocked binding caller-stack and initialization premises to a public root proof. Later explicit runtime-premise declarations provide a conditional route; a source-derived closure remains separate work. Nothing in this design selects a numeric premise, sets a stack/frame cap, discards cold execution, or turns private component success into root proof authority.

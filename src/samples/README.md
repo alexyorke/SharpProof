@@ -21,10 +21,12 @@ docker compose run --rm tooling samples -Configuration Release
 
 Without a supplied feed, the harness packs the current product into an isolated local feed. It redirects build and package-cache state into temporary roots and checks outputs. Portable-only host jobs do not execute the native verifier sample matrix.
 
-To test already packed artifacts:
+To test already packed artifacts, first copy them into the `nupkgs/` input feed.
+Finite task snapshots do not copy ignored `artifacts/` outputs:
 
 ```text
-docker compose run --rm tooling samples -Configuration Release -PackageSource artifacts/container-packages
+docker compose run --rm tooling dev -lc 'mkdir -p nupkgs && cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/'
+docker compose run --rm tooling samples -Configuration Release -PackageSource nupkgs
 ```
 
 The standard consumer needs one `SharpProof` reference, no activation properties, and no `PrivateAssets="all"`; its exact-version dependencies supply the application Attributes API and full verifier automatically. These samples deliberately select advisory/verification policies where needed to demonstrate portable diagnostics, mixed outcomes, or reviewed trust; their explicit overrides are not required installation steps. The Library sample exercises strict verification. See [getting started](../../docs/getting-started.md) for the standard setup and [Test-SharpProofSamples.ps1](../../eng/scripts/Test-SharpProofSamples.ps1) for the executable assertions.

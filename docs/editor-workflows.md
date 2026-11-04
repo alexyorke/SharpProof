@@ -27,6 +27,10 @@ Open the repository in a compatible Dev Container client using [.devcontainer/de
 
 Do not run concurrent builds against the same bind-mounted outputs. A targeted test is feedback for that selected case, not full qualification. See [contributing](../CONTRIBUTING.md) for the broader gates.
 
+Supply a repository-relative `.csproj` path at the targeted-test prompt, for
+example `src/SharpProof.CodeFixes.Tests/SharpProof.CodeFixes.Tests.csproj`;
+an assembly name alone is not a valid `-Target` path.
+
 ## Attach to managed processes
 
 Inside the Dev Container, **SharpProof: attach to managed process (Dev Container)** uses the managed debugger's process picker. Choose the relevant worker, host or compiler process for the reproduction. Source matching is exact and Just My Code is disabled so package/tool frames can be inspected. Build and reproduce in the persistent workspace; finite task copies may use different source paths and disappear after execution.

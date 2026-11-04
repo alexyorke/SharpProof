@@ -39,7 +39,9 @@ architectures before a release is qualified.
 The default structured evidence is under
 `obj/<configuration>/<target-framework>/SharpProof/result.json`; it includes
 claim outcomes, proof cores or counterexample models, and input/request hashes.
-`require-proven` fails the build for refuted, unknown, or incomplete claims.
+`require-proven` rejects refuted and incomplete declared claims. Timed-out
+call-precondition claims are a warning and count as unchecked calls; see
+[call-precondition policy](verification-results.md#call-preconditions).
 
 ## Qualified boundary and CI
 
@@ -59,7 +61,12 @@ cancellation, and process-tree termination. Native runs do not have Docker's
 CPU/memory isolation or an OS memory quota. The caller must provision sufficient
 resources or supply an external execution boundary for untrusted workloads.
 
-Native Windows proofs are not exercised in CI; the canonical Linux container runs the
-package tests.
+[The release workflow](../.github/workflows/release.yml) runs
+[the native smoke script](../eng/scripts/Test-SharpProofNativeSmoke.ps1) on
+`windows-latest` against the exact packed packages. It requires one Proven
+postcondition and a Refuted broken counterpart under Core MSBuild. It does not
+provide a separate ARM64, full-framework MSBuild.exe, payload-corruption or
+downstream CLR 4 execution matrix. Qualify those scenarios separately before
+claiming their exact-artifact results.
 Native Windows repository build/test/pack remains unsupported outside the canonical
 Linux container.
