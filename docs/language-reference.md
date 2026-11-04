@@ -9,7 +9,7 @@ Use [public API](public-api.md) for contract syntax, [coverage and limits](cover
 | Surface or term | Meaning |
 | --- | --- |
 | Portable analyzer | Validates declarations and contracts, reports conservative effects, and uses advisory abstract domains. An analyzer diagnostic or its absence is not a native proof verdict. |
-| Native verifier | Checks individual claims over admitted compiler artifacts, using the qualified Linux amd64 container. Exact frontend lowering is necessary for many checks but does not itself establish a claim. |
+| Native verifier | Checks individual claims over admitted compiler artifacts on a supported [container or native host](preview-support.md). Exact frontend lowering is necessary for many checks but does not itself establish a claim. |
 | Exact modeled operation | The admitted shape preserves its modeled values, faults, and ordering. Subsequent solver, loop, call, witness, or resource limits can still produce Unknown. |
 | Opaque value or call | Its details are unavailable. Conservative effects and approximation values preserve uncertainty; an unrelated claim can sometimes still be proven. |
 | Closed boundary | The unsupported shape is rejected or remains Unknown. It must not silently become an assumption that establishes the claim. |

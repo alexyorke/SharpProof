@@ -2,9 +2,12 @@
 
 ## GitHub settings
 
+The settings below were checked through the GitHub API on 2026-11-03. They are
+repository administration state, not controls installed by cloning this source.
+
 The public repository is `alexyorke/SharpProof`; its default branch is `master`.
 Private vulnerability reporting, secret scanning, secret push protection, Dependabot
-security updates, and extended CodeQL analysis for C# and GitHub Actions are enabled.
+security updates, and extended CodeQL analysis for C#, Python and GitHub Actions are enabled.
 
 The default-branch ruleset requires PRs, resolved review threads, up-to-date required
 checks, and CodeQL results. CodeQL errors and high/critical security findings block
@@ -32,8 +35,9 @@ second reviewer. Public releases use NuGet OIDC.
 
 [release.yml](../../.github/workflows/release.yml) runs on `v*` tags. It checks the tag
 against the checked-in package version, packs the product and optional developer
-packages in the canonical container, runs the package tests against that feed, then
-pushes to NuGet.org through NuGet OIDC from the `nuget.org` environment and creates
+packages in the canonical container, runs the package tests against that feed,
+requires native Windows/macOS smoke tests and `.nupkg` build-provenance attestation,
+then pushes to NuGet.org through NuGet OIDC from the `nuget.org` environment and creates
 the GitHub release with the same archives. Tag only commits whose `ci.yml` run on
 `master` succeeded.
 
@@ -58,6 +62,6 @@ without a published fix remain in the report for triage. `ci.sh` pins the Grype 
 version and digest; no SBOM is generated yet. Review those tool versions during image servicing; add reviewed,
 expiring exceptions only with a documented rationale and remediation owner.
 
-The serviced minimum-host fixture uses SDK 9.0.319 in the same 9.0.3xx/Roslyn 4.14 feature band; consumer version eligibility remains 9.0.300. .NET 8 fixtures use 8.0.32 servicing packs/runtime. The explicitly pinned PowerShell 7.5 Ubuntu image replaces the stale Debian copy, and the unused SDK-bundled PowerShell tool store is removed. The sole scanner exception is GO-2026-6604 for the exact Linux shfmt binary: the upstream advisory affects Windows junction handling only. Review it when servicing shfmt.
+The serviced minimum-host fixture uses SDK 9.0.319 in the same 9.0.3xx/Roslyn 4.14 feature band; consumer version eligibility remains 9.0.300. .NET 8 fixtures use 8.0.32 servicing packs/runtime. The explicitly pinned PowerShell 7.5 archive is installed on the Ubuntu SDK base, and the unused SDK-bundled PowerShell tool store is removed. The sole scanner exception is GO-2026-6604 for the exact Linux shfmt binary: the upstream advisory affects Windows junction handling only. Review it when servicing shfmt.
 
 MCR's PowerShell 7.5 aliases were verified to contain 7.5.0 despite newer upstream releases. The PowerShell stage therefore replaces that directory with the official 7.5.12 archive, pinned by SHA-256 in both the Dockerfile and catalog. Build-time and runtime contract checks require the exact serviced version. Update the archive URL/hash/version together during servicing.

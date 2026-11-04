@@ -103,6 +103,7 @@ Policy projects validated evidence into build diagnostics and exit status. It do
 | Unknown, `advisory` | `review`, level `none` |
 | Unknown, `warn-on-unknown` | `fail`, level `warning` |
 | Unknown, `require-proven` | `fail`, level `error` |
+| Unknown call precondition with `MethodTimeout` or `ProjectTimeout`, `require-proven` | `fail`, level `warning`; counts as an unchecked call |
 
 SARIF includes rule IDs such as `SharpProof.Proven`, `SharpProof.Refuted`, and `SharpProof.Unknown`, claim identities, locations, and structured claim/result properties. Incomplete selected callables and declared policy assumptions have their own records. The optional report helps code-review tools navigate evidence; retain the JSON result for full protocol/accountability inspection.
 

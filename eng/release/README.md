@@ -11,10 +11,33 @@
 3. Tag a `master` commit whose `ci.yml` run succeeded.
 4. The package job runs `tooling pack` and `tooling pack-tool` in the canonical Linux
    amd64 container, then runs the package tests against that exact feed.
-5. The publish job (canonical repository only, `nuget.org` environment) pushes every
+5. Native smoke jobs on `windows-latest` and `macos-latest` download those archives
+   and require one Proven postcondition and its Refuted broken counterpart. These
+   jobs use the runner's architecture and Core MSBuild; they do not qualify every
+   packaged architecture or full-framework MSBuild.exe.
+6. Tagged canonical-repository runs attest the `.nupkg` files with GitHub build
+   provenance. The workflow does not currently generate an SPDX SBOM, a signed
+   offline manifest, or an attestation for the `.snupkg` files.
+7. The publish job (canonical repository only, `nuget.org` environment) requires
+   packaging, both native smoke jobs and attestation. It pushes every
    `.nupkg` with its `.snupkg` through NuGet OIDC and creates the GitHub release with
    the same archives. NuGet and GitHub publication are separate operations: a GitHub
    release failure after the NuGet push does not roll back published packages.
+
+Manual dispatch on a branch exercises packaging and native smoke tests without
+publishing. Dispatch against a `v*` tag still satisfies the workflow's tag-gated
+publication conditions. A passing workflow definition or source version is not
+evidence that the corresponding packages have reached NuGet.org.
+
+For a published package, verify the original `.nupkg` against its GitHub build
+provenance and inspect the attested source and workflow identity:
+
+```sh
+gh attestation verify <package.nupkg> --repo alexyorke/SharpProof
+```
+
+NuGet repository signatures cover a different verification boundary; a public
+assembly strong name is not publisher authentication.
 
 Public CI uses distinct `0.0.0-ci.<run>.<attempt>` versions through
 `SHARPPROOF_CI_PACKAGE_VERSION`; those binaries are never release artifacts.

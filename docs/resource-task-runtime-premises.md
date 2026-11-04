@@ -91,7 +91,7 @@ Source-derived closure of every runtime/helper frame and initialization path is
 a separate future strengthening. A deployment or quantity declaration that is
 false invalidates the conditional guarantee.
 
-## Verification progress
+## Original implementation validation record
 
 The private arithmetic checker passed 21 targeted tests; the Linux Int32 helper
 selector passed 18 targeted tests. The package's existing no-premise consumer
@@ -102,4 +102,6 @@ suite passed 83 tests, the frontend catalog two, and analyzer resource/projectio
 checks 296. Packaged conditional-Proven controls passed for returned and configured roots,
 including all quantities, used assumptions, task/layout provenance and SARIF.
 The no-premise Unknown package regression also passed after the rebase.
-Exact-head hosted qualification also remains open.
+These counts describe the original implementation validation, not a current-head
+qualification receipt. Review completed CI for the exact source revision; ordinary
+CI does not establish that an application satisfies its declared deployment premises.

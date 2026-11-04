@@ -1,6 +1,6 @@
 # SMT lifecycle
 
-Native Z3 runs in the Linux amd64 verifier boundary. The portable analyzer does not load it. Pinned payload and loading rules are described in [native SMT packaging](native-smt-packaging.md).
+Native Z3 runs in the out-of-process verifier on the supported container or native host. The portable analyzer does not load it. Pinned payload, host support, and loading rules are described in [native SMT packaging](native-smt-packaging.md).
 
 ## Construct an obligation
 
@@ -28,7 +28,7 @@ The worker assembles outcomes, reasons, assumptions, certainty, witness, and vac
 
 ## Cancel and terminate
 
-The worker accepts cancellation and applies semantic and wall-clock limits. The launcher separately bounds project execution and termination grace. Container CPU and memory limits are the outer resource boundary; SharpProof does not duplicate Docker's resource controller.
+The worker accepts cancellation and applies semantic and wall-clock limits. The launcher separately bounds project execution and termination grace. Container runs also have Docker CPU and memory isolation; native callers must provision resources or provide external isolation. SharpProof does not duplicate Docker's resource controller.
 
 Timeout and backend failure are not proofs. They must remain visible in run or claim records and cannot become an empty successful response.
 
