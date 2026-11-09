@@ -1,10 +1,12 @@
 # Repository quality gates
 
-The main CI workflow runs the combined repository quality and link checks on pull
-requests and pushes to master. A failed, skipped, or canceled quality job fails the
-existing build-and-test gate. Release publication also requires this job. Quality
-checks and the standalone link audit have weekly schedules and manual dispatch.
-Findings are reported; CI never applies fixes.
+The main CI workflow runs the combined repository quality and link checks in its
+`repository` lane on pull requests, master pushes, weekly schedules and manual
+dispatch. A failed, skipped, or canceled lane fails the `build-and-test` gate.
+The release runbook requires tagging a master commit whose CI passed; the release
+workflow itself gates publication on its packaging, native smoke and attestation
+jobs. There is no separate link-audit workflow. Findings are reported; CI never
+applies fixes.
 
 ## Run locally
 
@@ -74,8 +76,8 @@ Other offline audits remain enabled, including credential persistence and inject
 
 ## API baseline
 
-There is no public NuGet release to use as a baseline yet. `api-baseline.txt` pins
-an immutable Git commit. The compatibility script builds its Attributes package in
+`api-baseline.txt` pins an immutable Git commit rather than selecting a NuGet
+version dynamically. The compatibility script builds its Attributes package in
 a separate temporary clone, builds the current package with SDK package validation,
 then compares the two with ApiCompat, including parameter names. Missing baseline
 objects, restore/build errors, missing packages, and API removals all fail.
@@ -88,8 +90,8 @@ only when intentionally accepting a compatibility change, with normal review.
 ## Links
 
 The combined command checks links using `lychee.toml` and saves its detailed report
-to `artifacts/lint/links.md`. The standalone link workflow runs the same script and
-keeps its own artifact. Both fail on broken links and empty input and exercise
+to `artifacts/lint/links.md`. The `repository` lane retains it with the other lint
+reports. The script fails on broken links and empty input and exercises
 missing-file and missing-anchor fixtures on successful runs.
 One historical Debian license reference is mapped to an archive mirror of the
 same message, verified by its Message-ID, because the original host times out in

@@ -9,7 +9,8 @@ both projects and the pinned local tool remain visible. Compiler outputs, NuGet
 packages, and the local tool resolver cache use private named volumes.
 
 `NuGet.config` restores every package, SharpProof included, from nuget.org and
-needs no credentials. Authenticate Docker to the private
+needs no credentials for that source. If the matching preview packages are not
+published there, configure your qualified local or private feed before restore. Authenticate Docker to the private
 `ghcr.io/alexyorke/sharpproof-preview` image using your credential store.
 
 For portable analysis:
@@ -34,7 +35,8 @@ docker compose run --rm verify tool run dotnet-sharpproof -- explain --result ar
 Use the commands for the variant selected with `--verification`. Portable
 analysis uses the advisory profile and disables native verification; the
 container variant uses the strict profile. `DemonstrateDiagnostic` intentionally
-emits SP0027; change its argument from -1 to 0 to remove that warning.
+emits SP0027; strict verification also refutes that call with SP0051. Change its
+argument from -1 to 0 before expecting the container build to pass.
 
 The optional `SharpProof.CodeFixes` reference is included by default. Generate
 with `--editor false` to omit it. The core `SharpProof` facade remains the only
@@ -50,7 +52,8 @@ docker compose run --rm verify test tests/SharpProof.Regression/SharpProof.Regre
 
 The container variant's CI caller pins the reusable workflow to source revision
 `__SHARPPROOF_SOURCE_REVISION__`. Configure read-only
-`SHARPPROOF_PREVIEW_TOKEN` for image and package reads. Comparison defaults to
+`SHARPPROOF_PREVIEW_TOKEN` for private image reads. Packages default to nuget.org;
+the optional package-read token is needed only with the GitHub package feed. Comparison defaults to
 `report`; change the caller's `mode` to `enforce` to gate regressions. PR
 baselines come from the exact base commit. An explicit default-branch manual
 `initialize-baseline` run establishes the first baseline.

@@ -86,12 +86,14 @@ With `tooling dev`, the shell works in the host bind-mounted checkout and can ch
 
 `-NoBuild` applies only to reusable test commands in an already built workspace; separate finite runs create separate workspaces. `-Fast` applies only to non-qualifying test commands and disables build analyzers while retaining generation and tests. `-ReuseTestHarness` is supported only for `package-tests`. These switches are not substitutes for qualification.
 
-`-SemanticCohort All|Remaining|Gates`, `-TaskGroup All|Worker|WorkerA|WorkerB|Projects`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone.
+`-SemanticCohort All|Remaining|Gates`, `-TaskGroup`, and `-TestResultsDirectory` are supported by `pr`, `pr-gates`, and `semantic-tests`; a task group other than `All` requires the `Remaining` cohort. Task-group values are `All`, `Worker`, `WorkerA`, `WorkerA1`, `WorkerA4`, `WorkerB`, `Projects`, `ProjectsA`, `ProjectsB`, `GatesCorpus`, `GatesCorpusA`, `GatesCorpusB`, and `GatesShards`. `coverage -CoveragePart Semantic` also accepts `-TaskGroup`. Partitions require retained results and the canonical category filter; use `semantic-tests` for Gates alone.
 
-After packing clean source, test the exported package bytes:
+After packing clean source, copy the exported packages into `nupkgs/`, the ignored
+feed that finite tasks import explicitly, then test those bytes:
 
 ```text
-docker compose run --rm tooling samples -Configuration Release -PackageSource artifacts/container-packages
+docker compose run --rm tooling dev -lc 'mkdir -p nupkgs && cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/'
+docker compose run --rm tooling samples -Configuration Release -PackageSource nupkgs
 ```
 
 ## Coverage

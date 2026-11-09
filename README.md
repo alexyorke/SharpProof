@@ -6,7 +6,7 @@ SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style pro
 
 ## Packages
 
-The standard setup is `dotnet add package SharpProof` using your configured feed, or this one reference with no SharpProof configuration properties:
+The standard setup is `dotnet add package SharpProof --version 1.0.0-preview.2` using your configured feed, or this one reference with no SharpProof configuration properties:
 
 ```xml
 <ItemGroup>

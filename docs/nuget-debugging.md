@@ -3,9 +3,10 @@
 `SharpProof` is the consumer entrypoint. Its package is a metadata-only facade
 depending on `SharpProof.Verifier`, which carries the analyzer, generator,
 MSBuild tasks, worker, and native payloads. `SharpProof.Attributes` supplies the
-public runtime contract API. A release has three `.nupkg` files and two
+public runtime contract API. The core product set has three `.nupkg` files and two
 `.snupkg` files: Attributes and Verifier. The facade has no assembly or PDB to
-publish.
+publish. The release workflow also includes the three optional developer packages;
+they do not add dependencies to the core application graph.
 
 ## Symbols and sources
 

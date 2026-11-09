@@ -5,10 +5,14 @@ Install the main `SharpProof` package as the single standard reference; it enabl
 strict verification automatically and restores its API/analyzer dependencies
 through `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`.
 `SharpProof.Verifier` is a compatibility entrypoint and owns the analyzer,
-`ContractFor` generator, build-transitive configuration, and worker payloads.
+`ContractFor` generator, direct-consumer build configuration, and worker payloads.
 Its worker supports the canonical Linux container and native Windows, macOS,
 and glibc Linux on x64/ARM64 within the [support matrix](preview-support.md).
 Implementation assemblies add no supported application API.
+
+Verification and analyzers apply to projects that reference SharpProof directly.
+Downstream projects receive the Attributes application dependency, without
+inheriting the verifier's build configuration.
 
 ## Attribute targets and arguments
 

@@ -24,14 +24,13 @@ Framework 4.6.1/4.7.2/4.8.1, Standard 2.0, Core 2.0, and .NET 10. This checks th
 older target does not accidentally skip verification. The legacy Verifier entrypoint
 retains its existing controls.
 
-Windows package CI additionally exercises `net48` proof, bound refutation, library
-packing, and downstream application execution. It checks that the application runs
-on the Windows CLR (`mscorlib`, CLR 4), receives the transitive Attributes assembly,
-and does not receive the native solver. That test runs on the current hosted Windows
-image. It does not qualify the original Framework 4.8 runtime or an older Windows OS.
-The Visual Studio MSBuild.exe variants use the same kinds of negative and downstream
-checks; their exact-artifact CI qualification must complete before those host results
-are reported as passed.
+The current [release workflow](../.github/workflows/release.yml) runs one native
+smoke consumer on `windows-latest` and one on `macos-latest`. Each targets net10.0
+and checks a Proven postcondition and its Refuted broken counterpart against the
+exact packed packages. It does not execute a net48 downstream application or run
+MSBuild.exe. The older-target tests above run under Core MSBuild in the canonical
+Linux container and establish compilation and verifier behavior, not deployment
+on an original Framework runtime or old Windows OS.
 
 These are integration tests using a small supported contract. They do not expand
 [language/API coverage](coverage-and-limits.md) or establish that arbitrary project
@@ -75,7 +74,7 @@ See Microsoft's
 | IDE / project | Current boundary |
 | --- | --- |
 | Modern SDK-style C# project, built with `dotnet build` | Target matrix above; one main-package reference |
-| Visual Studio 2026 / Windows x64 MSBuild 18+ | Full verification uses the .NET 10 out-of-process task host; require a successful completed exact-artifact MSBuild.exe qualification run for the scenarios below |
+| Visual Studio 2026 / Windows x64 MSBuild 18+ | Implemented .NET 10 out-of-process task-host path; actual MSBuild.exe qualification remains separate from current CI |
 | Visual Studio 2022 / MSBuild 17.14 | Explicit advisory-only operation with a compatible SDK/Roslyn host; default strict verification requires upgrading the build host |
 | Visual Studio 2019 and older | Existing analyzer compiler minimum is not met; no compatibility promise |
 | Classic non-SDK project or `packages.config` | Not covered by the one-reference SDK-style tests; requires separate package import/compiler integration |
@@ -89,25 +88,22 @@ must belong to the same .NET installation; custom split SDK/runtime layouts are
 rejected. This uses Microsoft's out-of-process
 [.NET task host for VS 2026](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-10/sdk#use-net-msbuild-tasks-with-net-framework-msbuild).
 
-The x64 host qualification workflow has two distinct modes:
+The package layout and host-selection tests exercise the task registrations,
+version gates and .NET-installation identity checks. They do not run a real
+Visual Studio MSBuild.exe host. The current release workflow has no MSBuild 17.14
+advisory-only job, no MSBuild 18+ full-verifier job, and no full-framework ARM64
+qualification job. Its native Windows smoke uses `dotnet build` on the hosted
+runner's architecture.
 
-- MSBuild 17.14 with SDK 9.0.300 explicitly selects advisory-only analysis and
-  checks portable behavior. This does not run or qualify the default verifier.
-- MSBuild 18+ with the pinned .NET 10 SDK runs actual MSBuild.exe against a
-  single-reference `net48` consumer with no SharpProof properties, requires proof
-  and bound refutation, packs a library, builds and executes its downstream
-  application on CLR 4, and checks clean behavior. The full-host path is tested
-  separately from the corresponding `dotnet build` consumer.
+To qualify those full-framework routes, run actual MSBuild.exe against the exact
+packages: require the single-reference proof and broken-contract failure, pack a
+library, execute its downstream net48 application on the intended CLR, and test
+clean, incremental and cancellation behavior. Retain the SDK/MSBuild.exe version,
+source SHA, architecture and complete result evidence. Native Core MSBuild results
+cannot stand in for those full-framework host results.
 
-Review the actual SDK/MSBuild.exe version, source SHA, architecture, and successful
-completed exact-artifact CI run. The Windows 2022 VS 17 and Windows 2025/VS 2026 VS 18
-jobs run on x64; their definitions describe qualification scenarios, not outcomes.
-The ARM64 full-framework task-host bridge is implemented but is not separately
-qualified by these jobs. Native Windows ARM64 proof coverage uses Core MSBuild and
-does not establish that the ARM64 full-framework host path has been exercised.
-
-Design-time builds do not run proofs. These checks qualify command-line build hosts,
-not interactive Visual Studio diagnostic discovery, code-fix menus, or typing latency.
+Design-time builds do not run proofs. Command-line host qualification does not
+establish interactive Visual Studio diagnostic discovery, code-fix menus, or typing latency.
 Installing a newer command-line SDK does not replace an IDE's embedded compiler or
 establish that its analyzer/code-fix loader works. Those interactive workflows have
 not been manually qualified by this matrix.

@@ -1,6 +1,6 @@
 # Getting started
 
-Run `dotnet add package SharpProof` in an SDK-style C# project using your configured feed, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
+Run `dotnet add package SharpProof --version 1.0.0-preview.2` in an SDK-style C# project using your configured feed, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
 
 The
 [workspace template](developer-experience.md#install-and-start) supplies the matching

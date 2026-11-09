@@ -48,9 +48,8 @@ try {
     if (@($untrackedCode | Where-Object { $_ -notlike 'docs/tutorials/*' }).Count) {
         throw 'Commit non-tutorial untracked source before running the tutorial snapshot.'
     }
-    [xml]$release = Get-Content (Join-Path $sourceRoot 'eng/Versions.props') -Raw
-    $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).Replace(
-        '$(SharpProofVersionPrefix)', [string]$release.Project.PropertyGroup.SharpProofVersionPrefix)
+    Import-Module (Join-Path $sourceRoot 'eng/scripts/SharpProof.ReleaseConfiguration.psm1') -Force
+    $version = Get-SharpProofEffectivePackageVersion -RepositoryRoot $sourceRoot
     $feed = Join-Path $scratch 'feed'
     [void][IO.Directory]::CreateDirectory($feed)
     $manifest = Get-Content (Join-Path $sourceRoot 'eng/scripts/package-projects.json') -Raw | ConvertFrom-Json
@@ -58,7 +57,18 @@ try {
     foreach ($project in $manifest.projects) {
         $name = [IO.Path]::GetFileNameWithoutExtension($project)
         $exitCode = Invoke-LoggedDotnet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                    'pack', (Join-Path $sourceRoot $project), '-c', 'Release', '-o', $feed, '--nologo'))) `
+                    'build', (Join-Path $sourceRoot $project), '-c', 'Release', '--nologo',
+                    '-p:GeneratePackageOnBuild=false'))) `
+            -LogPath (Join-Path $evidenceRoot "build-$name.log")
+        if ($exitCode -ne 0) { throw "Building $name failed; see the evidence directory." }
+    }
+    & (Join-Path $sourceRoot 'eng/scripts/Export-SharpProofEmbeddedSymbols.ps1') `
+        -RepositoryRoot $sourceRoot -Configuration Release
+    foreach ($project in $manifest.projects) {
+        $name = [IO.Path]::GetFileNameWithoutExtension($project)
+        $exitCode = Invoke-LoggedDotnet -Arguments ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+                    'pack', (Join-Path $sourceRoot $project), '-c', 'Release', '-o', $feed,
+                    '--no-build', '--no-restore', '--nologo'))) `
             -LogPath (Join-Path $evidenceRoot "pack-$name.log")
         if ($exitCode -ne 0) { throw "Packing $name failed; see the evidence directory." }
     }

@@ -51,7 +51,7 @@ dotnet sharpproof init --project MyLibrary.csproj --verification portable --appl
 ```
 
 Portable is the default; omit `--apply` to leave files unchanged. The plan pins
-the public facade, private editor reference, and local tool to the installed tool's
+the facade, optional editor reference with `PrivateAssets="all"`, and local tool to the installed tool's
 version and names the nuget.org source, mapping `SharpProof*` to it when the
 configuration already uses package source mapping. It may reuse ancestor
 NuGet/tool/central-version files, so review every listed path. Conflicting versions,

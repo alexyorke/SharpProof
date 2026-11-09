@@ -10,8 +10,8 @@ The repository follows the [Arcade SDK requirements at the pinned upstream commi
 | Shared scripts | All 151 files under `eng/common` match the pinned upstream tree. `eng/arcade-source.json` records Git blobs, SHA256 hashes and executable modes. These files are immutable. |
 | Engineering | `eng/Build.props` selects the source solution. Per-project restore supports `.slnx` with Arcade 9. Repository extensions live outside `eng/common`. |
 | Versions and feeds | Product and package dependency versions live in `eng/Versions.props`. Public engineering packages have explicit NuGet source mappings. |
-| Projects | All 57 owned C# projects are under `src`: 49 main-solution projects and eight package-backed samples. The additional upstream internal tools project stays in the required common tree. |
-| Test filenames | Nineteen test projects use `.Tests` or `.IntegrationTests`. Explicit assembly names and namespaces preserve existing identities and friend-assembly contracts. |
+| Projects | Shipping projects and their tests are under `src`; non-shipping gates, fuzzers, test helpers and their tests are under `tests`. The main solution excludes the package-backed samples under `src/samples`. The upstream internal tools project stays in the required common tree. |
+| Test filenames | Test projects use the accepted `.Tests`, `.UnitTests`, `.IntegrationTests`, or `.PerformanceTests` suffixes. Explicit assembly names and namespaces preserve existing identities and friend-assembly contracts. |
 | Build analyzers | Existing pre-SDK output isolation remains in the build-analyzer projects, with outputs redirected into Arcade's artifact tree. Existing guard and logging policies remain enabled. |
 | Testing | A custom Arcade test-runner extension uses the existing centrally pinned NUnit adapter and test SDK. Semantic and package schedulers remain available. |
 | Packaging | Package IDs, preview versions, portable symbols and Source Link remain unchanged. Arcade's explicit symbol-format validation opt-out retains NuGet.org `.snupkg` packages. |

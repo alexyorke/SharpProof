@@ -1,20 +1,20 @@
 # Preview support boundary
 
-This document defines the current verifier's qualified host/filesystem boundary. Language limits are described separately in [coverage and limits](coverage-and-limits.md).
+This document describes the implemented verifier host/filesystem boundary and the scope of current qualification checks. Packaged platform support and completed exact-artifact qualification are separate facts. Language limits are described in [coverage and limits](coverage-and-limits.md).
 
 ## Compatibility matrix
 
-| Workflow | Qualified environment | Boundary/evidence |
+| Workflow | Supported environment | Boundary/evidence |
 | --- | --- | --- |
 | Attributes API | netstandard2.0-compatible application targets | Application target is separate from compiler SDK |
 | Older application targets | SDK-style Framework 4.6.1/4.6.2/4.7.2/4.8/4.8.1, Standard 2.0, Core 2.0/3.1, .NET 5-10 | Actual default proof/refutation tests on a modern build host; see [legacy compatibility and qualification limits](legacy-compatibility.md) |
 | Explicit advisory-only analyzer consumers | Linux x64, Windows x64, macOS ARM64/x64; SDK 9.0.300+ / Roslyn 4.14+ | The default full verifier still requires SDK 10 |
 | Full verification | Canonical Linux amd64 container | Pinned .NET 10 SDK/runtime, payload, Docker resource isolation |
-| Full verification | Native Windows x64/ARM64, fixed local NTFS; SDK 10.0.100+ | .NET 10 runtime; architecture-matched solver with static C++ runtime; native package worker CI and restrictions below |
-| Full verification | Native macOS ARM64/x64; SDK 10.0.100+ | .NET 10 runtime; architecture-matched packaged solver; native package consumer CI |
+| Full verification | Native Windows x64/ARM64, fixed local NTFS; SDK 10.0.100+ | .NET 10 runtime; architecture-matched solver with static C++ runtime; release smoke coverage is limited to the Windows runner below |
+| Full verification | Native macOS ARM64/x64; SDK 10.0.100+ | .NET 10 runtime; architecture-matched packaged solver; release smoke coverage is limited to one macOS runner |
 | Full verification | Native Linux x64/ARM64; SDK 10.0.100+ | .NET 10 runtime and supported distribution prerequisites; solver payload requires glibc 2.31+ on x64 or glibc 2.17+ on ARM64, plus compatible native runtime dependencies |
-| Visual Studio command-line build host | Windows x64 full-framework MSBuild 18+ with .NET 10 SDK/runtime | Verifier tasks use the out-of-process .NET task host; require a successful completed exact-artifact MSBuild.exe proof/refutation/downstream/clean qualification run |
-| Older Visual Studio command-line build host | MSBuild 17.14 with SDK 9.0.300 and Roslyn 4.14 | Explicit advisory-only operation; default strict verification is not supported on this host |
+| Visual Studio command-line build host | Windows x64 full-framework MSBuild 18+ with .NET 10 SDK/runtime | Verifier tasks use the out-of-process .NET task host; implemented bridge with package/host-selection tests; no actual MSBuild.exe job in the current release workflow |
+| Older Visual Studio command-line build host | MSBuild 17.14 with SDK 9.0.300 and Roslyn 4.14 | Explicit advisory-only eligibility; no current native CI matrix for this host; default strict verification is unsupported |
 | Repository build/test/pack/acceptance | Canonical Linux amd64 container only | Includes repository PowerShell commands |
 | IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
 | musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
@@ -23,7 +23,7 @@ The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The c
 
 Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
 
-[Legacy compatibility](legacy-compatibility.md) separates application targets and deployment operating systems from build hosts. SDK-style targets from Framework 4.6.1 through modern .NET have package proof/refutation checks on a modern host. Windows `net48` downstream execution checks CLR 4 on the current hosted image; it does not qualify original Framework installations or old Windows VMs. The x64 MSBuild 18+ bridge and MSBuild 17.14 advisory-only matrix cover command-line hosts. Review successful completed exact-artifact CI runs for the source SHA and host version; job definitions alone are not outcomes. Full-framework ARM64 task hosting is implemented but is not separately qualified by these x64 Visual Studio jobs; native ARM64 Core MSBuild coverage is distinct. Interactive IDE behavior, classic non-SDK projects, `packages.config`, and Visual Studio 2019 or older remain unqualified.
+[Legacy compatibility](legacy-compatibility.md) separates application targets and deployment operating systems from build hosts. SDK-style targets from Framework 4.6.1 through modern .NET have package proof/refutation checks on a modern host. The canonical package tests cross-compile the older targets; they do not establish downstream execution on the original CLR or old Windows VMs. The full-framework MSBuild bridge has package-registration and host-selection tests, but the current release workflow does not run MSBuild.exe or an MSBuild 17.14 advisory-only matrix. Review successful completed exact-artifact CI runs for the source SHA and host version; job definitions alone are not outcomes. Full-framework ARM64 task hosting is implemented, but there are no separate Visual Studio or native ARM64 qualification jobs in the current release workflow. Interactive IDE behavior, classic non-SDK projects, `packages.config`, and Visual Studio 2019 or older remain unqualified.
 
 The standard `SharpProof` reference automatically enables strict full verification on a supported host; no activation properties or separate API/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint. Package defaults cannot install a compatible compiler/IDE host, supply an unsupported OS ABI, or remove local filesystem requirements. An unavailable verifier must report a failure rather than silently treating portable diagnostics as full proof.
 
@@ -39,7 +39,7 @@ The standard `SharpProof` reference automatically enables strict full verificati
 - Cooperative concurrent builds with disjoint or exactly equal publication sets. Partial overlap is rejected.
 - Independent clones and Compose projects without cross-host sharing of build outputs or qualification evidence.
 
-Explicit portable-only advisory configurations have separate cross-platform tests. Native Windows proof CI also runs the real packaged worker and validates its claim evidence. Native macOS verifier consumers use those same exact artifacts. Native Linux x64/ARM64 consumer CI restores the exact packed artifacts through the single SharpProof reference and checks proven/refuted claims and a packed library's downstream contract dependency. Review the actual source SHA and completed consumer job evidence when qualifying a release; the matrix describes the tested workflow, not the outcome of any particular CI run.
+The [release workflow](../.github/workflows/release.yml) runs exact-package proof/refutation smoke tests on `windows-latest` and `macos-latest`, using each runner's architecture and Core MSBuild. Linux amd64 package checks run in the canonical container. There are no separate native Linux ARM64, Windows ARM64, Intel/ARM macOS pair, full-framework MSBuild.exe, or downstream CLR 4 execution jobs. Payload, ABI/import, and simulated host tests do not establish those missing native execution results. Review the actual source SHA, runner architecture, and completed job evidence when qualifying a release.
 
 The Linux x64 solver payload requires glibc 2.31+. The ARM64 solver payload requires glibc 2.17+ and C++ runtime symbols through GLIBCXX_3.4.19, with the architecture-matched system loader and standard C/C++ runtime libraries available. These are native payload baselines, not a promise that an old distribution supports .NET 10: the complete host must also satisfy .NET 10's supported OS and runtime dependencies. musl distributions are unsupported. Windows x64 and ARM64 solver payloads link their C++ runtime statically and require no separate Visual C++ redistributable installation; compatible Windows and .NET 10 host prerequisites still apply. macOS uses its architecture-matched packaged library.
 
@@ -55,7 +55,7 @@ Native Windows uses the same solver and wall-clock budgets and process-tree term
 
 Hostile concurrent host mutation after validation is outside this preview threat model: for example, swapping a bind mount or directory during publication. This is not a sandbox for arbitrary malicious host processes.
 
-Attributes is fully strong-named with a deliberately public, stable open-source identity key for Framework compatibility. This is not publisher authentication or proof authority; exact assembly/payload admission and pinned inputs remain required. Public-release workflow provenance and SPDX attestations have separate subject/workflow/source checks in the [release process](../eng/release/README.md). Packages are not author-signed merely because the assembly has a strong name or the workflow uses OIDC; NuGet repository signatures and original GitHub release-asset digests are separate verification domains.
+Attributes is fully strong-named with a deliberately public, stable open-source identity key for Framework compatibility. This is not publisher authentication or proof authority; exact assembly/payload admission and pinned inputs remain required. Public-release build-provenance attestations have separate subject/workflow/source checks in the [release process](../eng/release/README.md); the current workflow does not emit an SPDX SBOM attestation. Packages are not author-signed merely because the assembly has a strong name or the workflow uses OIDC; NuGet repository signatures and original GitHub release-asset digests are separate verification domains.
 
 ## Unsupported hosts and workflows
 

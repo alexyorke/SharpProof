@@ -35,14 +35,18 @@ dotnet build src/app/MyLibrary.csproj
 ```
 
 It generates `MyLibrary.slnx`, `src/app/MyLibrary.csproj`, `tests/`, the pinned SDK/local
-tool manifest, and a credential-free private-feed configuration at the root. C# stays
-pinned to 13 for export. Both templates include the matching private editor package
-by default; `--editor false` omits it. The core application reference remains the
-public `SharpProof` facade. Private-feed authentication is needed before installing
-the template package as well as when restoring the generated workspace.
+tool manifest, and a credential-free `NuGet.config` pointing to nuget.org. C# stays
+pinned to 13 for export. Both templates include the matching optional editor package
+with `PrivateAssets="all"` by default; `--editor false` omits it. The core application
+reference remains the `SharpProof` facade. If the matching preview packages are not
+published there, configure a container-visible qualified local feed or authenticate
+to your chosen private feed before installing and restoring them.
 
 Choose `--verification container` when creating the project to generate strict
-verification, retained evidence, and a CI workflow. Run `docker compose pull verify`,
+verification, retained evidence, and a CI workflow. Before a successful strict build,
+change the deliberately invalid `Next(-1)` call in `DemonstrateDiagnostic` to `Next(0)`.
+The untouched starter emits SP0027 and its call-precondition claim is Refuted with
+SP0051, so strict verification fails even though `Next` itself is correct. Run `docker compose pull verify`,
 `docker compose run --rm verify restore MyLibrary.csproj`, then
 `docker compose run --rm verify build MyLibrary.csproj --no-restore`. The consumer image is pinned
 by digest and derives from the canonical Linux amd64 toolchain. No SharpProof source
@@ -108,7 +112,7 @@ repeat with `--apply` to write the supported configuration. Initialization does 
 establish a proof, install an SDK, authenticate a feed, or replace review of existing
 project policy. Keep secret values in your normal secret mechanism.
 
-The supported plan pins the facade, private CodeFixes reference, and local tool to the
+The supported plan pins the facade, optional CodeFixes reference with `PrivateAssets="all"`, and local tool to the
 installed tool's version, selects the requested profile, and names the nuget.org source,
 mapping `SharpProof*` to it when package source mapping is already in use. It can reuse ancestor NuGet/tool/central-version
 configuration, so inspect every listed path. Container mode also plans Compose,
@@ -163,7 +167,9 @@ freshness. Advisory project checks require SDK 9.0.300 or newer; evaluated activ
 verification requires SDK 10.0.100 or newer. The tool itself requires .NET 10.
 
 `dotnet sharpproof doctor` without `--project` is SDK discovery only. `explain --result`
-reads a standalone stored result when no sibling request and compiler manifest exist.
+can read a standalone stored result when the complete sibling request/manifest pair
+is unavailable and neither companion path is explicitly supplied. With both siblings
+present, or an explicit companion path, it requires the complete matching set.
 See the [tool reference](../src/SharpProof.Tool/README.md).
 
 `dotnet sharpproof explain --result artifacts/sharpproof/result.json` reads the matching

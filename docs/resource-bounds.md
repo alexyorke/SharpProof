@@ -8,8 +8,10 @@ dotnet_diagnostic.SP0060.severity = suggestion
 ```
 
 Bounds that depend on runtime layout, reviewed metadata costs or task premises are
-conditional on CoreCLR 8.0.32 and `net8.0` consumers. .NET 8 leaves support on
-2026-11-10, and these facts have not been re-audited for a later runtime.
+conditional on CoreCLR 8.0.32 and `net8.0` consumers. Microsoft's
+[support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core)
+lists .NET 8 support ending on 2026-11-10. These facts have not been re-audited
+for a later runtime; the pinned research runtime is not a claim of current servicing.
 
 Use SharpProof's advisory or strict profile. The off profile disables this feature.
 SP0060 reports one result per handwritten ordinary method declaration. It does
@@ -40,6 +42,11 @@ expressions, the mathematical size symbol `values.Length` is defined as zero for
 a null array; it is not an instruction to dereference a null value. Null
 array parameters may throw during execution. These count bounds apply to every
 execution prefix, including early returns and exceptional exits.
+
+The implementation sections below include version transitions from earlier
+milestones. [Release constants](release-constants.md) lists the versions required
+by the current checkout; historical introduction versions do not describe a
+second currently accepted wire format.
 
 ## Supported proof rules
 
@@ -727,12 +734,12 @@ record contains its reason and no partial order, degree or input data. Numeric
 Unknown results and finite numeric refutations publish no asymptotic proof; a
 single observed violation cannot establish an asymptotic lower bound.
 
-Protocol 45 and cache schema 68 invalidate older responses without this evidence.
+This evidence was introduced in protocol 45 and cache schema 68; later protocol/cache revisions retain it.
 Validation requires a complete growth record for non-vacuous numeric proofs,
 canonical order text matching its structured degrees, valid input identities,
 and mutually exclusive known/Unknown fields. It rejects growth records attached
-to numeric refutations or Unknown claims. Compiler artifact 52, manifest 6,
-resource program/evidence 8 and expression model 1 identify the current certificate.
+to numeric refutations or Unknown claims. The resource program/evidence model is 8 and expression model is 1. Use the current
+outer artifact, manifest and protocol versions from [release constants](release-constants.md).
 
 ### Lower size envelopes
 
@@ -779,8 +786,9 @@ The lower formula's nested growth descriptor uses the same canonical expression
 grammar as upper growth, with no further nested lower record. Protocol validation
 rejects missing, recursive, contradictory and mismatched input records, larger
 lower orders, partial Unknown records and tightness without matching bounds.
-Protocol 45 and cache 68 invalidate prior responses; compiler artifact 56 and
-resource program 8 retain their current formats. Cache and SARIF preserve the
+This lower-growth evidence was introduced in protocol 45 and cache 68. Resource
+program 8 retains the cost certificate; current outer versions are listed in
+[release constants](release-constants.md). Cache and SARIF preserve the
 lower record and its declared domain.
 
 ### Conditional expected upper bounds
@@ -918,9 +926,9 @@ heap allocations. Task stack metrics remain Unknown. Cumulative task bytes use
 declarations bind; without them, they remain Unknown.
 Normal-completion lifetime bounds use the separate
 runtime storage model described below. Task lower, tight, expected and amortized
-results remain unavailable. Protocol 45 and cache 68 identify the
-required execution scope and configured-await variant; compiler artifact 56
-identifies the projection execution kind.
+results remain unavailable. The current protocol and fork/join codec bind the
+required execution scope and configured-await variant; the compiler artifact
+retains the projection execution kind.
 
 ### Configured async join source work
 
@@ -966,13 +974,14 @@ remain unsupported. The declared model excludes framework and ambient callback
 work. Lifetime storage uses a separately bound runtime/layout model; this source
 work model does not measure elapsed time.
 
-Projection codec 3 and compiler artifact 56 carry the required execution-kind
-Boolean. Protocol 45 and cache 68 identify the configured runtime-model variant;
-resource program 8 and manifest 6 retain their formats.
+The projection carries the required execution-kind Boolean. The current codec,
+compiler artifact, protocol and cache versions are listed in
+[release constants](release-constants.md). Resource program 8 retains the source
+cost model.
 
 ## Compiler carrier evidence
 
-Projection codec 3 carries optional compiler-owned carrier evidence for selected
+The fork/join projection codec carries optional compiler-owned carrier evidence for selected
 AllocatedBytes, PeakAuxiliaryBytes and RetainedBytes contracts. The collector
 emits the compilation once per collector instance and imports generated callback
 frames and async state-machine fields, preserving compiler identity and a module
@@ -1019,5 +1028,6 @@ refutation, lower bound, tightness or expected value is invented.
 This model does not change AllocatedBytes: that cumulative metric includes
 exceptional prefixes, while this lifetime model describes successful completion.
 Cumulative task bytes instead require the complete declared runtime-premise
-model; see [the conditional byte model](resource-task-runtime-premises.md). Protocol 45 and cache 68 preserve the distinct lifetime
-scope through validated JSON, cache and SARIF evidence.
+model; see [the conditional byte model](resource-task-runtime-premises.md). The
+current protocol and cache preserve the distinct lifetime scope through validated
+JSON, cache and SARIF evidence.
