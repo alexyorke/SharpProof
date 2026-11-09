@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/dotnet/arcade",
-  "commit": "ca4c91e56da9ae88fc62578058d8aee531679dba",
-  "sdkVersion": "9.0.0-beta.26507.8",
+  "commit": "1141c9df487f40450bc0ab7444f8941b863528dd",
+  "sdkVersion": "9.0.0-beta.26523.9",
   "commonFiles": [
     {
       "path": "eng/common/BuildConfiguration/build-configuration.json",

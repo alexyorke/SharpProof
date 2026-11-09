@@ -1,8 +1,8 @@
 # Arcade adoption audit
 
-The repository follows the [Arcade SDK requirements at the pinned upstream commit](https://github.com/dotnet/arcade/blob/ca4c91e56da9ae88fc62578058d8aee531679dba/Documentation/ArcadeSdk.md).
+The repository follows the [Arcade SDK requirements at the pinned upstream commit](https://github.com/dotnet/arcade/blob/1141c9df487f40450bc0ab7444f8941b863528dd/Documentation/ArcadeSdk.md).
 `global.json` pins .NET SDK 10.0.403 and Microsoft.DotNet.Arcade.Sdk
-9.0.0-beta.26507.8. The SDK pin and all existing product identities are retained.
+9.0.0-beta.26523.9. The SDK pin and all existing product identities are retained.
 
 | Requirement | Implementation |
 | --- | --- |
