@@ -5,7 +5,7 @@
   "dotnet": {
     "sdkVersion": "10.0.403",
     "baseImage": "mcr.microsoft.com/dotnet/sdk:10.0.403-noble",
-    "baseImageDigest": "sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b",
+    "baseImageDigest": "sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e",
     "minimumSdkVersion": "9.0.320",
     "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.320-bookworm-slim",
     "minimumSdkImageDigest": "sha256:07ed28d9e7279248fcea27334880f6c415b42c631c39b8bc5b3caf13ec6fdaa2",
