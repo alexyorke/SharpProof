@@ -19,7 +19,7 @@ This document describes the implemented verifier host/filesystem boundary and th
 | IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
 | musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
 
-The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.319 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.403. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
+The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.320 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.403. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
 
 Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
 
