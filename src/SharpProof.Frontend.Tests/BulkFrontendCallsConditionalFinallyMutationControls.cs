@@ -110,7 +110,7 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
                 Assert.That(emission.IsElided(operation!), Is.False);
             }
 
-            var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context,
+            var lowering = RoslynProgramLowering.LowerCandidate(graph, context,
                 static _ => true, null, TestContext.CurrentContext.CancellationToken);
             if (partial && enabled)
             {

@@ -39,7 +39,7 @@ public sealed class TypedMetadataReferenceTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binder = new ContractBinder(subject.Compilation, factory);
+        var binder = new TotalContractBinder(subject.Compilation, factory);
         var binding = binder.BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
@@ -72,7 +72,7 @@ public sealed class TypedMetadataReferenceTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var binding = new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         var entry = context.Parameters[0].Entry;
         var entryType = factory.GetVariableInfo(entry).Type;
@@ -95,17 +95,17 @@ public sealed class TypedMetadataReferenceTests
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var binding = new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.EqualTo(success));
         Assert.That(binding.Clauses, Has.Length.EqualTo(count));
         Assert.That(binding.Failure, Is.EqualTo(success ? ContractBindingFailure.None : ContractBindingFailure.InvalidClosedAttribute));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellation.Token)));
+            new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellation.Token)));
         var foreignContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
         Assert.Throws<ArgumentException>(new Action(() =>
-            new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext, cancellationToken: TestContext.CurrentContext.CancellationToken)));
+            new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
 
     [Test]
@@ -332,7 +332,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         if (mode == "duplicate")
         {
             var factory = new IrFactory(IrExecutionSemantics.Total);
-            var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
             Assert.That(binding.Clauses, Is.Empty);
         }
@@ -457,7 +457,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(2));
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.True);
         Assert.That(binding.Clauses, Has.Length.EqualTo(2));
         var reversed = binding.Clauses.Reverse().ToImmutableArray();
@@ -488,7 +488,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var (compilation, method, _) = CreateSubject(directory.FullName,
             "using SharpProof.Attributes; public static class Library { public static int Target([Positive, InRange(10L, 1L)] int value) => value; }");
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(binding.Clauses, Is.Empty);
         Assert.That(new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken), Is.Null);

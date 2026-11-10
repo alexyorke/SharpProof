@@ -106,7 +106,7 @@ internal static class CompilerReachableSourceCollector
             {
                 var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
                     tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (capturedTrees[ordinals[tree]].Path));
-                var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+                var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
                     cancellationToken: cancellationToken);
                 if (binding.IsSuccess && operation != null)
                 {
@@ -117,7 +117,7 @@ internal static class CompilerReachableSourceCollector
                     if (graph != null)
                     {
                         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
-                        var lowered = new RoslynProgramLowerer(context.Factory).LowerShadowSourceBody(graph, context,
+                        var lowered = RoslynProgramLowering.LowerShadowSourceBody(graph, context,
                             callee => callee is null ? throw new System.ArgumentNullException(nameof(callee)) : (Enqueue(callee) != null), cancellationToken,
                             method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (TotalBodyLowering.ResolveScalarModel(method, context.Factory, apiSpecs) ?? specificationPacks.ResolveTotal(method)));
                         if (lowered.Classification.IsExact && body.CallsComplete)

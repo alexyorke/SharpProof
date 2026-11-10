@@ -60,7 +60,7 @@ public sealed class IteratorRequiresSessionApiCoverageTests
             System.ArgumentNullException.ThrowIfNull(candidate);
             Assert.That(candidate.Factory, Is.SameAs(factory));
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, invocation.TargetMethod), Is.True);
-            var binding = new ContractBinder(compilation, factory).BindTotalRequires(candidate);
+            var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(candidate);
             Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
             Assert.That(binding.Clauses, Has.Length.EqualTo(requires ? 1 : 0));
             Assert.That(binding.Clauses.All(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind == BoundContractKind.Requires)), Is.True);

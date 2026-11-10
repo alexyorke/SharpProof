@@ -59,7 +59,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
         var context = new TotalLoweringContext(factory, subject.Target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
-        var binding = new ContractBinder(subject.Compilation, factory).BindTotalRequires(context);
+        var binding = new TotalContractBinder(subject.Compilation, factory).BindTotalRequires(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         Assert.That(binding.Clauses.Single().Kind, Is.EqualTo(BoundContractKind.Requires));
@@ -69,7 +69,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
 
         var completeFactory = new IrFactory(IrExecutionSemantics.Total);
         var completeContext = new TotalLoweringContext(completeFactory, subject.Target);
-        var completeBinding = new ContractBinder(subject.Compilation, completeFactory).BindTotal(completeContext);
+        var completeBinding = new TotalContractBinder(subject.Compilation, completeFactory).BindTotal(completeContext);
         Assert.That(completeBinding.Failure, Is.EqualTo(hasSwitch
             ? ContractBindingFailure.UnsupportedExpression
             : ContractBindingFailure.None));
@@ -89,7 +89,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
         {
             Assert.That(subject.Invoke(input), Is.EqualTo(7));
         }
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(subject.Graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(subject.Graph, context);
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.EqualTo(!hasSwitch), lowered.Classification.Abstention.ToString());
         if (hasSwitch)

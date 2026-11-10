@@ -35,7 +35,7 @@ public sealed class PartialMethodContractTests
                 """)]);
         var definition = GetMethod(compilation, "Subject", "Identity");
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(definition);
 
         AssertSuccessfulImplementationBinding(
@@ -95,9 +95,9 @@ public sealed class PartialMethodContractTests
         var definition = GetMethod(compilation, "Subject", "Identity");
         var implementation = definition.PartialImplementationPart!;
 
-        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+        var fromDefinition = new ContractBinder(compilation)
             .Bind(definition);
-        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+        var fromImplementation = new ContractBinder(compilation)
             .Bind(implementation);
 
         AssertSingleClosedClause(fromDefinition, BoundContractKind.Requires);
@@ -125,9 +125,9 @@ public sealed class PartialMethodContractTests
         var definition = GetMethod(compilation, "Subject", "Identity");
         var implementation = definition.PartialImplementationPart!;
 
-        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+        var fromDefinition = new ContractBinder(compilation)
             .Bind(definition);
-        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+        var fromImplementation = new ContractBinder(compilation)
             .Bind(implementation);
 
         AssertSingleClosedClause(fromDefinition, BoundContractKind.Ensures);
@@ -218,7 +218,7 @@ public sealed class PartialMethodContractTests
             ? property.GetMethod!
             : property.SetMethod!;
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .BindRequires(accessor);
 
         using (Assert.EnterMultipleScope())
@@ -382,7 +382,7 @@ public sealed class PartialMethodContractTests
                 """)]);
         var target = GetMethod(compilation, "ISubject", "Identity");
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(target);
 
         AssertSuccessfulImplementationBinding(

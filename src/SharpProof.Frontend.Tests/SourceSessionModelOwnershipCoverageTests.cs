@@ -79,7 +79,7 @@ public sealed class SourceSessionModelOwnershipCoverageTests
         {
             Assert.That(frame, Is.Not.Null);
             Assert.That(graph, Is.Not.Null);
-            var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame!);
+            var lowered = RoslynProgramLowering.LowerCandidate(graph!, frame!);
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             var inputs = ImmutableDictionaryCapture.Create(frame!.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),

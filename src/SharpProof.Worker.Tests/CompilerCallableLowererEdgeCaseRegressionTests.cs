@@ -46,7 +46,7 @@ public sealed class CompilerCallableLowererEdgeCaseRegressionTests
         var (compilation, discovery) = CreateCompilation(source);
         var target = discovery.Targets.Values.Single(candidate =>
             candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == methodName));
-        return new CompilerCallableLowerer(compilation, new IrFactory())
+        return new CompilerCallableLowerer(compilation)
             .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 

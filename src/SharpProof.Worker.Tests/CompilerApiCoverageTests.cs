@@ -122,11 +122,9 @@ public sealed class CompilerApiCoverageTests
     {
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
         var compilationError = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = new CompilerCallableLowerer(null!, new IrFactory(), packs)));
-        var factoryError = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = new CompilerCallableLowerer(Compilation, null!, packs)));
+            _ = new CompilerCallableLowerer(null!, packs)));
         var packsError = Assert.Throws<ArgumentNullException>((Action)(() =>
-            _ = new CompilerCallableLowerer(Compilation, new IrFactory(),
+            _ = new CompilerCallableLowerer(Compilation,
                 (CompilerSpecificationPackConfiguration)null!)));
         var optionsError = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = CompilerOptionWireMappings.ReadInternalBoolean((CSharpCompilationOptions)null!, "ReferencesSupersedeLowerVersions")));
@@ -134,7 +132,6 @@ public sealed class CompilerApiCoverageTests
             CompilerSourceCoordinates.RememberTree(null!, 0)));
 
         Assert.That(compilationError!.ParamName, Is.EqualTo("compilation"));
-        Assert.That(factoryError!.ParamName, Is.EqualTo("factory"));
         Assert.That(packsError!.ParamName, Is.EqualTo("specificationPackAuthority"));
         Assert.That(optionsError!.ParamName, Is.EqualTo("options"));
         Assert.That(locationError!.ParamName, Is.EqualTo("location"));

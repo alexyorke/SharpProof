@@ -23,8 +23,8 @@ internal sealed record PassiveSourceSubject(TotalLoweringContext Context,
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == methodName));
         var model = compilation.GetSemanticModel(method.SyntaxTree);
         var context = new TotalLoweringContext(factory ?? new IrFactory(IrExecutionSemantics.Total), (IMethodSymbol)model.GetDeclaredSymbol(method)!);
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
-        var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(ControlFlowGraph.Create(method, model)!, context);
+        var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context);
+        var lowering = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(method, model)!, context);
         return new(context, binding, lowering);
     }
 

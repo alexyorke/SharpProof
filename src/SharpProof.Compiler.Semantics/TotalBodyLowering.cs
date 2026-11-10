@@ -46,13 +46,13 @@ internal static class TotalBodyLowering
         var invocationEmission = new InvocationEmissionPolicy(compilation);
         // Every frame shares this lowering's factory, and total binding keeps
         // no per-call state, so one binder serves all inlined callees.
-        ContractBinder? binder = null;
-        return new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context, frame =>
+        TotalContractBinder? binder = null;
+        return RoslynProgramLowering.LowerCandidate(graph, context, frame =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (initializationFree != null && !initializationFree(frame.Target.ContainingType))
             { return false; }
-            var contracts = (binder ??= new ContractBinder(compilation, context.Factory)).BindTotalRequires(frame,
+            var contracts = (binder ??= new TotalContractBinder(compilation, context.Factory)).BindTotalRequires(frame,
                 cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
             { return false; }

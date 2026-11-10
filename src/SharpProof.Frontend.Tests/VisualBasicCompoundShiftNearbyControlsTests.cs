@@ -33,7 +33,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         Assert.That(right.Classification.IsExact, Is.True);
         Assert.That(factory.GetTypeInfo(left.Value.Type).Kind, Is.EqualTo(IrTypeKind.Integer));
         Assert.That(factory.GetTypeInfo(right.Value.Type).Kind, Is.EqualTo(IrTypeKind.Reference));
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
@@ -55,7 +55,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         AssertRuntime(compilation, input, count, expected);
         var (graph, assignment, context, factory) = CreateCandidate(compilation);
         Assert.That(assignment.Value.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),

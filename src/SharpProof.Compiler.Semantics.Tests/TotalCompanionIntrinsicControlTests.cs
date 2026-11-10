@@ -36,7 +36,7 @@ public sealed class TotalCompanionIntrinsicControlTests
         var method = compilation.GetTypeByMetadataName("Target")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var result = new ContractBinder(compilation, factory).BindTotalRequires(context);
+        var result = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Clauses, Has.Length.EqualTo(1));
         Assert.That(result.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));

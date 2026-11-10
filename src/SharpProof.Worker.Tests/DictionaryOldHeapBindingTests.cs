@@ -20,11 +20,11 @@ public sealed class DictionaryOldHeapBindingTests
         var (compilation, graph, context) = Prepare();
         var parameter = context.Parameters.Single();
         context.SpecializeDictionaryOriginParameter(parameter.Parameter);
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+        var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         var clause = binding.Clauses.Single();
         Assert.That(clause.Kind, Is.EqualTo(BoundContractKind.Ensures));
-        var lowering = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
 
         var factory = context.Factory;
@@ -73,7 +73,7 @@ public sealed class DictionaryOldHeapBindingTests
     public void ArbitraryIncomingDictionaryOldStillHasNoConstructorOrigin()
     {
         var (compilation, _, context) = Prepare();
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context);
+        var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.False);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(binding.Clauses, Is.Empty);

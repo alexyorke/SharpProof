@@ -52,7 +52,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var requires = new ContractBinder(compilation, factory).BindTotalRequires(context);
+        var requires = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(requires.IsSuccess, Is.True, requires.Failure.ToString());
         Assert.That(requires.Clauses, Has.Length.EqualTo(1));
         Assert.That(requires.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
@@ -100,7 +100,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         Assert.That(planner.IsRestored(ownerBlock), Is.False);
         Assert.That(planner.TryGetPlan(source, out _), Is.False);
         Assert.That(work.ConstructionLimitExceeded, Is.False);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

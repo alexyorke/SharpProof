@@ -61,10 +61,29 @@ internal sealed class TotalContractBindingResult
     internal object Origin { get; }
 }
 
-internal sealed partial class ContractBinder
+// Lowers contract clauses to IR terms in one factory. Clause discovery,
+// source resolution and intrinsic validation are shared with ContractBinder.
+internal sealed class TotalContractBinder
 {
-    // Explicit candidate adapter. Legacy Bind and its canonical model remain
-    // authoritative while the native worker route is qualified.
+    private readonly ContractBinder _classifier;
+    private readonly IrFactory _factory;
+
+    public TotalContractBinder(
+        Compilation compilation,
+        IrFactory factory,
+        ContractClauseInventoryBuilder? clauseInventory = null)
+        : this(new ContractBinder(
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)), clauseInventory), factory)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+    }
+
+    internal TotalContractBinder(ContractBinder classifier, IrFactory factory)
+    {
+        _classifier = ArgumentNullGuard.NotNull(classifier, nameof(classifier));
+        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+    }
+
     public TotalContractBindingResult BindTotal(TotalLoweringContext context, IOperation? implementationBody = null)
     {
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
@@ -108,14 +127,14 @@ internal sealed partial class ContractBinder
         cancellationToken.ThrowIfCancellationRequested();
         if (!ReferenceEquals(_factory, context.Factory))
         { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
-        if (_api == null)
+        if (_classifier.Api == null)
         { return new([], ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature || context.Target.DeclaringSyntaxReferences.Length != 0)
         { return new([], ContractBindingFailure.UnsupportedTarget); }
         var sites = context.Target.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new ContractMetadataValueSite(
             parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry))));
         return ClosedContractAttributeBinding.BindMetadataValueSites(
-            _factory, _api.Selections, sites, cancellationToken);
+            _factory, _classifier.Api.Selections, sites, cancellationToken);
     }
 
     private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody,
@@ -127,20 +146,20 @@ internal sealed partial class ContractBinder
         {
             throw new ArgumentException("The context belongs to another factory.", nameof(context));
         }
-        if (_api == null)
+        if (_classifier.Api == null)
         { return Fail(ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature)
         { return Fail(ContractBindingFailure.UnsupportedTarget); }
-        var resolution = _contractSources.Resolve(context.Target, implementationBody, cancellationToken);
+        var resolution = _classifier.ContractSources.Resolve(context.Target, implementationBody, cancellationToken);
         if (!resolution.HasValidDirectClause && context.Target.MethodKind == MethodKind.Ordinary)
         {
-            var directFailure = ValidateIntrinsics(resolution.DirectInventory.Callable,
+            var directFailure = _classifier.ValidateIntrinsics(resolution.DirectInventory.Callable,
                 resolution.DirectInventory.ImplementationBody, requiresOnly);
             if (directFailure != ContractBindingFailure.None)
             { return Fail(directFailure); }
         }
         if (resolution.Failure != ContractBindingFailure.None &&
-            (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || HasRequiresPlacementErrors(resolution.Inventory)))
+            (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || ContractBinder.HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
         var candidates = resolution.Inventory.Clauses
             .Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
@@ -148,7 +167,7 @@ internal sealed partial class ContractBinder
                 occurrence.Kind, occurrence.Invocation)))
             .ToImmutableArray();
         var materialized = TotalContractInvocationMaterialization.Bind(
-            context, _api, _intrinsics, resolution, candidates, requiresOnly);
+            context, _classifier.Api, _classifier.Intrinsics, resolution, candidates, requiresOnly);
         if (materialized.Failure != ContractBindingFailure.None)
         {
             return Fail(materialized.Failure);
@@ -192,7 +211,7 @@ internal sealed partial class ContractBinder
         {
             var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;
             var bound = ClosedContractAttributeBinding.BindValue(
-                _factory, _api!.Selections, site.Attributes, site.Type, site.RefKind,
+                _factory, _classifier.Api!.Selections, site.Attributes, site.Type, site.RefKind,
                 () => site.IsReturn
                     ? context.Result is { } result ? _factory.Variable(result) : null
                     : _factory.Variable(context.Parameters[site.ParameterIndex].Entry), name,

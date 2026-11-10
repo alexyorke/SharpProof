@@ -65,7 +65,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
         var (graph, context, factory) = CreateLocalCandidate(compilation);
         Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
             block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error)), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
@@ -87,7 +87,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
             var (graph, context, factory) = CreateLocalCandidate(compilation);
             Assert.That(graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionalSuccessor?.Semantics == ControlFlowBranchSemantics.Error ||
                 block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Error)), Is.False);
-            var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+            var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
             foreach (var input in ImmutableArray.Create(false, true))

@@ -70,7 +70,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
 
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var fullContext = new TotalLoweringContext(factory, target);
-        var binder = new ContractBinder(compilation, factory);
+        var binder = new TotalContractBinder(compilation, factory);
         var full = binder.BindTotal(fullContext);
         Assert.That(full.IsSuccess, Is.EqualTo(!terminalArm));
         Assert.That(full.Failure, Is.EqualTo(terminalArm ? ContractBindingFailure.UnsupportedExpression : ContractBindingFailure.None));
@@ -84,7 +84,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
         Assert.That(requires.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
         Assert.That(context.IsExcludedSpecificationCall(ensures), Is.True);
         Assert.That(context.IsSpecificationOperation(conditionals[0].BranchValue!), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         Assert.That(lowering.IsExact, Is.EqualTo(!terminalArm));
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(terminalArm

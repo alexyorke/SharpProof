@@ -103,7 +103,7 @@ internal sealed class TotalProgramSourceReplay
                 var declared = model.GetDeclaredSymbol(method, cancellationToken) as IMethodSymbol
                     ?? throw new InvalidOperationException("Generated Total method has no declared method symbol.");
                 var context = new TotalLoweringContext(factory, declared);
-                var lower = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(method, model, cancellationToken)!, context, static _ => true, cancellationToken);
+                var lower = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(method, model, cancellationToken)!, context, static _ => true, cancellationToken);
                 if (!lower.IsExact)
                 { Fail(method.Identifier.ValueText + ": incomplete " + lower.Classification.Abstention); continue; }
                 var aliases = TotalProgramDifferentialOracle.CreateAliases();

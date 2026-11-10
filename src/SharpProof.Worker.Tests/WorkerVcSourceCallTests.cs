@@ -297,7 +297,7 @@ public sealed class WorkerVcSourceCallTests
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.CreateExact("SourceCallLegacyPreservation", [("Subject.cs", source)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });
         { withTotal = withTotal with { Total = null }; }

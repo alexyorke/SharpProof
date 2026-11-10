@@ -272,7 +272,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(methodSyntax, model)!, context,
+        var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(methodSyntax, model)!, context,
             static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.EqualTo(!duplicateInitializer), lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
@@ -297,7 +297,7 @@ public sealed class ResourceFrontendAdmissionGapTests
             "while (((i < n || j < n))) { if (i < n) i++; else j++; entries++; } return entries; }");
         Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
         var context = new TotalLoweringContext(subject.Factory, subject.Context.Target) { CaptureResourceLoopEntries = true };
-        var lowered = new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, context, static _ => true,
+        var lowered = RoslynProgramLowering.LowerCandidate(subject.Graph, context, static _ => true,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var guards = lowered.Program.Blocks.Select(static block => block is null

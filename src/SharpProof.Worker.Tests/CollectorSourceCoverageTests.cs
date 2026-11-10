@@ -36,7 +36,7 @@ public sealed class CollectorSourceCoverageTests
                 """)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
             .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory())
+        var preparation = new CompilerCallableLowerer(compilation)
             .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(preparation.IsSuccess, Is.False);
@@ -78,7 +78,6 @@ public sealed class CollectorSourceCoverageTests
         var packs = CompilerSpecificationPackProvider.ResolveConfiguration(null);
         var preparation = new CompilerCallableLowerer(
             compilation,
-            new IrFactory(),
             packs,
             trees.ToImmutableArray(),
             references).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);

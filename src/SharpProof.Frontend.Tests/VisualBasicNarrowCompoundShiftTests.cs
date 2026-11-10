@@ -125,7 +125,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),

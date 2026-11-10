@@ -26,7 +26,7 @@ public sealed class AdmissionCompilerCollectorCoverageTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(
             candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Method.MetadataName == "get_Value");
 
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(
             target, TestContext.CurrentContext.CancellationToken);
 
         Assert.That(preparation.Total, Is.Not.Null);

@@ -33,7 +33,7 @@ public sealed class CompilerContractBindingCaptureWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
-        var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var binding = new ContractBinder(compilation).Bind(method);
         var expectedFailure = nestedOld
             ? ContractBindingFailure.NestedOld
             : ContractBindingFailure.ResultOutsideEnsures;

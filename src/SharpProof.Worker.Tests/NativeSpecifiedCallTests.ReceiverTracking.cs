@@ -95,12 +95,12 @@ internal sealed partial class NativeSpecifiedCallTests
             .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Target"));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(target)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+        var lowered = RoslynProgramLowering.LowerCandidate(
             ControlFlowGraph.Create(target, model)!, context,
             frame =>
             {
                 System.ArgumentNullException.ThrowIfNull(frame);
-                var binding = new SharpProof.Contracts.ContractBinder(compilation, factory).BindTotalRequires(frame,
+                var binding = new SharpProof.Contracts.TotalContractBinder(compilation, factory).BindTotalRequires(frame,
                     cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
                 return binding.IsSuccess;

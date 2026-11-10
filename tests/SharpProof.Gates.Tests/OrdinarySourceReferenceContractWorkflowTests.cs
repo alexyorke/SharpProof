@@ -50,7 +50,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
         Assert.That(session.HasPotentialCallPreconditions(method), Is.True);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+        var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         var clause = binding.Clauses.Single();
         Assert.That(clause.Kind, Is.EqualTo(BoundContractKind.Requires));

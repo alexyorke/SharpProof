@@ -26,7 +26,8 @@ internal sealed class TypedContractLoweringTests
                 }
             }
             """);
-        var binder = new ContractBinder(subject.Compilation, subject.Factory);
+        var binder = new ContractBinder(subject.Compilation);
+        var totalBinder = new TotalContractBinder(binder, subject.Factory);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -37,13 +38,13 @@ internal sealed class TypedContractLoweringTests
         Assert.Throws<OperationCanceledException>(new Action(() =>
             binder.GetClauseInventory(subject.Context.Target, cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            binder.BindTotal(subject.Context, cancellationToken: cancellation.Token)));
+            totalBinder.BindTotal(subject.Context, cancellationToken: cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            binder.BindTotalRequires(subject.Context, cancellationToken: cancellation.Token)));
+            totalBinder.BindTotalRequires(subject.Context, cancellationToken: cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            binder.BindTotal(subject.Context, null, cancellation.Token)));
+            totalBinder.BindTotal(subject.Context, null, cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
-            binder.BindTotalRequires(subject.Context, null, cancellation.Token)));
+            totalBinder.BindTotalRequires(subject.Context, null, cancellation.Token)));
         Assert.Throws<OperationCanceledException>(new Action(() =>
             new ContractClauseInventoryBuilder(subject.Compilation).Create(
                 subject.Context.Target, cancellationToken: cancellation.Token)));
@@ -371,8 +372,8 @@ internal sealed class TypedContractLoweringTests
             .OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Other"));
         var model = subject.Compilation.GetSemanticModel(other.SyntaxTree);
         var graph = ControlFlowGraph.Create(other, model)!;
-        Assert.That(new RoslynProgramLowerer(subject.Factory).LowerCandidate(graph, subject.Context).IsExact, Is.False);
-        Assert.That(new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context, graph.OriginalOperation).IsSuccess, Is.False);
+        Assert.That(RoslynProgramLowering.LowerCandidate(graph, subject.Context).IsExact, Is.False);
+        Assert.That(new TotalContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context, graph.OriginalOperation).IsSuccess, Is.False);
     }
 
     [TestCase("closed-return", ContractBindingFailure.InvalidClosedAttribute)]
@@ -406,7 +407,7 @@ internal sealed class TypedContractLoweringTests
                 private static bool Helper(int x) => x > 0;
             }
             """);
-        var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
+        var binding = new TotalContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
         Assert.That(binding.Failure, Is.EqualTo(failure));
         Assert.That(binding.Clauses, Is.Empty);
         AssertRejectedBodyRetained(subject);
@@ -430,7 +431,7 @@ internal sealed class TypedContractLoweringTests
                 }
             }
             """, includeSharpProofReference: false);
-        var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
+        var binding = new TotalContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
         Assert.That(binding.Clauses, Is.Empty);
         AssertRejectedBodyRetained(subject);
@@ -449,7 +450,7 @@ internal sealed class TypedContractLoweringTests
                 }
             }
             """);
-        var binder = new ContractBinder(subject.Compilation, new IrFactory(IrExecutionSemantics.Total));
+        var binder = new TotalContractBinder(subject.Compilation, new IrFactory(IrExecutionSemantics.Total));
         Assert.Throws<ArgumentException>(new Action(() => binder.BindTotal(subject.Context)));
         AssertRejectedBodyRetained(subject);
         Assert.That(subject.Bind().Clauses, Has.Length.EqualTo(1));
@@ -469,10 +470,10 @@ internal sealed class TypedContractLoweringTests
                 public static int Target(int x) { Contract.Requires(x > 0); return x; }
             }
             """);
-        var legacy = new ContractBinder(subject.Compilation, new IrFactory()).Bind(subject.Context.Target);
+        var legacy = new ContractBinder(subject.Compilation).Bind(subject.Context.Target);
         Assert.That(legacy.IsSuccess, Is.True, legacy.Failure.ToString());
         Assert.That(legacy.Contracts!.UsesCompanion, Is.True);
-        var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
+        var binding = new TotalContractBinder(subject.Compilation, subject.Factory).BindTotal(subject.Context);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         Assert.That(binding.Clauses.Single().Evidence, Is.EqualTo(BoundContractEvidence.Companion));
@@ -497,7 +498,7 @@ internal sealed class TypedContractLoweringTests
                 "[ContractFor(typeof(Subject))] public static class SubjectContracts { public static int Target(int x) { " + clauses + " return x; } }"
             : "using SharpProof.Attributes; public static class Subject { public static int Target(int x) { " + clauses + " return x; } }";
         var subject = Subject.Create(source);
-        var binding = new ContractBinder(subject.Compilation, subject.Factory).BindTotalRequires(subject.Context);
+        var binding = new TotalContractBinder(subject.Compilation, subject.Factory).BindTotalRequires(subject.Context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         Assert.That(binding.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));
@@ -566,7 +567,7 @@ internal sealed class TypedContractLoweringTests
 
         internal TotalContractBindingResult Bind()
         {
-            var result = new ContractBinder(Compilation, Factory).BindTotal(Context);
+            var result = new TotalContractBinder(Compilation, Factory).BindTotal(Context);
             if (result.Failure != ContractBindingFailure.UnsupportedTarget)
             {
                 Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -576,7 +577,7 @@ internal sealed class TypedContractLoweringTests
 
         internal FrontendProgramLoweringResult Lower()
         {
-            return new RoslynProgramLowerer(Factory).LowerCandidate(graph, Context);
+            return RoslynProgramLowering.LowerCandidate(graph, Context);
         }
 
         internal ImmutableDictionary<IrVarId, IrValue> EntryValues(ImmutableArray<int> inputs)

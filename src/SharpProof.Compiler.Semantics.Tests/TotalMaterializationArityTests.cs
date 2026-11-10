@@ -48,7 +48,7 @@ public sealed class TotalMaterializationArityTests
         var api = ContractApiSymbols.TryCreate(compilation)!;
         Assert.That(api, Is.Not.Null);
         Assert.That(api.Clauses.GetClauseKind(invocation.TargetMethod), Is.Null);
-        var publicResult = new ContractBinder(compilation, factory).BindTotal(context);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses, Is.Empty);
         var rejected = TotalContractInvocationMaterialization.Bind(context, api,

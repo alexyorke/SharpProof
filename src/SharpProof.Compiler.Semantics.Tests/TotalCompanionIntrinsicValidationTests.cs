@@ -36,9 +36,10 @@ internal sealed class TotalCompanionIntrinsicValidationTests
         var method = compilation.GetTypeByMetadataName("Target")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binder = new ContractBinder(compilation, factory);
+        var binder = new ContractBinder(compilation);
+        var totalBinder = new TotalContractBinder(binder, factory);
         Assert.That(binder.Bind(method).Failure, Is.EqualTo(expected), "Legacy binding establishes the intrinsic policy.");
-        var total = binder.BindTotal(context);
+        var total = totalBinder.BindTotal(context);
         Assert.That(total.Failure, Is.EqualTo(expected));
         if (expected == ContractBindingFailure.None)
         {

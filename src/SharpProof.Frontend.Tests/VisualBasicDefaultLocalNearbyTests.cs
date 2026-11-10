@@ -45,7 +45,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, target);
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True, name);
-            var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+            var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);
@@ -77,7 +77,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
             var graph = ControlFlowGraph.Create(tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single(), model)!;
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
             var factory = new IrFactory(IrExecutionSemantics.Total);
-            var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, new TotalLoweringContext(factory, target));
+            var lowered = RoslynProgramLowering.LowerCandidate(graph, new TotalLoweringContext(factory, target));
             Assert.That(lowered.IsExact, Is.False);
             Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);

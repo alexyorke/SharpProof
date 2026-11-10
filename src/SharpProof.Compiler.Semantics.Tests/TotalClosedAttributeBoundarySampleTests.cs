@@ -45,7 +45,7 @@ public sealed class TotalClosedAttributeBoundarySampleTests
         Assert.That(target.GetReturnTypeAttributes(), Has.Length.EqualTo(1));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var bound = new ContractBinder(compilation, factory).BindTotal(context);
+        var bound = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
         Assert.That(bound.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)), Is.True);
@@ -78,7 +78,7 @@ public sealed class TotalClosedAttributeBoundarySampleTests
             Assert.That(interpreter.Evaluate(requires.SafeCondition, supplied).Value!.Boolean, Is.True);
             Assert.That(interpreter.Evaluate(ensures.SafeCondition, supplied).Value!.Boolean, Is.True);
         }
-        var legacy = new ContractBinder(compilation, new IrFactory()).Bind(target);
+        var legacy = new ContractBinder(compilation).Bind(target);
         Assert.That(legacy.IsSuccess, Is.EqualTo(typeName != "ulong"));
         Assert.That(legacy.Failure, Is.EqualTo(typeName == "ulong"
             ? ContractBindingFailure.InvalidClosedAttribute : ContractBindingFailure.None));

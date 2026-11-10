@@ -86,7 +86,7 @@ public sealed class DiscardedStaticConversionDepthApiTests
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.IsExact, Is.EqualTo(exact));
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         if (!exact)

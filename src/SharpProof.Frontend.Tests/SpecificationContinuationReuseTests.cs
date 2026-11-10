@@ -40,7 +40,7 @@ public sealed class SpecificationContinuationReuseTests
         var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, method);
-        var binding = new ContractBinder(compilation, factory).BindTotal(context);
+        var binding = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         var first = ControlFlowGraph.Create(syntax, model)!;
@@ -70,7 +70,7 @@ public sealed class SpecificationContinuationReuseTests
             // Reuse one owned context, then switch to another authentic graph and back.
             foreach (var graph in ImmutableArray.Create(first, first, second, first))
             {
-                var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+                var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
                 Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
                 Assert.That(lowering.ConstructionLimitExceeded, Is.False);
                 var parameter = context.Parameters.Single();

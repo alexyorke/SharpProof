@@ -372,7 +372,7 @@ internal sealed class TypedProgramSubject : IDisposable
     }
     internal FrontendProgramLoweringResult Lower()
     {
-        return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context);
+        return RoslynProgramLowering.LowerCandidate(Graph, Context);
     }
     internal FrontendProgramLoweringResult LowerSourceCalls()
     { return LowerSourceCalls(TestContext.CurrentContext.CancellationToken); }
@@ -385,7 +385,7 @@ internal sealed class TypedProgramSubject : IDisposable
 
     internal FrontendProgramLoweringResult LowerShadowSourceCalls(CancellationToken cancellationToken)
     {
-        return new RoslynProgramLowerer(Factory).LowerShadowSourceBody(Graph, Context, static _ => true, cancellationToken);
+        return RoslynProgramLowering.LowerShadowSourceBody(Graph, Context, static _ => true, cancellationToken);
     }
 
     internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, bool opaqueCalls = false)
@@ -393,7 +393,7 @@ internal sealed class TypedProgramSubject : IDisposable
 
     internal FrontendProgramLoweringResult LowerSourceCalls(bool arrayModels, CancellationToken cancellationToken, bool opaqueCalls = false)
     {
-        return new RoslynProgramLowerer(Factory).LowerCandidate(Graph, Context, static _ => true, null, cancellationToken,
+        return RoslynProgramLowering.LowerCandidate(Graph, Context, static _ => true, null, cancellationToken,
             arrayModels ? ResolveArrayEmpty : null, opaqueCalls: opaqueCalls);
 
         TotalScalarCallModel? ResolveArrayEmpty(IMethodSymbol method)

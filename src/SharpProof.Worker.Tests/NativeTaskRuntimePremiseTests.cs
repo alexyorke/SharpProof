@@ -205,7 +205,7 @@ internal sealed class NativeTaskRuntimePremiseTests
         TestCompilation.AssertNoErrors(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var target = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All, cancellation).Build().Targets.Values.Single();
-        var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+        var lowerer = new CompilerCallableLowerer(compilation);
         Assert.That(lowerer.Prepare(target, cancellation).ForkJoinProjection, Is.Not.Null);
         var quantities = target.Entry.Assumptions.Where(static assumption => assumption is null
             ? throw new ArgumentNullException(nameof(assumption)) : assumption.Kind == WorkerAssumptionKind.UserAssume).ToImmutableArray();

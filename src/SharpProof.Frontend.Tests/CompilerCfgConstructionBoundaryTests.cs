@@ -73,7 +73,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
             var context = new TotalLoweringContext(factory, method);
-            var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+            var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
 
             WriteEvidence(
                 $"case={name}; source_sha256={sourceHash}; strict_diagnostics=0; emit={emitted.Success}; " +

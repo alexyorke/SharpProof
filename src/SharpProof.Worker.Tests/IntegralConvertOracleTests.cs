@@ -61,7 +61,7 @@ public sealed class IntegralConvertOracleTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
+        var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).OfType<IrHavocInstruction>()
             .Any(havoc => havoc is null ? throw new ArgumentNullException(nameof(havoc)) : IrOpaqueCallSite.IntegralConvertInitializationPrimitive(factory, havoc.Operation) != null), Is.False);
@@ -119,7 +119,7 @@ public sealed class IntegralConvertOracleTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
+        var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         Assert.That(lowered.IsExact, Is.True);
         var runtime = new AssemblyLoadContext("IntegralConvertOracle", isCollectible: true);

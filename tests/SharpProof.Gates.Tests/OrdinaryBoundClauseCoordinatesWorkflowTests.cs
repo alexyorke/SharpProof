@@ -45,7 +45,7 @@ public sealed class OrdinaryBoundClauseCoordinatesWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Helper")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalRequires(new TotalLoweringContext(factory, method));
+        var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(new TotalLoweringContext(factory, method));
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         var clause = binding.Clauses.Single();
         var syntax = clause.SourceSyntax!;

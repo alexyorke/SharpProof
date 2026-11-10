@@ -144,7 +144,7 @@ internal sealed class FrontendTotalBody
         var context = new TotalLoweringContext(factory, method);
         var graph = ControlFlowGraph.Create(syntax, model, cancellationToken) ??
             throw new InvalidOperationException("The method has no control-flow graph.");
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context, cancellationToken);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context, cancellationToken);
         // The program reads every parameter's entry variable, so each one is
         // bound; the oracle gives the ones the body never reads a neutral value.
         var read = graph.OriginalOperation.DescendantsAndSelf()

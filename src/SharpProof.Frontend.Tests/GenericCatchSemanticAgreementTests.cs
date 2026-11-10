@@ -80,7 +80,7 @@ public sealed class GenericCatchSemanticAgreementTests
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
             Assert.That(candidate.HasScalarSignature, Is.True);
-            preparedHelper = new RoslynProgramLowerer(subject.Factory).LowerCandidate(helperGraph, candidate);
+            preparedHelper = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
             Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
             Assert.That(preparedHelper.ConstructionLimitExceeded, Is.False);
             return preparedHelper.IsExact;

@@ -68,19 +68,19 @@ public sealed class GoldenLoweringTests
             context = new(factory, symbol);
             if (bindContracts)
             {
-                contracts = new ContractBinder(compilation, factory).BindTotal(context);
+                contracts = new TotalContractBinder(compilation, factory).BindTotal(context);
             }
         }
         var sourceCalls = fixture.Source.Contains("// golden-inline-source: true", StringComparison.Ordinal);
         var frameworkModels = fixture.Source.Contains("// golden-framework-models: true", StringComparison.Ordinal);
         var opaqueCalls = fixture.Source.Contains("// golden-opaque-calls: true", StringComparison.Ordinal);
         var result = context == null ? throw new InvalidOperationException("Golden lowering fixtures lower the Total IR.")
-            : opaqueCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
+            : opaqueCalls ? RoslynProgramLowering.LowerCandidate(graph, context, PrepareCallee, null,
                 TestContext.CurrentContext.CancellationToken, opaqueCalls: true)
-            : frameworkModels ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, null,
+            : frameworkModels ? RoslynProgramLowering.LowerCandidate(graph, context, PrepareCallee, null,
                 TestContext.CurrentContext.CancellationToken, FrameworkModel)
-            : sourceCalls ? new RoslynProgramLowerer(factory).LowerCandidate(graph, context, PrepareCallee, TestContext.CurrentContext.CancellationToken)
-            : new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+            : sourceCalls ? RoslynProgramLowering.LowerCandidate(graph, context, PrepareCallee, TestContext.CurrentContext.CancellationToken)
+            : RoslynProgramLowering.LowerCandidate(graph, context);
         var printer = new IrPrinter(factory);
         var termBuilder = ImmutableDictionary.CreateBuilder<IrId, IrTerm>();
         var output = new StringBuilder();
@@ -193,7 +193,7 @@ public sealed class GoldenLoweringTests
             System.ArgumentNullException.ThrowIfNull(frame);
             if (!bindContracts)
             { return true; }
-            var binding = new ContractBinder(compilation, factory).BindTotal(frame);
+            var binding = new TotalContractBinder(compilation, factory).BindTotal(frame);
             frame.SourceCallPreconditions = [.. binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
                 .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation)))];
             return binding.IsSuccess && binding.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind != BoundContractKind.Assume));

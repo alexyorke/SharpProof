@@ -156,7 +156,7 @@ public sealed class ContractsCoverageBoundaryTests
         Assert.That(ordinaryResolution.Method, Is.Not.Null);
         Assert.That(ordinaryResolution.Method!.ContainingType.Name, Is.EqualTo("TargetContracts"));
         Assert.That(ordinaryResolution.Method.Name, Is.EqualTo("Read"));
-        var result = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var result = new ContractBinder(compilation).Bind(method);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
         Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
@@ -193,7 +193,7 @@ public sealed class ContractsCoverageBoundaryTests
         Assert.That(recognized.IsValid, Is.True);
         Assert.That(recognized.Kind, Is.EqualTo(ClosedContractAttributeKind.Positive));
         Assert.That(recognized.AttributeName, Is.EqualTo("[Positive]"));
-        var result = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var result = new ContractBinder(compilation).Bind(method);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
         Assert.That(result.Contracts.Clauses[0].Evidence, Is.EqualTo(BoundContractEvidence.ClosedAttribute));
@@ -256,7 +256,7 @@ public sealed class ContractsCoverageBoundaryTests
             ContractForSymbolMatcher.ResolveCompanion(target, null!)));
         Assert.That(exception!.ParamName, Is.EqualTo("targetIndex"));
 
-        var result = new ContractBinder(compilation, new IrFactory()).Bind(target);
+        var result = new ContractBinder(compilation).Bind(target);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
         Assert.That(result.Contracts!.UsesCompanion, Is.True);
         Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
@@ -368,7 +368,7 @@ public sealed class ContractsCoverageBoundaryTests
         var method = compilation.GetTypeByMetadataName("Library")!
             .GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        return new ContractBinder(compilation, factory)
+        return new TotalContractBinder(compilation, factory)
             .BindTotalMetadataRequires(new TotalLoweringContext(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
     }
 

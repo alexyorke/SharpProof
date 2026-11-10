@@ -14,7 +14,7 @@ public sealed class DiscardedFieldReceiverModeCoverageTests
             "int Target(bool missing) { Box receiver = missing ? null! : new Box(); try { receiver.Value++; return 17; } catch (System.NullReferenceException) { return 19; } }",
             "public sealed class Box { public int Value; }");
         Assert.That(subject.Invoke([missing]), Is.EqualTo(expected));
-        var lowering = new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, subject.Context,
+        var lowering = RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context,
             static _ => true, resolveIl: null, cancellationToken: default, approximateElementReads: true);
         Assert.That(lowering.IsExact, Is.True);
         var execution = subject.Execute(lowering, [missing]);
