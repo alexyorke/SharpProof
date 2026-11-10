@@ -36,8 +36,10 @@ try {
     $origin = & git -C $repositoryRoot remote get-url origin
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the baseline source repository.' }
     Invoke-CompatibilityNative 'git' @('-C', $baselineRoot, 'remote', 'set-url', 'origin', $origin)
+    # Baselines from before the src/ layout keep the project at the repository root.
+    $baselineProject = if (Test-Path -LiteralPath (Join-Path $baselineRoot ('src/' + $project))) { 'src/' + $project } else { $project }
     foreach ($entry in [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
-                ([ordered]@{ root = $baselineRoot; project = $project; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision }).AsReadOnly(),
+                ([ordered]@{ root = $baselineRoot; project = $baselineProject; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision }).AsReadOnly(),
                 ([ordered]@{ root = $repositoryRoot; project = ('src/' + $project); output = (Join-Path $packageRoot 'current'); validation = 'true'; revision = $currentRevision }).AsReadOnly()
             ))) {
         $entryRevision = (& git -C $entry.root rev-parse --verify 'HEAD^{commit}').Trim()
