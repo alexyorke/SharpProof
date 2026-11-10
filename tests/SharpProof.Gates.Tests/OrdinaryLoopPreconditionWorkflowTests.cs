@@ -78,7 +78,7 @@ public sealed class OrdinaryLoopPreconditionWorkflowTests
         Assert.That(plan!.LoopSearch, Is.Not.Null);
         using var solver = new PassiveCallableSolver(plan);
         var actual = await solver.VerifyCallPreconditionAsync(0, TestContext.CurrentContext.CancellationToken);
-        Assert.That(actual.Outcome, Is.TypeOf<SharpProof.Verify.ProvenOutcome>());
+        Assert.That(actual.Outcome, Is.TypeOf<SharpProof.Smt.ProvenOutcome>());
         Assert.That(actual.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(actual.CallPreconditionWitness, Is.Null);
 

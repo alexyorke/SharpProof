@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 
 namespace SharpProof.Worker.Test;

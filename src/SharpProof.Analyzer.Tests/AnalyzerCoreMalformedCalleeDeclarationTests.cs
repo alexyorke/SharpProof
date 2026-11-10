@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
 using SharpProof.Frontend.Host;
 using SharpProof.Ir;

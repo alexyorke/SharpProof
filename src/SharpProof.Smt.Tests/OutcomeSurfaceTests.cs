@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-namespace SharpProof.Verify.Test;
+namespace SharpProof.Smt.Test;
 
 [TestFixture]
 public sealed class OutcomeSurfaceTests

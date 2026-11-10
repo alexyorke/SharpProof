@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using ReportingInputValidation = ToolAssembly::SharpProof.Internal.InputValidation;
 using NUnit.Framework;
-using SharpProof.Reporting;
+using SharpProof.Tool;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.DeveloperExperience.Tests;

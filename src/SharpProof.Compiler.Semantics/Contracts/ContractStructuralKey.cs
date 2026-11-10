@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // A canonical structural rendering of a contract condition. Parameters are
 // identified by ordinal, so companion and override conditions written over

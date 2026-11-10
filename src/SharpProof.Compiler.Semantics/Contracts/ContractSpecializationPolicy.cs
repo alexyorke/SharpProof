@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // Keeps specialization failure atomic while callers retain their failure result.
 internal static class ContractSpecializationPolicy

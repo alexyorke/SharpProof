@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Specs;
 
 namespace SharpProof.Specs.Test;

@@ -13,7 +13,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

@@ -5,13 +5,13 @@ using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
 using SharpProof.Frontend;
 using SharpProof.Host;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using Microsoft.CodeAnalysis;
 
 namespace SharpProof.Worker.Test;

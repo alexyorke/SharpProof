@@ -1,6 +1,5 @@
 using System.Globalization;
 using NUnit.Framework;
-using SharpProof.Reporting;
 using SharpProof.Tool;
 using SharpProof.Worker.Protocol;
 

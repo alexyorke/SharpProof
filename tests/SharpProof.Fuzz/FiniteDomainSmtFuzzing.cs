@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Verify;
 
 namespace SharpProof.Fuzz;
 

@@ -2,9 +2,8 @@ using System.Runtime.CompilerServices;
 using System.Globalization;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
-using SharpProof.Effects;
 using SharpProof.Ir;
-namespace SharpProof.Specs;
+namespace SharpProof.Compiler.Semantics;
 
 internal enum ApiSpecResolutionFailureKind
 {

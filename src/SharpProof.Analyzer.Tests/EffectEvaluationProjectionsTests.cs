@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using SharpProof.Effects;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Analyzer.Test;
 

@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using SharpProof.Analyzer;
 using SharpProof.Frontend;
 
 namespace SharpProof.Analyzer.Test;
@@ -118,7 +117,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void PortableAnalysisAssembliesDoNotReferenceRuntimeAttributes()
     {
-        var assemblies = ImmutableArray.Create(typeof(SharpProofAnalyzer).Assembly, typeof(SharpProof.Effects.EffectSummaryProjector).Assembly);
+        var assemblies = ImmutableArray.Create(typeof(SharpProofAnalyzer).Assembly, typeof(SharpProof.Compiler.Semantics.EffectSummaryProjector).Assembly);
 
         foreach (var assembly in assemblies)
         {

@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
-using SharpProof.Fuzz;
-using SharpProof.Verify;
+using SharpProof.Smt;
 
 namespace SharpProof.Fuzz.Test;
 

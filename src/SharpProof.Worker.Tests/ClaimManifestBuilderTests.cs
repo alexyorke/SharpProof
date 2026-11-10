@@ -8,7 +8,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 
@@ -671,7 +671,7 @@ public sealed class ClaimManifestBuilderTests
     [Test]
     public void EffectWireMappingsAreNamedAndExhaustive()
     {
-        var effects = Enum.GetValues<SharpProof.Effects.EffectContractKind>().ToImmutableArray();
+        var effects = Enum.GetValues<SharpProof.Compiler.Semantics.EffectContractKind>().ToImmutableArray();
         foreach (var effect in effects)
         {
             Assert.That(
@@ -680,7 +680,7 @@ public sealed class ClaimManifestBuilderTests
         }
 
         var capabilities =
-            Enum.GetValues<SharpProof.Effects.EffectContractCapabilityKind>().ToImmutableArray();
+            Enum.GetValues<SharpProof.Compiler.Semantics.EffectContractCapabilityKind>().ToImmutableArray();
         foreach (var capability in capabilities)
         {
             Assert.That(
@@ -688,10 +688,10 @@ public sealed class ClaimManifestBuilderTests
                 Is.EqualTo(capability.ToString()));
         }
 
-        var effectCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Effects.EffectContractKind, WorkerEffectSet>();
-        effectCombinations[SharpProof.Effects.EffectContractKind.None] = WorkerEffectSet.None;
+        var effectCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Compiler.Semantics.EffectContractKind, WorkerEffectSet>();
+        effectCombinations[SharpProof.Compiler.Semantics.EffectContractKind.None] = WorkerEffectSet.None;
         foreach (var effect in effects.Where(static effect =>
-                     effect != SharpProof.Effects.EffectContractKind.None))
+                     effect != SharpProof.Compiler.Semantics.EffectContractKind.None))
         {
             var mapped = ClaimManifestBuilder.ToWorkerEffects(effect);
             foreach (var combination in effectCombinations.ToImmutable())
@@ -708,11 +708,11 @@ public sealed class ClaimManifestBuilderTests
                 combination.Key.ToString());
         }
 
-        var capabilityCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Effects.EffectContractCapabilityKind, WorkerEffectCapabilitySet>();
-        capabilityCombinations[SharpProof.Effects.EffectContractCapabilityKind.None] = WorkerEffectCapabilitySet.None;
+        var capabilityCombinations = ImmutableDictionary.CreateBuilder<SharpProof.Compiler.Semantics.EffectContractCapabilityKind, WorkerEffectCapabilitySet>();
+        capabilityCombinations[SharpProof.Compiler.Semantics.EffectContractCapabilityKind.None] = WorkerEffectCapabilitySet.None;
         foreach (var capability in capabilities.Where(static capability =>
                      capability !=
-                     SharpProof.Effects.EffectContractCapabilityKind.None))
+                     SharpProof.Compiler.Semantics.EffectContractCapabilityKind.None))
         {
             var mapped =
                 ClaimManifestBuilder.ToWorkerCapabilities(capability);
@@ -730,9 +730,9 @@ public sealed class ClaimManifestBuilderTests
                 combination.Key.ToString());
         }
         Action invalidEffect = () => _ = ClaimManifestBuilder.ToWorkerEffects(
-            (SharpProof.Effects.EffectContractKind)(1L << 30));
+            (SharpProof.Compiler.Semantics.EffectContractKind)(1L << 30));
         Action invalidCapability = () => _ = ClaimManifestBuilder.ToWorkerCapabilities(
-            (SharpProof.Effects.EffectContractCapabilityKind)(1 << 20));
+            (SharpProof.Compiler.Semantics.EffectContractCapabilityKind)(1 << 20));
         Assert.That(invalidEffect, Throws.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(invalidCapability, Throws.TypeOf<ArgumentOutOfRangeException>());
     }

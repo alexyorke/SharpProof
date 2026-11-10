@@ -1,7 +1,7 @@
 using System.Globalization;
 using SharpProof.Worker.Protocol;
 
-namespace SharpProof.Reporting;
+namespace SharpProof.Tool;
 
 internal static class VerificationReport
 {

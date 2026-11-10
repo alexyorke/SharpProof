@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace SharpProof.ContractForValidation;
+namespace SharpProof.Analyzer;
 
 internal static class ContractForDiagnosticDescriptors
 {

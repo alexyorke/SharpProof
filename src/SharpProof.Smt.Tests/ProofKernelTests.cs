@@ -3,7 +3,7 @@ using System.Reflection;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using OperationId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrOperationTag>;
 
-namespace SharpProof.Verify.Test;
+namespace SharpProof.Smt.Test;
 
 [TestFixture]
 internal sealed class ProofKernelTests

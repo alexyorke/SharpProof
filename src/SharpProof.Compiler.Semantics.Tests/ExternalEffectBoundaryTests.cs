@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using SharpProof.Specs;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 internal sealed class ExternalEffectBoundaryTests

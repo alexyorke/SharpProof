@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // Projects one compiler-owned value site's closed annotations into owned IR.
 // Every annotation is processed in source order; failure publishes no prefix.

@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 /// <summary>
 /// Resolves the existing compiler-bound trust declaration at every supported

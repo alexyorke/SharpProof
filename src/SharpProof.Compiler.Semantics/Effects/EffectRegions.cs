@@ -1,4 +1,4 @@
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 internal readonly record struct EffectRegionId : IComparable<EffectRegionId>
 {

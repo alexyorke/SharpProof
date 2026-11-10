@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;

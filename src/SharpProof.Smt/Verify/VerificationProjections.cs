@@ -1,5 +1,5 @@
 #nullable enable
-namespace SharpProof.Verify;
+namespace SharpProof.Smt;
 
 internal static class VerificationProjections
 {

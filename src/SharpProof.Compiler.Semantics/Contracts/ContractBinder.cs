@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // Classifies a callable's contract clauses (kinds, evidence and failures)
 // without lowering their conditions. TotalContractBinder lowers them to IR.

@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 internal sealed class EffectValueValidationTests

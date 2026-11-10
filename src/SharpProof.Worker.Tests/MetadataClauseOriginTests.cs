@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 

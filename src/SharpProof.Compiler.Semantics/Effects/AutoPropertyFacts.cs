@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class AutoPropertyFacts
 {

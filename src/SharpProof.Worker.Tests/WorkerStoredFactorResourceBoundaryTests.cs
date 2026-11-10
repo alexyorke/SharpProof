@@ -8,7 +8,6 @@ using SharpProof.CompilerCollector;
 using SharpProof.Ir;
 using SharpProof.Host;
 using SharpProof.Smt;
-using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

@@ -1,4 +1,4 @@
-namespace SharpProof.ContractForValidation;
+namespace SharpProof.Analyzer;
 
 /// <summary>
 /// Validates the one-to-one member mapping and clause bodies for a resolved

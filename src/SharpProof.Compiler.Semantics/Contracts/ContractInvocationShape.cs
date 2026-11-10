@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // Applies a caller's binding only after the invocation's unary shape is checked.
 internal static class ContractInvocationShape

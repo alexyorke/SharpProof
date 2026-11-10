@@ -7,9 +7,9 @@ using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Testing;
-using SharpProof.Verify;
+using SharpProof.Smt;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 internal sealed class TypedContractLoweringTests

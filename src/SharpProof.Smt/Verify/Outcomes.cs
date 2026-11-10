@@ -1,4 +1,4 @@
-namespace SharpProof.Verify;
+namespace SharpProof.Smt;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
     "Design",

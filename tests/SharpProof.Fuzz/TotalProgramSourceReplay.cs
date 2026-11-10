@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Host;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker;
 
 namespace SharpProof.Fuzz;

@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Ir;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class CompilerCustomModifierComparisonTests

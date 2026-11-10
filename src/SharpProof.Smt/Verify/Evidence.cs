@@ -1,4 +1,4 @@
-namespace SharpProof.Verify;
+namespace SharpProof.Smt;
 
 internal enum ProofDiagnosticKind
 {

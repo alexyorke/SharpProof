@@ -1,7 +1,5 @@
 using NUnit.Framework;
 using SharpProof.Ir;
-using SharpProof.Smt;
-using SharpProof.Verify;
 
 namespace SharpProof.Smt.Test;
 

@@ -6,12 +6,11 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
 using SharpProof.Specs;
-using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

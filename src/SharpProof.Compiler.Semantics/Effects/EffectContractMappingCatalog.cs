@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 [Flags]
 internal enum EffectAllocationKind

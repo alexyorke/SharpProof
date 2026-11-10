@@ -216,8 +216,8 @@ public sealed class CorpusGateTests
             Assert.That(result.Reason, Is.EqualTo(SharpProof.Worker.Protocol.WorkerClaimReason.None), item.Id);
             var outcome = result.Outcome switch
             {
-                SharpProof.Verify.ProvenOutcome => "Proven",
-                SharpProof.Verify.RefutedOutcome => "Refuted",
+                SharpProof.Smt.ProvenOutcome => "Proven",
+                SharpProof.Smt.RefutedOutcome => "Refuted",
                 _ => "Unknown"
             };
             rows.Add((item.SeedId, outcome, result.Reason.ToString()));

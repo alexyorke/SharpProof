@@ -114,7 +114,7 @@ public sealed class CompilerNestedGenericPredicateIdentityTests
         {
             Assert.That(claim.SourceOperation, Is.Not.Null);
             Assert.That(claim.SourceOperation!.Syntax.Span, Is.EqualTo(clauseSyntax.Span));
-            Assert.That(claim.Placement, Is.EqualTo(SharpProof.Contracts.ContractClausePlacement.ValidPrologue));
+            Assert.That(claim.Placement, Is.EqualTo(SharpProof.Compiler.Semantics.ContractClausePlacement.ValidPrologue));
             Assert.That(claim.Entry.Kind, Is.EqualTo(WorkerClaimKind.Postcondition));
             Assert.That(claim.Entry.Evidence, Is.EqualTo(WorkerClaimEvidence.DirectClause));
             Assert.That(claim.Entry.Ordinal, Is.Zero);

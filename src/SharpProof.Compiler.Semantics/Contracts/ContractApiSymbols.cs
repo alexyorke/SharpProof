@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed class ContractApiSymbols(
     ContractClauseSymbols clauses,

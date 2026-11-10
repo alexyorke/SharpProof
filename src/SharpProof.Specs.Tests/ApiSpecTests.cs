@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using SharpProof.Attributes;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 using SharpProof.Specs;
 using static SharpProof.Testing.ApiSpecTestFacets;

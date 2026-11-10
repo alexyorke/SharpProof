@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 internal sealed class EffectContractWireParityTests

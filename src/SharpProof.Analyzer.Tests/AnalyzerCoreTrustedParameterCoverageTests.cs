@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
-using SharpProof.Effects;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 
 namespace SharpProof.Analyzer.Test;
