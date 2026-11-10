@@ -13,7 +13,10 @@ internal enum DifferentialStatus
 {
     Agreement,
     Abstained,
-    Mismatch
+    Mismatch,
+    // Compiled C# threw where the Total IR term defines a value. Total IR
+    // models that fault as a separate guard, so the term itself agrees.
+    Undefined
 }
 
 internal sealed record DifferentialResult(
@@ -691,6 +694,14 @@ internal sealed class IrCSharpDifferentialOracle
     {
         System.ArgumentNullException.ThrowIfNull(actual);
         System.ArgumentNullException.ThrowIfNull(interpreted);
+        if (interpreted.Status == IrEvaluationStatus.Value)
+        {
+            return new DifferentialResult(
+                DifferentialStatus.Undefined,
+                interpreted,
+                "Compiled C# threw " + actual.GetType().Name +
+                "; the Total IR term defines this operation and guards the fault separately.");
+        }
         var kind = IrExceptionKindFacts.FromException(actual);
         var agrees = interpreted.Status == IrEvaluationStatus.Exception &&
                      kind != null &&
