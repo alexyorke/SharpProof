@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security;
 using System.Text.Json;
@@ -86,21 +85,10 @@ public sealed class WorkerMsBuildIntegrationTests
     ];
 
     [Test]
-    public void CanonicalContainerIsMandatoryForTheVerifier()
+    public void CanonicalContainerSatisfiesTheVerifierHostContract()
     {
-        if (OperatingSystem.IsLinux() &&
-            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-            string.Equals(
-                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            Assert.That(ContainerContract.ValidateRequired(), Is.Not.Null);
-            return;
-        }
-
-        Assert.Throws<PlatformNotSupportedException>(
-            (Action)(() => ContainerContract.ValidateRequired()));
+        TestRepository.RequireCanonicalContainer();
+        Assert.That(ContainerContract.ValidateRequired(), Is.Not.Null);
     }
 
     [Test]
@@ -2348,26 +2336,18 @@ public sealed class WorkerMsBuildIntegrationTests
     [Test]
     public async Task VerificationFailsExplicitlyOnUnsupportedHosts()
     {
-        if (OperatingSystem.IsLinux() &&
-            RuntimeInformation.ProcessArchitecture ==
-                Architecture.X64 &&
-            RuntimeInformation.OSArchitecture == Architecture.X64 &&
-            string.Equals(
-                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            Assert.Ignore("The packaged worker is supported in this container.");
-        }
-
         using var project = ConsumerProject.Create(IdentitySource);
 
-        var build = await project.BuildAsync(verify: true, []);
+        // Simulate a host outside the support matrix in docs/preview-support.md.
+        var build = await project.BuildAsync(
+            verify: true,
+            [("_SharpProofVerifierHostSupported", "false")]);
 
-        Assert.That(build.ExitCode, Is.Not.Zero);
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(
             build.Output,
-            Does.Contain("canonical Linux amd64 container"));
+            Does.Contain(
+                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
     }
 
     [Test]

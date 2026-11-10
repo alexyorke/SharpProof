@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Text.Json;
@@ -16,15 +15,6 @@ public sealed class FinalCompilationProbeTests
 {
     private const string NetStandardTargetFramework = "netstandard2.0";
     private const string NetTargetFramework = "net8.0";
-    private static bool IsSupportedWorkerHost =>
-        OperatingSystem.IsLinux() &&
-        RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
-        RuntimeInformation.OSArchitecture == Architecture.X64 &&
-        string.Equals(
-            Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
-            "1",
-            StringComparison.Ordinal);
-
     internal static void DisposeSharedPackageCache()
     {
         ProbeWorkspace.DisposeSharedPackageCache();
@@ -117,6 +107,7 @@ public sealed class FinalCompilationProbeTests
     [Test]
     public async Task PackedCollectorCapturesAndVerifiesGeneratorOutput()
     {
+        TestRepository.RequireCanonicalContainer();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ProbeWorkspace.Create();
         workspace.WritePackedConsumer(feed.Version);
@@ -135,9 +126,9 @@ public sealed class FinalCompilationProbeTests
         var firstCompilation = CompilerManifestArtifactJson.Deserialize(
             Encoding.UTF8.GetString(firstManifest.Bytes.AsSpan()),
             cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var firstResponse = IsSupportedWorkerHost
-            ? WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(workspace.VerifyResultPath))
-            : null;
+        var firstResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))
+            ?? throw new InvalidOperationException("The first worker response was not published.");
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -163,19 +154,15 @@ public sealed class FinalCompilationProbeTests
             noOpOracle.GetTreeChecksum(
                 CompilerProbeContract.ContractHintName),
             Is.EqualTo(firstGeneratedChecksum));
-        if (IsSupportedWorkerHost)
+        var noOpResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope())
         {
-            var baselineResponse = firstResponse ?? throw new InvalidOperationException("The first worker response was not published.");
-            var noOpResponse = WorkerProtocolJson.DeserializeResponse(
-                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(baselineResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-                Assert.That(noOpResponse.InputHash, Is.EqualTo(baselineResponse.InputHash));
-                Assert.That(noOpResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-                Assert.That(noOpResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-                Assert.That(noOpResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            }
+            Assert.That(firstResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(noOpResponse.InputHash, Is.EqualTo(firstResponse.InputHash));
+            Assert.That(noOpResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(noOpResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(noOpResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         }
 
         workspace.WriteProbeInput("changed-generator-input");
@@ -224,45 +211,41 @@ public sealed class FinalCompilationProbeTests
                 Is.EqualTo(JsonSerializer.Serialize(firstCompilation.ReachableSource, WorkerProtocolJson.Options)),
                 "Unrelated generated constants must preserve reachable source IR.");
         }
-        if (IsSupportedWorkerHost)
+        var changedResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope())
         {
-            var baselineResponse = firstResponse ?? throw new InvalidOperationException("The first worker response was not published.");
-            var changedResponse = WorkerProtocolJson.DeserializeResponse(
-                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(changedResponse.InputHash, Is.Not.EqualTo(baselineResponse.InputHash));
-                Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-                Assert.That(baselineResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-                Assert.That(changedResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-                Assert.That(baselineResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-                Assert.That(changedResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-                Assert.That(changedResponse.ClaimResults.Single().ClaimId, Is.EqualTo(baselineResponse.ClaimResults.Single().ClaimId));
-                Assert.That(changedResponse.CallableResults, Is.Not.Empty);
-                Assert.That(
-                    JsonSerializer.Serialize(changedResponse.CallableResults, WorkerProtocolJson.Options),
-                    Is.EqualTo(JsonSerializer.Serialize(baselineResponse.CallableResults, WorkerProtocolJson.Options)),
-                    "All callable response identities and coverage must remain stable.");
-            }
-            var verification = await workspace.VerifyPackedArtifactAsync();
-            var replayResponse = WorkerProtocolJson.DeserializeResponse(
-                await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    verification.ExitCode,
-                    Is.Zero,
-                    verification.Output);
-                Assert.That(
-                    verification.Output,
-                    Does.Contain("SharpProof Proven"));
-                Assert.That(await File.ReadAllBytesAsync(workspace.CompilerManifestPath), Is.EqualTo(changedManifest.Bytes));
-                Assert.That(replayResponse.InputHash, Is.EqualTo(changedResponse.InputHash));
-                Assert.That(replayResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-                Assert.That(replayResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-                Assert.That(replayResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-                Assert.That(replayResponse.ClaimResults.Single().ClaimId, Is.EqualTo(changedResponse.ClaimResults.Single().ClaimId));
-            }
+            Assert.That(changedResponse.InputHash, Is.Not.EqualTo(firstResponse.InputHash));
+            Assert.That(changedResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(firstResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(changedResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(firstResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(changedResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(changedResponse.ClaimResults.Single().ClaimId, Is.EqualTo(firstResponse.ClaimResults.Single().ClaimId));
+            Assert.That(changedResponse.CallableResults, Is.Not.Empty);
+            Assert.That(
+                JsonSerializer.Serialize(changedResponse.CallableResults, WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(firstResponse.CallableResults, WorkerProtocolJson.Options)),
+                "All callable response identities and coverage must remain stable.");
+        }
+        var verification = await workspace.VerifyPackedArtifactAsync();
+        var replayResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(workspace.VerifyResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                verification.ExitCode,
+                Is.Zero,
+                verification.Output);
+            Assert.That(
+                verification.Output,
+                Does.Contain("SharpProof Proven"));
+            Assert.That(await File.ReadAllBytesAsync(workspace.CompilerManifestPath), Is.EqualTo(changedManifest.Bytes));
+            Assert.That(replayResponse.InputHash, Is.EqualTo(changedResponse.InputHash));
+            Assert.That(replayResponse.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(replayResponse.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(replayResponse.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(replayResponse.ClaimResults.Single().ClaimId, Is.EqualTo(changedResponse.ClaimResults.Single().ClaimId));
         }
     }
 
@@ -282,7 +265,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(
             build.Output,
             Does.Contain(
-                "Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64"));
+                "Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
             workspace.InvocationCompilerManifestPath);
@@ -291,12 +274,7 @@ public sealed class FinalCompilationProbeTests
     [Test]
     public async Task GeneratedRefutationTraversesArtifactReplayAndCache()
     {
-        if (!IsSupportedWorkerHost)
-        {
-            Assert.Ignore(
-                "The verifier is supported only in the canonical Linux amd64 container.");
-        }
-
+        TestRepository.RequireCanonicalContainer();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ProbeWorkspace.Create();
         workspace.WritePackedConsumer(feed.Version);
@@ -365,17 +343,7 @@ public sealed class FinalCompilationProbeTests
     private static void AssertPackedBuildOutcome(ProcessResult result)
     {
         System.ArgumentNullException.ThrowIfNull(result);
-        if (IsSupportedWorkerHost)
-        {
-            Assert.That(result.ExitCode, Is.Zero, result.Output);
-            return;
-        }
-
-        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(
-            result.Output,
-            Does.Contain(
-                "canonical Linux amd64 container"));
+        Assert.That(result.ExitCode, Is.Zero, result.Output);
     }
 
     public enum ProbeSuppression
