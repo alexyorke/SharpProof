@@ -67,7 +67,7 @@ public sealed class TypedMetadataReferenceTests
     {
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
-            $"using SharpProof.Attributes; public static class Library {{ public static int Target([NotNull] {type} value) => 1; }}",
+            $"using SharpProof.Attributes; public static class Library {{ public static int Target([NonNull] {type} value) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
@@ -310,7 +310,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
 {
     [TestCase("positive", 1)]
     [TestCase("range", 1)]
-    [TestCase("notnull", 1)]
+    [TestCase("nonnull", 1)]
     [TestCase("duplicate", 0)]
     [TestCase("truncated", 0)]
     [TestCase("wrong-constructor", 0)]
@@ -380,7 +380,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         var core = metadata.AddAssemblyReference(metadata.GetOrAddString(coreName.Name!), coreName.Version!, default, metadata.GetOrAddBlob(ImmutableArray.Create<byte>((coreName.GetPublicKeyToken() ?? []).AsSpan())), (AssemblyFlags)0, default);
         var objectType = metadata.AddTypeReference(core, metadata.GetOrAddString("System"), metadata.GetOrAddString("Object"));
         var inRange = mode is "range" or "reversed-range";
-        var typeName = inRange ? "InRangeAttribute" : mode == "notnull" ? "NotNullAttribute" : "PositiveAttribute";
+        var typeName = inRange ? "InRangeAttribute" : mode == "nonnull" ? "NonNullAttribute" : "PositiveAttribute";
         var attributeType = metadata.AddTypeReference(attributes, metadata.GetOrAddString("SharpProof.Attributes"), metadata.GetOrAddString(typeName));
         ImmutableArray<byte> constructorSignature = inRange ? [0x20, 2, 1, 0x0a, 0x0a] :
             mode == "wrong-constructor" ? [0x20, 1, 1, 8] : [0x20, 0, 1];
@@ -406,7 +406,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         {
             metadata.AddCustomAttribute(parameter, constructor, metadata.GetOrAddBlob(attributeBlob));
         }
-        ImmutableArray<byte> signature = [0, 2, 8, 8, mode == "notnull" ? (byte)0x0e : (byte)8];
+        ImmutableArray<byte> signature = [0, 2, 8, 8, mode == "nonnull" ? (byte)0x0e : (byte)8];
         metadata.AddMethodDefinition(MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodImplAttributes.Managed, metadata.GetOrAddString("Read"), metadata.GetOrAddBlob(signature), 4, parameter);
         metadata.AddTypeDefinition(TypeAttributes.NotPublic, default, metadata.GetOrAddString("<Module>"), default, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));
         metadata.AddTypeDefinition(TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract, default, metadata.GetOrAddString("MetadataTarget"), objectType, MetadataTokens.FieldDefinitionHandle(1), MetadataTokens.MethodDefinitionHandle(1));

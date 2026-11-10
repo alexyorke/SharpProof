@@ -352,7 +352,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
     {
         return parameter.GetAttributes().Any(attribute => attribute.AttributeClass is { } type &&
             (type.Name is "PositiveAttribute" or "InRangeAttribute" or "RangeAttribute" ||
-             type.Name == "NotNullAttribute" && HasNamespace(type.ContainingNamespace, ["SharpProof", "Attributes"]) ||
+             type.Name == "NonNullAttribute" && HasNamespace(type.ContainingNamespace, ["SharpProof", "Attributes"]) ||
              type.Name == "DisallowNullAttribute" && HasNamespace(type.ContainingNamespace, ["System", "Diagnostics", "CodeAnalysis"])));
     }
     private static bool AcceptsEveryNullableReferenceValue(

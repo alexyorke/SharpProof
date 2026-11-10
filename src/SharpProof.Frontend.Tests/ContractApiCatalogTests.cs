@@ -31,7 +31,7 @@ public sealed class ContractApiCatalogTests
                 "SharpProof.Attributes.DoesNotThrowAttribute",
                 "SharpProof.Attributes.AllowedExceptionsAttribute",
                 "SharpProof.Attributes.EffectContractAttribute",
-                "SharpProof.Attributes.NotNullAttribute",
+                "SharpProof.Attributes.NonNullAttribute",
                 "SharpProof.Attributes.PositiveAttribute",
                 "SharpProof.Attributes.InRangeAttribute",
                 "SharpProof.Attributes.SharpProofSuppressAttribute",

@@ -68,7 +68,7 @@ internal sealed class WorkerVcDefaultArrayTests
     public async Task FreshInitializationDoesNotConstrainPreexistingArrays()
     {
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " +
-            "public static int Target([NotNull] int[] existing) { Contract.Requires(existing.Length > 0); " +
+            "public static int Target([NonNull] int[] existing) { Contract.Requires(existing.Length > 0); " +
             "Contract.Ensures(Contract.Result<int>() == 0); var fresh = new int[2]; fresh[0] = 7; return existing[0]; } }",
             cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);

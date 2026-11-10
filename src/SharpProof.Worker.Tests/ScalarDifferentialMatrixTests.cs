@@ -88,7 +88,7 @@ public sealed class ScalarDifferentialMatrixTests
             #nullable enable
             using SharpProof.Attributes;
             public static class ScalarDifferentialSubject {
-                [return: NotNull]
+                [return: NonNull]
                 public static string Target(string? left, string? right) { return string.Concat(left, right); }
             }
             """);

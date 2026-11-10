@@ -220,7 +220,7 @@ public sealed class ContractApiPolicyBoundaryTests
         var consumer = Consumer(reference);
         var resolver = ContractApiIdentityResolver.ForCompilation(consumer);
         Assert.That(resolver.Contract, Is.Not.Null);
-        Assert.That(resolver.ResolveAttribute(ContractApiMetadata.NotNull), Is.Not.Null);
+        Assert.That(resolver.ResolveAttribute(ContractApiMetadata.NonNull), Is.Not.Null);
         Assert.That(resolver.UnreadableContractApiReason, Is.Null);
         Assert.That(ContractApiIdentityResolver.ForCompilation(consumer), Is.SameAs(resolver));
     }

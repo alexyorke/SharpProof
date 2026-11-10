@@ -42,7 +42,7 @@ public sealed class ContractApiIdentityResolverTests
             Assert.That(Convert.ToHexString(assembly.GetName().GetPublicKeyToken()!), Is.EqualTo("75825C3E099F5FAC"));
             Assert.That(resolver.Contract, Is.Not.Null);
             Assert.That(
-                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                resolver.ResolveAttribute(ContractApiMetadata.NonNull),
                 Is.Not.Null);
         }
     }
@@ -64,7 +64,7 @@ public sealed class ContractApiIdentityResolverTests
         Assert.That(AssemblyName.GetAssemblyName(path).FullName, Is.EqualTo(authentic.GetName().FullName));
         var resolver = ContractApiIdentityResolver.ForCompilation(CreateConsumer(MetadataReference.CreateFromFile(path)));
         Assert.That(resolver.Contract, Is.Null);
-        Assert.That(resolver.ResolveAttribute(ContractApiMetadata.NotNull), Is.Null);
+        Assert.That(resolver.ResolveAttribute(ContractApiMetadata.NonNull), Is.Null);
         Assert.That(resolver.UnreadableContractApiReason, Is.Null,
             "A changed payload is an identity rejection, not an unreadable-file diagnostic.");
     }
@@ -83,7 +83,7 @@ public sealed class ContractApiIdentityResolverTests
             Assert.That(reference.FilePath, Is.Null);
             Assert.That(resolver.Contract, Is.Not.Null);
             Assert.That(
-                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                resolver.ResolveAttribute(ContractApiMetadata.NonNull),
                 Is.Not.Null);
         }
     }
@@ -112,7 +112,7 @@ public sealed class ContractApiIdentityResolverTests
             Assert.That(reference.FilePath, Is.Null);
             Assert.That(resolver.Contract, Is.Null);
             Assert.That(
-                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                resolver.ResolveAttribute(ContractApiMetadata.NonNull),
                 Is.Null);
         }
     }
@@ -147,7 +147,7 @@ public sealed class ContractApiIdentityResolverTests
         {
             Assert.That(resolver.Contract, Is.Null);
             Assert.That(
-                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                resolver.ResolveAttribute(ContractApiMetadata.NonNull),
                 Is.Null);
             Assert.That(
                 resolver.ResolveAttribute(ContractApiMetadata.Positive),
@@ -178,10 +178,10 @@ public sealed class ContractApiIdentityResolverTests
             Is.EquivalentTo(ImmutableArray.Create(
                 ContractApiMetadata.Trusted,
                 ContractApiMetadata.EffectContract,
-                ContractApiMetadata.NotNull,
+                ContractApiMetadata.NonNull,
                 ContractApiMetadata.Positive,
                 ContractApiMetadata.InRange,
-                ContractApiMetadata.NotNull
+                ContractApiMetadata.NonNull
             )));
     }
 
@@ -197,9 +197,9 @@ public sealed class ContractApiIdentityResolverTests
                 [SharpProof.Attributes.EffectContract(
                     SharpProof.Attributes.SharpProofEffect.None,
                     Complete = true)]
-                [return: SharpProof.Attributes.NotNull]
+                [return: SharpProof.Attributes.NonNull]
                 public static string Read(
-                    [SharpProof.Attributes.NotNull] string text,
+                    [SharpProof.Attributes.NonNull] string text,
                     [SharpProof.Attributes.Positive] int positive,
                     [SharpProof.Attributes.InRange(1, 5)] int range) =>
                     text;
@@ -268,7 +268,7 @@ public sealed class ContractApiIdentityResolverTests
                 [System.AttributeUsage(
                     System.AttributeTargets.Parameter |
                     System.AttributeTargets.ReturnValue)]
-                public sealed class NotNullAttribute : System.Attribute {
+                public sealed class NonNullAttribute : System.Attribute {
                 }
 
                 [System.AttributeUsage(

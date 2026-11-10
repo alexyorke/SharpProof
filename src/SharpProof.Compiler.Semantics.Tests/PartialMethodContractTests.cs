@@ -118,7 +118,7 @@ public sealed class PartialMethodContractTests
                 """
                 using SharpProof.Attributes;
                 public static partial class Subject {
-                    [return: NotNull]
+                    [return: NonNull]
                     public static partial string Identity(string value) => value;
                 }
                 """)]);

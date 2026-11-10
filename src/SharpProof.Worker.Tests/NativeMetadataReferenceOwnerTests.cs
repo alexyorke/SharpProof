@@ -26,7 +26,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     {
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
-            $"using SharpProof.Attributes; public static class Library {{ public static {type} Target([NotNull] {type} value) => value; }}",
+            $"using SharpProof.Attributes; public static class Library {{ public static {type} Target([NonNull] {type} value) => value; }}",
             $"public static class Subject {{ public static {type} Target({type} value) {{ {(guarded ? "if (value == null) return null;" : "")} return Library.Target(value); }} }}",
             includeSharpProofReference: true);
         var references = Capture(subject);
@@ -76,7 +76,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     public void ReferenceArgumentFaultPreventsCallObservation()
     {
         using var subject = new MetadataTestSubject(
-            "using SharpProof.Attributes; public static class Library { public static int Target([NotNull] string value) => 7; }",
+            "using SharpProof.Attributes; public static class Library { public static int Target([NonNull] string value) => 7; }",
             "public static class Subject { public static int Target(string value) => Library.Target(value.Length == 0 ? null : value); }",
             includeSharpProofReference: true);
         var references = Capture(subject);
@@ -103,7 +103,7 @@ public sealed class NativeMetadataReferenceOwnerTests
     {
         System.ArgumentNullException.ThrowIfNull(type);
         using var subject = new MetadataTestSubject(
-            "using SharpProof.Attributes; public static class Library { public static object Target([NotNull] object value) => value; }",
+            "using SharpProof.Attributes; public static class Library { public static object Target([NonNull] object value) => value; }",
             $"public struct ValueToken {{ }} public class Subject {{ public static object Target({type} value) => Library.Target(value); }}",
             includeSharpProofReference: true);
         var batch = Prepare(subject, Capture(subject), true);
