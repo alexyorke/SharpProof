@@ -15,8 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
-    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
-    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />

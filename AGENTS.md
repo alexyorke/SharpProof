@@ -7,6 +7,7 @@
 - Docker owns CPU and memory isolation. Do not add host Job Objects, cgroup readers, RSS monitors, or process-memory command-line budgets.
 
 - Follow the pinned Arcade SDK in `global.json`; keep `eng/common` byte-for-byte identical to `eng/arcade-source.json`.
-- Put shipping C# projects and their tests under `src/`; non-shipping test infrastructure (corpus gates, fuzzers, test helpers) lives under `tests/`. Test project filenames end in `.Tests`, `.UnitTests`, `.IntegrationTests`, or `.PerformanceTests`.
+- Put shipping C# projects and their tests under `src/`; non-shipping test infrastructure (corpus gates, fuzzers, smoke projects) lives under `tests/`. The repository-only build analyzers (`ConsoleLoggingAnalyzer`, `DefensiveCodingAnalyzer`) stay in `src/`. Test project filenames end in `.Tests`, `.UnitTests`, `.IntegrationTests`, or `.PerformanceTests` and are named after the production project they test.
+- Shared test helper sources live in `eng/testing/`; each test project links the helpers it uses with an explicit `<Compile Include="../../eng/testing/X.cs" Link="X.cs" />`.
 - Keep dependency versions in `eng/Versions.props` and compiler output under `artifacts/bin` and `artifacts/obj`.
 - Run `docker compose run --rm tooling layout` after structural changes. Finite task build outputs stay private to the container; evidence and packages are exported on completion.

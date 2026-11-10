@@ -7,4 +7,10 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>

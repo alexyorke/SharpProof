@@ -113,7 +113,7 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.host": {
@@ -126,7 +126,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Z3": "[4.12.2, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "Microsoft.CodeAnalysis.Analyzers": {

@@ -25,4 +25,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Gates.Test" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/DictionaryAnalyzerConfigOptions.cs" Link="DictionaryAnalyzerConfigOptions.cs" />
+  </ItemGroup>
 </Project>

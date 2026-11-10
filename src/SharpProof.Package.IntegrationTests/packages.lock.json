@@ -195,15 +195,15 @@
       "sharpproof.buildtasks": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+          "SharpProof.Host": "[1.0.0-preview.2, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.compilerartifact": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.compilerprobe.testasset": {
@@ -225,23 +225,23 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Z3": "[4.12.2, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.specs": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.worker": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Logging": "[1.0.0-preview.1, )",
-          "SharpProof.Smt": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
+          "SharpProof.CompilerArtifact": "[1.0.0-preview.2, )",
+          "SharpProof.Host": "[1.0.0-preview.2, )",
+          "SharpProof.Logging": "[1.0.0-preview.2, )",
+          "SharpProof.Smt": "[1.0.0-preview.2, )",
+          "SharpProof.Specs": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.worker.protocol": {

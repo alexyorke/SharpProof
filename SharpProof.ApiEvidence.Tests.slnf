@@ -2,7 +2,7 @@
   "solution": {
     "path": "SharpProof.slnx",
     "projects": [
-      "src\\SharpProof.Effects.Tests\\SharpProof.Effects.Tests.csproj",
+      "src\\SharpProof.Compiler.Semantics.Tests\\SharpProof.Compiler.Semantics.Tests.csproj",
       "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj"
     ]
   }

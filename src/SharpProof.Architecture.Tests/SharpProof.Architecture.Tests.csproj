@@ -17,4 +17,9 @@
                       Lines="@(_ArchitectureItem->'%(ProjectName)|%(Kind)|%(Identity)')"
                       Overwrite="true" Encoding="UTF-8" />
   </Target>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>
