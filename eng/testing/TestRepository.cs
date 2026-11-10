@@ -45,8 +45,10 @@ internal static class TestRepository
             return;
         }
 
+        // This is the repository test boundary, not the product support matrix in
+        // docs/preview-support.md: consumers also verify on native hosts.
         Assert.Ignore(
-            "The packaged worker is supported only in the canonical Linux amd64 container.");
+            "This test needs the canonical Linux amd64 tooling container.");
     }
 
 }
