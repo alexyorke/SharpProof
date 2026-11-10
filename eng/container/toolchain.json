@@ -9,13 +9,13 @@
     "minimumSdkVersion": "9.0.320",
     "minimumSdkImage": "mcr.microsoft.com/dotnet/sdk:9.0.320-bookworm-slim",
     "minimumSdkImageDigest": "sha256:07ed28d9e7279248fcea27334880f6c415b42c631c39b8bc5b3caf13ec6fdaa2",
-    "minimumSdkFrameworkVersion": "8.0.32",
-    "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.426-bookworm-slim",
-    "minimumSdkFrameworkImageDigest": "sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f",
+    "minimumSdkFrameworkVersion": "8.0.33",
+    "minimumSdkFrameworkImage": "mcr.microsoft.com/dotnet/sdk:8.0.427-bookworm-slim",
+    "minimumSdkFrameworkImageDigest": "sha256:341aa6e8bbaceb1194732328ca27c15bfa9c531687db83a66af3c0c1833f5534",
     "apiInventoryPackVersion": "9.0.18",
     "apiInventoryPackUrl": "https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/9.0.18/microsoft.netcore.app.ref.9.0.18.nupkg",
     "apiInventoryPackSha256": "645538957cff063262a94e2cca4644611e63e5eef8e4a31fe193e8d061e789c5",
-    "testRuntimeVersion": "8.0.32"
+    "testRuntimeVersion": "8.0.33"
   },
   "powershell": {
     "versionLine": "7.5",
