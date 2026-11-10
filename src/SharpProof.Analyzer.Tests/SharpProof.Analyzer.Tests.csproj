@@ -19,4 +19,14 @@
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/DictionaryAnalyzerConfigOptions.cs" Link="DictionaryAnalyzerConfigOptions.cs" />
+    <Compile Include="../../eng/testing/GoldenTest.cs" Link="GoldenTest.cs" />
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/RuntimeAssemblyTestHost.cs" Link="RuntimeAssemblyTestHost.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestMetadataReferences.cs" Link="TestMetadataReferences.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>

@@ -26,4 +26,13 @@
   <ItemGroup>
     <Compile Include="..\..\tests\SharpProof.Fuzz\FrontendTotalLowering.cs" Link="Shared\FrontendTotalLowering.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/GoldenTest.cs" Link="GoldenTest.cs" />
+    <Compile Include="../../eng/testing/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestMetadataReferences.cs" Link="TestMetadataReferences.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>

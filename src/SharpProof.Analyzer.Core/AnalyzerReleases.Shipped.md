@@ -1,1 +1,1 @@
-## Release 0.2.0
+; Shipped analyzer releases. No release has shipped yet; every rule is in AnalyzerReleases.Unshipped.md.

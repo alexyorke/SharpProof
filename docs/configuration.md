@@ -1,6 +1,6 @@
 # Consumer configuration
 
-Maintainers: see [configuration ownership](configuration-ownership.md) for runtime and automation setting authorities.
+Maintainers: see [configuration ownership](design/configuration-ownership.md) for runtime and automation setting authorities.
 
 The standard SDK-style consumer needs one `SharpProof` reference and no SharpProof properties. It brings the application contract API and analyzer transitively and enables strict verification automatically. Keep that reference without `PrivateAssets="all"` so contract application dependencies propagate. The internal package graph remains exact-version matched. The settings below are optional overrides, set in the project or `Directory.Build.props`; [getting started](getting-started.md) shows the minimal setup.
 

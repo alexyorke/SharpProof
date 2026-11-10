@@ -28,17 +28,15 @@
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
-    <InternalsVisibleTo Include="SharpProof.Contracts.Test" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
     <InternalsVisibleTo Include="SharpProof.Ir.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt" />
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />
     <InternalsVisibleTo Include="SharpProof.Testing.Test" />
-    <InternalsVisibleTo Include="SharpProof.Verify.Test" />
     <!-- Child process compiled at test time against this assembly. -->
     <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>

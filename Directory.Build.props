@@ -5,28 +5,10 @@
   </PropertyGroup>
   <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
   <PropertyGroup>
-    <!-- Keep logical/assembly identities stable while adopting Arcade test filenames. -->
-    <SharpProofProjectName>$(MSBuildProjectName)</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.DeveloperExperience.Tests'">SharpProof.DeveloperExperience.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Tool.Tests'">SharpProof.Tool.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'ConsoleLoggingAnalyzer.Tests'">ConsoleLoggingAnalyzer.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Tests'">SharpProof.Analyzer.Test</SharpProofProjectName>
+    <!-- Test projects keep their historical ".Test" logical/assembly identities
+         under Arcade's ".Tests"/".IntegrationTests" filenames. -->
+    <SharpProofProjectName>$([System.Text.RegularExpressions.Regex]::Replace('$(MSBuildProjectName)', '\.(Integration)?Tests$', '.Test'))</SharpProofProjectName>
     <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Architecture.Tests'">SharpProof.ArchitectureTest</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Attributes.Tests'">SharpProof.Attributes.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.CodeFixes.Tests'">SharpProof.CodeFixes.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Contracts.Tests'">SharpProof.Contracts.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Dataflow.Tests'">SharpProof.Dataflow.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Effects.Tests'">SharpProof.Effects.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Frontend.Tests'">SharpProof.Frontend.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Fuzz.Tests'">SharpProof.Fuzz.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Gates.Tests'">SharpProof.Gates.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Ir.Tests'">SharpProof.Ir.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.IntegrationTests'">SharpProof.Package.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Smt.Tests'">SharpProof.Smt.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Specs.Tests'">SharpProof.Specs.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Testing.Tests'">SharpProof.Testing.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Verify.Tests'">SharpProof.Verify.Test</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Worker.Tests'">SharpProof.Worker.Test</SharpProofProjectName>
     <SignAssembly>false</SignAssembly>
     <Company>$(SharpProofPublisher)</Company>
     <Authors>$(SharpProofPublisher)</Authors>
@@ -74,7 +56,7 @@
   <PropertyGroup>
     <SharpProofProductionProject Condition="
       '$(SharpProofTestProject)' != 'true' And
-      !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)', '[/\\](samples|eng[/\\]pilots)[/\\]')) And
+      !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)', '[/\\]samples[/\\]')) And
       !$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Testing|Package|Verifier|Smoke\.Net472|CompilerProbe\.TestAsset)$'))">true</SharpProofProductionProject>
     <NoWarn Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">$(NoWarn);RS2002;RS2003</NoWarn>
     <CopyLocalLockFileAssemblies Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">true</CopyLocalLockFileAssemblies>
@@ -83,7 +65,7 @@
       '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics.Test' Or
       '$(SharpProofProjectName)' == 'SharpProof.Frontend' Or
       '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' Or
       '$(SharpProofProjectName)' == 'SharpProof.Fuzz' Or
@@ -92,7 +74,6 @@
       '$(SharpProofProjectName)' == 'SharpProof.Specs' Or
       '$(SharpProofProjectName)' == 'SharpProof.Testing' Or
       '$(SharpProofProjectName)' == 'SharpProof.Testing.Test' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Verify.Test' Or
       '$(SharpProofProjectName)' == 'SharpProof.Worker' Or
       '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">true</SharpProofUsesIrIdentifiers>
   </PropertyGroup>
@@ -139,93 +120,14 @@
     <Using Include="SharpProof.Internal.$([System.String]::Copy('$(SharpProofProjectName)').Replace('.', '')).ParameterGuard" Alias="RepositoryParameterGuard" />
   </ItemGroup>
 
-
   <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(SharpProofProjectName)' != 'SharpProof.ArchitectureTest' AND '$(SharpProofProjectName)' != 'SharpProof.Attributes.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ParameterGuardContractTests.cs" Link="ParameterGuardContractTests.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Worker.Test' OR '$(SharpProofProjectName)' == 'SharpProof.Package.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ImmutableFixtureRows.cs" Link="ImmutableFixtureRows.cs" />
-  </ItemGroup>
   <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Package.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\GoldenTest.cs"
-             Link="GoldenTest.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.ArchitectureTest' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Fuzz.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Ir.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Specs.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestRepository.cs"
-             Link="TestRepository.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\RepositoryRoot.cs"
-             Link="RepositoryRoot.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Fuzz.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Specs.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ProcessRunner.cs"
-             Link="ProcessRunner.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Gates.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Fuzz.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Ir.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Specs.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TempDirectory.cs"
-             Link="TempDirectory.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Specs.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Testing' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestMetadataReferences.cs"
-             Link="TestMetadataReferences.cs" />
-  </ItemGroup>
-
-  <PropertyGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Fuzz' OR
-                            '$(SharpProofProjectName)' == 'SharpProof.Testing'">
-    <DefineConstants>$(DefineConstants);SHARPPROOF_PLATFORM_REFERENCES_ONLY</DefineConstants>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Contracts.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestCompilation.cs"
-             Link="TestCompilation.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Package.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\AllocationWitnessKinds.cs"
-             Link="AllocationWitnessKinds.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">
@@ -233,27 +135,6 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Gates' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Package.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DictionaryAnalyzerConfigOptions.cs"
-             Link="DictionaryAnalyzerConfigOptions.cs" />
-  </ItemGroup>
-
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Specs.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ApiSpecTestFacets.cs"
-             Link="ApiSpecTestFacets.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(SharpProofProjectName)' == 'SharpProof.Analyzer.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Effects.Test' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\RuntimeAssemblyTestHost.cs"
-             Link="RuntimeAssemblyTestHost.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">

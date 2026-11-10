@@ -21,8 +21,7 @@ dotnet build
 The generated project targets net10.0 and pins the compiler SDK, C# 13, and package
 versions. The portable variant explicitly selects advisory analysis without native
 verification. Its demonstration caller deliberately emits SP0027; change -1 to 0 to
-remove it. The [checkout project templates](../templates/README.md) remain available
-through their existing installation workflow.
+remove it.
 
 For a layout that keeps tools, CI, the application, and regressions together, use the
 workspace template instead:
@@ -316,12 +315,12 @@ test does not embed a host-specific absolute project path; source/reference hash
 checks still apply while exporting. Rebinding captured inputs can still require the
 original build container even though the resulting test project can move.
 
-Run `dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regressions`.
+Run `dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regression`.
 Use the matching single-target project. The output directory must not already exist,
 and its parent directory must exist. Export writes source without executing consumer code.
 Keep the generated project outside the consumer's source tree so its test source is not
 included by the consumer's default compile glob. Run
-`dotnet test ../MyLibrary.Regressions/SharpProof.Regression.csproj` in a canonical
+`dotnet test ../MyLibrary.Regression/SharpProof.Regression.csproj` in a canonical
 container workspace that contains both projects. The starter's project-only Compose
 mount needs an extra writable parent mount for container export and test. Preserve
 the relative directory relationship between consumer and test; use workspace mode

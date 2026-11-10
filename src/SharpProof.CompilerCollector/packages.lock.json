@@ -140,17 +140,17 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
-          "SharpProof.Frontend": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )",
+          "SharpProof.Dataflow": "[1.0.0-preview.2, )",
+          "SharpProof.Frontend": "[1.0.0-preview.2, )",
+          "SharpProof.Specs": "[1.0.0-preview.2, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
       "sharpproof.compilerartifact": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )",
+          "SharpProof.Ir": "[1.0.0-preview.2, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.2, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -165,7 +165,7 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
+          "SharpProof.Ir": "[1.0.0-preview.2, )",
           "System.Collections.Immutable": "[9.0.18, )"
         }
       },
@@ -178,7 +178,7 @@
       "sharpproof.specs": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.worker.protocol": {

@@ -7,10 +7,14 @@ function Get-SharpProofEffectivePackageVersion {
     [xml]$properties = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'eng/Versions.props') -Raw
     $versionNode = $properties.SelectSingleNode('/Project/PropertyGroup/SharpProofPackageVersion')
     $prefixNode = $properties.SelectSingleNode('/Project/PropertyGroup/SharpProofVersionPrefix')
-    if ($null -eq $versionNode -or $null -eq $prefixNode) {
+    $labelNode = $properties.SelectSingleNode('/Project/PropertyGroup/PreReleaseVersionLabel')
+    $iterationNode = $properties.SelectSingleNode('/Project/PropertyGroup/PreReleaseVersionIteration')
+    if ($null -eq $versionNode -or $null -eq $prefixNode -or $null -eq $labelNode -or $null -eq $iterationNode) {
         throw 'Release version authority is missing.'
     }
     $version = $versionNode.InnerText.Replace('$(SharpProofVersionPrefix)', $prefixNode.InnerText)
+    $version = $version.Replace('$(PreReleaseVersionLabel)', $labelNode.InnerText)
+    $version = $version.Replace('$(PreReleaseVersionIteration)', $iterationNode.InnerText)
     if (-not [string]::IsNullOrEmpty($env:SHARPPROOF_CI_PACKAGE_VERSION)) {
         if ($env:SHARPPROOF_CI_PACKAGE_VERSION -cnotmatch '\A0\.0\.0-ci\.[1-9][0-9]*\.[1-9][0-9]*\z') {
             throw 'CI validation versions require 0.0.0-ci.<run-id>.<attempt>.'

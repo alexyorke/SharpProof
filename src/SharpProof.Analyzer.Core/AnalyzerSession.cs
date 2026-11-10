@@ -76,7 +76,6 @@ internal sealed class AnalyzerSession
         Semantics.Attributes;
     internal ContractClausePlacementDiagnostics ClausePlacement { get; }
     internal CompilerSemanticSession Semantics { get; }
-    internal IrFactory IrFactory => Semantics.IrFactory;
     internal ResolvedApiSpecTable ApiSpecs => Semantics.ApiSpecs;
     internal bool HasCreatedApiSpecs => Semantics.HasCreatedApiSpecs;
 

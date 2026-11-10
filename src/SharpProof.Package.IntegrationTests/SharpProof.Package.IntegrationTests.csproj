@@ -33,4 +33,16 @@
                       TreatAsPackageReference="false" />
     <ProjectReference Include="..\SharpProof.Worker\SharpProof.Worker.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/AllocationWitnessKinds.cs" Link="AllocationWitnessKinds.cs" />
+    <Compile Include="../../eng/testing/DictionaryAnalyzerConfigOptions.cs" Link="DictionaryAnalyzerConfigOptions.cs" />
+    <Compile Include="../../eng/testing/GoldenTest.cs" Link="GoldenTest.cs" />
+    <Compile Include="../../eng/testing/ImmutableFixtureRows.cs" Link="ImmutableFixtureRows.cs" />
+    <Compile Include="../../eng/testing/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestMetadataReferences.cs" Link="TestMetadataReferences.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>

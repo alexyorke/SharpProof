@@ -11,7 +11,9 @@ internal static class ToolApplication
           dotnet sharpproof doctor [--project <csproj> [--verification portable|container]]
           dotnet sharpproof explain --result <result.json> [--claim <id>] [--request <json>] [--compiler-manifest <json>]
           dotnet sharpproof compare --baseline <result.json> --current <result.json> [--fail-on-regression]
+                [--request <json>] [--compiler-manifest <json>] [--baseline-request <json>] [--baseline-compiler-manifest <json>]
           dotnet sharpproof export-test --project <csproj> --result <result.json> --claim <id> --output <new-directory> [--workspace <root>]
+                [--request <json>] [--compiler-manifest <json>]
           dotnet sharpproof --help | <command> --help | --version
         Commands accept --format text|json|markdown (default text). Init previews changes unless --apply is specified.
         doctor without --project discovers SDK/runtime information without evaluating projects. With --project it checks evaluated configuration and existing restore evidence. Neither mode restores, builds, or loads the solver.

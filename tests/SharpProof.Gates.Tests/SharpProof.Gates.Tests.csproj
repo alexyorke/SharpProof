@@ -15,4 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Gates\SharpProof.Gates.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+  </ItemGroup>
 </Project>

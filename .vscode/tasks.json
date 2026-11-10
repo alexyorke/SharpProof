@@ -28,7 +28,7 @@
     }
   ],
   "inputs": [
-    { "id": "testProject", "type": "promptString", "description": "Test project name", "default": "SharpProof.CodeFixes.Test" },
+    { "id": "testProject", "type": "promptString", "description": "Test project path", "default": "src/SharpProof.CodeFixes.Tests/SharpProof.CodeFixes.Tests.csproj" },
     { "id": "testFilter", "type": "promptString", "description": "dotnet test filter", "default": "FullyQualifiedName~ResultTypeCodeFixTests" }
   ]
 }

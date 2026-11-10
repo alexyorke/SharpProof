@@ -5,15 +5,13 @@
       "src\\SharpProof.Analyzer.Tests\\SharpProof.Analyzer.Tests.csproj",
       "src\\SharpProof.Attributes.Tests\\SharpProof.Attributes.Tests.csproj",
       "src\\SharpProof.CodeFixes.Tests\\SharpProof.CodeFixes.Tests.csproj",
-      "src\\SharpProof.Contracts.Tests\\SharpProof.Contracts.Tests.csproj",
+      "src\\SharpProof.Compiler.Semantics.Tests\\SharpProof.Compiler.Semantics.Tests.csproj",
       "src\\SharpProof.Dataflow.Tests\\SharpProof.Dataflow.Tests.csproj",
-      "src\\SharpProof.Effects.Tests\\SharpProof.Effects.Tests.csproj",
       "src\\SharpProof.Frontend.Tests\\SharpProof.Frontend.Tests.csproj",
       "src\\SharpProof.Ir.Tests\\SharpProof.Ir.Tests.csproj",
       "src\\SharpProof.Smt.Tests\\SharpProof.Smt.Tests.csproj",
       "src\\SharpProof.Specs.Tests\\SharpProof.Specs.Tests.csproj",
-      "tests\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj",
-      "src\\SharpProof.Verify.Tests\\SharpProof.Verify.Tests.csproj"
+      "tests\\SharpProof.Testing.Tests\\SharpProof.Testing.Tests.csproj"
     ]
   }
 }

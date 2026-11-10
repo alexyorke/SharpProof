@@ -7,4 +7,11 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Fuzz\SharpProof.Fuzz.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
+  </ItemGroup>
 </Project>

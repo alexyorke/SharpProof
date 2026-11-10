@@ -11,7 +11,7 @@
                       PrivateAssets="all"
                       GeneratePathProperty="true" />
     <PackageReference Include="NETStandard.Library"
-                      VersionOverride="2.0.3"
+                      VersionOverride="$(NETStandardLibraryVersion)"
                       PrivateAssets="all"
                       GeneratePathProperty="true" />
   </ItemGroup>
@@ -27,5 +27,14 @@
     <None Include="$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net472)\build\.NETFramework\v4.7.2\**\*.dll"
           Link="ReferencePacks\net472\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test helpers from eng/testing. -->
+    <Compile Include="../../eng/testing/ApiSpecTestFacets.cs" Link="ApiSpecTestFacets.cs" />
+    <Compile Include="../../eng/testing/ProcessRunner.cs" Link="ProcessRunner.cs" />
+    <Compile Include="../../eng/testing/RepositoryRoot.cs" Link="RepositoryRoot.cs" />
+    <Compile Include="../../eng/testing/TempDirectory.cs" Link="TempDirectory.cs" />
+    <Compile Include="../../eng/testing/TestMetadataReferences.cs" Link="TestMetadataReferences.cs" />
+    <Compile Include="../../eng/testing/TestRepository.cs" Link="TestRepository.cs" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,10 @@
     <SharpProofCopyright>Copyright (c) $(SharpProofPublisher)</SharpProofCopyright>
     <SharpProofVersionPrefix>1.0.0</SharpProofVersionPrefix>
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
-    <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.2</SharpProofPackageVersion>
+    <!-- Bump the prerelease iteration (or label) here; the package version follows. -->
+    <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
+    <PreReleaseVersionIteration>2</PreReleaseVersionIteration>
+    <SharpProofPackageVersion>$(SharpProofVersionPrefix)-$(PreReleaseVersionLabel).$(PreReleaseVersionIteration)</SharpProofPackageVersion>
     <SharpProofPackageVersion Condition="'$(SHARPPROOF_CI_PACKAGE_VERSION)' != ''">$(SHARPPROOF_CI_PACKAGE_VERSION)</SharpProofPackageVersion>
     <Version>$(SharpProofPackageVersion)</Version>
     <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
@@ -13,8 +16,6 @@
     <SharpProofProjectUrl>https://github.com/alexyorke/SharpProof</SharpProofProjectUrl>
     <!-- Arcade features and repository dependency versions are centralized here. -->
     <VersionPrefix>$(SharpProofVersionPrefix)</VersionPrefix>
-    <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
-    <PreReleaseVersionIteration>2</PreReleaseVersionIteration>
     <UsingToolXliff>false</UsingToolXliff>
     <UsingToolPdbConverter>false</UsingToolPdbConverter>
     <ExcludeMicrosoftNetTestSdk>true</ExcludeMicrosoftNetTestSdk>
@@ -29,11 +30,11 @@
     <MicrosoftBuildFrameworkVersion>17.7.2</MicrosoftBuildFrameworkVersion>
     <MicrosoftBuildUtilitiesCoreVersion>17.7.2</MicrosoftBuildUtilitiesCoreVersion>
     <MicrosoftNETTestSdkVersion>18.11.0</MicrosoftNETTestSdkVersion>
-    <DotNetCoverageToolVersion>18.8.0</DotNetCoverageToolVersion>
     <MicrosoftNETFrameworkReferenceAssembliesnet472Version>1.0.3</MicrosoftNETFrameworkReferenceAssembliesnet472Version>
     <MicrosoftZ3Version>4.12.2</MicrosoftZ3Version>
     <NUnitVersion>4.6.1</NUnitVersion>
     <NUnit3TestAdapterVersion>6.2.0</NUnit3TestAdapterVersion>
+    <NETStandardLibraryVersion>2.0.3</NETStandardLibraryVersion>
     <NuGetConfigurationVersion>6.14.0</NuGetConfigurationVersion>
     <SystemCollectionsImmutableVersion>9.0.18</SystemCollectionsImmutableVersion>
     <SystemCompositionAttributedModelVersion>9.0.0</SystemCompositionAttributedModelVersion>

@@ -102,15 +102,15 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Analyzer.Core": "[1.0.0-preview.1, )"
+          "SharpProof.Analyzer.Core": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.analyzer.core": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Compiler.Semantics": "[1.0.0-preview.1, )",
-          "SharpProof.Dataflow": "[1.0.0-preview.1, )"
+          "SharpProof.Compiler.Semantics": "[1.0.0-preview.2, )",
+          "SharpProof.Dataflow": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.attributes": {
@@ -121,24 +121,24 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Dataflow": "[1.0.0-preview.1, )",
-          "SharpProof.Frontend": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
+          "SharpProof.Dataflow": "[1.0.0-preview.2, )",
+          "SharpProof.Frontend": "[1.0.0-preview.2, )",
+          "SharpProof.Specs": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.compilerartifact": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.compilercollector": {
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Compiler.Semantics": "[1.0.0-preview.1, )",
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )"
+          "SharpProof.Compiler.Semantics": "[1.0.0-preview.2, )",
+          "SharpProof.CompilerArtifact": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.dataflow": {
@@ -149,17 +149,17 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "Microsoft.CodeAnalysis.Common": "[4.14.0, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.gates": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Analyzer": "[1.0.0-preview.1, )",
-          "SharpProof.Attributes": "[1.0.0-preview.1, )",
-          "SharpProof.CompilerCollector": "[1.0.0-preview.1, )",
-          "SharpProof.Logging": "[1.0.0-preview.1, )",
-          "SharpProof.Worker": "[1.0.0-preview.1, )"
+          "SharpProof.Analyzer": "[1.0.0-preview.2, )",
+          "SharpProof.Attributes": "[1.0.0-preview.2, )",
+          "SharpProof.CompilerCollector": "[1.0.0-preview.2, )",
+          "SharpProof.Logging": "[1.0.0-preview.2, )",
+          "SharpProof.Worker": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.host": {
@@ -175,23 +175,23 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Z3": "[4.12.2, )",
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.specs": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Ir": "[1.0.0-preview.1, )"
+          "SharpProof.Ir": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.worker": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
-          "SharpProof.Host": "[1.0.0-preview.1, )",
-          "SharpProof.Logging": "[1.0.0-preview.1, )",
-          "SharpProof.Smt": "[1.0.0-preview.1, )",
-          "SharpProof.Specs": "[1.0.0-preview.1, )"
+          "SharpProof.CompilerArtifact": "[1.0.0-preview.2, )",
+          "SharpProof.Host": "[1.0.0-preview.2, )",
+          "SharpProof.Logging": "[1.0.0-preview.2, )",
+          "SharpProof.Smt": "[1.0.0-preview.2, )",
+          "SharpProof.Specs": "[1.0.0-preview.2, )"
         }
       },
       "sharpproof.worker.protocol": {

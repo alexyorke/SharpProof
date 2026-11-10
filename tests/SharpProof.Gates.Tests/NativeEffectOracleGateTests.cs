@@ -16,7 +16,7 @@ namespace SharpProof.Gates.Test;
 internal sealed class NativeEffectOracleGateTests
 {
     // The receipt hashes the complete manifest, including review metadata.
-    // BUG-007 reclassifies OSS0015; all pinned source and declaration hashes
+    // The reviewed OSS0015 correction (Corpus/README.md) reclassifies one method; all pinned source and declaration hashes
     // remain unchanged and all 200 methods still belong to the oracle universe.
     private const string ReviewedUniverseSha256 = "54681BB07D6BBE8A8110B032773A64A2E3269A84625327B9D51DA20B6855C7D5";
 

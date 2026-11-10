@@ -66,7 +66,6 @@ public sealed class CSharpOperationSemanticsTests
     public void FrozenDecisionsCoverEveryDistinctRoslynKind()
     {
         Assert.That(CSharpOperationSemantics.Operations.Keys, Is.EquivalentTo(Enum.GetValues<OperationKind>().Distinct()));
-        Assert.That(CSharpOperationSemantics.Operations.Count, Is.EqualTo(126));
         Assert.That(CSharpOperationSemantics.Operations.ContainsKey((OperationKind)int.MaxValue), Is.False);
     }
 

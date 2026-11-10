@@ -5,7 +5,7 @@ Install the main `SharpProof` package as the single standard reference; it enabl
 strict verification automatically and restores its API/analyzer dependencies
 through `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`.
 `SharpProof.Verifier` is a compatibility entrypoint and owns the analyzer,
-`ContractFor` generator, direct-consumer build configuration, and worker payloads.
+compiler collector, direct-consumer build configuration, and worker payloads.
 Its worker supports the canonical Linux container and native Windows, macOS,
 and glibc Linux on x64/ARM64 within the [support matrix](preview-support.md).
 Implementation assemblies add no supported application API.
@@ -68,8 +68,7 @@ lookalike produces SPCF0001.
 `ContractForAttribute` associates a static companion class with a target
 interface or class. The analyzer validates the association and member matching
 at compilation end, after all generators have contributed their syntax trees,
-using compiler symbol identity. The package generator is a loading hook and
-emits no source. The companion must be distinct from its target (SPCF0009), and
+using compiler symbol identity. SharpProof ships no source generator. The companion must be distinct from its target (SPCF0009), and
 companion-to-target relationships must be acyclic (SPCF0010).
 
 Instance target members use a static companion member with an explicit first

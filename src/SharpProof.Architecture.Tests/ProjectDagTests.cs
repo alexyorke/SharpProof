@@ -210,9 +210,7 @@ public sealed class ProjectDagTests
             }
             var relative = Path.GetRelativePath(repository, item.Value).Replace('\\', '/');
             var allowed = relative.StartsWith("eng/shared/", StringComparison.Ordinal) ||
-                relative == "src/DefensiveCodingAnalyzer/AllValuesValidAttribute.cs" ||
-                relative == "eng/ParameterGuard.cs" || relative == "eng/LoggingDefaults.cs" ||
-                relative == "eng/RoslynCfgFactory.cs" || relative == "eng/RoslynSymbolFacts.cs" ||
+                relative == "eng/ParameterGuard.cs" || relative == "eng/RoslynSymbolFacts.cs" ||
                 relative == "eng/CompilerAdditionalTextStability.cs" ||
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
             allowed |= item.Project == "SharpProof.Logging" &&

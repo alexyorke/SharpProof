@@ -2,7 +2,7 @@
 
 [release.yml](../../.github/workflows/release.yml) publishes a release from a `v*` tag.
 
-1. Update `SharpProofPackageVersion` in [eng/Versions.props](../../eng/Versions.props).
+1. Update `PreReleaseVersionIteration` (or `PreReleaseVersionLabel`) in [eng/Versions.props](../../eng/Versions.props).
    The workflow rejects a tag that does not match it.
 2. Review [the changelog](../../CHANGELOG.md), [upgrade guidance](../../docs/upgrading.md),
    and the [support matrix](../../docs/preview-support.md). Describe changes to Unknown

@@ -13,7 +13,7 @@ Targeting an older application framework does not require running the verifier o
 ## First use in three steps
 
 1. Obtain the current packages from your configured feed; this checkout does not imply public NuGet availability. See [obtaining packages](#obtain-this-checkouts-packages).
-2. Add this single reference to your project, or use the [verified project template](../templates/README.md):
+2. Add this single reference to your project, or use the [`sharpproof` project template](developer-experience.md#install-and-start):
 
    ```xml
    <ItemGroup>
@@ -80,7 +80,7 @@ For deliberate analysis without native proofs, opt out explicitly on the same si
 </PropertyGroup>
 ```
 
-This explicit portable-only configuration requires SDK 9.0.300+/Roslyn 4.14+ and does not run native proofs. The default configuration still requires SDK 10.0.100+ and runs full verification. `SharpProofProfile=off` disables analysis as well. The [portable template](../templates/README.md) and [diagnostic tutorial](tutorials/02-diagnostics.md) demonstrate the advisory alternative, including the SP0027 precondition warning. Editor design-time feedback remains portable; normal builds run the verifier by default.
+This explicit portable-only configuration requires SDK 9.0.300+/Roslyn 4.14+ and does not run native proofs. The default configuration still requires SDK 10.0.100+ and runs full verification. `SharpProofProfile=off` disables analysis as well. The portable template (`dotnet new sharpproof --verification portable`) and [diagnostic tutorial](tutorials/02-diagnostics.md) demonstrate the advisory alternative, including the SP0027 precondition warning. Editor design-time feedback remains portable; normal builds run the verifier by default.
 
 ## Next steps
 
