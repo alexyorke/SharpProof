@@ -12,7 +12,6 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerArchitectureTests
 {
     private static readonly ImmutableArray<string> ExpectedAnalyzerReferences = [
-        "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.CompilerArtifact",
         "SharpProof.Dataflow",
@@ -24,7 +23,6 @@ public sealed class AnalyzerArchitectureTests
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
-        "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
@@ -182,7 +180,7 @@ public sealed class AnalyzerArchitectureTests
         var root = TestRepository.FindRoot();
         var analyzerDirectory = Path.Combine(
             root,
-            "src/SharpProof.Analyzer.Core");
+            "src/SharpProof.Analyzer");
         var shipped = ReadReleaseSection(
             Path.Combine(
                 analyzerDirectory,

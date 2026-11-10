@@ -46,7 +46,7 @@ public sealed class CompilerAssemblyBoundaryTests
                 continue;
             }
             Assert.That(name, Is.Not.EqualTo("SharpProof.Analyzer"));
-            Assert.That(name, Is.Not.EqualTo("SharpProof.Analyzer.Core"));
+            Assert.That(name, Is.Not.EqualTo("SharpProof.Analyzer"));
             Assert.That(name, Is.Not.EqualTo("SharpProof.Smt"));
             Assert.That(name, Is.Not.EqualTo("SharpProof.Worker"));
             foreach (var reference in assembly.GetReferencedAssemblies())

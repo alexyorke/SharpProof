@@ -47,7 +47,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [];
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
-        "SharpProof.Analyzer.Core.dll",
         "SharpProof.Compiler.Semantics.dll",
         "SharpProof.Dataflow.dll",
         "SharpProof.Frontend.dll",
@@ -73,7 +72,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedSourceAnalyzerProjectFileNames = [
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
-        "SharpProof.Analyzer.Core.csproj",
         "SharpProof.CompilerCollector.csproj"
     ];
 
@@ -91,7 +89,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
-        "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.Compiler.Semantics.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
         "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
@@ -291,8 +288,6 @@ public sealed class PackageLayoutSmokeTests
                          "SharpProof.Analyzer.dll"), Path.Combine(
                          collectorDirectory,
                          "SharpProof.CompilerCollector.dll"), Path.Combine(
-                         sharedDirectory,
-                         "SharpProof.Analyzer.Core.dll"), Path.Combine(
                          sharedDirectory,
                          "SharpProof.Compiler.Semantics.dll")))
         {
@@ -934,8 +929,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             await File.ReadAllLinesAsync(
                 workspace.MappedProjectConfigurationsPath),
-            Does.Contain("SharpProof.Analyzer|Release")
-                .And.Contain("SharpProof.Analyzer.Core|Debug"));
+            Does.Contain("SharpProof.Analyzer|Release"));
 
         var dependencyPaths = (await File.ReadAllLinesAsync(
                 workspace.MappedAnalyzerItemsPath))
@@ -949,12 +943,12 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             dependencyPaths,
             Has.All.Matches<string>(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.Contains(
-                Path.Combine("Debug", "netstandard2.0"),
+                Path.Combine("Release", "netstandard2.0"),
                 StringComparison.Ordinal))));
         Assert.That(
             dependencyPaths,
             Has.None.Matches<string>(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.Contains(
-                Path.Combine("Release", "netstandard2.0"),
+                Path.Combine("Debug", "netstandard2.0"),
                 StringComparison.Ordinal))));
     }
 
@@ -3228,8 +3222,6 @@ public sealed class PackageLayoutSmokeTests
                 "{7B5B2351-815A-4416-A221-7D14948A120B}";
             const string analyzerGuid =
                 "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
-            const string analyzerCoreGuid =
-                "{B1C90B5D-04E7-4D8E-9D6F-3F5EE0F3C6CB}";
             const string projectTypeGuid =
                 "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
             var attributesProject = GetSolutionPath(
@@ -3240,10 +3232,6 @@ public sealed class PackageLayoutSmokeTests
                 repository,
                 "src/SharpProof.Analyzer",
                 "SharpProof.Analyzer.csproj");
-            var analyzerCoreProject = GetSolutionPath(
-                repository,
-                "src/SharpProof.Analyzer.Core",
-                "SharpProof.Analyzer.Core.csproj");
             var solution = Path.Combine(
                 ConsumerDirectory,
                 "MappedConsumer.sln");
@@ -3260,8 +3248,6 @@ public sealed class PackageLayoutSmokeTests
                 EndProject
                 Project("{projectTypeGuid}") = "SharpProof.Analyzer", "{analyzerProject}", "{analyzerGuid}"
                 EndProject
-                Project("{projectTypeGuid}") = "SharpProof.Analyzer.Core", "{analyzerCoreProject}", "{analyzerCoreGuid}"
-                EndProject
                 Global
                     GlobalSection(SolutionConfigurationPlatforms) = preSolution
                         Debug|Any CPU = Debug|Any CPU
@@ -3273,8 +3259,6 @@ public sealed class PackageLayoutSmokeTests
                         {attributesGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                         {analyzerGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
                         {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
-                        {analyzerCoreGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-                        {analyzerCoreGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
                     EndGlobalSection
                 EndGlobal
                 """);

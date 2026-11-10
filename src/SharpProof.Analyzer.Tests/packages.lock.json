@@ -140,14 +140,6 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
-          "SharpProof.Analyzer.Core": "[1.0.0-preview.2, )",
-          "System.Collections.Immutable": "[9.0.18, )"
-        }
-      },
-      "sharpproof.analyzer.core": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[4.14.0, )",
           "SharpProof.Compiler.Semantics": "[1.0.0-preview.2, )",
           "SharpProof.Dataflow": "[1.0.0-preview.2, )",
           "System.Collections.Immutable": "[9.0.18, )"

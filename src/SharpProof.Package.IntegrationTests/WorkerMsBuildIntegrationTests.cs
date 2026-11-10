@@ -3856,8 +3856,7 @@ public sealed class WorkerMsBuildIntegrationTests
                             .Replace('\\', Path.DirectorySeparatorChar)));
                     File.Copy(sourcePath, Path.Combine(payload.FullName, Path.GetFileName(sourcePath)));
                 }
-                if (!File.Exists(Path.Combine(payload.FullName, "SharpProof.Analyzer.Core.dll")) ||
-                    !File.Exists(Path.Combine(payload.FullName, "SharpProof.Compiler.Semantics.dll")))
+                if (!File.Exists(Path.Combine(payload.FullName, "SharpProof.Compiler.Semantics.dll")))
                 {
                     throw new InvalidDataException("The verifier manifest did not supply the shared compiler payload.");
                 }

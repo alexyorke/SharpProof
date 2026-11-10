@@ -17,7 +17,7 @@
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
