@@ -82,12 +82,12 @@ internal sealed class ContractApiTests
         Assert.That(method, Is.Not.Null);
         Assert.That(
             method!.GetParameters().Single().GetCustomAttributes(),
-            Has.Exactly(1).TypeOf<NotNullAttribute>() &
+            Has.Exactly(1).TypeOf<NonNullAttribute>() &
             Has.Exactly(1).TypeOf<PositiveAttribute>() &
             Has.Exactly(1).TypeOf<InRangeAttribute>());
         Assert.That(
             method.ReturnParameter.GetCustomAttributes(),
-            Has.Exactly(1).TypeOf<NotNullAttribute>());
+            Has.Exactly(1).TypeOf<NonNullAttribute>());
     }
 
     [Test]
@@ -105,9 +105,9 @@ internal sealed class ContractApiTests
             Has.Exactly(1).TypeOf<ZeroAllocationsAttribute>());
     }
 
-    [return: NotNull]
+    [return: NonNull]
     private static string ClosedContractSample(
-        [NotNull, Positive, InRange(0, 10)] int value)
+        [NonNull, Positive, InRange(0, 10)] int value)
     {
         if (value is <= 0 or > 10)
         {
@@ -201,7 +201,7 @@ internal sealed class ContractApiTests
     [Test]
     public void ClosedContractsTargetOnlyParametersAndReturns()
     {
-        foreach (var type in ImmutableArray.Create(typeof(NotNullAttribute), typeof(PositiveAttribute), typeof(InRangeAttribute)))
+        foreach (var type in ImmutableArray.Create(typeof(NonNullAttribute), typeof(PositiveAttribute), typeof(InRangeAttribute)))
         {
             Assert.That(
                 type.GetCustomAttribute<AttributeUsageAttribute>()!.ValidOn,
@@ -214,6 +214,30 @@ internal sealed class ContractApiTests
             typeof(Contract).Assembly.GetType(
                 "SharpProof.Attributes.PureAttribute"),
             Is.Null);
+    }
+
+    [Test]
+    public void PublicAttributesDoNotShareNamesWithCommonlyImportedAttributes()
+    {
+        // A consumer that imports one of these namespaces alongside SharpProof.Attributes
+        // gets CS0104 for any attribute simple name both declare.
+        var imported = ImmutableArray.Create(
+            (typeof(System.Diagnostics.CodeAnalysis.NotNullAttribute).Assembly, "System.Diagnostics.CodeAnalysis"),
+            (typeof(System.ComponentModel.DataAnnotations.RangeAttribute).Assembly, "System.ComponentModel.DataAnnotations"),
+            (typeof(System.Runtime.CompilerServices.CallerMemberNameAttribute).Assembly, "System.Runtime.CompilerServices"),
+            (typeof(ObsoleteAttribute).Assembly, "System"),
+            (typeof(System.Diagnostics.ConditionalAttribute).Assembly, "System.Diagnostics"))
+            .SelectMany(static pair => pair.Item1.GetExportedTypes()
+                .Where(type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Namespace == pair.Item2 && typeof(Attribute).IsAssignableFrom(type)))
+                .Select(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Name)))
+            .ToImmutableHashSet(StringComparer.Ordinal);
+
+        Assert.That(imported, Does.Contain("NotNullAttribute"));
+        Assert.That(
+            typeof(Contract).Assembly.GetExportedTypes()
+                .Where(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (typeof(Attribute).IsAssignableFrom(type)))
+                .Select(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Name)),
+            Has.None.Matches<string>(name => name is null ? throw new ArgumentNullException(nameof(name)) : imported.Contains(name)));
     }
 
     [Test]

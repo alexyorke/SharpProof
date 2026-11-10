@@ -38,7 +38,7 @@ public sealed class ContractApiIdentityResolverRebuildTests
         var reference = MetadataReference.CreateFromImage(original, filePath: output);
         var before = ContractApiIdentityResolver.ForCompilation(CreateConsumer(reference));
         Assert.That(before.Contract, Is.Not.Null, "Actual approved A must resolve before replacement.");
-        Assert.That(before.ResolveAttribute(ContractApiMetadata.NotNull), Is.Not.Null);
+        Assert.That(before.ResolveAttribute(ContractApiMetadata.NonNull), Is.Not.Null);
         Assert.That(before.UnreadableContractApiReason, Is.Null);
 
         var packages = PrivatePath(temporary.FullName, ["packages"]);
@@ -78,12 +78,12 @@ public sealed class ContractApiIdentityResolverRebuildTests
             staleConsumer.GetAssemblyOrModuleSymbol(reference)), Is.True);
         var stale = ContractApiIdentityResolver.ForCompilation(staleConsumer);
         Assert.That(stale.Contract, Is.Null);
-        Assert.That(stale.ResolveAttribute(ContractApiMetadata.NotNull), Is.Null);
+        Assert.That(stale.ResolveAttribute(ContractApiMetadata.NonNull), Is.Null);
         Assert.That(stale.UnreadableContractApiReason, Is.Null, "Readable B is a mismatch, not an I/O fault.");
         var imageOnly = ContractApiIdentityResolver.ForCompilation(
             CreateConsumer(MetadataReference.CreateFromImage(original)));
         Assert.That(imageOnly.Contract, Is.Not.Null);
-        Assert.That(imageOnly.ResolveAttribute(ContractApiMetadata.NotNull), Is.Not.Null);
+        Assert.That(imageOnly.ResolveAttribute(ContractApiMetadata.NonNull), Is.Not.Null);
         Assert.That(imageOnly.UnreadableContractApiReason, Is.Null);
     }
 

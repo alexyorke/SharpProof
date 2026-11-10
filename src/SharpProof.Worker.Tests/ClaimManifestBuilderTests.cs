@@ -1891,13 +1891,13 @@ public sealed class ClaimManifestBuilderTests
             namespace SharpProof.Attributes {
                 [System.AttributeUsage(
                     System.AttributeTargets.ReturnValue)]
-                public sealed class NotNullAttribute :
+                public sealed class NonNullAttribute :
                     System.Attribute {
                 }
             }
 
             public static class Subject {
-                [return: SharpProof.Attributes.NotNull]
+                [return: SharpProof.Attributes.NonNull]
                 private static string MaybeNull(bool condition) {
                     return condition ? "" : null!;
                 }
@@ -2137,22 +2137,22 @@ public sealed class ClaimManifestBuilderTests
             public static class Subject {
                 [AllowedExceptions(typeof(GenericException<int>))]
                 public static void WrongAllowed(
-                    [NotNull] GenericException<string> exception) =>
+                    [NonNull] GenericException<string> exception) =>
                     throw exception;
 
                 [AllowedExceptions(typeof(GenericException<string>))]
                 public static void ExactAllowed(
-                    [NotNull] GenericException<string> exception) =>
+                    [NonNull] GenericException<string> exception) =>
                     throw exception;
 
                 [AllowedExceptions(typeof(GenericException<string>))]
                 public static void DerivedAllowed(
-                    [NotNull] DerivedStringException exception) =>
+                    [NonNull] DerivedStringException exception) =>
                     throw exception;
 
                 [DoesNotThrow]
                 public static void WrongCatch(
-                    [NotNull] GenericException<string> exception) {
+                    [NonNull] GenericException<string> exception) {
                     try {
                         throw exception;
                     }
@@ -2162,7 +2162,7 @@ public sealed class ClaimManifestBuilderTests
 
                 [DoesNotThrow]
                 public static void ExactCatch(
-                    [NotNull] GenericException<string> exception) {
+                    [NonNull] GenericException<string> exception) {
                     try {
                         throw exception;
                     }

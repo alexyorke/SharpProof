@@ -24,6 +24,15 @@ re-registration and resurrection are excluded. Internal stock retries are
 included in the quantitative budgets, including later internal finalization. This is a declared deployment condition;
 the analyzer does not detect it on the machine running the worker.
 
+The runtime version is part of the profile's public name on purpose. The
+budgets were reviewed against that runtime's source, so the profile makes no
+claim about any other version. Compiled metadata records the profile's numeric
+value (`1`). The collector binds that value. Evidence reports the profile by
+the same name, and its `profileCatalogSha256` covers the
+`coreclr-8.0.32-linux-x64-ordinary-jit-stock-closed-v1` profile model. A
+profile is never widened to another runtime version or renumbered. Support for
+another reviewed runtime adds a new member with a new value.
+
 The collector reads constants without executing attribute constructors. It
 binds declarations to the root, emitted module, compiler and framework identity.
 Native verification additionally binds the reference/layout catalog and all

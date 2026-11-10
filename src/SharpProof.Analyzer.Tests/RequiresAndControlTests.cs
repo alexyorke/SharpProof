@@ -250,14 +250,14 @@ public sealed class RequiresAndControlTests
                 [return: Positive]
                 public static async Task Unsupported(
                     [Positive] string text,
-                    [NotNull] int count,
+                    [NonNull] int count,
                     [InRange(5, 1)] int range) {
                     await Task.Yield();
                 }
 
-                [return: NotNull]
+                [return: NonNull]
                 public static async Task<string> Valid(
-                    [NotNull] string text,
+                    [NonNull] string text,
                     [Positive] int count,
                     [InRange(1, 5)] int range) {
                     await Task.Yield();
@@ -275,7 +275,7 @@ public sealed class RequiresAndControlTests
                 [AllowedExceptions(typeof(string))]
                 [return: Positive]
                 string InterfaceMethod(
-                    [NotNull] int count,
+                    [NonNull] int count,
                     [InRange(5, 1)] int range);
             }
 
@@ -1111,12 +1111,12 @@ public sealed class RequiresAndControlTests
             using SharpProof.Attributes;
 
             public static class Fixture {
-                public static void NullableValue([NotNull] int? value) { }
-                public static void Unconstrained<T>([NotNull] T value) { }
-                public static void ReferenceConstrained<T>([NotNull] T value)
+                public static void NullableValue([NonNull] int? value) { }
+                public static void Unconstrained<T>([NonNull] T value) { }
+                public static void ReferenceConstrained<T>([NonNull] T value)
                     where T : class { }
-                public static void NonNullableValue([NotNull] int value) { }
-                public static void ValueConstrained<T>([NotNull] T value)
+                public static void NonNullableValue([NonNull] int value) { }
+                public static void ValueConstrained<T>([NonNull] T value)
                     where T : struct { }
             }
             """,

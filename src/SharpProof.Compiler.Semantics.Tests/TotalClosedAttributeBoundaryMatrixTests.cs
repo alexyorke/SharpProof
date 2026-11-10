@@ -21,7 +21,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
     public void PublicNotNullBindingRetainsNaturalNullAndNonNullReferenceValues(string typeName)
     {
         ArgumentNullException.ThrowIfNull(typeName);
-        var compilation = CreateCompilation(typeName, "NotNull");
+        var compilation = CreateCompilation(typeName, "NonNull");
         var target = GetTarget(compilation);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);

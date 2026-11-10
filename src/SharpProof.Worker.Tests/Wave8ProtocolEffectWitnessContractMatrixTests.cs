@@ -94,12 +94,12 @@ internal sealed class Wave8ProtocolEffectWitnessContractMatrixTests
         {
             "purity-write" => "[EnforcePure] public static void Target() { State = 1; } public static int State;",
             "exceptions-throw" => "[AllowedExceptions(typeof(System.ArgumentException))] public static void Target() { throw new System.InvalidOperationException(); }",
-            "capabilities-lock" => "[AllowedCapabilities(SharpProofCapability.None)] public static void Target([NotNull] object gate) { lock (gate) { } }",
+            "capabilities-lock" => "[AllowedCapabilities(SharpProofCapability.None)] public static void Target([NonNull] object gate) { lock (gate) { } }",
             "effect-allocation" => "[EffectContract(SharpProofEffect.None)] public static object Target() { return new object(); }",
             "purity-allocation" => "[EnforcePure] public static void Target() { new object(); }",
             "purity-ambient-read" => "[EnforcePure] public static int Target() { return State; } public static int State;",
             "capabilities-opaque-call" => "[AllowedCapabilities(SharpProofCapability.None)] public static void Target() { System.Console.WriteLine(1); }",
-            "effect-argument-read" => "[EffectContract(SharpProofEffect.None)] public static int Target([NotNull] int[] values) { return values.Length; }",
+            "effect-argument-read" => "[EffectContract(SharpProofEffect.None)] public static int Target([NonNull] int[] values) { return values.Length; }",
             _ => throw new AssertionException("Unknown frozen native control.")
         };
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { " + member + " }");

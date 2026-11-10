@@ -71,7 +71,7 @@ internal sealed class WorkerVcStringEqualityTests
             [DoesNotThrow]
             public static bool InstanceEqualsMayThrow(string left) => left.Equals("x");
             [DoesNotThrow]
-            public static bool InstanceEqualsOnNonNull([NotNull] string left) => left.Equals("x");
+            public static bool InstanceEqualsOnNonNull([NonNull] string left) => left.Equals("x");
             public static string InstanceEqualsInClause(string value) {
                 Contract.Requires(value.Equals("abc"));
                 Contract.Ensures(Contract.Result<string>().Length == 3);

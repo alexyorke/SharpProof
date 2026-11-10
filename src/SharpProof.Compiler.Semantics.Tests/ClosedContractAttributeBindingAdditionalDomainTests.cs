@@ -18,7 +18,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         "[InRange(1, 3)] count"
     ];
 
-    [TestCase("NotNull", "string", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("NonNull", "string", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
     [TestCase("Positive", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
     [TestCase("InRange(-2L, 2L)", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
     public void EveryRealClosedAttributeFamilyRejectsAValidBooleanIrValue(
@@ -67,7 +67,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase("NotNull", "string", IrExecutionSemantics.Total)]
+    [TestCase("NonNull", "string", IrExecutionSemantics.Total)]
     [TestCase("Positive", "int", IrExecutionSemantics.Total)]
     [TestCase("InRange(1L, 3L)", "int", IrExecutionSemantics.Total)]
     public void MissingLegalIrValueFailsClosedForRealAnnotations(
@@ -263,7 +263,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         if (isText)
         {
             Assert.That(result.Clauses, Has.Length.EqualTo(1));
-            Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[NotNull] text"));
+            Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[NonNull] text"));
             var interpreter = new IrInterpreter(factory);
             Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateNullValue(factory.StringType))).Value!.Boolean,
@@ -305,7 +305,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var library = TestCompilation.Create("ClosedAttributeMetadataLibrary", """
             using SharpProof.Attributes;
             public static class Library {
-                public static void Read([NotNull] string text, [Positive, InRange(1L, 3L)] int count) { }
+                public static void Read([NonNull] string text, [Positive, InRange(1L, 3L)] int count) { }
             }
             """);
         using var image = new MemoryStream();

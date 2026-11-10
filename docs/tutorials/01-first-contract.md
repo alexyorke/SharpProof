@@ -46,7 +46,7 @@ public static class FirstContract
 
 `Requires(value > 0)` belongs at the beginning of the body, before executable statements. It is an obligation for a caller and an entry condition when the callee is verified. `GoodCall` supplies a literal 1, so the portable analyzer can establish that this call does not violate the requirement.
 
-`[InRange(0, 10)]` is inclusive. A literal 5 satisfies it. You can also use `[Positive]` for greater than zero and `[NotNull]` for a reference-capable value. Parameter attributes describe incoming values; return attributes describe normal return. `out` parameters have no incoming value and cannot carry these entry contracts.
+`[InRange(0, 10)]` is inclusive. A literal 5 satisfies it. You can also use `[Positive]` for greater than zero and `[NonNull]` for a reference-capable value. Parameter attributes describe incoming values; return attributes describe normal return. `out` parameters have no incoming value and cannot carry these entry contracts.
 
 ## What this run establishes
 
