@@ -102,7 +102,7 @@ and `--compiler-manifest`; comparison also accepts `--baseline-request` and
 ```sh
 dotnet sharpproof explain --result artifacts/sharpproof/result.json --claim <id>
 dotnet sharpproof compare --baseline baseline/result.json --current artifacts/sharpproof/result.json --fail-on-regression
-dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regressions
+dotnet sharpproof export-test --project MyLibrary.csproj --result artifacts/sharpproof/result.json --claim <id> --output ../MyLibrary.Regression
 ```
 
 `explain` explains claims and typed Unknown detail from validated evidence.

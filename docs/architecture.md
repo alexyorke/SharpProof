@@ -10,19 +10,22 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Specs` | Reviewed API catalog and resolved specification evidence |
 | `SharpProof.Frontend` | Roslyn expression/program lowering to typed IR |
 | `SharpProof.Ir` | Owned types, values, instructions, blocks, source provenance, evaluation |
-| `SharpProof.Dataflow` | Analysis primitives over the modeled program |
+| `SharpProof.Dataflow` | Abstract domains and forward dataflow used by the analyzer's advisory interpreter and by effect summaries |
 | `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
 | `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
+| `SharpProof.CodeFixes` / `SharpProof.EditorSuggestions` | Optional editor code fixes and companion scaffolding suggestions |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
 | `SharpProof.CompilerArtifact` | Versioned compiler evidence, codecs, validation |
 | `SharpProof.Worker.Protocol` | Request/response models, budgets, manifests, tuple/accountability checks |
 | `SharpProof.Smt` | Native solver abstraction, typed encoding and result evidence |
 | `SharpProof.Worker` | Artifact preparation, native claims, VC checks, replay, response cache |
 | `SharpProof.Host` | Container/native loading and host infrastructure |
+| `SharpProof.Logging` | The worker launcher's stdout/stderr logging boundary |
 | `SharpProof.BuildTasks` | MSBuild integration and verifier orchestration |
 | `SharpProof.Package` | Metadata-only standard package facade with exact verifier dependency |
 | `SharpProof.Verifier` | Analyzer/collector, MSBuild integration, managed worker and native solver package assets |
 | `SharpProof.Tool` | Optional separately packaged doctor and stored-evidence explanation commands |
+| `SharpProof.Templates` | `dotnet new sharpproof` and `sharpproof-workspace` project templates |
 
 The solution lists production and test projects in [SharpProof.slnx](../SharpProof.slnx). Package identity and implementation assembly visibility do not make these internal components supported consumer APIs.
 
@@ -36,7 +39,7 @@ The collector operates on the compiler's final compilation, including generator 
 
 The worker consumes this closed artifact rather than reparsing a guessed source project with a potentially different compilation. It validates schema, content hash, manifest alignment, and evidence before constructing obligations. Unknown bodies stay visible in callable coverage and claim results.
 
-The build integration also checks that the artifact belongs to the current compiler capture. The collector publishes a completion token after writing the artifact, while MSBuild validates the matching invocation before verification. A stable capture-request path avoids adding a new incremental compiler input for every build. Request, compiler manifest, and response publication then bind the same invocation; reusing an unrelated result file cannot satisfy that check. See [collector publication](../src/SharpProof.CompilerCollector/FinalCompilationCollector.cs), [verifier targets](../src/SharpProof.Verifier/build/SharpProof.Verifier.targets), and [capture/cache regression tests](../src/SharpProof.Worker.Tests/Pr275ActualCompilerCaptureCacheTests.cs).
+The build integration also checks that the artifact belongs to the current compiler capture. The collector publishes a completion token after writing the artifact, while MSBuild validates the matching invocation before verification. A stable capture-request path avoids adding a new incremental compiler input for every build. Request, compiler manifest, and response publication then bind the same invocation; reusing an unrelated result file cannot satisfy that check. See [collector publication](../src/SharpProof.CompilerCollector/FinalCompilationCollector.cs), [verifier targets](../src/SharpProof.Verifier/build/SharpProof.Verifier.targets), and [capture/cache regression tests](../src/SharpProof.Worker.Tests/ActualCompilerCaptureCacheTests.cs).
 
 The public contract assembly is checked by exact supported identity and payload evidence. Attributes is fully strong-named with a deliberately public, stable open-source identity key; that provides Framework reference compatibility, not publisher authentication. Package/repository signatures and release attestations have separate verification scopes described in the [release process](../eng/release/README.md). Lookalikes do not create assumptions.
 

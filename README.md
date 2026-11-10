@@ -2,7 +2,7 @@
 
 SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style project and build to run the analyzer and full verification automatically.
 
-**This is a preview and very, very likely (read: does) have many bugs.** The way I would use this project is, if SharpProof claims there is an issue, then get your AI tool of choice to use it as a guide for a test case to prove that that specific test case fails. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
+**This is an early preview and it has many bugs.** Treat a reported issue as a lead: turn it into a test case (your AI tool of choice can help) that demonstrates the specific failure. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
 ## Packages
 
@@ -26,7 +26,7 @@ Full verification covers six native OS/architecture combinations: Windows, macOS
 
 The standard setup requires .NET SDK 10.0.100 or newer and its .NET 10 runtime, independently of the application's target framework. Explicit portable-only advisory analysis retains its separate SDK 9.0.300+/Roslyn 4.14 minimum; that older host cannot run the default verifier. The canonical image supplies the pinned SDK.
 
-The consumer application can retain a compatible older target framework. For setup diagnostics, run `pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` from this checkout; it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
+The consumer application can retain a compatible older target framework. For setup diagnostics, run `dotnet sharpproof doctor --project path/to/Consumer.csproj --format json` with the optional [SharpProof.Tool](src/SharpProof.Tool/README.md); it evaluates a trusted project without restore/build and identifies missing assets or configuration. From this checkout, `pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` runs the same check in the canonical container. A doctor pass does not execute a proof.
 
 See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
 
@@ -50,7 +50,7 @@ public static class Calculator
 
 Contract clauses belong in a contiguous method prologue. They express static conditions and are normally removed by the C# compiler. Do not define `SHARPPROOF_CONTRACTS`: SharpProof has no runtime contract-checking mode.
 
-Start with the [single-reference setup](docs/getting-started.md#first-use-in-three-steps) and [your first proof](docs/getting-started.md#your-first-proof). [Project templates](templates/README.md) generate the standard setup or an explicit portable-only alternative using this checkout's package version. Follow [incremental adoption](docs/adoption.md) for an existing repository and [upgrades](docs/upgrading.md) when changing versions. See [public API](docs/public-api.md) for the full contract surface.
+Start with the [single-reference setup](docs/getting-started.md#first-use-in-three-steps) and [your first proof](docs/getting-started.md#your-first-proof). The [`sharpproof` project templates](docs/developer-experience.md#install-and-start) generate the standard setup, or a portable-only alternative with `--verification portable`. Follow [incremental adoption](docs/adoption.md) for an existing repository and [upgrades](docs/upgrading.md) when changing versions. See [public API](docs/public-api.md) for the full contract surface.
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 

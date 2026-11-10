@@ -1,6 +1,6 @@
 # Golden tests
 
-Each fixture pairs a C# input with a stable `.expected` output in `lowering`, `worker`, `vc`, or `analyzer`. Discovery rejects orphan expectations; normal runs reject missing expectations. Files use UTF-8 without BOM and LF. [GoldenTest.cs](../../eng/testing/GoldenTest.cs) owns discovery, comparison, and guarded updates.
+Each fixture pairs a C# input with a stable `.expected` output in `lowering`, `worker`, `vc`, `analyzer`, or `build-task`. Discovery rejects orphan expectations; normal runs reject missing expectations. Files use UTF-8 without BOM and LF. [GoldenTest.cs](../../eng/testing/GoldenTest.cs) owns discovery, comparison, and guarded updates.
 
 ## Run a stage
 
@@ -12,6 +12,7 @@ docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpPr
 
 docker compose run --rm tooling test -Target src/SharpProof.Worker.Tests/SharpProof.Worker.Tests.csproj -TestFilter FullyQualifiedName~GoldenVcRegressionTests
 docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~GoldenAnalyzerTests
+docker compose run --rm tooling test -Target src/SharpProof.Package.IntegrationTests/SharpProof.Package.IntegrationTests.csproj -TestFilter FullyQualifiedName~BuildTaskTests
 ```
 
 Use a unique Compose project name when independent worktrees share a directory basename.
@@ -27,6 +28,8 @@ Every lowering case also runs after adding a heading and normalizing its indenta
 Operation descriptions such as `SimpleAssignment@96` encode a starting offset too. Their snapshots keep the operation kind and anchor its starting token instead; descriptions without a source offset remain literal.
 
 Worker fixtures record request binding, run/claim outcomes, reasons, cache behavior, and launcher boundaries. A `golden-scenario` directive selects a test driver where needed. Replay fixtures can construct explicit IR to exercise a boundary independently of source lowering.
+
+Build-task fixtures (`build-task`) record the MSBuild verifier task's observable protocol for a scripted scenario, such as cancellation readiness; [BuildTaskTests.cs](../../src/SharpProof.Package.IntegrationTests/BuildTaskTests.cs) loads them by name.
 
 Analyzer fixtures record code, effective severity, mapped location, and message. Formatters omit timings, absolute temporary paths, and arbitrary solver model choices. Assertions should preserve meaningful evidence rather than incidental output.
 

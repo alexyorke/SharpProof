@@ -6,10 +6,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
-- Restore SharpProof from nuget.org. Templates, `init` and the consumer workflow no
-  longer need the private GitHub feed or its credentials; the workflow still accepts
-  that feed with `package-read-token`. The package version moves to
-  `1.0.0-preview.2`, the first public version.
+- Point templates, `init` and the consumer workflow at nuget.org instead of the
+  private GitHub feed and its credentials; the workflow still accepts that feed with
+  `package-read-token`. The package version moves to `1.0.0-preview.2`. It is not
+  published yet, so until it is, restore from a configured feed that carries it.
 - Keep strict verification with the project that references SharpProof. The
   package's MSBuild files now ship in `build/`, passed to the direct consumer by
   `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of
@@ -18,6 +18,9 @@ Entries describe repository changes, not package publication. Confirm available 
   verification, the worker run or the SDK 10 requirement.
 - Smoke-test the packed packages on Windows and macOS in the release workflow, and
   attest package provenance before publishing.
+- Extend the native verifier payload/matrix to Windows, macOS, and glibc Linux on x64/ARM64. Windows solver payloads link their C++ runtime statically, removing the separate Visual C++ redistributable prerequisite. .NET SDK 10.0.100+ remains required; musl and other OS/CPU combinations are outside this support boundary. Exact-artifact native ABI checks establish release qualification separately from compilation/import audits.
+- Make the main `SharpProof` package the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. The cycle-free graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`; Verifier remains a compatibility entrypoint. Advisory/off are explicit opt-outs. Existing main-package consumers without an explicit profile now receive strict policy and require SDK 10; review upgrade guidance.
+- Move repository toolchain and verifier tasks/worker to .NET 10; full verification now requires SDK 10.0.100+ with the .NET 10 runtime. Portable analyzer minimum remains SDK 9.0.300+/Roslyn 4.14; application targets are independent.
 - Move to SDK 10.0.403 (.NET 10.0.14, a security release) and re-audit the
   pinned CoreLib facts; patch `libbrotli1` in the tooling image.
 
@@ -84,17 +87,9 @@ Entries describe repository changes, not package publication. Confirm available 
 - Rebuild the nightly fuzz runner with the solution-build allowance (600 seconds),
   instead of the worker's per-project limit (300 seconds), and retain its build streams.
   Retained/rotating run budgets, seeds, case counts, and proof budgets are unchanged.
-
-- Extend the native verifier payload/matrix to Windows, macOS, and glibc Linux on x64/ARM64. Windows solver payloads link their C++ runtime statically, removing the separate Visual C++ redistributable prerequisite. .NET SDK 10.0.100+ remains required; musl and other OS/CPU combinations are outside this support boundary. Exact-artifact native ABI checks establish release qualification separately from compilation/import audits.
-
-- Make the main `SharpProof` package the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. The cycle-free graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`; Verifier remains a compatibility entrypoint. Advisory/off are explicit opt-outs. Existing main-package consumers without an explicit profile now receive strict policy and require SDK 10; review upgrade guidance.
-
 - Separate portable first feedback, full verification, and incremental adoption instructions.
 - Reconcile qualified consumer hosts with the container-only contributor workflow.
-- Add local project templates using the authoritative checkout package version, plus a packed-consumer smoke check.
+- Remove the checkout-only `templates/` (`sp-verified`/`sp-portable`) and its installer;
+  the packaged `sharpproof` and `sharpproof-workspace` templates cover both the verified
+  and the portable (`--verification portable`) setups.
 - Add upgrade guidance, contributor navigation, structured issue forms, and guidance for preparing sanitized reproductions.
-- Move repository toolchain and verifier tasks/worker to .NET 10; full verification now requires SDK 10.0.100+ with the .NET 10 runtime. Portable analyzer minimum remains SDK 9.0.300+/Roslyn 4.14; application targets are independent.
-
-### Release review
-
-Before a release, replace this review note with the concrete shipped changes, required SDK/runtime, diagnostic/configuration changes, semantic/evidence changes, migration steps, known limitations and exact qualification evidence. Do not infer a publication date or artifact availability from this entry.

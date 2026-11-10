@@ -3,10 +3,10 @@
 Status: historical implementation design and original validation record for the
 emitted-fault-site milestone. The baseline versions, source line ranges, ownership
 assignments and future-tense instructions below describe that delivery, not the
-current branch state. Current wire versions are in [release constants](release-constants.md).
+current branch state. Current wire versions are in [release constants](../release-constants.md).
 
 The structural scanner and helper bridge remain separate from a source-derived
-closed runtime allocation proof. Later work added [explicit task runtime premises](resource-task-runtime-premises.md):
+closed runtime allocation proof. Later work added [explicit task runtime premises](../resource-task-runtime-premises.md):
 complete caller declarations can now support conditional cumulative-byte proofs.
 Without those premises, cumulative task runtime bytes remain Unknown. The design
 below does not close the remaining derivation obligations.

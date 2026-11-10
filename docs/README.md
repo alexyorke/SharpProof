@@ -9,7 +9,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | Guide | Contents |
 | --- | --- |
 | [Getting started](getting-started.md) | Package references, first contract, profiles, and verifier policies |
-| [Project templates](../templates/README.md) | Portable/verified class libraries with version-authoritative local installation |
+| [Project templates](developer-experience.md#install-and-start) | `dotnet new sharpproof` and `sharpproof-workspace`, verified or portable |
 | [Developer tools](developer-experience.md) | Optional packaged templates, project setup checks, evidence comparison, NUnit regression export, and companion scaffolding |
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
@@ -28,6 +28,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Unknown reasons](unknown-reasons.md) | Typed abstentions and infrastructure failures |
 | [Analysis limits](analysis-limits.md) | Current defaults and bounded execution |
 | [Preview support](preview-support.md) | Container, filesystem, and threat-model boundary |
+| [Legacy compatibility](legacy-compatibility.md) | Older application frameworks, Windows full-framework MSBuild, and Visual Studio qualification limits |
 | [Samples](../src/samples/README.md) | Executable package-consumer examples |
 
 ## Understand the implementation
@@ -41,11 +42,15 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Release constants](release-constants.md) | Version ownership and compatibility changes |
 | [Native SMT packaging](native-smt-packaging.md) | Payload pins, loading, and package graph |
 | [Native Windows verifier](windows-native-verifier.md) | Run Windows x64/ARM64 proofs, static runtime payloads, supported paths, and CI |
+| [Native macOS verifier](macos-native-verifier.md) | Run macOS ARM64/x64 proofs, packaged Z3 payloads, and qualification |
+| [Task runtime premises](resource-task-runtime-premises.md) | Declared runtime assumptions behind conditional task allocation bounds |
 
 ## Develop and qualify
 
 - [Development workflows](development-workflows.md): choose targeted, PR, coverage, corpus, packaging, and qualification workflows.
 - [Container development](container-development.md): all commands and workspace modes.
+- [Repository layout](repository-layout.md): directory roles, Arcade conventions, and output paths.
+- [Design notes](design/configuration-ownership.md): configuration ownership and the historical [emitted fault sites design](design/resource-emitted-fault-sites.md).
 - [Contributing](../CONTRIBUTING.md) and [agent notes](../AGENTS.md): development rules.
 - [Corpus gate](../tests/SharpProof.Gates/README.md) and [source provenance](../tests/SharpProof.Gates/Corpus/README.md): canonical snapshots and support ratchets.
 - [Golden tests](../tests/golden/README.md): stage fixtures and explicit expectation updates.
