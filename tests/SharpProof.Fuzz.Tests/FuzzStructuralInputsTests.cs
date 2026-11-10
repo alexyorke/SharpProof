@@ -16,7 +16,7 @@ public sealed class FuzzStructuralInputsTests
         if (index < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(index)); }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var condition = factory.Variable(factory.CreateVariable("condition", factory.BooleanType));
         var otherCondition = factory.Variable(factory.CreateVariable("other", factory.BooleanType));
         var firstObject = factory.Variable(factory.CreateVariable("first", factory.ObjectType));

@@ -9,7 +9,7 @@ public sealed class IrOperandFailureTests
     [Test]
     public void MissingReceiverAndSequenceValuesPropagateToTheirReads()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Receiver");
         var receiver = factory.Variable(factory.CreateVariable("receiver", type));
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), type, "Read", factory.IntegerType, false);
@@ -31,7 +31,7 @@ public sealed class IrOperandFailureTests
         if (missingOperand < 0)
         { throw new System.ArgumentException("Value must be initialized.", nameof(missingOperand)); }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", sequenceType);
         var index = factory.CreateVariable("index", factory.IntegerType);

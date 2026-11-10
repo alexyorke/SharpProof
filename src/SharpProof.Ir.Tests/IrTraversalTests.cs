@@ -11,7 +11,7 @@ public sealed class IrTraversalTests
     public void ChildrenCoverEveryTermKindInSemanticOrder()
     {
         var factory = new IrFactory();
-        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var totalFactory = new IrFactory();
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var receiverType = factory.GetOrCreateReferenceType(

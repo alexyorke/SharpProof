@@ -20,7 +20,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
     public void ValidLegacyWriteMarkersRetainTheirDeclaredStateRegions(IrWriteRegion region, bool violates)
     {
         var (compilation, _, caller, declaration, _) = Caller();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Write(entry, factory.CreateOperation(), region);
@@ -60,7 +60,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
         // API facets carry legacy effect flags. Trusted metadata contracts use
         // WithCapabilities instead; that distinct path is checked below.
         Assert.That(IrOpaqueCallSite.Capabilities(flags), Is.Null);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, site) = CallProgram(factory, callee, invocation, flags, sourceSpan: true);
         Assert.That(IrOpaqueCallSite.Effects(factory, site), Is.EqualTo(flags));
         var analysis = AdvisoryEffectSites.Analyze(program,
@@ -94,7 +94,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
     public void ASpanlessIrCallUsesTheCallersDeclaredSourceLocation()
     {
         var (_, callee, _, declaration, invocation) = Caller();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, _) = CallProgram(factory, callee, invocation, IrOpaqueCallEffects.None, sourceSpan: false);
         var fallback = declaration.Identifier.GetLocation();
         var analysis = AdvisoryEffectSites.Analyze(program, _ => null, fallback, TestContext.CurrentContext.CancellationToken);

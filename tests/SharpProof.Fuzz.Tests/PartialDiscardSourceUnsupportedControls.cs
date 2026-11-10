@@ -57,7 +57,7 @@ public sealed class PartialDiscardSourceUnsupportedControls
         var operation = model.GetOperation(declaration.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
         Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var lowering = FrontendTotalLowering.Lower(factory, operation);
         Assert.That(lowering.IsExact, Is.EqualTo(!unsupported));
         if (unsupported)

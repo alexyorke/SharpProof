@@ -9,7 +9,7 @@ public sealed class HornBooleanImplicationStateTests
     [Test]
     public async Task ReadinessRequiresCommitmentAcrossStateSteps()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var readyVariable = factory.CreateVariable("ready", factory.BooleanType);
         var committedVariable = factory.CreateVariable("committed", factory.BooleanType);
         var ready = factory.Variable(readyVariable);

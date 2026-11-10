@@ -110,7 +110,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
     private static (PassiveCallableCandidate Candidate, OperationId CallSite, OperationId LockSite) CreateModule(
         IrOpaqueCallEffects effects, bool locked)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         var lockSite = factory.CreateOperation("module-lock");
@@ -139,7 +139,7 @@ public sealed class NativeOpaqueCapabilityModuleTests
         bool locked, bool synchronizationAllowed, string expected)
     {
         System.ArgumentNullException.ThrowIfNull(expected);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         var lockSite = factory.CreateOperation("module-lock");

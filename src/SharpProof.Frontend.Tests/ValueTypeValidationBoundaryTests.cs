@@ -80,7 +80,7 @@ public sealed class ValueTypeValidationBoundaryTests
             Is.EqualTo(VisualBasicError));
         var local = Local(compilation, "broken");
         Assert.That(local.Type.TypeKind, Is.EqualTo(TypeKind.Error));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("broken", factory.ObjectType);
         var rejection = Assert.Throws<FrontendLoweringRejectionException>((Action)(() =>
             RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable)));
@@ -98,7 +98,7 @@ public sealed class ValueTypeValidationBoundaryTests
         var method = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
         var graph = ControlFlowGraph.Create(method, model)!;
         var target = (IMethodSymbol)model.GetDeclaredSymbol(method.SubOrFunctionStatement)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var local = Local(compilation, "broken");
         Assert.That(local.Type.TypeKind, Is.EqualTo(TypeKind.Error));
@@ -120,7 +120,7 @@ public sealed class ValueTypeValidationBoundaryTests
         AssertNoErrors(compilation);
         var local = Local(compilation, "integerValue");
         Assert.That(local.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = new RoslynTypeMapper(factory).GetTypeId(local.Type);
         var variable = factory.CreateVariable(local.Name, type);
         var value = RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable);
@@ -141,7 +141,7 @@ public sealed class ValueTypeValidationBoundaryTests
         Assert.That(local.Type.TypeKind, Is.Not.EqualTo(TypeKind.Error));
         Assert.That(CSharpOperationSemantics.IsValueDomain(local.Type), Is.True);
         Assert.That(CSharpOperationSemantics.IsOpaqueDomain(local.Type), Is.EqualTo(name == "opaqueValue"));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = new RoslynTypeMapper(factory).GetTypeId(local.Type);
         var variable = factory.CreateVariable(name, type);
         var value = RoslynValueTypeValidation.LocalStorageDefault(factory, local.Type, variable);

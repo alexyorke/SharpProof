@@ -12,7 +12,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
     [Test]
     public void ReplacementAndJoinContainConcreteExecutions()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var c = f.CreateVariable("c", f.BooleanType);
         var x = f.CreateVariable("x", f.IntegerType);
         var b = new IrProgramBuilder(f);
@@ -31,7 +31,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
     [Test]
     public void BranchEdgesRefineAndJoin()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var x = f.CreateVariable("x", f.IntegerType);
         var y = f.CreateVariable("y", f.IntegerType);
         var b = new IrProgramBuilder(f);
@@ -56,7 +56,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
     [Test]
     public void WrappingAssignmentContainsConcreteByteResults()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var type = f.GetOrCreateIntegerType(8, false);
         var x = f.CreateVariable("x", type);
         var b = new IrProgramBuilder(f);
@@ -71,7 +71,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
     }
     private static (IrProgram Program, IrVarId X) Loop()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var x = f.CreateVariable("x", f.IntegerType);
         var b = new IrProgramBuilder(f);
         var e = b.CreateBlock();
@@ -109,7 +109,7 @@ public sealed class CoreIrAdvisoryInterpreterTests
     [Test]
     public void UnsupportedOpaqueResultOverwritesOldFactAndReportsGap()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var x = f.CreateVariable("x", f.IntegerType);
         var member = f.GetOrCreateMember(f.CreateIdentity(), f.ObjectType, "Unknown", f.IntegerType, true, []);
         var b = new IrProgramBuilder(f);
@@ -130,7 +130,7 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void NullAndEmptyAndNonemptyJoinsContainConcreteLengths()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var c = f.CreateVariable("c", f.BooleanType);
         var s = f.CreateVariable("s", f.StringType);
         var n = f.CreateVariable("n", f.IntegerType);
@@ -158,7 +158,7 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void PositiveLengthRefinesNonNullSequenceAndEmptyRetainsNull()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var type = f.GetOrCreateSequenceType(f.IntegerType);
         var c = f.CreateVariable("c", f.BooleanType);
         var s = f.CreateVariable("s", type);
@@ -186,7 +186,7 @@ public sealed class CoreIrAdvisoryProductTests
     [TestCase(true)]
     public void CallsAndHavocForgetKnownReferenceFacts(bool call)
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var s = f.CreateVariable("s", f.StringType);
         var b = new IrProgramBuilder(f);
         var e = b.CreateBlock();
@@ -207,7 +207,7 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void ShortCircuitDoesNotObserveUnsupportedOperand()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var unknown = f.CreateVariable("unknown", f.BooleanType);
         var output = f.CreateVariable("output", f.BooleanType);
         var member = f.GetOrCreateMember(f.CreateIdentity(), f.ObjectType, "Unknown", f.BooleanType, true, []);
@@ -225,7 +225,7 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void AllocationAndUtf16AndNullConcatMatchConcreteFacts()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var type = f.GetOrCreateSequenceType(f.IntegerType);
         var array = f.CreateVariable("array", type);
         var text = f.CreateVariable("text", f.StringType);
@@ -248,7 +248,7 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void NegativeAllocationIsExplicitGap()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var type = f.GetOrCreateSequenceType(f.IntegerType);
         var array = f.CreateVariable("array", type);
         var b = new IrProgramBuilder(f);
@@ -264,14 +264,14 @@ public sealed class CoreIrAdvisoryProductTests
     [Test]
     public void UnsupportedTypesAndForeignVariablesFailAdmission()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var x = f.CreateVariable("x", f.GetOrCreateIntegerType(64, false));
         var b = new IrProgramBuilder(f);
         var e = b.CreateBlock();
         b.Return(e, f.CreateOperation());
         var program = b.Build();
         Assert.That(new CoreIrAdvisoryInterpreter(program, [x]).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty).Gaps, Does.Contain("unsupported integer type"));
-        var other = new IrFactory(IrExecutionSemantics.Total);
+        var other = new IrFactory();
         var foreign = other.CreateVariable("other", other.IntegerType);
         Assert.That(new CoreIrAdvisoryInterpreter(program, [foreign]).Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty).Gaps, Does.Contain("variable ownership"));
     }
@@ -285,7 +285,7 @@ public sealed class CoreIrAdvisoryAdmissionLimitTests
     public void OversizedInputReportsBoundedAdmissionGap(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var variables = Enumerable.Range(0, kind == "variables" ? 4097 : 1).Select(i => f.CreateVariable("x" + i, f.IntegerType)).ToImmutableArray();
         var b = new IrProgramBuilder(f);
         var entry = b.CreateBlock();
@@ -321,7 +321,7 @@ public sealed class CoreIrAdvisoryResourceTests
     [TestCase(true)]
     public void NullableCfgMergeContainsNullAndNonemptyConcreteResults(bool sequence)
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var type = sequence ? f.GetOrCreateSequenceType(f.IntegerType) : f.StringType;
         var c = f.CreateVariable("c", f.BooleanType);
         var value = f.CreateVariable("value", type);
@@ -360,7 +360,7 @@ public sealed class CoreIrAdvisoryResourceTests
     [Test]
     public void AggregateTermWorkStopsBeforePublishingPartialStates()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var x = f.CreateVariable("x", f.IntegerType);
         var b = new IrProgramBuilder(f);
         var entry = b.CreateBlock();
@@ -376,7 +376,7 @@ public sealed class CoreIrAdvisoryResourceTests
     [Test]
     public void SyntheticEdgeBudgetRejectsBeforeFixedPoint()
     {
-        var f = new IrFactory(IrExecutionSemantics.Total);
+        var f = new IrFactory();
         var c = f.CreateVariable("c", f.BooleanType);
         var b = new IrProgramBuilder(f);
         var entry = b.CreateBlock();
@@ -412,7 +412,7 @@ public sealed class CoreIrAdvisoryInitialFactTests
     [TestCase(true, 2L)]
     public void OutOfTypeInitialFactsAreRejected(bool boolean, long input)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("input", boolean ? factory.BooleanType : factory.GetOrCreateIntegerType(8, false));
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -431,7 +431,7 @@ public sealed class CoreIrAdvisoryInitialFactTests
     [TestCase(true, 1L)]
     public void TypedBoundaryInitialFactsRemainAvailable(bool boolean, long input)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("input", boolean ? factory.BooleanType : factory.GetOrCreateIntegerType(8, false));
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -447,7 +447,7 @@ public sealed class CoreIrAdvisoryInitialFactTests
     [TestCase(true)]
     public void BottomAndReferenceScalarFactsAreRejected(bool reference)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("input", reference ? factory.StringType : factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -472,7 +472,7 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
-        var context = new SharpProof.Frontend.TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total),
+        var context = new SharpProof.Frontend.TotalLoweringContext(new IrFactory(),
             (Microsoft.CodeAnalysis.IMethodSymbol)Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(model, syntax)!);
         var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
         var lowering = SharpProof.Frontend.RoslynProgramLowering.LowerCandidate(graph, context);

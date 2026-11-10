@@ -11,7 +11,7 @@ public sealed class DynamicReferenceWitnessTypeTests
     [TestCase(true, true)]
     public async Task BuiltinWitnessAliasRequiresACompatibleReferenceView(bool array, bool objectView)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builtinType = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
         var viewType = objectView ? factory.ObjectType : factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Cell");
         var builtin = factory.CreateVariable("builtin", builtinType);

@@ -55,7 +55,7 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static PassiveCallableCandidate DispatcherLoops(int count)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("dominance-work-admission");
         var dispatch = Enumerable.Range(0, count + 1).Select(_ => builder.CreateBlock()).ToImmutableArray();
@@ -74,7 +74,7 @@ public sealed class NativeConstructionWorkAdmissionTests
 
     private static PassiveCallableCandidate HeapStores(int count)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("overlay-work-admission");
         var storageType = factory.GetOrCreateSequenceType(factory.IntegerType);

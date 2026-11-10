@@ -12,7 +12,7 @@ public sealed class NativeBitvectorModelWidthTests
     [TestCase(64)]
     public void ActualNativeModelNumeralRequiresASupportedMatchingIrWidth(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width == 1 ? 32 : width, true);
         var bits = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         using var context = new Context();

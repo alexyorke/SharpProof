@@ -44,7 +44,7 @@ public sealed class FrontendTypeInitializationControls
         Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var lowered = FrontendTotalLowering.Lower(factory, operation!);
         Assert.That(lowered.IsExact, Is.True);
         var binding = lowered.Variables.Single();

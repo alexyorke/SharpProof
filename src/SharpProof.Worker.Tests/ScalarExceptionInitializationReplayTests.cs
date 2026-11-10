@@ -76,7 +76,7 @@ internal sealed class ScalarExceptionInitializationReplayTests
     public void UnownedDescriptionsCannotAuthorizeReplay(string description)
     {
         ArgumentNullException.ThrowIfNull(description);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(IrOpaqueCallSite.ScalarExceptionInitializationKind(factory, factory.CreateOperation(description)), Is.Null);
     }
 
@@ -93,7 +93,7 @@ internal sealed class ScalarExceptionInitializationReplayTests
 
     private static (IrFactory Factory, IrHavocRequest Request) Request(IrHavocOrigin origin, bool wrongType)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("ready", wrongType ? factory.IntegerType : factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

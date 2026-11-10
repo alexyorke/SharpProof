@@ -19,7 +19,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     [TestCase(64, true, long.MinValue, long.MaxValue)]
     public void SingletonArithmeticMatchesTotalInterpreter(int width, bool isSigned, long minimum, long maximum)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var info = factory.GetTypeInfo(type);
         Assert.That(CoreIrScalarIntervalTransfer.TryTypeRange(info, out var range), Is.True);
@@ -65,7 +65,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     [TestCase(false)]
     public void ByteRangesContainEveryConcreteArithmeticResult(bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, isSigned);
         var info = factory.GetTypeInfo(type);
         var x = factory.CreateVariable("x", type);
@@ -107,7 +107,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     [Test]
     public void TightBoundsAndWrappingRemainDistinct()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetTypeInfo(factory.IntegerType);
         Assert.That(CoreIrScalarIntervalTransfer.Binary(IrBinaryOperator.Add, type,
             IntervalValue.Range(0, 10), IntervalValue.Range(2, 3)), Is.EqualTo(IntervalValue.Range(2, 13)));
@@ -131,7 +131,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     public void CastsMatchTheInterpreterAndClrBoundaryValues(int sourceWidth, bool sourceIsSigned,
         int targetWidth, bool targetIsSigned, long input, long expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var source = factory.GetOrCreateIntegerType(sourceWidth, sourceIsSigned);
         var target = factory.GetOrCreateIntegerType(targetWidth, targetIsSigned);
         var variable = factory.CreateVariable("value", source);
@@ -146,7 +146,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     [Test]
     public void SparseCarrierExtremaRemainContained()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetTypeInfo(factory.GetOrCreateIntegerType(64, true));
         var even = IntervalValue.Congruent(null, null, 2, 0);
         var odd = IntervalValue.Congruent(null, null, 2, 1);
@@ -164,7 +164,7 @@ public sealed class CoreIrScalarIntervalTransferTests
     [Test]
     public void CastsPreserveSafeCongruenceAndCompleteWrapping()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var source = factory.GetTypeInfo(factory.IntegerType);
         var wide = factory.GetTypeInfo(factory.GetOrCreateIntegerType(64, true));
         var unsigned = factory.GetTypeInfo(factory.GetOrCreateIntegerType(32, false));
@@ -181,7 +181,5 @@ public sealed class CoreIrScalarIntervalTransferTests
             Is.EqualTo(IntervalValue.Top));
         Assert.That(CoreIrScalarIntervalTransfer.TryTypeRange(
             factory.GetTypeInfo(factory.GetOrCreateIntegerType(64, false)), out _), Is.False);
-        var legacy = new IrFactory();
-        Assert.That(CoreIrScalarIntervalTransfer.TryTypeRange(legacy.GetTypeInfo(legacy.IntegerType), out _), Is.False);
     }
 }

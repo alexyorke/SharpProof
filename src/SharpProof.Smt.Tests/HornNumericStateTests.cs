@@ -11,7 +11,7 @@ public sealed class HornNumericStateTests
     [TestCase(32)]
     public async Task SignedWidenedCountdownPreservesItsNegatedSafetyBound(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, true);
         var wideType = factory.GetOrCreateIntegerType(64, true);
         var variable = factory.CreateVariable("remaining", type);

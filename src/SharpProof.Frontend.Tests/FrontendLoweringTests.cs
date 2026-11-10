@@ -545,7 +545,7 @@ internal sealed class FrontendLoweringTests
             _methodSymbol = methodSymbol;
             TargetRoot = targetRoot;
             TargetExpression = targetExpression;
-            Factory = new IrFactory(IrExecutionSemantics.Total);
+            Factory = new IrFactory();
         }
 
         internal IrFactory Factory

@@ -16,7 +16,7 @@ public sealed class IrPurityWriteWitnessTests
     [TestCase(true, true, true)]
     public void OnlyCallerOwnedStoresSupplyPurityWriteWitnesses(bool array, bool allocated, bool alias)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
         var other = factory.CreateVariable("alias", type);
@@ -54,7 +54,7 @@ public sealed class IrPurityWriteWitnessTests
     [TestCase(true)]
     public void UnknownWriterForgetsAllocationOwnershipBeforeLaterStore(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
@@ -80,7 +80,7 @@ public sealed class IrPurityWriteWitnessTests
     [TestCase(true)]
     public void FailedStoreSuppliesNoEffectOrPurityWriteWitness(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);

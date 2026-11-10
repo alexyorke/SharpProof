@@ -11,7 +11,7 @@ public sealed class IrDefaultObjectReplayTests
     [TestCase(true, true)]
     public void FreshDefaultsRecoverAfterPriorInvalidationAndExpireAfterAnotherWriter(bool boolean, bool invalidateAgain)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = boolean ? factory.BooleanType : factory.IntegerType;
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", type, false);
@@ -37,7 +37,7 @@ public sealed class IrDefaultObjectReplayTests
     [Test]
     public void FreshReferenceFieldsRemainOutsideTheScalarDefaultModel()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.ObjectType, false);
         var value = factory.CreateReferenceValue(factory.ObjectType, new object());

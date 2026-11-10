@@ -139,7 +139,7 @@ public sealed class ListStateDomainBoundaryTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         context.TrackFreshLists(ControlFlowGraph.Create(syntax, model)!);
         var property = (IPropertyReferenceOperation)model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
         Assert.That(context.IsExactList(property.Instance!), Is.True);
@@ -157,7 +157,7 @@ public sealed class ListStateDomainBoundaryTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         var operation = model.GetOperation(syntax.DescendantNodes().OfType<ReturnStatementSyntax>().Single().Expression!)!;
         var lowered = new RoslynTotalExpressionLowerer(context).LowerClause(operation, depth: depth);
         Assert.That(lowered.Classification.IsExact, Is.False);
@@ -173,7 +173,7 @@ public sealed class ListStateDomainBoundaryTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         return (model, syntax, ControlFlowGraph.Create(syntax, model)!, context);
     }
 }

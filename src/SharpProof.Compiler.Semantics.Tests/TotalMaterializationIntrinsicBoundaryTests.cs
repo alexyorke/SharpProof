@@ -19,7 +19,7 @@ internal sealed class TotalMaterializationIntrinsicBoundaryTests
         var target = Method(compilation, methodName);
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var api = ContractApiSymbols.TryCreate(compilation)!;
         var intrinsics = new ContractIntrinsicValidator(api);
         var violations = intrinsics.Validate(resolution.Source, resolution.Inventory.ImplementationBody);
@@ -44,7 +44,7 @@ internal sealed class TotalMaterializationIntrinsicBoundaryTests
         var target = Method(compilation, "WrongResultSignature");
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var api = ContractApiSymbols.TryCreate(compilation)!;
         var intrinsics = new ContractIntrinsicValidator(api);

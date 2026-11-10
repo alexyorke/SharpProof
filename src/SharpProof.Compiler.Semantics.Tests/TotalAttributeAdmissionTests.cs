@@ -22,7 +22,7 @@ public sealed class TotalAttributeAdmissionTests
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target")
             .OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
         Assert.That(target.ContainingAssembly, Is.SameAs(compilation.Assembly));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var binder = new TotalContractBinder(compilation, factory);
         var binding = requiresOnly ? binder.BindTotalRequires(context) : binder.BindTotal(context);

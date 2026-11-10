@@ -17,7 +17,6 @@ public sealed class PortableTotalExecutionTests
         var graph = CreateGraph();
         var decoded = PortableIrGraphCodec.Decode(graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var json = JsonSerializer.Serialize(graph, WorkerProtocolJson.SharedOptions);
-        Assert.That(decoded.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(decoded.Factory.GetTypeInfo(decoded.Factory.IntegerType).Width, Is.EqualTo(32));
         var result = new IrProgramInterpreter(decoded.Factory).Execute(decoded.Program!, null, 100,
             new IrProgramReplayOptions(_ => decoded.Factory.CreateIntegerValue(-1)));
@@ -30,7 +29,6 @@ public sealed class PortableTotalExecutionTests
             decoded.Program, decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph, WorkerProtocolJson.SharedOptions), Is.EqualTo(json));
     }
 
-    [TestCase("semantics")]
     [TestCase("origin")]
     [TestCase("sourceSpan")]
     [TestCase("document")]
@@ -54,7 +52,6 @@ public sealed class PortableTotalExecutionTests
         }));
     }
 
-    [TestCase("mode")]
     [TestCase("origin")]
     [TestCase("unused-origin")]
     [TestCase("span-start")]
@@ -71,9 +68,6 @@ public sealed class PortableTotalExecutionTests
         var span = graph.Operations.Single(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).SourceSpan!;
         switch (mutation)
         {
-            case "mode":
-                graph = graph with { Semantics = (IrExecutionSemantics)99 };
-                break;
             case "origin":
                 graph = graph.ReplaceRow(instructions[0], instructions[0] with { Origin = (IrHavocOrigin)99 });
                 break;
@@ -116,7 +110,7 @@ public sealed class PortableTotalExecutionTests
     [Test]
     public void UnsignedModelPresentationUsesExactDecimalValue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, false);
         Assert.That(WorkerProjections.FormatValue(factory.CreateIntegerValue(type, ulong.MaxValue)),
             Is.EqualTo(("Integer", "18446744073709551615")));
@@ -124,7 +118,7 @@ public sealed class PortableTotalExecutionTests
 
     private static PortableIrGraph CreateGraph()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();

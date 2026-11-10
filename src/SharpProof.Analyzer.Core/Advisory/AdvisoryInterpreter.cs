@@ -223,7 +223,7 @@ internal sealed class CoreIrAdvisoryInterpreter
         _gaps = ImmutableHashSet.CreateBuilder<string>();
         _markerSites = null;
         _markerSnapshots = null;
-        if (_factory.Semantics != IrExecutionSemantics.Total || _program.Blocks.Length > 4096)
+        if (_program.Blocks.Length > 4096)
         { return Incomplete("admission/graph budget"); }
         _termWorkRemaining = maximumTermWork;
         _termBudgetExceeded = false;

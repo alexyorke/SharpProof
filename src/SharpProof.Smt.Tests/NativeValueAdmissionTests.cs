@@ -8,7 +8,7 @@ public sealed class NativeValueAdmissionTests
     [Test]
     public void PartialBooleanModelDoesNotBecomeAConcreteWitness()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var solver = context.MkSolver();
         using var predicate = context.MkBoolConst("unassigned");
@@ -22,7 +22,7 @@ public sealed class NativeValueAdmissionTests
     [Test]
     public void ArithmeticIntegerModelCannotMasqueradeAsABitvectorWitness()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var solver = context.MkSolver();
         using var value = context.MkIntConst("arithmetic");
@@ -40,7 +40,7 @@ public sealed class NativeValueAdmissionTests
     [Test]
     public void WrongWidthBitvectorCannotBecomeAnIntegerWitness()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var value = context.MkBV(7, 16);
 

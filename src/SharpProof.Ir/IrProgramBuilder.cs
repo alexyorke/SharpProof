@@ -411,7 +411,7 @@ internal sealed class IrProgramBuilder(IrFactory factory)
         { throw InvalidArgument("An identity-producing allocation requires matching reference storage.", "target"); }
         if (allocation.Length is { } length &&
             ((_factory.GetTypeInfo(allocation.AllocatedType).Kind != IrTypeKind.Sequence && !stringAllocation) || allocation.Target == null ||
-                ValidateTerm(length, "length") != _factory.IntegerType || _factory.Semantics != IrExecutionSemantics.Total))
+                ValidateTerm(length, "length") != _factory.IntegerType))
         { throw InvalidArgument("An array or repeated string allocation requires Total matching storage and an Int32 length.", "length"); }
         if (!stringAllocation && !allocation.InitialValues.IsEmpty)
         {

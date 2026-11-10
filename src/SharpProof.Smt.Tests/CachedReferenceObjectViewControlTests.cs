@@ -9,7 +9,7 @@ public sealed class CachedReferenceObjectViewControlTests
     [TestCase(true)]
     public async Task TypedCachedValueAndObjectViewKeepTheirAlias(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
         IrTerm cached = array ? factory.EmptyArray(type) : factory.String("text");
         var typed = factory.CreateVariable("typed", type);
@@ -28,7 +28,7 @@ public sealed class CachedReferenceObjectViewControlTests
     [Test]
     public async Task DistinctLiteralViewsRemainDistinct()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.ObjectType);
         var second = factory.CreateVariable("second", factory.ObjectType);
         var query = new VerificationQuery(factory,

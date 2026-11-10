@@ -18,7 +18,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
     public void RealMetadataAnnotationsRetainFacadeOrderAndIndependentPredicateTruth()
     {
         var (compilation, target) = Import("Single");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var parameter = target.Parameters.Single();
@@ -54,7 +54,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var (compilation, target) = Import("Single");
         var parameter = target.Parameters.Single();
         Assert.That(parameter.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
@@ -72,7 +72,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
     public void LateIncompatibleValuePublishesNoValidMetadataPrefix()
     {
         var (compilation, target) = Import("Pair");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);

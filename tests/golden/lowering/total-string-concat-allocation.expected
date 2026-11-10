@@ -1,4 +1,3 @@
-mode: Total
 classification: Exact/None
 entry: b0
 parameter: 0 entry=v0:string[width=0,signed=False] current=v1:string[width=0,signed=False] old=v2:string[width=0,signed=False]

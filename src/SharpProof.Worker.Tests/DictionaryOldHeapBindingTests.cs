@@ -121,7 +121,7 @@ public sealed class DictionaryOldHeapBindingTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
         return (compilation, ControlFlowGraph.Create(syntax, model)!, context);
     }
 }

@@ -41,7 +41,7 @@ public sealed class BulkFrontendCallsElidedConstructorCaptureTests
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = ControlFlowGraph.Create(syntax, model)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var runtime = new AssemblyLoadContext("ConstructorCapture_" + partial + "_" + enabled, isCollectible: true);
         try

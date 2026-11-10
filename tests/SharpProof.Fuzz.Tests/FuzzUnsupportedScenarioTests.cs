@@ -10,7 +10,7 @@ public sealed class FuzzUnsupportedScenarioTests
     [Test]
     public void PartialOracleRejectsAStringScenarioOutsideItsBooleanIntegerContract()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         const string text = "proof";
         var formula = factory.Binary(IrBinaryOperator.Equal,

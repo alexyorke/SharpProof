@@ -53,7 +53,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
             var targetGraph = ControlFlowGraph.Create(targetSyntax, model)!;
             var helperGraph = ControlFlowGraph.Create(helperSyntax, model)!;
             var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!);
             var preparedCount = 0;
             bool Prepare(TotalLoweringContext candidate)

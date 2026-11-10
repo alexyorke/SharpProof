@@ -6,7 +6,7 @@ public sealed class UnsupportedScalarBoundaryTests
     [Test]
     public async Task ReferenceArrayElementDoesNotEnterTheScalarArrayModel()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var arrayType = factory.GetOrCreateSequenceType(factory.ObjectType);
         var array = factory.CreateVariable("objects", arrayType);
         var element = factory.SequenceAccess(factory.Variable(array), factory.Integer(0));
@@ -21,7 +21,7 @@ public sealed class UnsupportedScalarBoundaryTests
     [Test]
     public async Task ObjectUnboxingDoesNotAcquireAnUnjustifiedIntegerValue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var boxed = factory.CreateVariable("boxed", factory.ObjectType);
         var value = factory.Cast(factory.IntegerType, factory.Variable(boxed));
         var predicate = factory.Binary(IrBinaryOperator.Equal, value, factory.Integer(0));
@@ -36,7 +36,7 @@ public sealed class UnsupportedScalarBoundaryTests
     [TestCase(16)]
     public async Task UnpromotedNarrowShiftDoesNotUseClrCountMasking(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, true);
         var value = factory.CreateVariable("value", type);
         var count = factory.CreateVariable("count", type);
@@ -52,7 +52,7 @@ public sealed class UnsupportedScalarBoundaryTests
     [Test]
     public async Task TotalZeroDividendRemainderIsZeroIncludingZeroDivisor()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var remainder = factory.Binary(IrBinaryOperator.Remainder, factory.Integer(0), factory.Variable(divisor));
         var predicate = factory.Binary(IrBinaryOperator.Equal, remainder, factory.Integer(0));

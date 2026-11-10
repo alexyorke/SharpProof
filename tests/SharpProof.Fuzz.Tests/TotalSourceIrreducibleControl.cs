@@ -39,7 +39,7 @@ public sealed class TotalSourceIrreducibleControl
         Assert.That(symbol!.IsStatic, Is.True);
         Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var loweringContext = new TotalLoweringContext(factory, symbol);
         var lowered = RoslynProgramLowering.LowerCandidate(
             ControlFlowGraph.Create(syntax, model)!, loweringContext, TestContext.CurrentContext.CancellationToken);

@@ -11,7 +11,7 @@ public sealed class CachedReferenceObjectViewTests
     public async Task ObjectViewOfLiteralUsesItsConcreteIdentity(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var literal = factory.String(text);
         await AssertObjectView(factory, literal, factory.GetString(literal.Value));
     }
@@ -19,7 +19,7 @@ public sealed class CachedReferenceObjectViewTests
     [Test]
     public async Task ObjectViewOfCanonicalEmptyArrayUsesItsConcreteIdentity()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         await AssertObjectView(factory, factory.EmptyArray(type), factory.CreateEmptyArrayValue(type));
     }

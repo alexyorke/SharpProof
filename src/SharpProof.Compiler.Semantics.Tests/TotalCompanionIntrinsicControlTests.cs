@@ -34,7 +34,7 @@ public sealed class TotalCompanionIntrinsicControlTests
             """);
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("Target")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var result = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());

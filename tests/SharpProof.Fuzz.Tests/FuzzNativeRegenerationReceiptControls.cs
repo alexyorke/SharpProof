@@ -44,7 +44,7 @@ public sealed class FuzzNativeRegenerationReceiptControls
         var references = Enumerable.Range(0, 3).Select(index =>
         {
             var seed = unchecked(12345 + index * 397);
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var generated = new WellSortedIrGenerator(factory, unchecked(seed ^ 0x6C8E9CF5))
                 .NextArithmeticOrBoolean(maximumDepth: 3);
             var ordinal = seed % FiniteDomainSmtDifferentialOracle.IntegerDomain.Length;

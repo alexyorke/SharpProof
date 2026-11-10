@@ -12,7 +12,7 @@ internal sealed class IrHeapReplayTests
     [TestCase(true, true)]
     public void ExplicitDefaultCellsAreKnownAfterInvalidation(bool array, bool reference)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var elementType = reference ? factory.ObjectType : factory.IntegerType;
         var type = array ? factory.GetOrCreateSequenceType(elementType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
@@ -38,7 +38,7 @@ internal sealed class IrHeapReplayTests
     [TestCase(true)]
     public void ConditionalOwnerDemandsOnlyTheSelectedContents(bool chooseKnown)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var known = factory.CreateVariable("known", type);
         var unknown = factory.CreateVariable("unknown", type);
@@ -62,7 +62,7 @@ internal sealed class IrHeapReplayTests
     [TestCase(true)]
     public void InvalidatedContentsRecoverOnlyExplicitlyStoredCells(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
         var old = factory.CreateVariable("old", type);
@@ -106,7 +106,7 @@ internal sealed class IrHeapReplayTests
     [TestCase(true)]
     public void FreshArrayContentsStayKnownUntilAnotherWriter(bool invalidateAgain)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", type);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Write", factory.IntegerType, true);
@@ -131,7 +131,7 @@ internal sealed class IrHeapReplayTests
     [TestCase(IrWriteRegion.Static)]
     public void EffectOnlyWritesForgetModeledContentsExceptAmbientStaticState(IrWriteRegion region)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", type);
         var builder = new IrProgramBuilder(factory);

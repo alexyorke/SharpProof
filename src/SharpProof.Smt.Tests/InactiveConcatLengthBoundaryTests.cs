@@ -12,7 +12,7 @@ internal sealed class InactiveConcatLengthBoundaryTests
     [TestCase(800_000_000, BackendCheckStatus.Unknown, BackendFailureReason.ResourceLimit)]
     public async Task PriorConcatContentQueryCannotRestrictLaterEntryLengths(int length, BackendCheckStatus expected, BackendFailureReason reason)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.StringType);
         var second = factory.CreateVariable("second", factory.StringType);
         var third = factory.CreateVariable("third", factory.StringType);

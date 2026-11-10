@@ -12,7 +12,7 @@ public sealed class NativeInstructionCountAdmissionTests
     [TestCase(PassiveCallableVcBuilder.MaximumSteps, false)]
     public async Task AcyclicInstructionAdmissionKeepsTheDefaultBoundary(int assignments, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("instruction-count-admission");

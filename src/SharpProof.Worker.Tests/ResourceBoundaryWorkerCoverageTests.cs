@@ -62,7 +62,7 @@ public sealed class ResourceBoundaryWorkerCoverageTests
     [TestCase(true)]
     public void ReplayInputProjectionPreservesOwnedScalarValuesAndRejectsUnknownKinds(bool unknown)
     {
-        var value = new IrFactory(IrExecutionSemantics.Total).CreateIntegerValue(7);
+        var value = new IrFactory().CreateIntegerValue(7);
         if (unknown)
         {
             var failure = InvokeFailure(typeof(NativeResourceViolationReplay), "ReadReplayInput", [(ResourceInputKind)999, value]);
@@ -185,29 +185,9 @@ public sealed class ResourceBoundaryWorkerCoverageTests
     }
 
     [Test]
-    public void LegacyUnboundedIntegerStorageCannotSupplyAnExactByteRefutation()
-    {
-        var factory = new IrFactory();
-        var builder = new IrProgramBuilder(factory);
-        var block = builder.CreateBlock();
-        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var variable = factory.CreateVariable("values", type);
-        var seed = builder.Write(block, factory.CreateOperation(), IrWriteRegion.Local);
-        // The public builder rejects Legacy array storage before the replay
-        // boundary. Construct the detached instruction to test that boundary.
-        var allocation = new IrAllocationInstruction(seed.Id, seed.Operation, type, variable, factory.Integer(1));
-        var method = typeof(NativeResourceViolationReplay).GetMethod("ExactArrayBytes", BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.That(method, Is.Not.Null);
-
-        var bytes = method!.Invoke(null, [factory, allocation, 1, Layout(), TestContext.CurrentContext.CancellationToken]);
-
-        Assert.That(bytes, Is.Null);
-    }
-
-    [Test]
     public void MemoryAdmissionRejectsAReferenceAssignedFromAScalar()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var reference = factory.CreateVariable("reference", factory.ObjectType);
@@ -232,7 +212,7 @@ public sealed class ResourceBoundaryWorkerCoverageTests
     public void ReachableUsesRequireDominatingOwnedOriginsAcrossTerminalShapes(string terminal, bool admitted)
     {
         ArgumentNullException.ThrowIfNull(terminal);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var allocation = builder.CreateBlock();
@@ -272,7 +252,7 @@ public sealed class ResourceBoundaryWorkerCoverageTests
     [Test]
     public void ScalarUnaryTermsDoNotIntroduceBorrowedReferenceOwnership()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var value = factory.CreateVariable("value", factory.IntegerType);

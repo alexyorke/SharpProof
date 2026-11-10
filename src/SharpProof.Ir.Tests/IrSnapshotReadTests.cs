@@ -10,7 +10,7 @@ public sealed class IrSnapshotReadTests
     [TestCase(true, 3)]
     public void ConditionalOwnerReadsItsSelectedSnapshot(bool chooseOld, int expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var current = factory.CreateVariable("current", factory.ObjectType);
         var old = factory.CreateVariable("old", factory.ObjectType);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
@@ -29,7 +29,7 @@ public sealed class IrSnapshotReadTests
     [Test]
     public void OldIndexDoesNotChangeCurrentArrayContents()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", type);
         var index = factory.CreateVariable("old-index", factory.IntegerType);
@@ -48,7 +48,7 @@ public sealed class IrSnapshotReadTests
     [TestCase(true, true, 3)]
     public void SnapshotGuardDoesNotOverrideSelectedArrayOwner(bool choose, bool oldBranch, int expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var first = factory.CreateVariable("first", type);
         var second = factory.CreateVariable("second", type);
@@ -67,7 +67,7 @@ public sealed class IrSnapshotReadTests
     [Test]
     public void DeepSnapshotSelectionIsBoundedAndCanResumeCompletedMemoEntries()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var old = factory.CreateVariable("old", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Next", factory.ObjectType, false);
         IrTerm owner = factory.Variable(old);

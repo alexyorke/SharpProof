@@ -31,7 +31,7 @@ public sealed class BulkCollectorWireConversionBoundaryTests
             """);
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var binding = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True);

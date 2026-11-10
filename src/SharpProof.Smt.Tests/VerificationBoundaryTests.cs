@@ -55,7 +55,7 @@ public sealed class VerificationBoundaryTests
     [Test]
     public async Task NullOrUnsupportedModelValuesCannotRefute()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var nestedType = factory.GetOrCreateSequenceType(
             factory.GetOrCreateSequenceType(factory.IntegerType));

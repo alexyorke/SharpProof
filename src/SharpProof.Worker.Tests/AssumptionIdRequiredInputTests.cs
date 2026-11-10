@@ -12,7 +12,7 @@ public sealed class AssumptionIdRequiredInputTests
     [Test]
     public async Task NativeEmptyProofCoreRequiresAnAssumptionIdMap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var query = new VerificationQuery(factory, [],
             new Goal(factory, factory.Boolean(true), ProofDiagnosticKind.Postcondition,
                 new SourceLocationId(0)));

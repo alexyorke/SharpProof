@@ -53,7 +53,7 @@ public sealed class ParamsCollectionShadowAdmissionCoverageTests
             Assert.That(argument.Parameter!.Ordinal, Is.Zero);
             Assert.That(SymbolEqualityComparer.Default.Equals(argument.Parameter.ContainingSymbol, invocation.TargetMethod), Is.True);
             Assert.That(argument.ArgumentKind, Is.EqualTo(expanded ? ArgumentKind.ParamCollection : ArgumentKind.Explicit));
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!);
             var policyCalls = 0;
             bool PreserveActualHelper(IMethodSymbol method)

@@ -305,7 +305,7 @@ internal sealed class PassiveLoopCutterTests
     [TestCase(true)]
     public void LoopCannotModifyCanonicalImmutableRoles(bool old)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binding = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType), factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var result = factory.CreateVariable("result", factory.IntegerType);
         var site = factory.CreateOperation("loop");
@@ -324,7 +324,7 @@ internal sealed class PassiveLoopCutterTests
     [Test]
     public void IrreducibleMultipleEntryLoopRemainsClosed()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("irreducible");
         var entry = builder.CreateBlock();
@@ -341,7 +341,7 @@ internal sealed class PassiveLoopCutterTests
     [Test]
     public void UnsupportedLoopInstructionStaysUnenrolledRatherThanBudgetLimited()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("unsupported-loop");
         var entry = builder.CreateBlock();
@@ -355,7 +355,7 @@ internal sealed class PassiveLoopCutterTests
     [Test]
     public void ExpansionStopsAtTheExistingConstructionBoundAndHonorsCancellation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("large-loop");
         var blocks = Enumerable.Range(0, 1000).Select(_ => builder.CreateBlock()).ToImmutableArray();

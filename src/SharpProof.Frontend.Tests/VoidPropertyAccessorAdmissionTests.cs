@@ -26,7 +26,7 @@ public sealed class VoidPropertyAccessorAdmissionTests
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var property = (IPropertySymbol)target.AssociatedSymbol!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(SymbolEqualityComparer.Default.Equals(context.Target, property.GetMethod), Is.True);
         var result = RoslynProgramLowering.LowerAutoAccessor(context, declaration);

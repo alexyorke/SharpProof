@@ -27,7 +27,7 @@ public sealed class NativeCompletedModelInvariantTests
     public void CompletedScalarKeepsItsAdmittedIntegerType(int width, bool signedness, string mode)
     {
         System.ArgumentNullException.ThrowIfNull(mode);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, signedness);
         var variable = factory.CreateVariable("input", type);
         var bits = mode == "high" ? 1UL << (width - 1)
@@ -58,7 +58,7 @@ public sealed class NativeCompletedModelInvariantTests
     public void CompletedScalarIsAConcreteBoolean(string mode, bool expected)
     {
         System.ArgumentNullException.ThrowIfNull(mode);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("flag", factory.BooleanType);
         ImmutableArray<IrTerm> predicates = mode == "free" ? []
             : [Equal(factory, factory.Variable(variable), factory.Boolean(expected))];
@@ -88,7 +88,7 @@ public sealed class NativeCompletedModelInvariantTests
     public void NonnullBuiltinLengthDecodesIntoTheIndependentClrShape(string kind, int count)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
         var term = factory.Variable(variable);
@@ -103,7 +103,7 @@ public sealed class NativeCompletedModelInvariantTests
     public void NativeNullBuiltinDecodesAsNull(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
         WithNativeModel(factory, variable, [Equal(factory, factory.Variable(variable), factory.Null(type))],
@@ -121,7 +121,7 @@ public sealed class NativeCompletedModelInvariantTests
     public void ActualEncodedLengthCanReachInt32MaxWithoutAllocatingAWitness(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = BuiltinType(factory, kind);
         var variable = factory.CreateVariable("input", type);
         var term = factory.Variable(variable);

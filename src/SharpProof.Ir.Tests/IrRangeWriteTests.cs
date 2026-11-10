@@ -12,7 +12,7 @@ public sealed class IrRangeWriteTests
     [TestCase(3, 1, 3)]
     public void RangeStorePreservesCellsOutsideItsHalfOpenInterval(int start, int length, int expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var variable = factory.CreateVariable("data", type);
         var array = factory.Variable(variable);
@@ -38,7 +38,7 @@ public sealed class IrRangeWriteTests
     [TestCase(int.MaxValue, int.MaxValue)]
     public void InvalidRangeNeverReplaysAsANormalWrite(int start, int length)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var variable = factory.CreateVariable("data", type);
         var builder = new IrProgramBuilder(factory);
@@ -55,7 +55,7 @@ public sealed class IrRangeWriteTests
     [Test]
     public void MissingRangeLengthIsUnsupportedWithoutApplyingAWritesWitness()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var length = factory.CreateVariable("length", factory.IntegerType);
@@ -72,7 +72,7 @@ public sealed class IrRangeWriteTests
     [Test]
     public void EmptyRangeOnNullStorageIsUnsupported()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -84,7 +84,7 @@ public sealed class IrRangeWriteTests
     [Test]
     public void ReferenceRangeStoresClrNullAndPreservesUnclearedIdentity()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.ObjectType);
         var variable = factory.CreateVariable("data", type);
         var array = factory.Variable(variable);
@@ -120,7 +120,7 @@ public sealed class IrRangeWriteTests
     [Test]
     public void RangeLengthAndStartMustBeInt32()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.EmptyArray(factory.GetOrCreateSequenceType(factory.IntegerType));

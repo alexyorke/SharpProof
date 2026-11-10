@@ -9,7 +9,7 @@ public sealed class IrSupportedBoundaryTests
     [Test]
     public void ClosureFramesKeepImmutableScopedStorageCertificates()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         Assert.That(factory.TryGetClosureFrameType(type, out _), Is.False);
         factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
@@ -22,12 +22,11 @@ public sealed class IrSupportedBoundaryTests
         Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
         Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
         Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedSealedReferenceType(type); }));
-        var other = new IrFactory(IrExecutionSemantics.Total);
+        var other = new IrFactory();
         Assert.Throws<ArgumentException>((Action)(() => { other.RegisterClosureFrameType(type, [ResourceStorageKind.Word32]); }));
         Assert.Throws<ArgumentException>((Action)(() => { other.TryGetClosureFrameType(type, out _); }));
     }
 
-    [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
@@ -36,7 +35,7 @@ public sealed class IrSupportedBoundaryTests
     [TestCase(6)]
     public void ClosureFramesRejectUnsupportedOrContradictoryStorage(int kind)
     {
-        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         if (kind == 4)
         { factory.RegisterDelegateReferenceType(type); }
@@ -52,7 +51,7 @@ public sealed class IrSupportedBoundaryTests
     [Test]
     public void DelegateCertificatesAreScopedAndExcludeClassAndInterfaceCertificates()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
         Assert.That(factory.IsDelegateReferenceType(type), Is.False);
         factory.RegisterDelegateReferenceType(type);
@@ -60,12 +59,11 @@ public sealed class IrSupportedBoundaryTests
         Assert.That(factory.IsDelegateReferenceType(type), Is.True);
         Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterInterfaceReferenceType(type); }));
         Assert.Throws<ArgumentException>((Action)(() => { factory.RegisterClosedClassReferenceType(type, null); }));
-        var other = new IrFactory(IrExecutionSemantics.Total);
+        var other = new IrFactory();
         Assert.Throws<ArgumentException>((Action)(() => { other.RegisterDelegateReferenceType(type); }));
         Assert.Throws<ArgumentException>((Action)(() => { other.IsDelegateReferenceType(type); }));
     }
 
-    [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
@@ -74,7 +72,7 @@ public sealed class IrSupportedBoundaryTests
     [TestCase(6)]
     public void InvalidDelegateCertificatesAreRejected(int kind)
     {
-        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var nominal = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Reference");
         if (kind == 5)
         { factory.RegisterInterfaceReferenceType(nominal); }
@@ -185,7 +183,7 @@ public sealed class IrSupportedBoundaryTests
     {
         var legacy = new IrFactory();
         Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterClosedSealedReferenceType(legacy.ObjectType)));
-        var total = new IrFactory(IrExecutionSemantics.Total);
+        var total = new IrFactory();
         Assert.Throws<ArgumentException>((Action)(() => total.RegisterClosedSealedReferenceType(total.IntegerType)));
         var type = total.GetOrCreateReferenceType(total.CreateIdentity(), "Closed");
         total.RegisterClosedSealedReferenceType(type);
@@ -198,7 +196,7 @@ public sealed class IrSupportedBoundaryTests
         var legacy = new IrFactory();
         Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterClosedClassReferenceType(legacy.ObjectType, null)));
         Assert.Throws<ArgumentException>((Action)(() => legacy.RegisterInterfaceReferenceType(legacy.ObjectType)));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parent = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Parent");
         var child = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Child");
         var other = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Other");

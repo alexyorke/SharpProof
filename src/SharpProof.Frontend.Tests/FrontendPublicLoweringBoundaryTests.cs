@@ -9,14 +9,6 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class FrontendPublicLoweringBoundaryTests
 {
-    [Test]
-    public void TotalContextRequiresTotalFactorySemantics()
-    {
-        using var subject = TypedProgramSubject.Create("int Target(int x) => x;");
-        var error = Assert.Throws<ArgumentException>((Action)(() =>
-            _ = new TotalLoweringContext(new IrFactory(), subject.Context.Target)));
-        Assert.That(error!.ParamName, Is.EqualTo("factory"));
-    }
 
     [Test]
     public void EntryVariablesMatchTheActualCallableInputs()

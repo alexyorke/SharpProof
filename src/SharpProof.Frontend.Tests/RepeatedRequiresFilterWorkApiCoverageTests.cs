@@ -65,7 +65,7 @@ public sealed class RepeatedRequiresFilterWorkApiCoverageTests
                 var handler = region.EnclosingRegion.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.FilterAndHandler));
                 Assert.That(handler.NestedRegions.Count(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Filter)), Is.EqualTo(1));
             }
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(target)!);
             var preparedCount = 0;
             bool Prepare(TotalLoweringContext candidate)

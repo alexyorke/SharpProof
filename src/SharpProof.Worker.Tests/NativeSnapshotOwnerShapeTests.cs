@@ -13,7 +13,7 @@ public sealed class NativeSnapshotOwnerShapeTests
     [TestCase(true)]
     public void SnapshotSelectionRequiresAnOwnerWhoseEntryStateCanBeTracked(bool concatenated)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         PassiveParameterBinding Parameter(string name)
         {
             System.ArgumentNullException.ThrowIfNull(name);

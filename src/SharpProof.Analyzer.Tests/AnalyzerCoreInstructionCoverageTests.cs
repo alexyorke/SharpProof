@@ -12,7 +12,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void AnAssertionRetainsItsConcreteResultWithAnExplicitUnsupportedInstructionGap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -34,7 +34,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void AnAssumptionRetainsOnlyItsAdmittedConcreteBooleanInput()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -54,7 +54,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void ADeepIntegerExpressionRetainsItsConcreteResultWithAnExplicitDepthGap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("input", factory.IntegerType);
         var output = factory.CreateVariable("output", factory.IntegerType);
         IrTerm expression = factory.Variable(input);
@@ -81,7 +81,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void ADeepReferenceExpressionRemainsUnknownWithAnExplicitDepthGap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var output = factory.CreateVariable("output", factory.StringType);
         IrTerm expression = factory.Null(factory.StringType);
@@ -118,7 +118,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [TestCase(true)]
     public void KnownConditionalSelectsTheConcreteIntegerResult(bool condition)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -138,7 +138,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [TestCase(true)]
     public void KnownConditionalSelectsTheReferenceNullness(bool condition)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var value = factory.CreateVariable("value", factory.StringType);
         var builder = new IrProgramBuilder(factory);
@@ -155,7 +155,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void NegatedBranchRefinesBothConcreteBooleanInputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -183,7 +183,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     public void UnmodeledInstructionsForgetAnEarlierConstant(string instruction, string gap)
     {
         System.ArgumentNullException.ThrowIfNull(gap);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Value", factory.IntegerType, true, []);
         var builder = new IrProgramBuilder(factory);
@@ -217,7 +217,7 @@ public sealed class AnalyzerCoreInstructionCoverageTests
     [Test]
     public void AnOpaqueStringValueRetainsAnExplicitReferenceGap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.StringType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Text", factory.StringType, true, []);
         var builder = new IrProgramBuilder(factory);

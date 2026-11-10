@@ -29,7 +29,7 @@ internal static class ResourceExpressionOwnership
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         cancellation.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(callableId) || !StringComparer.Ordinal.Equals(callableId, preparation.CallableId) ||
-            preparation.Factory is null || preparation.Factory.Semantics != IrExecutionSemantics.Total || preparation.Parameters.IsDefault)
+            preparation.Factory is null || preparation.Parameters.IsDefault)
         { throw new InvalidDataException("Resource expression entry ownership is invalid."); }
         ValidateBindings(expression, preparation.Factory, preparation.Parameters, preparation.HasReceiver, cancellation);
     }

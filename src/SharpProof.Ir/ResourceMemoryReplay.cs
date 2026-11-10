@@ -28,8 +28,6 @@ internal sealed class ResourceMemoryReplay
         execution = ArgumentNullGuard.NotNull(execution, nameof(execution));
         layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
         cancellation.ThrowIfCancellationRequested();
-        if (_program.Factory.Semantics != IrExecutionSemantics.Total)
-        { return Unknown("MemoryReplayRequiresTotalSemantics"); }
         if (_failure != null)
         { return Unknown(_failure); }
         if (execution.Status != IrProgramExecutionStatus.Returned || execution.ConsumedApproximation ||

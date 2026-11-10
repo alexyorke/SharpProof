@@ -28,7 +28,7 @@ public sealed class RuntimeTypeIdentityTests
         ArgumentNullException.ThrowIfNull(first);
         ArgumentNullException.ThrowIfNull(second);
         var (left, right) = Types(first, second);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(CompilerIdentityBridge.SameRuntimeType(left, right), Is.EqualTo(same));
         var identity = CompilerIdentityBridge.InternType(factory, left);
         Assert.That(CompilerIdentityBridge.InternSymbol(factory, left), Is.EqualTo(identity));
@@ -48,7 +48,7 @@ public sealed class RuntimeTypeIdentityTests
         }
         var (left, right) = Types(first, second);
         Assert.That(CompilerIdentityBridge.SameRuntimeType(left, right), Is.True);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(CompilerIdentityBridge.InternType(factory, left), Is.Not.EqualTo(CompilerIdentityBridge.InternType(factory, right)));
     }
 
@@ -72,7 +72,7 @@ public sealed class RuntimeTypeIdentityTests
         var tree = CSharpSyntaxTree.ParseText(source);
         var compilation = CSharpCompilation.Create("DeepAncestry", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var mapped = new RoslynTypeMapper(factory).GetTypeId(compilation.GetTypeByMetadataName("Base66")!);
         var certificate = typeof(IrFactory).GetMethod("TryGetClosedClassReferenceBase", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         Assert.That(certificate.Invoke(factory, [mapped, null]), Is.False);

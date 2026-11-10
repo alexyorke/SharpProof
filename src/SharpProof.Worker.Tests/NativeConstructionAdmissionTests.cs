@@ -55,7 +55,7 @@ public sealed class NativeConstructionAdmissionTests
     [TestCase(1024, false)]
     public async Task WitnessExpansionRespectsTheDefaultInstructionCap(int writes, bool supported)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = new PassiveParameterBinding(factory.CreateVariable("entry", factory.BooleanType),
             factory.CreateVariable("current", factory.BooleanType), factory.CreateVariable("old", factory.BooleanType));
         var site = factory.CreateOperation("bounded-expansion-admission");
@@ -117,7 +117,7 @@ public sealed class NativeConstructionAdmissionTests
     private static PassiveCallableCandidate CreateCandidate(string dimension, int count)
     {
         System.ArgumentNullException.ThrowIfNull(dimension);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("default-construction-admission");
         var parameters = ImmutableArray.CreateBuilder<PassiveParameterBinding>();

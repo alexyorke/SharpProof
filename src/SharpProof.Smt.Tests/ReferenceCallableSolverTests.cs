@@ -15,7 +15,7 @@ public sealed class ReferenceCallableSolverTests
     public async Task StringLiteralAliasesDecodeWithExactContents(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("input", factory.StringType);
         var literal = factory.String(text);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
@@ -33,7 +33,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public async Task DifferentStringLiteralsCannotShareAnIdentity()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = Query(factory, [], factory.Binary(IrBinaryOperator.NotEqual, factory.String("left"), factory.String("same")), []);
         Assert.That((await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken)).Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
@@ -42,7 +42,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public async Task EmptyArrayAliasesDecodeToTheSameConcreteValue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", type);
         var empty = factory.EmptyArray(type);
@@ -66,7 +66,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(false, 3)]
     public async Task StringIdentityWitnessesMatchConcreteAliases(bool alias, int length)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.StringType);
         var y = factory.CreateVariable("y", factory.StringType);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
@@ -88,7 +88,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(false)]
     public async Task ObjectWitnessesPreserveIdentity(bool same)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.ObjectType);
         var y = factory.CreateVariable("y", factory.ObjectType);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
@@ -107,7 +107,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(false)]
     public async Task ArrayWitnessesPreserveIdentityAndLength(bool same)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var x = factory.CreateVariable("x", type);
         var y = factory.CreateVariable("y", type);
@@ -132,7 +132,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(false, 3)]
     public async Task StringWitnessesPreserveNullAndCodeUnitLength(bool isNull, int length)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var query = Query(factory, [
@@ -154,7 +154,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(true)]
     public async Task FullLengthProofDomainIsPreservedWhileOversizedWitnessesAbstain(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
         var text = factory.CreateVariable("text", type);
         var length = factory.Length(factory.Variable(text));
@@ -181,7 +181,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(true, 257)]
     public async Task WitnessPreferenceRetriesUnboundedQueriesAndKeepsLargeCounterexamples(bool array, int minimum)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.StringType;
         var input = factory.CreateVariable("input", type);
         var length = factory.Length(factory.Variable(input));
@@ -213,7 +213,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(64, false, ulong.MaxValue)]
     public async Task ArrayElementWitnessesPreserveScalarBitsAndAliases(int width, bool isSigned, ulong bits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var element = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, isSigned);
         var type = factory.GetOrCreateSequenceType(element);
         var x = factory.CreateVariable("x", type);
@@ -242,7 +242,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(int.MaxValue)]
     public async Task TotalArrayReadOutsideItsRangeHasTheDefaultValue(int index)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var x = factory.CreateVariable("x", type);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
@@ -269,7 +269,7 @@ public sealed class ReferenceCallableSolverTests
     public async Task ListWitnessPreferencePreservesLargeProofsAndCounterexamples(int minimum, string collection = "list")
     {
         ArgumentNullException.ThrowIfNull(collection);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("list", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         var count = factory.Binary(IrBinaryOperator.BitwiseAnd,
@@ -320,7 +320,7 @@ public sealed class ReferenceCallableSolverTests
     public async Task CallbackCollectionWitnessCountsKeepTheirSignAndChargeTheirMagnitude(int value, string collection = "hash-set")
     {
         ArgumentNullException.ThrowIfNull(collection);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("set", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         var count = factory.PureOpaque(field, factory.Variable(input));
@@ -348,7 +348,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(true)]
     public async Task NominalWitnessPreferenceCannotProveAClaimOrOverrideRequiredAliases(bool fields)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var firstType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "First");
         var secondType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Second");
         var firstVariable = factory.CreateVariable("first", fields ? factory.ObjectType : firstType);
@@ -388,7 +388,7 @@ public sealed class ReferenceCallableSolverTests
     [TestCase(true)]
     public async Task NominalWitnessPreferenceRemainsConservativeBeyondItsTypeGroupLimit(bool fields)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var receiver = factory.CreateVariable("receiver", factory.ObjectType);
         var variables = ImmutableArray.CreateBuilder<IrVarId>();
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
@@ -423,7 +423,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public async Task ObservedFieldWitnessesAreNotCrowdedOutByRepeatedVariableTypes()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var repeated = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Repeated");
         var variables = ImmutableArray.CreateBuilder<IrVarId>();
         for (var index = 0; index < 80; index++)
@@ -447,7 +447,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public async Task EveryRepeatedNominalViewRetainsItsPreferredMembership()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var repeated = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Repeated");
         var rare = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Rare");
         var variables = ImmutableArray.CreateBuilder<IrVarId>();
@@ -468,7 +468,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public void BuiltinOnlyInputsDoNotCreateNominalMembershipConstraints()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variables = ImmutableArray.Create(factory.CreateVariable("integer", factory.IntegerType),
             factory.CreateVariable("text", factory.StringType), factory.CreateVariable("object", factory.ObjectType),
             factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType)));
@@ -487,7 +487,7 @@ public sealed class ReferenceCallableSolverTests
     [Test]
     public async Task BuiltinOnlyOptionalPreferenceKeepsTheOriginalSessionDomain()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var array = factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType));
         var variables = ImmutableArray.Create(factory.CreateVariable("text", factory.StringType),
             factory.CreateVariable("object", factory.ObjectType), array);

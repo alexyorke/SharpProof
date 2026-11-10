@@ -70,7 +70,7 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
         Assert.That(recursive.Instance, Is.Null);
         Assert.That(recursive.Arguments, Is.Empty);
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var binding = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());

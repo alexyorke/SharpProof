@@ -10,7 +10,7 @@ public sealed class HornClauseBoundaryTests
     [Test]
     public void DefaultClausesRejectBeforeCreatingNativeSearchResources()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var failure = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
             _ = HornInvariantSearch.Propose(
@@ -23,7 +23,7 @@ public sealed class HornClauseBoundaryTests
     [Test]
     public void InitializedEmptyClausesProduceNoProposals()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var proposals = HornInvariantSearch.Propose(
             factory, ImmutableArray<VerificationQuery>.Empty,
             ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>>.Empty,
@@ -35,7 +35,7 @@ public sealed class HornClauseBoundaryTests
     [TestCase(true)]
     public async Task CompoundRelationHeadsPreserveTheEstablishedCounterBound(bool guarded)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("counter", factory.IntegerType);
         var current = factory.Variable(variable);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
@@ -76,7 +76,7 @@ public sealed class HornClauseBoundaryTests
     [Test]
     public void NegatedRelationHeadCannotProduceAProposal()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("counter", factory.IntegerType);
         var current = factory.Variable(variable);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
@@ -96,7 +96,7 @@ public sealed class HornClauseBoundaryTests
     [Test]
     public void ExhaustedSearchBudgetCannotPublishAnUncheckedProposal()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("counter", factory.IntegerType);
         var current = factory.Variable(variable);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
@@ -114,7 +114,7 @@ public sealed class HornClauseBoundaryTests
     [Test]
     public async Task AffineTwoVariableLoopProposalPassesEstablishmentPreservationAndSafety()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var index = factory.CreateVariable("index", factory.IntegerType);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var currentIndex = factory.Variable(index);

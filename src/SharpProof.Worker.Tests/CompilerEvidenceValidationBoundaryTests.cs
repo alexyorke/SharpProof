@@ -93,7 +93,7 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         var mixed = subject.GetMembers("Mixed").OfType<IMethodSymbol>().Single();
         var sameDefinition = Definition(same);
         var mixedDefinition = Definition(mixed);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition), Is.SameAs(sameDefinition));
         Assert.That(CompilerSpecificationMethodBinding.Admit(mixed, mixedDefinition), Is.SameAs(mixedDefinition));
         Assert.That(CompilerSpecificationMethodBinding.CreateTotal(factory, mixed, mixedDefinition), Is.Null);
@@ -114,7 +114,6 @@ public sealed class CompilerEvidenceValidationBoundaryTests
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition with { Assemblies = [] }), Is.Null);
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition with { ResultType = IrTypeKind.Boolean }), Is.Null);
         Assert.That(CompilerSpecificationMethodBinding.Admit(same, sameDefinition with { ParameterTypes = [] }), Is.Null);
-        Assert.That(new CompilerSpecificationPackProvider(new IrFactory(), ["dotnet.scalar"]).ResolveTotal(null!), Is.Null);
     }
 
     [Test]

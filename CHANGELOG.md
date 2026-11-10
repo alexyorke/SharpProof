@@ -30,6 +30,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Remove the Legacy IR execution mode. Every IR factory now uses the Total
+  semantics the verifier already required: 32-bit default integers, defined
+  division and access results with faults as separate guarded terms. Compiler
+  artifacts drop the graph `semantics` field (artifact schema 58).
 - Route `new string(char, int)` faults through surrounding handlers and model its
   maximum length, so a handled negative length is no longer treated as escaping.
 - Record a captured instance field read as a read for effect contracts.

@@ -164,7 +164,7 @@ internal sealed class ExceptionInitializationReplayTests
     private static (IrFactory Factory, IrHavocRequest Request) Request(string kind, IrHavocOrigin origin, bool wrongType, string? description = null)
     {
         ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("ready", wrongType ? factory.IntegerType : factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

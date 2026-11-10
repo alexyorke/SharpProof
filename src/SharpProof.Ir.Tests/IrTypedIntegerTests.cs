@@ -9,11 +9,10 @@ namespace SharpProof.Ir.Test;
 internal sealed class IrTypedIntegerTests
 {
     [Test]
-    public void TypedInterningIncludesWidthAndSignAndKeepsLegacySeparate()
+    public void TypedInterningIncludesWidthAndSign()
     {
         var factory = new IrFactory();
         var types = ImmutableHashSet.CreateBuilder<IrTypeId>();
-        types.Add(factory.IntegerType);
         foreach (var width in ImmutableArray.Create(8, 16, 32, 64))
         {
             foreach (var isSigned in ImmutableArray.Create(false, true))
@@ -25,10 +24,7 @@ internal sealed class IrTypedIntegerTests
                 Assert.That(types.Add(type), Is.True);
             }
         }
-        Assert.That(factory.GetTypeInfo(factory.IntegerType).Width, Is.Zero);
-        var legacyOverflow = factory.Binary(IrBinaryOperator.Add, factory.Integer(long.MaxValue), factory.Integer(1));
-        Assert.That(new IrInterpreter(factory).Evaluate(legacyOverflow).Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.Overflow));
+        Assert.That(factory.IntegerType, Is.EqualTo(factory.GetOrCreateIntegerType(32, true)));
     }
 
     [Test]
@@ -92,7 +88,7 @@ internal sealed class IrTypedIntegerTests
     public void UnboxingRetainsExactClrWidthSignAndHighBits(int width, bool isSigned, object boxed, ulong expected)
     {
         System.ArgumentNullException.ThrowIfNull(boxed);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var variable = factory.CreateVariable("boxed", factory.ObjectType);
         var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateReferenceValue(factory.ObjectType, boxed));
@@ -109,7 +105,7 @@ internal sealed class IrTypedIntegerTests
     [TestCase(IrBinaryOperator.GreaterThan, false, true)]
     public void ComparisonInterpretsTheSignBitBeforeFolding(IrBinaryOperator operation, bool isSigned, bool expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, isSigned);
         var left = factory.CreateVariable("left", type);
         var right = factory.CreateVariable("right", type);
@@ -126,7 +122,7 @@ internal sealed class IrTypedIntegerTests
     [TestCase(128UL, 128UL)]
     public void TypedNegationWrapsAndFoldsTheSameBits(ulong bits, ulong expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, true);
         var variable = factory.CreateVariable("value", type);
         var result = new IrInterpreter(factory).Evaluate(factory.Unary(IrUnaryOperator.Negate, factory.Variable(variable)),
@@ -141,7 +137,7 @@ internal sealed class IrTypedIntegerTests
     [Test]
     public void IntegerStorageRejectsBooleanTypesAndNonintegerOperations()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var exception = Assert.Throws<ArgumentException>((Action)(() => factory.CreateIntegerValueFromBits(factory.BooleanType, 0)));
         Assert.That(exception!.ParamName, Is.EqualTo("type"));
         var integer = IrInteger.FromBits(factory.GetTypeInfo(factory.IntegerType), 1);

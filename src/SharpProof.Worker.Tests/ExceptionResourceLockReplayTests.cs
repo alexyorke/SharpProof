@@ -97,7 +97,7 @@ internal sealed class ExceptionResourceLockReplayTests
     [TestCase(true, true)]
     public void FrameworkCompletionDoesNotAuthorizeOrdinaryLocksOrEraseApproximation(bool? completion, bool priorApproximation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("source:lock-projection-control");
@@ -184,7 +184,7 @@ internal sealed class ExceptionResourceLockReplayTests
         IrHavocOrigin origin = IrHavocOrigin.Approximation, string? description = null)
     {
         ArgumentNullException.ThrowIfNull(type);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("observation", type switch
         {
             "bool" => factory.BooleanType,

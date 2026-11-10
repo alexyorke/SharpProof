@@ -9,7 +9,7 @@ public sealed class HornUnboundedAffineStateTests
     [Test]
     public async Task ArbitraryAffineInputsStayRelatedAcrossAnUnboundedWrappedStep()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.IntegerType);
         var second = factory.CreateVariable("second", factory.IntegerType);
         var x = factory.Variable(first);

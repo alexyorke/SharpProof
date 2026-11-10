@@ -10,7 +10,7 @@ public sealed class RegisteredTotalDefaultDomainCoverageTests
     [Test]
     public void EveryRegisteredKindPreservesItsExactTypedDefault()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
         var types = ImmutableArray.Create<IrTypeId>(factory.BooleanType, factory.IntegerType, factory.StringType, factory.ObjectType, sequence);
         Assert.That(types.Select(type => type.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(type)) : (factory.GetTypeInfo(type).Kind)),
@@ -41,7 +41,7 @@ public sealed class RegisteredTotalDefaultDomainCoverageTests
     [TestCase(64, false)]
     public void EverySupportedIntegerStorageWidthDefaultsToItsOwnZero(int width, bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var term = CSharpOperationSemantics.DefaultValue(factory, type);
         Assert.That(term.Type, Is.EqualTo(type));
@@ -55,8 +55,8 @@ public sealed class RegisteredTotalDefaultDomainCoverageTests
     [TestCase(true)]
     public void InvalidOrForeignIdsAreRejectedBeforeTypeDispatch(bool foreign)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var type = foreign ? new IrFactory(IrExecutionSemantics.Total).IntegerType : default;
+        var factory = new IrFactory();
+        var type = foreign ? new IrFactory().IntegerType : default;
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             _ = CSharpOperationSemantics.DefaultValue(factory, type)));
         Assert.That(error!.ParamName, Is.EqualTo("id"));

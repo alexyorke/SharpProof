@@ -82,11 +82,10 @@ internal sealed class IrKernelTests
             Is.SameAs(factory.Boolean(true)));
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
-    [TestCase(IrExecutionSemantics.Total)]
-    public void StringEqualityComparesContentAndNullness(IrExecutionSemantics semantics)
+    [Test]
+    public void StringEqualityComparesContentAndNullness()
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.StringType);
         var right = factory.CreateVariable("right", factory.StringType);
         var equal = factory.Binary(IrBinaryOperator.StringEquals, factory.Variable(left), factory.Variable(right));
@@ -111,7 +110,7 @@ internal sealed class IrKernelTests
             Assert.That(Evaluate(equal, text, nil), Is.False);
             Assert.That(Evaluate(equal, nil, text), Is.False);
             // Total equality on strings is reference identity.
-            Assert.That(Evaluate(reference, text, copy), Is.EqualTo(semantics == IrExecutionSemantics.Legacy));
+            Assert.That(Evaluate(reference, text, copy), Is.False);
             Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ab")),
                 Is.SameAs(factory.Boolean(true)));
             Assert.That(factory.Binary(IrBinaryOperator.StringEquals, factory.String("ab"), factory.String("ba")),
@@ -122,7 +121,7 @@ internal sealed class IrKernelTests
     }
 
     [Test]
-    public void EqualityIdentityDoesNotEraseOperandEvaluation()
+    public void EqualityOfIdenticalOperandsIsNotFolded()
     {
         var factory = new IrFactory();
         var divisor =
@@ -147,16 +146,13 @@ internal sealed class IrKernelTests
 
         Assert.That(equal, Is.TypeOf<IrBinaryTerm>());
         Assert.That(notEqual, Is.TypeOf<IrBinaryTerm>());
-        Assert.That(
-            equalResult.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
-        Assert.That(
-            notEqualResult.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        // Total division by zero is defined, so both comparisons evaluate.
+        Assert.That(equalResult.Value!.Boolean, Is.True);
+        Assert.That(notEqualResult.Value!.Boolean, Is.False);
     }
 
     [Test]
-    public void IdenticalConditionalBranchesDoNotEraseGuardEvaluation()
+    public void IdenticalConditionalBranchesAreNotFolded()
     {
         var factory = new IrFactory();
         var divisor =
@@ -178,16 +174,15 @@ internal sealed class IrKernelTests
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(divisor, factory.CreateIntegerValue(0)));
 
         Assert.That(conditional, Is.TypeOf<IrConditionalTerm>());
-        Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        Assert.That(result.Value!.Integer, Is.EqualTo(7));
     }
 
     [Test]
     public void InterpreterMemoizesSharedDagOnlyWithinOneEnvironment()
     {
         var factory = new IrFactory();
-        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var wide = factory.GetOrCreateIntegerType(64, signed: true);
+        var variable = factory.CreateVariable("value", wide);
         IrTerm term = factory.Variable(variable);
         for (var depth = 0; depth < 60; depth++)
         {
@@ -199,11 +194,11 @@ internal sealed class IrKernelTests
 
         var first = interpreter.Evaluate(
             term,
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(1)),
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(wide, 1)),
             timeout.Token);
         var second = interpreter.Evaluate(
             term,
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(2)),
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(wide, 2)),
             timeout.Token);
 
         Assert.That(first.Status, Is.EqualTo(IrEvaluationStatus.Value));
@@ -856,7 +851,7 @@ internal sealed class IrKernelTests
     }
 
     [Test]
-    public void InterpreterClassifiesArithmeticAndEnvironmentFailures()
+    public void InterpreterDefinesDivisionAndClassifiesEnvironmentFailures()
     {
         var factory = new IrFactory();
         var dividend =
@@ -874,13 +869,13 @@ internal sealed class IrKernelTests
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(1)).SetItem(divisor, factory.CreateIntegerValue(0)));
         var overflow = interpreter.Evaluate(
             division,
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(long.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(int.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
         var remainder = interpreter.Evaluate(
             factory.Binary(
                 IrBinaryOperator.Remainder,
                 factory.Variable(dividend),
                 factory.Variable(divisor)),
-            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(long.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
+            global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(int.MinValue)).SetItem(divisor, factory.CreateIntegerValue(-1)));
         var missing = interpreter.Evaluate(
             division,
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateIntegerValue(1)));
@@ -888,15 +883,10 @@ internal sealed class IrKernelTests
             factory.Variable(dividend),
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(dividend, factory.CreateBooleanValue(true)));
 
-        Assert.That(
-            divideByZero.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
-        Assert.That(
-            overflow.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.Overflow));
-        Assert.That(
-            remainder.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.Overflow));
+        // Division is total: faults are separate guarded terms.
+        Assert.That(divideByZero.Value!.Integer, Is.EqualTo(-1));
+        Assert.That(overflow.Value!.Integer, Is.EqualTo(int.MinValue));
+        Assert.That(remainder.Value!.Integer, Is.Zero);
         Assert.That(
             missing.Unsupported!.Reason,
             Is.EqualTo(IrUnsupportedReason.MissingVariable));
@@ -943,7 +933,7 @@ internal sealed class IrKernelTests
     }
 
     [Test]
-    public void InterpreterEvaluatesSequenceLengthAndAccessFailures()
+    public void InterpreterDefaultsInvalidSequenceAccess()
     {
         var factory = new IrFactory();
         var sequenceType =
@@ -980,21 +970,16 @@ internal sealed class IrKernelTests
             factory.Length(factory.Variable(sequence)),
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(sequence, values));
 
+        // Term access is total: an invalid access reads the element default.
         Assert.That(found.Value!.Integer, Is.EqualTo(8));
-        Assert.That(
-            outside.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.IndexOutOfRange));
-        Assert.That(
-            nullAccess.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.NullReference));
-        Assert.That(
-            failingIndex.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        Assert.That(outside.Value!.Integer, Is.Zero);
+        Assert.That(nullAccess.Value!.Integer, Is.Zero);
+        Assert.That(failingIndex.Value!.Integer, Is.Zero);
         Assert.That(length.Value!.Integer, Is.EqualTo(2));
     }
 
     [Test]
-    public void InterpreterClassifiesReferenceCastsWithoutInventingTypeRelations()
+    public void InterpreterKeepsReferencesAcrossClassCasts()
     {
         var factory = new IrFactory();
         var sourceType = factory.GetOrCreateReferenceType(
@@ -1017,9 +1002,9 @@ internal sealed class IrKernelTests
         var nullCast = interpreter.Evaluate(
             factory.Cast(targetType, factory.Null(sourceType)));
 
-        Assert.That(
-            unsupported.Unsupported!.Reason,
-            Is.EqualTo(IrUnsupportedReason.UnsupportedCast));
+        // A class cast keeps the reference; its type test is a separate guard.
+        Assert.That(unsupported.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(unsupported.Value!.Type, Is.EqualTo(targetType));
         Assert.That(nullCast.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(nullCast.Value!.Kind, Is.EqualTo(IrValueKind.Null));
         Assert.That(nullCast.Value.Type, Is.EqualTo(targetType));
@@ -1164,10 +1149,8 @@ internal sealed class IrKernelTests
 
         Assert.That(succeeded.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(succeeded.Value!.String, Is.EqualTo("sharp"));
-        Assert.That(failed.Status, Is.EqualTo(IrEvaluationStatus.Exception));
-        Assert.That(
-            failed.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.InvalidCast));
+        Assert.That(failed.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(failed.Value!.Kind, Is.EqualTo(IrValueKind.Null));
         Assert.That(concatNull.Value!.String, Is.EqualTo("proof"));
     }
 
@@ -1219,7 +1202,7 @@ internal sealed class IrKernelTests
 
         Assert.That(
             failingArgument.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+            Is.EqualTo(IrExceptionKind.NullReference));
         Assert.That(
             nullReceiver.Exception!.Kind,
             Is.EqualTo(IrExceptionKind.NullReference));

@@ -23,7 +23,7 @@ public sealed class ClosedContractAttributeBindingBoundaryTests
         var attribute = parameter.GetAttributes().Single();
         Assert.That(ClosedContractAttributeValidator.Validate(attribute, parameter.Type, parameter.RefKind,
             api.Selections, includeUnsigned64: true).IsValid, Is.True);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var bound = ClosedContractAttributeBinding.BindMetadataValueSites(factory, api.Selections,
             [new ContractMetadataValueSite(parameter, static () =>
                 throw new InvalidOperationException("Invalid attributes must not create an IR value."))],

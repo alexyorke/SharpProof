@@ -14,7 +14,7 @@ public sealed class NativeOpaqueTermAdmissionTests
     [TestCase(true)]
     public async Task LegalOpaquePredicateRemainsOutsideTheNativeBranchDomain(bool opaque)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "ExternalPredicate", factory.BooleanType, isStatic: true);
         IrTerm predicate = opaque ? factory.PureOpaque(member, receiver: null) : factory.Boolean(true);
@@ -68,7 +68,7 @@ public sealed class NativeOpaqueTermAdmissionTests
     [TestCase("return", true)]
     public async Task LegalExternalTermsHaveConsistentAdmissionAcrossOwnedInstructionOperands(string operand, bool opaque)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var termType = operand == "assume" ? factory.BooleanType
             : operand == "lock" ? factory.ObjectType : factory.IntegerType;
         var external = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,

@@ -13,7 +13,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task UnsatProofReturnsAHygienicCore()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("source name is irrelevant", factory.IntegerType);
         var operation = factory.CreateOperation("lowered");
         var lowerBound = factory.Binary(
@@ -46,7 +46,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task SatModelMustReplayBeforeRefutation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = factory.Binary(
             IrBinaryOperator.GreaterThan,
@@ -72,7 +72,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task StrictComparisonDoesNotAcceptEqualityBoundary()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("equal to zero");
         var equalToZero = factory.Binary(
@@ -107,7 +107,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task FormulaAndExplicitVariablesProduceOneExactModelSet()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var formula = factory.CreateVariable("formula", factory.BooleanType);
@@ -139,7 +139,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task NormalCompletionGuardsCheckedDivision()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var operation = factory.CreateOperation("nonzero");
         var nonzero = factory.Binary(
@@ -172,7 +172,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task SignedRemainderOverflowFailsItsExplicitCompletionGoal()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var dividendIsMinimum = factory.Binary(
@@ -224,7 +224,7 @@ public sealed class NativeSmtRegressionTests
         long expectedQuotient,
         long expectedRemainder)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var quotient = factory.Binary(
@@ -278,7 +278,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task DivisionByZeroFailsItsExplicitCompletionGoal()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var quotient = factory.Binary(
             IrBinaryOperator.Divide,
@@ -306,7 +306,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task StringLengthCannotProveAnUnconstrainedStringIsNonempty()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         var goal = factory.Binary(
             IrBinaryOperator.GreaterThan,
@@ -321,7 +321,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task EmbeddedNullStringRemainsDistinctFromItsTruncatedContent()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         var goal = factory.Binary(
             IrBinaryOperator.Equal,
@@ -350,7 +350,7 @@ public sealed class NativeSmtRegressionTests
     {
         System.ArgumentNullException.ThrowIfNull(first);
         System.ArgumentNullException.ThrowIfNull(second);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var selected = factory.Conditional(
             factory.Variable(flag),
@@ -381,7 +381,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task NullableStringConcatCannotProduceAFalseProof()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
         var concatenated = factory.Binary(
             IrBinaryOperator.StringConcat,
@@ -409,7 +409,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task UnsignedMaximumCannotHaveAStrictlyGreaterValue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, false);
         var variable = factory.CreateVariable("value", type);
         await AssertRefuted(factory,
@@ -420,7 +420,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task TypedArithmeticCannotProvePositivityAcrossSignedWrapping()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var choice = factory.CreateVariable("choice", factory.BooleanType);
         var value = factory.Conditional(factory.Variable(choice),
@@ -435,7 +435,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task OpaqueTermsFailClosed()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var member = factory.GetOrCreateMember(
             factory.CreateIdentity(),
             factory.ObjectType,
@@ -462,7 +462,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public void PreCancelledChecksDoNotBecomeUnknown()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var query = new VerificationQuery(
             factory,
             [],
@@ -511,7 +511,7 @@ public sealed class NativeSmtRegressionTests
         using var context = new Z3Context();
         var contextFactoryCalls = 0;
         Action action = () => _ = new CallableSolverSession(
-            new IrFactory(IrExecutionSemantics.Total), null!,
+            new IrFactory(), null!,
             () =>
             {
                 contextFactoryCalls++;
@@ -544,7 +544,7 @@ public sealed class NativeSmtRegressionTests
     public async Task ResourceAccountingTreatsEachSolverSnapshotAsFresh()
     {
         const uint queryLimit = 1_000_000;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var operation = factory.CreateOperation("tracked");
         var assumptions = Enumerable.Range(0, 256)
             .Select(index => new Assumption(
@@ -691,7 +691,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task DisposeWhileQueryIsQueuedReturnsUnavailable()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var query = new VerificationQuery(
             factory,
             [],
@@ -740,7 +740,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task ExplicitReferenceModelVariablesAreDecodedWithTheBooleanInput()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
         var text = factory.CreateVariable("text", factory.StringType);
         var query = new VerificationQuery(
@@ -806,7 +806,7 @@ public sealed class NativeSmtRegressionTests
     public async Task SharedAssumptionDagIsDepthValidatedOnce()
     {
         const uint queryLimit = 10_000;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("shared-depth", factory.BooleanType);
         IrTerm sharedPredicate = factory.Variable(variable);
         for (var index = 0; index < 127; index++)
@@ -842,7 +842,7 @@ public sealed class NativeSmtRegressionTests
     [Test]
     public async Task PublicBackendBoundsRecursiveEncodingDepth()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("deep", factory.BooleanType);
         var atBoundary = NestNot(factory, factory.Variable(variable), 255);
         var beyondBoundary = NestNot(factory, factory.Variable(variable), 256);
@@ -895,7 +895,7 @@ public sealed class NativeSmtRegressionTests
 
     private static VerificationQuery CreateUnusedBooleanModelQuery(int variableCount)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variables = System.Collections.Immutable.ImmutableArray.CreateRange(
             Enumerable.Range(0, variableCount)
                 .Select(index => factory.CreateVariable(

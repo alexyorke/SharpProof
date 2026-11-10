@@ -86,7 +86,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void AllNineIntegerDomainsMapFromActualMetadataAndMatchIndependentBoundaries()
     {
         var (compilation, target) = Import("IntegerDomains");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var sites = CreateSites(factory, context, target);
@@ -145,7 +145,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void OutOfDomainLongBoundsUseMathematicalRatherThanTruncatedComparisons()
     {
         var (compilation, target) = Import("LongBoundDomains");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(
@@ -202,7 +202,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void NotNullProjectsAndEvaluatesOwnedStringArrayAndObjectInputs()
     {
         var (compilation, target) = Import("References");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
@@ -242,7 +242,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void InvalidDeclaredBoundsRejectTheWholeActualSiteBatch()
     {
         var (compilation, target) = Import("Pair");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var sites = CreateSites(factory, context, target);
@@ -263,7 +263,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void LegalWrongDomainValuesRejectIntegerAndNotNullAnnotations()
     {
         var (integerCompilation, integerTarget) = Import("WrongIntegerGetter");
-        var integerFactory = new IrFactory(IrExecutionSemantics.Total);
+        var integerFactory = new IrFactory();
         var integerContext = new TotalLoweringContext(integerFactory, integerTarget);
         var integerSelections = ContractSelectionInventory.ForCompilation(integerCompilation);
         var integerSites = CreateSites(integerFactory, integerContext, integerTarget);
@@ -283,7 +283,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
         Assert.That(wrongInteger.Clauses, Is.Empty);
 
         var (referenceCompilation, referenceTarget) = Import("WrongReferenceGetter");
-        var referenceFactory = new IrFactory(IrExecutionSemantics.Total);
+        var referenceFactory = new IrFactory();
         var referenceContext = new TotalLoweringContext(referenceFactory, referenceTarget);
         var referenceSelections = ContractSelectionInventory.ForCompilation(referenceCompilation);
         var referenceSites = CreateSites(referenceFactory, referenceContext, referenceTarget);
@@ -307,7 +307,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
     public void RequiredMetadataProjectionArgumentsRejectNull()
     {
         var (compilation, target) = Import("IntegerDomains");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
         var sites = CreateSites(factory, context, target);

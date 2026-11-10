@@ -12,7 +12,7 @@ public sealed class FrameworkValueReplayTests
     public void AnUnavailableFrameworkObservationDoesNotConfirmTheHavoc(string failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("throws", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -40,7 +40,7 @@ public sealed class FrameworkValueReplayTests
     public void UnapprovedReplayRequestsNeverInvokeTheFrameworkGetter(string scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", scenario == "wrong-type" ? factory.IntegerType : factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -71,7 +71,7 @@ public sealed class FrameworkValueReplayTests
     public void FrameworkReferenceObservationsUseTheActualSingleton(string primitive)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.ObjectType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();

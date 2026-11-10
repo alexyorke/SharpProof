@@ -10,7 +10,7 @@ public sealed class PortableArrayRangeWriteTests
     [TestCase(true)]
     public void PortableElementAndRangeWritesPreserveArityAndOperands(bool range)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -43,7 +43,7 @@ public sealed class PortableArrayRangeWriteTests
     {
         if (corruption is < 0 or > 4)
         { throw new ArgumentOutOfRangeException(nameof(corruption)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();

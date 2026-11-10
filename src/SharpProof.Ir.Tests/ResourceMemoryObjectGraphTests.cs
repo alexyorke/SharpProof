@@ -12,7 +12,7 @@ public sealed class ResourceMemoryObjectGraphTests
     [TestCase(true, 64)]
     public void OwnedFieldGraphsCountSharedArraysOnce(bool shared, int bytes)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, shared ? [ResourceStorageKind.Reference, ResourceStorageKind.Reference] : [ResourceStorageKind.Reference]);
@@ -39,7 +39,7 @@ public sealed class ResourceMemoryObjectGraphTests
     [Test]
     public void ObjectCyclesRemainFiniteAndFieldOverwriteReleasesOldChildren()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference, ResourceStorageKind.Reference]);
@@ -67,7 +67,7 @@ public sealed class ResourceMemoryObjectGraphTests
     [Test]
     public void ReadFieldAliasSurvivesAnOverwriteAndKeepsItsIdentity()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -96,7 +96,7 @@ public sealed class ResourceMemoryObjectGraphTests
     [Test]
     public void CompleteStorageIsImmutableAndRequiresADirectClass()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         Assert.Throws<ArgumentException>((Action)(() => factory.RegisterObjectStorageType(node, [])));
         factory.RegisterClosedClassReferenceType(node, null);

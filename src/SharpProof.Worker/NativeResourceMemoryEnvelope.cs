@@ -14,7 +14,7 @@ internal static class NativeResourceMemoryEnvelope
         var program = owner.Program;
         var factory = program.Factory;
         if (owner.IsBodyAbstraction || !owner.EffectsCompleteAtEntry || owner.HasReceiver ||
-            factory.Semantics != IrExecutionSemantics.Total || program.Blocks.Length > ResourceMemoryTrace.MaximumEvents / 4)
+            program.Blocks.Length > ResourceMemoryTrace.MaximumEvents / 4)
         { return false; }
         foreach (var parameter in owner.Parameters)
         {

@@ -36,8 +36,6 @@ internal sealed class PassiveCallableCandidate
         if (string.IsNullOrWhiteSpace(callableId))
         { throw new ArgumentException("A callable identity is required.", nameof(callableId)); }
         Program = ArgumentNullGuard.NotNull(program, nameof(program));
-        if (program.Factory.Semantics != IrExecutionSemantics.Total)
-        { throw new ArgumentException("A passive candidate requires Total IR.", nameof(program)); }
         if (parameters.IsDefault || requires.IsDefault || ensures.IsDefault)
         { throw new ArgumentException("Candidate arrays must be initialized."); }
         var entries = ImmutableHashSet.CreateBuilder<IrVarId>();

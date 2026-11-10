@@ -81,7 +81,7 @@ public sealed partial class DotnetApiInventoryTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = model.GetDeclaredSymbol(syntax)!;
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         Assert.That(new RoslynTotalExpressionLowerer(context).LowerClause(operation).Classification.IsExact, Is.False);
         context.SpecializeHashSetOriginParameter(method.Parameters.Single());
@@ -98,7 +98,7 @@ public sealed partial class DotnetApiInventoryTests
         { return false; }
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);

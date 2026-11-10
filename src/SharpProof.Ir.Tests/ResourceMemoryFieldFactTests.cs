@@ -17,7 +17,7 @@ public sealed class ResourceMemoryFieldFactTests
     {
         if (update < 0 || update > 2)
         { throw new ArgumentOutOfRangeException(nameof(update)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [boolean ? ResourceStorageKind.Byte : ResourceStorageKind.Word32]);
@@ -71,7 +71,7 @@ public sealed class ResourceMemoryFieldFactTests
     {
         if (shape is not ("borrowed-receiver" or "null-receiver" or "borrowed-child" or "scalar-expression"))
         { throw new ArgumentOutOfRangeException(nameof(shape)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -97,7 +97,7 @@ public sealed class ResourceMemoryFieldFactTests
     [TestCase(true)]
     public void ReturningBorrowedStorageDiscardsPreviouslyCountedAllocations(bool fieldRead)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -120,7 +120,7 @@ public sealed class ResourceMemoryFieldFactTests
     [TestCase(false, 256, false)]
     public void NarrowScalarCastsRequireRepresentableConstants(bool isSigned, int value, bool representable)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var input = factory.CreateVariable("input", factory.IntegerType);
@@ -151,7 +151,7 @@ public sealed class ResourceMemoryFieldFactTests
     {
         if (depth is not (32 or 33))
         { throw new ArgumentOutOfRangeException(nameof(depth)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var input = factory.CreateVariable("input", factory.IntegerType);
@@ -191,7 +191,7 @@ public sealed class ResourceMemoryFieldFactTests
         if (count is not (1023 or 1024))
         { throw new ArgumentOutOfRangeException(nameof(count)); }
         ArgumentNullException.ThrowIfNull(reason);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -211,7 +211,7 @@ public sealed class ResourceMemoryFieldFactTests
     {
         if (depth is not (32 or 33))
         { throw new ArgumentOutOfRangeException(nameof(depth)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -259,7 +259,7 @@ public sealed class ResourceMemoryFieldFactTests
     {
         if (depth is < 15 or > 17)
         { throw new ArgumentOutOfRangeException(nameof(depth)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);

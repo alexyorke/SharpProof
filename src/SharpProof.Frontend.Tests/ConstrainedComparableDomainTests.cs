@@ -21,7 +21,7 @@ public sealed class ConstrainedComparableDomainTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         foreach (var call in syntax.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             var invocation = (IInvocationOperation)model.GetOperation(call)!;
@@ -38,7 +38,7 @@ public sealed class ConstrainedComparableDomainTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         var callerGraph = ControlFlowGraph.Create(syntax, model)!;
         var invocation = callerGraph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
             block.Operations.Concat(block.BranchValue is { } branch ? ImmutableArray.Create(branch) : ImmutableArray<IOperation>.Empty)).SelectMany(operation => operation is null
@@ -79,7 +79,7 @@ public sealed class ConstrainedComparableDomainTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = model.GetDeclaredSymbol(syntax)!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+        var context = new TotalLoweringContext(new IrFactory(), method);
         foreach (var parameter in method.Parameters)
         { context.SpecializeScalarParameter(parameter, compilation.GetSpecialType(element)); }
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
@@ -98,7 +98,7 @@ public sealed class ConstrainedComparableDomainTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = model.GetDeclaredSymbol(syntax)!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+        var context = new TotalLoweringContext(new IrFactory(), method);
         if (throughInterface)
         {
             context.SpecializeTypeParameter(method.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));

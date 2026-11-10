@@ -19,7 +19,7 @@ public sealed class CanonicalCacheIdentityTests
             _ => string.Empty
         };
         Assert.That(ReferenceEquals(runtimeFirst, runtimeSecond), Is.False);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm first = factory.EmptyArray(factory.GetOrCreateSequenceType(factory.IntegerType));
         IrTerm second = otherKind switch
         {

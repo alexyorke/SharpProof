@@ -41,7 +41,7 @@ public sealed class IntegralConvertOracleTests
         var compilation = CSharpCompilation.Create("UnsupportedArgument", [tree], TestMetadataReferences.Platform);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var builder = new IrProgramBuilder(factory);
         var lowerer = new RoslynTotalExpressionLowerer(context, builder);
@@ -59,7 +59,7 @@ public sealed class IntegralConvertOracleTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
@@ -117,7 +117,7 @@ public sealed class IntegralConvertOracleTests
         Assert.That(emitted.Success, Is.True, string.Join(";", emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);

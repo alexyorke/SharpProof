@@ -13,7 +13,7 @@ public sealed class CallableReplayBoundaryTests
     public async Task OpaqueWriterRequiresConcreteHeapEvidenceForContractReads(
         bool readInGuard, bool restoreCell)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var owner = factory.CreateVariable("owner", type);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
@@ -52,7 +52,7 @@ public sealed class CallableReplayBoundaryTests
     [Test]
     public async Task NontrivialReplayRequiresAProgramAndEveryEntryBinding()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var entry = factory.CreateVariable("entry", factory.IntegerType);
         var body = factory.CreateVariable("body", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -74,7 +74,7 @@ public sealed class CallableReplayBoundaryTests
     [Test]
     public async Task TrivialContextCannotClaimAnUnreplayedProgram()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation());
@@ -87,10 +87,10 @@ public sealed class CallableReplayBoundaryTests
     [Test]
     public async Task ForeignPrestateIdentifierCannotValidateARefutation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var entry = factory.CreateVariable("entry", factory.IntegerType);
         var old = factory.CreateVariable("old", factory.IntegerType);
-        var foreignFactory = new IrFactory(IrExecutionSemantics.Total);
+        var foreignFactory = new IrFactory();
         var foreign = foreignFactory.CreateVariable("foreign", foreignFactory.IntegerType);
         var model = ImmutableArray.Create(KeyValuePair.Create(entry, factory.CreateIntegerValue(1)));
         var foreignContext = Context(factory, null, true,
@@ -106,7 +106,7 @@ public sealed class CallableReplayBoundaryTests
     [Test]
     public async Task DeclaredCallableResultRequiresAReturnedValueOfItsType()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var result = factory.CreateVariable("result", factory.IntegerType);
         var noValue = new IrProgramBuilder(factory);
         var voidBlock = noValue.CreateBlock();
@@ -126,9 +126,11 @@ public sealed class CallableReplayBoundaryTests
     {
         var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var boxType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Box");
+        var read = factory.GetOrCreateMember(factory.CreateIdentity(), boxType, "Read", factory.IntegerType, isStatic: false);
+        // A read through a null receiver faults even in Total IR.
         var divisionByZero = factory.Binary(IrBinaryOperator.Equal,
-            factory.Binary(IrBinaryOperator.Divide,
-                factory.Integer(0), factory.Variable(divisor)), factory.Integer(0));
+            factory.PureOpaque(read, factory.Null(boxType)), factory.Variable(divisor));
         var model = ImmutableArray.Create(KeyValuePair.Create(divisor, factory.CreateIntegerValue(0)));
 
         var falsePostcondition = await Replay(factory, model, Context(factory, null, true), [divisor]);

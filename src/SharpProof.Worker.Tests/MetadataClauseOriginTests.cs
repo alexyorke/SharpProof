@@ -182,7 +182,7 @@ public sealed class MetadataClauseOriginTests
             evidence.Kind, evidence.Minimum, evidence.Maximum, evidence.ConstructorSignature, evidence.ValueBlob);
         var references = CompilerCompilationCapture.CaptureReferences(subject.Compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var entry = factory.CreateVariable("entry:0", type);
         var current = factory.CreateVariable("current:0", type);

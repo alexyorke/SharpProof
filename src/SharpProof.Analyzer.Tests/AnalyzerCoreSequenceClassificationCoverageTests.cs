@@ -9,10 +9,10 @@ public sealed class AnalyzerCoreSequenceClassificationCoverageTests
     [Test]
     public void ASequenceAccessFromAnotherFactoryRetainsItsOwnershipRejection()
     {
-        var owner = new IrFactory(IrExecutionSemantics.Total);
+        var owner = new IrFactory();
         var sequence = owner.CreateVariable("items", owner.GetOrCreateSequenceType(owner.IntegerType));
         var access = owner.SequenceAccess(owner.Variable(sequence), owner.Integer(0));
-        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var foreign = new IrFactory();
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             TotalBodyLowering.ReadsElements(foreign, [access])));
         Assert.That(error!.ParamName, Is.EqualTo("id"));
@@ -21,7 +21,7 @@ public sealed class AnalyzerCoreSequenceClassificationCoverageTests
     [Test]
     public void AFactoryAdmittedSequenceAccessReadsElementState()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var items = factory.CreateVariable("items", sequenceType);
         var index = factory.CreateVariable("index", factory.IntegerType);
@@ -33,7 +33,7 @@ public sealed class AnalyzerCoreSequenceClassificationCoverageTests
     [Test]
     public void StringsUseLengthTermsAndRejectSequenceAccess()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         var value = factory.Variable(text);
         var error = Assert.Throws<ArgumentException>((Action)(() =>

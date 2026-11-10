@@ -21,7 +21,7 @@ public sealed class SourceCallApiCoverageTests
             "public class Node { public int Count; public Node() { " + body + " } } public static class Subject { public static Node Caller() => new Node(); }")]);
         var caller = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Caller").OfType<IMethodSymbol>().Single();
         var constructor = compilation.GetTypeByMetadataName("Node")!.InstanceConstructors.Single();
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
+        var context = new TotalLoweringContext(new IrFactory(), caller);
         ContractBindingFailure? failure = null;
         bool Prepare(TotalLoweringContext frame)
         {
@@ -47,7 +47,7 @@ public sealed class SourceCallApiCoverageTests
         var syntax = caller.DeclaringSyntaxReferences.Single().GetSyntax(TestContext.CurrentContext.CancellationToken);
         var callerGraph = SharpProof.Frontend.TotalSourceCallSession.CreateGraph(syntax, caller,
             compilation.GetSemanticModel(syntax.SyntaxTree), TestContext.CurrentContext.CancellationToken);
-        var callerContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), caller);
+        var callerContext = new TotalLoweringContext(new IrFactory(), caller);
         var callerLowered = SharpProof.Compiler.Semantics.TotalBodyLowering.Lower(compilation, callerGraph!, callerContext,
             TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         Assert.That(callerLowered.IsExact, Is.True, callerLowered.Classification.ToString());
@@ -153,7 +153,7 @@ public sealed class SourceCallApiCoverageTests
         System.ArgumentNullException.ThrowIfNull(missing);
         var method = Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Callee")
             .OfType<IMethodSymbol>().Single();
-        var caller = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+        var caller = new TotalLoweringContext(new IrFactory(), method);
         var session = CreateSession();
         var exception = Assert.Throws<ArgumentNullException>((Action)(() =>
             _ = session.TryPrepare(missing == "caller" ? null! : caller,
@@ -203,7 +203,7 @@ public sealed class SourceCallApiCoverageTests
         var type = Compilation.GetTypeByMetadataName("Subject")!;
         var callerMethod = type.GetMembers("Caller").OfType<IMethodSymbol>().Single();
         var callee = type.GetMembers("Callee").OfType<IMethodSymbol>().Single();
-        var caller = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), callerMethod);
+        var caller = new TotalLoweringContext(new IrFactory(), callerMethod);
         var session = CreateSession();
 
         var prepared = session.TryPrepare(caller, callee, null, [], out var frame, out var graph);

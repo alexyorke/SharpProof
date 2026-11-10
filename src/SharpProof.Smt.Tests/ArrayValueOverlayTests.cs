@@ -9,7 +9,7 @@ public sealed class ArrayValueOverlayTests
     [TestCase(1)]
     public void ImmutableOverlayRejectsOutOfRangeObservationsWithoutChangingInput(int index)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var initial = factory.CreateBooleanValue(false);
         ImmutableArray<IrValue> elements = [initial];
         var observations = ImmutableDictionary<int, IrValue>.Empty.Add(index, factory.CreateBooleanValue(true));
@@ -25,7 +25,7 @@ public sealed class ArrayValueOverlayTests
     [Test]
     public void EmptyEntriesLeaveAnEmptyBufferEmpty()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrValue[] buffer = [];
         SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, []);
         Assert.That(buffer, Is.Empty);
@@ -34,7 +34,7 @@ public sealed class ArrayValueOverlayTests
     [Test]
     public void DefaultObservationsRejectBeforeWritingTheBuffer()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var initial = factory.CreateBooleanValue(false);
         IrValue[] buffer = [initial];
         var exception = Assert.Throws<ArgumentException>((Action)(() =>
@@ -46,7 +46,7 @@ public sealed class ArrayValueOverlayTests
     [Test]
     public void AOneElementBooleanBufferRetainsTheExactObservedValue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateBooleanValue(true);
         IrValue[] buffer = [factory.CreateBooleanValue(false)];
         SmtNativeUtilities.ApplyArrayObservations(factory, factory.BooleanType, buffer, [new(0, value)]);
@@ -57,7 +57,7 @@ public sealed class ArrayValueOverlayTests
     [Test]
     public void TwoIntegerEntriesFillTheirIndicesWithoutReplacingSameTypeValues()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, true);
         var first = factory.CreateIntegerValueFromBits(type, 128UL);
         var second = factory.CreateIntegerValueFromBits(type, 255UL);
@@ -78,7 +78,7 @@ public sealed class ArrayValueOverlayTests
     public void IntegerSignednessViewsRetainBitsAndUseTheTargetType(
         bool sourceSigned, bool targetSigned, int expectedNumericValue)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sourceType = factory.GetOrCreateIntegerType(8, sourceSigned);
         var targetType = factory.GetOrCreateIntegerType(8, targetSigned);
         var unchanged = factory.CreateIntegerValueFromBits(targetType, 0UL);
@@ -101,7 +101,7 @@ public sealed class ArrayValueOverlayTests
     [TestCase(2, 2)]
     public void IndicesOutsideTheActualBufferRejectBeforeWriting(int index, int count)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var initial = factory.CreateBooleanValue(false);
         var buffer = Enumerable.Repeat(initial, count).ToArray();
         var value = factory.CreateBooleanValue(true);
@@ -113,7 +113,7 @@ public sealed class ArrayValueOverlayTests
     [Test]
     public void ARejectedLaterEntryPreservesWritesFromEarlierEnumeratedEntries()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateBooleanValue(true);
         IrValue[] buffer = [factory.CreateBooleanValue(false)];
         ImmutableArray<KeyValuePair<int, IrValue>> entries = [new(0, first), new(1, factory.CreateBooleanValue(false))];

@@ -112,7 +112,7 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
             Is.EqualTo(IntervalValue.Bottom));
         Assert.That(CoreTransfer.Cast(source, target, IntervalValue.Constant(256)),
             Is.EqualTo(IntervalValue.Constant(0)));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sourceId = factory.GetOrCreateIntegerType(16, signed: true);
         var targetId = factory.GetOrCreateIntegerType(8, signed: true);
         var input = factory.CreateVariable("input", sourceId);
@@ -124,7 +124,7 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
 
     private static IrTypeInfo IntegerType(int width, bool signed)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         return factory.GetTypeInfo(factory.GetOrCreateIntegerType(width, signed));
     }
 
@@ -140,7 +140,7 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
     private static void AssertTotalBinary(
         IrBinaryOperator operation, bool signed, long left, long right, long expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, signed);
         var first = factory.CreateVariable("first", type);
         var second = factory.CreateVariable("second", type);
@@ -155,7 +155,7 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
 
     private static void AssertTotalNegate(long input, long expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, signed: true);
         var variable = factory.CreateVariable("input", type);
         var term = factory.Unary(IrUnaryOperator.Negate, factory.Variable(variable));

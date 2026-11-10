@@ -21,7 +21,7 @@ public sealed class NativeLoggingInitializationTests
             var nativeHandle = typeof(Context).GetField("m_ctx", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(nativeHandle, Is.Not.Null);
             Assert.That(nativeHandle!.GetValue(context), Is.Not.EqualTo(IntPtr.Zero));
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
 
             var error = Assert.Throws<Z3Exception>((Action)(() =>
             {

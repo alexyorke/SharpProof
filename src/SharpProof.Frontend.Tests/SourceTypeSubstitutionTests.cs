@@ -23,7 +23,7 @@ public sealed class SourceTypeSubstitutionTests
             diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var context = new TotalLoweringContext(new IrFactory(), target) { Compilation = compilation };
         var owner = target.ContainingType;
         context.SpecializeTypeParameter(owner.ContainingType.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));
         context.SpecializeTypeParameter(owner.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_String));
@@ -44,7 +44,7 @@ public sealed class SourceTypeSubstitutionTests
             : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(
             tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var context = new TotalLoweringContext(new IrFactory(), target) { Compilation = compilation };
         var replacement = compilation.GetSpecialType(SpecialType.System_Int32);
         context.SpecializeTypeParameter(target.ContainingType.TypeParameters[0], replacement);
         var original = (INamedTypeSymbol)((IFieldSymbol)target.ContainingType.GetMembers("Value").Single()).Type;
@@ -61,7 +61,7 @@ public sealed class SourceTypeSubstitutionTests
         var compilation = CSharpCompilation.Create("MissingSubstitutionCompilation", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var context = new TotalLoweringContext(new IrFactory(), target);
         context.SpecializeTypeParameter(target.TypeParameters[0], compilation.GetSpecialType(SpecialType.System_Int32));
         Assert.Throws<FrontendLoweringRejectionException>((System.Action)(() => context.SpecializeSourceType(target.Parameters[0].Type)));
     }
@@ -73,7 +73,7 @@ public sealed class SourceTypeSubstitutionTests
         var compilation = CSharpCompilation.Create("LazySubstitutionCompilation", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var caller = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target) { Compilation = compilation };
+        var caller = new TotalLoweringContext(new IrFactory(), target) { Compilation = compilation };
         var first = caller.CreateFrame(target);
         var nested = first.CreateFrame(target);
         Assert.That(first.Compilation, Is.Null);
@@ -90,7 +90,7 @@ public sealed class SourceTypeSubstitutionTests
         var compilation = CSharpCompilation.Create("NullableReceiverElement", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var context = new TotalLoweringContext(new IrFactory(), target);
         var concrete = compilation.GetSpecialType(SpecialType.System_Int32);
         context.SpecializeTypeParameter(target.TypeParameters[0], concrete);
         var specialize = typeof(TotalLoweringContext).GetMethod("SpecializeReceiverElementCore", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
@@ -107,7 +107,7 @@ public sealed class SourceTypeSubstitutionTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var context = new TotalLoweringContext(new IrFactory(), target);
         context.SpecializeTypeParameter(target.ContainingType.TypeParameters[0], target.ContainingType);
         Assert.Throws<FrontendLoweringRejectionException>((System.Action)(() => context.SpecializeSourceType(target.ContainingType)));
     }

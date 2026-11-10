@@ -13,7 +13,7 @@ internal sealed partial class NativeResourceContractTests
     [TestCase(true)]
     public void ProofBoundaryNullReferenceIdentityObservationCannotAuthorizeRetainedBytes(bool malformedObservation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("owned", factory.ObjectType);

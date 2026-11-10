@@ -270,7 +270,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         }
         var methodSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(methodSyntax, model)!, context,
             static _ => true, TestContext.CurrentContext.CancellationToken);

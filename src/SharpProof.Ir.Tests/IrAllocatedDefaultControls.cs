@@ -12,7 +12,7 @@ internal sealed class IrAllocatedDefaultControls
     [TestCase(IrTypeKind.Sequence)]
     public void AllocationDefaultsPreserveTheElementType(IrTypeKind kind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var element = kind switch
         {
             IrTypeKind.Boolean => factory.BooleanType,
@@ -45,7 +45,6 @@ internal sealed class IrAllocatedDefaultControls
         }
     }
 
-    [TestCase(0, true)]
     [TestCase(8, false)]
     [TestCase(8, true)]
     [TestCase(16, false)]
@@ -56,8 +55,8 @@ internal sealed class IrAllocatedDefaultControls
     [TestCase(64, true)]
     public void IntegerZeroBitsAndNumericCreationAgree(int width, bool isSigned)
     {
-        var factory = new IrFactory(width == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
-        var type = width == 0 ? factory.IntegerType : factory.GetOrCreateIntegerType(width, isSigned);
+        var factory = new IrFactory();
+        var type = factory.GetOrCreateIntegerType(width, isSigned);
         var numeric = factory.CreateIntegerValue(type, 0L);
         var bits = factory.CreateIntegerValueFromBits(type, 0);
         using (Assert.EnterMultipleScope())

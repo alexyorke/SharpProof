@@ -13,7 +13,7 @@ public sealed class NativeLoopAdmissionContractTests
     [TestCase(true)]
     public void CyclicAssumptionIsRejectedBeforeInvariantCandidates(bool containsAssumption)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var header = builder.CreateBlock("header");

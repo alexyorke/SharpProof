@@ -9,22 +9,14 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
 {
-    private static readonly ImmutableArray<long> PredicateInputs = [-1L, 2L, 4L];
     private static readonly ImmutableArray<string> MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
 
-    private static readonly ImmutableArray<string> MetadataIntegerDiagnostics =
-    [
-        "[Positive] count",
-        "[InRange(1, 3)] count"
-    ];
-
-    [TestCase("NotNull", "string", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
-    [TestCase("Positive", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
-    [TestCase("InRange(-2L, 2L)", "int", IrExecutionSemantics.Total, ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("NotNull", "string", ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("Positive", "int", ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("InRange(-2L, 2L)", "int", ContractBindingFailure.UnsupportedExpression)]
     public void EveryRealClosedAttributeFamilyRejectsAValidBooleanIrValue(
         string attributeText,
         string sourceType,
-        IrExecutionSemantics semantics,
         ContractBindingFailure expectedFailure)
     {
         ArgumentNullException.ThrowIfNull(attributeText);
@@ -36,7 +28,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(attributes, Has.Length.EqualTo(1));
         Assert.That(attributes[0].ApplicationSyntaxReference, Is.Not.Null);
 
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("legalBoolean", factory.BooleanType);
         var value = factory.Variable(variable);
         var valueRequests = 0;
@@ -67,13 +59,12 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase("NotNull", "string", IrExecutionSemantics.Total)]
-    [TestCase("Positive", "int", IrExecutionSemantics.Total)]
-    [TestCase("InRange(1L, 3L)", "int", IrExecutionSemantics.Total)]
+    [TestCase("NotNull", "string")]
+    [TestCase("Positive", "int")]
+    [TestCase("InRange(1L, 3L)", "int")]
     public void MissingLegalIrValueFailsClosedForRealAnnotations(
         string attributeText,
-        string sourceType,
-        IrExecutionSemantics semantics)
+        string sourceType)
     {
         ArgumentNullException.ThrowIfNull(attributeText);
         ArgumentNullException.ThrowIfNull(sourceType);
@@ -82,7 +73,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var parameter = GetMethod(compilation, "Read").Parameters.Single();
         var valueRequests = 0;
         var operationCalls = 0;
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var result = ClosedContractAttributeBinding.BindValue(
             factory,
             api.Selections,
@@ -108,8 +99,8 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase(IrExecutionSemantics.Total)]
-    public void OutParameterIsRejectedBeforeRequestingItsIrValue(IrExecutionSemantics semantics)
+    [Test]
+    public void OutParameterIsRejectedBeforeRequestingItsIrValue()
     {
         var compilation = TestCompilation.Create("ClosedAttributeOutParameter", """
             using SharpProof.Attributes;
@@ -121,7 +112,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var parameter = GetMethod(compilation, "Read").Parameters.Single();
         Assert.That(parameter.RefKind, Is.EqualTo(RefKind.Out));
 
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("entry", factory.IntegerType);
         var value = factory.Variable(variable);
         var valueRequests = 0;
@@ -151,8 +142,8 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase(IrExecutionSemantics.Total)]
-    public void RealNonContractMarkerIsSkippedAroundAClosedAnnotation(IrExecutionSemantics semantics)
+    [Test]
+    public void RealNonContractMarkerIsSkippedAroundAClosedAnnotation()
     {
         var compilation = TestCompilation.Create("ClosedAttributeMarker", """
             using System;
@@ -168,7 +159,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(attributes.Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.Name)),
             Is.EqualTo(MarkerNames));
 
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var value = factory.Variable(variable);
         var valueRequests = 0;
@@ -199,7 +190,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(result.Clauses[0].SourceSyntax, Is.Not.Null);
         Assert.That(valueRequests, Is.EqualTo(1));
         Assert.That(operationSites, Has.Length.EqualTo(1));
-        Assert.That(operationSites[0] is not null, Is.EqualTo(semantics == IrExecutionSemantics.Total));
+        Assert.That(operationSites[0], Is.Not.Null);
 
         var interpreter = new IrInterpreter(factory);
         var negative = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, -1));
@@ -208,11 +199,10 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(interpreter.Evaluate(result.Clauses[0].Condition, positive).Value!.Boolean, Is.True);
     }
 
-    [TestCase("text", IrExecutionSemantics.Total)]
-    [TestCase("count", IrExecutionSemantics.Total)]
-    public void MetadataAttributesKeepLegacyFallbackAndRequireSourceSyntaxInTotal(
-        string parameterName,
-        IrExecutionSemantics semantics)
+    [TestCase("text")]
+    [TestCase("count")]
+    public void MetadataAttributesWithoutSourceSyntaxAreRejected(
+        string parameterName)
     {
         ArgumentNullException.ThrowIfNull(parameterName);
         var (consumer, method) = CreateMetadataConsumer();
@@ -222,9 +212,8 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(attributes, Is.Not.Empty);
         Assert.That(attributes.All(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference is null)), Is.True);
 
-        var isText = parameterName == "text";
-        var factory = new IrFactory(semantics);
-        var type = isText ? factory.StringType : factory.IntegerType;
+        var factory = new IrFactory();
+        var type = parameterName == "text" ? factory.StringType : factory.IntegerType;
         var variable = factory.CreateVariable(parameter.Name, type);
         var value = factory.Variable(variable);
         var valueRequests = 0;
@@ -248,44 +237,10 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
                 return factory.CreateOperation("held-metadata-attribute");
             });
 
-        if (semantics == IrExecutionSemantics.Total)
-        {
-            Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
-            Assert.That(result.Clauses, Is.Empty);
-            Assert.That(valueRequests, Is.Zero);
-            Assert.That(operationCalls, Is.Zero);
-            return;
-        }
-
-        Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(valueRequests, Is.EqualTo(isText ? 1 : 2));
-        Assert.That(operationCalls, Is.EqualTo(isText ? 1 : 2));
-        if (isText)
-        {
-            Assert.That(result.Clauses, Has.Length.EqualTo(1));
-            Assert.That(result.Clauses[0].DiagnosticText, Is.EqualTo("[NotNull] text"));
-            var interpreter = new IrInterpreter(factory);
-            Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateNullValue(factory.StringType))).Value!.Boolean,
-                Is.False);
-            Assert.That(interpreter.Evaluate(result.Clauses[0].Condition,
-                global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateStringValue("present"))).Value!.Boolean,
-                Is.True);
-            return;
-        }
-
-        Assert.That(result.Clauses, Has.Length.EqualTo(2));
-        Assert.That(result.Clauses.Select(static clause => clause.DiagnosticText),
-            Is.EqualTo(MetadataIntegerDiagnostics));
-        var integerInterpreter = new IrInterpreter(factory);
-        foreach (var input in PredicateInputs)
-        {
-            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(variable, factory.CreateIntegerValue(factory.IntegerType, input));
-            Assert.That(integerInterpreter.Evaluate(result.Clauses[0].Condition, values).Value!.Boolean,
-                Is.EqualTo(input > 0));
-            Assert.That(integerInterpreter.Evaluate(result.Clauses[1].Condition, values).Value!.Boolean,
-                Is.EqualTo(input is >= 1 and <= 3));
-        }
+        Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(result.Clauses, Is.Empty);
+        Assert.That(valueRequests, Is.Zero);
+        Assert.That(operationCalls, Is.Zero);
     }
 
     private static CSharpCompilation CreateParameterCompilation(string attributeText, string sourceType)

@@ -13,7 +13,7 @@ public sealed class ResourceAdmissionCompilerArtifactCoverageTests
     [Test]
     public void ForkJoinSerializationRejectsAMissingChildBeforePublishingPayload()
     {
-        var root = new CompilerTotalEntryPreparation("root", new IrFactory(IrExecutionSemantics.Total), [], []);
+        var root = new CompilerTotalEntryPreparation("root", new IrFactory(), [], []);
         var projection = new CompilerForkJoinProjection("root", "framework", [], [null!, null!]);
         var exception = Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerForkJoinProjectionCodec.Encode(projection, root, TestContext.CurrentContext.CancellationToken)));

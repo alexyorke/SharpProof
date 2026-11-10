@@ -223,7 +223,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(shape.IsReference, Is.EqualTo(reference));
         Assert.That(shape.IsBooleanCompatibleI4, Is.EqualTo(booleanCompatible));
         Assert.That(shape.IsNullReference, Is.False);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var storage = shape.StorageType(factory);
         if (type == "object")
         { Assert.That(storage, Is.EqualTo(factory.ObjectType)); }
@@ -250,7 +250,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(TotalIlStackType.TryFromTypeSymbol(Type(type), out var shape), Is.False);
         Assert.That(shape.IsValid, Is.False);
         Assert.That(TotalIlStackType.NumericWidthFor(Type(type).SpecialType), Is.Zero);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() => shape.StorageType(factory)));
         Assert.That(exception!.ParamName, Is.EqualTo("width"));
     }
@@ -262,7 +262,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(missing, Is.Null);
         Assert.That(TotalIlStackType.TryFromTypeSymbol(missing, out var shape), Is.False);
         Assert.That(shape.IsValid, Is.False);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var exception = Assert.Throws<ArgumentOutOfRangeException>(new Action(() => shape.StorageType(factory)));
         Assert.That(exception!.ParamName, Is.EqualTo("width"));
     }
@@ -276,7 +276,7 @@ public sealed class StackTypeCalculusCoverageTests
         Assert.That(shape.IsNullReference, Is.True);
         Assert.That(shape.IsReference, Is.True);
         Assert.That(shape.NumericWidth, Is.Zero);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(shape.StorageType(factory), Is.EqualTo(factory.ObjectType));
     }
 

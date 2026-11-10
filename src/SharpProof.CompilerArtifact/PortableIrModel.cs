@@ -7,8 +7,6 @@ namespace SharpProof.CompilerArtifact;
 
 internal sealed record PortableIrGraph
 {
-    [System.Text.Json.Serialization.JsonRequired]
-    public IrExecutionSemantics Semantics { get; init; }
     public bool HasProgram { get; init; }
     [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<PortableIrType> Types { get; init; } = [];
@@ -356,9 +354,6 @@ internal static class PortableIrWireCatalog
     ];
     internal static readonly ImmutableArray<IrHavocOrigin> HavocOrigins = [
         IrHavocOrigin.Input, IrHavocOrigin.SpecResult, IrHavocOrigin.Approximation
-    ];
-    internal static readonly ImmutableArray<IrExecutionSemantics> ExecutionSemantics = [
-        IrExecutionSemantics.Legacy, IrExecutionSemantics.Total
     ];
     internal static readonly ImmutableArray<IrExceptionKind> ExceptionKinds = [
         IrExceptionKind.DivideByZero, IrExceptionKind.Overflow, IrExceptionKind.NullReference,

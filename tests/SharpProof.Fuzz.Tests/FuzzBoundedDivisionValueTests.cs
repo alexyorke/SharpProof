@@ -10,7 +10,7 @@ public sealed class FuzzBoundedDivisionValueTests
     [Test]
     public async Task Signed64NestedDivisionAgreesOnItsUnchangedBoundedDomain()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(64, signed: true);
         var first = factory.CreateVariable("first", integer);
         var second = factory.CreateVariable("second", integer);

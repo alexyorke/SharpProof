@@ -18,7 +18,7 @@ public sealed class FuzzClosedDomainTests
     [TestCase(true)]
     public async Task ConstantFormulaHasOneAssignmentAndNoDomainAssumptions(bool value)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var formula = factory.Boolean(value);
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken),
             Is.True);
@@ -39,7 +39,7 @@ public sealed class FuzzClosedDomainTests
     [Test]
     public async Task MixedDomainRetainsFactoryAndActualBooleanIntegerAssignments()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var formula = factory.Binary(IrBinaryOperator.AndAlso, factory.Variable(enabled),
@@ -57,7 +57,7 @@ public sealed class FuzzClosedDomainTests
         Assert.That(prepared.Domain.Factory, Is.SameAs(factory));
         Func<Task> wrongFactory = async () =>
             await FiniteDomainSmtDifferentialOracle.ComparePreparedAsync(
-                new IrFactory(IrExecutionSemantics.Total), prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
+                new IrFactory(), prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var exception = Assert.ThrowsAsync<ArgumentException>(wrongFactory);
         Assert.That(exception!.ParamName, Is.EqualTo("formula"));
     }
@@ -65,7 +65,7 @@ public sealed class FuzzClosedDomainTests
     [Test]
     public async Task PreparedConstantStillObservesCancellationBeforeSolving()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory,
             factory.Boolean(true), TestContext.CurrentContext.CancellationToken, out var prepared), Is.True);
         using var cancellation = new CancellationTokenSource();
@@ -95,7 +95,7 @@ public sealed class FuzzClosedDomainTests
         var model = compilation.GetSemanticModel(tree);
         var operation = model.GetOperation(syntax.ExpressionBody!.Expression);
         Assert.That(operation, Is.Not.Null);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var lowering = FrontendTotalLowering.Lower(factory, operation!);
 
         Assert.That(lowering.IsExact, Is.False);

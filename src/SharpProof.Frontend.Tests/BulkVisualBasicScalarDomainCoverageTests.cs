@@ -35,7 +35,7 @@ public sealed class BulkVisualBasicScalarDomainCoverageTests
             Assert.That(operation.OperatorMethod, Is.Null);
             Assert.That(operation.IsLifted, Is.False);
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             var lowerer = new RoslynTotalExpressionLowerer(context);
             var children = operation.ChildOperations.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (lowerer.LowerClause(child))).ToImmutableArray();

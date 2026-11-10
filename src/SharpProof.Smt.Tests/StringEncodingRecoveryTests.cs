@@ -8,7 +8,7 @@ public sealed class StringEncodingRecoveryTests
     [Test]
     public void ExhaustedContentInitializationResumesAllLiteralFacts()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         var encoder = new BvEncoder(context, factory, owner);

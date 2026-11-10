@@ -44,7 +44,7 @@ public sealed class CoreRequiredInputTests
     {
         var fixture = CreateSourceFixture();
         var context = new TotalLoweringContext(
-            new IrFactory(IrExecutionSemantics.Total), fixture.Method);
+            new IrFactory(), fixture.Method);
 
         AssertArgumentNull(
             "compilation",
@@ -111,7 +111,7 @@ public sealed class CoreRequiredInputTests
     {
         var fixture = CreateSourceFixture();
         var context = new TotalLoweringContext(
-            new IrFactory(IrExecutionSemantics.Total), fixture.Method);
+            new IrFactory(), fixture.Method);
         var lowering = TotalBodyLowering.Lower(
             fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         var variables = context.Parameters

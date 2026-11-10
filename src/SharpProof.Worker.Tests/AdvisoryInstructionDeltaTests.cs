@@ -87,7 +87,7 @@ public sealed class AdvisoryInstructionDeltaTests
 
     private static (IrFactory Factory, IrInstruction Instruction) BuildInstruction(string shape)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var integer = factory.CreateVariable("integer", factory.IntegerType);

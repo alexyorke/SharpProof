@@ -113,7 +113,7 @@ public sealed class AdvisoryArgumentListTests
 
     private static BuiltProgram Build()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("input", factory.IntegerType);
         var integerTarget = factory.CreateVariable("integerTarget", factory.IntegerType);
         var booleanTarget = factory.CreateVariable("booleanTarget", factory.BooleanType);

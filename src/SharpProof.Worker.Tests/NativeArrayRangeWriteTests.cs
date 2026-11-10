@@ -51,7 +51,7 @@ public sealed class NativeArrayRangeWriteTests
     [TestCase(int.MaxValue, int.MaxValue, false)]
     public async Task NativeRangeProofRequiresTheCompleteOperationalBounds(int start, int length, bool valid)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var variable = factory.CreateVariable("data", type);
         var builder = new IrProgramBuilder(factory);

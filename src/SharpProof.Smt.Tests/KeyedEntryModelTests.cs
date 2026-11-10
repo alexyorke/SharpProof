@@ -10,7 +10,7 @@ public sealed class KeyedEntryModelTests
     [TestCase(long.MaxValue)]
     public void DecoderReconstructsOnlyObservedOwnerAndFullWidthKey(long bits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, true);
         var first = factory.CreateVariable("first", factory.ObjectType);
         var second = factory.CreateVariable("second", factory.ObjectType);
@@ -36,7 +36,7 @@ public sealed class KeyedEntryModelTests
     [TestCase(true)]
     public void ObservedReferenceCellsPreserveNullAndCyclicIdentity(bool cycle)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:refs", factory.ObjectType, false, factory.IntegerType);
         var read = factory.PureOpaque(field, factory.Variable(variable), factory.Integer(0));
@@ -58,7 +58,7 @@ public sealed class KeyedEntryModelTests
     public void OversizedCollectionWitnessIsRejectedBeforeReplay(string collection)
     {
         ArgumentNullException.ThrowIfNull(collection);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:" + collection + ":count", factory.IntegerType, false);
         Assert.Throws<SmtResourceLimitException>((Action)(() => Decode(factory, [variable], [

@@ -178,7 +178,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         var limited = 0;
         for (var available = 0; available <= 256; available++)
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, subject.Context.Target);
             var session = new TotalSourceCallSession(subject.Compilation, static _ => true, null,
                 TestContext.CurrentContext.CancellationToken);
@@ -414,7 +414,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total),
+        var context = new TotalLoweringContext(new IrFactory(),
             (IMethodSymbol)model.GetDeclaredSymbol(syntax)!)
         { Compilation = compilation };
         var session = new TotalSourceCallSession(compilation, static _ => true, null, TestContext.CurrentContext.CancellationToken);

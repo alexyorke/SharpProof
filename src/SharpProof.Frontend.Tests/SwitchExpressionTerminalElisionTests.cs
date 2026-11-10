@@ -58,7 +58,7 @@ public sealed class SwitchExpressionTerminalElisionTests
         var parentGraph = ControlFlowGraph.Create(syntax, model)!;
         var method = shape == "local" ? parentGraph.LocalFunctions.Single() : (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = shape == "local" ? parentGraph.GetLocalFunctionControlFlowGraph(method) : parentGraph;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);

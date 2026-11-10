@@ -867,7 +867,7 @@ public sealed class ConstructedGenericContractTests
         // clause never becomes proof evidence.
         if (expectedFailure == ContractBindingFailure.UnsupportedExpression)
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var total = new TotalContractBinder(compilation, factory)
                 .BindTotal(new TotalLoweringContext(factory, target));
             Assert.That(total.IsSuccess, Is.False);

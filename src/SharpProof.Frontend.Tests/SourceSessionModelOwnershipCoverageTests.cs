@@ -61,7 +61,7 @@ public sealed class SourceSessionModelOwnershipCoverageTests
         {
             runtime.Unload();
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var caller = new TotalLoweringContext(factory, target);
         var prepared = 0;
         var session = new TotalSourceCallSession(compilation, _ => { prepared++; return true; }, null, default);

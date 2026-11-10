@@ -109,7 +109,7 @@ internal sealed class CompilerSpecificationPackProvider
 
     internal TotalScalarCallModel? ResolveTotal(IMethodSymbol method)
     {
-        if (_factory.Semantics != IrExecutionSemantics.Total || !TryResolve(method, out var definition))
+        if (!TryResolve(method, out var definition))
         { return null; }
         return CompilerSpecificationMethodBinding.CreateTotal(_factory, method, definition);
     }
