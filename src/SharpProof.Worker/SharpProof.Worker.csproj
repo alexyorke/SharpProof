@@ -5,7 +5,6 @@
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Logging\SharpProof.Logging.csproj" />
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
     <ProjectReference Include="..\SharpProof.Host\SharpProof.Host.csproj" />
     <ProjectReference Include="..\SharpProof.Smt\SharpProof.Smt.csproj" />

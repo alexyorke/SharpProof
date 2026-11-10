@@ -1,7 +1,7 @@
 global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
 
 using System.Collections.Immutable;
-using SharpProof.Logging;
+using SharpProof.Worker;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SharpProof;

@@ -19,7 +19,6 @@
   <ItemGroup>
     <Compile Include="..\..\eng\scripts\SharpProof.JsonDefaults.cs"
              Link="SharpProof.JsonDefaults.cs" />
-    <ProjectReference Include="..\..\src\SharpProof.Logging\SharpProof.Logging.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Frontend\SharpProof.Frontend.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Attributes\SharpProof.Attributes.csproj" />

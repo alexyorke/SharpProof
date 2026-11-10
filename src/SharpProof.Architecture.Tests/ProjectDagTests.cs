@@ -33,7 +33,6 @@ public sealed class ProjectDagTests
                 "SharpProof.CompilerCollector",
                 "SharpProof.Frontend",
                 "SharpProof.Host",
-                "SharpProof.Logging",
                 "SharpProof.Smt",
                 "SharpProof.Testing",
                 "SharpProof.Worker"
@@ -42,19 +41,16 @@ public sealed class ProjectDagTests
                 "SharpProof.Analyzer",
                 "SharpProof.Attributes",
                 "SharpProof.CompilerCollector",
-                "SharpProof.Logging",
                 "SharpProof.Worker"
             ]),
             new("SharpProof.Host", []),
             new("SharpProof.Ir", []),
-            new("SharpProof.Logging", []),
             new("SharpProof.Smt", ["SharpProof.Ir"]),
             new("SharpProof.Specs", ["SharpProof.Ir"]),
             new("SharpProof.Tool", ["SharpProof.Worker.Protocol", "SharpProof.CompilerArtifact", "SharpProof.Specs", "SharpProof.Frontend"]),
             new("SharpProof.Worker", [
                 "SharpProof.CompilerArtifact",
                 "SharpProof.Host",
-                "SharpProof.Logging",
                 "SharpProof.Smt",
                 "SharpProof.Specs"
             ]),
@@ -213,8 +209,6 @@ public sealed class ProjectDagTests
                 relative == "eng/ParameterGuard.cs" || relative == "eng/RoslynSymbolFacts.cs" ||
                 relative == "eng/CompilerAdditionalTextStability.cs" ||
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
-            allowed |= item.Project == "SharpProof.Logging" &&
-                relative == "eng/logging/RepositoryLogger.cs";
             allowed |= item.Project == "SharpProof.EditorSuggestions" &&
                 relative is "src/SharpProof.CodeFixes/CompanionEligibility.cs" or "src/SharpProof.CodeFixes/CompanionSuggestionContract.cs";
             if (item.Project is "SharpProof.Gates" or "SharpProof.Fuzz")

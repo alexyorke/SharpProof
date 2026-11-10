@@ -20,7 +20,6 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Smt` | Native solver abstraction, typed encoding and result evidence |
 | `SharpProof.Worker` | Artifact preparation, native claims, VC checks, replay, response cache |
 | `SharpProof.Host` | Container/native loading and host infrastructure |
-| `SharpProof.Logging` | The worker launcher's stdout/stderr logging boundary |
 | `SharpProof.BuildTasks` | MSBuild integration and verifier orchestration |
 | `SharpProof.Package` | Metadata-only standard package facade with exact verifier dependency |
 | `SharpProof.Verifier` | Analyzer/collector, MSBuild integration, managed worker and native solver package assets |

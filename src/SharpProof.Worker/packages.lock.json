@@ -21,9 +21,6 @@
       "sharpproof.ir": {
         "type": "Project"
       },
-      "sharpproof.logging": {
-        "type": "Project"
-      },
       "sharpproof.smt": {
         "type": "Project",
         "dependencies": {
