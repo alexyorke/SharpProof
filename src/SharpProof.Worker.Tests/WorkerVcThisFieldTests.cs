@@ -29,7 +29,7 @@ internal sealed class WorkerVcThisFieldTests
                 Contract.Ensures(count == Contract.Old(count) + amount);
                 count += amount;
             }
-            public static void CompoundOther([NotNull] Counter other, int amount) {
+            public static void CompoundOther([NonNull] Counter other, int amount) {
                 Contract.Ensures(other.count == Contract.Old(other.count) + amount);
                 other.count += amount;
             }
@@ -57,7 +57,7 @@ internal sealed class WorkerVcThisFieldTests
                 flag = true;
                 return count;
             }
-            public int MayAlias([NotNull] Counter other) {
+            public int MayAlias([NonNull] Counter other) {
                 Contract.Ensures(Contract.Result<int>() == 1);
                 count = 1;
                 other.count = 2;
@@ -72,11 +72,11 @@ internal sealed class WorkerVcThisFieldTests
                 Contract.Ensures(count == Contract.Old(count) + 1);
                 Bump();
             }
-            public static void IncrementOther([NotNull] Counter other) {
+            public static void IncrementOther([NonNull] Counter other) {
                 Contract.Ensures(other.count == Contract.Old(other.count) + 1);
                 other.Bump();
             }
-            public int Distinct([NotNull] Counter other) {
+            public int Distinct([NonNull] Counter other) {
                 Contract.Requires(other != this);
                 Contract.Ensures(Contract.Result<int>() == 1);
                 count = 1;

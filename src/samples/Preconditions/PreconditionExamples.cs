@@ -12,7 +12,7 @@ public static class PreconditionExamples
 
     public static int KnownGoodCall() => Positive(1);
 
-    public static string RequiredText([NotNull] string value)
+    public static string RequiredText([NonNull] string value)
     {
         System.ArgumentNullException.ThrowIfNull(value);
         return value;

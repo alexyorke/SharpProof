@@ -33,7 +33,7 @@ public sealed class WorkerVcDefaultFieldControlTests
     public async Task FreshDefaultsDoNotConstrainPreexistingObjects()
     {
         using var project = new ShadowTestProject("using SharpProof.Attributes; public sealed class Cell { public int Value; } " +
-            "public static class Subject { public static int Target([NotNull] Cell existing) { " +
+            "public static class Subject { public static int Target([NonNull] Cell existing) { " +
             "Contract.Ensures(Contract.Result<int>() == 0); var fresh = new Cell(); return existing.Value; } }", cacheEnabled: false);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);

@@ -57,13 +57,13 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 return i;
             }
             [DoesNotThrow]
-            public static int Sum([NotNull] int[] values) {
+            public static int Sum([NonNull] int[] values) {
                 var total = 0;
                 for (var i = 0; i < values.Length; i++) { total += values[i]; }
                 return total;
             }
             [DoesNotThrow]
-            public static int SumFromOne([NotNull] int[] values) {
+            public static int SumFromOne([NonNull] int[] values) {
                 var total = 0;
                 for (var i = 1; i <= values.Length; i++) { total += values[i]; }
                 return total;

@@ -76,7 +76,7 @@ internal static class ContractApiCatalog
     internal const string DoesNotThrow = AttributesNamespace + ".DoesNotThrowAttribute";
     internal const string AllowedExceptions = AttributesNamespace + ".AllowedExceptionsAttribute";
     internal const string EffectContract = AttributesNamespace + ".EffectContractAttribute";
-    internal const string NotNull = AttributesNamespace + ".NotNullAttribute";
+    internal const string NonNull = AttributesNamespace + ".NonNullAttribute";
     internal const string Positive = AttributesNamespace + ".PositiveAttribute";
     internal const string InRange = AttributesNamespace + ".InRangeAttribute";
     internal const string Suppress = AttributesNamespace + ".SharpProofSuppressAttribute";
@@ -164,8 +164,8 @@ internal static class ContractApiCatalog
                 ContractApiAttributeCategory.Effect,
                 ContractApiSelectionFeature.Effects),
             new(
-                NotNull,
-                "NotNullAttribute",
+                NonNull,
+                "NonNullAttribute",
                 ContractApiAttributeCategory.Closed,
                 ContractApiSelectionFeature.Contracts),
             new(
@@ -250,8 +250,8 @@ internal static partial class ContractApiMetadata
         ContractApiCatalog.AllowedExceptions;
     internal const string EffectContract =
         ContractApiCatalog.EffectContract;
-    internal const string NotNull =
-        ContractApiCatalog.NotNull;
+    internal const string NonNull =
+        ContractApiCatalog.NonNull;
     internal const string Positive =
         ContractApiCatalog.Positive;
     internal const string InRange =

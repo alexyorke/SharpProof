@@ -28,7 +28,7 @@ internal sealed class ContractSelectionInventory
         DoesNotThrow = _identity.ResolveAttribute(ContractApiMetadata.DoesNotThrow);
         AllowedExceptions = _identity.ResolveAttribute(ContractApiMetadata.AllowedExceptions);
         EffectContract = _identity.ResolveAttribute(ContractApiMetadata.EffectContract);
-        NotNull = _identity.ResolveAttribute(ContractApiMetadata.NotNull);
+        NonNull = _identity.ResolveAttribute(ContractApiMetadata.NonNull);
         Positive = _identity.ResolveAttribute(ContractApiMetadata.Positive);
         InRange = _identity.ResolveAttribute(ContractApiMetadata.InRange);
         Suppress = _identity.ResolveAttribute(ContractApiMetadata.Suppress);
@@ -81,7 +81,7 @@ internal sealed class ContractSelectionInventory
     {
         get;
     }
-    internal INamedTypeSymbol? NotNull
+    internal INamedTypeSymbol? NonNull
     {
         get;
     }
@@ -120,8 +120,8 @@ internal sealed class ContractSelectionInventory
         AttributeData attribute)
     {
         attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        return Is(attribute, NotNull)
-            ? ClosedContractAttributeClassification.NotNull
+        return Is(attribute, NonNull)
+            ? ClosedContractAttributeClassification.NonNull
             : Is(attribute, Positive)
                 ? ClosedContractAttributeClassification.Positive
                 : Is(attribute, InRange)
@@ -139,7 +139,7 @@ internal sealed class ContractSelectionInventory
         }
 
         return metadataName is
-            ContractApiMetadata.NotNull or
+            ContractApiMetadata.NonNull or
             ContractApiMetadata.Positive or
             ContractApiMetadata.InRange;
     }

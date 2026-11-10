@@ -1,6 +1,12 @@
 namespace SharpProof.Attributes;
 
 /// <summary>Identifies a declared deployment profile for conditional task resource proofs.</summary>
+/// <remarks>
+/// Each member names exactly one reviewed runtime deployment, including its runtime version, because the
+/// declared runtime budgets were reviewed against that runtime's source. The member's numeric value is its
+/// identity in compiled metadata. Members are never widened to other runtime versions or renumbered; support
+/// for another reviewed runtime adds a new member.
+/// </remarks>
 public enum ResourceTaskDeploymentProfile
 {
     /// <summary>No deployment profile; this value cannot declare a premise.</summary>

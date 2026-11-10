@@ -20,6 +20,28 @@ internal sealed class RuntimePremiseIdentityProtocolCoverageTests
         Assert.That(scope!.ParamName, Is.EqualTo("quantity"));
     }
 
+    [Test]
+    public void PublicDeploymentProfilesMirrorTheWireProfilesByNameAndValue()
+    {
+        // The collector binds the public enum by integer value; the protocol serializes the
+        // internal mirror by name. Both must name the same reviewed deployment for each value.
+        static ImmutableArray<(string Name, int Value)> Members<TEnum>() where TEnum : struct, Enum
+        {
+            return [.. Enum.GetNames<TEnum>().Select(static name => name is null ? throw new ArgumentNullException(nameof(name)) :
+                (name, Convert.ToInt32(Enum.Parse<TEnum>(name), System.Globalization.CultureInfo.InvariantCulture)))];
+        }
+
+        Assert.That(
+            Members<SharpProof.Attributes.ResourceTaskDeploymentProfile>(),
+            Is.EqualTo(Members<WorkerResourceTaskDeploymentProfile>()));
+        Assert.That(
+            Members<WorkerResourceTaskDeploymentProfile>(),
+            Is.EqualTo(new[] { ("Unspecified", 0), ("CoreClr8032LinuxX64OrdinaryJitStockClosed", 1) }));
+        Assert.That(
+            ResourceTaskRuntimePremiseIdentity.DeploymentProfileModel,
+            Is.EqualTo("coreclr-8.0.32-linux-x64-ordinary-jit-stock-closed-v1"));
+    }
+
     [TestCase(0)]
     [TestCase(10)]
     [TestCase(12)]

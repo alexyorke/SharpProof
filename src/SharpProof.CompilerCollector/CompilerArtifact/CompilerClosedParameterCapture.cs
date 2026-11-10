@@ -80,7 +80,7 @@ internal static class CompilerClosedParameterCapture
                 var (recognized, expected) = (typeNamespace, typeName) switch
                 {
                     ("SharpProof.Attributes", "PositiveAttribute") => (true, selections.Positive),
-                    ("SharpProof.Attributes", "NotNullAttribute") => (true, selections.NotNull),
+                    ("SharpProof.Attributes", "NonNullAttribute") => (true, selections.NonNull),
                     ("SharpProof.Attributes", "InRangeAttribute") => (true, selections.InRange),
                     _ => (false, (INamedTypeSymbol?)null)
                 };
@@ -118,7 +118,7 @@ internal static class CompilerClosedParameterCapture
                     MetadataTokens.GetToken(parameterHandle), MetadataTokens.GetToken(attributeHandle),
                     MetadataTokens.GetToken(attribute.Constructor), CompilerIdentityBridge.CreateSymbolDisplay(expected),
                     CompilerIdentityBridge.CreateSymbolDisplay(expectedConstructor),
-                    inRange ? "InRange" : typeName == "PositiveAttribute" ? "Positive" : "NotNull",
+                    inRange ? "InRange" : typeName == "PositiveAttribute" ? "Positive" : "NonNull",
                     ImmutableArray.CreateRange(reader.GetBlobBytes(constructorSignature)),
                     ImmutableArray.CreateRange(reader.GetBlobBytes(attribute.Value)), minimum, maximum));
             }

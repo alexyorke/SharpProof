@@ -33,12 +33,12 @@ public sealed class ParameterGuardAnalyzerTests
         const string source = """
             namespace SharpProof.Attributes
             {
-                public sealed class NotNullAttribute : System.Attribute { }
+                public sealed class NonNullAttribute : System.Attribute { }
                 public sealed class PositiveAttribute : System.Attribute { }
             }
             public static class Sample
             {
-                public static string? MissingNullGuard([SharpProof.Attributes.NotNull] string? text) => text;
+                public static string? MissingNullGuard([SharpProof.Attributes.NonNull] string? text) => text;
                 public static int? MissingRangeGuard([SharpProof.Attributes.Positive] int? count) => count;
                 public static int? Validated([SharpProof.Attributes.Positive] int? value)
                 {
@@ -611,10 +611,10 @@ public sealed class ParameterGuardAnalyzerTests
     {
         const string source = """
             #nullable enable
-            namespace Foreign { public sealed class NotNullAttribute : System.Attribute { } }
+            namespace Foreign { public sealed class NonNullAttribute : System.Attribute { } }
             public static class Sample
             {
-                public static string? Transport([Foreign.NotNull] string? text) => text;
+                public static string? Transport([Foreign.NonNull] string? text) => text;
                 public static int Validated(string text) { Check<string>(text); return text.Length; }
                 private static void Check<T>(T value) { if (value is null) throw new System.ArgumentNullException(nameof(value)); }
                 public static int Missing(string text) { (new System.Action<string>(System.Console.WriteLine))(text); return text.Length; }
