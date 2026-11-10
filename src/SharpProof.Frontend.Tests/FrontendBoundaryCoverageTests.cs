@@ -30,7 +30,7 @@ public sealed class FrontendBoundaryCoverageTests
         Assert.That(ContractApiMetadata.TryGetAttribute(null!, out var descriptor), Is.False);
         Assert.That(descriptor, Is.EqualTo(default(ContractApiAttributeDescriptor)));
         Assert.That(ContractApiMetadata.TryGetAttribute(
-            "SharpProof.Attributes.NotNullAttribute", out _), Is.True);
+            "SharpProof.Attributes.NonNullAttribute", out _), Is.True);
     }
 
     [Test]

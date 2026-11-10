@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reviewed, intentional breaks against eng/lint/api-baseline.txt. Remove an entry
+     once the baseline advances past the change it suppresses. -->
+<Suppressions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- NotNull became NonNull before the first publication to avoid CS0104 with
+       System.Diagnostics.CodeAnalysis.NotNullAttribute. -->
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:SharpProof.Attributes.NotNullAttribute</Target>
+    <Left>lib/netstandard2.0/SharpProof.Attributes.dll</Left>
+    <Right>lib/netstandard2.0/SharpProof.Attributes.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

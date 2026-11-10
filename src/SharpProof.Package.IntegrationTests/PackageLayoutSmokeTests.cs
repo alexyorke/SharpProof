@@ -1437,7 +1437,7 @@ public sealed class PackageLayoutSmokeTests
                 [return: Positive]
                 Task Unsupported(
                     [Positive] string text,
-                    [NotNull] int count,
+                    [NonNull] int count,
                     [InRange(5, 1)] int range);
             }
 
@@ -1465,7 +1465,7 @@ public sealed class PackageLayoutSmokeTests
             Does.Contain("AllowedCapabilities")
                 .And.Contain("AllowedExceptions")
                 .And.Contain("[Positive]")
-                .And.Contain("[NotNull]")
+                .And.Contain("[NonNull]")
                 .And.Contain("[InRange]")
                 .And.Contain("invalid argument 'Task'")
                 .And.Contain("expected an unconditional prologue statement")
@@ -1487,11 +1487,11 @@ public sealed class PackageLayoutSmokeTests
 
             public static class Subject {
                 [EffectContract(SharpProofEffect.None, Complete = true)]
-                public static int ReadString([NotNull] string value) =>
+                public static int ReadString([NonNull] string value) =>
                     value.Length;
 
                 [EffectContract(SharpProofEffect.None, Complete = true)]
-                public static int ReadArray([NotNull] int[] value) =>
+                public static int ReadArray([NonNull] int[] value) =>
                     value.Length;
             }
             """,

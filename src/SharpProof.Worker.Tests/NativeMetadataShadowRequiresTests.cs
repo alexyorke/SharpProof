@@ -23,8 +23,8 @@ public sealed class NativeMetadataShadowRequiresTests
     [TestCase("Positive", "int", "value + 1", "1", 2, true)]
     [TestCase("InRange(1, 10)", "int", "value + 1", "0", 1, false)]
     [TestCase("InRange(1, 10)", "int", "value + 1", "5", 6, true)]
-    [TestCase("NotNull", "string", "value == null ? 0 : 1", null, 0, false)]
-    [TestCase("NotNull", "string", "value == null ? 0 : 1", "hello", 1, true)]
+    [TestCase("NonNull", "string", "value == null ? 0 : 1", null, 0, false)]
+    [TestCase("NonNull", "string", "value == null ? 0 : 1", "hello", 1, true)]
     public async Task GenuineMetadataCallsRecordTypedObligationAndExecuteOriginalBody(string attribute,
         string type, string body, string? input, int result, bool predicate)
     {
@@ -67,7 +67,7 @@ public sealed class NativeMetadataShadowRequiresTests
 
     [TestCase("Positive", "int", "1")]
     [TestCase("InRange(1, 10)", "int", "5")]
-    [TestCase("NotNull", "string", "\"hello\"")]
+    [TestCase("NonNull", "string", "\"hello\"")]
     public async Task ConstantArgumentsProveWithoutImportedPremises(string attribute, string type, string argument)
     {
         System.ArgumentNullException.ThrowIfNull(argument);

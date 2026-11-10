@@ -28,6 +28,15 @@ Entries describe repository changes, not package publication. Confirm available 
   changed no CoreLib or CoreCLR source, so the resource-bound facts reviewed
   against 8.0.32 and their model identifiers are unchanged.
 
+### Contract API
+
+- Rename the closed contract `SharpProof.Attributes.NotNullAttribute` to
+  `NonNullAttribute`. A file that imported both `SharpProof.Attributes` and
+  `System.Diagnostics.CodeAnalysis` could not write `[NotNull]` without error
+  CS0104, because the two namespaces each declare a `NotNullAttribute`. Replace
+  `[NotNull]` with `[NonNull]` wherever it named the SharpProof contract. The
+  nullable-analysis `[NotNull]` still selects no SharpProof obligation.
+
 ### Verification
 
 - Remove the Legacy IR execution mode. Every IR factory now uses the Total

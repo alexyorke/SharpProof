@@ -18,7 +18,7 @@ public static class Loops
         return i;
     }
     [DoesNotThrow]
-    public static int Sum([NotNull] int[] values)
+    public static int Sum([NonNull] int[] values)
     {
         var total = 0;
         for (var i = 0; i < values.Length; i++)
@@ -54,7 +54,7 @@ These three obligations are different:
 
 None implies observable purity. In particular, writing `count` changes receiver state. Do not add EnforcePure merely because the method is small.
 
-The NotNull input condition does not prove every future array access valid. Change the loop guard to `i <= values.Length` and the final access can be out of range. Check the resulting worker reason/witness instead of refreshing expected output blindly.
+The NonNull input condition does not prove every future array access valid. Change the loop guard to `i <= values.Length` and the final access can be out of range. Check the resulting worker reason/witness instead of refreshing expected output blindly.
 
 ## Understand the current boundary
 

@@ -1,6 +1,10 @@
 #nullable enable
 SharpProof.Attributes.EffectContractAttribute.PreconditionFree.get -> bool
 SharpProof.Attributes.EffectContractAttribute.PreconditionFree.set -> void
+SharpProof.Attributes.NonNullAttribute
+SharpProof.Attributes.NonNullAttribute.NonNullAttribute() -> void
+*REMOVED*SharpProof.Attributes.NotNullAttribute
+*REMOVED*SharpProof.Attributes.NotNullAttribute.NotNullAttribute() -> void
 SharpProof.Attributes.ResourceBooleanInputAttribute
 SharpProof.Attributes.ResourceBooleanInputAttribute.FalseWeight.get -> int
 SharpProof.Attributes.ResourceBooleanInputAttribute.ResourceBooleanInputAttribute(int trueWeight, int falseWeight) -> void

@@ -20,7 +20,7 @@ public sealed class OrdinarySummaryUpdateReportTests
     public async Task ActualModeledInstanceUpdateKeepsItsRuntimeGapVisible(string update)
     {
         System.ArgumentNullException.ThrowIfNull(update);
-        var source = "public class SummaryInvocation { public int Value; public static void Target([global::SharpProof.Attributes.NotNull] SummaryInvocation value) { " + update + " } }";
+        var source = "public class SummaryInvocation { public int Value; public static void Target([global::SharpProof.Attributes.NonNull] SummaryInvocation value) { " + update + " } }";
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",

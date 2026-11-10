@@ -3,7 +3,7 @@ namespace SharpProof.Compiler.Semantics;
 internal enum ClosedContractAttributeKind
 {
     None,
-    NotNull,
+    NonNull,
     Positive,
     InRange
 }
@@ -107,7 +107,7 @@ internal static class ClosedContractAttributeValidator
 
         return classification.Kind switch
         {
-            ClosedContractAttributeKind.NotNull when !CanBeNull(type) =>
+            ClosedContractAttributeKind.NonNull when !CanBeNull(type) =>
                 Invalid(classification, "expected a nullable or reference-capable value"),
             ClosedContractAttributeKind.Positive when !IsSupportedInteger(type, includeUnsigned64) =>
                 Invalid(classification, "expected a supported integral value"),
@@ -177,9 +177,9 @@ internal static class ClosedContractAttributeValidator
 
 internal sealed class ClosedContractAttributeClassification
 {
-    internal static readonly ClosedContractAttributeClassification NotNull =
-        new(ClosedContractAttributeKind.NotNull, "[NotNull]",
-            IsTotalReferenceValue, CreateTotalNotNullPredicate);
+    internal static readonly ClosedContractAttributeClassification NonNull =
+        new(ClosedContractAttributeKind.NonNull, "[NonNull]",
+            IsTotalReferenceValue, CreateTotalNonNullPredicate);
     internal static readonly ClosedContractAttributeClassification Positive =
         new(ClosedContractAttributeKind.Positive, "[Positive]",
             IsTotalIntegerValue, CreateTotalPositivePredicate);
@@ -228,7 +228,7 @@ internal sealed class ClosedContractAttributeClassification
         return type.Kind == IrTypeKind.Integer && type.Width > 0;
     }
 
-    private static IrTerm CreateTotalNotNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long __, long ___)
+    private static IrTerm CreateTotalNonNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long __, long ___)
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
 

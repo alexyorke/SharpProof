@@ -36,8 +36,10 @@ try {
     $origin = & git -C $repositoryRoot remote get-url origin
     if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the baseline source repository.' }
     Invoke-CompatibilityNative 'git' @('-C', $baselineRoot, 'remote', 'set-url', 'origin', $origin)
+    # Baselines from before the src/ layout keep the project at the repository root.
+    $baselineProject = if (Test-Path -LiteralPath (Join-Path $baselineRoot ('src/' + $project))) { 'src/' + $project } else { $project }
     foreach ($entry in [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@(
-                ([ordered]@{ root = $baselineRoot; project = $project; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision }).AsReadOnly(),
+                ([ordered]@{ root = $baselineRoot; project = $baselineProject; output = (Join-Path $packageRoot 'baseline'); validation = 'false'; revision = $baselineRevision }).AsReadOnly(),
                 ([ordered]@{ root = $repositoryRoot; project = ('src/' + $project); output = (Join-Path $packageRoot 'current'); validation = 'true'; revision = $currentRevision }).AsReadOnly()
             ))) {
         $entryRevision = (& git -C $entry.root rev-parse --verify 'HEAD^{commit}').Trim()
@@ -62,9 +64,13 @@ try {
     if ($baselinePackages.Length -ne 1 -or $currentPackages.Length -ne 1) {
         throw 'Expected exactly one baseline and current public API package.'
     }
-    Invoke-CompatibilityNative 'apicompat' @(
+    $compatibilityArguments = @(
         'package', $currentPackages[0].FullName, '--baseline-package', $baselinePackages[0].FullName,
         '--enable-rule-cannot-change-parameter-name')
+    # Reviewed intentional breaks against the baseline live in one suppression file.
+    $suppressions = Join-Path $repositoryRoot 'eng/lint/api-compat-suppressions.xml'
+    if (Test-Path -LiteralPath $suppressions) { $compatibilityArguments += @('--suppression-file', $suppressions) }
+    Invoke-CompatibilityNative 'apicompat' $compatibilityArguments
     Write-Host "Public package compatibility passed against $baselineRevision."
 }
 finally {

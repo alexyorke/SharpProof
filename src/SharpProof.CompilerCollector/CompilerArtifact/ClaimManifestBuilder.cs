@@ -1019,7 +1019,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "DoesNotThrow" or
                     "AllowedExceptions" or
                     "EffectContract" or
-                    "NotNull" or
+                    "NonNull" or
                     "Positive" or
                     "InRange" or
                     "SharpProofSuppress" or
@@ -1032,7 +1032,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     "DoesNotThrowAttribute" or
                     "AllowedExceptionsAttribute" or
                     "EffectContractAttribute" or
-                    "NotNullAttribute" or
+                    "NonNullAttribute" or
                     "PositiveAttribute" or
                     "InRangeAttribute" or
                     "SharpProofSuppressAttribute" or
