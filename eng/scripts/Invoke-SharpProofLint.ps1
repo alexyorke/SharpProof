@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Workflows', 'PowerShell', 'Shell', 'Markdown', 'Spelling', 'Links', 'ToolDependencies', 'Compatibility')]
+    [ValidateSet('All', 'Workflows', 'Markdown', 'Spelling', 'Links', 'ToolDependencies', 'Compatibility')]
     [string]$Category = 'All'
 )
 
@@ -17,9 +17,8 @@ $reportRoot = Join-Path $repositoryRoot 'artifacts/lint'
 $sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(& git ls-files --cached --others --exclude-standard))
 if ($LASTEXITCODE -ne 0 -or $sourceFiles.Length -eq 0) { throw 'Lint requires a nonempty Git source inventory.' }
 $sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Sort-Object -Unique | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }))
-if (Test-Path -LiteralPath (Join-Path $repositoryRoot 'eng/arcade-source.json')) {
-    & (Join-Path $PSScriptRoot 'Test-SharpProofRepositoryLayout.ps1')
-}
+# The repository lane runs `tooling layout` itself, and `tooling format-check`
+# (build lane) owns PSScriptAnalyzer and ShellCheck.
 $sourceFiles = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { -not $_.StartsWith('eng/common/', [StringComparison]::Ordinal) }))
 $checks = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
 
@@ -49,24 +48,6 @@ Invoke-LintCheck 'Workflows' {
 Invoke-LintCheck 'WorkflowSecurity' {
     # Plain output preserves finding exit codes; SARIF mode does not.
     Invoke-LintNative 'zizmor' @('--offline', '--format', 'plain', '--config', 'eng/lint/zizmor.yml', '.github')
-}
-Invoke-LintCheck 'PowerShell' {
-    Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
-    $paths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { $_ -match '\.ps[md]?1$' }))
-    if ($paths.Length -eq 0) { throw 'No PowerShell inputs found.' }
-    $findings = [Collections.Immutable.ImmutableArray]::CreateRange[object]([object[]]@($paths | ForEach-Object {
-                Invoke-ScriptAnalyzer -Path $_ -Settings eng/lint/PSScriptAnalyzerSettings.psd1
-            }))
-    $findings | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $reportRoot 'powershell.json')
-    if ($findings.Length -gt 0) {
-        $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -Wrap
-        throw "PSScriptAnalyzer reported $($findings.Length) findings."
-    }
-}
-Invoke-LintCheck 'Shell' {
-    $paths = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@($sourceFiles | Where-Object { $_ -match '\.sh$' }))
-    if ($paths.Length -eq 0) { throw 'No shell inputs found.' }
-    Invoke-LintNative 'shellcheck' (@('--format=gcc') + [string[]]@($paths))
 }
 Invoke-LintCheck 'Markdown' { Invoke-LintNative 'node' @('eng/lint/markdownlint.mjs') }
 Invoke-LintCheck 'Spelling' { Invoke-LintNative 'cspell' @('lint', '--config', 'cspell.json', '--no-progress', '--no-cache') }

@@ -17,8 +17,6 @@ const files = explicitFiles.length ? explicitFiles : [...new Set(
   && !/(^|\/)(bin|obj|artifacts|node_modules)\//.test(file)
   // Pinned Arcade sources are attested by the repository layout gate.
   && !file.startsWith("eng/common/")
-  && !file.startsWith("docs/generated/")
-  && !/\.generated\.md$/i.test(file)
   && !/\/Corpus\/third-party\//.test(file)
   && existsSync(resolve(root, file)));
 if (!files.length) throw new Error("No authored Markdown inputs found.");

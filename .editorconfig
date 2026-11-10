@@ -73,12 +73,6 @@ dotnet_diagnostic.CA2217.severity = none
 [src/SharpProof.Frontend/FrontendSubset.cs]
 dotnet_diagnostic.CA1815.severity = none
 
-# Z3 exceptions and native handles cross the solver boundary deliberately.
-[src/SharpProof.Smt/IrSmtBackend.cs]
-dotnet_diagnostic.CA1032.severity = none
-dotnet_diagnostic.CA1064.severity = none
-dotnet_diagnostic.CA2000.severity = none
-
 # Internal resource and encoding exceptions are control flow at the native boundary.
 [src/SharpProof.Smt/SmtQueryResourceMeter.cs]
 dotnet_diagnostic.CA1032.severity = none
@@ -93,5 +87,5 @@ dotnet_diagnostic.CA1849.severity = none
 dotnet_diagnostic.CA1515.severity = none
 
 # Lowercase hexadecimal is the package's stable wire-format encoding.
-[src/SharpProof.Worker/{CallableVerifier,VerificationCache,WorkerInputSnapshot}.cs]
+[src/SharpProof.Worker/{VerificationCache,WorkerInputSnapshot}.cs]
 dotnet_diagnostic.CA1308.severity = none

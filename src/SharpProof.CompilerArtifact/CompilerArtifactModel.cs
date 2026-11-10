@@ -38,13 +38,6 @@ internal enum CompilerContractKind
     Assume = 2
 }
 
-internal enum CompilerContractEvidence
-{
-    CompilerBoundInvocation = 0,
-    ClosedAttribute = 1,
-    Companion = 2
-}
-
 internal sealed record CompilerCallablePreparation(
     WorkerCallableManifestEntry Entry,
     WorkerClaimReason FailureReason

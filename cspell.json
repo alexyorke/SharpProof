@@ -10,8 +10,6 @@
     "**/obj/**",
     "artifacts/**",
     "**/node_modules/**",
-    "docs/generated/**",
-    "**/*.generated.md",
     "**/Corpus/third-party/**",
     "eng/common/**"
   ],
