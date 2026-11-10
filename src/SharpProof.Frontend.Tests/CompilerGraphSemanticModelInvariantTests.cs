@@ -136,7 +136,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context, static _ => true, TestContext.CurrentContext.CancellationToken);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         var binding = context.Parameters.Single();

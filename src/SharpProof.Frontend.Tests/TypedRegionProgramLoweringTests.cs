@@ -159,7 +159,7 @@ public sealed class TypedRegionProgramLoweringTests
         Assert.That(lowered.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(1));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        Assert.Throws<OperationCanceledException>(new Action(() => new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() => RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
     }
 
     [Test]

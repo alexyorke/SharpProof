@@ -84,7 +84,7 @@ internal sealed partial class NativeSpecifiedCallTests
             .Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
+        var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static frame => { ArgumentNullException.ThrowIfNull(frame); return true; }, null,
             TestContext.CurrentContext.CancellationToken, opaqueCalls: true, pinElementReads: true);
         Assert.That(lowered.IsExact, Is.True);

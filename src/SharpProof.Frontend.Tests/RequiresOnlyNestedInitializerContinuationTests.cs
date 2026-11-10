@@ -94,7 +94,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
 
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var fullContext = new TotalLoweringContext(factory, target);
-        var binder = new ContractBinder(compilation, factory);
+        var binder = new TotalContractBinder(compilation, factory);
         var full = binder.BindTotal(fullContext);
         Assert.That(full.IsSuccess, Is.EqualTo(!initializers));
         Assert.That(full.Failure, Is.EqualTo(initializers ? ContractBindingFailure.UnsupportedExpression : ContractBindingFailure.None));
@@ -110,7 +110,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
         Assert.That(context.IsSpecificationOperation(conditionals[0].BranchValue!), Is.True);
         foreach (var addition in additions)
         { Assert.That(context.IsSpecificationOperation(addition.Operation), Is.True); }
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         Assert.That(lowering.IsExact, Is.EqualTo(!initializers));
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(initializers

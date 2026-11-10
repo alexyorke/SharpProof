@@ -26,7 +26,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         Assert.That(fragment.Classification.IsExact, Is.True);
         Assert.That(subject.Context.Variables.Any(binding =>
             SymbolEqualityComparer.Default.Equals(binding.Symbol, subject.Read.Local)), Is.True);
-        var lowered = new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, subject.Context);
+        var lowered = RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program);
@@ -57,7 +57,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
         Assert.That(home.Context.Variables.Any(binding =>
             SymbolEqualityComparer.Default.Equals(binding.Symbol, home.Read.Local)), Is.False);
         Assert.That(home.Context.OwnsBody(home.Graph.OriginalOperation), Is.True);
-        var lowered = new RoslynProgramLowerer(home.Factory).LowerCandidate(home.Graph, home.Context);
+        var lowered = RoslynProgramLowering.LowerCandidate(home.Graph, home.Context);
         Assert.That(lowered.IsExact, Is.False);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);

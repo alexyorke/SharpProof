@@ -2701,8 +2701,7 @@ internal sealed partial class WorkerTests
         var target = discovery.Targets.Values.Single(candidate =>
             candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == "Call"));
         var lowerer = new CompilerCallableLowerer(
-            compilation,
-            new IrFactory());
+            compilation);
         var preparation = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(
             preparation.Total,
@@ -2836,7 +2835,7 @@ internal sealed partial class WorkerTests
             declaredMaxStack: 1);
         var compilation = project.CreateCompilation();
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
     }
@@ -3188,7 +3187,7 @@ internal sealed partial class WorkerTests
         foreach (var signature in signatures)
         {
             var targetName = "Verify" + signature.Name;
-            var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var preparation = new CompilerCallableLowerer(compilation).Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
                 .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Any(),
@@ -3294,7 +3293,7 @@ internal sealed partial class WorkerTests
 
         foreach (var targetName in ImmutableArray.Create("VerifyRoundTrip", "VerifyAssignmentValue", "VerifyManyLocals"))
         {
-            var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
+            var lowerer = new CompilerCallableLowerer(compilation);
             var preparation = lowerer.Prepare(targets[targetName], cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(preparation.Total, Is.Not.Null, targetName);
             Assert.That(preparation.Total!.IsBodyAbstraction || preparation.Total.Program.Blocks
@@ -3303,8 +3302,7 @@ internal sealed partial class WorkerTests
         }
 
         var wideLowerer = new CompilerCallableLowerer(
-            compilation,
-            new IrFactory());
+            compilation);
         var widePreparation = wideLowerer.Prepare(
             targets["VerifyManyParameters"], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(

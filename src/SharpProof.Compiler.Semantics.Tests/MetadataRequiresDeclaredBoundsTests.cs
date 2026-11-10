@@ -17,7 +17,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
             Is.EqualTo(ImmutableArray.Create<object>(-2L, 2L)));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var result = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var result = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(result.Clauses, Has.Length.EqualTo(1));
         Assert.That(result.Clauses[0].ParameterOrdinal, Is.Zero);
@@ -47,7 +47,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
             Is.EqualTo(ImmutableArray.Create<object>(2L, 1L)));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var result = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var result = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(result.Clauses, Is.Empty);
         if (parameterCount == 2)

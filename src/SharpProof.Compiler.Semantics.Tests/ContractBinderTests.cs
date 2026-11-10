@@ -1562,7 +1562,7 @@ internal sealed class ContractBinderTests
         {
             System.ArgumentNullException.ThrowIfNull(compilation);
             Compilation = compilation;
-            _binder = new ContractBinder(compilation, new IrFactory());
+            _binder = new ContractBinder(compilation);
         }
 
         private CSharpCompilation Compilation
@@ -1601,7 +1601,7 @@ internal sealed class ContractBinderTests
             System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(typeName, methodName);
             var factory = new IrFactory(IrExecutionSemantics.Total);
-            return new ContractBinder(Compilation, factory).BindTotal(new TotalLoweringContext(factory, method));
+            return new TotalContractBinder(Compilation, factory).BindTotal(new TotalLoweringContext(factory, method));
         }
 
         internal ContractBindingResult Bind(IMethodSymbol method)

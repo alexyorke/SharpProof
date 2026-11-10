@@ -72,7 +72,7 @@ public sealed class RecursiveRequiresDefaultWorkContractTests
 
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var binding = new ContractBinder(compilation, factory).BindTotal(context);
+        var binding = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(clauses));
         Assert.That(binding.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires &&

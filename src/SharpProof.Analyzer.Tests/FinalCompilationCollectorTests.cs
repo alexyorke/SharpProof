@@ -320,7 +320,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(method.GetAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.GetReturnTypeAttributes().Single().ApplicationSyntaxReference, Is.Null);
         Assert.That(method.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
-        var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var binding = new ContractBinder(compilation).Bind(method);
         Assert.That(binding.IsSuccess, Is.EqualTo(matchingSignature));
         Assert.That(binding.Failure, Is.EqualTo(matchingSignature
             ? ContractBindingFailure.None : ContractBindingFailure.CompanionSignatureMismatch));

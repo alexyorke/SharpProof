@@ -1268,8 +1268,7 @@ public sealed class ClaimManifestBuilderTests
         var result = new ClaimManifestBuilder(compilation).Build();
         var target = result.Targets.Values.Single();
         var binding = new ContractBinder(
-            compilation,
-            new SharpProof.Ir.IrFactory()).Bind(
+            compilation).Bind(
                 target.Method);
 
         using (Assert.EnterMultipleScope())
@@ -1359,8 +1358,7 @@ public sealed class ClaimManifestBuilderTests
         var result = new ClaimManifestBuilder(compilation).Build();
         var target = result.Targets.Values.Single();
         var binding = new ContractBinder(
-            compilation,
-            new SharpProof.Ir.IrFactory()).Bind(
+            compilation).Bind(
                 target.Method);
 
         Assert.That(target.Claims, Has.Length.EqualTo(2));

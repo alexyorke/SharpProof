@@ -18,7 +18,7 @@ public sealed class BulkContractsApiTests
             "Pr275BulkContractsApiRequiredInputs",
             "internal static class Subject { internal static void Target() { } }");
         var inventory = new ContractClauseInventoryBuilder(compilation);
-        var binder = new ContractBinder(compilation, new IrFactory(), inventory);
+        var binder = new ContractBinder(compilation, inventory);
 
         AssertMissingCallable("bind", "target", () => _ = binder.Bind(null!));
         AssertMissingCallable("requires", "target", () => _ = binder.BindRequires(null!));

@@ -106,7 +106,7 @@ public sealed class ValueTypeValidationBoundaryTests
         // context, so the whole-program route must refuse its default storage.
         context.Variable(local);
 
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
 
         Assert.That(lowered.IsExact, Is.False);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));

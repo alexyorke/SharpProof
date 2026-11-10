@@ -24,7 +24,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var parameter = target.Parameters.Single();
         var variable = context.Parameters.Single().Entry;
         var value = factory.Variable(variable);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         var result = ClosedContractAttributeBinding.BindMetadataValueSites(factory, selections,
             [new ContractMetadataValueSite(parameter, () => value)], TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -57,7 +57,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses, Has.Length.EqualTo(2));
         var wrongValue = factory.Boolean(true);
@@ -75,7 +75,7 @@ public sealed class MetadataValueProjectionRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         var selections = ContractSelectionInventory.ForCompilation(compilation);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ParameterOrdinal)), Is.EqualTo(PairParameterOrdinals));
         var prefix = new ContractMetadataValueSite(target.Parameters[0],

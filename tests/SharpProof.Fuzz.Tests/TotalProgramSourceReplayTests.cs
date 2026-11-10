@@ -212,7 +212,7 @@ public sealed class TotalProgramSourceReplayTests
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var declared = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
                 var loweringContext = new TotalLoweringContext(factory, declared);
-                var lowering = new RoslynProgramLowerer(factory).LowerCandidate(
+                var lowering = RoslynProgramLowering.LowerCandidate(
                     ControlFlowGraph.Create(method, model)!, loweringContext,
                     TestContext.CurrentContext.CancellationToken);
                 IrProgramExecutionStatus? execution = null;

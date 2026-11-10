@@ -29,7 +29,7 @@ public sealed class ContractForMetadataSignatureTests
             .OfType<IMethodSymbol>()
             .Single();
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(target);
 
         Assert.That(

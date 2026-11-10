@@ -123,7 +123,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         Assert.That(filtered.Clauses[0].SourceSyntax!.Span,
             Is.EqualTo(candidates[0].Invocation.Syntax.Span));
 
-        var publicRequires = new ContractBinder(compilation, factory).BindTotalRequires(
+        var publicRequires = new TotalContractBinder(compilation, factory).BindTotalRequires(
             new TotalLoweringContext(factory, target));
         Assert.That(publicRequires.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicRequires.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
@@ -148,7 +148,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
 
         var api = ContractApiSymbols.TryCreate(compilation)!;
         Assert.That(api.Clauses.GetClauseKind(rawInvocation.TargetMethod), Is.Null);
-        var publicResult = new ContractBinder(compilation, factory).BindTotal(
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotal(
             new TotalLoweringContext(factory, target));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ThreeClauseKinds));
@@ -187,9 +187,9 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var intrinsics = new ContractIntrinsicValidator(api);
         var staticCandidates = Candidates(staticResolution);
         var instanceCandidates = Candidates(instanceResolution);
-        var properStatic = new ContractBinder(compilation, factory).BindTotal(
+        var properStatic = new TotalContractBinder(compilation, factory).BindTotal(
             new TotalLoweringContext(factory, staticTarget));
-        var properInstance = new ContractBinder(compilation, factory).BindTotal(
+        var properInstance = new TotalContractBinder(compilation, factory).BindTotal(
             new TotalLoweringContext(factory, instanceTarget));
         Assert.That(properStatic.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(properInstance.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -229,7 +229,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         Assert.That(destinationResolution.Source.Parameters.Length, Is.EqualTo(2));
         Assert.That(destinationTarget.Parameters.Length, Is.EqualTo(2));
 
-        var properDestination = new ContractBinder(compilation, factory).BindTotal(
+        var properDestination = new TotalContractBinder(compilation, factory).BindTotal(
             new TotalLoweringContext(factory, destinationTarget));
         Assert.That(properDestination.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(properDestination.Clauses, Has.Length.EqualTo(1));

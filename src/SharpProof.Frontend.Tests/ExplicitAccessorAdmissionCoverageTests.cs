@@ -35,9 +35,8 @@ public sealed class ExplicitAccessorAdmissionCoverageTests
             var context = new TotalLoweringContext(factory, target);
             var graph = ControlFlowGraph.Create(declaration, model)!;
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-            var lowerer = new RoslynProgramLowerer(factory);
-            Assert.That(lowerer.LowerAutoAccessor(context, declaration), Is.Null);
-            var lowered = lowerer.LowerCandidate(graph, context);
+            Assert.That(RoslynProgramLowering.LowerAutoAccessor(context, declaration), Is.Null);
+            var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
             Assert.That(lowered.IsExact, Is.True);
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);

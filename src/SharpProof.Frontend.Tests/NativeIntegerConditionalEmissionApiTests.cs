@@ -153,7 +153,7 @@ public sealed class NativeIntegerConditionalEmissionApiTests
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);
         FrontendProgramLoweringResult? lowered = null;
-        Assert.DoesNotThrow((Action)(() => lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context)));
+        Assert.DoesNotThrow((Action)(() => lowered = RoslynProgramLowering.LowerCandidate(graph, context)));
         Assert.That(lowered, Is.Not.Null);
         Assert.That(lowered!.ConstructionLimitExceeded, Is.False);
         if (!enabled)

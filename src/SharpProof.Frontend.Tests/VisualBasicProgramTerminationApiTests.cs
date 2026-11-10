@@ -47,7 +47,7 @@ public sealed class VisualBasicProgramTerminationApiTests
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.EqualTo(!terminate));
         if (terminate)

@@ -63,7 +63,7 @@ public sealed class PartialConstructedReturnEditingRecoveryTests
         var actualImplementation = implementation.Construct(target.TypeArguments, target.TypeArgumentNullableAnnotations);
         Assert.That(SymbolEqualityComparer.Default.Equals(target.ReturnType,
             actualImplementation.ReturnType), Is.EqualTo(coincident));
-        var binder = new ContractBinder(compilation, new IrFactory());
+        var binder = new ContractBinder(compilation);
         var inventory = binder.GetClauseInventory(target);
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
         Assert.That(inventory.Clauses[0].Location.SourceTree, Is.SameAs(tree));
@@ -72,7 +72,7 @@ public sealed class PartialConstructedReturnEditingRecoveryTests
         var ownImplementation = binder.Bind(actualImplementation);
         Assert.That(ownImplementation.IsSuccess, Is.True, ownImplementation.Failure.ToString());
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var result = new ContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
+        var result = new TotalContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
         // The Total binder rejects constructed partial targets outright.
         Assert.That(result.IsSuccess, Is.False);
     }

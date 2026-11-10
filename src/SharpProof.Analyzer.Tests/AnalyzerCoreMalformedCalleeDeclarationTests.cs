@@ -68,7 +68,7 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(model.GetOperation(calleeSyntax) == null, Is.EqualTo(missingBody));
 
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalRequires(new TotalLoweringContext(factory, callee));
+        var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(new TotalLoweringContext(factory, callee));
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
         Assert.That(binding.Clauses, Has.Length.EqualTo(1));
         Assert.That(binding.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Requires));

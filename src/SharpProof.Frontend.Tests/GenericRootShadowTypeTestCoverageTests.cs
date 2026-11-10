@@ -38,7 +38,7 @@ public sealed class GenericRootShadowTypeTestCoverageTests
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, method);
             var graph = ControlFlowGraph.Create(syntax, model)!;
-            var shadow = new RoslynProgramLowerer(factory).LowerShadowSourceBody(graph, context, static _ => true, default);
+            var shadow = RoslynProgramLowering.LowerShadowSourceBody(graph, context, static _ => true, default);
             Assert.That(shadow.Classification.IsExact, Is.True, shadow.Classification.Abstention.ToString());
             Assert.That(shadow.IsShadowCallSkeleton, Is.True);
             Assert.That(shadow.IsExact, Is.False);

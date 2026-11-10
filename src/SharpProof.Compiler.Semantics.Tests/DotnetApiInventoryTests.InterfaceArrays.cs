@@ -104,7 +104,7 @@ public sealed partial class DotnetApiInventoryTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
+        var lowered = RoslynProgramLowering.LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.Classification.IsExact, Is.True);
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
         var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
@@ -139,7 +139,7 @@ public sealed partial class DotnetApiInventoryTests
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         // No callee preparation or opaque-call admission: each source helper
         // remains outside this lowering context and must retain its abstention.
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
         Assert.That(lowered.IsExact, Is.False);
         if (kind != "value")
         {
@@ -226,7 +226,7 @@ public sealed partial class DotnetApiInventoryTests
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-            var lowered = new RoslynProgramLowerer(factory).LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
+            var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
             if (!lowered.IsExact)
             {
                 if (!wrongClaim)

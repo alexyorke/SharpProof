@@ -43,8 +43,8 @@ internal sealed class CompilerCallableLowererTests
         var availableModel = available.GetSemanticModel(tree);
         var missingMethod = (IMethodSymbol)missingModel.GetDeclaredSymbol(declaration)!;
         var availableMethod = (IMethodSymbol)availableModel.GetDeclaredSymbol(declaration)!;
-        var rejected = new ContractBinder(missing, new IrFactory()).Bind(missingMethod);
-        var control = new ContractBinder(available, new IrFactory()).Bind(availableMethod);
+        var rejected = new ContractBinder(missing).Bind(missingMethod);
+        var control = new ContractBinder(available).Bind(availableMethod);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(missingImage.Length, Is.GreaterThan(0));
@@ -78,7 +78,7 @@ internal sealed class CompilerCallableLowererTests
         var destructor = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var ordinaryDeclaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var ordinary = (IMethodSymbol)model.GetDeclaredSymbol(ordinaryDeclaration)!;
-        var binder = new ContractBinder(compilation, new IrFactory());
+        var binder = new ContractBinder(compilation);
         var control = binder.Bind(ordinary);
         var rejected = binder.Bind(destructor);
         using (Assert.EnterMultipleScope())
@@ -498,7 +498,7 @@ internal sealed class CompilerCallableLowererTests
             }
             """,
             "Identity");
-        var lowerer = new CompilerCallableLowerer(compilation, factory);
+        var lowerer = new CompilerCallableLowerer(compilation);
 
         var valid = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var missingClaim = lowerer.Prepare(target with
@@ -530,7 +530,7 @@ internal sealed class CompilerCallableLowererTests
             }
             """,
             "Identity");
-        var lowerer = new CompilerCallableLowerer(compilation, factory);
+        var lowerer = new CompilerCallableLowerer(compilation);
         var valid = lowerer.Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(valid.IsSuccess, Is.True);
 
@@ -577,7 +577,7 @@ internal sealed class CompilerCallableLowererTests
         cancellation.Cancel();
 
         Assert.That(
-            (Action)(() => new CompilerCallableLowerer(compilation, factory)
+            (Action)(() => new CompilerCallableLowerer(compilation)
                 .Prepare(target, cancellation.Token)),
             Throws.InstanceOf<OperationCanceledException>());
     }
@@ -625,7 +625,7 @@ internal sealed class CompilerCallableLowererTests
         System.ArgumentNullException.ThrowIfNull(methodName);
         System.ArgumentNullException.ThrowIfNull(source);
         var (compilation, target, factory) = CreateTarget(source, methodName);
-        return new CompilerCallableLowerer(compilation, factory).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken) with
+        return new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken) with
         {
             EffectClaims = [.. target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence))]
         };

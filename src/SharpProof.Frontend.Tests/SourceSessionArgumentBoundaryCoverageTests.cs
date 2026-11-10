@@ -41,7 +41,7 @@ public sealed class SourceSessionArgumentBoundaryCoverageTests
                 subject.Compilation.Assembly), Is.True);
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
             Assert.That(helperGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-            var prepared = new RoslynProgramLowerer(subject.Factory).LowerCandidate(helperGraph, candidate);
+            var prepared = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
             Assert.That(prepared.IsExact, Is.True);
             Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
             return prepared.IsExact;

@@ -71,7 +71,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         var branch = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return));
         Assert.That(branch.BranchValue, Is.InstanceOf<ILiteralOperation>());
         Assert.That(emission.IsElided(branch.BranchValue!), Is.False);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         var execution = new IrProgramInterpreter(factory).Execute(lowering.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
@@ -140,7 +140,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         Assert.That(emission.IsElided(invocation), Is.True);
         Assert.That(emission.OwningInvocation(branchValue), Is.Not.Null);
         Assert.That(emission.IsElided(branchValue), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

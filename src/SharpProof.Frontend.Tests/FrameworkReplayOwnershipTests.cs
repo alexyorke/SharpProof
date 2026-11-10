@@ -23,7 +23,7 @@ public sealed class FrameworkReplayOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+        var lowered = RoslynProgramLowering.LowerCandidate(
             Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!, context, static _ => true, null,
             TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
         Assert.That(lowered.IsExact, Is.True);

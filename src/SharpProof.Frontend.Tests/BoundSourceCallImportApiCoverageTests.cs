@@ -64,7 +64,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, invocation.TargetMethod), Is.True);
                 Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target.ContainingAssembly, compilation.Assembly), Is.True);
                 Assert.That(helperGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-                var binding = new ContractBinder(compilation, factory).BindTotal(candidate);
+                var binding = new TotalContractBinder(compilation, factory).BindTotal(candidate);
                 Assert.That(binding.IsSuccess, Is.True);
                 Assert.That(binding.Clauses, Has.Length.EqualTo(clauseKind == "plain" ? 0 : 1));
                 if (clauseKind != "plain")
@@ -74,7 +74,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 }
                 candidate.SourceCallPreconditions = [.. binding.Clauses.Where(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (c.Kind == BoundContractKind.Requires))
                     .Select(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation)))];
-                var prepared = new RoslynProgramLowerer(factory).LowerCandidate(helperGraph, candidate);
+                var prepared = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(prepared.IsExact, Is.True);
                 Assert.That(prepared.ConstructionLimitExceeded, Is.False);

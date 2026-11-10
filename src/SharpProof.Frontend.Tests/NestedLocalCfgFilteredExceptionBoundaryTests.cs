@@ -49,7 +49,7 @@ public sealed class NestedLocalCfgFilteredExceptionBoundaryTests
         { externalFinally |= region.Kind == ControlFlowRegionKind.TryAndFinally; }
         Assert.That(externalFinally, Is.EqualTo(enclosingFinally));
 
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = context.Parameters.Single();

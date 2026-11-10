@@ -38,7 +38,7 @@ internal static class CompilerTotalCallableLowerer
                 [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
                     new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], []);
         }
-        var binding = new ContractBinder(compilation, context.Factory).BindTotalRequires(context,
+        var binding = new TotalContractBinder(compilation, context.Factory).BindTotalRequires(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
@@ -80,7 +80,7 @@ internal static class CompilerTotalCallableLowerer
         context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
         var binding = autoAccessor != null ? new TotalContractBindingResult([], ContractBindingFailure.None, context.Origin)
-            : new ContractBinder(compilation, context.Factory).BindTotal(context,
+            : new TotalContractBinder(compilation, context.Factory).BindTotal(context,
                 cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions)
@@ -114,7 +114,7 @@ internal static class CompilerTotalCallableLowerer
         ControlFlowGraph? graph = null;
         FrontendProgramLoweringResult? lowering;
         if (autoAccessor != null)
-        { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
+        { lowering = RoslynProgramLowering.LowerAutoAccessor(context, autoAccessor); }
         else
         {
             graph = TotalSourceCallSession.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
@@ -298,7 +298,7 @@ internal static class CompilerTotalCallableLowerer
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
         var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree])) { CaptureShadowCallAncestry = true };
-        var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+        var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || !binding.Clauses.IsEmpty)
@@ -678,7 +678,7 @@ internal static class CompilerTotalCallableLowerer
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
-        var binding = new ContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
+        var binding = new TotalContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
         _ = CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
             body.ParameterAttributes, cancellationToken, out var paired);
         var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>();

@@ -46,7 +46,7 @@ public sealed class ConstrainedComparableDomainTests
         bool PrepareCallee(TotalLoweringContext frame)
         {
             ArgumentNullException.ThrowIfNull(frame);
-            var binding = new ContractBinder(compilation, frame.Factory).BindTotalRequires(frame);
+            var binding = new TotalContractBinder(compilation, frame.Factory).BindTotalRequires(frame);
             Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
             return frame.HasScalarSignature;
         }

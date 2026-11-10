@@ -143,8 +143,7 @@ public sealed class TypedExceptionSearchTests
         Assert.That(subject.Lower().IsExact, Is.False);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        Assert.Throws<OperationCanceledException>(new Action(() => new RoslynProgramLowerer(subject.Factory)
-            .LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
+        Assert.Throws<OperationCanceledException>(new Action(() => RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
     }
 
     [Test]

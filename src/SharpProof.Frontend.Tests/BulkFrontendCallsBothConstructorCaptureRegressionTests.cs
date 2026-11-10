@@ -121,10 +121,9 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                 }
             }
 
-            var lowerer = new RoslynProgramLowerer(factory);
             var lowering = enabled
-                ? lowerer.LowerCandidate(graph, context, static _ => true, null, TestContext.CurrentContext.CancellationToken)
-                : lowerer.LowerCandidate(graph, context);
+                ? RoslynProgramLowering.LowerCandidate(graph, context, static _ => true, null, TestContext.CurrentContext.CancellationToken)
+                : RoslynProgramLowering.LowerCandidate(graph, context);
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.ConstructionLimitExceeded, Is.False);
             foreach (var flag in ImmutableArray.Create(false, true))

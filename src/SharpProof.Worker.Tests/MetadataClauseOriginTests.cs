@@ -196,7 +196,7 @@ public sealed class MetadataClauseOriginTests
         builder.Assign(block, prologue, current, factory.Variable(entry));
         builder.Assign(block, prologue, old, factory.Variable(entry));
         var context = new TotalLoweringContext(factory, method);
-        var bound = new ContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken).Clauses.Single();
+        var bound = new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken).Clauses.Single();
         var value = IrSubstitution.Substitute(factory, bound.Value,
             ImmutableDictionary<IrVarId, IrTerm>.Empty.SetItem(context.Parameters[0].Entry, factory.Variable(entry)));
         string name;

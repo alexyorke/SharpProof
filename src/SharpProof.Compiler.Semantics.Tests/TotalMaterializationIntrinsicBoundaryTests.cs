@@ -26,7 +26,7 @@ internal sealed class TotalMaterializationIntrinsicBoundaryTests
         Assert.That(violations, Has.Length.EqualTo(1));
         Assert.That(violations[0].Failure, Is.EqualTo(expected));
         Assert.That(violations[0].Operation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var publicResult = new ContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
         Assert.That(publicResult.Failure, Is.EqualTo(expected));
         Assert.That(publicResult.Clauses, Is.Empty);
         var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
@@ -54,7 +54,7 @@ internal sealed class TotalMaterializationIntrinsicBoundaryTests
         var candidates = resolution.Inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
             .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))).ToImmutableArray();
         var moduleResult = TotalContractInvocationMaterialization.Bind(context, api, intrinsics, resolution, candidates, requiresOnly: true);
-        var publicResult = new ContractBinder(compilation, factory).BindTotalRequires(context);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(moduleResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(moduleResult.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));

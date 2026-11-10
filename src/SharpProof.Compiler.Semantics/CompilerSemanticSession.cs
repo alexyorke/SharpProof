@@ -24,12 +24,11 @@ internal sealed class CompilerSemanticSession
         _contractClauses = CreateLazy(() => ContractClauseInventoryBuilder.ForCompilation(compilation));
         _contractSources = CreateLazy(() => EffectiveContractSourceResolver.ForCompilation(compilation, cancellationToken));
         _contractIntrinsics = CreateLazy(() => new ContractIntrinsicValidator(compilation));
-        _contractBinder = CreateLazy(() => ContractBinder.CreateWithContractSources(compilation, IrFactory,
+        _contractBinder = CreateLazy(() => ContractBinder.CreateWithContractSources(compilation,
             GetValue(_contractClauses), GetValue(_contractSources)));
     }
 
     internal Compilation Compilation { get; }
-    internal IrFactory IrFactory { get; } = new();
     internal ContractSelectionInventory Attributes => GetValue(_attributes);
     internal ResolvedApiSpecTable ApiSpecs => GetValue(_apiSpecs);
     internal bool HasCreatedApiSpecs => _apiSpecs.IsValueCreated;

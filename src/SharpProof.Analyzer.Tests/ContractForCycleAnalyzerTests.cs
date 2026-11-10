@@ -184,9 +184,7 @@ public sealed class ContractForCycleAnalyzerTests
             .OfType<IMethodSymbol>()
             .Single();
 
-        var binding = new SharpProof.Contracts.ContractBinder(
-            compilation,
-            new SharpProof.Ir.IrFactory()).Bind(target);
+        var binding = new SharpProof.Contracts.ContractBinder(compilation).Bind(target);
 
         using (Assert.EnterMultipleScope())
         {

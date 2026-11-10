@@ -25,7 +25,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         var target = GetTarget(compilation);
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var bound = new ContractBinder(compilation, factory).BindTotal(context);
+        var bound = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
         var type = factory.GetVariableInfo(context.Parameters[0].Entry).Type;

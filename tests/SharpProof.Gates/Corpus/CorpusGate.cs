@@ -87,7 +87,7 @@ internal static class CorpusGate
         {
             var factory = new IrFactory(IrExecutionSemantics.Total);
             var context = new TotalLoweringContext(factory, call.Target);
-            var binding = new ContractBinder(compilation, factory).BindTotalRequires(context);
+            var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
             if (!binding.IsSuccess)
             { failures.Add(binding.Failure.ToString()); continue; }
             boundRequires += binding.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
@@ -120,7 +120,7 @@ internal static class CorpusGate
                 var callDocument = documents[call.Syntax.SyntaxTree];
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var context = new TotalLoweringContext(factory, call.Target);
-                var binding = new ContractBinder(compilation, factory).BindTotalRequires(context, cancellationToken);
+                var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context, cancellationToken);
                 if (!binding.IsSuccess)
                 { failures.Add("RequiresBindingFailed:" + binding.Failure); continue; }
                 var ordinal = 0;

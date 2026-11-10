@@ -17,7 +17,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
         { Assert.That(subject.Invoke([null!]), Is.EqualTo(19)); }
         else
         { Assert.That(subject.Invoke([new object()]), Is.InstanceOf<InvalidCastException>()); }
-        var lowering = new RoslynProgramLowerer(subject.Factory).LowerCandidate(subject.Graph, subject.Context,
+        var lowering = RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context,
             static _ => true, null, default, approximateElementReads: true);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
@@ -75,7 +75,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     {
         using var subject = TypedProgramSubject.Create("int Target(int value) => Helper(value); static int Helper(int value) => value + 1;");
         Assert.That(subject.Invoke([16]), Is.EqualTo(17));
-        var shadow = new RoslynProgramLowerer(subject.Factory).LowerShadowSourceBody(subject.Graph, subject.Context,
+        var shadow = RoslynProgramLowering.LowerShadowSourceBody(subject.Graph, subject.Context,
             _ => preserve, default);
         Assert.That(shadow.IsShadowCallSkeleton, Is.True);
         Assert.That(shadow.Classification.IsExact, Is.EqualTo(preserve));

@@ -41,7 +41,7 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
                 var factory = new IrFactory(IrExecutionSemantics.Total);
                 var context = new TotalLoweringContext(factory, target);
                 Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True, item.Name);
-                var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+                var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program);
                 Assert.That(lowered.IsExact, Is.True, item.Name);
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned), item.Name);

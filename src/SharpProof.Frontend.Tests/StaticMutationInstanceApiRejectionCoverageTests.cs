@@ -70,7 +70,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
 
             void CheckStaticWorkflow()
             {
-                var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+                var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.ConstructionLimitExceeded, Is.False);
                 var writes = lowered.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
