@@ -10,18 +10,3 @@ ignore:
       type: go-module
       location: /usr/local/bin/shfmt
     reason: "Windows-only os.Root junction issue is not applicable to the pinned Linux amd64 shfmt binary."
-
-# GHSA-p3jp-9v83-76w9 (CVE-2026-111497) is a Brotli decoder out-of-bounds write
-# fixed in .NET 8.0.33. The 8.0.32 runtime is the immutable runtime that the
-# resource-bounds model, CoreLib facts and runtime tests are reviewed against, so
-# it cannot move to 8.0.33 without that re-audit. It runs only repository tests
-# on trusted inputs in the tooling image. The 9.0 fixture is already serviced.
-# Upstream: https://github.com/advisories/GHSA-p3jp-9v83-76w9
-# Owner: alexyorke. Expires 2026-12-08: remove this entry when the 8.0.33
-# re-audit lands, or renew it with a fresh review.
-  - vulnerability: GHSA-p3jp-9v83-76w9
-    package:
-      name: Microsoft.NETCore.App.Runtime.linux-x64
-      version: 8.0.32
-      type: dotnet
-    reason: "Pinned reviewed 8.0.32 test runtime; Brotli decoder fix needs the 8.0.33 resource-bounds re-audit. Expires 2026-12-08."

@@ -146,7 +146,7 @@ internal sealed class TaskFaultNotificationRuntimeTests
 
     private static void AssertPinnedRuntime()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 32)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
     }

@@ -1,6 +1,6 @@
 ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e
 ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.320-bookworm-slim@sha256:07ed28d9e7279248fcea27334880f6c415b42c631c39b8bc5b3caf13ec6fdaa2
-ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.426-bookworm-slim@sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f
+ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.427-bookworm-slim@sha256:341aa6e8bbaceb1194732328ca27c15bfa9c531687db83a66af3c0c1833f5534
 # MCR's 7.5 aliases still contain 7.5.0, so install the verified serviced
 # release on the SDK base this build already pulls instead of pulling a
 # PowerShell image only to replace its payload.
@@ -59,16 +59,16 @@ RUN test "${TARGETOS}" = "linux" && test "${TARGETARCH}" = "amd64"
 COPY --from=powershell /opt/microsoft/powershell/7 /opt/microsoft/powershell/7
 # The minimum-framework SDK carries the pinned test runtime, byte for byte the
 # same files as the matching runtime image.
-COPY --from=minimum-framework /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.32
+COPY --from=minimum-framework /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33
 COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.320 /usr/share/dotnet/sdk/9.0.320
 # Retain the runtime and targeting packs needed by the minimum portable compiler host.
 COPY --from=minimum-sdk /usr/share/dotnet/shared /usr/share/dotnet/shared
 COPY --from=minimum-sdk /usr/share/dotnet/packs /usr/share/dotnet/packs
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.32
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.32 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.32
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.33 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.33
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.33 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.33
 # Keep the reviewed API inventory pack alongside the minimum-SDK packs.
 COPY --from=api-inventory /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.32 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.32
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.33 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.33
 # Use only the explicitly pinned PowerShell copy, not the SDK image's unused tool store.
 RUN rm -rf /usr/share/powershell
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json

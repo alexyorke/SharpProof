@@ -10,8 +10,10 @@ dotnet_diagnostic.SP0060.severity = suggestion
 Bounds that depend on runtime layout, reviewed metadata costs or task premises are
 conditional on CoreCLR 8.0.32 and `net8.0` consumers. Microsoft's
 [support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core)
-lists .NET 8 support ending on 2026-11-10. These facts have not been re-audited
-for a later runtime; the pinned research runtime is not a claim of current servicing.
+lists .NET 8 support ending on 2026-11-10. The final .NET 8 release, 8.0.33,
+changed no CoreLib or CoreCLR source from 8.0.32, so these facts also describe
+8.0.33; they have not been re-audited for any later runtime. The pinned research
+runtime is not a claim of current servicing.
 
 Use SharpProof's advisory or strict profile. The off profile disables this feature.
 SP0060 reports one result per handwritten ordinary method declaration. It does
