@@ -34,8 +34,8 @@ public sealed class NativeMetadataNominalOwnerTests
             _ => ("", "string")
         };
         var library = nominalReturn ?
-            "using SharpProof.Attributes; public static class Library { public static void Target([NotNull] object value) { } }" :
-            "using SharpProof.Attributes; public static class Library { public static object Target([NotNull] object value) => value; }";
+            "using SharpProof.Attributes; public static class Library { public static void Target([NonNull] object value) { } }" :
+            "using SharpProof.Attributes; public static class Library { public static object Target([NonNull] object value) => value; }";
         var body = nominalReturn ? "Library.Target(value); return value;" : "return Library.Target(value);";
         using var subject = new MetadataTestSubject(library,
             $"{definition} public static class Subject {{ public static {(nominalReturn ? type : "object")} Target({type} value) {{ {body} }} }}",
@@ -89,7 +89,7 @@ public sealed class NativeMetadataNominalOwnerTests
     public async Task ObjectWidenedAliasGuardProvesRequiresAndMatchesClr()
     {
         using var subject = new MetadataTestSubject(
-            "using SharpProof.Attributes; public static class Library { public static int Target([NotNull] object value) => 7; }",
+            "using SharpProof.Attributes; public static class Library { public static int Target([NonNull] object value) => 7; }",
             """
             public sealed class Token { }
             public static class Subject {
@@ -141,7 +141,7 @@ public sealed class NativeMetadataNominalOwnerTests
             using SharpProof.Attributes;
             public static class Library {
                 public static int Target(object value) => Leaf(value);
-                private static int Leaf([NotNull] object value) => 7;
+                private static int Leaf([NonNull] object value) => 7;
             }
             """, "public sealed class Token { } public static class Subject { public static int Target(Token value) => Library.Target(value); }",
             includeSharpProofReference: true);

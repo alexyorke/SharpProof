@@ -608,7 +608,7 @@ public sealed class ConstructedGenericContractTests
             using SharpProof.Attributes;
 
             public static class Target {
-                public static void Read<T>([NotNull] T value) { }
+                public static void Read<T>([NonNull] T value) { }
             }
 
             public static class Caller {

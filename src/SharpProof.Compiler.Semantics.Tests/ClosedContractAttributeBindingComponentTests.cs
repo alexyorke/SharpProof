@@ -88,7 +88,7 @@ public sealed class ClosedContractAttributeBindingComponentTests
         Assert.That(returnResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(returnResult.Clauses, Has.Length.EqualTo(1));
         Assert.That(returnResult.Clauses[0].Kind, Is.EqualTo(BoundContractKind.Ensures));
-        Assert.That(returnResult.Clauses[0].DiagnosticText, Does.Contain("NotNull"));
+        Assert.That(returnResult.Clauses[0].DiagnosticText, Does.Contain("NonNull"));
         Assert.That(returnResult.Clauses[0].SourceSyntax, Is.Not.Null);
         var returnInterpreter = new IrInterpreter(returnFactory);
         Assert.That(returnInterpreter.Evaluate(returnResult.Clauses[0].Condition,
@@ -171,10 +171,10 @@ public sealed class ClosedContractAttributeBindingComponentTests
             using SharpProof.Attributes;
             public static class Target {
                 public static void Read([Positive, InRange(1L, 3L)] int count) { }
-                [return: NotNull]
+                [return: NonNull]
                 public static string? Name() => null;
                 public static void TypeMismatch([Positive] int value) { }
-                public static void InvalidAfterPrefix([Positive, NotNull] int value) { }
+                public static void InvalidAfterPrefix([Positive, NonNull] int value) { }
             }
             """);
         using var image = new MemoryStream();

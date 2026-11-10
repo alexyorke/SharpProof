@@ -451,7 +451,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return ImmutableArray.Create(
                 compilation.GetTypeByMetadataName(
-                    ContractApiMetadata.NotNull),
+                    ContractApiMetadata.NonNull),
                 compilation.GetTypeByMetadataName(
                     ContractApiMetadata.Positive),
                 compilation.GetTypeByMetadataName(

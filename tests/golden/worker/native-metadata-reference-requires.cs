@@ -9,5 +9,5 @@ public static class Subject
 using SharpProof.Attributes;
 public static class Library
 {
-    public static string Target([NotNull] string value) => value;
+    public static string Target([NonNull] string value) => value;
 }

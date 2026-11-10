@@ -11,7 +11,7 @@ public static class Loops
         return i;
     }
     [DoesNotThrow]
-    public static int Sum([NotNull] int[] values)
+    public static int Sum([NonNull] int[] values)
     {
         var total = 0;
         for (var i = 0; i < values.Length; i++)

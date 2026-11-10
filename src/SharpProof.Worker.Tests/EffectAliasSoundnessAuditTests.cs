@@ -54,7 +54,7 @@ public sealed class EffectAliasSoundnessAuditTests
         var source = "using SharpProof.Attributes; public sealed class C { " +
             "public int Stored; private static void Set(C target, int value) { target.Stored = value; } " +
             "[EffectContract(" + effects + ")] " +
-            "public int Target([NotNull] C other, int value) { Set(" +
+            "public int Target([NonNull] C other, int value) { Set(" +
             (writeReceiver ? "this" : "other") + ", value); return value; } }";
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("EffectAliasControlOracle", source).Emit(image).Success, Is.True);
@@ -118,7 +118,7 @@ public sealed class EffectAliasSoundnessAuditTests
         const string source = "using SharpProof.Attributes; public sealed class C { " +
             "public int Stored; private static void Set(C target, int value) { target.Stored = value; } " +
             "[EffectContract(SharpProofEffect.WritesArgumentState)] " +
-            "public int Target([NotNull] C other, bool flag, int value) " +
+            "public int Target([NonNull] C other, bool flag, int value) " +
             "{ Set(flag ? this : other, value); return value; } }";
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("ConditionalEffectAliasOracle", source).Emit(image).Success, Is.True);

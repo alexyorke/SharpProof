@@ -530,7 +530,7 @@ internal static class CompilerTotalCallableArtifactCodec
             origin.ConstructorSignature.IsDefault || origin.ValueBlob.IsDefault)
         { return false; }
         var range = origin.Kind == "InRange";
-        if (origin.Kind is not ("Positive" or "NotNull" or "InRange") ||
+        if (origin.Kind is not ("Positive" or "NonNull" or "InRange") ||
             !origin.ConstructorSignature.SequenceEqual(range ? ImmutableArray.Create<byte>(0x20, 2, 1, 0x0a, 0x0a) : ImmutableArray.Create<byte>(0x20, 0, 1)) ||
             origin.ValueBlob.Length != (range ? 20 : 4) || origin.ValueBlob[0] != 1 || origin.ValueBlob[1] != 0 ||
             origin.ValueBlob[origin.ValueBlob.Length - 2] != 0 || origin.ValueBlob[origin.ValueBlob.Length - 1] != 0)

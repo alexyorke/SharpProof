@@ -43,22 +43,22 @@ public sealed class WorkerVcLoopFieldTests
                 count = 0;
                 for (var i = 0; i < n; i++) { count++; }
             }
-            public void FillAndCount([NotNull] int[] values) {
+            public void FillAndCount([NonNull] int[] values) {
                 Contract.Ensures(count == values.Length);
                 count = 0;
                 for (var i = 0; i < values.Length; i++) { values[i] = 0; count++; }
             }
-            public void FillAndAdd([NotNull] int[] values) {
+            public void FillAndAdd([NonNull] int[] values) {
                 Contract.Requires(values.Length <= 1000 && count >= 0 && count <= 1000);
                 Contract.Ensures(count == Contract.Old(count) + values.Length);
                 for (var i = 0; i < values.Length; i++) { values[i] = 0; count++; }
             }
-            public void FillKeepsFlag([NotNull] int[] values) {
+            public void FillKeepsFlag([NonNull] int[] values) {
                 Contract.Requires(flag);
                 Contract.Ensures(flag);
                 for (var i = 0; i < values.Length; i++) { values[i] = 1; }
             }
-            public static void ParameterLoop([NotNull] Counter other, int n) {
+            public static void ParameterLoop([NonNull] Counter other, int n) {
                 Contract.Requires(n >= 0);
                 Contract.Ensures(other.count == n);
                 other.count = 0;

@@ -398,14 +398,14 @@ internal sealed class NativeWorkerRoutingTests
     [TestCase("byte", "InRange(-1, 256)", "255", WorkerClaimOutcome.Proven)]
     [TestCase("byte", "InRange(256, 300)", "255", WorkerClaimOutcome.Refuted)]
     [TestCase("ulong", "InRange(-2, -1)", "0UL", WorkerClaimOutcome.Refuted)]
-    [TestCase("string", "NotNull", "value", WorkerClaimOutcome.Proven)]
-    [TestCase("string", "NotNull", "null!", WorkerClaimOutcome.Refuted)]
+    [TestCase("string", "NonNull", "value", WorkerClaimOutcome.Proven)]
+    [TestCase("string", "NonNull", "null!", WorkerClaimOutcome.Refuted)]
     public async Task NativeWorkerVerifiesTypedReturnAttributes(string type, string attribute, string value, WorkerClaimOutcome outcome)
     {
         System.ArgumentNullException.ThrowIfNull(attribute);
         System.ArgumentNullException.ThrowIfNull(type);
         System.ArgumentNullException.ThrowIfNull(value);
-        var parameters = type == "string" ? "[NotNull] string value" : "";
+        var parameters = type == "string" ? "[NonNull] string value" : "";
         var source = $$"""
             using SharpProof.Attributes;
             public static class Subject { [return: {{attribute}}] public static {{type}} Target({{parameters}}) { return {{value}}; } }

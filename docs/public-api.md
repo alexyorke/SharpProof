@@ -19,7 +19,7 @@ inheriting the verifier's build configuration.
 | API | Declared CLR targets | Constructor or principal data |
 | --- | --- | --- |
 | `ContractForAttribute` | Class | Target `Type`; companion must be a static class |
-| `NotNullAttribute`, `PositiveAttribute` | Parameter, return value | No arguments |
+| `NonNullAttribute`, `PositiveAttribute` | Parameter, return value | No arguments |
 | `InRangeAttribute` | Parameter, return value | Inclusive `long minimum, long maximum`; exposes `Minimum`, `Maximum` |
 | `EnforcePureAttribute`, `ZeroAllocationsAttribute`, `DoesNotThrowAttribute` | Constructor, method, property | No arguments |
 | `AllowedCapabilitiesAttribute` | Constructor, method, property | `SharpProofCapability capabilities`; exposes `Capabilities` |
@@ -112,7 +112,7 @@ including argument evaluation, is omitted from verifier body execution.
 
 ## Closed parameter and return contracts
 
-`NotNullAttribute`, `PositiveAttribute`, and `InRangeAttribute` apply only to
+`NonNullAttribute`, `PositiveAttribute`, and `InRangeAttribute` apply only to
 parameters and return values. Their constructors and properties are part of
 the supported API. Invalid target or argument shapes produce diagnostics
 instead of being treated as evidence.
@@ -132,7 +132,12 @@ does not remove the portable analyzer's SP0024 for an unsupported `ulong`
 closed attribute. See [ClosedContractAttributeValidator.cs](../src/SharpProof.Compiler.Semantics/Contracts/ClosedContractAttributeValidator.cs)
 and [coverage and limits](coverage-and-limits.md) for the separate boundaries.
 
-`NotNullAttribute` accepts reference types, `Nullable<T>`, and type parameters
+`NonNullAttribute` is a SharpProof contract, not the nullable-analysis
+`System.Diagnostics.CodeAnalysis.NotNullAttribute`. The distinct name lets a
+file import both namespaces without an ambiguous reference (CS0104). The
+nullable-analysis attribute selects no SharpProof obligation.
+
+`NonNullAttribute` accepts reference types, `Nullable<T>`, and type parameters
 that are not constrained to non-nullable value types. For `Nullable<T>`, the
 condition means that the value has a value (`HasValue`). A definitely
 non-nullable value such as `int`, or a type parameter constrained with
