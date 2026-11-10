@@ -64,9 +64,13 @@ try {
     if ($baselinePackages.Length -ne 1 -or $currentPackages.Length -ne 1) {
         throw 'Expected exactly one baseline and current public API package.'
     }
-    Invoke-CompatibilityNative 'apicompat' @(
+    $compatibilityArguments = @(
         'package', $currentPackages[0].FullName, '--baseline-package', $baselinePackages[0].FullName,
         '--enable-rule-cannot-change-parameter-name')
+    # Reviewed intentional breaks against the baseline live in one suppression file.
+    $suppressions = Join-Path $repositoryRoot 'eng/lint/api-compat-suppressions.xml'
+    if (Test-Path -LiteralPath $suppressions) { $compatibilityArguments += @('--suppression-file', $suppressions) }
+    Invoke-CompatibilityNative 'apicompat' $compatibilityArguments
     Write-Host "Public package compatibility passed against $baselineRevision."
 }
 finally {
