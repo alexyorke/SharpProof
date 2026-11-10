@@ -133,7 +133,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         }
         var graph = ControlFlowGraph.Create(syntax, semanticModel);
         Assert.That(graph, Is.Not.Null);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, lowering);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph!, lowering);
         Assert.That(lowered.IsExact, Is.True);
         var assignments = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
             .OfType<IrAssignInstruction>().ToImmutableArray();

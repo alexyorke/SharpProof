@@ -98,7 +98,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         Assert.That(factory.GetTypeInfo(right.Value.Type).Kind, Is.EqualTo(IrTypeKind.Reference));
         var graph = ControlFlowGraph.Create(methods[0], model)!;
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
@@ -108,7 +108,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         var controlContext = new TotalLoweringContext(controlFactory, control);
         var controlGraph = ControlFlowGraph.Create(methods[1], model)!;
         Assert.That(controlContext.OwnsBody(controlGraph.OriginalOperation), Is.True);
-        var controlLowering = new RoslynProgramLowerer(controlFactory).LowerCandidate(controlGraph, controlContext);
+        var controlLowering = RoslynProgramLowering.LowerCandidate(controlGraph, controlContext);
         Assert.That(controlLowering.IsExact, Is.True, controlLowering.Classification.Abstention.ToString());
         Assert.That(controlLowering.ConstructionLimitExceeded, Is.False);
         var environment = ImmutableDictionaryCapture.Create(controlContext.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),

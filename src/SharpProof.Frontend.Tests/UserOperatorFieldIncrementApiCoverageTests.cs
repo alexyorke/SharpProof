@@ -59,7 +59,7 @@ public sealed class UserOperatorFieldIncrementApiCoverageTests
         Assert.That(body.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
         Assert.That(body.Value, Is.InstanceOf<IrVariableTerm>());
         Assert.That(body.Value.Type, Is.EqualTo(context.Type(increment.Type)));
-        var wholeHelper = new RoslynProgramLowerer(subject.Factory).LowerCandidate(graph, context);
+        var wholeHelper = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(wholeHelper.IsExact, Is.False);
         Assert.That(wholeHelper.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));
         Assert.That(wholeHelper.ConstructionLimitExceeded, Is.False);

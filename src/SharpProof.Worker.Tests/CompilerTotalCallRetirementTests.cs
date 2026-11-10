@@ -47,7 +47,7 @@ public sealed class CompilerTotalCallRetirementTests
         Assert.That(targets, Has.Length.EqualTo(2));
         foreach (var target in targets)
         {
-            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            var preparation = new CompilerCallableLowerer(ClosedFormsCompilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
             await AssertProvesAsync(preparation);
         }
     }
@@ -80,7 +80,7 @@ public sealed class CompilerTotalCallRetirementTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary, NullableContextOptions.Enable));
         TestCompilation.AssertNoErrors(compilation);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Verify"));
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await AssertProvesAsync(preparation, emitted && resultPlaceholder ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven);
     }
 
@@ -101,7 +101,7 @@ public sealed class CompilerTotalCallRetirementTests
             }
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new SharpProof.Ir.IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var resultBuilder = ImmutableArray.CreateBuilder<WorkerClaimResult>();
         await TotalCallableVerifier.VerifyAsync(preparation, new WorkerBudgets(),
             check => { System.ArgumentNullException.ThrowIfNull(check); resultBuilder.Add(CallableClaimResultAssembler.FromTotal(preparation, check)); }, TestContext.CurrentContext.CancellationToken);

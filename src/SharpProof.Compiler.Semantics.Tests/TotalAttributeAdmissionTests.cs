@@ -24,7 +24,7 @@ public sealed class TotalAttributeAdmissionTests
         Assert.That(target.ContainingAssembly, Is.SameAs(compilation.Assembly));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
-        var binder = new ContractBinder(compilation, factory);
+        var binder = new TotalContractBinder(compilation, factory);
         var binding = requiresOnly ? binder.BindTotalRequires(context) : binder.BindTotal(context);
         using (Assert.EnterMultipleScope())
         {

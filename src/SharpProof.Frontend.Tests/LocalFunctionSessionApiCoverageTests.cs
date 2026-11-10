@@ -48,7 +48,7 @@ public sealed class LocalFunctionSessionApiCoverageTests
                 subject.Compilation.Assembly), Is.True);
             Assert.That(candidate.Compilation, Is.Null);
             Assert.That(localGraph!.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
-            var prepared = new RoslynProgramLowerer(subject.Factory).LowerCandidate(localGraph, candidate);
+            var prepared = RoslynProgramLowering.LowerCandidate(localGraph, candidate);
             Assert.That(candidate.Compilation, Is.SameAs(subject.Compilation));
             Assert.That(prepared.IsExact, Is.True);
             Assert.That(prepared.ConstructionLimitExceeded, Is.False);

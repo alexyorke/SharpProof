@@ -495,10 +495,10 @@ public sealed class ContractClauseInventoryTests
 
         var ownCallable = owner.GetTypeByMetadataName("Target")!
             .GetMembers("Analyze").OfType<IMethodSymbol>().Single();
-        var binding = new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+        var binding = new ContractBinder(owner).Bind(
             ownCallable, owner.GetSemanticModel(tree).GetOperation(body));
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.OldOutsideEnsures));
-        Assert.That(new ContractBinder(owner, new SharpProof.Ir.IrFactory()).Bind(
+        Assert.That(new ContractBinder(owner).Bind(
             callable, foreignCallable ? null : foreign.GetSemanticModel(tree).GetOperation(body))
             .IsSuccess, Is.False);
     }

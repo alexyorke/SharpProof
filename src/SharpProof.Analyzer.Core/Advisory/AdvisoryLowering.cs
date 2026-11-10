@@ -63,10 +63,10 @@ internal static class AdvisoryLowering
         FrontendProgramLoweringResult? lowering;
         ImmutableArray<BoundTotalContractClause> clauses = [];
         if (TotalBodyLowering.AutoAccessor(declaration) is { } autoAccessor)
-        { lowering = new RoslynProgramLowerer(context.Factory).LowerAutoAccessor(context, autoAccessor); }
+        { lowering = RoslynProgramLowering.LowerAutoAccessor(context, autoAccessor); }
         else
         {
-            var binding = new ContractBinder(compilation, context.Factory).BindTotal(context,
+            var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
                 cancellationToken: cancellationToken);
             if (!binding.IsSuccess)
             { return (null, "ContractBinding:" + binding.Failure); }

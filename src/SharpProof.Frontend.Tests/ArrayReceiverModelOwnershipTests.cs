@@ -24,7 +24,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+        var lowered = RoslynProgramLowering.LowerCandidate(
             Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!, context, static _ => true, null,
             TestContext.CurrentContext.CancellationToken, opaqueCalls: true, approximateElementReads: true);
         Assert.That(lowered.IsExact, Is.True);
@@ -70,7 +70,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         {
             Assert.That(frame, Is.Not.Null);
             Assert.That(graph, Is.Not.Null);
-            Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame!).IsExact, Is.True);
+            Assert.That(RoslynProgramLowering.LowerCandidate(graph!, frame!).IsExact, Is.True);
         }
     }
 
@@ -153,10 +153,10 @@ public sealed class ArrayReceiverModelOwnershipTests
                 ((INamedTypeSymbol)frame.Parameters[0].Parameter.Type).TypeArguments[0]));
         Assert.That(frame.HasScalarSignature, Is.True);
         Assert.That(frame.OwnsBody(graph.OriginalOperation), Is.True);
-        var isolated = new RoslynProgramLowerer(factory).LowerCandidate(graph, frame);
+        var isolated = RoslynProgramLowering.LowerCandidate(graph, frame);
         Assert.That(isolated.IsExact, Is.True, isolated.Classification.Abstention + "; " +
             "The prepared helper must lower exactly in isolation.");
-        Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(rootGraph, context,
+        Assert.That(RoslynProgramLowering.LowerCandidate(rootGraph, context,
             static prepared => { ArgumentNullException.ThrowIfNull(prepared); return true; }, TestContext.CurrentContext.CancellationToken).IsExact,
             Is.True, "Inlining the prepared helper must preserve its exact array receiver model.");
     }
@@ -209,7 +209,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
         Assert.That(factory.GetVariableInfo(frame!.Result!.Value).Type, Is.EqualTo(factory.IntegerType));
-        Assert.That(new RoslynProgramLowerer(factory).LowerCandidate(graph!, frame).IsExact, Is.True);
+        Assert.That(RoslynProgramLowering.LowerCandidate(graph!, frame).IsExact, Is.True);
     }
     [Test]
     public void UnboundGenericArrayParametersDoNotAcquireScalarEvidence()

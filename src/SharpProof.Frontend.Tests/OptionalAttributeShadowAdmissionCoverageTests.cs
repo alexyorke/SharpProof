@@ -47,7 +47,7 @@ public sealed class OptionalAttributeShadowAdmissionCoverageTests
             policyCalls++;
             return SymbolEqualityComparer.Default.Equals(method, invocation.TargetMethod.OriginalDefinition);
         }
-        var shadow = new RoslynProgramLowerer(subject.Factory).LowerShadowSourceBody(subject.Graph, subject.Context,
+        var shadow = RoslynProgramLowering.LowerShadowSourceBody(subject.Graph, subject.Context,
             PreserveActualHelper, default);
         Assert.That(shadow.IsShadowCallSkeleton, Is.True);
         Assert.That(shadow.IsExact, Is.False);
@@ -61,7 +61,7 @@ public sealed class OptionalAttributeShadowAdmissionCoverageTests
         }
         var helperContext = new TotalLoweringContext(subject.Factory, invocation.TargetMethod);
         var helperGraph = ControlFlowGraph.Create(helperSyntax, model)!;
-        var direct = new RoslynProgramLowerer(subject.Factory).LowerCandidate(helperGraph, helperContext);
+        var direct = RoslynProgramLowering.LowerCandidate(helperGraph, helperContext);
         Assert.That(direct.IsExact, Is.True);
         Assert.That(direct.ConstructionLimitExceeded, Is.False);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(direct.Program,

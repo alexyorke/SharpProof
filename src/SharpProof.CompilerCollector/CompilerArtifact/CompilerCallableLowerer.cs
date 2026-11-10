@@ -15,20 +15,16 @@ internal sealed class CompilerCallableLowerer
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
-        IrFactory factory,
         IEnumerable<string>? specificationPacks = null)
         : this(
             compilation,
-            factory,
             CompilerSpecificationPackProvider.ResolveConfiguration(specificationPacks))
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
-        IrFactory factory,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         ImmutableArray<CompilerSyntaxTreeSnapshot>? capturedTrees = null,
         ImmutableArray<CompilerReferenceSnapshot>? capturedReferences = null)
@@ -39,7 +35,7 @@ internal sealed class CompilerCallableLowerer
         _capturedTrees = capturedTrees is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedTrees)) : capturedTrees;
         _capturedReferences = capturedReferences is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedReferences)) : capturedReferences;
         _specificationPackAuthority = ArgumentNullGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
-        _contracts = new ContractBinder(compilation, ArgumentNullGuard.NotNull(factory, nameof(factory)));
+        _contracts = new ContractBinder(compilation);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken)

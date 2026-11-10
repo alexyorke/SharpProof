@@ -62,7 +62,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.True);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
@@ -130,7 +130,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(graph.Root.NestedRegions.Length, Is.LessThanOrEqualTo(1));
         Assert.That(graph.Root.Locals.Length + graph.Root.NestedRegions.Sum(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Locals.Length)),
             Is.LessThanOrEqualTo(2));
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         Assert.That(lowered.IsExact, Is.EqualTo(depth == 255));
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(depth == 255
@@ -171,7 +171,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.IsExact, Is.True);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.None));
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);

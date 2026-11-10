@@ -49,7 +49,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var target = Method(compilation, companion ? "Target" : "Direct", "Run");
         var context = new TotalLoweringContext(factory, target);
-        var publicResult = new ContractBinder(compilation, factory).BindTotal(context);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         AssertTruth(factory, context, publicResult.Clauses);
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -106,7 +106,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
             new ContractIntrinsicValidator(api), resolution, Candidates(resolution), requiresOnly: false);
         Assert.That(incompatible.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
         Assert.That(incompatible.Clauses, Is.Empty);
-        Assert.That(new ContractBinder(compilation, factory).BindTotal(intContext).IsSuccess, Is.True);
+        Assert.That(new TotalContractBinder(compilation, factory).BindTotal(intContext).IsSuccess, Is.True);
     }
 
     [Test]
@@ -119,7 +119,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(resolution.Inventory.Clauses, Is.Empty);
-        var publicResult = new ContractBinder(compilation, factory).BindTotal(context);
+        var publicResult = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
         Assert.That(publicResult.Clauses, Is.Empty);
         var invocation = resolution.Inventory.ImplementationBody!.DescendantsAndSelf().OfType<IInvocationOperation>().Single();

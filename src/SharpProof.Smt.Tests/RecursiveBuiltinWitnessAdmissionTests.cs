@@ -27,7 +27,7 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
         var graph = ControlFlowGraph.Create(syntax, model);
         Assert.That(graph, Is.Not.Null);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph!, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph!, context);
         Assert.That(lowered.IsExact, Is.True);
         var binding = context.Parameters.Single();
         var receiver = binding.Entry;

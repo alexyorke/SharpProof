@@ -30,7 +30,7 @@ internal static class CompilerForkJoinResourceLowering
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
             var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), child)
             { CaptureResourceLoopEntries = true };
-            var contracts = new ContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
+            var contracts = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || !contracts.Clauses.IsEmpty)
             { return new(null, "ForkJoinChildContractsUnsupported"); }
             var failure = ReadChildBody(declaration, child, model, childBody =>

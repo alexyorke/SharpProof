@@ -39,7 +39,7 @@ public sealed class TotalSourceLoopPostconditionControls
         Assert.That(symbol.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Int64));
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var loweringContext = new TotalLoweringContext(factory, symbol);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+        var lowered = RoslynProgramLowering.LowerCandidate(
             ControlFlowGraph.Create(syntax, model)!, loweringContext, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var parameter = loweringContext.Parameters.Single();

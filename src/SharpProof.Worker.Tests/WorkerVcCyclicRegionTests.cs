@@ -166,7 +166,7 @@ public sealed class WorkerVcCyclicRegionTests
     {
         var compilation = TestCompilation.CreateExact("CyclicLegacyPreservation", [("Subject.cs", repeated ? RepeatedFilterSource : CaughtLoopSource)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
-        var preparation = new CompilerCallableLowerer(compilation, new IrFactory()).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
+        var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });

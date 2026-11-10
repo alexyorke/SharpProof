@@ -120,10 +120,9 @@ public sealed class BulkFrontendCoreElisionTerminalTests
             // Omitted arguments return; enabled arguments throw before Log.
             WriteOwnedGraph(graph, source, shape + "-" + (partial ? "partial" : "conditional") +
                 "-" + (enabled ? "enabled" : "omitted"), invocations);
-            var lowerer = new RoslynProgramLowerer(factory);
             var lowered = enabled
-                ? lowerer.LowerCandidate(graph, context, static _ => true, null, TestContext.CurrentContext.CancellationToken)
-                : lowerer.LowerCandidate(graph, context);
+                ? RoslynProgramLowering.LowerCandidate(graph, context, static _ => true, null, TestContext.CurrentContext.CancellationToken)
+                : RoslynProgramLowering.LowerCandidate(graph, context);
             Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
             Assert.That(lowered.ConstructionLimitExceeded, Is.False);
             foreach (var input in ImmutableArray.Create<string?>(null, "", "word"))

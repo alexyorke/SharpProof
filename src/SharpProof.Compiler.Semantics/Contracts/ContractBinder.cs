@@ -1,8 +1,9 @@
 namespace SharpProof.Contracts;
 
-internal sealed partial class ContractBinder
+// Classifies a callable's contract clauses (kinds, evidence and failures)
+// without lowering their conditions. TotalContractBinder lowers them to IR.
+internal sealed class ContractBinder
 {
-    private readonly IrFactory _factory;
     private readonly ContractApiSymbols? _api;
     private readonly ContractIntrinsicValidator _intrinsics;
     private readonly ContractClauseInventoryBuilder _clauseInventory;
@@ -14,30 +15,24 @@ internal sealed partial class ContractBinder
 
     public ContractBinder(
         Compilation compilation,
-        IrFactory factory,
         ContractClauseInventoryBuilder? clauseInventory = null)
         : this(
             compilation,
-            factory,
             clauseInventory,
             contractSources: null)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
     }
 
     internal static ContractBinder CreateWithContractSources(
         Compilation compilation,
-        IrFactory factory,
         ContractClauseInventoryBuilder clauseInventory,
         EffectiveContractSourceResolver contractSources)
     {
         clauseInventory = RepositoryParameterGuard.NotNull(clauseInventory, nameof(clauseInventory));
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return new ContractBinder(
             compilation,
-            factory,
             clauseInventory,
             ArgumentNullGuard.NotNull(
                 contractSources,
@@ -46,14 +41,12 @@ internal sealed partial class ContractBinder
 
     private ContractBinder(
         Compilation compilation,
-        IrFactory factory,
         ContractClauseInventoryBuilder? clauseInventory,
         EffectiveContractSourceResolver? contractSources)
     {
         compilation = ArgumentNullGuard.NotNull(
             compilation,
             nameof(compilation));
-        _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _api = ContractApiSymbols.TryCreate(compilation);
         _intrinsics = new ContractIntrinsicValidator(_api);
         _clauseInventory = clauseInventory ??
@@ -66,6 +59,12 @@ internal sealed partial class ContractBinder
                     compilation,
                     clauseInventory, cancellation.Token));
     }
+
+    internal ContractApiSymbols? Api => _api;
+
+    internal ContractIntrinsicValidator Intrinsics => _intrinsics;
+
+    internal EffectiveContractSourceResolver ContractSources => _contractSources;
 
     public ContractBindingResult Bind(
         IMethodSymbol target,
@@ -249,7 +248,7 @@ internal sealed partial class ContractBinder
             target, source, clauses.ToImmutable(), usesCompanion));
     }
 
-    private static bool HasRequiresPlacementErrors(
+    internal static bool HasRequiresPlacementErrors(
         ContractClauseInventory inventory)
     {
         inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
@@ -306,7 +305,7 @@ internal sealed partial class ContractBinder
         return ContractBindingFailure.None;
     }
 
-    private ContractBindingFailure ValidateIntrinsics(
+    internal ContractBindingFailure ValidateIntrinsics(
         IMethodSymbol source,
         IOperation? body,
         bool requiresOnly)

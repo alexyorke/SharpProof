@@ -50,7 +50,7 @@ public sealed class ReferenceIdentityOracleTests
         }
         else
         {
-            var lowered = new RoslynProgramLowerer(factory).LowerCandidate(
+            var lowered = RoslynProgramLowering.LowerCandidate(
                 Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!, context, static _ => true, null,
                 TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
             Assert.That(lowered.IsExact, Is.True);

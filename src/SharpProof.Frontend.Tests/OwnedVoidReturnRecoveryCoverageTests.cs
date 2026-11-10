@@ -89,10 +89,10 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(context.Result, Is.Null);
         Assert.That(context.Parameters, Is.Empty);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
-        var binding = new ContractBinder(compilation, factory).BindTotal(context);
+        var binding = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(binding.IsSuccess, Is.True);
         Assert.That(binding.Clauses, Is.Empty);
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(context.Compilation, Is.SameAs(compilation));
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);

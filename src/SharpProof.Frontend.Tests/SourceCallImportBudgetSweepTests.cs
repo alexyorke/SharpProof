@@ -54,7 +54,7 @@ public sealed class SourceCallImportBudgetSweepTests
                 bool Prepare(TotalLoweringContext candidate)
                 {
                     ArgumentNullException.ThrowIfNull(candidate);
-                    var binding = new ContractBinder(compilation, factory).BindTotal(candidate);
+                    var binding = new TotalContractBinder(compilation, factory).BindTotal(candidate);
                     Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
                     Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
                     Assert.That(binding.Clauses, Has.Length.EqualTo(8));

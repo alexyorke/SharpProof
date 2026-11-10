@@ -618,7 +618,7 @@ public sealed class ConstructedGenericContractTests
         var target = GetConstructedTargets(compilation, "Target.Read")
             .Single();
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(target);
 
         Assert.That(result.IsSuccess, Is.False);
@@ -690,7 +690,7 @@ public sealed class ConstructedGenericContractTests
         return new(
             compilation,
             GetConstructedTargets(compilation, "Target.Echo"),
-            new ContractBinder(compilation, new IrFactory()));
+            new ContractBinder(compilation));
     }
 
     [Test]
@@ -721,9 +721,9 @@ public sealed class ConstructedGenericContractTests
             """);
         var targets = GetConstructedTargets(compilation, "target.Echo");
 
-        var first = new ContractBinder(compilation, new IrFactory())
+        var first = new ContractBinder(compilation)
             .Bind(targets[0]);
-        var second = new ContractBinder(compilation, new IrFactory())
+        var second = new ContractBinder(compilation)
             .Bind(targets[1]);
 
         using (Assert.EnterMultipleScope())
@@ -837,7 +837,7 @@ public sealed class ConstructedGenericContractTests
             .Symbol as IMethodSymbol ??
             throw new InvalidOperationException(invocation.ToString());
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(target);
 
         Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
@@ -868,13 +868,13 @@ public sealed class ConstructedGenericContractTests
         if (expectedFailure == ContractBindingFailure.UnsupportedExpression)
         {
             var factory = new IrFactory(IrExecutionSemantics.Total);
-            var total = new ContractBinder(compilation, factory)
+            var total = new TotalContractBinder(compilation, factory)
                 .BindTotal(new TotalLoweringContext(factory, target));
             Assert.That(total.IsSuccess, Is.False);
             return;
         }
 
-        var result = new ContractBinder(compilation, new IrFactory())
+        var result = new ContractBinder(compilation)
             .Bind(target);
 
         Assert.That(result.IsSuccess, Is.False);

@@ -33,7 +33,7 @@ internal sealed class CompilerCompanionBindingCaptureWorkflowTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Target")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();
-        var binding = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var binding = new ContractBinder(compilation).Bind(method);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(binding.IsSuccess, Is.False);

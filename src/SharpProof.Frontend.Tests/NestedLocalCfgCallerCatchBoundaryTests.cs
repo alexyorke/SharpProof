@@ -38,7 +38,7 @@ public sealed class NestedLocalCfgCallerCatchBoundaryTests
         Assert.That(externalCatch, Is.EqualTo(enclosingCatch));
 
         // Execute the local CFG alone: its caller's catch is outside this program.
-        var lowered = new RoslynProgramLowerer(factory).LowerCandidate(graph, context);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
         var parameter = context.Parameters.Single();

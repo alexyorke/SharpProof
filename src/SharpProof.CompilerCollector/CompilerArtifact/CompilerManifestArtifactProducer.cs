@@ -59,16 +59,9 @@ internal static class CompilerManifestArtifactProducer
         else
         {
             ImmutableArray<CompilerCallPreconditionClaims.LoweredCallable> lowered = [.. targets.Concat(discovery.ContractCallers).OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal).Select(item => {
-                // Each encoded callable is a self-contained IR graph. Keep its
-                // lowering factory self-contained too: contract binding and
-                // body lowering may request the same symbol with different
-                // display-name purposes (opaque versus call), and IrFactory
-                // intentionally hash-conses those requests by structural
-                // identity rather than display name.
                 item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var lowerer = new CompilerCallableLowerer(
                     compilation,
-                    new IrFactory(),
                     specificationPackAuthority,
                     snapshot.SyntaxTrees,
                     snapshot.References);

@@ -54,7 +54,7 @@ public sealed class BindingAndCaptureRequiredInputTests
         var compilation = CreateCompilation();
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target")
             .OfType<IMethodSymbol>().Single();
-        var original = new ContractBinder(compilation, new IrFactory()).Bind(method);
+        var original = new ContractBinder(compilation).Bind(method);
         Assert.That(original.IsSuccess, Is.True);
 
         var result = ContractBindingResult.Success(original.Contracts!);

@@ -47,12 +47,12 @@ public sealed class PartialGenericClauseSubstitutionTests
         Assert.That(SymbolEqualityComparer.Default.Equals(target.Parameters[0].Type, source.Parameters[0].Type),
             Is.EqualTo(constructed));
 
-        var fromImplementation = new ContractBinder(compilation, new IrFactory()).Bind(source);
+        var fromImplementation = new ContractBinder(compilation).Bind(source);
         Assert.That(fromImplementation.IsSuccess, Is.True, fromImplementation.Failure.ToString());
         Assert.That(fromImplementation.Contracts!.Clauses, Has.Length.EqualTo(1));
         Assert.That(fromImplementation.Contracts.Clauses.Single().Kind, Is.EqualTo(BoundContractKind.Requires));
 
-        var fromDefinition = new ContractBinder(compilation, new IrFactory()).Bind(target);
+        var fromDefinition = new ContractBinder(compilation).Bind(target);
         Assert.That(fromDefinition.IsSuccess, Is.True, fromDefinition.Failure.ToString());
         Assert.That(fromDefinition.Contracts!.Clauses, Has.Length.EqualTo(1));
         Assert.That(fromDefinition.Contracts.Clauses.Single().Kind, Is.EqualTo(BoundContractKind.Requires));

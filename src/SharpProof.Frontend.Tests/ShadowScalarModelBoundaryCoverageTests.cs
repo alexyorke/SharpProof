@@ -15,7 +15,7 @@ public sealed class ShadowScalarModelBoundaryCoverageTests
         using var subject = TypedProgramSubject.Create("int Target() => System.Array.Empty<" + elementType + ">().Length;");
         Assert.That(subject.Invoke([]), Is.EqualTo(0));
         var resolutions = 0;
-        var shadow = new RoslynProgramLowerer(subject.Factory).LowerShadowSourceBody(subject.Graph, subject.Context,
+        var shadow = RoslynProgramLowering.LowerShadowSourceBody(subject.Graph, subject.Context,
             static _ => true, default, ResolveArrayEmpty);
         Assert.That(resolutions, Is.EqualTo(1));
         Assert.That(shadow.Classification.IsExact, Is.True);

@@ -3,37 +3,29 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Frontend;
 
-internal sealed class RoslynProgramLowerer(IrFactory factory)
+// Entry points that lower one callable body under its TotalLoweringContext.
+internal static class RoslynProgramLowering
 {
-    private readonly IrFactory _factory =
-        ArgumentNullGuard.NotNull(factory, nameof(factory));
-
-    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
+    public static FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context)
     {
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         return LowerCandidate(graph, context, default);
     }
 
-    public FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context, CancellationToken cancellationToken)
+    public static FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(context, nameof(context));
-        if (!ReferenceEquals(_factory, context.Factory))
-        {
-            throw new ArgumentException("The context belongs to another factory.", nameof(context));
-        }
         return new RoslynTotalProgramLowerer(context, cancellationToken).Lower(ArgumentNullGuard.NotNull(graph, nameof(graph)));
     }
 
     // An auto-property accessor only reads or writes its backing field. The
     // read is an approximation: the IR does not model the field's value.
-    internal FrontendProgramLoweringResult? LowerAutoAccessor(TotalLoweringContext context, AccessorDeclarationSyntax declaration)
+    internal static FrontendProgramLoweringResult? LowerAutoAccessor(TotalLoweringContext context, AccessorDeclarationSyntax declaration)
     {
         ArgumentNullGuard.NotNull(context, nameof(context));
         ArgumentNullGuard.NotNull(declaration, nameof(declaration));
-        if (!ReferenceEquals(_factory, context.Factory))
-        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         if (declaration.Body != null || declaration.ExpressionBody != null || !context.HasScalarSignature ||
             CSharpOperationSemantics.HasSynchronizedEntry(context.Target) ||
             context.Target.AssociatedSymbol is not IPropertySymbol property ||
@@ -43,23 +35,24 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         var getter = context.Target.MethodKind == MethodKind.PropertyGet;
         if (getter != (context.Result != null))
         { return null; }
-        var builder = new IrProgramBuilder(_factory);
+        var factory = context.Factory;
+        var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock("entry");
         builder.SetEntry(block);
         var site = context.SyntaxSite(getter ? OperationKind.FieldReference : OperationKind.SimpleAssignment, declaration);
-        var structural = _factory.CreateOperation("candidate:auto-accessor");
+        var structural = factory.CreateOperation("candidate:auto-accessor");
         foreach (var binding in context.Inputs)
         {
-            builder.Assign(block, structural, binding.Current, _factory.Variable(binding.Entry));
-            builder.Assign(block, structural, binding.PreState, _factory.Variable(binding.Entry));
+            builder.Assign(block, structural, binding.Current, factory.Variable(binding.Entry));
+            builder.Assign(block, structural, binding.PreState, factory.Variable(binding.Entry));
         }
         if (getter)
         {
             var result = context.Result!.Value;
-            var value = context.Temporary(_factory.GetVariableInfo(result).Type);
+            var value = context.Temporary(factory.GetVariableInfo(result).Type);
             builder.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
-            builder.Assign(block, site, result, _factory.Variable(value));
-            builder.Return(block, site, _factory.Variable(result));
+            builder.Assign(block, site, result, factory.Variable(value));
+            builder.Return(block, site, factory.Variable(result));
         }
         else
         {
@@ -69,22 +62,20 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         return new(builder.Build(), FrontendSubsetClassification.Exact, context.Variables, context.Captures, [], context.Origin);
     }
 
-    internal FrontendProgramLoweringResult LowerShadowSourceBody(ControlFlowGraph graph, TotalLoweringContext context,
+    internal static FrontendProgramLoweringResult LowerShadowSourceBody(ControlFlowGraph graph, TotalLoweringContext context,
         Func<IMethodSymbol, bool> preserveSourceCall, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
         ArgumentNullGuard.NotNull(preserveSourceCall, nameof(preserveSourceCall));
-        if (!ReferenceEquals(_factory, context.Factory))
-        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         var calls = resolveScalarModel != null && graph.OriginalOperation.SemanticModel?.Compilation is { } compilation
             ? new TotalSourceCallSession(compilation, null, null, cancellationToken, resolveScalarModel) : null;
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls,
             preserveSourceCall: preserveSourceCall).Lower(graph);
     }
 
-    internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
+    internal static FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, CancellationToken cancellationToken)
     {
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
@@ -93,7 +84,7 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         return LowerCandidate(graph, context, prepareCallee, null, cancellationToken);
     }
 
-    internal FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
+    internal static FrontendProgramLoweringResult LowerCandidate(ControlFlowGraph graph, TotalLoweringContext context,
         Func<TotalLoweringContext, bool> prepareCallee, ResolveTotalIlBody? resolveIl, CancellationToken cancellationToken,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false,
@@ -103,8 +94,6 @@ internal sealed class RoslynProgramLowerer(IrFactory factory)
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
         ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
-        if (!ReferenceEquals(_factory, context.Factory))
-        { throw new ArgumentException("The context belongs to another factory.", nameof(context)); }
         // Roslyn retains the original semantic-model operation, including nested CFGs.
         var compilation = graph.OriginalOperation.SemanticModel!.Compilation;
         var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,

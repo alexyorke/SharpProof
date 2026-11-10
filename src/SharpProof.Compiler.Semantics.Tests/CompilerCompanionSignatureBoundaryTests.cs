@@ -64,6 +64,6 @@ public sealed class CompilerCompanionSignatureBoundaryTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var target = compilation.GetTypeByMetadataName("Target")!.GetMembers("Map")
             .OfType<IMethodSymbol>().Single();
-        return new ContractBinder(compilation, new IrFactory()).Bind(target);
+        return new ContractBinder(compilation).Bind(target);
     }
 }

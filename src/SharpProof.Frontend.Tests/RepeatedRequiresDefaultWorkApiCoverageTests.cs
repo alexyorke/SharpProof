@@ -58,13 +58,13 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
                 preparedCount++;
                 Assert.That(candidate.Factory, Is.SameAs(factory));
                 Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
-                var binding = new ContractBinder(compilation, factory).BindTotal(candidate);
+                var binding = new TotalContractBinder(compilation, factory).BindTotal(candidate);
                 Assert.That(binding.IsSuccess, Is.True);
                 Assert.That(binding.Clauses, Has.Length.EqualTo(clauses));
                 Assert.That(binding.Clauses.All(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (c.Kind == BoundContractKind.Requires)), Is.True);
                 candidate.SourceCallPreconditions = [.. binding.Clauses.Select(c =>
                     c is null ? throw new System.ArgumentNullException(nameof(c)) : (new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation)))];
-                var exactHelper = new RoslynProgramLowerer(factory).LowerCandidate(helperGraph, candidate);
+                var exactHelper = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(exactHelper.IsExact, Is.True);
                 Assert.That(exactHelper.ConstructionLimitExceeded, Is.False);

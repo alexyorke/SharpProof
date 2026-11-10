@@ -124,7 +124,7 @@ internal static class CompilerClosedParameterCapture
             }
         }
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binding = new ContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
+        var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
         if (binding.Failure == ContractBindingFailure.ContractApiUnavailable && result.Count == 0)
         { return true; }
         return binding.IsSuccess && CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses, result.ToImmutable(),

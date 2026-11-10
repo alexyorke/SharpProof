@@ -26,7 +26,7 @@ public sealed class SourceCallApiCoverageTests
         bool Prepare(TotalLoweringContext frame)
         {
             ArgumentNullException.ThrowIfNull(frame);
-            var binding = new ContractBinder(compilation, frame.Factory).BindTotalRequires(frame, TestContext.CurrentContext.CancellationToken);
+            var binding = new TotalContractBinder(compilation, frame.Factory).BindTotalRequires(frame, TestContext.CurrentContext.CancellationToken);
             failure = binding.Failure;
             return binding.IsSuccess;
         }
@@ -35,7 +35,7 @@ public sealed class SourceCallApiCoverageTests
         Assert.That(prepared, Is.True, "Constructor preparation failed: " + failure);
         Assert.That(frame, Is.Not.Null);
         Assert.That(graph, Is.Not.Null);
-        var lowered = new RoslynProgramLowerer(context.Factory).LowerCandidate(graph!, frame!, Prepare, TestContext.CurrentContext.CancellationToken);
+        var lowered = RoslynProgramLowering.LowerCandidate(graph!, frame!, Prepare, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.ToString());
         var approximate = false;
         foreach (var block in lowered.Program.Blocks)
@@ -69,7 +69,7 @@ public sealed class SourceCallApiCoverageTests
     private static bool PrepareCallee(TotalLoweringContext context)
     {
         System.ArgumentNullException.ThrowIfNull(context);
-        return new ContractBinder(Compilation, context.Factory).BindTotalRequires(context).IsSuccess;
+        return new TotalContractBinder(Compilation, context.Factory).BindTotalRequires(context).IsSuccess;
     }
 
     private static TotalSourceCallSession CreateSession()

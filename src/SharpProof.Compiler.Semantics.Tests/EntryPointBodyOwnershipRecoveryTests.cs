@@ -73,7 +73,7 @@ public sealed class EntryPointBodyOwnershipRecoveryTests
         Assert.That(wrongMain.HasRejectedContractApiUsage, Is.True);
         Assert.That(wrongMain.ImplementationBody, Is.Null);
         Assert.That(wrongMain.Clauses, Is.Empty);
-        var bound = new ContractBinder(compilation, new IrFactory()).Bind(namedMain, body);
+        var bound = new ContractBinder(compilation).Bind(namedMain, body);
         Assert.That(bound.Failure, Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
     }
 }

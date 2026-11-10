@@ -84,7 +84,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
         var provider = new CompilerTotalIlBodyProvider(compilation, references);
-        var lowering = new RoslynProgramLowerer(factory).LowerCandidate(graph, context, static _ => true,
+        var lowering = RoslynProgramLowering.LowerCandidate(graph, context, static _ => true,
             provider.Resolve, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);

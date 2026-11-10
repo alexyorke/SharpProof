@@ -29,9 +29,10 @@ public sealed class InitializerIntrinsicBindingControlAuditTests
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 1));
         var inventory = new ContractClauseInventoryBuilder(compilation).Create(constructor);
         var factory = new IrFactory(IrExecutionSemantics.Total);
-        var binder = new ContractBinder(compilation, factory);
+        var binder = new ContractBinder(compilation);
+        var totalBinder = new TotalContractBinder(binder, factory);
         var legacy = binder.Bind(constructor);
-        var total = binder.BindTotal(new TotalLoweringContext(factory, constructor));
+        var total = totalBinder.BindTotal(new TotalLoweringContext(factory, constructor));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(inventory.HasPlacementErrors, Is.False);

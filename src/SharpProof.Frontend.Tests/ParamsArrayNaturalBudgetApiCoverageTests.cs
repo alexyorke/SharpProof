@@ -68,7 +68,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, helperSymbol), Is.True);
             Assert.That(candidate.Factory, Is.SameAs(control.Factory));
             Assert.That(helperGraph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(control.Compilation));
-            var prepared = new RoslynProgramLowerer(control.Factory).LowerCandidate(helperGraph, candidate);
+            var prepared = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
             Assert.That(candidate.Compilation, Is.SameAs(control.Compilation));
             Assert.That(prepared.IsExact, Is.True);
             return prepared.IsExact;

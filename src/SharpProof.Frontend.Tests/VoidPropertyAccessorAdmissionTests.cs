@@ -29,7 +29,7 @@ public sealed class VoidPropertyAccessorAdmissionTests
         var factory = new IrFactory(IrExecutionSemantics.Total);
         var context = new TotalLoweringContext(factory, target);
         Assert.That(SymbolEqualityComparer.Default.Equals(context.Target, property.GetMethod), Is.True);
-        var result = new RoslynProgramLowerer(factory).LowerAutoAccessor(context, declaration);
+        var result = RoslynProgramLowering.LowerAutoAccessor(context, declaration);
         Assert.That(result, Is.Null);
     }
 }

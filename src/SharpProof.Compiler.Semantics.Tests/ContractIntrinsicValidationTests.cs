@@ -52,6 +52,6 @@ public sealed class ContractIntrinsicValidationTests
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()
             .Single();
-        return new ContractBinder(compilation, new IrFactory()).Bind(method);
+        return new ContractBinder(compilation).Bind(method);
     }
 }
