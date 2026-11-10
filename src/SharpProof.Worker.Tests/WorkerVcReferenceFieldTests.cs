@@ -19,37 +19,37 @@ internal sealed class WorkerVcReferenceFieldTests
             public int[] Items;
         }
         public static class Subject {
-            public static int NextValue([NotNull] Node node) {
+            public static int NextValue([NonNull] Node node) {
                 Contract.Requires(node.Next != null && node.Next.Value > 0);
                 Contract.Ensures(Contract.Result<int>() > 0);
                 return node.Next.Value;
             }
-            public static void Link([NotNull] Node left, [NotNull] Node right) {
+            public static void Link([NonNull] Node left, [NonNull] Node right) {
                 Contract.Ensures(left.Next == right);
                 left.Next = right;
             }
-            public static int ThroughLink([NotNull] Node left, [NotNull] Node right) {
+            public static int ThroughLink([NonNull] Node left, [NonNull] Node right) {
                 Contract.Ensures(Contract.Result<int>() == 5);
                 left.Next = right;
                 right.Value = 5;
                 return left.Next.Value;
             }
-            public static Node StoreNull([NotNull] Node node) {
+            public static Node StoreNull([NonNull] Node node) {
                 Contract.Ensures(Contract.Result<Node>() != null);
                 node.Next = null;
                 return node.Next;
             }
-            public static void Rename([NotNull] Node node) {
+            public static void Rename([NonNull] Node node) {
                 Contract.Ensures(node.Name == "x");
                 node.Name = "x";
             }
-            public static int ArrayField([NotNull] Node node) {
+            public static int ArrayField([NonNull] Node node) {
                 Contract.Requires(node.Items != null && node.Items.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 3);
                 node.Items[0] = 3;
                 return node.Items[0];
             }
-            public static int UnknownNext([NotNull] Node node) {
+            public static int UnknownNext([NonNull] Node node) {
                 Contract.Requires(node.Next != null);
                 Contract.Ensures(Contract.Result<int>() == 0);
                 return node.Next.Value;

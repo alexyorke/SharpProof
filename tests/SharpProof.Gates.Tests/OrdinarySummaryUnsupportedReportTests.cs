@@ -17,8 +17,8 @@ namespace SharpProof.Gates.Test;
 public sealed class OrdinarySummaryUnsupportedReportTests
 {
     [TestCase("public static object State; public static void Target(object value) { State = value; }", "UnsupportedWriteFieldType")]
-    [TestCase("public int Value; public static void Target([global::SharpProof.Attributes.NotNull] SummaryUnsupported value) { value.Value = 1; }", "UnsupportedWriteTarget")]
-    [TestCase("public static void Target([global::SharpProof.Attributes.NotNull] int[] values) { global::SharpProof.Attributes.Contract.Requires(values.Length > 0); values[0] = 1; }", "UnsupportedWriteTarget")]
+    [TestCase("public int Value; public static void Target([global::SharpProof.Attributes.NonNull] SummaryUnsupported value) { value.Value = 1; }", "UnsupportedWriteTarget")]
+    [TestCase("public static void Target([global::SharpProof.Attributes.NonNull] int[] values) { global::SharpProof.Attributes.Contract.Requires(values.Length > 0); values[0] = 1; }", "UnsupportedWriteTarget")]
     public async Task ActualUnsupportedWriteReportsAnUnperformedRuntimeGap(string member, string expectedRuntime)
     {
         System.ArgumentNullException.ThrowIfNull(expectedRuntime);
@@ -45,7 +45,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
     [Test]
     public async Task ActualSummaryLockReportsAnUnperformedRuntimeGap()
     {
-        var compilation = await PrepareAsync("public class SummaryUnsupported { public static void Target([global::SharpProof.Attributes.NotNull] object gate) { lock (gate) { } } }");
+        var compilation = await PrepareAsync("public class SummaryUnsupported { public static void Target([global::SharpProof.Attributes.NonNull] object gate) { lock (gate) { } } }");
         var evidence = await EvidenceAsync(compilation);
         Assert.That(evidence.Outcome, Is.InstanceOf<RefutedOutcome>());
         Assert.That(evidence.LockWitness, Is.Not.Null);

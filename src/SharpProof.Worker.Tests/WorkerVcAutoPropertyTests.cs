@@ -32,7 +32,7 @@ public sealed class WorkerVcAutoPropertyTests
                 Contract.Ensures(Count == Contract.Old(Count) + 1);
                 Count++;
             }
-            public void Link([NotNull] Holder other) {
+            public void Link([NonNull] Holder other) {
                 Contract.Ensures(Next == other);
                 Next = other;
             }
@@ -45,18 +45,18 @@ public sealed class WorkerVcAutoPropertyTests
                 text = text ?? "";
                 return text;
             }
-            public static int StoreThroughList([NotNull] System.Collections.Generic.IList<int> values) {
+            public static int StoreThroughList([NonNull] System.Collections.Generic.IList<int> values) {
                 Contract.Ensures(Contract.Result<int>() == 5);
                 values[0] = 5;
                 return 5;
             }
-            public static int CountUpTo([NotNull] System.Collections.Generic.IEnumerable<int> values) {
+            public static int CountUpTo([NonNull] System.Collections.Generic.IEnumerable<int> values) {
                 Contract.Ensures(Contract.Result<int>() >= 0);
                 var count = 0;
                 foreach (var value in values) { if (count < 1000) { count++; } }
                 return count;
             }
-            public static int ReadThroughRef(ref int value, [NotNull] ref System.Collections.Generic.List<int> list) {
+            public static int ReadThroughRef(ref int value, [NonNull] ref System.Collections.Generic.List<int> list) {
                 Contract.Ensures(Contract.Result<int>() == value);
                 list.Add(value);
                 return value;
@@ -73,7 +73,7 @@ public sealed class WorkerVcAutoPropertyTests
                 Depth(n - 1);
                 return n;
             }
-            public static int CountBag([NotNull] Bag bag) {
+            public static int CountBag([NonNull] Bag bag) {
                 Contract.Ensures(Contract.Result<int>() >= 0);
                 var count = 0;
                 foreach (var item in bag) { if (count < 1000) { count++; } }
@@ -112,7 +112,7 @@ public sealed class WorkerVcAutoPropertyTests
                 Contract.Ensures(Contract.Result<int>() == 0);
                 return int.MaxValue & x;
             }
-            public static int MaskUnknown([NotNull] System.Version version) {
+            public static int MaskUnknown([NonNull] System.Version version) {
                 Contract.Ensures(Contract.Result<int>() == 1);
                 return version.GetHashCode() & int.MaxValue;
             }

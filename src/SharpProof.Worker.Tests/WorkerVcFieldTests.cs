@@ -17,49 +17,49 @@ internal sealed class WorkerVcFieldTests
             public bool Flag;
         }
         public static class Subject {
-            public static int StoreThenRead([NotNull] Box box) {
+            public static int StoreThenRead([NonNull] Box box) {
                 Contract.Ensures(Contract.Result<int>() == 7);
                 box.Value = 7;
                 return box.Value;
             }
-            public static void SetValue([NotNull] Box box) {
+            public static void SetValue([NonNull] Box box) {
                 Contract.Ensures(box.Value == 7);
                 box.Value = 7;
             }
-            public static void Increment([NotNull] Box box) {
+            public static void Increment([NonNull] Box box) {
                 Contract.Ensures(box.Value == Contract.Old(box.Value) + 1);
                 box.Value++;
             }
-            public static int MayAlias([NotNull] Box left, [NotNull] Box right) {
+            public static int MayAlias([NonNull] Box left, [NonNull] Box right) {
                 Contract.Ensures(Contract.Result<int>() == 1);
                 left.Value = 1;
                 right.Value = 2;
                 return left.Value;
             }
-            public static int Distinct([NotNull] Box left, [NotNull] Box right) {
+            public static int Distinct([NonNull] Box left, [NonNull] Box right) {
                 Contract.Requires(left != right);
                 Contract.Ensures(Contract.Result<int>() == 1);
                 left.Value = 1;
                 right.Value = 2;
                 return left.Value;
             }
-            public static int ReadsEntry([NotNull] Box box) {
+            public static int ReadsEntry([NonNull] Box box) {
                 Contract.Requires(box.Value > 0);
                 Contract.Ensures(Contract.Result<int>() > 0);
                 return box.Value;
             }
-            public static int EntryValueIsUnknown([NotNull] Box box) {
+            public static int EntryValueIsUnknown([NonNull] Box box) {
                 Contract.Ensures(Contract.Result<int>() == 0);
                 return box.Value;
             }
-            public static int OtherField([NotNull] Box box) {
+            public static int OtherField([NonNull] Box box) {
                 Contract.Requires(box.Value == 3);
                 Contract.Ensures(Contract.Result<int>() == 3);
                 box.Flag = true;
                 return box.Value;
             }
             private static int First(int first, int second) => first;
-            public static int EvaluationOrder([NotNull] Box box) {
+            public static int EvaluationOrder([NonNull] Box box) {
                 Contract.Ensures(Contract.Result<int>() == 0);
                 box.Value = 0;
                 return First(box.Value, box.Value = 5);

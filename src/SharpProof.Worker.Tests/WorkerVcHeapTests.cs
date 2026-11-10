@@ -12,30 +12,30 @@ internal sealed class WorkerVcHeapTests
         """
         using SharpProof.Attributes;
         public static class Subject {
-            public static int StoreThenRead([NotNull] int[] values) {
+            public static int StoreThenRead([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 7);
                 values[0] = 7;
                 return values[0];
             }
-            public static void SetFirst([NotNull] int[] values) {
+            public static void SetFirst([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(values[0] == 7);
                 values[0] = 7;
             }
-            public static void Increment([NotNull] int[] values) {
+            public static void Increment([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(values[0] == Contract.Old(values[0]) + 1);
                 values[0]++;
             }
-            public static int MayAlias([NotNull] int[] left, [NotNull] int[] right) {
+            public static int MayAlias([NonNull] int[] left, [NonNull] int[] right) {
                 Contract.Requires(left.Length > 0 && right.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 1);
                 left[0] = 1;
                 right[0] = 2;
                 return left[0];
             }
-            public static int Distinct([NotNull] int[] left, [NotNull] int[] right) {
+            public static int Distinct([NonNull] int[] left, [NonNull] int[] right) {
                 Contract.Requires(left.Length > 0 && right.Length > 0);
                 Contract.Requires(left != right);
                 Contract.Ensures(Contract.Result<int>() == 1);
@@ -44,19 +44,19 @@ internal sealed class WorkerVcHeapTests
                 return left[0];
             }
             private static int First(int first, int second) => first;
-            public static int EvaluationOrder([NotNull] int[] values) {
+            public static int EvaluationOrder([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 0);
                 values[0] = 0;
                 return First(values[0], values[0] = 5);
             }
-            public static int WrongValue([NotNull] int[] values) {
+            public static int WrongValue([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 8);
                 values[0] = 7;
                 return values[0];
             }
-            public static int OverwrittenInLoop([NotNull] int[] values) {
+            public static int OverwrittenInLoop([NonNull] int[] values) {
                 Contract.Requires(values.Length > 0);
                 Contract.Ensures(Contract.Result<int>() == 9);
                 values[0] = 9;

@@ -29,12 +29,12 @@ public sealed class ContractApiIdentityAnalyzerTests
                 [System.AttributeUsage(
                     System.AttributeTargets.Parameter |
                     System.AttributeTargets.ReturnValue)]
-                public sealed class NotNullAttribute :
+                public sealed class NonNullAttribute :
                     System.Attribute {
                 }
             }
             public static class Subject {
-                [return: SharpProof.Attributes.NotNull]
+                [return: SharpProof.Attributes.NonNull]
                 public static string Read() => "value";
             }
             """;
@@ -77,12 +77,12 @@ public sealed class ContractApiIdentityAnalyzerTests
         const string source =
             """
             namespace Lookalike {
-                public sealed class NotNullAttribute :
+                public sealed class NonNullAttribute :
                     System.Attribute {
                 }
             }
             public static class Subject {
-                [return: Lookalike.NotNull]
+                [return: Lookalike.NonNull]
                 public static string Read() => "value";
             }
             """;
@@ -99,10 +99,47 @@ public sealed class ContractApiIdentityAnalyzerTests
             """
             using SharpProof.Attributes;
             public static class Subject {
-                [return: NotNull]
+                [return: NonNull]
                 public static string Read() => "value";
             }
             """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task ClosedNonNullCoexistsWithNullableAnalysisNamespace()
+    {
+        const string source =
+            """
+            #nullable enable
+            using System.Diagnostics.CodeAnalysis;
+            using SharpProof.Attributes;
+            public static class Subject {
+                [return: NonNull]
+                public static string Read([NonNull] string text) => text;
+
+                public static void Fill([NotNull] ref string? cache) => cache ??= "value";
+            }
+            """;
+        var compilation = AnalyzerTestHost.CreateCompilation(source, []);
+        Assert.That(
+            compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
+            Is.Empty);
+        var subject = compilation.GetTypeByMetadataName("Subject")!;
+        var read = subject.GetMembers("Read").OfType<IMethodSymbol>().Single();
+        var fill = subject.GetMembers("Fill").OfType<IMethodSymbol>().Single();
+        Assert.That(
+            read.GetReturnTypeAttributes().Single().AttributeClass!.ToDisplayString(),
+            Is.EqualTo("SharpProof.Attributes.NonNullAttribute"));
+        Assert.That(
+            read.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),
+            Is.EqualTo("SharpProof.Attributes.NonNullAttribute"));
+        Assert.That(
+            fill.Parameters.Single().GetAttributes().Single().AttributeClass!.ToDisplayString(),
+            Is.EqualTo("System.Diagnostics.CodeAnalysis.NotNullAttribute"));
 
         var diagnostics = await Analyze(source);
 
@@ -260,13 +297,13 @@ public sealed class ContractApiIdentityAnalyzerTests
             namespace SharpProof.Attributes {
                 [System.AttributeUsage(
                     System.AttributeTargets.ReturnValue)]
-                public sealed class NotNullAttribute :
+                public sealed class NonNullAttribute :
                     System.Attribute {
                 }
             }
 
             public static class Subject {
-                [return: SharpProof.Attributes.NotNull]
+                [return: SharpProof.Attributes.NonNull]
                 private static string MaybeNull(bool condition) {
                     return condition ? "" : null!;
                 }

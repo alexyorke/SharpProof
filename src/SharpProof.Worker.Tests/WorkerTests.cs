@@ -2479,8 +2479,8 @@ internal sealed partial class WorkerTests
             using SharpProof.Attributes;
             public static class Subject {
                 public static void Invalid(
-                    [NotNull] int[] left,
-                    [NotNull] int[] right) {
+                    [NonNull] int[] left,
+                    [NonNull] int[] right) {
                     Contract.Requires(left.Length == 1);
                     Contract.Requires(right.Length == 1);
                     Contract.Ensures(

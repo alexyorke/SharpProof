@@ -95,7 +95,7 @@ internal sealed class ContractBinderTests
             $$"""
             using SharpProof.Attributes;
             public static unsafe class Target {
-                public static void Annotated([NotNull] {{type}} value) {}
+                public static void Annotated([NonNull] {{type}} value) {}
                 public static void Unannotated({{type}} value) {}
             }
             """,
@@ -799,9 +799,9 @@ internal sealed class ContractBinderTests
             """
             using SharpProof.Attributes;
             public static class Target {
-                [return: NotNull]
+                [return: NonNull]
                 public static string Read(
-                    [NotNull] string text,
+                    [NonNull] string text,
                     [Positive, InRange(1L, 10L)] long count) => text;
             }
             """;
@@ -886,7 +886,7 @@ internal sealed class ContractBinderTests
                 First
             }
             public static class Target {
-                public static void Read([NotNull] TYPE value) {
+                public static void Read([NonNull] TYPE value) {
                 }
             }
             """.Replace("TYPE", typeName, StringComparison.Ordinal);
@@ -897,7 +897,7 @@ internal sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
     }
 
-    [TestCase("[NotNull]", "string")]
+    [TestCase("[NonNull]", "string")]
     [TestCase("[Positive]", "long")]
     [TestCase("[InRange(1, 10)]", "long")]
     public void ClosedPreconditionRejectsOutParameters(
@@ -931,7 +931,7 @@ internal sealed class ContractBinderTests
             """
             using SharpProof.Attributes;
             public static class Target {
-                public static void Read<T>([NotNull] T value)
+                public static void Read<T>([NonNull] T value)
                     where T : struct {
                 }
             }
@@ -950,7 +950,7 @@ internal sealed class ContractBinderTests
             """
             using SharpProof.Attributes;
             public static class Target {
-                public static void Read<T>([NotNull] T value)
+                public static void Read<T>([NonNull] T value)
                     where T : class {
                 }
             }
@@ -990,7 +990,7 @@ internal sealed class ContractBinderTests
             """
             using SharpProof.Attributes;
             public static class Target {
-                [return: NotNull]
+                [return: NonNull]
                 public static void Read() {
                 }
             }

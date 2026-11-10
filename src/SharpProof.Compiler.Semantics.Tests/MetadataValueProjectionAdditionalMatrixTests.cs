@@ -64,9 +64,9 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
                 [InRange(long.MinValue, long.MinValue)] uint belowUIntDomain) { }
 
             public static void References(
-                [NotNull] string text,
-                [NotNull] int[] values,
-                [NotNull] object instance) { }
+                [NonNull] string text,
+                [NonNull] int[] values,
+                [NonNull] object instance) { }
 
             public static void Pair(
                 [Positive] int validPrefix,
@@ -77,7 +77,7 @@ public sealed class MetadataValueProjectionAdditionalMatrixTests
                 bool marker) { }
 
             public static void WrongReferenceGetter(
-                [NotNull] string text,
+                [NonNull] string text,
                 int marker) { }
         }
         """;

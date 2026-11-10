@@ -48,7 +48,7 @@ public sealed class NativeEffectContractTests
     public async Task InlinedCalleeReceiverIsNotCallerReceiver()
     {
         const string method = "[EffectContract(SharpProofEffect.WritesReceiverState)] " +
-            "public int Target([NotNull] C other, int value) { other.Set(value); return value; }";
+            "public int Target([NonNull] C other, int value) { other.Set(value); return value; }";
         const string source = "using SharpProof.Attributes; public sealed class C { " +
             "public int Stored; private void Set(int value) { Stored = value; } " + method + " }";
         using var image = new MemoryStream();
@@ -150,7 +150,7 @@ public sealed class NativeEffectContractTests
         System.ArgumentNullException.ThrowIfNull(body);
         System.ArgumentNullException.ThrowIfNull(effects);
         var result = await VerifyAsync("[EffectContract(" + effects + ", Complete = true)] public int Target(" +
-            "[NotNull] int[] values, [NotNull] string text) { " + body + " }");
+            "[NonNull] int[] values, [NonNull] string text) { " + body + " }");
         if (proven)
         { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         else

@@ -3,16 +3,18 @@ namespace SharpProof.Attributes;
 /// <summary>Declares that a parameter or return value is non-null.</summary>
 /// <remarks>
 /// Applies to reference-capable parameters and return values. Parameter use is an incoming-value precondition;
-/// <c>[return: NotNull]</c> describes normal return. An <c>out</c> parameter has no incoming value and is rejected.
-/// This is a static contract and inserts no runtime null check.
+/// <c>[return: NonNull]</c> describes normal return. An <c>out</c> parameter has no incoming value and is rejected.
+/// This is a static contract and inserts no runtime null check. The name differs from
+/// <c>System.Diagnostics.CodeAnalysis.NotNullAttribute</c>, a nullable-analysis annotation with different meaning,
+/// so a file can import both namespaces without an ambiguous <c>[NotNull]</c> reference.
 /// </remarks>
 [AttributeUsage(
     SharpProofAttributeTargets.ParameterOrReturn,
     Inherited = false)]
-public sealed class NotNullAttribute : Attribute
+public sealed class NonNullAttribute : Attribute
 {
-    /// <summary>Initializes a new instance of the <see cref="NotNullAttribute"/> class.</summary>
-    public NotNullAttribute()
+    /// <summary>Initializes a new instance of the <see cref="NonNullAttribute"/> class.</summary>
+    public NonNullAttribute()
     {
     }
 }

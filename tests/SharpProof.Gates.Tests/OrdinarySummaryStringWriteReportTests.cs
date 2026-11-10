@@ -19,7 +19,7 @@ public sealed class OrdinarySummaryStringWriteReportTests
     [Test]
     public async Task ActualOwnedNonNullStringEntryConfirmsItsStaticWrite()
     {
-        const string source = "public class SummaryInvocation { public static int Counter; public static void Target([global::SharpProof.Attributes.NotNull] string value) { Counter = 1; } }";
+        const string source = "public class SummaryInvocation { public static int Counter; public static void Target([global::SharpProof.Attributes.NonNull] string value) { Counter = 1; } }";
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var target = discovery.Targets.Values.Single(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) == "sample"));

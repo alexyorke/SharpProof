@@ -11,7 +11,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
 {
     private static readonly ImmutableArray<string> MarkerNames = ["MarkerAttribute", "PositiveAttribute"];
 
-    [TestCase("NotNull", "string", ContractBindingFailure.UnsupportedExpression)]
+    [TestCase("NonNull", "string", ContractBindingFailure.UnsupportedExpression)]
     [TestCase("Positive", "int", ContractBindingFailure.UnsupportedExpression)]
     [TestCase("InRange(-2L, 2L)", "int", ContractBindingFailure.UnsupportedExpression)]
     public void EveryRealClosedAttributeFamilyRejectsAValidBooleanIrValue(
@@ -59,7 +59,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         Assert.That(operationCalls, Is.Zero);
     }
 
-    [TestCase("NotNull", "string")]
+    [TestCase("NonNull", "string")]
     [TestCase("Positive", "int")]
     [TestCase("InRange(1L, 3L)", "int")]
     public void MissingLegalIrValueFailsClosedForRealAnnotations(
@@ -260,7 +260,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var library = TestCompilation.Create("ClosedAttributeMetadataLibrary", """
             using SharpProof.Attributes;
             public static class Library {
-                public static void Read([NotNull] string text, [Positive, InRange(1L, 3L)] int count) { }
+                public static void Read([NonNull] string text, [Positive, InRange(1L, 3L)] int count) { }
             }
             """);
         using var image = new MemoryStream();
