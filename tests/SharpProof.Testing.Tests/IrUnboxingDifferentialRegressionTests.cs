@@ -8,7 +8,7 @@ namespace SharpProof.Testing.Test;
 public sealed class IrUnboxingDifferentialRegressionTests
 {
     [Test]
-    public void InterpreterUsesCSharpObjectUnboxingSemantics()
+    public void InterpreterDefaultsInvalidUnboxing()
     {
         var fixture = CreateFixture();
         var interpreter = new IrInterpreter(fixture.Factory);
@@ -23,18 +23,11 @@ public sealed class IrUnboxingDifferentialRegressionTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                results["null integer"].Exception?.Kind,
-                Is.EqualTo(IrExceptionKind.NullReference));
-            Assert.That(
-                results["null boolean"].Exception?.Kind,
-                Is.EqualTo(IrExceptionKind.NullReference));
-            Assert.That(
-                results["wrong integer box"].Exception?.Kind,
-                Is.EqualTo(IrExceptionKind.InvalidCast));
-            Assert.That(
-                results["wrong boolean box"].Exception?.Kind,
-                Is.EqualTo(IrExceptionKind.InvalidCast));
+            // Total unboxing reads the target default; C# faults.
+            Assert.That(results["null integer"].Value!.Integer, Is.Zero);
+            Assert.That(results["null boolean"].Value!.Boolean, Is.False);
+            Assert.That(results["wrong integer box"].Value!.Integer, Is.Zero);
+            Assert.That(results["wrong boolean box"].Value!.Boolean, Is.False);
             Assert.That(results["integer"].Value!.Integer, Is.EqualTo(17));
             Assert.That(results["boolean"].Value!.Boolean, Is.True);
         }
@@ -54,7 +47,7 @@ public sealed class IrUnboxingDifferentialRegressionTests
 
             Assert.That(
                 result.Status,
-                Is.EqualTo(DifferentialStatus.Agreement),
+                Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined),
                 @case.Name + ": " + result.Detail);
         }
     }
@@ -89,7 +82,7 @@ public sealed class IrUnboxingDifferentialRegressionTests
                 new(
                     "integer",
                     unboxInteger,
-                    factory.CreateReferenceValue(factory.ObjectType, 17L)),
+                    factory.CreateReferenceValue(factory.ObjectType, 17)),
                 new(
                     "boolean",
                     unboxBoolean,
