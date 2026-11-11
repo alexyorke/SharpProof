@@ -813,8 +813,8 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 forward.Hash,
                 Is.EqualTo(
-                    "ea450f1375f8dbdc7c8bc32b1b29f57f2" +
-                    "ca56034ca3729f37b5965bc9a24363c"));
+                    "5db9f01d33be514f2db9f885467da35728" +
+                    "fc151dfc51b9929a77a516b630ceee"));
         }
     }
 
