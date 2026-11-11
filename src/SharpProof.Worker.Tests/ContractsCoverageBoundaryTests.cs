@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 

@@ -1,5 +1,5 @@
 #nullable enable
-namespace SharpProof.Specs;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed partial class ApiSpecLookupResult
 {

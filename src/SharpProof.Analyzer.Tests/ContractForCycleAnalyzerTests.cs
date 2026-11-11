@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using SharpProof.ContractForValidation;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -184,7 +183,7 @@ public sealed class ContractForCycleAnalyzerTests
             .OfType<IMethodSymbol>()
             .Single();
 
-        var binding = new SharpProof.Contracts.ContractBinder(compilation).Bind(target);
+        var binding = new SharpProof.Compiler.Semantics.ContractBinder(compilation).Bind(target);
 
         using (Assert.EnterMultipleScope())
         {

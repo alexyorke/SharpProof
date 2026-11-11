@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 internal static class EffectContractMappings
 {

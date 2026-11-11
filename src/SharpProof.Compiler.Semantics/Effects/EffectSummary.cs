@@ -1,4 +1,4 @@
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed record EffectSummary
 {

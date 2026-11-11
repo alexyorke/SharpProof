@@ -121,7 +121,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
         using SharpProof.Host;
         using SharpProof.Ir;
         using SharpProof.Smt;
-        using SharpProof.Verify;
+        using SharpProof.Smt;
 
         internal static class Program
         {

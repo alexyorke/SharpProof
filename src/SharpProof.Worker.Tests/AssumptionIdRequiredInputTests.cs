@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Verify;
 
 namespace SharpProof.Worker.Test;
 

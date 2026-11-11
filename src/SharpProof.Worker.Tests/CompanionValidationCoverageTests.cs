@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using SharpProof.ContractForValidation;
-using SharpProof.Contracts;
+using SharpProof.Analyzer;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Worker.Test;
 

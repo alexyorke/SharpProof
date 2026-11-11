@@ -1,6 +1,6 @@
 using SharpProof.Worker.Protocol;
 
-namespace SharpProof.Reporting;
+namespace SharpProof.Tool;
 
 internal sealed class VerificationChange
 {

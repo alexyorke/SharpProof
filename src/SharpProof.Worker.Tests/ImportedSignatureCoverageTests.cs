@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 
 namespace SharpProof.Worker.Test;
 

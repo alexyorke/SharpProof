@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.Z3;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using IrTypeId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrTypeTag>;
-using Goal = SharpProof.Verify.Goal;
+using Goal = SharpProof.Smt.Goal;
 
 namespace SharpProof.Smt.Test;
 

@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
 using SharpProof.Host;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 

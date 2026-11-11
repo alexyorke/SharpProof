@@ -1,4 +1,4 @@
-using Goal = SharpProof.Verify.Goal;
+using Goal = SharpProof.Smt.Goal;
 
 namespace SharpProof.Smt.Test;
 

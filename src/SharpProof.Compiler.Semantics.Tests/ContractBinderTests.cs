@@ -8,7 +8,7 @@ using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 internal sealed class ContractBinderTests

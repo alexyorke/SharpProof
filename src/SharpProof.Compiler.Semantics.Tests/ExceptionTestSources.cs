@@ -1,4 +1,4 @@
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 internal static class ExceptionTestSources
 {

@@ -5,7 +5,7 @@ using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class TotalMaterializationArityTests

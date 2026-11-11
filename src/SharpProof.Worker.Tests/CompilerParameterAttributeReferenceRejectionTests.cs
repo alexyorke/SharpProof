@@ -12,7 +12,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
 using SharpProof.Logging;
 

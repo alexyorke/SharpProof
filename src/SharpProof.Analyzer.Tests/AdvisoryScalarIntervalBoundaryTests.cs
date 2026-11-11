@@ -4,7 +4,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
-using CoreTransfer = SharpProof.Advisory.Core.CoreIrScalarIntervalTransfer;
+using CoreTransfer = SharpProof.Analyzer.CoreIrScalarIntervalTransfer;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
 namespace SharpProof.Analyzer.Test;

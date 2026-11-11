@@ -7,7 +7,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class CompanionEditingRecoveryTests

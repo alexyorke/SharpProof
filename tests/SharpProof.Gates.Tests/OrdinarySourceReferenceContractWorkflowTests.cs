@@ -6,7 +6,6 @@ using SharpProof.Compiler.Semantics;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
 using SharpProof.Frontend;
 using SharpProof.Gates.Corpus;
 using SharpProof.Ir;

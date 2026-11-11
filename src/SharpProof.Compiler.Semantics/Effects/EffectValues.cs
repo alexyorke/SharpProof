@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using SharpProof.Roslyn;
 
-namespace SharpProof.Effects;
+namespace SharpProof.Compiler.Semantics;
 
 internal readonly record struct EffectCapabilitySet
 {

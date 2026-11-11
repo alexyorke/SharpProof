@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Globalization;
-using SharpProof.Reporting;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Tool;

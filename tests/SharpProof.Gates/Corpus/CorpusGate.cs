@@ -8,7 +8,7 @@ using SharpProof.Analyzer;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;

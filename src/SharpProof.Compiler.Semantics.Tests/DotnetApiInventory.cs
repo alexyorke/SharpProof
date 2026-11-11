@@ -3,7 +3,7 @@ using System.Globalization;
 using SharpProof.Frontend;
 using SharpProof.Specs;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 // Test infrastructure: the inventory observes the production resolver and intrinsic
 // predicates. It never grants support based on an API name alone.

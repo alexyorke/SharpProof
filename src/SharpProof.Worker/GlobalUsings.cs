@@ -10,5 +10,4 @@ global using SharpProof.CompilerArtifact;
 global using SharpProof.Ir;
 global using SharpProof.Smt;
 global using SharpProof.Specs;
-global using SharpProof.Verify;
 global using SharpProof.Worker.Protocol;

@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using SharpProof.Advisory.Core;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
 

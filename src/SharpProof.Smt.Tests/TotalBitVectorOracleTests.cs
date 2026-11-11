@@ -65,7 +65,7 @@ public sealed class TotalBitVectorOracleTests
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(y), factory.IntegerBits(type, right)),
                             new LoweredJustification(factory.CreateOperation())));
                     var query = new VerificationQuery(factory, assumptions,
-                        new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.AndAlso,
+                        new SharpProof.Smt.Goal(factory, factory.Binary(IrBinaryOperator.AndAlso,
                             factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
                             factory.Binary(IrBinaryOperator.Equal, factory.Binary(operation, factory.IntegerBits(type, left), factory.Variable(y)),
                                 factory.IntegerBits(type, expected))),
@@ -127,7 +127,7 @@ public sealed class TotalBitVectorOracleTests
                         new Assumption(factory, factory.Binary(IrBinaryOperator.Equal, factory.Variable(y), factory.IntegerBits(type, right)),
                             new LoweredJustification(factory.CreateOperation())));
                     var query = new VerificationQuery(factory, assumptions,
-                        new SharpProof.Verify.Goal(factory, factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
+                        new SharpProof.Smt.Goal(factory, factory.Binary(IrBinaryOperator.Equal, term, factory.IntegerBits(type, expected)),
                             ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0)));
                     var solved = await session.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
                     Assert.That(solved.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable),

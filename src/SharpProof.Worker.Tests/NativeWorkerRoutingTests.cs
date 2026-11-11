@@ -3,7 +3,6 @@ using NUnit.Framework;
 using SharpProof.Host;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

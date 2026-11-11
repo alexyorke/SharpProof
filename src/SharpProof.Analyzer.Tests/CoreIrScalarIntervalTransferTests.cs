@@ -1,6 +1,5 @@
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 using System.Collections.Immutable;
-using SharpProof.Advisory.Core;
 using NUnit.Framework;
 using SharpProof.Dataflow;
 using SharpProof.Ir;

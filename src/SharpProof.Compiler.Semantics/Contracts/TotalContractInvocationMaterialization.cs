@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 // Prepares a compiler-derived source frame and binds raw single-argument
 // clause candidates. Recognition and enrollment remain with the caller.

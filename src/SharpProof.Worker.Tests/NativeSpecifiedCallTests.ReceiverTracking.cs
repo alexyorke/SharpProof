@@ -100,7 +100,7 @@ internal sealed partial class NativeSpecifiedCallTests
             frame =>
             {
                 System.ArgumentNullException.ThrowIfNull(frame);
-                var binding = new SharpProof.Contracts.TotalContractBinder(compilation, factory).BindTotalRequires(frame,
+                var binding = new SharpProof.Compiler.Semantics.TotalContractBinder(compilation, factory).BindTotalRequires(frame,
                     cancellationToken: TestContext.CurrentContext.CancellationToken);
                 Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
                 return binding.IsSuccess;

@@ -10,7 +10,7 @@ using NUnit.Framework;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 
-namespace SharpProof.Contracts.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class TotalClosedAttributeBoundaryMatrixTests

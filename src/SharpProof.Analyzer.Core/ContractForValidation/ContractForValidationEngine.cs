@@ -1,4 +1,4 @@
-namespace SharpProof.ContractForValidation;
+namespace SharpProof.Analyzer;
 
 internal static class ContractForValidationEngine
 {

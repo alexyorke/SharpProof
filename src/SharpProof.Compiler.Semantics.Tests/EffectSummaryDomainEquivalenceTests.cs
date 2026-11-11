@@ -1,6 +1,6 @@
 using SharpProof.Dataflow;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class EffectSummaryDomainEquivalenceTests

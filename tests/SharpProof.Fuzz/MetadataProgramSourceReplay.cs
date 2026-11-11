@@ -11,7 +11,7 @@ using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
 using SharpProof.Host;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
 

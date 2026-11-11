@@ -7,7 +7,7 @@ using SharpProof.Analyzer;
 using SharpProof.Compiler.Semantics;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;

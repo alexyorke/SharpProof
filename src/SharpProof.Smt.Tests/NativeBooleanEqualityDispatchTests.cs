@@ -1,5 +1,5 @@
 using Microsoft.Z3;
-using Goal = SharpProof.Verify.Goal;
+using Goal = SharpProof.Smt.Goal;
 
 namespace SharpProof.Smt.Test;
 

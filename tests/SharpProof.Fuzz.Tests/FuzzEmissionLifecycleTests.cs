@@ -6,9 +6,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Frontend;
-using SharpProof.Fuzz;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 
 namespace SharpProof.Fuzz.Test;
 

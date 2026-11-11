@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace SharpProof.Verify;
+namespace SharpProof.Smt;
 
 /// <summary>The concrete IR and contract state checked before a callable is refuted.</summary>
 internal sealed class CallableReplayContext(

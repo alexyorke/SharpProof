@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
 using NUnit.Framework;
-using SharpProof.Reporting;
 using SharpProof.Tool;
 using SharpProof.Worker.Protocol;
 

@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 public sealed partial class DotnetApiInventoryTests
 {

@@ -4,7 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using SharpProof.Dataflow;
 using SharpProof.Ir;
-using CoreScalarIntervalTransfer = SharpProof.Advisory.Core.CoreIrScalarIntervalTransfer;
+using CoreScalarIntervalTransfer = SharpProof.Analyzer.CoreIrScalarIntervalTransfer;
 
 
 namespace SharpProof.Analyzer.Test;

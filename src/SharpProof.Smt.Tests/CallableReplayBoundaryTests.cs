@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using System.Numerics;
 using IrVarId = SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>;
 
-namespace SharpProof.Verify.Test;
+namespace SharpProof.Smt.Test;
 
 [TestFixture]
 public sealed class CallableReplayBoundaryTests

@@ -1,4 +1,3 @@
-using SharpProof.Advisory.Core;
 using SharpProof.Dataflow;
 
 namespace SharpProof.Analyzer;

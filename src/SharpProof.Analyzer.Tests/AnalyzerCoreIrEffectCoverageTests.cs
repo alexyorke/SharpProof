@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Compiler.Semantics;
-using SharpProof.Effects;
 using SharpProof.Frontend;
 using SharpProof.Ir;
 using SharpProof.Specs;

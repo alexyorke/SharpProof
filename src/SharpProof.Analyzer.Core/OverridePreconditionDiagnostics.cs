@@ -1,4 +1,4 @@
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using SharpProof.Ir;
 
 namespace SharpProof.Analyzer;

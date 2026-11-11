@@ -1,6 +1,6 @@
 using SharpProof.Specs;
 
-namespace SharpProof.Effects.Test;
+namespace SharpProof.Compiler.Semantics.Test;
 
 [TestFixture]
 public sealed class ApiSpecResolutionCoverageTests

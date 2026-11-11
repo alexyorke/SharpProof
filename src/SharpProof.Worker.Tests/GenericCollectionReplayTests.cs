@@ -2,7 +2,6 @@ using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
 using SharpProof.Smt;
-using SharpProof.Verify;
 
 namespace SharpProof.Worker.Test;
 

@@ -19,7 +19,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
 using SharpProof.Ir;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Worker.Protocol;
 using Program = SharpProof.Worker.Launcher.Program;
 

@@ -1,4 +1,4 @@
-namespace SharpProof.Contracts;
+namespace SharpProof.Compiler.Semantics;
 
 internal sealed class BoundTotalMetadataRequires(int parameterOrdinal, AttributeData attribute,
     ClosedContractAttributeValidation validation, IrTerm value, IrTerm safeCondition)

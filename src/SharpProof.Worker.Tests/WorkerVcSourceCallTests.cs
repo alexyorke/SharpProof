@@ -1,11 +1,11 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
-using SharpProof.Verify;
+using SharpProof.Smt;
 using SharpProof.Ir;
 using SharpProof.Worker.Protocol;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
-using SharpProof.Contracts;
+using SharpProof.Compiler.Semantics;
 using System.Text.Json;
 
 namespace SharpProof.Worker.Test;

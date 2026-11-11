@@ -84,7 +84,7 @@ public sealed class KeyedEntryModelTests
             var meter = new SmtQueryResourceMeter(IrSmtBackendOptions.DefaultQueryRlimit, TestContext.CurrentContext.CancellationToken);
             var query = new VerificationQuery(factory,
                 predicates.Select(predicate => new Assumption(factory, predicate ?? throw new ArgumentNullException(nameof(predicate)), new LoweredJustification(factory.CreateOperation()))),
-                new SharpProof.Verify.Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
+                new SharpProof.Smt.Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), variables);
             encoder.ValidateQuery(query, meter, TestContext.CurrentContext.CancellationToken);
             foreach (var predicate in predicates)
             { solver.Assert(encoder.EncodeBoolean(predicate, meter)); }
