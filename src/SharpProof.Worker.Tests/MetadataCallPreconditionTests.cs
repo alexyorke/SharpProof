@@ -306,19 +306,34 @@ public sealed class MetadataCallPreconditionTests
         }
     }
 
-    [Test]
-    public void ArtifactRejectsAMetadataClaimOnAnotherAssembly()
+    // Every field of a metadata target is checked against the captured
+    // evidence, so a resealed manifest cannot relabel what was proved.
+    [TestCase("assembly")]
+    [TestCase("attribute")]
+    [TestCase("member")]
+    [TestCase("parameter")]
+    public void ArtifactRejectsAForgedMetadataTarget(string field)
     {
+        System.ArgumentNullException.ThrowIfNull(field);
         using var directory = new TempDirectory("sharpproof-metadata-call-");
-        var artifact = Artifact(Consumer("public static int Caller() { return Remote.Count(0); }"), Library(directory));
-        var claim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition);
+        var artifact = Artifact(Consumer("public static int Caller() { return Remote.Pick(10, 1); }"), Library(directory));
+        var claim = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition &&
+            claim.CallPrecondition!.MetadataClause!.Attribute.StartsWith("InRange", StringComparison.Ordinal));
+        var metadata = claim.CallPrecondition!.MetadataClause!;
         var forged = claim with
         {
-            CallPrecondition = claim.CallPrecondition! with
+            CallPrecondition = claim.CallPrecondition with
             {
-                MetadataClause = claim.CallPrecondition.MetadataClause! with { Assembly = "Other, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" }
+                MetadataClause = field switch
+                {
+                    "assembly" => metadata with { Assembly = "Other, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" },
+                    "attribute" => metadata with { Attribute = "Positive" },
+                    "member" => metadata with { Member = metadata.Member.Replace("Pick", "Count", StringComparison.Ordinal) },
+                    _ => metadata with { Parameter = 1 }
+                }
             }
         };
+        Assert.That(forged.CallPrecondition!.MetadataClause, Is.Not.EqualTo(metadata));
         var manifest = artifact.Manifest with { Claims = artifact.Manifest.Claims.Replace(claim, forged) };
         WorkerProtocolJson.SealManifest(manifest);
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact with { Manifest = manifest }, TestContext.CurrentContext.CancellationToken);

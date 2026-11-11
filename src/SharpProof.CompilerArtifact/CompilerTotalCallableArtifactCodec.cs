@@ -456,8 +456,7 @@ internal static class CompilerTotalCallableArtifactCodec
                     claim.CallPrecondition is { } target && target.Callee == row.CalleeIdentity && target.ClauseOrdinal == row.ClauseOrdinal &&
                     claim.Location.Start == span.Start && claim.Location.Length == span.Length &&
                     (row.MetadataClause is { } origin
-                        ? target.ClauseLocation == null && target.MetadataClause is { } metadata && metadata.Assembly == origin.AssemblyIdentity &&
-                            metadata.Parameter == origin.ParameterOrdinal
+                        ? target.ClauseLocation == null && target.MetadataClause == origin.ClaimTarget(row.CalleeIdentity)
                         : target.ClauseLocation is { } clause && target.MetadataClause == null &&
                             factory.GetOperationInfo(clauseSite).SourceSpan is { } clauseSpan &&
                             clause.Start == clauseSpan.Start && clause.Length == clauseSpan.Length),
