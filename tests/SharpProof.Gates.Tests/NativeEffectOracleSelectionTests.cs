@@ -12,7 +12,7 @@ namespace SharpProof.Gates.Test;
 public sealed class NativeEffectOracleSelectionTests
 {
     [TestCase(1, false)]
-    [TestCase(200, true)]
+    [TestCase(500, true)]
     public async Task ExplicitLimitPreservesPinnedMethodSelection(int maximumMethods, bool exhaustive)
     {
         var root = RepositoryLayout.FindRoot();
@@ -87,7 +87,7 @@ public sealed class NativeEffectOracleSelectionTests
         Assert.That(report.Passed, Is.True);
     }
     [TestCase(-1)]
-    [TestCase(201)]
+    [TestCase(501)]
     public void LimitsOutsidePinnedUniverseAreRejected(int maximumMethods)
     {
         var error = Assert.ThrowsAsync<ArgumentOutOfRangeException>(new Func<Task>(() =>

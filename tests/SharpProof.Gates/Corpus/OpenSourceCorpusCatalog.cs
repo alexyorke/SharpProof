@@ -16,6 +16,8 @@ internal static class OpenSourceCorpusCatalog
     internal const int MinimumMethodCount = 200;
     internal const int MaximumMethodCount = 500;
     internal const int MinimumSourceFileCount = 25;
+    internal const int SchemaVersion = 3;
+    internal static readonly ImmutableArray<string> AllowedLicenses = ["Apache-2.0", "MIT"];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -116,6 +118,35 @@ internal static class OpenSourceCorpusCatalog
             "Corpus");
     }
 
+    internal static string GetSourcesConfigPath(string repositoryRoot)
+    {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
+        return Path.Combine(GetCorpusDirectory(repositoryRoot), "sources.json");
+    }
+
+    // Every source's files parse with that source's preprocessor symbols.
+    internal static CSharpParseOptions GetParseOptions(
+        OpenSourceCorpusCompilationOptions options)
+    {
+        System.ArgumentNullException.ThrowIfNull(options);
+        return options.PreprocessorSymbols.IsDefaultOrEmpty
+            ? AnalyzerGateHost.ParseOptions
+            : AnalyzerGateHost.ParseOptions.WithPreprocessorSymbols(options.PreprocessorSymbols);
+    }
+
+    // Documents built by tests may omit their source entries; those files
+    // compile with the default options.
+    internal static OpenSourceCorpusCompilationOptions GetCompilationOptions(
+        OpenSourceCorpusDocument document,
+        string sourceId)
+    {
+        System.ArgumentNullException.ThrowIfNull(document);
+        System.ArgumentNullException.ThrowIfNull(sourceId);
+        return (document.Sources.IsDefault ? [] : document.Sources)
+            .FirstOrDefault(source => source is not null && string.Equals(source.Id, sourceId, StringComparison.Ordinal))?
+            .Compilation ?? OpenSourceCorpusCompilationOptions.Default;
+    }
+
     internal static string GetSourceFileKey(string sourceId, string path)
     {
         System.ArgumentNullException.ThrowIfNull(path);
@@ -149,7 +180,7 @@ internal static class OpenSourceCorpusCatalog
         OpenSourceCorpusDocument document,
         string corpusDirectory)
     {
-        if (document.SchemaVersion != 2)
+        if (document.SchemaVersion != SchemaVersion)
         {
             throw new InvalidDataException(
                 $"Unsupported OSS corpus schema {document.SchemaVersion}.");
@@ -174,6 +205,9 @@ internal static class OpenSourceCorpusCatalog
         }
 
         var sourceIds = ValidateSourceIds(document.Sources);
+        var sourcesById = document.Sources.ToImmutableDictionary(
+            static source => source.Id,
+            StringComparer.Ordinal);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
         {
@@ -229,7 +263,7 @@ internal static class OpenSourceCorpusCatalog
 
             var root = CSharpSyntaxTree.ParseText(
                     content,
-                    AnalyzerGateHost.ParseOptions,
+                    GetParseOptions(sourcesById[file.SourceId].Compilation),
                     file.Path)
                 .GetCompilationUnitRoot();
             fileBuilder.Add(key, root);
@@ -460,31 +494,75 @@ internal static class OpenSourceCorpusCatalog
                 $"OSS corpus source {source.Id} must pin a full Git commit.");
         }
 
-        if (!string.Equals(source.LicenseSpdx, "MIT", StringComparison.Ordinal))
+        if (!AllowedLicenses.Contains(source.LicenseSpdx, StringComparer.Ordinal))
         {
             throw new InvalidDataException(
                 $"OSS corpus source {source.Id} uses unsupported license " +
-                $"{source.LicenseSpdx}; this importer currently accepts MIT only.");
+                $"{source.LicenseSpdx}; the corpus accepts " +
+                $"{string.Join(" and ", AllowedLicenses)} only.");
         }
 
-        ValidateRelativePath(source.LicenseFile, $"source {source.Id} license");
-        var licensePath = Path.GetFullPath(
-            Path.Combine(corpusDirectory, source.LicenseFile));
-        EnsureContained(corpusDirectory, licensePath);
-        if (!File.Exists(licensePath))
+        ValidateCopiedFile(corpusDirectory, source.Id, "license", source.LicenseFile, source.LicenseSha256);
+        if (source.NoticeFiles.IsDefault || source.NoticeFiles.Any(static notice => notice is null))
         {
             throw new InvalidDataException(
-                $"OSS corpus source {source.Id} license file is missing.");
+                $"OSS corpus source {source.Id} must list its notice files.");
         }
 
-        var actualHash = HashEncoding.ComputeSha256Hex((File.ReadAllBytes(licensePath)).ToImmutableArray());
+        foreach (var notice in source.NoticeFiles)
+        {
+            ValidateCopiedFile(corpusDirectory, source.Id, "notice", notice.File, notice.Sha256);
+        }
+
+        ValidateCompilationOptions(source.Id, source.Compilation);
+    }
+
+    internal static void ValidateCompilationOptions(
+        string sourceId,
+        OpenSourceCorpusCompilationOptions? options)
+    {
+        System.ArgumentNullException.ThrowIfNull(sourceId);
+        if (options is null ||
+            options.GlobalUsings.IsDefault ||
+            options.PreprocessorSymbols.IsDefault ||
+            options.GlobalUsings.Any(static name => string.IsNullOrWhiteSpace(name) ||
+                !name.Split('.').All(SyntaxFacts.IsValidIdentifier)) ||
+            options.PreprocessorSymbols.Any(static symbol => !SyntaxFacts.IsValidIdentifier(symbol)))
+        {
+            throw new InvalidDataException(
+                $"OSS corpus source {sourceId} has invalid compilation options.");
+        }
+    }
+
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
+    private static void ValidateCopiedFile(
+        string corpusDirectory,
+        string sourceId,
+        string kind,
+        string relativePath,
+        string expectedSha256)
+    {
+        ValidateRelativePath(relativePath, $"source {sourceId} {kind}");
+        var path = Path.GetFullPath(
+            Path.Combine(corpusDirectory, relativePath));
+        EnsureContained(corpusDirectory, path);
+        if (!File.Exists(path))
+        {
+            throw new InvalidDataException(
+                $"OSS corpus source {sourceId} {kind} file is missing.");
+        }
+
+        var actualHash = HashEncoding.ComputeSha256Hex((File.ReadAllBytes(path)).ToImmutableArray());
         if (!string.Equals(
                 actualHash,
-                source.LicenseSha256,
+                expectedSha256,
                 StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"OSS corpus source {source.Id} license hash does not match.");
+                $"OSS corpus source {sourceId} {kind} hash does not match.");
         }
     }
 

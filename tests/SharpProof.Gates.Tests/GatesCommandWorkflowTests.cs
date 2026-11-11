@@ -83,7 +83,7 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         using (Assert.EnterMultipleScope())
         {
             Assert.That(report.GetProperty("ContractKind").GetString(), Is.EqualTo(contract));
-            Assert.That(report.GetProperty("UniverseMethodCount").GetInt32(), Is.EqualTo(200));
+            Assert.That(report.GetProperty("UniverseMethodCount").GetInt32(), Is.EqualTo(500));
             Assert.That(report.GetProperty("CheckedMethodCount").GetInt32(), Is.EqualTo(1));
             Assert.That(report.GetProperty("Exhaustive").GetBoolean(), Is.False);
             Assert.That(report.GetProperty("Passed").GetBoolean(), Is.True);
@@ -98,11 +98,12 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         var result = await RunAsync([]);
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         Assert.That(result.Error, Does.StartWith("Corpus gate wall time: "));
+        Assert.That(result.Error, Does.Contain("Corpus source nodatime: 100 methods, "));
         using var document = JsonDocument.Parse(result.Output);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(document.RootElement.GetProperty("Passed").GetBoolean(), Is.True);
-            Assert.That(document.RootElement.GetProperty("CaseCount").GetInt32(), Is.EqualTo(462));
+            Assert.That(document.RootElement.GetProperty("CaseCount").GetInt32(), Is.EqualTo(762));
         }
     }
 

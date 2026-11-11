@@ -37,7 +37,7 @@ public sealed class CorpusDeclarationWorkflowTests
         var document = SourceDocument("public static class C { public static int Value() => MissingValue; }");
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken)));
-        Assert.That(error!.Message, Does.StartWith("The pinned OSS corpus did not compile:"));
+        Assert.That(error!.Message, Does.StartWith("The pinned OSS corpus source '"));
         Assert.That(error.Message, Does.Contain("CS0103"));
         Assert.That(error.Message, Does.Contain("MissingValue"));
     }
