@@ -85,14 +85,14 @@ internal static class TestCompilation
         System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                errors.Select(static diagnostic => diagnostic.ToString())));
     }
 
     private static CSharpCompilation CreateCore(

@@ -16,10 +16,8 @@ public sealed class CorpusGateTests
     public void ResourceCallbackCorrectionRetainsPinnedGreatestCommonDivisorSource()
     {
         var document = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
-        var method = document.Methods.Single(static item => item is null
-            ? throw new ArgumentNullException(nameof(item)) : item.Id == "OSS0015");
-        var file = document.Files.Single(item => item is null
-            ? throw new ArgumentNullException(nameof(item)) : item.Path == method.Path);
+        var method = document.Methods.Single(static item => item.Id == "OSS0015");
+        var file = document.Files.Single(item => item.Path == method.Path);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(method.Support, Is.EqualTo(CorpusSupport.IntentionallyUnsupported));
@@ -112,12 +110,12 @@ public sealed class CorpusGateTests
             "internal class Unused {}", options, "Implementation.cs#1");
         var compilation = AnalyzerGateHost.CreateCompilation("", "CompanionCoverage")
             .RemoveAllSyntaxTrees().AddSyntaxTrees(implementation, companion, occupiedSuffix);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var batch = SharpProof.CompilerCollector.CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
             SharpProof.Worker.Protocol.WorkerFeatureSet.All,
             SharpProof.CompilerCollector.CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken).ToImmutableArray(), null,
             SharpProof.CompilerCollector.CompilerSpecificationPackProvider.ResolveConfiguration([]), TestContext.CurrentContext.CancellationToken);
-        Assert.That(batch.Gaps.All(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedOwnContracts")), Is.True);
+        Assert.That(batch.Gaps.All(static gap => gap.Reason == "UnsupportedOwnContracts"), Is.True);
         var body = batch.Callers.Single().Body;
         var detached = SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.DecodeShadowBody(body.CallableId,
             SharpProof.CompilerArtifact.CompilerTotalCallableArtifactCodec.Encode(body)!, TestContext.CurrentContext.CancellationToken);
@@ -150,15 +148,15 @@ public sealed class CorpusGateTests
         var root = RepositoryLayout.FindRoot();
         var snapshotPath = Path.Combine(root, "tests/SharpProof.Gates", "Corpus", "expected.canonical.snapshot");
         var snapshotBefore = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(snapshotPath)));
-        var frozen = ImmutableDictionaryCapture.Create((await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
-, static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0]), static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : line, StringComparer.Ordinal);
-        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Mode == "contracts")).ToImmutableArray();
+        var frozen = ImmutableDictionaryCapture.Create((await File.ReadAllLinesAsync(snapshotPath)).Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+, static line => line.Split('|')[0], static line => line, StringComparer.Ordinal);
+        var cases = CorpusCatalog.CreateSyntheticCases().Where(static item => item.Mode == "contracts").ToImmutableArray();
         Assert.That(cases, Has.Length.EqualTo(100));
-        Assert.That(cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId)).Distinct().Count(), Is.EqualTo(10));
-        Assert.That(frozen.Keys, Is.EquivalentTo(cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id))));
-        foreach (var seed in cases.GroupBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId), StringComparer.Ordinal))
+        Assert.That(cases.Select(static item => item.SeedId).Distinct().Count(), Is.EqualTo(10));
+        Assert.That(frozen.Keys, Is.EquivalentTo(cases.Select(static item => item.Id)));
+        foreach (var seed in cases.GroupBy(static item => item.SeedId, StringComparer.Ordinal))
         {
-            Assert.That(seed.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Variant)), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
+            Assert.That(seed.Select(static item => item.Variant), Is.EquivalentTo(Enum.GetValues<CorpusVariant>()), seed.Key);
         }
         var rows = ImmutableArray.CreateBuilder<(string Seed, string Outcome, string Reason)>();
         foreach (var item in cases)
@@ -201,8 +199,8 @@ public sealed class CorpusGateTests
             Assert.That(coverage.Matched, Is.EqualTo(1), item.Id);
             Assert.That(coverage.Failures, Is.Empty, item.Id);
             var nativeClause = detached.Body.CallPreconditions.Single();
-            var marker = detached.Body.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == nativeClause.Instruction));
+            var marker = detached.Body.Program.Blocks.SelectMany(static block => block.Instructions)
+                .Single(instruction => instruction.Id == nativeClause.Instruction);
             var callSpan = detached.Body.Program.Factory.GetOperationInfo(marker.Operation).SourceSpan!;
             var clauseSpan = detached.Body.Program.Factory.GetOperationInfo(nativeClause.ClauseSite).SourceSpan!;
             var nativeKey = new ContractCoverageKey(body.CallableId, nativeClause.CalleeIdentity, nativeClause.ClauseOrdinal,
@@ -861,21 +859,21 @@ public sealed class CorpusGateTests
     {
         var cases = CorpusCatalog.CreateCases();
         var synthetic = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.SyntheticMetamorphic)).ToImmutableArray();
+            item.Origin == CorpusOrigin.SyntheticMetamorphic).ToImmutableArray();
         var openSource = cases.Where(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Origin == CorpusOrigin.OpenSource)).ToImmutableArray();
+            item.Origin == CorpusOrigin.OpenSource).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(synthetic, Has.Length.EqualTo(262));
             Assert.That(
-                synthetic.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId)).Distinct().Count(),
+                synthetic.Select(static item => item.SeedId).Distinct().Count(),
                 Is.EqualTo(28));
             Assert.That(
-                synthetic.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Variant)).Distinct(),
+                synthetic.Select(static item => item.Variant).Distinct(),
                 Is.EquivalentTo(Enum.GetValues<CorpusVariant>()));
             Assert.That(
-                synthetic.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Support)),
+                synthetic.Select(static item => item.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
             Assert.That(
                 openSource.Length,
@@ -883,11 +881,11 @@ public sealed class CorpusGateTests
                     OpenSourceCorpusCatalog.MinimumMethodCount,
                     OpenSourceCorpusCatalog.MaximumMethodCount));
             Assert.That(
-                openSource.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ProvenanceId))
+                openSource.Select(static item => item.ProvenanceId)
                     .Distinct(StringComparer.Ordinal).Count(),
                 Is.EqualTo(openSource.Length));
             Assert.That(
-                cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id)).Distinct().Count(),
+                cases.Select(static item => item.Id).Distinct().Count(),
                 Is.EqualTo(cases.Length));
         }
     }
@@ -898,7 +896,7 @@ public sealed class CorpusGateTests
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
         var selectedFileCount = document.Methods
-            .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Path))
+            .Select(static method => method.Path)
             .Distinct(StringComparer.Ordinal)
             .Count();
 
@@ -913,10 +911,10 @@ public sealed class CorpusGateTests
             Assert.That(document.Methods, Has.Length.EqualTo(200));
             Assert.That(
                 document.Methods.Count(static method =>
-                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Supported)),
+                    method.Support == CorpusSupport.Supported),
                 Is.EqualTo(17));
             Assert.That(
-                document.Methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support)),
+                document.Methods.Select(static method => method.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
             Assert.That(
                 selectedFileCount,
@@ -924,7 +922,7 @@ public sealed class CorpusGateTests
                     OpenSourceCorpusCatalog.MinimumSourceFileCount));
             Assert.That(
                 document.Methods.Select(static method =>
-                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256)).Distinct(StringComparer.Ordinal)
+                    method.DeclarationSha256).Distinct(StringComparer.Ordinal)
                     .Count(),
                 Is.EqualTo(document.Methods.Length));
         }
@@ -970,7 +968,7 @@ public sealed class CorpusGateTests
             Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
-, static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Reason), static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Count)),
+, static item => item.Reason, static item => item.Count),
                 Is.EquivalentTo(
                     ImmutableDictionaryCapture.Create(ImmutableArray.Create(
                         new KeyValuePair<string, int>("SP0002", 122),
@@ -1023,12 +1021,12 @@ public sealed class CorpusGateTests
     {
         var cases = CorpusCatalog.CreateSyntheticCases();
         Assert.That(
-            cases.Any(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId.StartsWith('E') &&
-                item.Variant == CorpusVariant.AlphaRenameContractFormals)),
+            cases.Any(item => item.SeedId.StartsWith('E') &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
             Is.False);
         Assert.That(
-            cases.Any(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.SeedId == "C07" &&
-                item.Variant == CorpusVariant.AlphaRenameContractFormals)),
+            cases.Any(item => item.SeedId == "C07" &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
             Is.True);
     }
 
@@ -1037,32 +1035,32 @@ public sealed class CorpusGateTests
     {
         var catalog = CorpusCatalog.CreateSyntheticCases();
         var baseline = catalog.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "C02.baseline")) with
+            item.Id == "C02.baseline") with
         {
             Id = "seed.baseline",
             SeedId = "seed"
         };
         var renamed = catalog.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "C02.rename")) with
+            item.Id == "C02.rename") with
         {
             Id = "seed.rename",
             SeedId = "seed"
         };
         var temporary = catalog.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "C01.temporary")) with
+            item.Id == "C01.temporary") with
         {
             Id = "seed.temporary",
             SeedId = "seed"
         };
         var trivia = catalog.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "E02.trivia")) with
+            item.Id == "E02.trivia") with
         {
             Id = "seed.trivia",
             SeedId = "seed"
         };
         var cases = ImmutableArray.Create(baseline, renamed, temporary, trivia);
         var observations = (await Task.WhenAll(cases.Select(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken))))).ToImmutableArray();
+            CorpusGate.ObserveCaseAsync(item, TestContext.CurrentContext.CancellationToken)))).ToImmutableArray();
         var failures = CorpusGate.ValidateMetamorphicConsistency(
             [.. cases],
             [.. observations]);
@@ -1093,16 +1091,16 @@ public sealed class CorpusGateTests
                 "Corpus",
                 "expected.canonical.snapshot")).ToImmutableArray();
         var refuted = lines.Single(static line =>
-            line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("C02.baseline|", StringComparison.Ordinal)));
+            line.StartsWith("C02.baseline|", StringComparison.Ordinal));
         var refutedParts = refuted.Split('|').ToImmutableArray();
         var diagnosticParts = refutedParts[3].Split('@').ToImmutableArray();
         var message = Encoding.UTF8.GetString(
             Convert.FromBase64String(diagnosticParts[3]));
         var unsupportedInitialization = lines.Single(static line =>
-            line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal)))
+            line.StartsWith("OSS0139.baseline|", StringComparison.Ordinal))
             .Split('|').ToImmutableArray();
         var openSource = lines.Single(static line =>
-            line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith("OSS0003.baseline|", StringComparison.Ordinal)))
+            line.StartsWith("OSS0003.baseline|", StringComparison.Ordinal))
             .Split('|').ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
@@ -1145,10 +1143,10 @@ public sealed class IndependentPinnedRequiresCensusTests
     private static ImmutableArray<Row> Census(Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation, out int declarations, out int declaredRequires)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")!;
         Assert.That(api, Is.Not.Null);
-        Assert.That(api.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
+        Assert.That(api.Locations.Any(static location => location.IsInSource), Is.False);
         Assert.That(api.ContainingAssembly.Identity.Name, Is.EqualTo(typeof(SharpProof.Attributes.Contract).Assembly.GetName().Name));
         var clauses = ImmutableDictionary.CreateBuilder<IMethodSymbol, ImmutableArray<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>.Builder>(SymbolEqualityComparer.Default);
         var calls = ImmutableArray.CreateBuilder<(IMethodSymbol Owner, IMethodSymbol Target, Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax Syntax)>();
@@ -1179,14 +1177,14 @@ public sealed class IndependentPinnedRequiresCensusTests
                 calls.Add((owner, target.OriginalDefinition, invocation));
             }
         }
-        declaredRequires = clauses.Values.Sum(static owned => owned is null ? throw new System.ArgumentNullException(nameof(owned)) : (owned.Count));
+        declaredRequires = clauses.Values.Sum(static owned => owned.Count);
         var rows = ImmutableArray.CreateBuilder<Row>();
         foreach (var call in calls)
         {
             if (!clauses.TryGetValue(call.Target, out var required))
             { continue; }
             var ordinal = 0;
-            foreach (var clause in required.OrderBy(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SpanStart)))
+            foreach (var clause in required.OrderBy(static clause => clause.SpanStart))
             {
                 rows.Add(new(call.Owner.GetDocumentationCommentId()!, call.Target.GetDocumentationCommentId()!, ordinal++,
                     call.Syntax.SpanStart, call.Syntax.Span.Length, clause.SpanStart, clause.Span.Length));
@@ -1220,12 +1218,12 @@ public sealed class IndependentPinnedRequiresCensusTests
             var tree = compilation.SyntaxTrees.Single();
             var model = compilation.GetSemanticModel(tree);
             var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
-                .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.SpanStart == row.CallStart && invocation.Span.Length == row.CallLength));
+                .Single(invocation => invocation.SpanStart == row.CallStart && invocation.Span.Length == row.CallLength);
             var owner = (IMethodSymbol)model.GetEnclosingSymbol(syntax.SpanStart)!;
             Assert.That(owner.IsStatic && owner.MethodKind == MethodKind.Ordinary && owner.DeclaredAccessibility == Accessibility.Public,
                 Is.True, item.Id);
-            Assert.That(syntax.Ancestors().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax or
-                Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax)), Is.False, item.Id);
+            Assert.That(syntax.Ancestors().Any(static node => node is Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax or
+                Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax), Is.False, item.Id);
             var existing = CorpusGate.CensusContractCalls(compilation);
             Assert.That(existing.PublicOwners, Is.EqualTo(1), item.Id);
             Assert.That(existing.PotentialCalls, Is.EqualTo(rows.Length), item.Id);
@@ -1235,8 +1233,8 @@ public sealed class IndependentPinnedRequiresCensusTests
         }
         Assert.That(obligations, Is.EqualTo(100));
         var snapshot = (await File.ReadAllLinesAsync(Path.Combine(root, "tests/SharpProof.Gates", "Corpus", "expected.canonical.snapshot"))).ToImmutableArray();
-        var pinnedContractIds = snapshot.Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal)))
-            .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Split('|')[0])).ToImmutableArray();
+        var pinnedContractIds = snapshot.Where(static line => line.StartsWith('C') && line.Contains('|', StringComparison.Ordinal))
+            .Select(static line => line.Split('|')[0]).ToImmutableArray();
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
         var document = OpenSourceCorpusCatalog.Load(root);
         Assert.That(document.Methods, Has.Length.EqualTo(200));

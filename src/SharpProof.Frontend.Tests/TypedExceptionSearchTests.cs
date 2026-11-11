@@ -92,7 +92,7 @@ public sealed class TypedExceptionSearchTests
     {
         System.ArgumentNullException.ThrowIfNull(name);
         if (branch != null)
-        { TestContext.Out.WriteLine($"  {name} {branch.Semantics} -> {branch.Destination?.Ordinal} finally={string.Join(',', branch.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.FirstBlockOrdinal)))}"); }
+        { TestContext.Out.WriteLine($"  {name} {branch.Semantics} -> {branch.Destination?.Ordinal} finally={string.Join(',', branch.FinallyRegions.Select(region => region.FirstBlockOrdinal))}"); }
     }
 
     [TestCase(0, "10 / x")]

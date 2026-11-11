@@ -35,7 +35,7 @@ public sealed class LocalLifetimeRegionWorkApiCoverageTests
             { pending = pending.Push(child); }
         }
         var regions = regionsBuilder.ToImmutable();
-        var scopes = regions.Where(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (!region.Locals.IsEmpty)).ToImmutableArray();
+        var scopes = regions.Where(region => !region.Locals.IsEmpty).ToImmutableArray();
         TestContext.WriteLine($"Region scan leaves={leaves}; actualScopes={scopes.Length}; totalRegions={regions.Length}; blocks={subject.Graph.Blocks.Length}; membersSha256={Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(members)))}");
         Assert.That(scopes, Has.Length.EqualTo(2 * leaves - 1));
         foreach (var region in scopes)
@@ -48,7 +48,7 @@ public sealed class LocalLifetimeRegionWorkApiCoverageTests
             Assert.That(local.HasConstantValue, Is.False);
             Assert.That(SymbolEqualityComparer.Default.Equals(local.ContainingSymbol, subject.Context.Target), Is.True);
         }
-        Assert.That(regions.All(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind is ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime)), Is.True);
+        Assert.That(regions.All(region => region.Kind is ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime), Is.True);
         Assert.That(subject.Graph.Blocks.Length, Is.LessThanOrEqualTo(RoslynTotalProgramLowerer.MaximumRegionSteps));
         Assert.That(regions.Length > RoslynTotalProgramLowerer.MaximumRegionSteps, Is.EqualTo(exceedsLimit));
         var lowered = subject.Lower();

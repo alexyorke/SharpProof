@@ -52,7 +52,7 @@ internal static class AdvisoryLowering
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         cancellationToken.ThrowIfCancellationRequested();
-        var documents = DocumentMaps.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : new Documents(value));
+        var documents = DocumentMaps.GetValue(compilation, static value => new Documents(value));
         if (!documents.Paths.ContainsKey(declaration.SyntaxTree))
         { return (null, "SourceOwnership"); }
         if (!TotalSourceCallSession.IsBodyDeclaration(declaration))

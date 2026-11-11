@@ -72,8 +72,7 @@ internal static class CompilerForkJoinResourceLowering
                 var owner = new CompilerTotalCallablePreparation(
                     callableId + ":fork-child:" + children.Count.ToString(CultureInfo.InvariantCulture),
                     lowered.Program,
-                    [.. context.Parameters.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                        new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], null, [])
+                    [.. context.Parameters.Select(static parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], null, [])
                 { EffectsCompleteAtEntry = true };
                 children.Add(new(owner, cost.Bounds.Program, arguments.MoveToImmutable()));
                 return null;
@@ -82,7 +81,7 @@ internal static class CompilerForkJoinResourceLowering
             { return failure; }
         }
         return new(new(callableId, plan.Join.TargetMethod.ContainingAssembly.Identity.ToString(),
-            [.. method.Parameters.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Name)], children.MoveToImmutable())
+            [.. method.Parameters.Select(static parameter => parameter.Name)], children.MoveToImmutable())
         { ConfiguredAwait = plan.ConfiguredAwait }, null);
     }
 

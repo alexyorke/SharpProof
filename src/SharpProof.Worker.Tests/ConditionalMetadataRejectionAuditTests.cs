@@ -30,10 +30,10 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static readonly ImmutableArray<string> RealPresentSymbols = ["PRIVATE_PRESENT", "OFFICIAL_ABSENT"];
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group.Key, group => group.First());
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private const string CallerSource = """
@@ -136,13 +136,13 @@ public sealed class ConditionalMetadataRejectionAuditTests
             CallerSourceSha256 = Hash(Encoding.UTF8.GetBytes(CallerSource)),
             SourceLogIsConditional = sourceLog.IsConditional,
             SourceLogToken = sourceLog.MetadataToken,
-            Attributes = sourceAttributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
+            Attributes = sourceAttributes.Select(attribute => new
             {
                 Type = attribute.AttributeClass!.ToDisplayString(),
                 Assembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
                 Constructor = attribute.AttributeConstructor!.ToDisplayString(),
                 Values = attribute.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))).ToImmutableArray()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             Compiler = typeof(CSharpCompilation).Assembly.FullName,
             CompilerMvid = typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId,
             MetadataRuntime = typeof(MetadataReader).Assembly.FullName,
@@ -151,9 +151,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(sourceLog.IsConditional, Is.True);
         Assert.That(sourceLog.DeclaringSyntaxReferences.Length, Is.EqualTo(1));
         Assert.That(sourceAttributes.Length, Is.EqualTo(2));
-        var official = sourceAttributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType))).ToImmutableArray();
+        var official = sourceAttributes.Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType)).ToImmutableArray();
         Assert.That(official.Length, Is.EqualTo(settings.Mutation == null ? 1 : 2));
-        Assert.That(official.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : ((string)attribute.ConstructorArguments.Single().Value!)),
+        Assert.That(official.Select(attribute => (string)attribute.ConstructorArguments.Single().Value!),
             Does.Contain("OFFICIAL_ABSENT"));
         foreach (var attribute in official)
         {
@@ -321,14 +321,14 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(image.LogSignature, Is.EqualTo("00010108"));
         Assert.That(image.LogIl, Is.EqualTo("2a"));
         Assert.That(image.Rows.Length, Is.EqualTo(2));
-        Assert.That(image.Rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ParentToken == logToken)), Is.True);
-        var official = image.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Symbol == "OFFICIAL_ABSENT"));
+        Assert.That(image.Rows.All(row => row.ParentToken == logToken), Is.True);
+        var official = image.Rows.Single(row => row.Symbol == "OFFICIAL_ABSENT");
         Assert.That(official.ConstructorKind, Is.EqualTo(nameof(HandleKind.MemberReference)));
         Assert.That(official.OwnerKind, Is.EqualTo(nameof(HandleKind.TypeReference)));
         Assert.That(official.OwnerName, Is.EqualTo("ConditionalAttribute"));
         Assert.That(official.OwnerNamespace, Is.EqualTo("System.Diagnostics"));
         Assert.That(official.Signature, Is.EqualTo("2001010e"));
-        var extra = image.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId != official.RowId));
+        var extra = image.Rows.Single(row => row.RowId != official.RowId);
         if (mutated)
         {
             if (scenario == "nil-value")
@@ -461,8 +461,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
         Assert.That(after.Sha256, Is.Not.EqualTo(before.Sha256));
         Assert.That(after.Tables, Is.EqualTo(before.Tables));
         Assert.That(after.LogIl, Is.EqualTo(before.LogIl));
-        Assert.That(after.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact))),
-            Is.EqualTo(before.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RowId == MetadataTokens.GetRowNumber(intact)))));
+        Assert.That(after.Rows.Single(row => row.RowId == MetadataTokens.GetRowNumber(intact)),
+            Is.EqualTo(before.Rows.Single(row => row.RowId == MetadataTokens.GetRowNumber(intact))));
         return mutatedImage;
     }
 
@@ -587,9 +587,9 @@ public sealed class ConditionalMetadataRejectionAuditTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, producerBytes);
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
-            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
+            var calls = targetIl.Instructions.Where(instruction => instruction.OpCode is "call" or "callvirt").ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction.OpCode is "starg" or "starg.s").ToImmutableArray();
+            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction.OpCode == "div");
             var observations = (retained ? RetainedInputs : OmittedInputs).Select(input => Invoke(target, input)).ToImmutableArray();
             await Save(directory, "emission-and-clr.json", new
             {
@@ -629,8 +629,8 @@ public sealed class ConditionalMetadataRejectionAuditTests
             Assert.That(logType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static), Is.Empty);
             Assert.That(calls.Length, Is.EqualTo(retained ? 1 : 0));
             Assert.That(stores.Length, Is.EqualTo(retained ? 1 : 0));
-            Assert.That(targetIl.Instructions.Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "ldc.i4.1")), Is.EqualTo(retained ? 1 : 0));
-            Assert.That(targetIl.Instructions.Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")), Is.Zero);
+            Assert.That(targetIl.Instructions.Count(instruction => instruction.OpCode == "ldc.i4.1"), Is.EqualTo(retained ? 1 : 0));
+            Assert.That(targetIl.Instructions.Count(instruction => instruction.OpCode == "newobj"), Is.Zero);
             if (retained)
             {
                 var call = calls.Single();
@@ -689,7 +689,7 @@ public sealed class ConditionalMetadataRejectionAuditTests
         var result = compilation.Emit(image);
         await Save(directory, name + "-emit-diagnostics.json", Diagnostics(result.Diagnostics));
         Assert.That(result.Success, Is.True);
-        Assert.That(result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllBytesAsync(Path.Combine(directory, name + ".dll"), bytes.AsMemory());
         await Save(directory, name + "-pe.json", DescribePe(bytes));
@@ -765,14 +765,14 @@ public sealed class ConditionalMetadataRejectionAuditTests
     private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
-        return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
+        return diagnostics.Select(diagnostic => (object)new
         {
             diagnostic.Id,
             Severity = diagnostic.Severity.ToString(),
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        })).ToImmutableArray();
+        }).ToImmutableArray();
     }
 
     private static Task Save(string directory, string name, object value)

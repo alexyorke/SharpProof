@@ -39,13 +39,13 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
                 public static int Target() => Guard.Need(1);
             }
             """, ["SP0027"]);
-        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors.Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)), Is.EqualTo(missingBody ? MissingBodyErrorIds : ImmutableArray<string>.Empty));
+        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors.Select(d => d.Id), Is.EqualTo(missingBody ? MissingBodyErrorIds : ImmutableArray<string>.Empty));
         using (var image = new MemoryStream())
         {
             var emitted = compilation.Emit(image);
             Assert.That(emitted.Success, Is.EqualTo(!missingBody));
-            Assert.That(emitted.Diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)),
+            Assert.That(emitted.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
                 Is.EqualTo(missingBody ? MissingBodyErrorIds : ImmutableArray<string>.Empty));
         }
 
@@ -54,8 +54,8 @@ public sealed class AnalyzerCoreMalformedCalleeDeclarationTests
         Assert.That(compilation.ContainsSyntaxTree(tree), Is.True);
         Assert.That(model.Compilation, Is.SameAs(compilation));
         var declarations = (await tree.GetRootAsync().ConfigureAwait(false)).DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
-        var calleeSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard"));
-        var callerSyntax = declarations.Single(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Identifier.ValueText == "Target"));
+        var calleeSyntax = declarations.Single(d => d.Parent is ClassDeclarationSyntax c && c.Identifier.ValueText == "Guard");
+        var callerSyntax = declarations.Single(d => d.Identifier.ValueText == "Target");
         var callee = (IMethodSymbol)model.GetDeclaredSymbol(calleeSyntax)!;
         var caller = (IMethodSymbol)model.GetDeclaredSymbol(callerSyntax)!;
         Assert.That(callee.IsStatic, Is.True);

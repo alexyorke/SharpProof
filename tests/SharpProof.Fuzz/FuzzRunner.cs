@@ -353,12 +353,12 @@ internal static class FuzzRunner
     {
         if (sourceCases.IsDefault)
         { throw new ArgumentNullException(nameof(sourceCases)); }
-        var sources = sourceCases.Select(source => source is null ? throw new ArgumentNullException(nameof(source)) : new FuzzSourceCampaignCase(
+        var sources = sourceCases.Select(source => new FuzzSourceCampaignCase(
             source.Frontend, source.FiniteMembers, source.FiniteArguments,
             source.PartialMembers, source.PartialScenarios)).ToImmutableArray();
         var options = new FuzzOptions(sources.Length, seed, FuzzOptions.DefaultMaximumParallelism);
         var nativeInputs = sources.Select(FuzzSourceCaseExecutor.NativeInput.Source).ToImmutableArray();
-        var frontendCases = sources.Select(source => source is null ? throw new ArgumentNullException(nameof(source)) : source.Frontend).ToImmutableArray();
+        var frontendCases = sources.Select(source => source.Frontend).ToImmutableArray();
         var frontendResultBuffer = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(sources.Length);
         frontendResultBuffer.Count = sources.Length;
         for (var offset = 0; offset < frontendCases.Length; offset += FrontendCompilationBatchSize)
@@ -384,8 +384,8 @@ internal static class FuzzRunner
             }, cancellationToken).ConfigureAwait(false);
         var finiteResults = evaluations.Select(static result => result.FiniteResult).ToImmutableArray();
         var partialResults = evaluations.Select(static result => result.PartialResult).ToImmutableArray();
-        var smtStatuses = finiteResults.Select(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Status).ToImmutableArray();
-        var partialStatuses = partialResults.Select(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Status).ToImmutableArray();
+        var smtStatuses = finiteResults.Select(static result => result.Status).ToImmutableArray();
+        var partialStatuses = partialResults.Select(static result => result.Status).ToImmutableArray();
         var completed = await CompleteCaseStageAsync(options, frontendCases, frontendResults,
             smtStatuses, partialStatuses, nativeInputs, cancellationToken).ConfigureAwait(false);
         return new FuzzSourceCampaignResult(sources.Length, seed, completed.Agreements, completed.Abstentions,

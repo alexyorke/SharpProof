@@ -38,9 +38,8 @@ public sealed class ResourceForkJoinProjectionTests
             Assert.That(child.Owner.ValidEffectClaimIds, Is.Empty);
             Assert.That(child.Owner.EffectsCompleteAtEntry, Is.True);
             Assert.That(child.Cost, Is.Not.Null);
-            Assert.That(child.Owner.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions),
-                Has.Some.Matches<IrInstruction>(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
-                    instruction is IrBranchInstruction && child.Owner.Program.Factory.GetOperationInfo(instruction.Operation).Description is { } description &&
+            Assert.That(child.Owner.Program.Blocks.SelectMany(static block => block.Instructions),
+                Has.Some.Matches<IrInstruction>(instruction => instruction is IrBranchInstruction && child.Owner.Program.Factory.GetOperationInfo(instruction.Operation).Description is { } description &&
                     child.Owner.Program.Factory.GetString(description) == IrSourceLoopEntry.GuardMarker));
         }
     }
@@ -162,7 +161,7 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(capture.Shapes.ModuleSha256, Has.Length.EqualTo(64));
         Assert.That(capture.Shapes.CompilerIdentity, Does.Contain("Microsoft.CodeAnalysis.CSharp"));
         Assert.That(capture.Shapes.MatchedCallbacks, Is.EqualTo(2));
-        Assert.That(capture.Shapes.CallbackFrames.SelectMany(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.Fields),
+        Assert.That(capture.Shapes.CallbackFrames.SelectMany(static frame => frame.Fields),
             Does.Contain(ResourceStorageKind.Word32));
         Assert.That(capture.Shapes.StateMachine != null, Is.EqualTo(configured));
         if (configured)
@@ -216,7 +215,7 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(first.Shapes!.RootCallableId, Is.EqualTo("first"));
         Assert.That(second.Shapes!.RootCallableId, Is.EqualTo("second"));
         Assert.That(second.Shapes.ModuleSha256, Is.EqualTo(first.Shapes.ModuleSha256));
-        Assert.That(second.Shapes.CallbackFrames.Select(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.MetadataName),
+        Assert.That(second.Shapes.CallbackFrames.Select(static frame => frame.MetadataName),
             Has.Some.StartsWith("A.B.Outer+Inner+"));
     }
 
@@ -283,7 +282,7 @@ public sealed class ResourceForkJoinProjectionTests
         Assert.That(capture.Shapes, Is.Not.Null);
         Assert.That(capture.Shapes!.MatchedCallbacks, Is.EqualTo(3));
         Assert.That(capture.Shapes.CallbackFrames.SelectMany(static frame =>
-            frame is null ? throw new ArgumentNullException(nameof(frame)) : frame.Fields), Does.Contain((ResourceStorageKind)storage));
+            frame.Fields), Does.Contain((ResourceStorageKind)storage));
     }
 
     [Test]
@@ -307,12 +306,12 @@ public sealed class ResourceForkJoinProjectionTests
     {
         ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root" &&
-                method.ParameterList.Parameters.All(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Modifiers.Count == 0))
-            .OrderBy(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.ParameterList.Parameters.Count).First();
+            .Where(static method => method.Identifier.ValueText == "Root" &&
+                method.ParameterList.Parameters.All(static parameter => parameter.Modifiers.Count == 0))
+            .OrderBy(static method => method.ParameterList.Parameters.Count).First();
         return (compilation, (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!);
     }
 }

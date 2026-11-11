@@ -30,7 +30,7 @@ internal sealed class CompilerCompanionBindingCaptureWorkflowTests
         var compilation = AnalyzerTestHost.CreateCompilation(
             "using SharpProof.Attributes; public static class Target { [ZeroAllocations] public static long Read(long value) => value; } " + companions,
             [], filePath: "companion.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Target")!
             .GetMembers("Read").OfType<IMethodSymbol>().Single();
         var binding = new ContractBinder(compilation).Bind(method);
@@ -55,7 +55,7 @@ internal sealed class CompilerCompanionBindingCaptureWorkflowTests
     private static async Task<CompilerManifestArtifact> CaptureAsync(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofCompanionCapture-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try

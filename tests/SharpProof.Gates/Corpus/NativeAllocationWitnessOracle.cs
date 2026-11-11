@@ -36,7 +36,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
         cancellationToken.ThrowIfCancellationRequested();
         if (!evidence.HasFeasibleEntryWitness)
         { return Gap("NoFeasibleEntryWitness"); }
-        if (!method.IsStatic || method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
+        if (!method.IsStatic || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
             preparation.Parameters.Length != method.Parameters.Length)
         { return Gap("UnsupportedInvocationShape"); }
         var inputs = evidence.EntryModel;

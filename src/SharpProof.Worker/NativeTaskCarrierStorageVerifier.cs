@@ -114,7 +114,7 @@ internal static class NativeTaskCarrierStorageVerifier
             { return new(null, "TaskSourceBodyEvidenceInvalid"); }
         }
         if (!methods.SetEquals(shapes.CallbackActivations!.Activations!.Forwarders.Select(static forwarder =>
-            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)))
+            forwarder.ChildMethodToken)))
         { return new(null, "TaskSourceBodyEvidenceInvalid"); }
         return new(1, null);
     }

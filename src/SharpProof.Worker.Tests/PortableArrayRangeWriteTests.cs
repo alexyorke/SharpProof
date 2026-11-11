@@ -21,7 +21,7 @@ public sealed class PortableArrayRangeWriteTests
         builder.ElementStore(entry, factory.CreateOperation(), array, factory.Integer(1), factory.Integer(0), range ? factory.Integer(2) : null);
         builder.Return(entry, factory.CreateOperation(), factory.SequenceAccess(array, factory.Integer(2)));
         var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var row = encoded.Graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).Single(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Kind == IrInstructionKind.Write);
+        var row = encoded.Graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Write);
         Assert.That(row.Items, Has.Length.EqualTo(range ? 2 : 1));
         var decoded = PortableIrGraphCodec.Decode(encoded.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var write = decoded.Instructions.OfType<IrWriteInstruction>().Single();
@@ -51,7 +51,7 @@ public sealed class PortableArrayRangeWriteTests
         builder.ElementStore(entry, factory.CreateOperation(), array, factory.Integer(0), factory.Integer(0), factory.Integer(0));
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
         var encoded = PortableIrGraphCodec.Encode(factory, builder.Build(), [factory.Boolean(true), factory.Integer(factory.GetOrCreateIntegerType(64, true), 0)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var row = encoded.Graph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).Single(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Kind == IrInstructionKind.Write);
+        var row = encoded.Graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Write);
         var malformedRow = corruption switch
         {
             3 => row with { A = (int)IrWriteRegion.Field },

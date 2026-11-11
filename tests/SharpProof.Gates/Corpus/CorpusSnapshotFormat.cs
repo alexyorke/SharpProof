@@ -158,7 +158,7 @@ internal static class CorpusSnapshotFormat
             ? []
             : [.. parts[3].Split(',')
                 .OrderBy(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic),
+                    diagnostic,
                     StringComparer.Ordinal)
             ];
         expectation = new CorpusObservation(

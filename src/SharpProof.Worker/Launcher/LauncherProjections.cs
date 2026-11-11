@@ -12,13 +12,13 @@ internal static partial class LauncherPresentation
         RepositoryParameterGuard.ThrowIfMissing(assumptions.IsDefault, nameof(assumptions));
         var user = assumptions
             .Where(static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume))
-            .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
+                assumption.Kind == WorkerAssumptionKind.UserAssume)
+            .Select(static assumption => assumption.Id)
             .ToImmutableArray();
         var trusted = assumptions
             .Where(static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
-            .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+            .Select(static assumption => assumption.Id)
             .ToImmutableArray();
         var userIds = string.Join(", ", user);
         var trustedIds = string.Join(", ", trusted);

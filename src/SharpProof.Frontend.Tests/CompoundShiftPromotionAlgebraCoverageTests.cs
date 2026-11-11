@@ -75,8 +75,8 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
         var rule = CSharpOperationSemantics.Compound(subject.Factory, operation, left.Value, right.Value, false);
         Assert.That(rule.Classification.IsExact, Is.True);
         Assert.That(rule.Throws, Is.Empty);
-        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, inputs[binding.Parameter.Ordinal])));
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding.Current,
+            binding => subject.Value(binding.Current, inputs[binding.Parameter.Ordinal]));
         Assert.That(new IrInterpreter(subject.Factory).Evaluate(rule.Value, environment).Value!.IntegerNumericValue,
             Is.EqualTo(new BigInteger(expected)));
         var lowering = subject.Lower();

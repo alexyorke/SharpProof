@@ -7,7 +7,7 @@ internal static class CallableClaimResultAssembler
         ArgumentNullGuard.NotNull(target, nameof(target));
         ArgumentNullGuard.NotNull(check, nameof(check));
         var total = target.Total;
-        if (total == null || !total.Clauses.Any(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures && clause.ClaimId == check.ClaimId)))
+        if (total == null || !total.Clauses.Any(clause => clause.Kind == CompilerContractKind.Ensures && clause.ClaimId == check.ClaimId))
         { throw new ArgumentException("The check does not belong to this Total callable.", nameof(check)); }
         var record = Create(target, check.ClaimId, WorkerClaimOutcome.Unknown,
             check.Evidence.Reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : check.Evidence.Reason,
@@ -21,15 +21,15 @@ internal static class CallableClaimResultAssembler
         }
         if (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome && check.Evidence.Reason != WorkerClaimReason.None)
         { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; return record; }
-        var declarations = ImmutableDictionaryCapture.Create(target.Entry.Assumptions, assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind), StringComparer.Ordinal);
+        var declarations = ImmutableDictionaryCapture.Create(target.Entry.Assumptions, assumption => assumption.Id, assumption => assumption.Kind, StringComparer.Ordinal);
         if (check.Assumptions.Length != declarations.Count ||
-            check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)).Distinct(StringComparer.Ordinal).Count() != declarations.Count ||
-            check.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (!declarations.TryGetValue(assumption.Id, out var kind) || kind != assumption.Kind)))
+            check.Assumptions.Select(assumption => assumption.Id).Distinct(StringComparer.Ordinal).Count() != declarations.Count ||
+            check.Assumptions.Any(assumption => !declarations.TryGetValue(assumption.Id, out var kind) || kind != assumption.Kind))
         { record = record with { Reason = WorkerClaimReason.MalformedBackendResult }; return record; }
         record = record with
         {
-            Assumptions = [.. check.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (new WorkerAssumptionEvidence
-        { Id = assumption.Id, Kind = assumption.Kind, Used = assumption.Used }))]
+            Assumptions = [.. check.Assumptions.Select(assumption => new WorkerAssumptionEvidence
+        { Id = assumption.Id, Kind = assumption.Kind, Used = assumption.Used })]
         };
         switch (check.Evidence.Outcome)
         {
@@ -75,7 +75,7 @@ internal static class CallableClaimResultAssembler
                 Kind = formatted.Kind,
                 Value = formatted.Value
             };
-        }).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable), StringComparer.Ordinal)];
+        }).OrderBy(value => value.Variable, StringComparer.Ordinal)];
     }
 
     private static ImmutableArray<WorkerAssumptionEvidence> ProjectAssumptions(
@@ -85,12 +85,12 @@ internal static class CallableClaimResultAssembler
         System.ArgumentNullException.ThrowIfNull(isUsed);
         System.ArgumentNullException.ThrowIfNull(target);
         return [.. target.Entry.Assumptions.Select(evidence =>
-            evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (new WorkerAssumptionEvidence
+            new WorkerAssumptionEvidence
             {
                 Id = evidence.Id,
                 Kind = evidence.Kind,
                 Used = isUsed(evidence)
-            }))];
+            })];
     }
 
     internal static WorkerClaimResult Unknown(
@@ -111,7 +111,7 @@ internal static class CallableClaimResultAssembler
             claimId,
             reason,
             effectClaimIds?.Contains(claimId) ??
-                target.EffectClaims.Any(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId == claimId)),
+                target.EffectClaims.Any(evidence => evidence.ClaimId == claimId),
             projectAssumptions);
     }
 
@@ -120,18 +120,18 @@ internal static class CallableClaimResultAssembler
     {
         System.ArgumentNullException.ThrowIfNull(target);
         var effectClaimIds = EffectClaimIds(target);
-        return [.. target.Entry.ClaimIds.Select(claimId => claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (CreateUnknown(
+        return [.. target.Entry.ClaimIds.Select(claimId => CreateUnknown(
             target,
             claimId,
             reason,
-            effectClaimIds.Contains(claimId))))];
+            effectClaimIds.Contains(claimId)))];
     }
 
     internal static ImmutableHashSet<string> EffectClaimIds(
         CompilerCallablePreparation target)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        return target.EffectClaims.Select(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId))
+        return target.EffectClaims.Select(static evidence => evidence.ClaimId)
             .ToImmutableHashSet(StringComparer.Ordinal);
     }
 
@@ -178,7 +178,7 @@ internal static class CallableClaimResultAssembler
             {
                 Assumptions = ProjectAssumptions(
                 target,
-                static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used))
+                static evidence => evidence.Used)
             };
         }
         return record;
@@ -216,6 +216,6 @@ internal static class CallableClaimResultAssembler
         ArgumentNullGuard.NotNull(usedAssumptionIds, nameof(usedAssumptionIds));
         return ProjectAssumptions(
             target,
-            evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Used || usedAssumptionIds.Contains(evidence.Id)));
+            evidence => evidence.Used || usedAssumptionIds.Contains(evidence.Id));
     }
 }

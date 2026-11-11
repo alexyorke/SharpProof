@@ -92,7 +92,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(search.CapabilityQuery(synchronizationAllowed, callViolates), null, cancellationToken, search).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.CapabilityQuery(synchronizationAllowed, callViolates)), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => plan.CapabilityQuery(synchronizationAllowed, callViolates), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? site = null;
@@ -122,7 +122,7 @@ internal sealed class PassiveCallableSolver : IDisposable
                 .ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates)),
+            return await ProveWithInvariantsAsync(witness, plan => plan.EffectSiteQuery(writeViolates, readsViolate, locksViolate, callViolates),
                 cancellationToken).ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? write = null;
@@ -183,7 +183,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (allocations ? plan.AllocationQuery() : plan.PurityQuery()), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => allocations ? plan.AllocationQuery() : plan.PurityQuery(), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         OperationId? site = null;
@@ -242,7 +242,7 @@ internal sealed class PassiveCallableSolver : IDisposable
             : await VerifyAsync(encoding.ExceptionQuery(allowed, allowedSite), null, cancellationToken, encoding).ConfigureAwait(false);
         if (witness.Outcome is not RefutedOutcome)
         {
-            return await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.ExceptionQuery(allowed, allowedSite)), cancellationToken)
+            return await ProveWithInvariantsAsync(witness, plan => plan.ExceptionQuery(allowed, allowedSite), cancellationToken)
                 .ConfigureAwait(false) ?? (witness.Outcome is ProvenOutcome ? Inconclusive() : witness);
         }
         if (!_plan.HasBodyAbstraction)
@@ -290,7 +290,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         {
             return proven with
             {
-                Core = [.. cores.OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+                Core = [.. cores.OrderBy(value => value, StringComparer.Ordinal)],
                 BodyAssumptions = [.. assumptions.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
             };
         }
@@ -325,8 +325,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         for (var occurrence = 0; occurrence < occurrences; occurrence++)
         {
             var current = occurrence;
-            var evidence = await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) :
-                plan.CallPreconditionQuery(ordinal, current, occurrences), cancellationToken).ConfigureAwait(false);
+            var evidence = await ProveWithInvariantsAsync(witness, plan => plan.CallPreconditionQuery(ordinal, current, occurrences), cancellationToken).ConfigureAwait(false);
             if (evidence == null)
             { return null; }
             proven ??= evidence;
@@ -335,7 +334,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         }
         return proven == null ? null : proven with
         {
-            Core = [.. cores.OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            Core = [.. cores.OrderBy(value => value, StringComparer.Ordinal)],
             BodyAssumptions = [.. assumptions.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
         };
     }
@@ -350,7 +349,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         if (proof.Outcome is ProvenOutcome)
         { return proof; }
         var witness = await VerifyAsync(search.EnsuresQuery(ordinal), search.Replay(ordinal), cancellationToken, search).ConfigureAwait(false);
-        if (await ProveWithInvariantsAsync(witness, plan => plan is null ? throw new System.ArgumentNullException(nameof(plan)) : (plan.EnsuresQuery(ordinal)), cancellationToken).ConfigureAwait(false) is { } proven)
+        if (await ProveWithInvariantsAsync(witness, plan => plan.EnsuresQuery(ordinal), cancellationToken).ConfigureAwait(false) is { } proven)
         { return proven; }
         // A cut model is never a refutation; finite search is never a proof.
         return witness.Outcome is RefutedOutcome or UnknownOutcome || witness.Outcome == null ? witness : Inconclusive();
@@ -389,7 +388,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         System.ArgumentNullException.ThrowIfNull(proven);
         return proven with
         {
-            Core = [.. proven.Core.Union(invariants.Core, StringComparer.Ordinal).OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            Core = [.. proven.Core.Union(invariants.Core, StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal)],
             BodyAssumptions = [.. proven.BodyAssumptions.Union(invariants.Assumptions).OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))]
         };
     }
@@ -429,7 +428,7 @@ internal sealed class PassiveCallableSolver : IDisposable
         // an entry edge) is dropped before any check.
         var initialPlan = active.IsEmpty ? null : PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, active, cancellationToken);
         if (!active.IsEmpty && initialPlan == null)
-        { active = [.. active.Where(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null))]; }
+        { active = [.. active.Where(invariant => PassiveCallableVcBuilder.TryBuildWithInvariants(candidate, [invariant], cancellationToken) != null)]; }
         var rechecking = false;
         while (!active.IsEmpty)
         {
@@ -497,8 +496,8 @@ internal sealed class PassiveCallableSolver : IDisposable
         foreach (var loop in PassiveLoopCutter.Loops(candidate, cancellationToken))
         {
             var (tracked, anchors) = LoopInvariantCandidates.State(candidate, loop, cancellationToken);
-            ImmutableArray<IrTerm> state = [.. tracked.Concat(anchors.Where(anchor => anchor is null ? throw new System.ArgumentNullException(nameof(anchor)) : (anchor is not IrIntegerTerm))).Distinct()
-                .Where(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 }))];
+            ImmutableArray<IrTerm> state = [.. tracked.Concat(anchors.Where(anchor => anchor is not IrIntegerTerm)).Distinct()
+                .Where(term => factory.GetTypeInfo(term.Type) is { Kind: IrTypeKind.Boolean } or { Kind: IrTypeKind.Integer, Width: > 0 })];
             if (state.IsEmpty)
             { continue; }
             var relation = IrInvariantRelations.Create(factory, relations.Count, state);
@@ -511,9 +510,9 @@ internal sealed class PassiveCallableSolver : IDisposable
         ImmutableArray<VerificationQuery> clauses = [.. plan.InvariantQueries().Select(pair => pair.Query), query(plan)];
         var proposals = HornInvariantSearch.Propose(factory, clauses,
             states.ToImmutable(), _queryRlimit, cancellationToken);
-        return [.. relations.SelectMany(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
+        return [.. relations.SelectMany(relation => proposals.TryGetValue(((IrOpaqueTerm)relation.Condition).Member, out var invariant)
             ? Conjuncts(invariant).Select(conjunct => conjunct is null ? throw new System.ArgumentNullException(nameof(conjunct)) : (new PassiveLoopCutter.Invariant(relation.Header, conjunct)))
-            : []))];
+            : [])];
 
         static IEnumerable<IrTerm> Conjuncts(IrTerm term)
         {

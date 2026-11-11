@@ -58,8 +58,8 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Does.Contain("CS0029"));
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id), Does.Contain("CS0029"));
         Action emit = () =>
         {
             using var image = MetadataProgramDifferentialOracle.Emit(
@@ -87,7 +87,7 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
             compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -100,8 +100,8 @@ public sealed class FuzzEmissionLifecycleTests
         var methods = ImmutableDictionaryCapture.Create(
             tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>(),
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
+            method => method.Identifier.ValueText,
+            static item => item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {
@@ -141,7 +141,7 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
             compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -182,7 +182,7 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
             compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -192,7 +192,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(model.SyntaxTree, Is.SameAs(tree));
         var methods = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().ToImmutableArray();
-        Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
+        Assert.That(methods.Select(method => method.Identifier.ValueText),
             Is.EquivalentTo(ParameterBindingMethodNames));
         var generated = new GeneratedCSharpCase(
             GeneratedCSharpExpression.Condition(), 0L, 0L, true);
@@ -265,7 +265,7 @@ public sealed class FuzzEmissionLifecycleTests
                 optimizationLevel: OptimizationLevel.Release,
                 checkOverflow: true, nullableContextOptions: NullableContextOptions.Enable));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
             compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -282,7 +282,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(symbol.DeclaringSyntaxReferences.Single().SyntaxTree, Is.SameAs(tree));
         var literal = method.ExpressionBody!.Expression.DescendantNodesAndSelf()
             .OfType<LiteralExpressionSyntax>()
-            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.IsKind(SyntaxKind.StringLiteralExpression)));
+            .Single(node => node.IsKind(SyntaxKind.StringLiteralExpression));
         var constant = model.GetConstantValue(literal, TestContext.CurrentContext.CancellationToken);
         Assert.That(constant.HasValue, Is.True);
         Assert.That(constant.Value, Is.EqualTo(loneSurrogate));
@@ -333,7 +333,7 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(
             compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
@@ -346,8 +346,8 @@ public sealed class FuzzEmissionLifecycleTests
         var methods = ImmutableDictionaryCapture.Create(
             tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>(),
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
+            method => method.Identifier.ValueText,
+            static item => item);
         Assert.That(methods.Count, Is.EqualTo(2));
         foreach (var method in methods.Values)
         {
@@ -423,7 +423,7 @@ public sealed class FuzzEmissionLifecycleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
@@ -432,7 +432,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(image.Length, Is.GreaterThan(0));
         var model = compilation.GetSemanticModel(tree);
         var guardSyntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Guard"));
+            .Single(method => method.Identifier.ValueText == "Guard");
         var guardSymbol = model.GetDeclaredSymbol(guardSyntax);
         Assert.That(guardSymbol, Is.Not.Null);
         Assert.That(guardSymbol!.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
@@ -444,7 +444,7 @@ public sealed class FuzzEmissionLifecycleTests
         var sourceOperators = guardSyntax.ExpressionBody!.Expression.DescendantNodesAndSelf()
             .OfType<PrefixUnaryExpressionSyntax>().ToImmutableArray();
         Assert.That(sourceOperators.Length, Is.EqualTo(unaryCount));
-        Assert.That(sourceOperators.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsKind(SyntaxKind.LogicalNotExpression))), Is.True);
+        Assert.That(sourceOperators.All(operation => operation.IsKind(SyntaxKind.LogicalNotExpression)), Is.True);
         Assert.That(model.GetOperation(guardSyntax.ExpressionBody.Expression), Is.Not.Null);
 
         var factory = new IrFactory();
@@ -587,7 +587,7 @@ public sealed class FuzzEmissionLifecycleTests
                 optimizationLevel: OptimizationLevel.Release,
                 checkOverflow: true, nullableContextOptions: NullableContextOptions.Enable));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return compilation;
     }
 }

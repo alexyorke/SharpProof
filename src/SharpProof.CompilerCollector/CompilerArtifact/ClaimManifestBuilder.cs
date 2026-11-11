@@ -71,14 +71,14 @@ internal sealed partial class ClaimManifestBuilder(
             }
         }
         var ordered = targets.Values
-            .OrderBy(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal)
+            .OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal)
             .ToImmutableArray();
         var manifest = new WorkerClaimManifest
         {
-            Callables = [.. ordered.Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry))],
+            Callables = [.. ordered.Select(static target => target.Entry)],
             Claims = [.. ordered.SelectMany(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry))
-                    .Concat(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry)))))]
+                target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry))
+                    .Concat(target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry))))]
         };
         WorkerProtocolJson.SealManifest(manifest);
         var result = WithContractCalls(new ClaimManifestBuildResult(manifest, targets.ToImmutable()));
@@ -148,9 +148,9 @@ internal sealed partial class ClaimManifestBuilder(
                 if (!declaration.Modifiers.Any(SyntaxKind.StaticKeyword) ||
                     declaration.Modifiers.Any(SyntaxKind.AsyncKeyword) ||
                     declaration.TypeParameterList != null ||
-                    declaration.Ancestors().OfType<TypeDeclarationSyntax>().Any(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.TypeParameterList != null)) ||
+                    declaration.Ancestors().OfType<TypeDeclarationSyntax>().Any(static type => type.TypeParameterList != null) ||
                     declaration.DescendantNodes().Any(static child =>
-                        child is null ? throw new System.ArgumentNullException(nameof(child)) : (child is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or YieldStatementSyntax)))
+                        child is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax or YieldStatementSyntax))
                 {
                     gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedOwner"));
                     continue;
@@ -178,8 +178,8 @@ internal sealed partial class ClaimManifestBuilder(
                     continue;
                 }
                 if (method.ReturnsByRef || method.ReturnsByRefReadonly ||
-                    method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
-                        !SupportedShadowOwnerType(parameter.Type, allowReferenceOwners))) ||
+                    method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                        !SupportedShadowOwnerType(parameter.Type, allowReferenceOwners)) ||
                     !method.ReturnsVoid && !SupportedShadowOwnerType(method.ReturnType, allowReferenceOwners))
                 {
                     gaps.Add(new(treeOrdinal, declaration.SpanStart, declaration.Span.Length, "UnsupportedSignature"));
@@ -207,7 +207,7 @@ internal sealed partial class ClaimManifestBuilder(
         hasPreconditions = RepositoryParameterGuard.NotNull(hasPreconditions, nameof(hasPreconditions));
         owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var calls = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
-        foreach (var operation in body.Descendants().OrderBy(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SpanStart)))
+        foreach (var operation in body.Descendants().OrderBy(static operation => operation.Syntax.SpanStart))
         {
             var (target, instance, arguments) = operation switch
             {
@@ -317,7 +317,7 @@ internal sealed partial class ClaimManifestBuilder(
                 pending.Add((child, depth + 1));
             }
         }
-        nodes = collected.OrderBy(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.SpanStart)).ToImmutableArray();
+        nodes = collected.OrderBy(static node => node.SpanStart).ToImmutableArray();
         return true;
     }
 
@@ -394,8 +394,7 @@ internal sealed partial class ClaimManifestBuilder(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
             : [];
-        if (effects.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+        if (effects.Any(claim => claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
             seed.Declaration is MethodDeclarationSyntax resourceDeclaration && seed.Model is { } resourceModel)
         {
             var body = resourceDeclaration.Body is { } block ? resourceModel.GetOperation(block, cancellationToken) :
@@ -407,8 +406,7 @@ internal sealed partial class ClaimManifestBuilder(
             {
                 metadataIds.Add(ResourceTaskCatalog.AssumptionId(callableId,
                     taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
-                if (effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                    claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+                if (effects.Any(static claim => claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
                 {
                     metadataIds.Add(ResourceTaskStorageCatalog.AssumptionId(callableId,
                         taskPlan.Join.TargetMethod.ContainingAssembly.Identity.ToString(), taskPlan.ConfiguredAwait));
@@ -416,10 +414,8 @@ internal sealed partial class ClaimManifestBuilder(
             }
             if (resource.Bounds is { } bounds)
             { CollectResourceAssumptions(bounds.Program, callableId, metadataIds); }
-            var requiresLifetimeLayout = effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes);
-            var requiresCumulativeLayout = (resource.Bounds != null || taskPlan != null) && effects.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes);
+            var requiresLifetimeLayout = effects.Any(static claim => claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes);
+            var requiresCumulativeLayout = (resource.Bounds != null || taskPlan != null) && effects.Any(static claim => claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes);
             if (requiresLifetimeLayout || requiresCumulativeLayout)
             {
                 metadataIds.Add(ResourceLayoutCatalog.AssumptionId(callableId,
@@ -430,9 +426,7 @@ internal sealed partial class ClaimManifestBuilder(
                 var runtime = CompilerTaskRuntimePremiseCollector.Parse(target, callableId, cancellationToken);
                 if (runtime.Declarations is { } declarations)
                 {
-                    var runtimeIds = declarations.Quantities.Select(declaration => declaration is null
-                        ? throw new ArgumentNullException(nameof(declaration))
-                        : ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration))
+                    var runtimeIds = declarations.Quantities.Select(declaration => ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration))
                         .Prepend(ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations));
                     assumptions = assumptions.AddRange(runtimeIds.Select(static id => new WorkerAssumptionEvidence
                     {
@@ -482,8 +476,8 @@ internal sealed partial class ClaimManifestBuilder(
                     (CompanionDeclarationLocation(resolution) is { IsInSource: true } companionLocation
                         ? ToSourceLocation(companionLocation)
                         : new WorkerSourceLocation()),
-            ClaimIds = [.. postconditions.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId)),
-                .. effects.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId))],
+            ClaimIds = [.. postconditions.Select(static claim => claim.Entry.ClaimId),
+                .. effects.Select(static claim => claim.Entry.ClaimId)],
             Assumptions = assumptions
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
@@ -522,27 +516,27 @@ internal sealed partial class ClaimManifestBuilder(
         RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
 
         var candidates = clauses
-            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new ClaimCandidate(
+            .Select(clause => new ClaimCandidate(
                 SemanticClaimIdentity.CreateInvocationFingerprint(
                     clause.Invocation, target, source, usesCompanion, _intrinsics),
                 clause.Location,
                 usesCompanion
                     ? WorkerClaimEvidence.CompanionClause
                     : WorkerClaimEvidence.DirectClause,
-                clause.Invocation, null, clause.Placement)))
+                clause.Invocation, null, clause.Placement))
             .Concat(target.GetReturnTypeAttributes()
                 .Where(_attributes.IsClosedContract)
                 .OrderBy(
                     static attribute =>
-                        attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty),
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
                     StringComparer.Ordinal)
                 .ThenBy(static attribute =>
-                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue))
-                .Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new ClaimCandidate(
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
+                .Select(attribute => new ClaimCandidate(
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
                     AttributeLocation(attribute, target, companionLocation),
                     WorkerClaimEvidence.ReturnAttribute,
-                    null, attribute, null))))
+                    null, attribute, null)))
             .ToImmutableArray();
         var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         var claims = ImmutableArray.CreateBuilder<ManifestClaim>(candidates.Length);
@@ -695,15 +689,15 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
-        foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Kind)))
+        foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
         {
             var attributes = evaluation.Attributes
                 .OrderBy(
                     static attribute =>
-                        attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty),
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
                     StringComparer.Ordinal)
                 .ThenBy(static attribute =>
-                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue))
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
                 .ToImmutableArray();
 
             // AllowedExceptions attributes are unioned by the analyzer, so
@@ -720,8 +714,8 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     string.Join(
                         "|",
                         attributes.Select(attribute =>
-                            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SemanticClaimIdentity.CreateAttributeFingerprint(
-                                attribute, method))));
+                            SemanticClaimIdentity.CreateAttributeFingerprint(
+                                attribute, method)));
                 claims.Add(CreateEffectClaim(
                     evaluation,
                     method,
@@ -732,7 +726,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     fingerprint,
                     ranks,
                     companionLocation,
-                    method.Locations.FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource))));
+                    method.Locations.FirstOrDefault(static location => location.IsInSource)));
                 continue;
             }
 
@@ -827,7 +821,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                 AllowedExceptionTypes = [.. evaluation.Constraint.ExceptionTypes
                     .Select(CompilerExceptionTypeIdentity.Encode)
                     .Distinct(StringComparer.Ordinal)
-                    .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)]
+                    .OrderBy(static value => value, StringComparer.Ordinal)]
             },
             Evidence = evaluation.Evidence
         };
@@ -982,7 +976,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
         static bool MaySelectNestedCallable(SyntaxNode callable)
         {
-            if (callable.DescendantNodesAndSelf().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is AttributeListSyntax)))
+            if (callable.DescendantNodesAndSelf().Any(static node => node is AttributeListSyntax))
             { return true; }
             foreach (var token in callable.DescendantTokens())
             {
@@ -999,7 +993,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         {
             // An alias declared in another tree can name any attribute. Let
             // semantic selection decide whether attributed trees are relevant.
-            if (root.DescendantNodesAndSelf().Any(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is AttributeSyntax)))
+            if (root.DescendantNodesAndSelf().Any(static node => node is AttributeSyntax))
             { return true; }
             foreach (var token in root.DescendantTokens())
             {
@@ -1089,9 +1083,9 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var declaration = method.DeclaringSyntaxReferences
-            .Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken)))
-            .OrderBy(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.SyntaxTree.FilePath), StringComparer.Ordinal)
-            .ThenBy(static syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.SpanStart))
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OrderBy(static syntax => syntax.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static syntax => syntax.SpanStart)
             .FirstOrDefault();
         var model = declaration == null ? null :
             SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(_compilation, declaration.SyntaxTree);
@@ -1160,8 +1154,8 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         // Preserve all existing selected-sibling slots. Append the required
         // plain ancestors and trust-only siblings; unrelated siblings use none.
         foreach (var group in requiredOrder.ToImmutable()
-                     .Where(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.MethodKind is
-                         MethodKind.AnonymousFunction or MethodKind.LocalFunction))
+                     .Where(static method => method.MethodKind is
+                         MethodKind.AnonymousFunction or MethodKind.LocalFunction)
                      .Select(CreateSeed)
                      .GroupBy(static seed => ((seed.Method is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(seed)) : (seed.Method.ContainingSymbol!)), SymbolEqualityComparer.Default))
         {
@@ -1284,12 +1278,12 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         // The matched companion declares this metadata target's contract. Only
         // its declaration in the current compilation can anchor inherited claims.
         return resolution.Source.DeclaringSyntaxReferences
-            .Where(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (_compilation.SyntaxTrees.Contains(reference.SyntaxTree)))
-            .Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken)))
+            .Where(reference => _compilation.SyntaxTrees.Contains(reference.SyntaxTree))
+            .Select(reference => reference.GetSyntax(cancellationToken))
             .OfType<MethodDeclarationSyntax>()
-            .OrderBy(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.SyntaxTree.FilePath), StringComparer.Ordinal)
-            .ThenBy(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.SpanStart))
-            .Select(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.GetLocation()))
+            .OrderBy(static declaration => declaration.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static declaration => declaration.SpanStart)
+            .Select(static declaration => declaration.GetLocation())
             .FirstOrDefault() ?? Location.None;
     }
 
@@ -1301,7 +1295,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-        target.Locations.FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ??
+        target.Locations.FirstOrDefault(static location => location.IsInSource) ??
         companionLocation ?? Location.None;
     }
 
@@ -1322,7 +1316,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
                     lastGlobalStatement.Span.End));
         }
 
-        return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ?? Location.None;
+        return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
     }
 
     private WorkerSourceLocation ToSourceLocation(Location location)

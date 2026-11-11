@@ -86,7 +86,7 @@ public sealed class RuntimeTypeIdentityTests
             "public class Subject<T, U> { public " + first + " First; public " + second + " Second; }");
         var compilation = CSharpCompilation.Create("RuntimeIdentity", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var fields = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().ToImmutableArray();
         var model = compilation.GetSemanticModel(tree);
         return (model.GetTypeInfo(fields[0].Declaration.Type).Type!, model.GetTypeInfo(fields[1].Declaration.Type).Type!);

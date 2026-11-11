@@ -49,7 +49,7 @@ internal static class EffectSummaryFixpoint
         var predecessorBuilders = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>.Builder>(StringComparer.Ordinal);
         foreach (var id in bodyOrder)
         {
-            edgeBuilder.Add(id, bodies[id].Callees.OrderBy(callee => callee is null ? throw new ArgumentNullException(nameof(callee)) : callee, StringComparer.Ordinal).ToImmutableArray());
+            edgeBuilder.Add(id, bodies[id].Callees.OrderBy(callee => callee, StringComparer.Ordinal).ToImmutableArray());
             predecessorBuilders.Add(id, ImmutableArray.CreateBuilder<string>());
         }
         var edges = edgeBuilder.ToImmutable();
@@ -67,7 +67,7 @@ internal static class EffectSummaryFixpoint
         { summaries.Add(id, Local(bodies[id], cancellationToken)); }
         var finished = ImmutableArray.CreateBuilder<string>();
         var visited = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        foreach (var first in bodyOrder.OrderBy(id => id is null ? throw new ArgumentNullException(nameof(id)) : id, StringComparer.Ordinal))
+        foreach (var first in bodyOrder.OrderBy(id => id, StringComparer.Ordinal))
         {
             var pending = ImmutableStack<(string Id, bool Exit)>.Empty.Push((first, false));
             while (!pending.IsEmpty)
@@ -101,7 +101,7 @@ internal static class EffectSummaryFixpoint
                 { pending = pending.Push(caller); }
             }
             if (component.Count != 0)
-            { components.Add(component.ToImmutable().OrderBy(id => id is null ? throw new ArgumentNullException(nameof(id)) : id, StringComparer.Ordinal).ToImmutableArray()); }
+            { components.Add(component.ToImmutable().OrderBy(id => id, StringComparer.Ordinal).ToImmutableArray()); }
         }
         // Reverse Kosaraju's source-first components so outgoing summaries
         // are final before each component's monotone worklist runs.

@@ -106,7 +106,7 @@ internal static class MetadataProgramDifferentialOracle
         if (!result.Success)
         {
             image.Dispose();
-            throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
+            throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
         }
         image.Position = 0;
         return image;

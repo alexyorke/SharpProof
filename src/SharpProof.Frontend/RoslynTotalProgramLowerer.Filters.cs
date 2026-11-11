@@ -75,7 +75,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             { continue; }
             if (parent.Kind == ControlFlowRegionKind.TryAndFinally)
             {
-                unwind.Add(parent.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Finally)));
+                unwind.Add(parent.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Finally));
                 continue;
             }
             if (parent.Kind != ControlFlowRegionKind.TryAndCatch)
@@ -84,12 +84,12 @@ internal sealed partial class RoslynTotalProgramLowerer
             {
                 SpendRegion();
                 var caught = handler.Kind == ControlFlowRegionKind.FilterAndHandler
-                    ? handler.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Catch)) : handler;
+                    ? handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Catch) : handler;
                 var catches = caught.Kind == ControlFlowRegionKind.Catch ? Catches(caught, token) : false;
                 if (catches == false)
                 { continue; }
                 RegionFilter? filter = handler.Kind == ControlFlowRegionKind.FilterAndHandler
-                    ? _regionFilters[handler.NestedRegions.Single(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Filter))] : null;
+                    ? _regionFilters[handler.NestedRegions.Single(child => child.Kind == ControlFlowRegionKind.Filter)] : null;
                 foreach (var _ in unwind)
                 { SpendRegion(); }
                 candidates.Add((caught, filter, unwind.ToImmutable(), catches == null));

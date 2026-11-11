@@ -99,8 +99,8 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var intrinsicCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
-                method.Name is "Result" or "Old")).ToImmutableArray();
+            .Where(invocation => model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
+                method.Name is "Result" or "Old").ToImmutableArray();
         Assert.That(intrinsicCalls, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsicCalls)
         {
@@ -171,14 +171,14 @@ public sealed class FieldInitializerIntrinsicPlacementRegressionTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
     }
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceSpan}|" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceSpan}|" +
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)));
     }
 }

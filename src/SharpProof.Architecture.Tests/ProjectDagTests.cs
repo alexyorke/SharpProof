@@ -14,8 +14,7 @@ public sealed class ProjectDagTests
         [
             new("ConsoleLoggingAnalyzer", []),
             new("DefensiveCodingAnalyzer", []),
-            new("SharpProof.Analyzer", ["SharpProof.Analyzer.Core"]),
-            new("SharpProof.Analyzer.Core", ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"]),
+            new("SharpProof.Analyzer", ["SharpProof.Compiler.Semantics", "SharpProof.Dataflow"]),
             new("SharpProof.Compiler.Semantics", ["SharpProof.Dataflow", "SharpProof.Frontend", "SharpProof.Specs"]),
             new("SharpProof.Attributes", []),
             new("SharpProof.BuildTasks", ["SharpProof.Host", "SharpProof.Worker.Protocol"]),
@@ -72,7 +71,6 @@ public sealed class ProjectDagTests
     private static readonly ImmutableArray<string> CompilerFacingProjects =
     [
         "SharpProof.Analyzer",
-        "SharpProof.Analyzer.Core",
         "SharpProof.CodeFixes",
         "SharpProof.EditorSuggestions",
         "SharpProof.Attributes",
@@ -165,7 +163,6 @@ public sealed class ProjectDagTests
         {
             var closure = RuntimeClosure(project);
             Assert.That(closure, Does.Not.Contain("SharpProof.Analyzer"));
-            Assert.That(closure, Does.Not.Contain("SharpProof.Analyzer.Core"));
             Assert.That(closure, Does.Not.Contain("SharpProof.Worker"));
             Assert.That(closure, Does.Not.Contain("SharpProof.Smt"));
         }

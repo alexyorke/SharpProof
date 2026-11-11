@@ -358,38 +358,38 @@ internal static partial class WorkerProtocolJson
             ? CreateClaimIndex(null)
             : CanonicalizeManifest(response.Manifest);
 
-        response.CallableResults = SortOrdinal(response.CallableResults, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.CallableId));
+        response.CallableResults = SortOrdinal(response.CallableResults, static value => value?.CallableId);
         foreach (var result in response.CallableResults.OfType<WorkerCallableResult>())
         {
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
 
         response.ClaimResults = [.. (EmptyIfDefault(response.ClaimResults))
-            .OrderBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (FindClaimCallableId(claimsById, value?.ClaimId)), s_ordinal)
-            .ThenBy(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (FindClaimOrdinal(claimsById, value?.ClaimId)))
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.ClaimId), s_ordinal)];
+            .OrderBy(value => FindClaimCallableId(claimsById, value?.ClaimId), s_ordinal)
+            .ThenBy(value => FindClaimOrdinal(claimsById, value?.ClaimId))
+            .ThenBy(static value => value?.ClaimId, s_ordinal)];
         foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
             Canonicalize(result);
         }
 
         response.Errors = [.. (EmptyIfDefault(response.Errors))
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Code), s_ordinal)
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Message), s_ordinal)];
+            .OrderBy(static value => value?.Code, s_ordinal)
+            .ThenBy(static value => value?.Message, s_ordinal)];
     }
     private static void Canonicalize(WorkerClaimResult result)
     {
         result = RepositoryParameterGuard.NotNull(result, nameof(result));
-        result.ProofCore = SortOrdinal(result.ProofCore, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value));
+        result.ProofCore = SortOrdinal(result.ProofCore, static value => value);
         result.Model = [.. (EmptyIfDefault(result.Model))
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Variable), s_ordinal)
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Kind), s_ordinal)
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Value), s_ordinal)];
+            .OrderBy(static value => value?.Variable, s_ordinal)
+            .ThenBy(static value => value?.Kind, s_ordinal)
+            .ThenBy(static value => value?.Value, s_ordinal)];
         result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         if (result.EffectWitness != null)
         {
             result.EffectWitness.ExactExceptionTypeHierarchy = SortOrdinal(
-                result.EffectWitness.ExactExceptionTypeHierarchy, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value));
+                result.EffectWitness.ExactExceptionTypeHierarchy, static value => value);
         }
     }
 
@@ -612,17 +612,17 @@ internal static partial class WorkerProtocolJson
         allClaimsPostconditions = !manifest.Claims.IsDefaultOrEmpty &&
             claims.Length == manifest.Claims.Length;
         var callableIdValues = ValidateUniqueIds(
-            callables.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.CallableId)),
+            callables.Select(static value => value.CallableId),
             prefix + ".callable_id", errors);
         _ = ValidateUniqueIds(
-            claims.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ClaimId)),
+            claims.Select(static value => value.ClaimId),
             prefix + ".claim_id", errors);
         var callableIds = callableIdValues
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(static value => value!)
             .ToImmutableHashSet(s_ordinal);
         var claimsByCallable = claims.ToLookup(
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : ((string?)value.CallableId),
+            static value => (string?)value.CallableId,
             s_ordinal);
         foreach (var callable in callables)
         {
@@ -669,8 +669,8 @@ internal static partial class WorkerProtocolJson
         claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
         var expected = claims
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Ordinal))
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ClaimId), s_ordinal).ToImmutableArray();
+            .OrderBy(static value => value.Ordinal)
+            .ThenBy(static value => value.ClaimId, s_ordinal).ToImmutableArray();
         var denseOrdinals = true;
         var claimMembership = !callable.ClaimIds.IsDefault &&
             callable.ClaimIds.Length == expected.Length;
@@ -717,8 +717,8 @@ internal static partial class WorkerProtocolJson
         out bool allResultsComplete)
     {
         var valid = ValidateResultSet(values,
-            manifestIndexes.Callables.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.CallableId)),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.CallableId), "response.callable_results",
+            manifestIndexes.Callables.Select(static value => value.CallableId),
+            static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
         allResultsComplete = !values.IsDefaultOrEmpty &&
             valid.Length == values.Length;
@@ -743,8 +743,8 @@ internal static partial class WorkerProtocolJson
         out bool allResultsDecided)
     {
         var valid = ValidateResultSet(values,
-            manifestIndexes.Claims.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ClaimId)),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ClaimId), "response.claim_results",
+            manifestIndexes.Claims.Select(static value => value.ClaimId),
+            static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
         allResultsDecided = !values.IsDefaultOrEmpty &&
             valid.Length == values.Length;
@@ -861,13 +861,13 @@ internal static partial class WorkerProtocolJson
     {
         RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
         errors = RepositoryParameterGuard.NotNull(errors, nameof(errors));
-        var incomplete = callables.Where(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Coverage == WorkerCallableCoverage.Incomplete))
-            .Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.CallableId))
+        var incomplete = callables.Where(static value => value.Coverage == WorkerCallableCoverage.Incomplete)
+            .Select(static value => value.CallableId)
             .ToImmutableHashSet(s_ordinal);
-        errors.Check(!claims.Any(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Outcome == WorkerClaimOutcome.Unknown &&
+        errors.Check(!claims.Any(value => value.Outcome == WorkerClaimOutcome.Unknown &&
             !string.IsNullOrWhiteSpace(value.ClaimId) &&
             manifestIndexes.ClaimsById.Find(value.ClaimId) is { } claim &&
-            !incomplete.Contains(claim.CallableId))),
+            !incomplete.Contains(claim.CallableId)),
             "response.unknown_coverage");
     }
     private static void ValidateRun(
@@ -899,7 +899,7 @@ internal static partial class WorkerProtocolJson
         if (response.Manifest != null && projected)
         {
             var claimsById = claims.ToLookup(
-                static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : ((string?)claim.ClaimId),
+                static claim => (string?)claim.ClaimId,
                 s_ordinal);
             foreach (var callable in callables)
             {
@@ -1005,7 +1005,7 @@ internal static partial class WorkerProtocolJson
 
     internal static bool AreDistinctNonblank(ImmutableArray<string> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
-        return CompleteUnique(values, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (!string.IsNullOrWhiteSpace(value)), static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value));
+        return CompleteUnique(values, static value => !string.IsNullOrWhiteSpace(value), static value => value);
     }
 
     internal static bool IsSingleLineText(string? value)
@@ -1038,16 +1038,16 @@ internal static partial class WorkerProtocolJson
 
     internal static bool AreValidModel(ImmutableArray<WorkerModelValue> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
-        return CompleteUnique(values, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (!string.IsNullOrWhiteSpace(value.Variable) &&
-                !string.IsNullOrWhiteSpace(value.Kind) && !string.IsNullOrWhiteSpace(value.Value)),
-                static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable));
+        return CompleteUnique(values, static value => !string.IsNullOrWhiteSpace(value.Variable) &&
+                !string.IsNullOrWhiteSpace(value.Kind) && !string.IsNullOrWhiteSpace(value.Value),
+                static value => value.Variable);
     }
 
     internal static bool AreValidAssumptions(ImmutableArray<WorkerAssumptionEvidence> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
         return CompleteUnique(values,
                 WorkerProtocolMetadata.IsAssumptionValid,
-                static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id));
+                static value => value.Id);
     }
 
     private static bool HasProducerAssumptionKinds(ImmutableArray<WorkerAssumptionEvidence> values /* SPINT001: all values valid - default preserves wire null for validation */)
@@ -1169,9 +1169,9 @@ internal static partial class WorkerProtocolJson
     private static ImmutableArray<WorkerAssumptionEvidence> CanonicalizeAssumptions(ImmutableArray<WorkerAssumptionEvidence> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
         return [.. (EmptyIfDefault(values))
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolMetadata.GetAssumptionOrder(
-                value?.Kind ?? WorkerAssumptionKind.Unspecified)))
-            .ThenBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value?.Id), s_ordinal)];
+            .OrderBy(static value => WorkerProtocolMetadata.GetAssumptionOrder(
+                value?.Kind ?? WorkerAssumptionKind.Unspecified))
+            .ThenBy(static value => value?.Id, s_ordinal)];
     }
 
     private static ImmutableArray<T> SortManifestEnums<T>(ImmutableArray<T> values /* SPINT001: all values valid - default preserves wire null for validation */) where T : struct, Enum
@@ -1197,8 +1197,8 @@ internal static partial class WorkerProtocolJson
         NormalizeAssumptionDeclarations(ImmutableArray<WorkerAssumptionEvidence> values /* SPINT001: all values valid - default preserves wire null for validation */)
     {
         return [.. (EmptyIfDefault(values)).Where(static value => value != null)
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Id), s_ordinal)
-            .Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : ((value.Id, value.Kind)))];
+            .OrderBy(static value => value.Id, s_ordinal)
+            .Select(static value => (value.Id, value.Kind))];
     }
 
     private sealed class ManifestIdentityIndexes
@@ -1214,10 +1214,10 @@ internal static partial class WorkerProtocolJson
             CallablesById = new OrdinalIdentityIndex<
                 WorkerCallableManifestEntry>(
                     Callables,
-                    static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId));
+                    static item => item.CallableId);
             ClaimsById = new OrdinalIdentityIndex<WorkerClaimManifestEntry>(
                 Claims,
-                static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId));
+                static item => item.ClaimId);
             CallableAssumptionsById = CreateCallableAssumptions(Callables);
         }
 
@@ -1330,7 +1330,7 @@ internal static partial class WorkerProtocolJson
     {
         return new(
             (EmptyIfDefault(manifest?.Claims ?? [])).OfType<WorkerClaimManifestEntry>(),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ClaimId));
+            static value => value.ClaimId);
     }
 
     private static int FindClaimOrdinal(

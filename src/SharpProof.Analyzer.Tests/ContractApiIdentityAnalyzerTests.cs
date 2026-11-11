@@ -126,7 +126,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             """;
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         Assert.That(
-            compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
+            compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
             Is.Empty);
         var subject = compilation.GetTypeByMetadataName("Subject")!;
         var read = subject.GetMembers("Read").OfType<IMethodSymbol>().Single();
@@ -201,8 +201,8 @@ public sealed class ContractApiIdentityAnalyzerTests
         {
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 7);
             Assert.That(
-                diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture))),
+                diagnostics.Select(diagnostic => diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)),
                 Has.All.Contain("ContractApiIdentityRejected"));
         }
     }
@@ -282,7 +282,7 @@ public sealed class ContractApiIdentityAnalyzerTests
         {
             Assert.That(exact, Is.Empty);
             Assert.That(
-                generatedLookalike.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                generatedLookalike.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(["SP0047"]));
         }
     }
@@ -323,17 +323,17 @@ public sealed class ContractApiIdentityAnalyzerTests
             features: "all");
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0046", "SP0047"]));
         Assert.That(
             diagnostics.Single(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0047"))
+                diagnostic.Id == "SP0047")
                 .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
             Does.Contain("MaybeNull")
                 .And.Contain("ContractApiIdentityRejected"));
         Assert.That(
             diagnostics.Single(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0046"))
+                diagnostic.Id == "SP0046")
                 .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
             Does.Contain("Call")
                 .And.Contain("NullReferenceException"));
@@ -411,7 +411,7 @@ public sealed class ContractApiIdentityAnalyzerTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SP0050"));
     }
 
@@ -492,7 +492,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             features: "contracts");
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Not.Contain("SP0047"));
     }
 

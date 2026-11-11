@@ -380,19 +380,19 @@ public sealed class AdvisoryActivationTests
             Assert.That(factory.CreateCount, Is.EqualTo(1));
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
             var messages = diagnostics.Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                    System.Globalization.CultureInfo.InvariantCulture))).ToImmutableArray();
+                diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)).ToImmutableArray();
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "BodylessEffectContractNotEnforced",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(2));
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "MissingOperationRoot",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
         }
     }

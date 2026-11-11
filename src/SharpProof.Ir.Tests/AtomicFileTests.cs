@@ -107,7 +107,7 @@ public sealed class AtomicFileTests : IDisposable
         var staged = stagedBuilder.ToImmutable();
 
         using var start = new Barrier(publicationCount + 1);
-        var publications = staged.Select(temporary => temporary is null ? throw new System.ArgumentNullException(nameof(temporary)) : (Task.Factory.StartNew(() =>
+        var publications = staged.Select(temporary => Task.Factory.StartNew(() =>
         {
             start.SignalAndWait();
             try
@@ -119,7 +119,7 @@ public sealed class AtomicFileTests : IDisposable
                 AtomicFile.TryDeleteStaged(temporary);
             }
         }, TestContext.CurrentContext.CancellationToken, TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
-            TaskScheduler.Default))).ToImmutableArray();
+            TaskScheduler.Default)).ToImmutableArray();
 
         start.SignalAndWait();
         await Task.WhenAll(publications);

@@ -58,7 +58,7 @@ internal static partial class WorkerProtocolJson
             { return false; }
         }
         if (used.Length != expected.Count || !expected.SetEquals(used.Select(static assumption =>
-                assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id)) ||
+                assumption.Id)) ||
             tokens.Length != 1 || tokens[0] != "resource-runtime-premise-record:" + RuntimePremiseRecordSha256(evidence))
         { return false; }
         var references = bound.MetadataAssumptions.Where(static dependency => dependency is not null &&

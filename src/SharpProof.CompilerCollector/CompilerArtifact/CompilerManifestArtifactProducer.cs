@@ -34,12 +34,12 @@ internal static class CompilerManifestArtifactProducer
             SpecificationPackCatalogSha256 = specificationPackAuthority.SpecificationPackCatalogSha256
         };
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
-            .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error &&
-                !item.IsSuppressed))
-            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (CreateDiagnostic(item, compilation, snapshot)));
+            .Where(static item => item.Severity == DiagnosticSeverity.Error &&
+                !item.IsSuppressed)
+            .Select(item => CreateDiagnostic(item, compilation, snapshot));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
-        ImmutableArray<ManifestCallableTarget> targets = [.. discovery.Targets.Values.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal)];
+        ImmutableArray<ManifestCallableTarget> targets = [.. discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal)];
         var manifest = discovery.Manifest;
         ImmutableArray<CompilerCallableArtifact> callables;
         if (diagnosticArtifacts.Length != 0)
@@ -58,7 +58,7 @@ internal static class CompilerManifestArtifactProducer
         }
         else
         {
-            ImmutableArray<CompilerCallPreconditionClaims.LoweredCallable> lowered = [.. targets.Concat(discovery.ContractCallers).OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId), StringComparer.Ordinal).Select(item => {
+            ImmutableArray<CompilerCallPreconditionClaims.LoweredCallable> lowered = [.. targets.Concat(discovery.ContractCallers).OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal).Select(item => {
                 item = RepositoryParameterGuard.NotNull(item, nameof(item));
                 var lowerer = new CompilerCallableLowerer(
                     compilation,
@@ -71,9 +71,9 @@ internal static class CompilerManifestArtifactProducer
             {
                 (manifest, lowered) = CompilerCallPreconditionClaims.Attach(compilation, snapshot.SyntaxTrees, manifest, lowered,
                     [.. discovery.ContractCallers], discovery.PreconditionCallSites, cancellationToken);
-                targets = [.. lowered.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.Target)];
+                targets = [.. lowered.Select(static item => item.Target)];
             }
-            callables = [.. lowered.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : CompilerLoweredArtifact.Encode(item.Preparation, cancellationToken).AttachEffectEvidence(item.Target))];
+            callables = [.. lowered.Select(item => CompilerLoweredArtifact.Encode(item.Preparation, cancellationToken).AttachEffectEvidence(item.Target))];
         }
         var resourceSnapshot = snapshot;
         var artifact = Compose(manifest, callables, targets);
@@ -100,8 +100,8 @@ internal static class CompilerManifestArtifactProducer
             { break; }
             var removed = dropped.ToImmutable();
             manifest = CompilerCallPreconditionClaims.Drop(manifest, removed, discovery.PreconditionCallSites);
-            callables = [.. callables.Where(callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : !removed.Contains(callable.CallableId))];
-            targets = [.. targets.Where(target => target is null ? throw new ArgumentNullException(nameof(target)) : !removed.Contains(target.Entry.CallableId))];
+            callables = [.. callables.Where(callable => !removed.Contains(callable.CallableId))];
+            targets = [.. targets.Where(target => !removed.Contains(target.Entry.CallableId))];
             artifact = Compose(manifest, callables, targets);
         }
         return artifact;
@@ -124,8 +124,7 @@ internal static class CompilerManifestArtifactProducer
                 { pending.Push(ResourceProgramCodec.Decode(payload, cancellationToken)); }
                 if (callable.ForkJoinProjection is { } forkPayload)
                 {
-                    var entry = composedManifest.Callables.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-                        candidate.CallableId == callable.CallableId);
+                    var entry = composedManifest.Callables.Single(candidate => candidate.CallableId == callable.CallableId);
                     var root = CompilerTotalCallableArtifactCodec.DecodeEntry(callable.TotalEntry, entry, cancellationToken)
                         ?? throw new InvalidDataException("Fork-join reference ownership has no root entry.");
                     var projection = CompilerForkJoinProjectionCodec.Decode(forkPayload, root, cancellationToken);
@@ -143,8 +142,7 @@ internal static class CompilerManifestArtifactProducer
                     { pending.Push(child); }
                 }
             }
-            if (composedManifest.Claims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+            if (composedManifest.Claims.Any(static claim => claim.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
             {
                 composedSnapshot = composedSnapshot with { ResourceTargetPlatform = compilation.Options.Platform.ToString() };
                 resourceAssemblies.Add(compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly.Identity.ToString());
@@ -152,7 +150,7 @@ internal static class CompilerManifestArtifactProducer
             composedSnapshot = composedSnapshot with
             {
                 ResourceMetadataReferences = composedSnapshot.References.Where(reference =>
-                reference is null ? throw new ArgumentNullException(nameof(reference)) : resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
+                resourceAssemblies.Contains(reference.Identity)).ToImmutableArray()
             };
             return new CompilerManifestArtifact
             {
@@ -188,7 +186,7 @@ internal static class CompilerManifestArtifactProducer
             evidence.Add(claim.Evidence);
         }
         artifact = artifact with { EffectClaims = evidence.ToImmutable() };
-        if (artifact.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
+        if (artifact.EffectClaims.Any(claim => claim.ContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
             artifact.ResourceProgram is null && artifact.ResourceUnknownReason is null)
         { artifact = artifact with { ResourceUnknownReason = "CompilationOrBodyUnavailable" }; }
         return artifact;

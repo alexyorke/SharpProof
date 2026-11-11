@@ -31,18 +31,18 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.Syntax.SyntaxTree, Is.SameAs(tree));
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var logSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Log"));
+            .Single(invocation => invocation.Expression.ToString() == "Log");
         var invocation = (IInvocationOperation)model.GetOperation(logSyntax)!;
         Assert.That(invocation.TargetMethod.IsConditional, Is.True);
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
         Assert.That(emission.IsElided(invocation, requireOwningInvocation: true), Is.True);
-        var conditional = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
-            block.BranchValue != null && emission.IsElided(block.BranchValue)));
+        var conditional = graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
+            block.BranchValue != null && emission.IsElided(block.BranchValue));
         Assert.That(conditional.BranchValue!.Syntax.ToString(), Is.EqualTo("value > 0"));
         Assert.That(conditional.IsReachable, Is.EqualTo(branchEnabled));
         Assert.That(conditional.FallThroughSuccessor!.Destination!.IsReachable, Is.EqualTo(branchEnabled));
@@ -104,7 +104,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                 Length = graph.OriginalOperation.Syntax.Span.Length,
                 Syntax = graph.OriginalOperation.Syntax.ToString()
             },
-            OwningInvocations = owningInvocations.Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (new
+            OwningInvocations = owningInvocations.Select(invocation => new
             {
                 Kind = invocation.Kind.ToString(),
                 Tree = invocation.Syntax.SyntaxTree.FilePath,
@@ -112,16 +112,16 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                 Length = invocation.Syntax.Span.Length,
                 Syntax = invocation.Syntax.ToString(),
                 Target = invocation.TargetMethod.ToDisplayString()
-            })).ToImmutableArray(),
-            Regions = regions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (new
+            }).ToImmutableArray(),
+            Regions = regions.Select(region => new
             {
                 Id = regionIds[region],
                 Parent = region.EnclosingRegion == null ? (int?)null : regionIds[region.EnclosingRegion],
                 Kind = region.Kind.ToString(),
                 First = region.FirstBlockOrdinal,
                 Last = region.LastBlockOrdinal
-            })).ToImmutableArray(),
-            Blocks = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
+            }).ToImmutableArray(),
+            Blocks = graph.Blocks.Select(block => new
             {
                 block.Ordinal,
                 block.IsReachable,
@@ -158,7 +158,7 @@ public sealed class ConditionalElisionDeadShadowContinuationTests
                     Destination = block.ConditionalSuccessor.Destination?.Ordinal,
                     Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 }
-            })).ToImmutableArray()
+            }).ToImmutableArray()
         };
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ?? TestContext.CurrentContext.WorkDirectory;
         var directory = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "conditional-elision-cfg");

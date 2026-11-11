@@ -58,11 +58,11 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0 && input is ulong unsigned
+        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding.Entry,
+            binding => binding.Parameter.Ordinal == 0 && input is ulong unsigned
                 ? factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, unsigned)
                 : factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
-                    binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count)));
+                    binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count));
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -79,7 +79,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         var compilation = VisualBasicCompilation.Create("CompoundShiftNearbyControl", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: strict,
                 checkOverflow: true, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return compilation;
     }
 

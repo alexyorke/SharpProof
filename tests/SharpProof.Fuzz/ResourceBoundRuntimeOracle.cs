@@ -128,7 +128,7 @@ internal static class ResourceBoundRuntimeOracle
                 var offset = index * BatchSize;
                 var generated = Enumerable.Range(offset, Math.Min(BatchSize, cases - offset))
                     .Select(ordinal => ResourceBoundProgramGenerator.Generate(seed, ordinal)).ToImmutableArray();
-                return ValueTask.FromResult(Check(generated, seed, static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : claim, token));
+                return ValueTask.FromResult(Check(generated, seed, static claim => claim, token));
             }, cancellationToken).ConfigureAwait(false);
         var total = new ResourceBoundBatch();
         foreach (var batch in batches)
@@ -146,11 +146,11 @@ internal static class ResourceBoundRuntimeOracle
         RepositoryParameterGuard.ThrowIfInvalid(cases.IsDefault, nameof(cases));
         claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
         var result = new ResourceBoundBatch();
-        var source = GeneratedSource(cases.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : item.Member));
+        var source = GeneratedSource(cases.Select(static item => item.Member));
         var tree = Parse(source, "resource-bounds.cs", cancellationToken);
         var compilation = Compile("ResourceBoundPlain", [tree], TestMetadataReferences.SortedDistinctPlatform);
         var proofs = Prove(cases, compilation, tree, claims, cancellationToken);
-        var proven = cases.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : proofs.ContainsKey(item.Name)).ToImmutableArray();
+        var proven = cases.Where(item => proofs.ContainsKey(item.Name)).ToImmutableArray();
         foreach (var item in cases)
         { result.ShapeMask |= 1 << (int)item.Shape; }
         if (proven.IsEmpty)
@@ -192,7 +192,7 @@ internal static class ResourceBoundRuntimeOracle
         claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
         var targets = tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))
+            .Where(static method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))
             .ToImmutableArray();
         if (targets.Length != cases.Length)
         { throw new InvalidOperationException("Generated method count does not match the resource case universe."); }
@@ -218,8 +218,7 @@ internal static class ResourceBoundRuntimeOracle
     {
         RepositoryParameterGuard.ThrowIfInvalid(proven.IsDefault, nameof(proven));
         claims = RepositoryParameterGuard.NotNull(claims, nameof(claims));
-        var source = "using SharpProof.Attributes; " + GeneratedSource(proven.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) :
-            "[ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0)] " + item.Member));
+        var source = "using SharpProof.Attributes; " + GeneratedSource(proven.Select(static item => "[ResourceUpperBound(ResourceMetric.LoopBodyEntries, 0)] " + item.Member));
         var compilation = Compile("ResourceBoundNative", [Parse(source, "/resource-bounds/Subject.cs", cancellationToken)],
             TestMetadataReferences.WithAdditionalPaths([typeof(SharpProof.Attributes.Contract).Assembly.Location], sort: true));
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/resource-bounds", "net9.0", WorkerFeatureSet.All,
@@ -228,8 +227,7 @@ internal static class ResourceBoundRuntimeOracle
         var results = ImmutableDictionary.CreateBuilder<string, ResourceBoundClaim>(StringComparer.Ordinal);
         foreach (var item in proven)
         {
-            var preparation = preparations.FirstOrDefault(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) :
-                candidate.Entry.CallableId.Contains(GeneratedType + "." + item.Name + "(", StringComparison.Ordinal));
+            var preparation = preparations.FirstOrDefault(candidate => candidate.Entry.CallableId.Contains(GeneratedType + "." + item.Name + "(", StringComparison.Ordinal));
             if (preparation is not { ResourceProgram: { } program, Total: { IsBodyAbstraction: false } owner })
             { continue; }
             var check = NativeResourceProgramVerifier.Verify(program, preparation.Entry.CallableId, owner, new NativeResourceMetadataBinding(preparation).Bind, cancellationToken);
@@ -385,7 +383,7 @@ internal static class ResourceBoundRuntimeOracle
         var (image, emit) = GeneratedCompilationEmitter.Emit(compilation, cancellationToken);
         using var imageScope = image;
         if (!emit.Success)
-        { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))); }
+        { throw new InvalidOperationException(string.Join("\n", emit.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))); }
         image.Position = 0;
         return context.LoadFromStream(image);
     }

@@ -32,7 +32,7 @@ internal sealed class NativeWorkerRoutingTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);
-            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Assert.That(response.ClaimResults.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(response.ClaimResults[1].Model, Has.Length.EqualTo(1));
@@ -143,7 +143,7 @@ internal sealed class NativeWorkerRoutingTests
             """);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)),
+        Assert.That(response.ClaimResults.Select(claim => claim.Outcome),
             Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
@@ -437,7 +437,7 @@ internal sealed class NativeWorkerRoutingTests
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-        Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
     }
 
@@ -498,17 +498,17 @@ internal sealed class NativeWorkerRoutingTests
             using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True, sourceCase.Name);
-            var postIds = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-                .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+            var postIds = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+                .Select(claim => claim.ClaimId).ToImmutableHashSet(StringComparer.Ordinal);
             posts += postIds.Count;
-            var actual = ImmutableDictionaryCapture.Create(response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (postIds.Contains(result.ClaimId))), result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), static result => result ?? throw new System.ArgumentNullException(nameof(result)), StringComparer.Ordinal);
+            var actual = ImmutableDictionaryCapture.Create(response.ClaimResults.Where(result => postIds.Contains(result.ClaimId)), result => result.ClaimId, static result => result ?? throw new System.ArgumentNullException(nameof(result)), StringComparer.Ordinal);
             Assert.That(actual.Keys, Is.EquivalentTo(postIds), sourceCase.Name);
             if (sourceCase.Name == "golden:vc-shadow-unsupported-lock-local")
             {
                 Assert.That(actual.Values.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
                 Assert.That(actual.Values.Single().Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
             }
-            foreach (var result in expected.Values.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted)))
+            foreach (var result in expected.Values.Where(result => result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
             {
                 known++;
                 Assert.That((actual[result.ClaimId].Outcome, actual[result.ClaimId].Vacuity),
@@ -542,15 +542,15 @@ internal sealed class NativeWorkerRoutingTests
             }
             """, cacheEnabled);
         project.Request.Budgets.MaxParallelism = parallelism;
-        Assert.That(project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal))).IsSuccess, Is.True);
+        Assert.That(project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains(".A(", StringComparison.Ordinal)).IsSuccess, Is.True);
         Assert.That(SharpProofWorker.CountSolverTargets(project.Snapshot.Callables), Is.EqualTo(2));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         for (var run = 0; run < 2; run++)
         {
             var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(response.CallableResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)), Is.All.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(response.CallableResults.Select(result => result.Coverage), Is.All.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(cacheEnabled
                 ? run == 0 ? WorkerCacheStatus.Written : WorkerCacheStatus.Hit : WorkerCacheStatus.Disabled));
@@ -598,8 +598,8 @@ internal sealed class NativeWorkerRoutingTests
         var factory = project.Snapshot.Callables.Single().Total!.Program.Factory;
         using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory, project.Request.Budgets.QueryRlimit));
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.ClaimResults.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
-        var pending = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
         Assert.That(pending.Reason, Is.EqualTo(WorkerClaimReason.MethodTimeout));
         Assert.That(response.CallableResults.Single().Reason, Is.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
@@ -630,12 +630,12 @@ internal sealed class NativeWorkerRoutingTests
             project.Request.Budgets.ProjectWallTimeMilliseconds = 1500;
             project.Request.Budgets.MethodWallTimeMilliseconds = 1500;
         }
-        var factory = project.Snapshot.Callables.OrderBy(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId), StringComparer.Ordinal).First().Total!.Program.Factory;
+        var factory = project.Snapshot.Callables.OrderBy(callable => callable.Entry.CallableId, StringComparer.Ordinal).First().Total!.Program.Factory;
         using var worker = new SharpProofWorker(() => new StallAfterQueriesBackend(factory,
             project.Request.Budgets.QueryRlimit, projectTimeout ? null : cancellation.Cancel));
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, cancellation.Token);
-        Assert.That(response.ClaimResults.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
-        var pending = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown));
+        Assert.That(response.ClaimResults.Count(result => result.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        var pending = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
         if (projectTimeout)
         {
             // Both budgets expire together; either timer may signal first.
@@ -661,8 +661,8 @@ internal sealed class NativeWorkerRoutingTests
         using var backend = new StallAfterQueriesBackend(target.Total!.Program.Factory, project.Request.Budgets.QueryRlimit, boundary.Cancel);
         var result = await CallableVerificationPolicy.VerifyNativeTargetAsync(backend, target, project.Request.Budgets,
             null, project.Request.Budgets.MethodWallTimeMilliseconds, boundary, TestContext.CurrentContext.CancellationToken);
-        Assert.That(result.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
-        Assert.That(result.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown)).Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
+        Assert.That(result.Claims.Count(claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        Assert.That(result.Claims.Single(claim => claim.Outcome == WorkerClaimOutcome.Unknown).Reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
         Assert.That(result.Callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.ProjectTimeout));
     }
 

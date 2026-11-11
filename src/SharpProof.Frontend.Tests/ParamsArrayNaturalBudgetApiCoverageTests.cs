@@ -23,12 +23,12 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
         var target = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var calls = target.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!)).ToImmutableArray();
+            .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(callCount));
         var session = new TotalSourceCallSession(subject.Compilation, null, null, default,
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ResolveArrayEmpty(subject.Factory, method)));
+            method => ResolveArrayEmpty(subject.Factory, method));
         Assert.That(session.Enter(subject.Context.Target), Is.True);
         try
         {
@@ -59,7 +59,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
         var controlTree = control.Compilation.SyntaxTrees.Single();
         var controlModel = control.Compilation.GetSemanticModel(controlTree);
         var helperSyntax = controlTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
+            .Single(method => method.Identifier.ValueText == "Helper");
         var helperSymbol = controlModel.GetDeclaredSymbol(helperSyntax)!;
         var helperGraph = ControlFlowGraph.Create(helperSyntax, controlModel)!;
         bool PrepareCallee(TotalLoweringContext candidate)
@@ -74,7 +74,7 @@ public sealed class ParamsArrayNaturalBudgetApiCoverageTests
             return prepared.IsExact;
         }
         var supported = new TotalSourceCallSession(control.Compilation, PrepareCallee, null, default,
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ResolveArrayEmpty(control.Factory, method)));
+            method => ResolveArrayEmpty(control.Factory, method));
         var program = new RoslynTotalProgramLowerer(control.Context, default, supported).Lower(control.Graph);
         Assert.That(program.IsExact, Is.True);
         Assert.That(program.ConstructionLimitExceeded, Is.False);

@@ -174,7 +174,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(target.ForkJoinProjection, Is.Null);
         var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
             new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
-        var resource = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound != null);
+        var resource = results.Single(static result => result.ResourceBound != null);
         Assert.That(resource.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(resource.ResourceBound!.InferredUpperBound, Is.Null);
     }
@@ -261,10 +261,10 @@ internal sealed partial class NativeResourceContractTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), cancellation);
         Assert.That(results, Has.Length.EqualTo(2));
-        Assert.That(results.All(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Outcome == WorkerClaimOutcome.Proven), Is.True);
+        Assert.That(results.All(static result => result.Outcome == WorkerClaimOutcome.Proven), Is.True);
         var cost = NativeForkJoinSourceCostVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, cancellation).Upper!;
-        var arrayUpper = cost.Arrays.Evaluate(size => size is null ? throw new ArgumentNullException(nameof(size)) : input, cancellation) + 1;
-        var elementUpper = cost.Elements.Evaluate(size => size is null ? throw new ArgumentNullException(nameof(size)) : input, cancellation) + 2;
+        var arrayUpper = cost.Arrays.Evaluate(size => input, cancellation) + 1;
+        var elementUpper = cost.Elements.Evaluate(size => input, cancellation) + 2;
         // Observe successful source allocation events in a separately emitted
         // execution. Instrumentation is not submitted as proof evidence.
         var observed = source.Replace(join, "Task.WhenAll(Observe(new Task[] { Task.Run(()=>Child(n)),Task.Run(()=>Child(3)) }))", StringComparison.Ordinal)

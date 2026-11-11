@@ -42,8 +42,8 @@ public sealed class EnumEqualityCompatibilityAuditTests
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".observed.cs"), source);
         var compilation = TestCompilation.CreateExact("EnumEqualityCompatibility_" + caseName, [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
-        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
-        Assert.That(warnings, Is.Empty, string.Join("\n", warnings.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        var warnings = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning).ToImmutableArray();
+        Assert.That(warnings, Is.Empty, string.Join("\n", warnings.Select(diagnostic => diagnostic.ToString())));
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
@@ -78,17 +78,17 @@ public sealed class EnumEqualityCompatibilityAuditTests
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var declaredClaim = artifact.Manifest.Claims.Single();
         Assert.That(declaredClaim.Kind, Is.EqualTo(WorkerClaimKind.Postcondition));
-        var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == declaredClaim.CallableId));
+        var captured = artifact.Callables.Single(callable => callable.CallableId == declaredClaim.CallableId);
         Assert.That(captured.Total, Is.Not.Null, "Copied enum equality must retain captured Total.");
         await File.WriteAllTextAsync(Path.Combine(evidence, caseName + ".compiler-artifact.json"),
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken));
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);
         artifact = project.Artifact;
-        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaredClaim.CallableId));
+        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaredClaim.CallableId);
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;
         Assert.That(total.IsBodyAbstraction, Is.False);
-        var clause = total.Clauses.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind == CompilerContractKind.Ensures));
+        var clause = total.Clauses.Single(candidate => candidate.Kind == CompilerContractKind.Ensures);
         Assert.That(clause.ClaimId, Is.EqualTo(declaredClaim.ClaimId));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);

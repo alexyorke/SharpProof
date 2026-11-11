@@ -107,8 +107,8 @@ public sealed class GenericTestedTypeFacetControlAuditTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var expectedClaims = ImmutableDictionaryCapture.Create(
             manifest.Claims,
-            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            claim => claim.ClaimId,
+            static item => item,
             StringComparer.Ordinal);
         var observedClaims = response.ClaimResults.Select(claim =>
         {
@@ -129,12 +129,12 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            ManifestClaims = manifest.Claims.Select(claim => new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             Claims = observedClaims,
             Cases = cases,
             FrozenExpectation = "Both EnforcePure and DoesNotThrow remain Proven independently of potential allocation."
@@ -144,14 +144,14 @@ public sealed class GenericTestedTypeFacetControlAuditTests
             Assert.That(response.Errors, Is.Empty);
             Assert.That(project.Request.Cache.Enabled, Is.False);
             Assert.That(manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(manifest.Claims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Effect)), Is.True);
-            Assert.That(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.EffectContractKind)), Is.EquivalentTo(ImmutableArray.Create(WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow)));
+            Assert.That(manifest.Claims.All(claim => claim.Kind == WorkerClaimKind.Effect), Is.True);
+            Assert.That(manifest.Claims.Select(claim => claim.EffectContractKind), Is.EquivalentTo(ImmutableArray.Create(WorkerEffectContractKind.EnforcePure, WorkerEffectContractKind.DoesNotThrow)));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-            Assert.That(response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)), Is.EquivalentTo(manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+            Assert.That(response.ClaimResults.Select(claim => claim.ClaimId), Is.EquivalentTo(manifest.Claims.Select(claim => claim.ClaimId)));
             foreach (var claim in response.ClaimResults)
             {
                 Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
-                    observedClaims.Single(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.ClaimId == claim.ClaimId)).ContractKind + ": " + claim.Reason);
+                    observedClaims.Single(observed => observed.ClaimId == claim.ClaimId).ContractKind + ": " + claim.Reason);
             }
         }
     }

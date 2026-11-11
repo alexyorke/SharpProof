@@ -32,7 +32,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(analysis.Sites.Single().Region, Is.EqualTo(region));
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         var contract = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, TestContext.CurrentContext.CancellationToken)
-            .Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.EffectContract));
+            .Single(claim => claim.Kind == EffectEvaluationContractKind.EffectContract);
         var violation = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
         Assert.That(violation.HasValue, Is.EqualTo(violates));
         if (violates)
@@ -73,7 +73,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
         Assert.That(call.Location.SourceTree, Is.SameAs(invocation.SyntaxTree));
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         var claims = EffectContractDiagnostics.Declare(caller, declaration.Identifier.GetLocation(), session, TestContext.CurrentContext.CancellationToken);
-        var permission = claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.AllowedCapabilities));
+        var permission = claims.Single(claim => claim.Kind == EffectEvaluationContractKind.AllowedCapabilities);
         var violation = AdvisoryEffectClaims.FindViolation(permission.Kind, permission.Constraint, analysis.Sites, compilation);
         if (capability == "None")
         {
@@ -84,7 +84,7 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
             Assert.That(violation, Is.Not.Null);
             Assert.That(violation!.Value.Detail, Does.Contain(capability));
         }
-        var contract = claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == EffectEvaluationContractKind.EffectContract));
+        var contract = claims.Single(claim => claim.Kind == EffectEvaluationContractKind.EffectContract);
         var undeclared = AdvisoryEffectClaims.FindViolation(contract.Kind, contract.Constraint, analysis.Sites, compilation);
         Assert.That(undeclared.HasValue, Is.EqualTo(effect != SpecEffect.None));
     }
@@ -130,14 +130,14 @@ internal sealed class AnalyzerCoreIrEffectCoverageTests
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, TestContext.CurrentContext.CancellationToken);
         Assert.That(gap, Is.Null);
         Assert.That(body, Is.Not.Null);
-        var call = body!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>()
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Receiver == null && instruction.Target == null));
+        var call = body!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>()
+            .Single(instruction => instruction.Receiver == null && instruction.Target == null);
         var flags = IrOpaqueCallSite.Effects(body.Program.Factory, call.Operation);
         Assert.That(IrOpaqueCallSite.Capabilities(flags), Is.EqualTo((int)projected.Capabilities));
         var ordinary = AdvisoryEffectSites.Analyze(compilation, method, declaration, TestContext.CurrentContext.CancellationToken);
         Assert.That(ordinary.Gap, Is.Null);
         Assert.That(ordinary.Sites, Has.Length.EqualTo(1));
-        var ordinaryCall = ordinary.Sites.Single(site => site is null ? throw new System.ArgumentNullException(nameof(site)) : (site.Kind == AdvisoryEffectSiteKind.Call));
+        var ordinaryCall = ordinary.Sites.Single(site => site.Kind == AdvisoryEffectSiteKind.Call);
         Assert.That(ordinaryCall.Effects, Is.EqualTo(flags));
         var loweredLocation = body.Locate(call.Operation);
         Assert.That(loweredLocation, Is.Not.Null);

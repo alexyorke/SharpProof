@@ -24,10 +24,10 @@ internal static partial class CallableVerificationPolicy
         }
 
         var effectClaims = ImmutableDictionaryCapture.Create(target.EffectClaims,
-            static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId),
-            static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : evidence, StringComparer.Ordinal);
+            static evidence => evidence.ClaimId,
+            static evidence => evidence, StringComparer.Ordinal);
         var hasRequires = target.Entry.Assumptions.Any(static assumption =>
-            assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition));
+            assumption.Kind == WorkerAssumptionKind.Precondition);
         var claims = target.Entry.ClaimIds.Select((claimId, index) =>
             claimId is null ? throw new System.ArgumentNullException(nameof(claimId)) : (effectClaims.TryGetValue(claimId, out var evidence) && NativeEffectClaims.IsNative(evidence.ContractKind) &&
                 evidence.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary

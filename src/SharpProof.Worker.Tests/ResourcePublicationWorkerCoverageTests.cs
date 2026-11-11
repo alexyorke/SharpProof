@@ -208,8 +208,7 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(result.ResourceBound!.InferredUpperBound, Is.Not.Null.And.Not.Empty);
             Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
             var dependency = result.ResourceBound.MetadataAssumptions.Single();
-            Assert.That(result.Assumptions.Single(assumption => assumption is null
-                ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId).Used, Is.True);
+            Assert.That(result.Assumptions.Single(assumption => assumption.Id == dependency.AssumptionId).Used, Is.True);
         }
         else
         { Assert.That(result.ResourceBound, Is.Null); }
@@ -223,7 +222,7 @@ internal sealed partial class NativeResourceContractTests
             reviewedRuntime: true, x64: true));
         var result = NativeResourceContractVerifier.Verify(target, target.EffectClaims.Single(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
-        Assert.That(result.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used), Is.True);
+        Assert.That(result.Assumptions.Any(static assumption => assumption.Used), Is.True);
         var binding = new NativeResourceLayoutBinding(target);
         Assert.That(binding.Bind(), Is.Not.Null);
         result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [] } };
@@ -232,7 +231,7 @@ internal sealed partial class NativeResourceContractTests
 
         Assert.That(projected.ResourceBound!.MetadataAssumptions, Has.Length.EqualTo(1));
         var dependency = projected.ResourceBound.MetadataAssumptions.Single();
-        Assert.That(projected.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId).Used, Is.True);
+        Assert.That(projected.Assumptions.Single(assumption => assumption.Id == dependency.AssumptionId).Used, Is.True);
         Assert.That(projected.ResourceBound.InferredUpperBound, Is.EqualTo(result.ResourceBound!.InferredUpperBound));
     }
 

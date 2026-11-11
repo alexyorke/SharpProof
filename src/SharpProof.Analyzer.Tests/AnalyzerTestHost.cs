@@ -22,7 +22,7 @@ internal static class AnalyzerTestHost
     private static readonly ImmutableDictionary<string, DiagnosticDescriptor>
         SupportedDiagnosticMap = DefaultAnalyzer.SupportedDiagnostics
             .ToImmutableDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
+                static descriptor => descriptor.Id,
                 StringComparer.Ordinal);
     private static readonly CSharpParseOptions ParseOptions =
         new(LanguageVersion.Preview);
@@ -47,13 +47,13 @@ internal static class AnalyzerTestHost
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         var actual = diagnostics.ToImmutableArray();
         Assert.That(
-            actual.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            actual.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(expected),
             string.Join(
                 Environment.NewLine,
                 actual.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}: " +
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)))));
+                    $"{diagnostic.Id}@{diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}: " +
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 
     internal static void AssertIds(
@@ -271,8 +271,8 @@ internal static class AnalyzerTestHost
                 reportSuppressedDiagnostics: false));
         return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync(
                 cancellationToken))
-            .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)];
+            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
@@ -297,7 +297,7 @@ internal static class AnalyzerTestHost
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         if (errors.IsEmpty)
         {
@@ -307,7 +307,7 @@ internal static class AnalyzerTestHost
         throw new InvalidOperationException(
             "Analyzer fixture compilation failed:" +
             Environment.NewLine +
-            string.Join(Environment.NewLine, errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
+            string.Join(Environment.NewLine, errors.Select(static error => error.ToString())));
     }
 
     internal static ImmutableArray<byte> EmitImage(CSharpCompilation compilation)
@@ -321,7 +321,7 @@ internal static class AnalyzerTestHost
                 string.Join(
                     Environment.NewLine,
                     result.Diagnostics.Select(static diagnostic =>
-                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                        diagnostic.ToString())));
         }
 
         return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));

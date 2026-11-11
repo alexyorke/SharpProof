@@ -47,7 +47,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedGeneratorEntryFileNames = [];
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerDependencyFileNames = [
-        "SharpProof.Analyzer.Core.dll",
         "SharpProof.Compiler.Semantics.dll",
         "SharpProof.Dataflow.dll",
         "SharpProof.Frontend.dll",
@@ -73,7 +72,6 @@ public sealed class PackageLayoutSmokeTests
     private static readonly ImmutableArray<string> ExpectedSourceAnalyzerProjectFileNames = [
         "SharpProof.Attributes.csproj",
         "SharpProof.Analyzer.csproj",
-        "SharpProof.Analyzer.Core.csproj",
         "SharpProof.CompilerCollector.csproj"
     ];
 
@@ -91,7 +89,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/SharpProof.CodeFixes.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
-        "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.Compiler.Semantics.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
         "tools/shared/netstandard2.0/SharpProof.Dataflow.dll",
@@ -292,8 +289,6 @@ public sealed class PackageLayoutSmokeTests
                          collectorDirectory,
                          "SharpProof.CompilerCollector.dll"), Path.Combine(
                          sharedDirectory,
-                         "SharpProof.Analyzer.Core.dll"), Path.Combine(
-                         sharedDirectory,
                          "SharpProof.Compiler.Semantics.dll")))
         {
             var reference = new AnalyzerFileReference(path, loader);
@@ -316,17 +311,17 @@ public sealed class PackageLayoutSmokeTests
             Assert.That(failures, Is.Empty);
             Assert.That(
                 analyzers.Count(analyzer =>
-                    analyzer is null ? throw new System.ArgumentNullException(nameof(analyzer)) : (string.Equals(
+                    string.Equals(
                         analyzer.GetType().FullName,
                         "SharpProof.Analyzer.SharpProofAnalyzer",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
                 analyzers.Count(analyzer =>
-                    analyzer is null ? throw new System.ArgumentNullException(nameof(analyzer)) : (string.Equals(
+                    string.Equals(
                         analyzer.GetType().FullName,
                         "SharpProof.CompilerCollector.FinalCompilationCollectorAnalyzer",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
                 analyzers,
@@ -876,12 +871,12 @@ public sealed class PackageLayoutSmokeTests
             sourceEvaluation.Output,
             "Analyzer")
             .Where(path =>
-                path is null ? throw new System.ArgumentNullException(nameof(path)) : (ExpectedAnalyzerDependencyFileNames.Contains(
+                ExpectedAnalyzerDependencyFileNames.Contains(
                     Path.GetFileName(path),
                     StringComparer.Ordinal) ||
                 ExpectedCollectorDependencyFileNames.Contains(
                     Path.GetFileName(path),
-                    StringComparer.Ordinal)))
+                    StringComparer.Ordinal))
             .ToImmutableArray();
         var sourceProjects = GetEvaluatedItemIdentities(
             sourceEvaluation.Output,
@@ -934,28 +929,27 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             await File.ReadAllLinesAsync(
                 workspace.MappedProjectConfigurationsPath),
-            Does.Contain("SharpProof.Analyzer|Release")
-                .And.Contain("SharpProof.Analyzer.Core|Debug"));
+            Does.Contain("SharpProof.Analyzer|Release"));
 
         var dependencyPaths = (await File.ReadAllLinesAsync(
                 workspace.MappedAnalyzerItemsPath))
-            .Where(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ExpectedAnalyzerDependencyFileNames.Contains(
+            .Where(path => ExpectedAnalyzerDependencyFileNames.Contains(
                 Path.GetFileName(path),
-                StringComparer.Ordinal)))
+                StringComparer.Ordinal))
             .ToImmutableArray();
         Assert.That(
             dependencyPaths.Select(Path.GetFileName),
             Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
         Assert.That(
             dependencyPaths,
-            Has.All.Matches<string>(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.Contains(
-                Path.Combine("Debug", "netstandard2.0"),
-                StringComparison.Ordinal))));
+            Has.All.Matches<string>(path => path.Contains(
+                Path.Combine("Release", "netstandard2.0"),
+                StringComparison.Ordinal)));
         Assert.That(
             dependencyPaths,
-            Has.None.Matches<string>(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.Contains(
-                Path.Combine("Release", "netstandard2.0"),
-                StringComparison.Ordinal))));
+            Has.None.Matches<string>(path => path.Contains(
+                Path.Combine("Debug", "netstandard2.0"),
+                StringComparison.Ordinal)));
     }
 
     [TestCase(
@@ -1161,9 +1155,9 @@ public sealed class PackageLayoutSmokeTests
                 .ToImmutableArray();
             Assert.That(effectClaims, Has.Length.EqualTo(2));
             Assert.That(
-                effectClaims.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Claim
+                effectClaims.Select(static item => item.Claim
                     .GetProperty("claimId")
-                    .GetString())),
+                    .GetString()),
                 Is.Unique.And.All.Not.Empty);
         }
 
@@ -1937,9 +1931,9 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(id);
         System.ArgumentNullException.ThrowIfNull(output);
         return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Count(line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.Contains(
+            .Count(line => line.Contains(
                 ": error " + id + ":",
-                StringComparison.Ordinal)));
+                StringComparison.Ordinal));
     }
 
     private static void VerifyPackageGraph(PackagedProductFeed feed)
@@ -1960,24 +1954,24 @@ public sealed class PackageLayoutSmokeTests
         {
             using var archive = ZipFile.OpenRead(package.Path);
             var nuspec = archive.Entries.Single(entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName.EndsWith(
+                entry.FullName.EndsWith(
                     ".nuspec",
-                    StringComparison.OrdinalIgnoreCase)));
+                    StringComparison.OrdinalIgnoreCase));
             using var stream = nuspec.Open();
             var document = XDocument.Load(stream);
             var metadata = document.Descendants().Single(element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "metadata"));
+                element.Name.LocalName == "metadata");
             Assert.That(
                 metadata.Elements().Single(element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "id")).Value,
+                    element.Name.LocalName == "id").Value,
                 Is.EqualTo(package.Id));
             Assert.That(
                 metadata.Elements().Single(element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "version")).Value,
+                    element.Name.LocalName == "version").Value,
                 Is.EqualTo(feed.Version));
             Assert.That(
                 metadata.Elements().Single(element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "icon")).Value,
+                    element.Name.LocalName == "icon").Value,
                 Is.EqualTo("icon.png"));
             using (var icon = archive.GetEntry("icon.png")!.Open())
             {
@@ -1988,24 +1982,24 @@ public sealed class PackageLayoutSmokeTests
                 Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(20, 4)), Is.EqualTo(128));
             }
             var authors = metadata.Elements().Single(element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "authors")).Value;
+                element.Name.LocalName == "authors").Value;
             if (package.Id is PackagedProductFeed.MainPackageId or
                 PackagedProductFeed.VerifierPackageId)
             {
                 Assert.That(
                     metadata.Elements().Single(element =>
-                        element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "copyright")).Value,
+                        element.Name.LocalName == "copyright").Value,
                     Is.EqualTo("Copyright (c) " + authors),
                     package.Id);
             }
             var dependencies = metadata.Descendants()
                 .Where(element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "dependency"))
+                    element.Name.LocalName == "dependency")
                 .ToImmutableArray();
             Assert.That(
-                dependencies.Select(static dependency => dependency is null ? throw new System.ArgumentNullException(nameof(dependency)) : ((
+                dependencies.Select(static dependency => (
                     Id: dependency.Attribute("id")?.Value,
-                    Version: dependency.Attribute("version")?.Value))),
+                    Version: dependency.Attribute("version")?.Value)),
                 Is.EqualTo(expectedDependencies[package.Id]),
                 package.Id);
             // The main package hands the verifier's build files to its direct
@@ -2017,7 +2011,7 @@ public sealed class PackageLayoutSmokeTests
                 Assert.That(
                     dependency.Attributes()
                         .Select(static attribute =>
-                            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Name.LocalName)),
+                            attribute.Name.LocalName),
                     Is.EquivalentTo(main ? [.. ExpectedDependencyAttributes, "include"] : ExpectedDependencyAttributes),
                     package.Id +
                     " dependency metadata must not filter assets.");
@@ -2094,7 +2088,7 @@ public sealed class PackageLayoutSmokeTests
             System.ArgumentNullException.ThrowIfNull(package);
             using var archive = ZipFile.OpenRead(package.Path);
             return archive.Entries
-                .Select(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : ((package.Id, entry.FullName)))
+                .Select(entry => (package.Id, entry.FullName))
                 .ToImmutableArray();
         }).ToImmutableArray();
         Assert.That(
@@ -2111,7 +2105,7 @@ public sealed class PackageLayoutSmokeTests
             allEntries.Where(static entry =>
                 IsNativeZ3(entry.FullName)),
             Is.EquivalentTo(ExpectedNativeZ3Entries.Select(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : ((PackagedProductFeed.VerifierPackageId, entry)))));
+                (PackagedProductFeed.VerifierPackageId, entry))));
     }
 
     private static void AssertArchiveLayout(
@@ -2124,7 +2118,7 @@ public sealed class PackageLayoutSmokeTests
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
             .Select(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (NormalizeGeneratedPackageEntry(entry.FullName)))
+                NormalizeGeneratedPackageEntry(entry.FullName))
             .ToImmutableArray();
         Assert.That(
             entries,
@@ -2144,7 +2138,7 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(symbolPackagePath);
         using var package = ZipFile.OpenRead(packagePath);
         var packageEntries = package.Entries
-            .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
+            .Select(static entry => entry.FullName)
             .ToImmutableArray();
         Assert.That(
             packageEntries,
@@ -2152,11 +2146,11 @@ public sealed class PackageLayoutSmokeTests
             Path.GetFileName(packagePath));
         var expectedPdbEntries = packageEntries
             .Where(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.EndsWith(".dll", StringComparison.Ordinal) &&
+                entry.EndsWith(".dll", StringComparison.Ordinal) &&
                 Path.GetFileName(entry).StartsWith(
                     "SharpProof.",
-                    StringComparison.Ordinal)))
-            .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry[..^".dll".Length] + ".pdb"))
+                    StringComparison.Ordinal))
+            .Select(static entry => entry[..^".dll".Length] + ".pdb")
             .Order(StringComparer.Ordinal)
             .ToImmutableArray();
         Assert.That(
@@ -2267,7 +2261,7 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(packagePath);
         var document = PackageNuspecReader.Read(packagePath);
         var repository = document.Descendants().Single(element =>
-            element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "repository"));
+            element.Name.LocalName == "repository");
         Assert.That(
             repository.Attribute("type")?.Value,
             Is.EqualTo("git"),
@@ -2319,59 +2313,59 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
-            .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
+            .Select(static entry => entry.FullName)
             .ToImmutableArray();
         var analyzerEntries = entries
-            .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+            .Where(entry => entry.StartsWith(
                 "analyzers/dotnet/cs/",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         var conditionalAnalyzerEntries = entries
-            .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+            .Where(entry => entry.StartsWith(
                 "tools/analyzers/dotnet/cs/",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         var collectorEntries = entries
-            .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+            .Where(entry => entry.StartsWith(
                 "tools/collector/",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         var sharedEntries = entries
-            .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+            .Where(entry => entry.StartsWith(
                 "tools/shared/netstandard2.0/",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         Assert.That(analyzerEntries, Is.Empty);
         Assert.That(
             conditionalAnalyzerEntries,
             Is.EquivalentTo(
                 ExpectedConditionalAnalyzerEntries.Where(static entry =>
-                    entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+                    entry.StartsWith(
                         "tools/analyzers/dotnet/cs/",
-                        StringComparison.Ordinal)))));
+                        StringComparison.Ordinal))));
         Assert.That(
             collectorEntries,
             Is.EquivalentTo(
                 ExpectedConditionalAnalyzerEntries.Where(static entry =>
-                    entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+                    entry.StartsWith(
                         "tools/collector/",
-                        StringComparison.Ordinal)))));
+                        StringComparison.Ordinal))));
         Assert.That(
             sharedEntries,
             Is.EquivalentTo(
                 ExpectedConditionalAnalyzerEntries.Where(static entry =>
-                    entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+                    entry.StartsWith(
                         "tools/shared/netstandard2.0/",
-                        StringComparison.Ordinal)))));
+                        StringComparison.Ordinal))));
         Assert.That(
             conditionalAnalyzerEntries
                 .Concat(collectorEntries)
                 .Concat(sharedEntries),
             Has.None.Matches<string>(
                 entry =>
-                    entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.Contains("Microsoft.Z3", StringComparison.Ordinal) ||
+                    entry.Contains("Microsoft.Z3", StringComparison.Ordinal) ||
                     entry.Contains("libz3", StringComparison.OrdinalIgnoreCase) ||
-                    entry.Contains("NativeSmtLocator", StringComparison.Ordinal))));
+                    entry.Contains("NativeSmtLocator", StringComparison.Ordinal)));
 
         Assert.That(
             entries,
@@ -2416,12 +2410,12 @@ public sealed class PackageLayoutSmokeTests
         System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var entries = archive.Entries
-            .Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName))
+            .Select(static entry => entry.FullName)
             .ToImmutableArray();
         var toolEntries = entries
-            .Where(entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+            .Where(entry => entry.StartsWith(
                 "tools/net10/",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         Assert.That(
             toolEntries,
@@ -2432,13 +2426,13 @@ public sealed class PackageLayoutSmokeTests
                 "tools/net10/Microsoft.CodeAnalysis.AnalyzerUtilities.dll"));
         Assert.That(
             toolEntries.Where(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.StartsWith(
+                entry.StartsWith(
                     "tools/net10/Microsoft.CodeAnalysis",
                     StringComparison.Ordinal) ||
                 entry is
                     "tools/net10/SharpProof.Attributes.dll" or
                     "tools/net10/SharpProof.Compiler.Semantics.dll" or
-                    "tools/net10/SharpProof.Frontend.dll")),
+                    "tools/net10/SharpProof.Frontend.dll"),
             Is.Empty);
         Assert.That(
             entries,
@@ -2465,7 +2459,7 @@ public sealed class PackageLayoutSmokeTests
 
         Assert.That(
             entries.Where(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (IsNativeZ3(entry))),
+                IsNativeZ3(entry)),
             Is.EquivalentTo(ExpectedNativeZ3Entries));
         VerifyPinnedZ3Payload(archive);
     }
@@ -2698,12 +2692,12 @@ public sealed class PackageLayoutSmokeTests
                     item.GetProperty("Identity").GetString()) ??
                 string.Empty)))
             .Where(static fileName =>
-                fileName is null ? throw new System.ArgumentNullException(nameof(fileName)) : (ExpectedAnalyzerDependencyFileNames.Contains(
+                ExpectedAnalyzerDependencyFileNames.Contains(
                     fileName,
                     StringComparer.Ordinal) ||
                 ExpectedCollectorDependencyFileNames.Contains(
                     fileName,
-                    StringComparer.Ordinal)))
+                    StringComparer.Ordinal))
             .ToImmutableArray();
         var entryNames = items.GetProperty("ProjectReference")
             .EnumerateArray()
@@ -2791,13 +2785,13 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             items.Select(static item => item.Role),
             Has.All.Matches<string>(role =>
-                role is null ? throw new System.ArgumentNullException(nameof(role)) : (role is
+                role is
                     "EntryPoint" or
                     "CodeFix" or
                     "Generator" or
                     "Dependency" or
                     "Collector" or
-                    "CollectorDependency")));
+                    "CollectorDependency"));
     }
 
     private static Task WriteUtf8Async(string path, string contents)
@@ -3228,8 +3222,6 @@ public sealed class PackageLayoutSmokeTests
                 "{7B5B2351-815A-4416-A221-7D14948A120B}";
             const string analyzerGuid =
                 "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
-            const string analyzerCoreGuid =
-                "{B1C90B5D-04E7-4D8E-9D6F-3F5EE0F3C6CB}";
             const string projectTypeGuid =
                 "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
             var attributesProject = GetSolutionPath(
@@ -3240,10 +3232,6 @@ public sealed class PackageLayoutSmokeTests
                 repository,
                 "src/SharpProof.Analyzer",
                 "SharpProof.Analyzer.csproj");
-            var analyzerCoreProject = GetSolutionPath(
-                repository,
-                "src/SharpProof.Analyzer.Core",
-                "SharpProof.Analyzer.Core.csproj");
             var solution = Path.Combine(
                 ConsumerDirectory,
                 "MappedConsumer.sln");
@@ -3260,8 +3248,6 @@ public sealed class PackageLayoutSmokeTests
                 EndProject
                 Project("{projectTypeGuid}") = "SharpProof.Analyzer", "{analyzerProject}", "{analyzerGuid}"
                 EndProject
-                Project("{projectTypeGuid}") = "SharpProof.Analyzer.Core", "{analyzerCoreProject}", "{analyzerCoreGuid}"
-                EndProject
                 Global
                     GlobalSection(SolutionConfigurationPlatforms) = preSolution
                         Debug|Any CPU = Debug|Any CPU
@@ -3273,8 +3259,6 @@ public sealed class PackageLayoutSmokeTests
                         {attributesGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
                         {analyzerGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
                         {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
-                        {analyzerCoreGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-                        {analyzerCoreGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
                     EndGlobalSection
                 EndGlobal
                 """);
@@ -3361,7 +3345,7 @@ public sealed class PackageLayoutSmokeTests
                     "\n",
                     enabledDiagnosticIds
                         .Select(static id =>
-                            id is null ? throw new System.ArgumentNullException(nameof(id)) : ("dotnet_diagnostic." + id + ".severity = warning"))
+                            "dotnet_diagnostic." + id + ".severity = warning")
                         .Prepend("is_global = true")) + "\n");
             var escapedVersion = SecurityElement.Escape(version);
             var escapedPackageId = SecurityElement.Escape(packageId);
@@ -3503,9 +3487,7 @@ public sealed class PackageLayoutSmokeTests
 
         internal PackageAnalyzerAssemblyLoader()
         {
-            _context = new PackageAnalyzerLoadContext(name => name is null
-                ? throw new ArgumentNullException(nameof(name))
-                : System.Threading.Volatile.Read(ref _dependencies).TryGetValue(name, out var path) ? path : null);
+            _context = new PackageAnalyzerLoadContext(name => System.Threading.Volatile.Read(ref _dependencies).TryGetValue(name, out var path) ? path : null);
         }
 
         public void AddDependencyLocation(string fullPath)
@@ -3545,9 +3527,9 @@ public sealed class PackageLayoutSmokeTests
                 System.ArgumentNullException.ThrowIfNull(path);
                 var identity = AssemblyName.GetAssemblyName(path);
                 var loaded = Assemblies.FirstOrDefault(assembly =>
-                    assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (AssemblyName.ReferenceMatchesDefinition(
+                    AssemblyName.ReferenceMatchesDefinition(
                         assembly.GetName(),
-                        identity)));
+                        identity));
                 return loaded ?? LoadWithoutLock(path);
             }
 
@@ -3555,9 +3537,9 @@ public sealed class PackageLayoutSmokeTests
             {
                 System.ArgumentNullException.ThrowIfNull(identity);
                 var compilerAssembly = Default.Assemblies.FirstOrDefault(
-                    assembly => assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (AssemblyName.ReferenceMatchesDefinition(
+                    assembly => AssemblyName.ReferenceMatchesDefinition(
                         assembly.GetName(),
-                        identity)));
+                        identity));
                 if (compilerAssembly != null)
                 {
                     return compilerAssembly;

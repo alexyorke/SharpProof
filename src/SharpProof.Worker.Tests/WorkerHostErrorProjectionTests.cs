@@ -65,13 +65,13 @@ public sealed class WorkerHostErrorProjectionTests
             char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character));
         Assert.That(response.Errors[0].Message, Is.EqualTo(prefix + " " + expectedMessage));
         var validation = WorkerProtocolJson.Validate(response);
-        Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(validation.IsValid, Is.True, string.Join(";", validation.Errors.Select(error => error.Code)));
         TestContext.Progress.WriteLine("ACTUAL-SDK-ERROR-PROJECTION " + System.Text.Json.JsonSerializer.Serialize(new
         {
             exceptionType = exception.GetType().FullName,
             rawMessage = exception.GetBaseException().Message,
             projectedMessage = response.Errors[0].Message,
-            validationErrors = validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToImmutableArray()
+            validationErrors = validation.Errors.Select(error => error.Code).ToImmutableArray()
         }));
         var json = WorkerProtocolJson.SerializeResponse(response);
         var decoded = WorkerProtocolJson.DeserializeResponse(json);

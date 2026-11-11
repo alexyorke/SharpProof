@@ -207,7 +207,7 @@ public sealed class CallableSolverSessionTests
             new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
         Assert.That(result.UnsatCore.Single(), Is.EqualTo(2));
-        Assert.That(valid.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
+        Assert.That(valid.All(label => label.IsDisposed), Is.True);
         foreach (var inactive in ImmutableArray.Create("a-inactive", "g-previous"))
         {
             using var inactiveLabel = new CoreLabel(inactive);
@@ -216,7 +216,7 @@ public sealed class CallableSolverSessionTests
             result = CallableSolverSession.DecodeCore(malformed, active, "g-current",
                 new SmtQueryResourceMeter(100, TestContext.CurrentContext.CancellationToken));
             Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.MalformedResult));
-            Assert.That(malformed.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.IsDisposed)), Is.True);
+            Assert.That(malformed.All(label => label.IsDisposed), Is.True);
         }
     }
 
@@ -397,10 +397,10 @@ public sealed class CallableSolverSessionTests
         var expressions = ((IEnumerable<Expr>)typeof(Z3ExpressionOwner).GetField("_expressions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!).ToImmutableArray();
         Assert.That(expressions, Is.Not.Empty);
         Assert.That(NativeObject(solver), Is.Not.EqualTo(IntPtr.Zero));
-        Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) != IntPtr.Zero)), Is.True);
+        Assert.That(expressions.All(expression => NativeObject(expression) != IntPtr.Zero), Is.True);
         session.Dispose();
         Assert.That(NativeObject(solver), Is.EqualTo(IntPtr.Zero));
-        Assert.That(expressions.All(expression => expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) == IntPtr.Zero)), Is.True);
+        Assert.That(expressions.All(expression => NativeObject(expression) == IntPtr.Zero), Is.True);
         Assert.That((await session.CheckAsync(Query(factory, [], factory.Boolean(false)), TestContext.CurrentContext.CancellationToken)).FailureReason,
             Is.EqualTo(BackendFailureReason.Unavailable));
     }

@@ -32,7 +32,7 @@ internal static class CompilerCallPreconditionClaims
             { documents.Add(trees[ordinal].Path, compilation.SyntaxTrees[ordinal]); }
         }
         var sources = documents.ToImmutable();
-        var verified = lowered.Where(IsVerified).Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : CompilerIdentityBridge.CreateSymbolDisplay(callable.Target.Method))
+        var verified = lowered.Where(IsVerified).Select(static callable => CompilerIdentityBridge.CreateSymbolDisplay(callable.Target.Method))
             .ToImmutableHashSet(StringComparer.Ordinal);
         var claims = ImmutableArray.CreateBuilder<WorkerClaimManifestEntry>();
         var published = ImmutableArray.CreateBuilder<LoweredCallable>(lowered.Length);
@@ -57,11 +57,11 @@ internal static class CompilerCallPreconditionClaims
                 }
             });
         }
-        var checkedSites = claims.Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Location).ToImmutableHashSet();
+        var checkedSites = claims.Select(static claim => claim.Location).ToImmutableHashSet();
         var result = manifest with
         {
-            UncheckedCallSites = callSites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : !checkedSites.Contains(site)),
-            Callables = [.. published.Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.Preparation.Entry)],
+            UncheckedCallSites = callSites.Count(site => !checkedSites.Contains(site)),
+            Callables = [.. published.Select(static callable => callable.Preparation.Entry)],
             Claims = [.. manifest.Claims, .. claims]
         };
         WorkerProtocolJson.SealManifest(result);
@@ -72,9 +72,8 @@ internal static class CompilerCallPreconditionClaims
     {
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return manifest.Callables
-            .Where(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) :
-                callable.SelectionReasons.Length == 1 && callable.SelectionReasons[0] == WorkerSelectionReason.DiscoveredCallPrecondition)
-            .Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId)
+            .Where(static callable => callable.SelectionReasons.Length == 1 && callable.SelectionReasons[0] == WorkerSelectionReason.DiscoveredCallPrecondition)
+            .Select(static callable => callable.CallableId)
             .ToImmutableHashSet(StringComparer.Ordinal);
     }
 
@@ -86,15 +85,13 @@ internal static class CompilerCallPreconditionClaims
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         callers = RepositoryParameterGuard.NotNull(callers, nameof(callers));
         RepositoryParameterGuard.RequireInitialized(callSites.IsDefault, nameof(callSites), "Array must be initialized.");
-        ImmutableArray<WorkerClaimManifestEntry> claims = [.. manifest.Claims.Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            !callers.Contains(claim.CallableId))];
-        var checkedSites = claims.Where(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind == WorkerClaimKind.CallPrecondition)
-            .Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Location).ToImmutableHashSet();
+        ImmutableArray<WorkerClaimManifestEntry> claims = [.. manifest.Claims.Where(claim => !callers.Contains(claim.CallableId))];
+        var checkedSites = claims.Where(static claim => claim.Kind == WorkerClaimKind.CallPrecondition)
+            .Select(static claim => claim.Location).ToImmutableHashSet();
         var result = manifest with
         {
-            UncheckedCallSites = callSites.Count(site => site is null ? throw new ArgumentNullException(nameof(site)) : !checkedSites.Contains(site)),
-            Callables = [.. manifest.Callables.Where(callable => callable is null ? throw new ArgumentNullException(nameof(callable)) :
-                !callers.Contains(callable.CallableId))],
+            UncheckedCallSites = callSites.Count(site => !checkedSites.Contains(site)),
+            Callables = [.. manifest.Callables.Where(callable => !callers.Contains(callable.CallableId))],
             Claims = claims
         };
         WorkerProtocolJson.SealManifest(result);
@@ -122,8 +119,8 @@ internal static class CompilerCallPreconditionClaims
         if (total.CallPreconditions.IsEmpty)
         { return default; }
         var factory = total.Program.Factory;
-        var markers = ImmutableDictionaryCapture.Create(total.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions),
-            static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Id,
+        var markers = ImmutableDictionaryCapture.Create(total.Program.Blocks.SelectMany(static block => block.Instructions),
+            static instruction => instruction.Id,
             static instruction => instruction ?? throw new ArgumentNullException(nameof(instruction)));
         var entry = callable.Preparation.Entry;
         var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
@@ -170,7 +167,7 @@ internal static class CompilerCallPreconditionClaims
         row = RepositoryParameterGuard.NotNull(row, nameof(row));
         verified = RepositoryParameterGuard.NotNull(verified, nameof(verified));
         return row.MetadataClause == null && !row.Ancestry.Take(row.Ancestry.Length - 1)
-            .Any(hop => hop is null ? throw new ArgumentNullException(nameof(hop)) : verified.Contains(hop.CalleeIdentity));
+            .Any(hop => verified.Contains(hop.CalleeIdentity));
     }
 
     private static WorkerSourceLocation Project(ImmutableDictionary<string, SyntaxTree> documents, IrSourceSpan span)
@@ -187,7 +184,7 @@ internal static class CompilerCallPreconditionClaims
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         return entry with
         {
-            ClaimIds = [.. entry.ClaimIds, .. claims.Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId)],
+            ClaimIds = [.. entry.ClaimIds, .. claims.Select(static claim => claim.ClaimId)],
             SelectedFeatures = entry.SelectedFeatures.Contains(WorkerSelectedFeature.Contracts) ? entry.SelectedFeatures
                 : entry.SelectedFeatures.Add(WorkerSelectedFeature.Contracts),
             SelectionReasons = entry.SelectionReasons.Contains(WorkerSelectionReason.DiscoveredCallPrecondition) ? entry.SelectionReasons

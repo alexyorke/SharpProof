@@ -78,9 +78,9 @@ internal static partial class CSharpOperationSemantics
         return creation is { Initializer: null, Constructor: { } constructor } && exception != null &&
             (SymbolEqualityComparer.Default.Equals(constructor.ContainingAssembly, exception.ContainingAssembly) ||
                 IsAuditedMessageExceptionDeclaration(constructor)) &&
-            constructor.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
-                (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception)))) &&
-            creation.Arguments.All(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue)) &&
+            constructor.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
+                (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception))) &&
+            creation.Arguments.All(argument => argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue) &&
             !RejectsPossiblyNullInnerException(creation, exception);
     }
 
@@ -374,8 +374,8 @@ internal static partial class CSharpOperationSemantics
         // for a null innerException. Only a new object is known nonnull here;
         // other values require a precise constructor model before admission.
         return creation.Arguments.Any(argument =>
-            argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (SymbolEqualityComparer.Default.Equals(argument.Parameter?.Type, exception) &&
-            ThrownOperand(argument.Value) is not IObjectCreationOperation));
+            SymbolEqualityComparer.Default.Equals(argument.Parameter?.Type, exception) &&
+            ThrownOperand(argument.Value) is not IObjectCreationOperation);
     }
 
     // The core library's System.Exception among type's base classes, found

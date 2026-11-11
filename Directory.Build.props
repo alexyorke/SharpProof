@@ -58,10 +58,10 @@
       '$(SharpProofTestProject)' != 'true' And
       !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)', '[/\\]samples[/\\]')) And
       !$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Testing|Package|Verifier|Smoke\.Net472|CompilerProbe\.TestAsset)$'))">true</SharpProofProductionProject>
-    <NoWarn Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">$(NoWarn);RS2002;RS2003</NoWarn>
-    <CopyLocalLockFileAssemblies Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">true</CopyLocalLockFileAssemblies>
+    <NoWarn Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer|CompilerCollector)$'))">$(NoWarn);RS2002;RS2003</NoWarn>
+    <CopyLocalLockFileAssemblies Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '^SharpProof\.(Analyzer|CompilerCollector)$'))">true</CopyLocalLockFileAssemblies>
     <SharpProofUsesIrIdentifiers Condition="
-      '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Core' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Analyzer' Or
       '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' Or
@@ -94,7 +94,6 @@
   <PropertyGroup Condition="'$(SharpProofProjectName)' == 'ConsoleLoggingAnalyzer' OR
                         '$(SharpProofProjectName)' == 'DefensiveCodingAnalyzer' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Analyzer' OR
-                        '$(SharpProofProjectName)' == 'SharpProof.Analyzer.Core' OR
                         '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' OR
                         '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' OR

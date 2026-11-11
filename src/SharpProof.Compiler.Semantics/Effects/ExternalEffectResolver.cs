@@ -147,7 +147,7 @@ internal sealed class ExternalEffectResolver
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.GetAttributes()
             .Concat(method.AssociatedSymbol is IPropertySymbol property ? property.GetAttributes() : [])
-            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (IsAttribute(attribute, _effectContractAttribute)));
+            .Where(attribute => IsAttribute(attribute, _effectContractAttribute));
     }
 
     private bool TryDecodeContract(

@@ -35,7 +35,7 @@ public sealed class CollectorSourceCoverageTests
                 }
                 """)]);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values
-            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
+            .Single(item => item.Method.Name == "Adjust");
         var preparation = new CompilerCallableLowerer(compilation)
             .Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -67,7 +67,7 @@ public sealed class CollectorSourceCoverageTests
                 """)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.Name == "Adjust"));
+            item.Method.Name == "Adjust");
         var trees = CompilerCompilationCapture.CaptureTrees(
             compilation,
             TestContext.CurrentContext.CancellationToken);
@@ -83,7 +83,7 @@ public sealed class CollectorSourceCoverageTests
             references).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var artifact = CreateArtifact(compilation, discovery);
         var decoded = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)
-            .Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == target.Entry.CallableId));
+            .Single(item => item.Entry.CallableId == target.Entry.CallableId);
 
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
@@ -123,22 +123,22 @@ public sealed class CollectorSourceCoverageTests
                 """)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var targets = discovery.Targets.Values
-            .Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind is
-                MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet))
+            .Where(item => item.Method.MethodKind is
+                MethodKind.Constructor or MethodKind.PropertyGet or MethodKind.PropertySet)
             .ToImmutableArray();
         var artifact = CreateArtifact(compilation, discovery);
         var callables = artifact.Callables.ToImmutableDictionary(
-            item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
+            item => item.CallableId,
             StringComparer.Ordinal);
 
-        Assert.That(targets.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Method.MethodKind)), Is.EquivalentTo(ImmutableArray.Create(MethodKind.Constructor, MethodKind.PropertyGet, MethodKind.PropertySet)));
+        Assert.That(targets.Select(item => item.Method.MethodKind), Is.EquivalentTo(ImmutableArray.Create(MethodKind.Constructor, MethodKind.PropertyGet, MethodKind.PropertySet)));
         foreach (var target in targets)
         {
             var manifestClaims = target.EffectClaims
-                .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))
+                .Select(item => item.Evidence.ClaimId)
                 .ToImmutableArray();
             var artifactClaims = callables[target.Entry.CallableId].EffectClaims
-                .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId))
+                .Select(item => item.ClaimId)
                 .ToImmutableArray();
 
             Assert.That(manifestClaims, Has.Length.EqualTo(1), target.Method.MethodKind.ToString());
@@ -174,8 +174,8 @@ public sealed class CollectorSourceCoverageTests
             Assert.That(target.Entry.CallableId, Is.Not.Empty);
             Assert.That(callable.CallableId, Is.EqualTo(target.Entry.CallableId));
             Assert.That(target.EffectClaims, Has.Length.EqualTo(1));
-            Assert.That(callable.EffectClaims.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId)),
-                Is.EqualTo(target.EffectClaims.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Evidence.ClaimId))));
+            Assert.That(callable.EffectClaims.Select(item => item.ClaimId),
+                Is.EqualTo(target.EffectClaims.Select(item => item.Evidence.ClaimId)));
         }
     }
 

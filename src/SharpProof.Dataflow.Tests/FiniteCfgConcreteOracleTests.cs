@@ -321,7 +321,7 @@ public sealed class FiniteCfgConcreteOracleTests
     {
         if (transfers.IsDefault)
         { throw new ArgumentNullException(nameof(transfers)); }
-        return string.Join("/", transfers.Select(static transfer => transfer is null ? throw new System.ArgumentNullException(nameof(transfer)) : (transfer.Encoded)));
+        return string.Join("/", transfers.Select(static transfer => transfer.Encoded));
     }
 
     private static ConcreteFixpoint ExecuteConcreteFixpoint(

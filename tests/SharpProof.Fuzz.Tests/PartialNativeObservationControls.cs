@@ -30,8 +30,8 @@ public sealed class PartialNativeObservationControls
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = ImmutableDictionaryCapture.Create(
             (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>(),
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            method => method.Identifier.ValueText,
+            static item => item,
             StringComparer.Ordinal);
         Assert.That(methods, Has.Count.EqualTo(3));
         var model = compilation.GetSemanticModel(tree);

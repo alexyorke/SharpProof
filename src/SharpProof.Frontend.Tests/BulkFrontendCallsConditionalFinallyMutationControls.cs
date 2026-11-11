@@ -31,13 +31,13 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
         var compilation = CSharpCompilation.Create("ConditionalFinallyMutation_" + partial + "_" + enabled,
             [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var factory = new IrFactory();
@@ -65,10 +65,10 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
                 { pending = pending.Push(child); }
             }
             var regions = regionsBuilder.ToImmutable();
-            Assert.That(regions.Any(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.TryAndFinally)), Is.True);
-            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
+            Assert.That(regions.Any(region => region.Kind == ControlFlowRegionKind.TryAndFinally), Is.True);
+            Assert.That(graph.Blocks.SelectMany(block => ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor))
                 .Any(edge => edge != null && !edge.FinallyRegions.IsEmpty), Is.True);
-            Assert.That(graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor)))
+            Assert.That(graph.Blocks.SelectMany(block => ImmutableArray.Create(block.FallThroughSuccessor, block.ConditionalSuccessor))
                 .Any(edge => edge?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow), Is.False);
             var ownerSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
             var owner = (IInvocationOperation)model.GetOperation(ownerSyntax)!;
@@ -80,8 +80,8 @@ public sealed class BulkFrontendCallsConditionalFinallyMutationControls
             Assert.That(owner.Syntax.SyntaxTree, Is.SameAs(tree));
             Assert.That(owner.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
             var outer = (ConditionalExpressionSyntax)ownerSyntax.ArgumentList.Arguments.Single().Expression;
-            var conditionalBlock = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
-                block.BranchValue is { } branch && ReferenceEquals(branch.Syntax.SyntaxTree, tree) && branch.Syntax.Span == outer.Condition.Span));
+            var conditionalBlock = graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
+                block.BranchValue is { } branch && ReferenceEquals(branch.Syntax.SyntaxTree, tree) && branch.Syntax.Span == outer.Condition.Span);
             Assert.That(conditionalBlock.BranchValue, Is.Not.Null);
             var conditionalValue = conditionalBlock.BranchValue!;
             Assert.That(emission.IsElided(conditionalValue), Is.EqualTo(!enabled));

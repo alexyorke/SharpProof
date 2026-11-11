@@ -53,7 +53,7 @@ public sealed class CompilerDiagnosticSourceIdentityRegressionTests
 
         var artifact = CreateArtifact(compilation);
         var diagnostics = artifact.CompilerDiagnostics.OrderBy(diagnostic =>
-            diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.SourceTreeOrdinal).ToArray();
+            diagnostic.SourceTreeOrdinal).ToArray();
         Assert.That(diagnostics, Has.Length.EqualTo(2));
         Assert.That(diagnostics[0].Location, Is.EqualTo(diagnostics[1].Location));
         for (var ordinal = 0; ordinal < diagnostics.Length; ordinal++)
@@ -74,9 +74,9 @@ public sealed class CompilerDiagnosticSourceIdentityRegressionTests
             CompilerManifestArtifactJson.Serialize(artifact, TestContext.CurrentContext.CancellationToken),
             TestContext.CurrentContext.CancellationToken);
         Assert.That(roundTrip.CompilerDiagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Location),
+                diagnostic.Location),
             Is.EqualTo(artifact.CompilerDiagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Location)));
+                diagnostic.Location)));
     }
 
     private static CompilerManifestArtifact CreateArtifact(CSharpCompilation compilation)

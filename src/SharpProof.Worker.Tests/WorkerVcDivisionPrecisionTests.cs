@@ -28,7 +28,7 @@ public sealed class WorkerVcDivisionPrecisionTests
     {
         System.ArgumentNullException.ThrowIfNull(kind);
         var source = kind == "constant"
-            ? WorkerVcShadowSourceGateTests.Universe.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name == "general-division-budget")).Source
+            ? WorkerVcShadowSourceGateTests.Universe.Single(item => item.Name == "general-division-budget").Source
             : VariableSource;
         var trialBuilder = ImmutableArray.CreateBuilder<DivisionTrial>();
         ImmutableArray<string> structure = [];
@@ -48,7 +48,7 @@ public sealed class WorkerVcDivisionPrecisionTests
             if (trial == 0)
             {
                 var printer = new IrPrinter(plan.Factory);
-                structure = [.. query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (printer.Print(assumption.Predicate))),
+                structure = [.. query.Assumptions.Select(assumption => printer.Print(assumption.Predicate)),
                     "goal: " + printer.Print(query.Goal.Predicate)];
             }
             var workerWatch = Stopwatch.StartNew();
@@ -120,16 +120,16 @@ public sealed class WorkerVcDivisionPrecisionTests
         Assert.That(response.Errors, Is.Empty);
         var posts = Postconditions(response);
         Assert.That(posts, Has.Length.EqualTo(2));
-        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(WorkerClaimReason.None));
+        Assert.That(posts.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(posts.Select(result => result.Reason), Is.All.EqualTo(WorkerClaimReason.None));
     }
 
     private static ImmutableArray<WorkerClaimResult> Postconditions(WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
-        var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
+        var ids = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .Select(claim => claim.ClaimId).ToImmutableHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToImmutableArray();
     }
 
     private sealed record DivisionQuery(string Outcome, WorkerClaimReason Reason, long Resources, double Milliseconds)

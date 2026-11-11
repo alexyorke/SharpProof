@@ -378,9 +378,9 @@ internal sealed class NativeForkJoinProjectionTests
         var projection = Lower(body);
         var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(memory.UnknownReason, Is.Null);
-        var cumulative = memory.CumulativeUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : size,
+        var cumulative = memory.CumulativeUpper!.Evaluate(input => size,
             TestContext.CurrentContext.CancellationToken);
-        var peak = memory.PeakAuxiliaryUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : size,
+        var peak = memory.PeakAuxiliaryUpper!.Evaluate(input => size,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(cumulative, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(peak, Is.EqualTo(cumulative));
@@ -397,7 +397,7 @@ internal sealed class NativeForkJoinProjectionTests
         var decoded = CompilerForkJoinProjectionCodec.Decode(CompilerForkJoinProjectionCodec.Encode(projection, root, cancellation), root, cancellation);
         var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(decoded, root, Layout(), cancellation);
         Assert.That(memory.UnknownReason, Is.Null);
-        Assert.That(memory.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7, cancellation),
+        Assert.That(memory.CumulativeUpper!.Evaluate(static input => 7, cancellation),
             Is.EqualTo(new System.Numerics.BigInteger(320)));
         Assert.That(memory.RetainedUpper, Is.EqualTo(ResourceExpression.Zero));
     }
@@ -408,7 +408,7 @@ internal sealed class NativeForkJoinProjectionTests
         var projection = LowerSource("using System.Threading.Tasks; public static class C {public static Task Root(int n) => Task.WhenAll(Task.Run(()=>Child(right:3,left:n)),Task.Run(()=>Child(right:n,left:1))); static void Child(int left,int right) {var a=new int[left];var b=new byte[right];}}");
         var memory = NativeForkJoinSourceCostVerifier.CheckChildStorage(projection, Root(projection), Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(memory.UnknownReason, Is.Null);
-        Assert.That(memory.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+        Assert.That(memory.CumulativeUpper!.Evaluate(static input => 7,
             TestContext.CurrentContext.CancellationToken), Is.EqualTo(new System.Numerics.BigInteger(152)));
     }
 
@@ -600,7 +600,7 @@ internal sealed class NativeForkJoinProjectionTests
         var projection = LowerSource("using System.Threading.Tasks; public static class C { public static Task Root(int n,int m) => Task.WhenAll(Task.Run(()=>Child(right:m,left:n)),Task.Run(()=>Child(right:n,left:3))); static void Child(int left,int right) {for(int i=0;i<left;i++){} for(int j=0;j<right;j++){}} }");
         var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
-        var value = result.Upper!.LoopEntries.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal == 0 ? 4 : 7,
+        var value = result.Upper!.LoopEntries.Evaluate(static input => input.Ordinal == 0 ? 4 : 7,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(18)));
     }
@@ -616,7 +616,7 @@ internal sealed class NativeForkJoinProjectionTests
         var projection = Lower(body);
         var result = NativeForkJoinSourceCostVerifier.Check(projection, Root(projection), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.HasSourceCosts, Is.True, result.UnknownReason);
-        var value = result.Upper!.LoopEntries.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputValue,
+        var value = result.Upper!.LoopEntries.Evaluate(input => inputValue,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(value, Is.EqualTo(new System.Numerics.BigInteger(expected)));
     }
@@ -1218,8 +1218,7 @@ internal sealed class NativeForkJoinProjectionTests
     {
         ArgumentNullException.ThrowIfNull(projection);
         var factory = new SharpProof.Ir.IrFactory();
-        var parameters = projection.RootParameterNames.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) :
-            new CompilerTotalParameter(factory.CreateVariable("entry:" + name, factory.IntegerType),
+        var parameters = projection.RootParameterNames.Select(name => new CompilerTotalParameter(factory.CreateVariable("entry:" + name, factory.IntegerType),
                 factory.CreateVariable("current:" + name, factory.IntegerType), factory.CreateVariable("old:" + name, factory.IntegerType))).ToImmutableArray();
         return new(projection.RootCallableId, factory, parameters, []);
     }
@@ -1246,7 +1245,7 @@ internal sealed class NativeForkJoinProjectionTests
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root");
+            .Single(static method => method.Identifier.ValueText == "Root");
         var method = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
         return CompilerForkJoinResourceLowering.Lower(method, compilation, "root", TestContext.CurrentContext.CancellationToken);
     }

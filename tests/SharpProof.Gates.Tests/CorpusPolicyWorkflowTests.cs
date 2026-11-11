@@ -67,9 +67,9 @@ public sealed class CorpusPolicyWorkflowTests
         }
         var snapshotPath = Path.Combine(destination, "expected.canonical.snapshot");
         var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToBuilder();
-        var repeatedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
+        var repeatedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
         rows.Add(repeatedRow);
-        var contents = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
+        var contents = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row, StringComparer.Ordinal));
         File.WriteAllText(snapshotPath, contents);
 
         var error = Assert.ThrowsAsync<InvalidDataException>(

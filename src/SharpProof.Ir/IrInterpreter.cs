@@ -899,7 +899,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         failure = null;
         if (heap == null || state.Snapshots is not { Count: > 0 } snapshots)
         { return true; }
-        var selection = IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
+        var selection = IrSnapshotReads.TrySelector(_factory, owner, snapshots.Contains, static guard => guard,
             () => --state.SnapshotWork >= 0, state.SnapshotSelectors, state.CancellationToken);
         state.SnapshotSelectors = selection.Memo;
         if (!selection.Success)

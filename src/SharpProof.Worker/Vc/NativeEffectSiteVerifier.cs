@@ -18,7 +18,7 @@ internal static class NativeEffectSiteVerifier
     {
         System.ArgumentNullException.ThrowIfNull(budgets);
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
-        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToImmutableArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToImmutableArray();
         return claims.Length != 1 ? Unknown(WorkerClaimReason.UnsupportedContract)
             : await VerifyCapabilityClaimAsync(preparation, claims[0].ClaimId, budgets, cancellationToken, resourceBudget).ConfigureAwait(false);
     }
@@ -28,7 +28,7 @@ internal static class NativeEffectSiteVerifier
     {
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToImmutableArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToImmutableArray();
         if (claims.Length != 1 || claims[0].ClaimId != claimId ||
             !preparation.Entry.ClaimIds.Contains(claimId) ||
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
@@ -94,9 +94,9 @@ internal static class NativeEffectSiteVerifier
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
-        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.EffectContract)).ToImmutableArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.EffectContract).ToImmutableArray();
         if (claims.Length != 1 || preparation.Total is not { } total || !total.ValidEffectClaimIds.Contains(claims[0].ClaimId) ||
-            total.ExceptionConstraints.FirstOrDefault(constraint => constraint is null ? throw new System.ArgumentNullException(nameof(constraint)) : (constraint.ClaimId == claims[0].ClaimId)) is not { } exceptions)
+            total.ExceptionConstraints.FirstOrDefault(constraint => constraint.ClaimId == claims[0].ClaimId) is not { } exceptions)
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
@@ -225,7 +225,7 @@ internal static class NativeEffectSiteVerifier
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities)).ToImmutableArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == WorkerEffectContractKind.AllowedCapabilities).ToImmutableArray();
         if (claims.Length != 1 || claims[0].ClaimId != claimId ||
             !preparation.Entry.ClaimIds.Contains(claimId) ||
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
@@ -257,7 +257,7 @@ internal static class NativeEffectSiteVerifier
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
         cancellationToken.ThrowIfCancellationRequested();
-        var claims = preparation.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == contract)).ToImmutableArray();
+        var claims = preparation.EffectClaims.Where(claim => claim.ContractKind == contract).ToImmutableArray();
         if (claims.Length != 1)
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (preparation.Total == null)

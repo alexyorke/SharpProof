@@ -25,7 +25,7 @@ internal static class NativeStaticWriteWitnessOracle
         CompilerTotalCallablePreparation preparation, PassiveCallableCheckResult evidence, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!method.IsStatic || method.Arity != 0 || method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
+        if (!method.IsStatic || method.Arity != 0 || method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
             method.Parameters.Length != preparation.Parameters.Length)
         { return Gap("UnsupportedWriteInvocationShape"); }
         // Native source writes retain their captured SDK span through replay.
@@ -43,8 +43,8 @@ internal static class NativeStaticWriteWitnessOracle
         if (replay.ConsumedApproximation || replay.Status is not (IrProgramExecutionStatus.Returned or IrProgramExecutionStatus.Exception))
         { return Gap("NonTerminatingOrIncompleteWriteWitness"); }
         // The producer captures full paths while the SDK tree may retain a relative path.
-        var trees = compilation.SyntaxTrees.Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (Path.GetFullPath(
-            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document)).ToImmutableArray();
+        var trees = compilation.SyntaxTrees.Where(tree => Path.GetFullPath(
+            string.IsNullOrEmpty(tree.FilePath) ? "<compiler-generated>" : tree.FilePath) == span.Document).ToImmutableArray();
         if (trees.Length != 1)
         { return Gap("UnsupportedWriteSourceSite"); }
         var tree = trees[0];
@@ -87,9 +87,9 @@ internal static class NativeStaticWriteWitnessOracle
             var assembly = context.LoadFromStream(image);
             var owner = assembly.GetType(CompilerClrTypeMatcher.MetadataName(method.ContainingType), throwOnError: true)!;
             var callable = owner.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == method.MetadataName && !candidate.IsGenericMethod &&
+                .Single(candidate => candidate.Name == method.MetadataName && !candidate.IsGenericMethod &&
                     candidate.GetParameters().Length == method.Parameters.Length && candidate.GetParameters().Select((parameter, ordinal) =>
-                        parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerClrTypeMatcher.Matches(method.Parameters[ordinal].Type, parameter.ParameterType, typeof(int)))).All(match => match)));
+                        parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CompilerClrTypeMatcher.Matches(method.Parameters[ordinal].Type, parameter.ParameterType, typeof(int)))).All(match => match));
             var valueBuilder = ImmutableArray.CreateBuilder<object?>(method.Parameters.Length);
             var parameters = callable.GetParameters().ToImmutableArray();
             for (var ordinal = 0; ordinal < method.Parameters.Length; ordinal++)

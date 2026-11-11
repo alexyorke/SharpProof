@@ -165,7 +165,7 @@ public sealed class PartialMethodContractTests
             .GetMembers("Value")
             .OfType<IPropertySymbol>()
             .Single(static property =>
-                property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.PartialImplementationPart != null));
+                property.PartialImplementationPart != null);
         var definitionAccessor = accessorKind == MethodKind.PropertyGet
             ? property.GetMethod!
             : property.SetMethod!;
@@ -282,13 +282,13 @@ public sealed class PartialMethodContractTests
                 @event is null ? throw new System.ArgumentNullException(nameof(@event)) : (@event.PartialImplementationPart != null));
         var implementation = definition.PartialImplementationPart!;
         var consumerTree = compilation.SyntaxTrees.Single(static tree =>
-            tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (Path.GetFileName(tree.FilePath) == "Consumer.cs"));
+            Path.GetFileName(tree.FilePath) == "Consumer.cs");
         var assignmentKind = accessorKind == MethodKind.EventAdd
             ? SyntaxKind.AddAssignmentExpression
             : SyntaxKind.SubtractAssignmentExpression;
         var eventReference = consumerTree.GetRoot().DescendantNodes()
             .OfType<AssignmentExpressionSyntax>()
-            .Single(assignment => assignment is null ? throw new System.ArgumentNullException(nameof(assignment)) : (assignment.IsKind(assignmentKind)))
+            .Single(assignment => assignment.IsKind(assignmentKind))
             .Left;
         var referencedEvent = (IEventSymbol)compilation
             .GetSemanticModel(consumerTree)
@@ -315,7 +315,7 @@ public sealed class PartialMethodContractTests
                 inventory.Clauses,
                 Has.Length.EqualTo(expectedClauseCount));
             Assert.That(
-                inventory.Clauses.All(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid)),
+                inventory.Clauses.All(static clause => clause.IsValid),
                 Is.True);
         }
 

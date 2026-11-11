@@ -49,8 +49,8 @@ internal static class RuntimeAssemblyTestHost
         System.ArgumentNullException.ThrowIfNull(requestedName);
         return AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (AssemblyName.ReferenceMatchesDefinition(
+                AssemblyName.ReferenceMatchesDefinition(
                     candidate.GetName(),
-                    requestedName)));
+                    requestedName));
     }
 }

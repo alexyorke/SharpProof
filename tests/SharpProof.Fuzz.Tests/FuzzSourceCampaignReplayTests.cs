@@ -66,14 +66,14 @@ public sealed class FuzzSourceCampaignReplayTests
         Assert.That(result.FrontendAgreements, Is.EqualTo(3));
         Assert.That(result.SmtAgreements, Is.EqualTo(3));
         Assert.That(result.PartialSmtAgreements, Is.EqualTo(3));
-        Assert.That(result.FrontendResults.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Status)), Is.EqualTo(FrontendStatuses));
-        Assert.That(result.FiniteResults.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Status)), Is.EqualTo(FiniteStatuses));
-        Assert.That(result.PartialResults.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Status)), Is.EqualTo(PartialStatuses));
+        Assert.That(result.FrontendResults.Select(value => value.Status), Is.EqualTo(FrontendStatuses));
+        Assert.That(result.FiniteResults.Select(value => value.Status), Is.EqualTo(FiniteStatuses));
+        Assert.That(result.PartialResults.Select(value => value.Status), Is.EqualTo(PartialStatuses));
         Assert.That(result.FiniteResults[0].Detail, Is.EqualTo("SMT abstained: UnsupportedEncoding."));
         Assert.That(result.PartialResults[2].Detail,
             Is.EqualTo("The guarded interpreter disagrees with C# execution in scenario 0."));
-        Assert.That(result.Failures.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : ((value.Case, value.Oracle))), Is.EqualTo(FailureKeys));
-        Assert.That(result.Failures.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Detail)), Is.All.Not.Empty);
+        Assert.That(result.Failures.Select(value => (value.Case, value.Oracle)), Is.EqualTo(FailureKeys));
+        Assert.That(result.Failures.Select(value => value.Detail), Is.All.Not.Empty);
         var empty = await FuzzRunner.ReplaySourceCasesAsync([], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(empty.Cases, Is.Zero);
         Assert.That(empty.Failures, Is.Empty);
@@ -178,8 +178,8 @@ public sealed class FuzzSourceCampaignReplayTests
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
-        Assert.That(emission.Emit.Diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS1029" &&
-            diagnostic.Severity == DiagnosticSeverity.Error)), Is.True);
+        Assert.That(emission.Emit.Diagnostics.Any(diagnostic => diagnostic.Id == "CS1029" &&
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
         var positive = new GeneratedCSharpCase(GeneratedCSharpExpression.Boolean(true), 0, 0, true);
         Func<Task> replay = async () => await FuzzRunner.ReplaySourceCasesAsync(
             [new(positive, finite, [0L], HealthyPartial, [[0L]])], cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -203,7 +203,7 @@ public sealed class FuzzSourceCampaignReplayTests
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == name));
+            .Single(candidate => candidate.Identifier.ValueText == name);
         var symbol = compilation.GetSemanticModel(tree).GetDeclaredSymbol(method);
         Assert.That(symbol, Is.Not.Null);
         Assert.That(symbol!.IsStatic, Is.True);
@@ -239,7 +239,7 @@ public sealed class FuzzSourceCampaignReplayTests
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
-        Assert.That(methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText)),
+        Assert.That(methods.Select(method => method.Identifier.ValueText),
             Is.EqualTo(FaultMethodNames));
         var model = compilation.GetSemanticModel(tree);
         foreach (var method in methods)

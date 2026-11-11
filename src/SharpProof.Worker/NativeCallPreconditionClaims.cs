@@ -7,7 +7,7 @@ internal static class NativeCallPreconditionClaims
     internal static ImmutableHashSet<string> ClaimIds(CompilerCallablePreparation target)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
-        return [.. (target.Total?.CallPreconditions ?? []).Select(static row => row is null ? throw new ArgumentNullException(nameof(row)) : row.ClaimId)
+        return [.. (target.Total?.CallPreconditions ?? []).Select(static row => row.ClaimId)
             .OfType<string>()];
     }
 

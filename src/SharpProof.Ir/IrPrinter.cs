@@ -26,7 +26,7 @@ internal sealed partial class IrPrinter(IrFactory factory)
                 IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
                 _ => 0
             };
-            var cost = 64L + 6L * textLength + children.Sum(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (costs[child.Id]));
+            var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);
             if (cost > 1_048_576)
             {
                 throw new InvalidOperationException("IR term exceeds the printer formatting work limit.");
@@ -56,7 +56,7 @@ internal sealed partial class IrPrinter(IrFactory factory)
             : "impure:" + opaque.Operation + ":";
         var arguments = string.Join(
             ", ",
-            opaque.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (FormatChild(argument, depth))));
+            opaque.Arguments.Select(argument => FormatChild(argument, depth)));
         var receiver = opaque.Receiver == null
             ? ""
             : FormatChild(opaque.Receiver, depth) +

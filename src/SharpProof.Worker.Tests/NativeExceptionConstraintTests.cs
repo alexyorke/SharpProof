@@ -123,7 +123,7 @@ internal sealed class NativeExceptionConstraintTests
             }
             """);
         var checks = await NativeExceptionEffectVerifier.VerifyClaimsAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(checks.Keys, Is.EquivalentTo(preparation.EffectClaims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+        Assert.That(checks.Keys, Is.EquivalentTo(preparation.EffectClaims.Select(claim => claim.ClaimId)));
         foreach (var claim in preparation.EffectClaims)
         {
             Assert.That(checks[claim.ClaimId].Outcome, claim.ContractKind == WorkerEffectContractKind.DoesNotThrow

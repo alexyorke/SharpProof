@@ -32,8 +32,8 @@ public sealed class TotalCallableVerifierTests
                 await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; },
                     null, TestContext.CurrentContext.CancellationToken, backend, resourceBudget, () => backend.ConsumedResourceCount);
                 var checks = checkBuilder.ToImmutable();
-                Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
-                Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome)), Is.EqualTo(1));
+                Assert.That(checks.Values.Count(check => check.Evidence.Outcome is ProvenOutcome), Is.EqualTo(1));
+                Assert.That(checks.Values.Count(check => check.Evidence.Outcome is RefutedOutcome), Is.EqualTo(1));
             }
             Assert.That(backend.Disposed, Is.False);
         }
@@ -55,8 +55,8 @@ public sealed class TotalCallableVerifierTests
             await TotalCallableVerifier.VerifyAsync(preparation, budgets, check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; },
                 null, TestContext.CurrentContext.CancellationToken, backend, resourceBudget);
             var checks = checkBuilder.ToImmutable();
-            Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Reason)), Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(checks.Values.Any(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome or RefutedOutcome)), Is.False);
+            Assert.That(checks.Values.Select(check => check.Evidence.Reason), Is.All.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(checks.Values.Any(check => check.Evidence.Outcome is ProvenOutcome or RefutedOutcome), Is.False);
         }
         Assert.That(backend.QueryCount, Is.EqualTo(1));
         Assert.That(backend.Disposed, Is.False);
@@ -114,11 +114,11 @@ public sealed class TotalCallableVerifierTests
         var checks = checkBuilder.ToImmutable();
         Assert.That(entry, Is.Not.Null);
         Assert.That((int)entry!.Kind, Is.EqualTo(entryKind));
-        Assert.That(checks.Values.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : ((int)check.Feasibility)), Is.All.EqualTo(normalKind));
+        Assert.That(checks.Values.Select(check => (int)check.Feasibility), Is.All.EqualTo(normalKind));
         if (scenario == "contradictory")
         {
             Assert.That(entry.ProofCore, Is.Not.Empty);
-            Assert.That(entry.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))));
+            Assert.That(entry.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption.Id)));
         }
         else
         { Assert.That(entry.ProofCore, Is.Empty); }
@@ -137,7 +137,7 @@ public sealed class TotalCallableVerifierTests
                 value => { System.ArgumentNullException.ThrowIfNull(value, nameof(value)); entry = value; cancellation.Cancel(); }, cancellation.Token)));
         var checks = checkBuilder.ToImmutable();
         Assert.That(entry!.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Feasible));
-        Assert.That(checks.Values.All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Checked)), Is.True);
+        Assert.That(checks.Values.All(check => !check.Checked), Is.True);
     }
 
     [Test]
@@ -177,11 +177,11 @@ public sealed class TotalCallableVerifierTests
         await TotalCallableVerifier.VerifyAsync(preparation, project.Request.Budgets,
             check => { System.ArgumentNullException.ThrowIfNull(check); checkBuilder[check.ClaimId] = check; }, TestContext.CurrentContext.CancellationToken);
         var checks = checkBuilder.ToImmutable();
-        var result = checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is RefutedOutcome));
+        var result = checks.Values.Single(check => check.Evidence.Outcome is RefutedOutcome);
         Assert.That(result.Checked, Is.True);
         Assert.That(result.Evidence.EntryModel.Keys,
             Is.EquivalentTo(preparation.Total!.Parameters.Select(parameter => parameter.Entry)));
-        Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Evidence.Outcome is ProvenOutcome)), Is.EqualTo(1));
+        Assert.That(checks.Values.Count(check => check.Evidence.Outcome is ProvenOutcome), Is.EqualTo(1));
     }
 
     [Test]
@@ -200,8 +200,8 @@ public sealed class TotalCallableVerifierTests
                     { cancellation.Cancel(); }
                 }, cancellation.Token)));
         var checks = checkBuilder.ToImmutable();
-        Assert.That(checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)), Is.EqualTo(1));
-        Assert.That(checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)).Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(checks.Values.Single(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Checked)).Enrolled, Is.True);
+        Assert.That(checks.Values.Count(check => check.Checked), Is.EqualTo(1));
+        Assert.That(checks.Values.Single(check => check.Checked).Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That(checks.Values.Single(check => !check.Checked).Enrolled, Is.True);
     }
 }

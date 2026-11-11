@@ -17,17 +17,14 @@ internal sealed class NativeResourceMetadataBinding
             !(_target.Compilation.TargetFramework == "net8.0" || (_target.Compilation.TargetFramework?.StartsWith("net8.0-", StringComparison.Ordinal) ?? false)))
         { return false; }
         var id = ResourceMetadataCatalog.AssumptionId(_target.Entry.CallableId, reference);
-        if (!_target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
+        if (!_target.Entry.Assumptions.Any(assumption => assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
         { return false; }
         if (_target.Compilation.ResourceMetadataReferences.IsDefault || _target.Compilation.ResourceMetadataReferences.Any(static candidate => candidate is null))
         { return false; }
-        var references = _target.Compilation.ResourceMetadataReferences.Where(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-            candidate.Kind == "Assembly" && candidate.Identity == reference.AssemblyIdentity).ToArray();
-        if (references.Length == 0 || references.Any(static candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-            candidate.Modules is not { Length: 1 } || candidate.Modules[0] is null || !WorkerProtocolJson.IsSha256(candidate.Modules[0].Sha256)))
+        var references = _target.Compilation.ResourceMetadataReferences.Where(candidate => candidate.Kind == "Assembly" && candidate.Identity == reference.AssemblyIdentity).ToArray();
+        if (references.Length == 0 || references.Any(static candidate => candidate.Modules is not { Length: 1 } || candidate.Modules[0] is null || !WorkerProtocolJson.IsSha256(candidate.Modules[0].Sha256)))
         { return false; }
-        var hashes = references.Select(static candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Modules[0].Sha256)
+        var hashes = references.Select(static candidate => candidate.Modules[0].Sha256)
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (hashes.Length != 1)
         { return false; }

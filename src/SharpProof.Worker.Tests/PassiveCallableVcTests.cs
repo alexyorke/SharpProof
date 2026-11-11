@@ -130,7 +130,7 @@ internal sealed class PassiveCallableVcTests
         var proof = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(proof.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(proof.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
-        Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.True);
+        Assert.That(proof.Core.Any(label => label.StartsWith("assume:", StringComparison.Ordinal)), Is.True);
         var normal = await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(normal.Kind, Is.EqualTo(PassiveCallableFeasibilityKind.NoModeledNormalReturn));
         Assert.That(normal.Evidence.BodyAssumptions, Is.EqualTo(ImmutableArray.Create(subject.Site)));
@@ -327,11 +327,11 @@ internal sealed class PassiveCallableVcTests
         subject.Builder.Return(block, subject.Site, subject.Factory.Integer(0));
         var plan = Build(subject.Candidate(subject.Factory.Boolean(false)));
         var query = plan.EnsuresQuery(0);
-        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
-        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<LoweredJustification>()
-            .Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (justification.Operation)).Distinct(),
+        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).Distinct().Count(), Is.EqualTo(query.Assumptions.Length));
+        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<LoweredJustification>()
+            .Select(justification => justification.Operation).Distinct(),
             Is.EqualTo(ImmutableArray.Create(subject.Site)));
-        Assert.That(query.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).OfType<UserAssumedJustification>()
+        Assert.That(query.Assumptions.Select(assumption => assumption.Justification).OfType<UserAssumedJustification>()
             .Single().Location, Is.EqualTo(new SourceLocationId(subject.Site.Value)));
         var kernel = new ProofKernel(new ReorderedCoreBackend());
         var proof = (ProvenOutcome)await kernel.VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -677,7 +677,7 @@ internal sealed class PassiveCallableVcTests
     public async Task BodyOldHeapReadsUseOwnedSnapshotRoles(bool array, bool correctClaim)
     {
         var (candidate, inputs) = BodyOldHeapCandidate(array);
-        var returned = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().Single().Value!.Id;
+        var returned = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id;
         var actual = new IrProgramInterpreter(candidate.Factory).Execute(candidate.Program, inputs);
         Assert.That(actual.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(actual.ReturnValue!.Integer, Is.EqualTo(7));
@@ -691,7 +691,7 @@ internal sealed class PassiveCallableVcTests
         var result = await solver.VerifyEnsuresAsync(correctClaim ? 1 : 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, correctClaim ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().Single().Value!.Id,
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().Single().Value!.Id,
             Is.EqualTo(returned));
         if (!correctClaim)
         { Assert.That(result.EntryModel.All(row => row.Key == candidate.Parameters.Single().Entry), Is.True); }

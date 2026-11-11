@@ -117,13 +117,13 @@ internal sealed class PassiveLoopCutterTests
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields,
             Has.Length.EqualTo(unstable ? 0 : 1));
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        var instructions = proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = proof!.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.EqualTo(unstable));
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.EqualTo(unstable));
         if (unstable)
         { return; }
-        var cell = instructions.OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (factory.GetOperationInfo(write.Operation).Description is { } id &&
-            factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal)));
+        var cell = instructions.OfType<IrWriteInstruction>().Single(write => factory.GetOperationInfo(write.Operation).Description is { } id &&
+            factory.GetString(id).StartsWith("LoopCell@", StringComparison.Ordinal));
         Assert.That(cell.Target!.Id, Is.EqualTo(expectedReceiver.Id));
     }
 
@@ -155,8 +155,8 @@ internal sealed class PassiveLoopCutterTests
         builder.Return(exit, subject.Site, factory.Integer(0));
         Assert.That(PassiveLoopCutter.TryCreate(subject.Candidate(factory.Boolean(true)), out var proof, out _, out var reason,
             TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
     }
 
     [TestCase(false)]
@@ -172,8 +172,8 @@ internal sealed class PassiveLoopCutterTests
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory)), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken).Single().Fields, Is.Empty);
     }
 
@@ -242,8 +242,8 @@ internal sealed class PassiveLoopCutterTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(2)));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out _, out var cutReason, TestContext.CurrentContext.CancellationToken), Is.True, cutReason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.HavocKind == IrHavocKind.VariablesAndMemory)), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.HavocKind == IrHavocKind.VariablesAndMemory), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible));
@@ -401,7 +401,7 @@ internal sealed class PassiveLoopCutterTests
         var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(result.BodyAssumptions, Has.Length.EqualTo(1));
-        Assert.That(plan!.EntryQuery().Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)), Is.All.TypeOf<LoweredJustification>());
+        Assert.That(plan!.EntryQuery().Assumptions.Select(assumption => assumption.Justification), Is.All.TypeOf<LoweredJustification>());
     }
 
     [TestCase("input")]

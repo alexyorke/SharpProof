@@ -27,8 +27,8 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "owned-void-return.cs");
         var compilation = CSharpCompilation.Create("OwnedVoidReturn_" + shape, [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToImmutableArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id).ToImmutableArray();
         if (compilerError)
         {
             Assert.That(errors, Is.EqualTo(RecoveryErrorIds));
@@ -41,8 +41,8 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.EqualTo(!compilerError));
-        var emitErrors = emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)).ToImmutableArray();
+        var emitErrors = emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id).ToImmutableArray();
         if (compilerError)
         {
             Assert.That(emitErrors, Is.EqualTo(RecoveryErrorIds));
@@ -59,7 +59,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(target.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Void));
         var graph = ControlFlowGraph.Create(syntax, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var returns = graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return))
+        var returns = graph.Blocks.Where(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return)
             .ToImmutableArray();
         if (compilerError)
         {
@@ -78,7 +78,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         else
         {
             Assert.That(returns, Is.Empty);
-            Assert.That(graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).Where(value => value != null), Is.Empty);
+            Assert.That(graph.Blocks.Select(block => block.BranchValue).Where(value => value != null), Is.Empty);
         }
 
         var factory = new IrFactory();
@@ -96,7 +96,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
         Assert.That(context.Compilation, Is.SameAs(compilation));
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         Assert.That(lowered.ConstructionLimitExceeded, Is.False);
-        var irReturns = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrReturnInstruction>().ToImmutableArray();
+        var irReturns = lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrReturnInstruction>().ToImmutableArray();
         Assert.That(irReturns, Is.Not.Empty);
         Assert.That(irReturns.All(instruction => instruction.Value == null), Is.True);
         var replay = new IrProgramInterpreter(factory).Execute(lowered.Program, global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);

@@ -33,7 +33,7 @@ internal sealed class NativePurityEffectTests
             "private static void Sink() { System.Console.WriteLine(1); }")));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
     }
 
@@ -66,8 +66,8 @@ internal sealed class NativePurityEffectTests
             "private static int Helper(int value) { new object(); value++; return value; }")));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>(), Is.Not.Empty);
-        Assert.That(preparation.Total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>(), Is.Not.Empty);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>(), Is.Not.Empty);
+        Assert.That(preparation.Total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>(), Is.Not.Empty);
     }
 
     [TestCase(IrWriteRegion.Local, true)]
@@ -81,8 +81,8 @@ internal sealed class NativePurityEffectTests
         // Exercise the portable event protocol independently of source-region
         // classification independently of the admitted source stores.
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("if (x == 0) x = 1; return x;"));
-        var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
+        var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write);
         {
             var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = (int)region });
             row = changedFixture.Item1;
@@ -95,8 +95,8 @@ internal sealed class NativePurityEffectTests
         if (!pure)
         {
             Assert.That((int)result.EntryModel.Values.Single().IntegerNumericValue, Is.Zero);
-            Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>()
-                .Any(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == result.WriteWitness && write.Region == region)), Is.True);
+            Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>()
+                .Any(write => write.Operation == result.WriteWitness && write.Region == region), Is.True);
         }
     }
 
@@ -111,9 +111,9 @@ internal sealed class NativePurityEffectTests
                 {
                     Total = artifact.Callables.Single().Total! with
                     {
-                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write) with
             { A = (int)IrWriteRegion.Field })
                     }
                 })
@@ -134,9 +134,9 @@ internal sealed class NativePurityEffectTests
                 {
                     Total = artifact.Callables.Single().Total! with
                     {
-                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write)) with
+                        Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write), artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write) with
             { A = (int)IrWriteRegion.Element })
                     }
                 })
@@ -154,8 +154,8 @@ internal sealed class NativePurityEffectTests
     public void MalformedWriteRegionsAndUnusedSlotsAreRejected(int region, bool unusedSlot)
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Source("x = 1; return x;"));
-        var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
+        var row = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Single(instruction => instruction.Kind == IrInstructionKind.Write);
         {
             var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(row, row with { A = region });
             row = changedFixture.Item1;
@@ -225,7 +225,7 @@ internal sealed class NativePurityEffectTests
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.WriteWitness, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Static));
     }
 
@@ -260,7 +260,7 @@ internal sealed class NativePurityEffectTests
             """ + "Contract.Requires(" + requirement + "); cell.Value = x; return x; } }"));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, pure ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Parameter));
     }
 
@@ -281,8 +281,8 @@ internal sealed class NativePurityEffectTests
             """));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrWriteInstruction>().Single(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == result.WriteWitness)).Region,
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Single(write => write.Operation == result.WriteWitness).Region,
             Is.EqualTo(IrWriteRegion.Static));
     }
 
@@ -298,7 +298,7 @@ internal sealed class NativePurityEffectTests
             """));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
     }
 
@@ -382,8 +382,8 @@ internal sealed class NativePurityEffectTests
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         Assert.That(result.LockWitness, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrLockInstruction>().Any(synchronization => synchronization is null ? throw new System.ArgumentNullException(nameof(synchronization)) : (synchronization.Operation == result.LockWitness)), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrLockInstruction>().Any(synchronization => synchronization.Operation == result.LockWitness), Is.True);
         Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());
@@ -466,7 +466,7 @@ internal sealed class NativePurityEffectTests
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrLockInstruction>(), Is.Empty);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrLockInstruction>(), Is.Empty);
     }
 
     [Test]
@@ -484,7 +484,7 @@ internal sealed class NativePurityEffectTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(SynchronizationSource("System.Threading.Monitor.Enter(gate); x = 1;"));
         var graph = artifact.Callables.Single().Total!.Graph;
-        var row = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Lock));
+        var row = graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Lock);
         if (unusedSlot)
         {
             (row, graph) = graph.ChangeRow(row, row with { B = 0 });
@@ -492,7 +492,7 @@ internal sealed class NativePurityEffectTests
         }
         else
         {
-            (row, graph) = graph.ChangeRow(row, row with { A = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Integer)) });
+            (row, graph) = graph.ChangeRow(row, row with { A = PortableGraphChanges.FindIndex(graph.Terms, term => term.Kind == IrTermKind.Integer) });
             { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         }
         Assert.Throws<System.Text.Json.JsonException>(new Action(() => Prepare(artifact)));
@@ -530,7 +530,7 @@ internal sealed class NativePurityEffectTests
         Assert.That(preparation.Total, Is.Not.Null);
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().ToImmutableArray();
+        var writes = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().ToImmutableArray();
         Assert.That(writes, Has.Length.EqualTo(1));
         Assert.That(writes[0].Region, Is.EqualTo(IrWriteRegion.Static));
         Assert.That(result.WriteWitness, Is.EqualTo(writes[0].Operation));
@@ -629,7 +629,7 @@ internal sealed class NativePurityEffectTests
         var faults = nullReceiver && !rebind;
         Assert.That(result.Outcome, faults ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
         var total = preparation.Total!;
-        var write = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Region != IrWriteRegion.Local));
+        var write = total.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().Single(item => item.Region != IrWriteRegion.Local);
         Assert.That(write.Region, Is.EqualTo(region));
         Assert.That(result.WriteWitness, faults ? Is.Null : Is.EqualTo(write.Operation));
         var factory = total.Program.Factory;
@@ -693,7 +693,7 @@ internal sealed class NativePurityEffectTests
         var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(source));
         var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>().Single().Region, Is.EqualTo(IrWriteRegion.Field));
     }
 
     private static string InstanceMutationSource(string body, string field = "public int Value;")

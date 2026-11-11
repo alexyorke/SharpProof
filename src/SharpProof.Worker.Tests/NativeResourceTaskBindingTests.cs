@@ -29,7 +29,7 @@ internal sealed partial class NativeResourceContractTests
             new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.MetadataAssumptions, Is.Empty);
-        Assert.That(result.Assumptions.All(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : !assumption.Used), Is.True);
+        Assert.That(result.Assumptions.All(static assumption => !assumption.Used), Is.True);
     }
 
     [TestCase("projection")]

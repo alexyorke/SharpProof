@@ -42,8 +42,8 @@ public sealed class NativeStandaloneEntrySessionTests
         if (contradictory)
         {
             Assert.That(result.ProofCore, Is.Not.Empty);
-            Assert.That(result.ProofCore.All(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("requires:", StringComparison.Ordinal))), Is.True);
-            Assert.That(result.UsedAssumptionIds, Is.EqualTo(entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.AssumptionId!))));
+            Assert.That(result.ProofCore.All(label => label.StartsWith("requires:", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.UsedAssumptionIds, Is.EqualTo(entry.Clauses.Select(clause => clause.AssumptionId!)));
         }
         else
         {

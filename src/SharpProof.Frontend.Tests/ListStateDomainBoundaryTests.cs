@@ -75,7 +75,7 @@ public sealed class ListStateDomainBoundaryTests
         var (model, syntax, _, _) = Prepare("System.Collections.Generic.List<" + element + "> data",
             "data.Add(default(" + element + ")); var item = data[0]; return data.Count;");
         var invocation = (IInvocationOperation)model.GetOperation(syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
-        var properties = syntax.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Select(node => node is null ? throw new ArgumentNullException(nameof(node)) : (IPropertyReferenceOperation)model.GetOperation(node)!).ToImmutableArray();
+        var properties = syntax.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Select(node => (IPropertyReferenceOperation)model.GetOperation(node)!).ToImmutableArray();
         Assert.That(CSharpOperationSemantics.IsListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
         Assert.That(CSharpOperationSemantics.IsConcreteListStateMember(invocation.TargetMethod), Is.EqualTo(contents));
         Assert.That(CSharpOperationSemantics.IsListStateMember(properties.Single().Property.GetMethod!), Is.EqualTo(contents));
@@ -127,8 +127,8 @@ public sealed class ListStateDomainBoundaryTests
         var lowered = new RoslynTotalExpressionLowerer(context, builder, exceptional).LowerBodyValue(model.GetOperation(expression)!, entry, depth);
         Assert.That(lowered.Classification.IsExact, Is.False);
         builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
-        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+        Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.IsStore), Is.Empty);
     }
 
     [Test]
@@ -170,7 +170,7 @@ public sealed class ListStateDomainBoundaryTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(" + parameters + ") { " + body + " } }");
         var compilation = CSharpCompilation.Create("ListDomainBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);

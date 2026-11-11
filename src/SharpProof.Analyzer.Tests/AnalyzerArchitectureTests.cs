@@ -12,7 +12,6 @@ namespace SharpProof.Analyzer.Test;
 public sealed class AnalyzerArchitectureTests
 {
     private static readonly ImmutableArray<string> ExpectedAnalyzerReferences = [
-        "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.CompilerArtifact",
         "SharpProof.Dataflow",
@@ -24,7 +23,6 @@ public sealed class AnalyzerArchitectureTests
 
     private static readonly ImmutableArray<string> ExpectedAnalyzerOutputAssemblies = [
         "SharpProof.Analyzer",
-        "SharpProof.Analyzer.Core",
         "SharpProof.Compiler.Semantics",
         "SharpProof.Attributes",
         "SharpProof.CompilerArtifact",
@@ -102,7 +100,7 @@ public sealed class AnalyzerArchitectureTests
     {
         var references = typeof(SharpProofAnalyzer).Assembly
             .GetReferencedAssemblies()
-            .Select(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Name))
+            .Select(static name => name.Name)
             .Where(static name => name != null &&
                                   name.StartsWith(
                                       "SharpProof.",
@@ -123,7 +121,7 @@ public sealed class AnalyzerArchitectureTests
         {
             Assert.That(
                 assembly.GetReferencedAssemblies()
-                    .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Name)),
+                    .Select(static reference => reference.Name),
                 Does.Not.Contain("SharpProof.Attributes"),
                 assembly.GetName().Name);
         }
@@ -182,7 +180,7 @@ public sealed class AnalyzerArchitectureTests
         var root = TestRepository.FindRoot();
         var analyzerDirectory = Path.Combine(
             root,
-            "src/SharpProof.Analyzer.Core");
+            "src/SharpProof.Analyzer");
         var shipped = ReadReleaseSection(
             Path.Combine(
                 analyzerDirectory,
@@ -195,9 +193,9 @@ public sealed class AnalyzerArchitectureTests
             "New Rules");
         var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
             .SupportedDiagnostics
-            .Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (!descriptor.Id.StartsWith(
+            .Where(static descriptor => !descriptor.Id.StartsWith(
                 "SPCF",
-                StringComparison.Ordinal))), static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+                StringComparison.Ordinal)), static descriptor => descriptor.Id, static item => item, StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
@@ -231,7 +229,7 @@ public sealed class AnalyzerArchitectureTests
     public void CompilationEndOnlyDescriptorsCarryCompilationEndTag()
     {
         var descriptors = ImmutableDictionaryCapture.Create(new SharpProofAnalyzer()
-            .SupportedDiagnostics, static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id), static item => item is null ? throw new ArgumentNullException(nameof(item)) : item, StringComparer.Ordinal);
+            .SupportedDiagnostics, static descriptor => descriptor.Id, static item => item, StringComparer.Ordinal);
         var expected = ImmutableArray.Create("SP0025", "SP0050");
 
         foreach (var id in expected)
@@ -275,7 +273,7 @@ public sealed class AnalyzerArchitectureTests
 
             var columns = line
                 .Split('|')
-                .Select(static column => column is null ? throw new System.ArgumentNullException(nameof(column)) : (column.Trim()))
+                .Select(static column => column.Trim())
                 .ToImmutableArray();
             if (columns.Length < 4 ||
                 columns[0].Length != 6 ||
@@ -313,9 +311,9 @@ public sealed class AnalyzerArchitectureTests
         return string.Join(
             "\n",
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + "|" +
+                diagnostic.Id + "|" +
                 diagnostic.Location.SourceSpan.Start + "|" +
-                diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)));
     }
 
     private sealed record ReleaseRule(

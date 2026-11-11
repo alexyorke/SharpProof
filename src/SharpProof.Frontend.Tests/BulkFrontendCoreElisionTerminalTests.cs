@@ -60,13 +60,13 @@ public sealed class BulkFrontendCoreElisionTerminalTests
             new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: enabled ? ["ABSENT"] : []), shape + ".cs");
         var compilation = CSharpCompilation.Create("TerminalElision_" + shape + "_" + partial, [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var factory = new IrFactory();
@@ -95,7 +95,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
 
             var emission = new CSharpInvocationEmissionPolicy(compilation);
             var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetOperation(invocation))).OfType<IInvocationOperation>().ToImmutableArray();
+                .Select(invocation => model.GetOperation(invocation)).OfType<IInvocationOperation>().ToImmutableArray();
             Assert.That(invocations, Has.Length.EqualTo(shape == "consecutive-both-terminal" ? 2 : 1));
             foreach (var invocation in invocations)
             {
@@ -105,7 +105,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Assert.That(emission.IsElided(invocation, requireOwningInvocation: true), Is.EqualTo(!enabled));
             }
             var thrown = graph.Blocks.Where(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
+                block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToImmutableArray();
             Assert.That(thrown.Length, Is.GreaterThanOrEqualTo(2));
             foreach (var block in thrown)
             {
@@ -185,7 +185,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Length = graph.OriginalOperation.Syntax.Span.Length,
                 Syntax = graph.OriginalOperation.Syntax.ToString()
             },
-            OwningInvocations = owningInvocations.Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (new
+            OwningInvocations = owningInvocations.Select(invocation => new
             {
                 Kind = invocation.Kind.ToString(),
                 Tree = invocation.Syntax.SyntaxTree.FilePath,
@@ -193,16 +193,16 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                 Length = invocation.Syntax.Span.Length,
                 Syntax = invocation.Syntax.ToString(),
                 Target = invocation.TargetMethod.ToDisplayString()
-            })).ToImmutableArray(),
-            Regions = regions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (new
+            }).ToImmutableArray(),
+            Regions = regions.Select(region => new
             {
                 Id = regionIds[region],
                 Parent = region.EnclosingRegion == null ? (int?)null : regionIds[region.EnclosingRegion],
                 Kind = region.Kind.ToString(),
                 First = region.FirstBlockOrdinal,
                 Last = region.LastBlockOrdinal
-            })).ToImmutableArray(),
-            Blocks = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new
+            }).ToImmutableArray(),
+            Blocks = graph.Blocks.Select(block => new
             {
                 block.Ordinal,
                 block.IsReachable,
@@ -239,7 +239,7 @@ public sealed class BulkFrontendCoreElisionTerminalTests
                     Destination = block.ConditionalSuccessor.Destination?.Ordinal,
                     Finally = block.ConditionalSuccessor.FinallyRegions.Select(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (regionIds[region])).ToImmutableArray()
                 }
-            })).ToImmutableArray()
+            }).ToImmutableArray()
         };
         var repositoryRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ?? TestContext.CurrentContext.WorkDirectory;
         var directory = Path.Combine(repositoryRoot, "artifacts", "coverage", "semantic", "conditional-elision-cfg");

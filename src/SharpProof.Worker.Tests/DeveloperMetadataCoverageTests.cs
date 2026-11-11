@@ -44,7 +44,7 @@ internal sealed class DeveloperMetadataCoverageTests
             Is.EqualTo(JsonSerializer.Serialize(artifact.Compilation.SyntaxTrees, WorkerProtocolJson.SharedOptions)));
         Assert.That(JsonSerializer.Serialize(roundTrip.Compilation.References, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
-        Assert.That(roundTrip.Compilation.References.SelectMany(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Modules), Is.Not.Empty);
+        Assert.That(roundTrip.Compilation.References.SelectMany(reference => reference.Modules), Is.Not.Empty);
         Assert.That(preparations.Single().Compilation, Is.SameAs(roundTrip.Compilation));
         Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(artifact.Manifest.Hash));
     }
@@ -83,8 +83,8 @@ internal sealed class DeveloperMetadataCoverageTests
             TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
-        var unknown = response.ClaimResults.Single(result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Outcome == WorkerClaimOutcome.Unknown);
-        var proven = response.ClaimResults.Single(result => result is null ? throw new ArgumentNullException(nameof(result)) : result.Outcome == WorkerClaimOutcome.Proven);
+        var unknown = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Unknown);
+        var proven = response.ClaimResults.Single(result => result.Outcome == WorkerClaimOutcome.Proven);
         Assert.That(unknown.Reason, Is.EqualTo(WorkerClaimReason.CounterexampleNotReplayable));
         Assert.That(unknown.Diagnostic, Is.EqualTo(preparation.Diagnostic));
         Assert.That(proven.Diagnostic, Is.Null);

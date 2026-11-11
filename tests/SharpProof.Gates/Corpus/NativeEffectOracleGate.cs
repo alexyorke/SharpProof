@@ -55,11 +55,11 @@ internal static class NativeEffectOracleGate
             Path.Combine(root, "tests/SharpProof.Gates", "Corpus", "oss-methods.json"), cancellationToken).ConfigureAwait(false)));
         var selected = maximumMethods == 0 || maximumMethods == document.Methods.Length ? document : document with
         {
-            Methods = [.. document.Methods.OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id), StringComparer.Ordinal)
+            Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
                 .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]
         };
         var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations, purity, capabilities, summary),
-            selected.Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(), root,
+            selected.Methods.Select(method => method.Id).ToImmutableArray(), root,
             universeSha256, document.Methods.Length, cancellationToken, allocations, purity, capabilities, summary).ConfigureAwait(false);
         return report with { WallSeconds = wall.Elapsed.TotalSeconds };
     }
@@ -80,8 +80,8 @@ internal static class NativeEffectOracleGate
             methodIds.Length > universeMethodCount)
         { throw new ArgumentException("An oracle universe must have unique, nonempty method identities.", nameof(methodIds)); }
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
-        var targets = discovery.Targets.Values.Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) != null))
-            .ToImmutableDictionary(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!), StringComparer.Ordinal);
+        var targets = discovery.Targets.Values.Where(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration) != null)
+            .ToImmutableDictionary(target => OpenSourceCorpusRunner.CorpusMethodId(target.Declaration)!, StringComparer.Ordinal);
         if (!targets.Keys.ToImmutableHashSet(StringComparer.Ordinal).SetEquals(methodIds))
         { throw new InvalidDataException("The declared exception probes do not equal the selected corpus universe."); }
         var artifact = CompilerManifestArtifactProducer.Create(compilation, root, "net9.0", WorkerFeatureSet.Effects,
@@ -91,20 +91,20 @@ internal static class NativeEffectOracleGate
         var sourceSummaries = validatedArtifact.ReachableSource is { } source
             ? EffectSummaryFixpoint.ComputeValidated(source, cancellationToken)
             : ImmutableSortedDictionary<string, SourceEffectSummary>.Empty;
-        var owned = preparations.ToImmutableDictionary(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId), StringComparer.Ordinal);
+        var owned = preparations.ToImmutableDictionary(preparation => preparation.Entry.CallableId, StringComparer.Ordinal);
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         using var oracle = new NativeExceptionWitnessOracle(compilation);
         using var allocationOracle = new NativeAllocationWitnessOracle(compilation);
         var rows = ImmutableArray.CreateBuilder<NativeEffectOracleRow>(methodIds.Length);
-        foreach (var id in methodIds.OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal))
+        foreach (var id in methodIds.OrderBy(id => id, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var target = targets[id];
             var preparation = owned[target.Entry.CallableId];
-            var claim = preparation.EffectClaims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == (summary ? WorkerEffectContractKind.EffectContract
+            var claim = preparation.EffectClaims.Single(claim => claim.ContractKind == (summary ? WorkerEffectContractKind.EffectContract
                 : capabilities ? WorkerEffectContractKind.AllowedCapabilities
                 : purity ? WorkerEffectContractKind.EnforcePure : allocations
-                ? WorkerEffectContractKind.ZeroAllocations : WorkerEffectContractKind.DoesNotThrow)));
+                ? WorkerEffectContractKind.ZeroAllocations : WorkerEffectContractKind.DoesNotThrow));
             var evidence = summary
                 ? await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), cancellationToken).ConfigureAwait(false)
                 : capabilities
@@ -167,17 +167,17 @@ internal static class NativeEffectOracleGate
         ImmutableArray<NativeEffectOracleRow> rows, double wallSeconds)
     {
         System.ArgumentNullException.ThrowIfNull(universeSha256);
-        if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row is null || string.IsNullOrWhiteSpace(row.MethodId))) ||
-            rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)).Distinct(StringComparer.Ordinal).Count() != rows.Length)
+        if (rows.IsDefaultOrEmpty || rows.Length > universeMethodCount || rows.Any(row => row is null || string.IsNullOrWhiteSpace(row.MethodId)) ||
+            rows.Select(row => row.MethodId).Distinct(StringComparer.Ordinal).Count() != rows.Length)
         { throw new ArgumentException("Oracle rows do not define a unique covered universe.", nameof(rows)); }
-        var runtimeContradictions = rows.Count(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RuntimeOracle == "Contradiction"));
+        var runtimeContradictions = rows.Count(row => row.RuntimeOracle == "Contradiction");
         // Passed means no observed runtime contradiction. Unsupported or
         // unchanged write observations remain visible gaps in the rows.
         return new(universeSha256, universeMethodCount, rows.Length, rows.Length == universeMethodCount,
-            rows.Count(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeOutcome == WorkerClaimOutcome.Proven)), rows.Count(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeOutcome == WorkerClaimOutcome.Refuted)),
-            rows.Count(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RuntimeOracle == "Confirmed")), runtimeContradictions, wallSeconds, rows,
-            rows.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeOutcome == WorkerClaimOutcome.Unknown)).GroupBy(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeReason.ToString()), StringComparer.Ordinal)
-                .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()), StringComparer.Ordinal),
+            rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Proven), rows.Count(row => row.NativeOutcome == WorkerClaimOutcome.Refuted),
+            rows.Count(row => row.RuntimeOracle == "Confirmed"), runtimeContradictions, wallSeconds, rows,
+            rows.Where(row => row.NativeOutcome == WorkerClaimOutcome.Unknown).GroupBy(row => row.NativeReason.ToString(), StringComparer.Ordinal)
+                .ToImmutableDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal),
             runtimeContradictions == 0);
     }
 }

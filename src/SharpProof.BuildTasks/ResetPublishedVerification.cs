@@ -30,10 +30,10 @@ public sealed class ResetPublishedVerification : CancelableBuildTask
         try
         {
             var paths = Present([RequestPath, ResultPath, ManifestPath, SarifPath])
-                .Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (ResolveProjectRelativePath(ProjectDirectory, path))).ToImmutableArray();
+                .Select(path => ResolveProjectRelativePath(ProjectDirectory, path)).ToImmutableArray();
             var capturePaths = Present([CompilerManifestStagingPath, CompilerCaptureRequestPath,
                 string.IsNullOrWhiteSpace(CompilerCaptureRequestPath) ? null : CompilerCaptureRequestPath + ".completed"])
-                .Select(path => path is null ? throw new ArgumentNullException(nameof(path)) : ResolveProjectRelativePath(ProjectDirectory, path));
+                .Select(path => ResolveProjectRelativePath(ProjectDirectory, path));
             var allPaths = paths.Concat(capturePaths).ToImmutableArray();
             PublicationPaths.ValidateWorkerRuntime(allPaths, string.IsNullOrWhiteSpace(WorkerPath)
                 ? null : ResolveProjectRelativePath(ProjectDirectory, WorkerPath));

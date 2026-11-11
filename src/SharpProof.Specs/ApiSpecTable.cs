@@ -18,7 +18,7 @@ internal sealed partial class ApiSpecTable
         RepositoryParameterGuard.RequireInitialized(templates.IsDefault, nameof(templates), "Array must be initialized.");
         (_scope, Templates) = (scope, templates);
         _byWitness = templates.ToImmutableDictionary(
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Target.WitnessIdentifier),
+            static template => template.Target.WitnessIdentifier,
             StringComparer.Ordinal);
         ContentSha256 = ApiSpecContentDigest.Compute(templates);
     }
@@ -43,7 +43,7 @@ internal sealed partial class ApiSpecTable
                                    throw new ArgumentException(
                                        "Spec declarations cannot contain null.",
                                        nameof(declarations)))
-            .OrderBy(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Target?.WitnessIdentifier), StringComparer.Ordinal)
+            .OrderBy(static declaration => declaration.Target?.WitnessIdentifier, StringComparer.Ordinal)
             .ToImmutableArray();
         if (ordered.IsDefaultOrEmpty)
         {
@@ -118,7 +118,7 @@ internal sealed partial class ApiSpecTable
             declaration.Target.ResultType);
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
-            static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : ((variable.Role, variable.Ordinal)));
+            static variable => (variable.Role, variable.Ordinal));
         var validatedTerms = ImmutableDictionary.CreateBuilder<SpecTermDeclaration, ValidatedSpecTerm>(
             ApiSpecTermValidator.DeclarationReferenceComparer.Instance);
         var facets = NormalizeFacets(
@@ -294,10 +294,10 @@ internal sealed partial class ApiSpecTable
             }
         }
         if (target.ApprovedAssemblies
-                .Select(static assembly => assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : ((
+                .Select(static assembly => (
                     assembly.Name,
                     PublicKeyToken: assembly.PublicKeyToken.ToUpperInvariant(),
-                    assembly.ReferenceFamily)))
+                    assembly.ReferenceFamily))
                 .Distinct()
                 .Count() != target.ApprovedAssemblies.Length)
         {
@@ -410,8 +410,8 @@ internal sealed partial class ApiSpecTable
         }
 
         if (throws.ExceptionMetadataNames.Any(static name =>
-                name is null ? throw new System.ArgumentNullException(nameof(name)) : (string.IsNullOrWhiteSpace(name) ||
-                !Utf16WellFormedness.IsWellFormed(name))))
+                string.IsNullOrWhiteSpace(name) ||
+                !Utf16WellFormedness.IsWellFormed(name)))
         {
             throw new ArgumentException(
                 "Throw exception names must be non-empty, well-formed UTF-16.",

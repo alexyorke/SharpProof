@@ -66,8 +66,8 @@ public sealed partial class DotnetApiInventoryTests
             }
             """);
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("InterfaceArrayAdmission", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var compilation = CSharpCompilation.Create("InterfaceArrayAdmission", [tree], paths.Select(path => MetadataReference.CreateFromFile(path)), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
@@ -86,8 +86,8 @@ public sealed partial class DotnetApiInventoryTests
             }
             """);
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("InterfaceArraySpoof", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var compilation = CSharpCompilation.Create("InterfaceArraySpoof", [tree], paths.Select(path => MetadataReference.CreateFromFile(path)), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var property = (Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation)compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         Assert.That(CSharpOperationSemantics.IsArrayCollectionDeclaration(property.Property), Is.False);
@@ -99,7 +99,7 @@ public sealed partial class DotnetApiInventoryTests
     {
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int index) { int[] values = new int[1]; return " + "((System.Collections.Generic.IList<int>)values)[index]; } }");
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("InterfaceArraySkeleton", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var compilation = CSharpCompilation.Create("InterfaceArraySkeleton", [tree], paths.Select(path => MetadataReference.CreateFromFile(path)), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory();
@@ -107,10 +107,10 @@ public sealed partial class DotnetApiInventoryTests
         var lowered = RoslynProgramLowering.LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.Classification.IsExact, Is.True);
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         Assert.That(instructions.OfType<IrCallInstruction>(), Is.Empty);
-        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new global::System.ArgumentNullException(nameof(havoc)) : (factory.GetOperationInfo(havoc.Operation).Description is { } description && factory.GetString(description).EndsWith(":interface-array:bounds", StringComparison.Ordinal))), Is.True);
-        Assert.That(instructions.OfType<IrWriteInstruction>().Any(write => write is null ? throw new global::System.ArgumentNullException(nameof(write)) : (write.Region == IrWriteRegion.Static)), Is.True);
+        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => factory.GetOperationInfo(havoc.Operation).Description is { } description && factory.GetString(description).EndsWith(":interface-array:bounds", StringComparison.Ordinal)), Is.True);
+        Assert.That(instructions.OfType<IrWriteInstruction>().Any(write => write.Region == IrWriteRegion.Static), Is.True);
     }
 
     [TestCase("receiver")]
@@ -131,10 +131,10 @@ public sealed partial class DotnetApiInventoryTests
         };
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { " + "public static int Check(int[] values) { " + body + " } " + "private static int[] UnknownValues() => new int[1]; private static int UnknownIndex() => 0; }");
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("IncompleteIntrinsicOperands", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var compilation = CSharpCompilation.Create("IncompleteIntrinsicOperands", [tree], paths.Select(path => MetadataReference.CreateFromFile(path)), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Check"));
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Check");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         // No callee preparation or opaque-call admission: each source helper
@@ -166,14 +166,14 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(body);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, System.Collections.Generic.IList<int> unknown, bool choose) { " + body + " } }");
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("ReceiverProvenance", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        var compilation = CSharpCompilation.Create("ReceiverProvenance", [tree], paths.Select(path => MetadataReference.CreateFromFile(path)), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         context.TrackArrayReceivers(graph);
-        var property = graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
+        var property = graph.Blocks.SelectMany(block => block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue))).SelectMany(operation => operation.DescendantsAndSelf()).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
         Assert.That(context.ConcreteArray(property.Instance!) != null, Is.EqualTo(expected));
     }
 
@@ -215,7 +215,7 @@ public sealed partial class DotnetApiInventoryTests
             };
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check(int[] values, int index, int replacement) { " + body + " } }");
             var compilation = references.AddSyntaxTrees(tree);
-            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
+            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
             {
                 if (!wrongClaim)
                 { throw new InvalidOperationException(action + ": compilation error"); }

@@ -123,12 +123,12 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                     }
                 }
                 """, []);
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
             var tree = compilation.SyntaxTrees.Single();
             var model = compilation.GetSemanticModel(tree);
             var ensures = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Ensures"));
+                .Single(invocation => invocation.Expression.ToString() == "Contract.Ensures");
             var operation = (IInvocationOperation)model.GetOperation(ensures)!;
             var foundAnonymousParameter = false;
             var pending = ImmutableStack<IOperation>.Empty;
@@ -141,7 +141,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                     parameterReference.Parameter.ContainingSymbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction } owner)
                 {
                     foundAnonymousParameter = true;
-                    var declarations = owner.DeclaringSyntaxReferences.Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax().GetType().Name));
+                    var declarations = owner.DeclaringSyntaxReferences.Select(reference => reference.GetSyntax().GetType().Name);
                     TestContext.Out.WriteLine($"Compiler-owned query parameter: implicit={owner.IsImplicitlyDeclared}, declarations={string.Join(",", declarations)}");
                 }
                 foreach (var child in current.ChildOperations)
@@ -364,7 +364,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 }
                 """, [], filePath: "query-valued-selector.cs");
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var image = AnalyzerTestHost.EmitImage(compilation);
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("QueryValueControl", isCollectible: true);
             try
@@ -414,7 +414,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
                 }
                 """, [], filePath: "query-valued-selector-roles.cs");
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var image = AnalyzerTestHost.EmitImage(compilation);
             var runtime = new System.Runtime.Loader.AssemblyLoadContext("DistinctQueryRoleControl", isCollectible: true);
             try
@@ -438,7 +438,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first, Has.Length.EqualTo(2));
-            Assert.That(first.Select(static fingerprint => fingerprint is null ? throw new System.ArgumentNullException(nameof(fingerprint)) : (fingerprint.Length)), Is.All.EqualTo(64));
+            Assert.That(first.Select(static fingerprint => fingerprint.Length), Is.All.EqualTo(64));
             Assert.That(first, Is.Unique);
             Assert.That(Fingerprints("renamedValue", "renamedOuter", "renamedInner"), Is.EqualTo(first));
         }
@@ -447,13 +447,13 @@ public sealed class CompilerSemanticIdentityWorkflowTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         return tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((IInvocationOperation)model.GetOperation(syntax)!))
-            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.Name == "Ensures"))
+            .Select(syntax => (IInvocationOperation)model.GetOperation(syntax)!)
+            .Where(invocation => invocation.TargetMethod.Name == "Ensures")
             .Select(invocation =>
             {
                 System.ArgumentNullException.ThrowIfNull(invocation);
@@ -495,7 +495,7 @@ public sealed class CompilerSemanticIdentityWorkflowTests
             }
             """, []);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var local = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().Single();

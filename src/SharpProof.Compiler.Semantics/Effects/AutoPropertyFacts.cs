@@ -22,14 +22,14 @@ internal static class AutoPropertyFacts
         property = RepositoryParameterGuard.NotNull(property, nameof(property));
 
         return property.DeclaringSyntaxReferences.Any(reference =>
-            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
+            reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
             {
                 ExpressionBody: null,
                 AccessorList.Accessors: var accessors
             } &&
             accessors.Count != 0 &&
             accessors.All(static accessor =>
-                accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body == null && accessor.ExpressionBody == null))));
+                accessor is null ? throw new System.ArgumentNullException(nameof(accessor)) : (accessor.Body == null && accessor.ExpressionBody == null)));
     }
 
     internal static bool TryGetBackingField(
@@ -41,8 +41,8 @@ internal static class AutoPropertyFacts
         field = property.ContainingType.GetMembers()
             .OfType<IFieldSymbol>()
             .FirstOrDefault(candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.AssociatedSymbol is IPropertySymbol associated &&
-                AreSameProperty(associated, property)))!;
+                candidate.AssociatedSymbol is IPropertySymbol associated &&
+                AreSameProperty(associated, property))!;
         return field != null;
     }
 

@@ -366,7 +366,7 @@ internal sealed class ProtocolJsonTests
         }
         var validation = WorkerProtocolJson.Validate(response);
         Assert.That(validation.IsValid, Is.False);
-        Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+        Assert.That(validation.Errors.Select(static error => error.Code),
             Does.Contain("manifest.callable_id"));
     }
 
@@ -732,7 +732,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
                 roundTrip.Manifest.Callables[0].Assumptions
-                    .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind)),
+                    .Select(static assumption => assumption.Kind),
                 Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
             Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(artifact.Compilation.SyntaxTrees.Length));
             Assert.That(ArtifactDigest.Compute((Encoding.UTF8.GetBytes(json)).ToImmutableArray()), Does.Match("^[0-9a-f]{64}$"));
@@ -1014,8 +1014,8 @@ internal sealed class ProtocolJsonTests
                     ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with
                     {
                         Assumptions = response.ClaimResults[0].Assumptions.ReplaceReference(response.ClaimResults[0].Assumptions.Single(static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)), response.ClaimResults[0].Assumptions.Single(static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)) with
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary), response.ClaimResults[0].Assumptions.Single(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary) with
                 { Used = true })
                     })
                 };
@@ -1026,7 +1026,7 @@ internal sealed class ProtocolJsonTests
         var validation = WorkerProtocolJson.Validate(response);
 
         Assert.That(
-            validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+            validation.Errors.Select(static error => error.Code),
             Is.Empty);
     }
 
@@ -1118,11 +1118,10 @@ internal sealed class ProtocolJsonTests
         response = response with
         {
             ClaimResults = [.. response.ClaimResults.Select(static result =>
-                result is null ? throw new ArgumentNullException(nameof(result)) : result with
+                result with
                 {
                     Assumptions = [.. result.Assumptions.Select(static value =>
-                        value is null ? throw new ArgumentNullException(nameof(value)) :
-                            value.Kind == WorkerAssumptionKind.TrustedBoundary ? value with { Used = true } : value)]
+                        value.Kind == WorkerAssumptionKind.TrustedBoundary ? value with { Used = true } : value)]
                 })]
         };
         { response = response with { Summary = CreateSummary(response) }; }
@@ -1392,28 +1391,28 @@ internal sealed class ProtocolJsonTests
         var response = CreateShapeCoverageResponse();
         var responseJson = WorkerProtocolJson.SerializeResponse(response);
         var cases = ImmutableArray.Create<(string Json, Func<JsonObject, JsonObject> Select, string Property)>(
-            (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["compilerManifest"]!.AsObject()), "path"),
-            (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["budgets"]!.AsObject()), "queryRlimit"),
-            (requestJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["cache"]!.AsObject()), "enabled"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!.AsObject()), "schemaVersion"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!["callables"]![0]!.AsObject()), "callableId"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!["callables"]![0]!["location"]!.AsObject()), "path"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!["callables"]![0]!["assumptions"]![0]!.AsObject()), "id"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["manifest"]!["claims"]![0]!.AsObject()), "claimId"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["callableResults"]![0]!.AsObject()), "coverage"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!.AsObject()), "outcome"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["presentation"]!.AsObject()), "name"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["presentation"]!.AsObject()), "parameterNames"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "stage"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "code"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!.AsObject()), "location"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["diagnostic"]!["location"]!.AsObject()), "path"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["effectWitness"]!.AsObject()), "kind"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["claimResults"]![0]!["model"]![0]!.AsObject()), "variable"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!.AsObject()), "cacheStatus"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!["versions"]!.AsObject()), "protocolVersion"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["summary"]!["budgets"]!.AsObject()), "queryRlimit"),
-            (responseJson, static root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root["errors"]![0]!.AsObject()), "code"));
+            (requestJson, static root => root["compilerManifest"]!.AsObject(), "path"),
+            (requestJson, static root => root["budgets"]!.AsObject(), "queryRlimit"),
+            (requestJson, static root => root["cache"]!.AsObject(), "enabled"),
+            (responseJson, static root => root["manifest"]!.AsObject(), "schemaVersion"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!.AsObject(), "callableId"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!["location"]!.AsObject(), "path"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!["assumptions"]![0]!.AsObject(), "id"),
+            (responseJson, static root => root["manifest"]!["claims"]![0]!.AsObject(), "claimId"),
+            (responseJson, static root => root["callableResults"]![0]!.AsObject(), "coverage"),
+            (responseJson, static root => root["claimResults"]![0]!.AsObject(), "outcome"),
+            (responseJson, static root => root["claimResults"]![0]!["presentation"]!.AsObject(), "name"),
+            (responseJson, static root => root["claimResults"]![0]!["presentation"]!.AsObject(), "parameterNames"),
+            (responseJson, static root => root["claimResults"]![0]!["diagnostic"]!.AsObject(), "stage"),
+            (responseJson, static root => root["claimResults"]![0]!["diagnostic"]!.AsObject(), "code"),
+            (responseJson, static root => root["claimResults"]![0]!["diagnostic"]!.AsObject(), "location"),
+            (responseJson, static root => root["claimResults"]![0]!["diagnostic"]!["location"]!.AsObject(), "path"),
+            (responseJson, static root => root["claimResults"]![0]!["effectWitness"]!.AsObject(), "kind"),
+            (responseJson, static root => root["claimResults"]![0]!["model"]![0]!.AsObject(), "variable"),
+            (responseJson, static root => root["summary"]!.AsObject(), "cacheStatus"),
+            (responseJson, static root => root["summary"]!["versions"]!.AsObject(), "protocolVersion"),
+            (responseJson, static root => root["summary"]!["budgets"]!.AsObject(), "queryRlimit"),
+            (responseJson, static root => root["errors"]![0]!.AsObject(), "code"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1934,7 +1933,7 @@ internal sealed class ProtocolJsonTests
         var response = CreateResponse(CreateManifest());
         var used = response.ClaimResults[0].Assumptions.Single(
             static assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume));
+                assumption.Kind == WorkerAssumptionKind.UserAssume);
         { var originalFixtureRow72002 = used; used = used with { Used = true }; response = response with { ClaimResults = response.ClaimResults.ReplaceAt(0, response.ClaimResults[0] with { Assumptions = response.ClaimResults[0].Assumptions.ReplaceReference(originalFixtureRow72002, used) }) }; }
         { response = response with { Summary = CreateSummary(response) }; }
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -1969,7 +1968,7 @@ internal sealed class ProtocolJsonTests
         Assert.DoesNotThrow(
             (Action)(() => WorkerProtocolJson.Canonicalize(response)));
         var codes = WorkerProtocolJson.Validate(response).Errors
-            .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)).ToImmutableArray();
+            .Select(static error => error.Code).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(codes, Does.Contain("response.claim_results"));
@@ -2045,7 +2044,7 @@ internal sealed class ProtocolJsonTests
 
         Assert.That(
             WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+                .Select(static error => error.Code),
             Is.EqualTo(["manifest.claim_order"]));
     }
 
@@ -2163,8 +2162,8 @@ internal sealed class ProtocolJsonTests
 
         var validation = WorkerProtocolJson.Validate(response);
         var elapsedErrors = validation.Errors
-            .Where(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code is
-                "response.elapsed_unrepresentable" or "summary.elapsed"))
+            .Where(static error => error.Code is
+                "response.elapsed_unrepresentable" or "summary.elapsed")
             .ToImmutableArray();
 
         Assert.That(elapsedErrors.Length == 0, Is.EqualTo(expectedValid));
@@ -2266,7 +2265,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(roundtrip.RunStatus, Is.EqualTo(status));
             Assert.That(roundtrip.Manifest.Claims, Is.Empty);
             Assert.That(roundtrip.ClaimResults, Is.Empty);
-            Assert.That(roundtrip.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Is.EqualTo(hasCallable ? [] : ImmutableArray.Create(status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout)));
+            Assert.That(roundtrip.Errors.Select(static error => error.Code), Is.EqualTo(hasCallable ? [] : ImmutableArray.Create(status == WorkerRunStatus.Canceled ? "worker.canceled" : WorkerProtocolErrorCodes.WorkerTimeout)));
             Assert.That(VerificationCache.IsCacheable(roundtrip, inputHash, manifest), Is.False);
         }
         var originalError = new WorkerProtocolError
@@ -2354,8 +2353,8 @@ internal sealed class ProtocolJsonTests
         {
             Assert.That(WorkerProtocolJson.ValidateForRequest(roundtrip, response.RequestHash,
                 InputHash, manifest, request, versions).IsValid, Is.True);
-            Assert.That(roundtrip.CallableResults.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)), Is.EquivalentTo(manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId))));
-            Assert.That(roundtrip.ClaimResults.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId)), Is.EqualTo(manifest.Claims.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId))));
+            Assert.That(roundtrip.CallableResults.Select(static item => item.CallableId), Is.EquivalentTo(manifest.Callables.Select(static item => item.CallableId)));
+            Assert.That(roundtrip.ClaimResults.Select(static item => item.ClaimId), Is.EqualTo(manifest.Claims.Select(static item => item.ClaimId)));
             Assert.That(VerificationCache.IsCacheable(roundtrip, InputHash, manifest), Is.False);
         }
     }
@@ -2382,7 +2381,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(File.Exists(firstPath), Is.False);
             Assert.That(File.Exists(Path.Combine(directory.FullName, secondHash + VerificationCache.CacheFileSuffix)), Is.True);
             Assert.That(await File.ReadAllTextAsync(unrelated), Is.EqualTo("preserve"));
-            Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix).Sum(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (new FileInfo(path).Length)), Is.LessThanOrEqualTo(maximumBytes));
+            Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix).Sum(static path => new FileInfo(path).Length), Is.LessThanOrEqualTo(maximumBytes));
         }
     }
 
@@ -2395,8 +2394,7 @@ internal sealed class ProtocolJsonTests
         var validation = WorkerProtocolJson.ValidateManifest(manifest);
 
         Assert.That(validation.IsValid, Is.False);
-        Assert.That(validation.Errors.Select(static error => error is null
-            ? throw new ArgumentNullException(nameof(error)) : error.Code), Does.Contain("manifest.assumption_kind"));
+        Assert.That(validation.Errors.Select(static error => error.Code), Does.Contain("manifest.assumption_kind"));
     }
 
     [TestCase(false)]
@@ -2441,7 +2439,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(attempted, Does.Contain(removable));
             Assert.That(File.Exists(removable), Is.False);
             Assert.That(Directory.GetFiles(directory.FullName, "*" + VerificationCache.CacheFileSuffix)
-                .Sum(static path => path is null ? throw new ArgumentNullException(nameof(path)) : new FileInfo(path).Length),
+                .Sum(static path => new FileInfo(path).Length),
                 Is.LessThanOrEqualTo(maximumBytes));
         }
     }
@@ -2655,7 +2653,7 @@ internal sealed class ProtocolJsonTests
             Is.Empty,
             string.Join(
                 ", ",
-                validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+                validation.Errors.Select(static error => error.Code)));
         return stopwatch.Elapsed;
     }
 
@@ -2669,7 +2667,7 @@ internal sealed class ProtocolJsonTests
         }
         System.ArgumentNullException.ThrowIfNull(validation);
         var actual = validation.Errors
-            .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))
+            .Select(static error => error.Code)
             .ToImmutableArray();
         Assert.That(actual, Is.EquivalentTo(expected));
     }
@@ -2684,7 +2682,7 @@ internal sealed class ProtocolJsonTests
         }
         System.ArgumentNullException.ThrowIfNull(validation);
         var actual = validation.Errors
-            .Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))
+            .Select(static error => error.Code)
             .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
@@ -2877,14 +2875,14 @@ internal sealed class ProtocolJsonTests
             RunStatus = WorkerRunStatus.Complete,
             FailureReason = WorkerRunFailureReason.None,
             CallableResults = [.. manifest.Callables.Select(
-                static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult {
+                static callable => new WorkerCallableResult {
                     CallableId = callable.CallableId,
                     Coverage = WorkerCallableCoverage.Complete,
                     Reason = WorkerCallableCoverageReason.None,
                     Assumptions = CopyAssumptions(callable.Assumptions)
-                }))],
+                })],
             ClaimResults = [.. manifest.Claims.Select(
-                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new WorkerClaimResult {
+                claim => new WorkerClaimResult {
                     ClaimId = claim.ClaimId,
                     Outcome = WorkerClaimOutcome.Proven,
                     Reason = WorkerClaimReason.None,
@@ -2895,7 +2893,7 @@ internal sealed class ProtocolJsonTests
                         manifest.Callables.Single(callable =>
                             callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == claim.CallableId))
                             .Assumptions)
-                }))]
+                })]
         };
         { response = response with { Summary = CreateSummary(response) }; }
         return response;
@@ -2906,11 +2904,11 @@ internal sealed class ProtocolJsonTests
     {
         System.ArgumentNullException.ThrowIfNull(assumptions);
         return [.. assumptions.Select(static assumption =>
-            assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (new WorkerAssumptionEvidence {
+            new WorkerAssumptionEvidence {
                 Id = assumption.Id,
                 Kind = assumption.Kind,
                 Used = assumption.Used
-            }))];
+            })];
     }
 
     private static WorkerVerificationSummary CreateSummary(
@@ -3044,7 +3042,7 @@ internal sealed class ProtocolJsonTests
         Assert.That(
             validation.IsValid,
             Is.EqualTo(expectedValid),
-            string.Join(", ", validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+            string.Join(", ", validation.Errors.Select(static error => error.Code)));
         if (!expectedValid)
         {
             AssertErrorCode(validation, ["response.cache_request_mismatch"]);

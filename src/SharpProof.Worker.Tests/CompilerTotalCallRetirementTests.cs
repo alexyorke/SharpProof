@@ -79,7 +79,7 @@ public sealed class CompilerTotalCallRetirementTests
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")], TestMetadataReferences.WithSharpProof,
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary, NullableContextOptions.Enable));
         TestCompilation.AssertNoErrors(compilation);
-        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Name == "Verify"));
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(target => target.Method.Name == "Verify");
         var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await AssertProvesAsync(preparation, emitted && resultPlaceholder ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven);
     }
@@ -110,7 +110,7 @@ public sealed class CompilerTotalCallRetirementTests
         // so nothing can be proven) or only non-proven results.
         if (results.Length == 0)
         { Assert.That(preparation.Total, Is.Null, "Published nothing despite an admitted Total body."); }
-        Assert.That(results.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome != WorkerClaimOutcome.Proven)), Is.True);
+        Assert.That(results.All(result => result.Outcome != WorkerClaimOutcome.Proven), Is.True);
     }
 
     private static async Task AssertProvesAsync(CompilerCallablePreparation preparation, WorkerClaimOutcome expected = WorkerClaimOutcome.Proven)
@@ -158,7 +158,7 @@ public sealed class CompilerTotalCallRetirementTests
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                        diagnostic.ToString())));
         }
         File.Copy(implementationPath, duplicatePath);
         var firstReference = MetadataReference.CreateFromFile(implementationPath,
@@ -224,9 +224,9 @@ public sealed class CompilerTotalCallRetirementTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == callerName));
+            .Single(method => method.Identifier.ValueText == callerName);
         var syntax = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString().EndsWith(calledMethodName, StringComparison.Ordinal)));
+            .Single(invocation => invocation.Expression.ToString().EndsWith(calledMethodName, StringComparison.Ordinal));
         var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
         return ((IInvocationOperation)model.GetOperation(syntax)!).TargetMethod;
     }

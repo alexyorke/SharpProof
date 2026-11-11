@@ -11,7 +11,7 @@ internal sealed partial class EffectiveContractSourceResolution
         DirectInventory.HasRejectedContractApiUsage ||
         Inventory.HasRejectedContractApiUsage ||
         Inventory.Clauses.Any(static clause =>
-            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement != ContractClausePlacement.NestedCallable));
+            clause.Placement != ContractClausePlacement.NestedCallable);
 }
 
 internal sealed class EffectiveContractSourceResolver
@@ -51,10 +51,10 @@ internal sealed class EffectiveContractSourceResolver
         cancellationToken.ThrowIfCancellationRequested();
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(
+            value => new(
                 value,
                 ContractClauseInventoryBuilder.ForCompilation(value),
-                cancellationToken)));
+                cancellationToken));
     }
 
     internal EffectiveContractSourceResolution Resolve(
@@ -69,7 +69,7 @@ internal sealed class EffectiveContractSourceResolver
         return implementationBody == null
             ? ImmutableInterlocked.GetOrAdd(ref _cache,
                 target,
-                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (ResolveUncached(value, cancellationToken)))
+                value => ResolveUncached(value, cancellationToken))
             : ResolveCore(target, implementationBody, cancellationToken);
     }
 

@@ -96,11 +96,11 @@ internal static class ContractForCompanionValidator
         var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
         var targetMatches = ImmutableDictionaryCapture.Create(targets,
-            static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target),
+            static target => target,
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         var candidateMatches = ImmutableDictionaryCapture.Create(candidates,
-            static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate),
+            static candidate => candidate,
             static _ => ImmutableArray.CreateBuilder<IMethodSymbol>(),
             comparer);
         foreach (var target in targets)
@@ -122,8 +122,8 @@ internal static class ContractForCompanionValidator
         var byTarget = ImmutableDictionaryCapture.Create(targetMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
         var byCandidate = ImmutableDictionaryCapture.Create(candidateMatches, static pair => pair.Key, static pair => pair.Value.ToImmutable(), comparer);
         var targetSurfaceIsComplete = targets.All(target =>
-            target is null ? throw new System.ArgumentNullException(nameof(target)) : (byTarget[target] is { Length: 1 } matches &&
-            byCandidate[matches[0]].Length == 1));
+            byTarget[target] is { Length: 1 } matches &&
+            byCandidate[matches[0]].Length == 1);
         var diagnosed = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
 
         void Diagnose(
@@ -160,11 +160,11 @@ internal static class ContractForCompanionValidator
             }
 
             var mismatches = candidates.Where(candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (string.Equals(
+                    string.Equals(
                         candidate.Name,
                         target.Name,
                         StringComparison.Ordinal) &&
-                    byCandidate[candidate].IsDefaultOrEmpty))
+                    byCandidate[candidate].IsDefaultOrEmpty)
                 .ToImmutableArray();
             if (mismatches.IsDefaultOrEmpty)
             {
@@ -299,13 +299,13 @@ internal static class ContractForCompanionValidator
         fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
 
         return symbol.Locations.Where(location =>
-                location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource &&
+                location.IsInSource &&
                 location.SourceTree is { } tree &&
-                compilation.ContainsSyntaxTree(tree)))
+                compilation.ContainsSyntaxTree(tree))
             .OrderBy(
-                static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.SourceTree?.FilePath),
+                static location => location.SourceTree?.FilePath,
                 StringComparer.Ordinal)
-            .ThenBy(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.SourceSpan.Start))
+            .ThenBy(static location => location.SourceSpan.Start)
             .FirstOrDefault() ?? fallback;
     }
 }

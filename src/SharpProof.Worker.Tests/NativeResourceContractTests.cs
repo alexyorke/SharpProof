@@ -66,8 +66,7 @@ internal sealed partial class NativeResourceContractTests
         }
         if (x64)
         { initial = initial.WithOptions(initial.Options.WithPlatform(Microsoft.CodeAnalysis.Platform.X64)); }
-        var trees = initial.SyntaxTrees.Select(tree => tree is null ? throw new ArgumentNullException(nameof(tree)) :
-            CSharpSyntaxTree.ParseText(tree.GetText(cancellation), ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>()), tree.FilePath, cancellationToken: cancellation));
+        var trees = initial.SyntaxTrees.Select(tree => CSharpSyntaxTree.ParseText(tree.GetText(cancellation), ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(Array.Empty<string>()), tree.FilePath, cancellationToken: cancellation));
         var compilation = initial.RemoveAllSyntaxTrees().AddSyntaxTrees(trees);
         TestCompilation.AssertNoErrors(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All, cancellation).Build();
@@ -128,7 +127,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Not.Null.And.Not.Empty);
         Assert.That(result.ResourceBound.UnknownReason, Is.Null);
         Assert.That(result.ProofCore, Has.Some.StartsWith("native-resource:"));
-        Assert.That(result.Assumptions.All(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : !assumption.Used), Is.True);
+        Assert.That(result.Assumptions.All(assumption => !assumption.Used), Is.True);
     }
 
     [Test]
@@ -609,7 +608,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("2"));
         Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("1"));
-        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("1"));
+        Assert.That(result.Model.Single(value => value.Variable == "parameter:0").Value, Is.EqualTo("1"));
     }
 
     [TestCase("Contract.Requires(n>=0); if(n>=0)return; var a=new int[3];")]
@@ -633,8 +632,8 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("7"));
         Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("2"));
-        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:0").Value, Is.EqualTo("7"));
-        Assert.That(result.Model.Single(value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
+        Assert.That(result.Model.Single(value => value.Variable == "parameter:0").Value, Is.EqualTo("7"));
+        Assert.That(result.Model.Single(value => value.Variable == "parameter:1").Kind, Is.EqualTo("Sequence"));
     }
     [TestCase("int left=2147483647,right=2147483647; while(left>0||right>0) { if(left>0) left-=2147483647; else right/=2147483647; }", 2, "3")]
     [TestCase("int left=2,right=3; while(left>0||right>0) { if(left>0) left--; else right--; }", 4, "5")]
@@ -718,7 +717,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(metadata.EvidenceSource, Does.Contain("b9a49e4a6d3a444a3685e318c74a7892d01873f7"));
         Assert.That(metadata.CatalogSha256, Has.Length.EqualTo(64));
         Assert.That(metadata.ReferenceSha256, Has.Length.EqualTo(64));
-        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == metadata.AssumptionId).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption.Id == metadata.AssumptionId).Used, Is.True);
     }
 
     [TestCase(0)]
@@ -746,7 +745,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("1"));
         Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("0"));
         var dependency = result.ResourceBound.MetadataAssumptions.Single();
-        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == dependency.AssumptionId).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption.Id == dependency.AssumptionId).Used, Is.True);
     }
     [Test]
     public async Task MetadataCostSummaryDoesNotSupplyAnExactExecutionValue()
@@ -777,7 +776,7 @@ internal sealed partial class NativeResourceContractTests
         ArgumentNullException.ThrowIfNull(corruption);
         var preparation = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 0)]", "int value=System.Math.Max(n,0);"), reviewedRuntime: true));
         var reference = preparation.ResourceProgram!.Children.Single().Metadata!;
-        var capturedReference = preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity == reference.AssemblyIdentity);
+        var capturedReference = preparation.Compilation.ResourceMetadataReferences.Single(candidate => candidate.Identity == reference.AssemblyIdentity);
         switch (corruption)
         {
             case "undeclared":
@@ -848,7 +847,7 @@ internal sealed partial class NativeResourceContractTests
         var result = (await NativeEffectClaims.VerifyAsync(preparation, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.MetadataAssumptions, Has.Length.EqualTo(2));
-        Assert.That(result.Assumptions.Count(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used), Is.EqualTo(2));
+        Assert.That(result.Assumptions.Count(assumption => assumption.Used), Is.EqualTo(2));
     }
     [TestCase("LoopBodyEntries", 7)]
     [TestCase("ArrayAllocations", 7)]

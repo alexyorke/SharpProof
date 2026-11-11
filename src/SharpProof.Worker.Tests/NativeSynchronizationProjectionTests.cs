@@ -73,7 +73,7 @@ public sealed class NativeSynchronizationProjectionTests
         var result = await NativeEffectSiteVerifier.VerifySynchronizationShadowAsync(preparation, claim.ClaimId, WorkerEffectCapabilitySet.None, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Check(result, "Refuted");
         GoldenTest.Compare(fixture, "Refuted");
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrLockInstruction>().Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Operation == result.LockWitness)), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrLockInstruction>().Any(instruction => instruction.Operation == result.LockWitness), Is.True);
         Assert.That(preparation.Total.Program.Factory.GetOperationInfo(result.LockWitness!.Value).SourceSpan, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, failure.ToString());

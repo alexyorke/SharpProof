@@ -76,7 +76,7 @@ internal static class AdvisoryEffectClaims
                 var capabilities = Capabilities(site) & ~constraint.Capabilities;
                 return effects != EffectContractKind.None || capabilities != EffectContractCapabilityKind.None
                     ? "may have undeclared effects: " + string.Join(", ", ImmutableArray.Create(effects.ToString(), capabilities.ToString())
-                        .Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name != "None")))
+                        .Where(name => name != "None"))
                     : null;
         }
     }
@@ -166,7 +166,7 @@ internal static class AdvisoryEffectClaims
             return site.ThrownTypes.Any(listed.Contains);
         }
         var runtime = compilation.GetTypeByMetadataName(IrExceptionKindFacts.MetadataName(site.Exception));
-        return runtime != null && allowed.Any(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (EffectTypeFacts.IsDerivedFrom(runtime, type)));
+        return runtime != null && allowed.Any(type => EffectTypeFacts.IsDerivedFrom(runtime, type));
     }
 
     private static string ThrownName(AdvisoryEffectSite site)

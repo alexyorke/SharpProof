@@ -96,11 +96,11 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var invocation = ActualEnsures(tree, model);
         var reference = invocation.Arguments.Single().Value.DescendantsAndSelf().OfType<ILocalReferenceOperation>().Single();
         var local = reference.Local;
-        var declaration = local.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).First();
+        var declaration = local.DeclaringSyntaxReferences.Select(static item => item.GetSyntax()).First();
         var ownerReferences = ((IMethodSymbol)local.ContainingSymbol).DeclaringSyntaxReferences
-            .Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToImmutableArray();
+            .Select(static item => item.GetSyntax()).ToImmutableArray();
         var admittedOwner = ownerReferences.FirstOrDefault(node =>
-            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.SyntaxTree == declaration.SyntaxTree && node.Span.Contains(declaration.Span)));
+            node.SyntaxTree == declaration.SyntaxTree && node.Span.Contains(declaration.Span));
         var astContainer = language == "CSharp"
             ? owner.DeclaringSyntaxReferences.Single().GetSyntax()
             : tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.MethodBlockSyntax>().Single();
@@ -166,17 +166,17 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         var owner = sample.Compilation.GetTypeByMetadataName("Subject")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
         var tree = sample.Compilation.SyntaxTrees.Single();
         var model = sample.Compilation.GetSemanticModel(tree);
-        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.GetSyntax())).ToImmutableArray();
+        var actualOwnerReferences = owner.DeclaringSyntaxReferences.Select(static item => item.GetSyntax()).ToImmutableArray();
         var astContainer = language == "CSharp" ? actualOwnerReferences.Single()
             : tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.VisualBasic.Syntax.MethodBlockSyntax>().Single();
         var queries = astContainer.DescendantNodes().Where(static node =>
-            node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax)).ToImmutableArray();
+            node is QueryExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.QueryExpressionSyntax).ToImmutableArray();
         Assert.That(queries, Is.Not.Empty);
-        var paths = queries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (IndependentPath(astContainer, query))).ToImmutableArray();
+        var paths = queries.Select(query => IndependentPath(astContainer, query)).ToImmutableArray();
         Assert.That(paths, Is.All.Not.Null);
         bool? queryOwnerAdmitted = language == "CSharp"
-            ? queries.All(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (actualOwnerReferences.Any(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == query.SyntaxTree && reference.Span.Contains(query.Span)))))
+            ? queries.All(query => actualOwnerReferences.Any(reference =>
+                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == query.SyntaxTree && reference.Span.Contains(query.Span))))
             : null;
         var fingerprint = language == "CSharp"
             ? PublicFingerprint(sample.Compilation, ActualEnsures(tree, model), owner, language)
@@ -207,9 +207,9 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
         System.ArgumentNullException.ThrowIfNull(model);
         System.ArgumentNullException.ThrowIfNull(tree);
         return tree.GetRoot().DescendantNodes().Where(static node =>
-                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is InvocationExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.InvocationExpressionSyntax))
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetOperation(node))).OfType<IInvocationOperation>()
-            .Single(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.TargetMethod.Name == "Ensures"));
+                node is InvocationExpressionSyntax or Microsoft.CodeAnalysis.VisualBasic.Syntax.InvocationExpressionSyntax)
+            .Select(node => model.GetOperation(node)).OfType<IInvocationOperation>()
+            .Single(static operation => operation.TargetMethod.Name == "Ensures");
     }
 
     private static FingerprintObservation PublicFingerprint(
@@ -291,7 +291,7 @@ public sealed class SemanticClaimRelativeSyntaxPathObservationTests
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release))
             : VisualBasicCompilation.Create("RelativeSyntaxBaseline", [VisualBasicSyntaxTree.ParseText(source)], references,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

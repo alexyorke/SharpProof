@@ -68,7 +68,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
             ["SP0046"], new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
                 warns ? Is.EqualTo(["SP0046"]) : Is.Empty);
             Assert.That(factory.Outcomes["Target"], Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
         }
@@ -136,7 +136,7 @@ public sealed class AdvisoryEffectDiagnosticsTests
             "effects", ["SP0046"], new SharpProofAnalyzer(factory));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), proven ? Is.Empty : Is.EqualTo(["SP0046"]));
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), proven ? Is.Empty : Is.EqualTo(["SP0046"]));
             Assert.That(factory.Outcomes["Target"],
                 Is.EqualTo(proven ? AnalyzerSemanticOutcome.Proven : AnalyzerSemanticOutcome.Unknown));
         }

@@ -51,7 +51,7 @@ public sealed class FrontendSemanticEdgeCaseTests
 
         Assert.That(results, Has.Length.EqualTo(cases.Length));
         Assert.That(
-            results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)),
+            results.Select(static result => result.Status),
             Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(
                 Environment.NewLine,

@@ -137,7 +137,7 @@ internal sealed class ApiSpecInstantiationCoverageTests
                 Has.Length.EqualTo(postconditions.Length));
             Assert.That(
                 instantiated.Postconditions.Select(
-                    term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetTypeInfo(term.Type).Kind)),
+                    term => factory.GetTypeInfo(term.Type).Kind),
                 Is.All.EqualTo(IrTypeKind.Boolean));
         }
     }
@@ -593,9 +593,9 @@ internal sealed class ApiSpecInstantiationCoverageTests
             NeutralFacets(Evidence),
             [.. postconditions.Select(
                 condition =>
-                    condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(
+                    new SpecPostconditionDeclaration(
                         condition,
-                        Evidence)))]);
+                        Evidence))]);
         return ApiSpecTable.Create([declaration]).Templates.Single();
     }
 

@@ -39,10 +39,10 @@ public sealed partial class DotnetApiInventoryTests
         }
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int " + (incoming ? "Target(System.Collections.Generic.List<int> data)" : opaqueValues ? "Target<T>()" : "Target()") + " { " + body + " } " + helpers + " }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
@@ -57,10 +57,10 @@ public sealed partial class DotnetApiInventoryTests
         ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>? inputs = null;
         if (incoming)
         {
-            var count = lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-                .OfType<IrAssignInstruction>().Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Value)
-                .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
-                .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
+            var count = lowered.Program.Blocks.SelectMany(block => block.Instructions)
+                .OfType<IrAssignInstruction>().Select(instruction => instruction.Value)
+                .OfType<IrBinaryTerm>().Where(term => term.Operator == IrBinaryOperator.BitwiseAnd)
+                .Select(term => term.Left).OfType<IrOpaqueTerm>().First();
             var parameter = context.Parameters.Single().Entry;
             inputs = ImmutableDictionary<ScopedIrId<IrVariableTag>, IrValue>.Empty.Add(
                 parameter, factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
@@ -100,10 +100,10 @@ public sealed partial class DotnetApiInventoryTests
         }
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static T Target<T>(T first, T second) { " + body + " } static void Replace<U>(System.Collections.Generic.IList<U> data) { data[0] = data[1]; } }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,

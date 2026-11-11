@@ -48,8 +48,8 @@ public sealed class HornBooleanDataflowTests
         System.ArgumentNullException.ThrowIfNull(assumptions);
         System.ArgumentNullException.ThrowIfNull(factory);
         System.ArgumentNullException.ThrowIfNull(goal);
-        return new(factory, assumptions.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate,
-            new LoweredJustification(factory.CreateOperation())))),
+        return new(factory, assumptions.Select(predicate => new Assumption(factory, predicate,
+            new LoweredJustification(factory.CreateOperation()))),
             new Goal(factory, goal, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)));
     }
 }

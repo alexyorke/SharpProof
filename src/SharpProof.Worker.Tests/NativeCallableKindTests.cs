@@ -102,7 +102,7 @@ public sealed class NativeCallableKindTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
+        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 
     // A constructor that runs no member initializers or base constructor
@@ -123,7 +123,7 @@ public sealed class NativeCallableKindTests
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(members);
         var preparation = Prepare("public sealed class C { " + members + " }");
-        var outcome = preparation.EffectClaims.Any(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ContractKind == WorkerEffectContractKind.EnforcePure))
+        var outcome = preparation.EffectClaims.Any(static claim => claim.ContractKind == WorkerEffectContractKind.EnforcePure)
             ? (await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome
             : (await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome;
         if (preparation.EffectClaims.Length > 1)
@@ -171,6 +171,6 @@ public sealed class NativeCallableKindTests
         System.ArgumentNullException.ThrowIfNull(type);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + type);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
+        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 }

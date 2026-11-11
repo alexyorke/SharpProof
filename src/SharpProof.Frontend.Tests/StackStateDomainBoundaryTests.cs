@@ -54,8 +54,8 @@ public sealed class StackStateDomainBoundaryTests
         var lowered = new RoslynTotalExpressionLowerer(context, builder, exceptional).LowerBodyValue(operation, entry, depth);
         builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
         var program = builder.Build();
-        Assert.That(program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+        Assert.That(program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.IsStore), Is.Empty);
     }
 
     private static (SemanticModel Model, MethodDeclarationSyntax Syntax, TotalLoweringContext Context) Prepare(string parameters, string body)
@@ -65,7 +65,7 @@ public sealed class StackStateDomainBoundaryTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(" + parameters + ") { " + body + " } static System.Collections.Generic.Stack<int> Get() => null; static int Static => 0; }");
         var compilation = CSharpCompilation.Create("StackDomainBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);

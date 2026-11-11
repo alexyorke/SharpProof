@@ -31,7 +31,7 @@ internal static class NativeResourceExpectedVerifier
         var checkedProgram = NativeResourceProgramVerifier.Verify(program, callableId, owner, bindMetadata, cancellation);
         if (!checkedProgram.Verified)
         { return Unknown(checkedProgram.UnknownReason ?? "ResourceExpectedProgramUnproved"); }
-        if (!owner.CallPreconditions.IsEmpty || owner.Clauses.Any(static clause => clause is null ? throw new ArgumentNullException(nameof(clause)) : clause.Kind == CompilerContractKind.Requires &&
+        if (!owner.CallPreconditions.IsEmpty || owner.Clauses.Any(static clause => clause.Kind == CompilerContractKind.Requires &&
             (clause.Value is not IrBooleanTerm { Value: true } || clause.Safe is not IrBooleanTerm { Value: true })))
         { return Unknown("ResourceInputModelSupportUnproved"); }
         if (metric is not (ResourceCostMetric.LoopBodyEntries or ResourceCostMetric.ArrayAllocations or ResourceCostMetric.AllocatedElements or ResourceCostMetric.AllocatedBytes))

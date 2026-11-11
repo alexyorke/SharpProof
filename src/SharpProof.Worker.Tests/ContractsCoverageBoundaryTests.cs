@@ -46,14 +46,14 @@ public sealed class ContractsCoverageBoundaryTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
+            .Select(syntax => (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!)
             .ToImmutableArray();
-        var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
+        var target = invocations.Single(invocation => invocation.TargetMethod.ContainingType.Name == "ITarget")
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
         var companion = invocations.Single(invocation =>
-                invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
-                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName))
+                invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
+                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName)
             .TargetMethod;
         var targetArgument = (ITypeParameterSymbol)target.TypeArguments.Single();
         var companionArgument = (ITypeParameterSymbol)companion.TypeArguments.Single();
@@ -99,14 +99,14 @@ public sealed class ContractsCoverageBoundaryTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : ((Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!))
+            .Select(syntax => (Microsoft.CodeAnalysis.Operations.IInvocationOperation)model.GetOperation(syntax)!)
             .ToImmutableArray();
-        var target = invocations.Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "ITarget"))
+        var target = invocations.Single(invocation => invocation.TargetMethod.ContainingType.Name == "ITarget")
             .TargetMethod;
         var callerName = distinctCaller ? "CallerRight" : "CallerLeft";
         var companion = invocations.Single(invocation =>
-                invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
-                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName))
+                invocation.TargetMethod.ContainingType.Name == "TargetContracts" &&
+                invocation.Syntax.Ancestors().OfType<ClassDeclarationSyntax>().Single().Identifier.ValueText == callerName)
             .TargetMethod;
         var targetArgument = (ITypeParameterSymbol)target.TypeArguments.Single();
         var companionArgument = (ITypeParameterSymbol)companion.TypeArguments.Single();
@@ -295,8 +295,8 @@ public sealed class ContractsCoverageBoundaryTests
             .GetAnalyzerDiagnosticsAsync();
 
         Assert.That(diagnostics, Has.Length.EqualTo(resultIntrinsic ? 2 : 0),
-            string.Join("\n", diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + ": " +
-                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)))));
+            string.Join("\n", diagnostics.Select(diagnostic => diagnostic.Id + ": " +
+                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture))));
         foreach (var diagnostic in diagnostics)
         {
             Assert.That(diagnostic.Id, Is.EqualTo("SP0024"));

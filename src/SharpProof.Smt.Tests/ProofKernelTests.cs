@@ -165,7 +165,7 @@ internal sealed class ProofKernelTests
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
         Assert.That(
             outcomes.Cast<UnknownOutcome>()
-                .Select(static outcome => outcome is null ? throw new System.ArgumentNullException(nameof(outcome)) : (outcome.Reason)),
+                .Select(static outcome => outcome.Reason),
             Has.All.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
 

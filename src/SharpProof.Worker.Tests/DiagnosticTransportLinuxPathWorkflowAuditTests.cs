@@ -63,7 +63,7 @@ public sealed class DiagnosticTransportLinuxPathWorkflowAuditTests
         using var assemblyImage = new MemoryStream();
         var emitted = compilation.Emit(assemblyImage);
         Assert.That(emitted.Success, Is.True,
-            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ToString()))));
+            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item.ToString())));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("DiagnosticTransportLinuxPathAudit", assemblyImage,
             assembly =>
             {

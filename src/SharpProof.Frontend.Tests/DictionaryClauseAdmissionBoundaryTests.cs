@@ -61,10 +61,10 @@ public sealed class DictionaryClauseAdmissionBoundaryTests
             "var data = new System.Collections.Generic.Dictionary<int, int>(); " + body + " } static int ReadKey() => 1; }");
         var compilation = CSharpCompilation.Create("DictionaryClauseAdmissionBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+            .Single(method => method.Identifier.ValueText == "Target");
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         context.TrackDefaultDictionaries(ControlFlowGraph.Create(syntax, model)!);
         return (model, syntax, context);

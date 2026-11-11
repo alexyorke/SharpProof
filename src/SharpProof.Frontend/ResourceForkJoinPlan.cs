@@ -43,8 +43,7 @@ internal sealed class ResourceForkJoinPlan
             : declaration.Body == null && declaration.ExpressionBody is { } arrow ? model.GetOperation(arrow.Expression, cancellationToken) : null;
         if (method.IsAsync)
         {
-            if (method.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
-                attribute.AttributeClass?.Name == "AsyncMethodBuilderAttribute"))
+            if (method.GetAttributes().Any(static attribute => attribute.AttributeClass?.Name == "AsyncMethodBuilderAttribute"))
             { return null; }
             result = declaration.Body is { Statements.Count: 1 } asyncBody && asyncBody.Statements[0] is ExpressionStatementSyntax expression
                 ? model.GetOperation(expression.Expression, cancellationToken) : result;

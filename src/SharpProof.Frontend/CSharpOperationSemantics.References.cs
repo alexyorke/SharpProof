@@ -191,7 +191,7 @@ internal static partial class CSharpOperationSemantics
             {
                 IArrayTypeSymbol array => ContainsOpenType(array.ElementType, depth + 1),
                 INamedTypeSymbol named => named.IsUnboundGenericType ||
-                    named.TypeArguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (ContainsOpenType(argument, depth + 1))) ||
+                    named.TypeArguments.Any(argument => ContainsOpenType(argument, depth + 1)) ||
                     named.ContainingType != null && ContainsOpenType(named.ContainingType, depth + 1),
                 { TypeKind: TypeKind.Dynamic } => false,
                 _ => true
@@ -237,8 +237,7 @@ internal static partial class CSharpOperationSemantics
         return method.IsStatic && method.Name == "ReferenceEquals" && method.Arity == 0 &&
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_Object && IsFrameworkCollectionMember(method) &&
-            method.Parameters.Length == 2 && method.Parameters.All(parameter => parameter is null ?
-                throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind == RefKind.None &&
+            method.Parameters.Length == 2 && method.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
                 parameter.Type.SpecialType == SpecialType.System_Object);
     }
 
@@ -249,8 +248,8 @@ internal static partial class CSharpOperationSemantics
             method.ReturnType.SpecialType == SpecialType.System_Boolean &&
             method.ContainingType.SpecialType == SpecialType.System_String &&
             method.Parameters.Length == 2 &&
-            method.Parameters.All(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
-                parameter.Type.SpecialType == SpecialType.System_String));
+            method.Parameters.All(static parameter => parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_String);
     }
 
     // The framework's instance string.Equals(string): content equality, with a

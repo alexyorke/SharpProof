@@ -45,7 +45,7 @@ internal sealed partial class WorkerTests
             row => row.Justification,
             row => row.Label);
         var complete = CallableProofCore.Create(proof, labels);
-        Assert.That(complete, Is.EqualTo(labels.Values.OrderBy(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal)));
+        Assert.That(complete, Is.EqualTo(labels.Values.OrderBy(label => label, StringComparer.Ordinal)));
         var incompleteLabels = labels.Remove(proof.Core[0]);
         Assert.That(CallableProofCore.Create(proof, incompleteLabels), Is.Empty);
         Assert.That(plan!.CoreLabels(proof), Is.Not.Empty);

@@ -90,11 +90,9 @@ internal sealed class ExceptionStackTraceRuntimeTests
         { fault = captured; }
         Assert.That(fault, Is.Not.Null);
         var trace = new System.Diagnostics.StackTrace(fault!, false);
-        var count = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
-            frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
+        var count = trace.GetFrames().Count(static frame => frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
         Assert.That(count, Is.EqualTo(1));
-        var wrappers = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
-            frame.GetMethod()?.Name == nameof(DirectSourceForwarderProbe));
+        var wrappers = trace.GetFrames().Count(static frame => frame.GetMethod()?.Name == nameof(DirectSourceForwarderProbe));
         Assert.That(wrappers, Is.LessThanOrEqualTo(forwarded ? 1 : 0));
         Assert.That(count + wrappers, Is.LessThanOrEqualTo(forwarded ? 2 : 1));
     }
@@ -149,7 +147,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var count = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "materializations", int.MaxValue));
         var check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(count, "Linux", layout, cancellation);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 7,
             cancellation), Is.EqualTo(new BigInteger(1792)));
         for (var depth = count.Depth; depth < ResourceExpression.MaximumDepth - 1; depth++)
         { count = ResourceExpression.Add(count, ResourceExpression.One); }
@@ -252,7 +250,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var attempts = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "attempts", int.MaxValue));
         var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(attempts, "Linux", layout, cancellation);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 3,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 3,
             cancellation), Is.EqualTo(new BigInteger(432)));
         for (var depth = attempts.Depth; depth < ResourceExpression.MaximumDepth; depth++)
         { attempts = ResourceExpression.Add(attempts, ResourceExpression.One); }
@@ -321,7 +319,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(conversions,
             new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
         Assert.That(check.UnknownReason, Is.Null);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 7,
             TestContext.CurrentContext.CancellationToken), Is.EqualTo(new BigInteger(952)));
     }
 
@@ -477,7 +475,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         Assert.That(result.UnknownReason, Is.Null);
         Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.TraceBufferModel));
         Assert.That(result.CumulativeUpper!.Evaluate(input =>
-            input is null ? throw new ArgumentNullException(nameof(input)) : values[input.Ordinal], cancellation), Is.EqualTo(expected));
+            values[input.Ordinal], cancellation), Is.EqualTo(expected));
     }
 
     [Test]

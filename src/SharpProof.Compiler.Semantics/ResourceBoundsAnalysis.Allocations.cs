@@ -5,7 +5,7 @@ internal sealed partial class ResourceBoundsAnalysis
     private Cost DelegateCreation(IDelegateCreationOperation creation, int depth)
     {
         creation = ArgumentNullGuard.NotNull(creation, nameof(creation));
-        if (_rootClosures.Values.Any(closure => closure is null ? throw new ArgumentNullException(nameof(closure)) : closure.Matches(creation)))
+        if (_rootClosures.Values.Any(closure => closure.Matches(creation)))
         { return new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate())); }
         if (!CSharpOperationSemantics.IsExplicitDelegateCreation(creation))
         { return Unknown("UnsupportedDelegateAllocation"); }
@@ -16,8 +16,7 @@ internal sealed partial class ResourceBoundsAnalysis
         if (!target.Method.ContainingType.StaticConstructors.IsEmpty)
         { return Unknown("DelegateTypeInitializationUnknown"); }
         if (target.Method.IsExtern || target.Method.DeclaringSyntaxReferences.IsEmpty || _compilation is null ||
-            target.Method.DeclaringSyntaxReferences.Any(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-                !_compilation.ContainsSyntaxTree(reference.SyntaxTree)))
+            target.Method.DeclaringSyntaxReferences.Any(reference => !_compilation.ContainsSyntaxTree(reference.SyntaxTree)))
         { return Unknown("DelegateTargetBindingUnknown"); }
         return receiver.Add(new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate())));
     }
@@ -27,8 +26,8 @@ internal sealed partial class ResourceBoundsAnalysis
         creation = ArgumentNullGuard.NotNull(creation, nameof(creation));
         if (CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
         {
-            var stringArguments = Sequence(creation.Arguments.Select(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Value), depth + 1);
-            var count = creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 1).Value;
+            var stringArguments = Sequence(creation.Arguments.Select(static argument => argument.Value), depth + 1);
+            var count = creation.Arguments.Single(static argument => argument.Parameter!.Ordinal == 1).Value;
             var size = Size(count, charged: true);
             if (size is null)
             { return Unknown("UnsupportedStringAllocationSize"); }
@@ -42,15 +41,13 @@ internal sealed partial class ResourceBoundsAnalysis
         if (_compilation is null || creation.Type is not INamedTypeSymbol { TypeKind: TypeKind.Class } type ||
             type.IsRecord || type.IsAnonymousType || type.IsGenericType || type.IsComImport || type.BaseType?.SpecialType != SpecialType.System_Object ||
             type.DeclaringSyntaxReferences.IsEmpty || creation.Constructor is not { } constructor ||
-            constructor.Parameters.Any(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                parameter.RefKind != RefKind.None || !SupportedType(parameter.Type)))
+            constructor.Parameters.Any(static parameter => parameter.RefKind != RefKind.None || !SupportedType(parameter.Type)))
         { return Unknown("UnsupportedManagedConstructor"); }
         if (!type.StaticConstructors.IsEmpty)
         { return Unknown("ConstructorTypeInitializationUnknown"); }
         if (_activeMethods.Contains(constructor))
         { return Unknown("RecursiveConstructorCostUnknown"); }
-        if (type.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
-            attribute.AttributeClass is
+        if (type.GetAttributes().Any(static attribute => attribute.AttributeClass is
             {
                 MetadataName: "StructLayoutAttribute", ContainingType: null,
                 ContainingNamespace:
@@ -92,11 +89,9 @@ internal sealed partial class ResourceBoundsAnalysis
                 if (property.IsIndexer || property.DeclaringSyntaxReferences.Length != 1 ||
                     property.DeclaringSyntaxReferences[0].GetSyntax(_cancellation) is not PropertyDeclarationSyntax declaration ||
                     declaration.ExpressionBody is not null || declaration.Modifiers.Any(SyntaxKind.PartialKeyword) ||
-                    declaration.AccessorList is not { } accessors || accessors.Accessors.Any(static accessor => accessor is null ? throw new ArgumentNullException(nameof(accessor)) :
-                        accessor.Body is not null || accessor.ExpressionBody is not null))
+                    declaration.AccessorList is not { } accessors || accessors.Accessors.Any(static accessor => accessor.Body is not null || accessor.ExpressionBody is not null))
                 { return Unknown("UnsupportedManagedLayout"); }
-                if (!members.OfType<IFieldSymbol>().Any(field => field is null ? throw new ArgumentNullException(nameof(field)) :
-                    SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
+                if (!members.OfType<IFieldSymbol>().Any(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
                 {
                     var storage = FieldStorage(property.Type);
                     if (storage == ResourceStorageKind.Unspecified)

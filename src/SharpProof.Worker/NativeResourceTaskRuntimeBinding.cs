@@ -38,7 +38,7 @@ internal static class NativeResourceTaskRuntimeBinding
             cancellation.ThrowIfCancellationRequested();
             ids.Add(ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration));
         }
-        if (target.Entry.Assumptions.IsDefault || ids.Any(id => id is null ? throw new ArgumentNullException(nameof(id)) : target.Entry.Assumptions.Count(assumption =>
+        if (target.Entry.Assumptions.IsDefault || ids.Any(id => target.Entry.Assumptions.Count(assumption =>
                 assumption is not null && assumption.Id == id && assumption.Kind == WorkerAssumptionKind.UserAssume && !assumption.Used) != 1))
         { return Unknown("TaskRuntimeAssumptionsNotBound"); }
         var quantities = ImmutableArray.CreateBuilder<WorkerResourceTaskRuntimeQuantityEvidence>(declarations.Quantities.Length);
@@ -85,7 +85,7 @@ internal static class NativeResourceTaskRuntimeBinding
             result.Outcome != WorkerClaimOutcome.Proven || result.ResourceBound is null)
         { throw new ArgumentException("Conditional runtime publication requires complete bound premises and a proof.", nameof(binding)); }
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used)
-            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id), StringComparer.Ordinal)
+            .Select(static assumption => assumption.Id), StringComparer.Ordinal)
         { evidence.DeploymentAssumptionId };
         foreach (var quantity in evidence.Quantities)
         { used.Add(quantity.AssumptionId); }

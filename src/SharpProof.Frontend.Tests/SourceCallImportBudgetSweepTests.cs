@@ -27,8 +27,7 @@ public sealed class SourceCallImportBudgetSweepTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "source-call-budget-sweep.cs");
         var compilation = CSharpCompilation.Create("SourceCallBudgetSweep", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) :
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
@@ -40,8 +39,8 @@ public sealed class SourceCallImportBudgetSweepTests
             Assert.That(runtime.GetMethod("Target")!.Invoke(null, [17]), Is.EqualTo(19));
             var model = compilation.GetSemanticModel(tree);
             var declarations = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
-            var target = declarations.Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
-            var helper = declarations.Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Helper");
+            var target = declarations.Single(method => method.Identifier.ValueText == "Target");
+            var helper = declarations.Single(method => method.Identifier.ValueText == "Helper");
             var targetSymbol = model.GetDeclaredSymbol(target)!;
             var helperSymbol = model.GetDeclaredSymbol(helper)!;
             var graph = ControlFlowGraph.Create(target, model)!;
@@ -59,7 +58,7 @@ public sealed class SourceCallImportBudgetSweepTests
                     Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
                     Assert.That(binding.Clauses, Has.Length.EqualTo(8));
                     candidate.SourceCallPreconditions = [.. binding.Clauses.Select(clause =>
-                        clause is null ? throw new ArgumentNullException(nameof(clause)) : new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
+                        new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
                     return true;
                 }
                 var session = new TotalSourceCallSession(compilation, Prepare, null, default);

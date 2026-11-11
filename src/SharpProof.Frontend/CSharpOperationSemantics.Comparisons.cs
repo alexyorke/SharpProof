@@ -38,8 +38,8 @@ internal static partial class CSharpOperationSemantics
             method.ReturnType.SpecialType == SpecialType.System_Int32 &&
             method.ContainingType.OriginalDefinition.GetDocumentationCommentId() == "T:System.Collections.Generic.Comparer`1" &&
             IsFrameworkCollectionMember(method) &&
-            method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
-                SymbolEqualityComparer.Default.Equals(parameter.Type, method.ContainingType.TypeArguments[0])));
+            method.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
+                SymbolEqualityComparer.Default.Equals(parameter.Type, method.ContainingType.TypeArguments[0]));
     }
 
     internal static bool IsComparisonIntegerType(ITypeSymbol? type)

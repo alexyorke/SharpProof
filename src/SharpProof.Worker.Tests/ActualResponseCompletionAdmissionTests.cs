@@ -37,7 +37,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         // Neither response is mutated or enrolled as evidence for the other target.
         var rejected = WorkerProtocolJson.Validate(actual, otherHash, other.Snapshot.CompilerManifest.Manifest);
         Assert.That(rejected.IsValid, Is.False);
-        Assert.That(rejected.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("response.input_mismatch"));
+        Assert.That(rejected.Errors.Select(error => error.Code), Does.Contain("response.input_mismatch"));
         Assert.That(WorkerProtocolJson.SerializeCanonicalResponse(actual), Is.EqualTo(actualJson));
         using var projectBoundary = new CancellationTokenSource();
         projectBoundary.CancelAfter(other.Request.Budgets.ProjectWallTimeMilliseconds);
@@ -57,13 +57,13 @@ public sealed class ActualResponseCompletionAdmissionTests
         Assert.That(fallback.InputHash, Is.EqualTo(otherHash));
         Assert.That(fallback.Manifest, Is.SameAs(other.Snapshot.CompilerManifest.Manifest));
         Assert.That(fallback.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Rejected));
-        Assert.That(fallback.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Is.EqualTo(rejected.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(fallback.Errors.Select(error => error.Code), Is.EqualTo(rejected.Errors.Select(error => error.Code)));
         Assert.That(fallback.CallableResults, Has.Length.EqualTo(other.Snapshot.Callables.Length));
         foreach (var callable in fallback.CallableResults)
         {
             Assert.That(callable.Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(callable.Reason, Is.EqualTo(WorkerCallableCoverageReason.MissingClaimResult));
-            Assert.That(other.Snapshot.Callables.Any(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId == callable.CallableId)), Is.True);
+            Assert.That(other.Snapshot.Callables.Any(target => target.Entry.CallableId == callable.CallableId), Is.True);
         }
         Assert.That(fallback.ClaimResults, Has.Length.EqualTo(other.Snapshot.CompilerManifest.Manifest.Claims.Length));
         foreach (var claim in fallback.ClaimResults)
@@ -73,11 +73,11 @@ public sealed class ActualResponseCompletionAdmissionTests
             Assert.That(claim.ProofCore, Is.Empty);
             Assert.That(claim.Model, Is.Empty);
             Assert.That(claim.EffectWitness, Is.Null);
-            Assert.That(claim.Assumptions.All(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (!assumption.Used)), Is.True);
+            Assert.That(claim.Assumptions.All(assumption => !assumption.Used), Is.True);
         }
         Assert.That(WorkerProtocolJson.SerializeCanonicalResponse(actual), Is.EqualTo(actualJson));
         var validation = WorkerProtocolJson.Validate(fallback, otherHash, other.Snapshot.CompilerManifest.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
         var json = WorkerProtocolJson.SerializeCanonicalResponse(fallback);
         var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
             ?? throw new AssertionException("The canonical malformed fallback did not deserialize.");
@@ -108,7 +108,7 @@ public sealed class ActualResponseCompletionAdmissionTests
         var otherHash = other.Bind().InputHash;
         var foreignValidation = WorkerProtocolJson.Validate(actual, otherHash, other.Snapshot.CompilerManifest.Manifest);
         Assert.That(foreignValidation.IsValid, Is.False);
-        Assert.That(foreignValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("response.input_mismatch"));
+        Assert.That(foreignValidation.Errors.Select(error => error.Code), Does.Contain("response.input_mismatch"));
         // This new raw completion profile is fixed before its clock starts.
         // Native controls above retain their original 10s/300s defaults.
         var profile = new WorkerBudgets
@@ -123,7 +123,7 @@ public sealed class ActualResponseCompletionAdmissionTests
             ?? throw new AssertionException("The actual owned request did not deserialize.");
         { profileRequest = profileRequest with { Budgets = profile }; }
         var profileValidation = WorkerProtocolJson.Validate(profileRequest);
-        Assert.That(profileValidation.IsValid, Is.True, string.Join(", ", profileValidation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(profileValidation.IsValid, Is.True, string.Join(", ", profileValidation.Errors.Select(error => error.Code)));
         var requestHash = WorkerProtocolJson.ComputeRequestHash(profileRequest);
         using var projectBoundary = new CancellationTokenSource();
         var started = Stopwatch.GetTimestamp();

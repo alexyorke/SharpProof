@@ -196,8 +196,8 @@ SOFTWARE.
                 cancellationToken)
             .ConfigureAwait(false);
         var verdicts = observations.ToImmutableDictionary(
-            static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId),
-            static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.Verdict),
+            static observation => observation.CaseId,
+            static observation => observation.Verdict,
             StringComparer.Ordinal);
         var methods = provisionalMethods
             .Select(method => method with
@@ -218,8 +218,8 @@ SOFTWARE.
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var unreviewedMethods = methods
             .Where(static method =>
-                method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support == CorpusSupport.Unspecified))
-            .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))
+                method.Support == CorpusSupport.Unspecified)
+            .Select(static method => method.Id)
             .ToImmutableArray();
         if (unreviewedMethods.Length != 0)
         {
@@ -296,8 +296,8 @@ SOFTWARE.
             .ConfigureAwait(false);
         foreach (var relativePath in trackedPaths
                      .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                     .Where(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path.EndsWith(".cs", StringComparison.Ordinal)))
-                     .OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.Ordinal))
+                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
+                     .OrderBy(static path => path, StringComparer.Ordinal))
         {
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 Encoding.UTF8.GetString(
@@ -321,7 +321,7 @@ SOFTWARE.
             foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
                          .DescendantNodes()
                          .OfType<MethodDeclarationSyntax>()
-                         .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.SpanStart)))
+                         .OrderBy(static method => method.SpanStart))
             {
                 if (!IsCandidate(method))
                 {
@@ -373,9 +373,9 @@ SOFTWARE.
 
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         var byFile = candidates
-            .GroupBy(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path), StringComparer.Ordinal)
-            .OrderBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
-            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()))
+            .GroupBy(static candidate => candidate.Path, StringComparer.Ordinal)
+            .OrderBy(static group => group.Key, StringComparer.Ordinal)
+            .Select(static group => group.ToImmutableArray())
             .ToImmutableArray();
         ValidateCapacity(count);
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1512:Use ArgumentOutOfRangeException throw helper",
@@ -416,7 +416,7 @@ SOFTWARE.
         }
 
         var fileCount = selected
-            .Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path))
+            .Select(static candidate => candidate.Path)
             .Distinct(StringComparer.Ordinal)
             .Count();
         if (fileCount < OpenSourceCorpusCatalog.MinimumSourceFileCount)

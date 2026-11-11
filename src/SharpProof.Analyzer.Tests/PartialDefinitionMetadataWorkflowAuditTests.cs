@@ -42,7 +42,7 @@ public sealed class PartialDefinitionMetadataWorkflowAuditTests
             System.ArgumentNullException.ThrowIfNull(assembly);
             var method = assembly.GetType("Subject", throwOnError: true)!.GetMethod("Run", BindingFlags.Static | BindingFlags.Public)!;
             var emittedAttribute = method.CustomAttributes.Single(item =>
-                item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.AttributeType == typeof(SharpProof.Attributes.EffectContractAttribute)));
+                item.AttributeType == typeof(SharpProof.Attributes.EffectContractAttribute));
             Assert.That(emittedAttribute.ConstructorArguments.Single().Value, Is.EqualTo(1L << 40));
         });
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null,

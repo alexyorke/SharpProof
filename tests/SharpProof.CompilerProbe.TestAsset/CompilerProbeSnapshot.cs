@@ -32,9 +32,9 @@ internal static class CompilerProbeSnapshot
         internal PropertyInfo? Value { get; } = (referenceType is null ? throw new System.ArgumentNullException(nameof(referenceType)) : referenceType
             .GetProperties(InstanceMemberFlags)
             .SingleOrDefault(static candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == "Compilation" &&
+                candidate.Name == "Compilation" &&
                 typeof(CSharpCompilation).IsAssignableFrom(
-                    candidate.PropertyType))));
+                    candidate.PropertyType)));
     }
 
     private sealed class ReferenceIdentityComparer : IEqualityComparer<object>
@@ -104,7 +104,7 @@ internal static class CompilerProbeSnapshot
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var options = compilation.Options;
         var parseOptions = compilation.SyntaxTrees
-            .Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Options))
+            .Select(static tree => tree.Options)
             .OfType<CSharpParseOptions>()
             .ToImmutableArray();
         var languageVersions = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
@@ -130,7 +130,7 @@ internal static class CompilerProbeSnapshot
             options.Deterministic);
         json.StringArray(
 "languageVersions",
-            languageVersions.ToImmutable().OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
+            languageVersions.ToImmutable().OrderBy(static value => value, StringComparer.Ordinal));
         json.String(
 "mainTypeName",
             options.MainTypeName ?? string.Empty);
@@ -148,16 +148,16 @@ internal static class CompilerProbeSnapshot
             options.Platform.ToString());
         json.StringArray(
 "preprocessorSymbols",
-            preprocessorSymbols.ToImmutable().OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
+            preprocessorSymbols.ToImmutable().OrderBy(static value => value, StringComparer.Ordinal));
         json.StringArray(
 "specifiedLanguageVersions",
             specifiedLanguageVersions.ToImmutable().OrderBy(
-                static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value),
+                static value => value,
                 StringComparer.Ordinal));
         json.StringArray(
 "usings",
             options.Usings.OrderBy(
-                static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value),
+                static value => value,
                 StringComparer.Ordinal));
     }
 
@@ -183,13 +183,13 @@ internal static class CompilerProbeSnapshot
                     CompilerProbeContract.OutputPathOptionKey))
         ]);
         rows.AddRange(context.Options.AdditionalFiles.Select(file =>
-            file is null ? throw new System.ArgumentNullException(nameof(file)) : (CreateOptionRow(
+            CreateOptionRow(
                 CompilerProbeContract.AdditionalFileMetadataOptionKey,
                 NormalizePath(file.Path),
                 GetOption(
                     provider.GetOptions(file),
-                    CompilerProbeContract.AdditionalFileMetadataOptionKey)))));
-        return rows.ToImmutable().OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal);
+                    CompilerProbeContract.AdditionalFileMetadataOptionKey))));
+        return rows.ToImmutable().OrderBy(static row => row, StringComparer.Ordinal);
     }
 
     private static string CreateOptionRow(
@@ -274,17 +274,17 @@ internal static class CompilerProbeSnapshot
         return tree.GetRoot(cancellationToken)
             .DescendantNodesAndSelf()
             .Where(static node =>
-                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is BaseTypeDeclarationSyntax or
+                node is BaseTypeDeclarationSyntax or
                     DelegateDeclarationSyntax or
                     BaseMethodDeclarationSyntax or
                     PropertyDeclarationSyntax or
-                    EventDeclarationSyntax))
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (model.GetDeclaredSymbol(node, cancellationToken)))
+                    EventDeclarationSyntax)
+            .Select(node => model.GetDeclaredSymbol(node, cancellationToken))
             .Where(static symbol => symbol != null)
-            .Select(static symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol!.ToDisplayString(
-                SymbolDisplayFormat.CSharpErrorMessageFormat)))
+            .Select(static symbol => symbol!.ToDisplayString(
+                SymbolDisplayFormat.CSharpErrorMessageFormat))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal);
+            .OrderBy(static value => value, StringComparer.Ordinal);
     }
 
     private static void AppendParseOptions(
@@ -312,7 +312,7 @@ internal static class CompilerProbeSnapshot
         json.StringArray(
 "preprocessorSymbols",
             options.PreprocessorSymbolNames.OrderBy(
-                static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value),
+                static value => value,
                 StringComparer.Ordinal));
         json.String(
 "specifiedLanguageVersion",
@@ -336,11 +336,11 @@ internal static class CompilerProbeSnapshot
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return compilation.References
             .Select(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (CreateReferenceRow(
+                CreateReferenceRow(
                     compilation,
                     reference,
-                    cancellationToken)))
-            .OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal);
+                    cancellationToken))
+            .OrderBy(static row => row, StringComparer.Ordinal);
     }
 
     private static string CreateReferenceRow(
@@ -374,7 +374,7 @@ internal static class CompilerProbeSnapshot
         json.StringArray(
 "aliases",
             reference.Properties.Aliases.OrderBy(
-                static alias => alias is null ? throw new System.ArgumentNullException(nameof(alias)) : (alias),
+                static alias => alias,
                 StringComparer.Ordinal));
         json.String(
 "assemblyOrModuleIdentity",
@@ -408,7 +408,7 @@ internal static class CompilerProbeSnapshot
         json.StringArray(
 "aliases",
             reference.Properties.Aliases.OrderBy(
-                static alias => alias is null ? throw new System.ArgumentNullException(nameof(alias)) : (alias),
+                static alias => alias,
                 StringComparer.Ordinal));
         json.String(
 "assemblyOrModuleIdentity",
@@ -443,7 +443,7 @@ internal static class CompilerProbeSnapshot
         var metadata = reference.GetMetadata();
         var image = PortableImageMethods.GetValue(
             metadata.GetType(),
-            static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (new PortableImageMethod(type)))
+            static type => new PortableImageMethod(type))
             .Value?.Invoke(metadata, null);
         if (image is null)
         {
@@ -536,7 +536,7 @@ internal static class CompilerProbeSnapshot
     {
         var property = CompilationProperties.GetValue(
             reference.GetType(),
-            static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (new CompilationProperty(type)))
+            static type => new CompilationProperty(type))
             .Value;
         return property?.GetValue(reference) as CSharpCompilation ??
             throw new InvalidOperationException(
@@ -602,7 +602,7 @@ internal static class CompilerProbeSnapshot
                     ProbeHash.Text(text));
                 return json.Complete();
             })
-            .OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal);
+            .OrderBy(static row => row, StringComparer.Ordinal);
     }
 
     private static SourceText GetStableAdditionalText(

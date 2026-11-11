@@ -81,7 +81,7 @@ internal sealed partial class NativeSpecifiedCallTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var syntax = (await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken)).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+            .Single(method => method.Identifier.ValueText == "Target");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,

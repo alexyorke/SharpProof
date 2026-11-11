@@ -315,7 +315,7 @@ internal sealed class CoreIrAdvisoryInterpreter
             {
                 return Incomplete("marker budget");
             }
-            var owned = ImmutableDictionaryCapture.Create(_program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>(), assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Id), assign => assign ?? throw new ArgumentNullException(nameof(assign)));
+            var owned = ImmutableDictionaryCapture.Create(_program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>(), assign => assign.Id, assign => assign ?? throw new ArgumentNullException(nameof(assign)));
             var selected = ImmutableDictionary.CreateBuilder<IrInstructionId, IrAssignInstruction>();
             foreach (var marker in markers)
             {
@@ -357,7 +357,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                     }
 
                     var edgeId = blocks.Count;
-                    blocks.Add(new(edgeId, state => state is null ? throw new System.ArgumentNullException(nameof(state)) : (RefineEdge(state, branch.Condition, truth))));
+                    blocks.Add(new(edgeId, state => RefineEdge(state, branch.Condition, truth)));
                     edges.Add(new(from, edgeId));
                     edges.Add(new(edgeId, ids[target]));
                 }
@@ -389,7 +389,7 @@ internal sealed class CoreIrAdvisoryInterpreter
                 return Incomplete("aggregate term work budget");
             }
         }
-        return new(result!.InputStates, result.OutputStates, [.. _gaps.ToImmutable().OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], result.Iterations)
+        return new(result!.InputStates, result.OutputStates, [.. _gaps.ToImmutable().OrderBy(static gap => gap, StringComparer.Ordinal)], result.Iterations)
         {
             Markers = _markerSnapshots == null ? [] : _markerSnapshots.ToImmutable()
         };
@@ -398,7 +398,7 @@ internal sealed class CoreIrAdvisoryInterpreter
     {
         reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
         AddGap(reason);
-        return new([], [], [.. _gaps.ToImmutable().OrderBy(static gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap), StringComparer.Ordinal)], 0, Accepted: false);
+        return new([], [], [.. _gaps.ToImmutable().OrderBy(static gap => gap, StringComparer.Ordinal)], 0, Accepted: false);
     }
     private void AddGap(string reason)
     {

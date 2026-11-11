@@ -54,9 +54,9 @@ public sealed class NativeTotalCandidateCoreTests
         {
             // The typed owned program is legal builder input, but its declared
             // callable result cannot be coupled to the actual return type.
-            Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(TwoOrdinals));
-            Assert.That(run.Checks.All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Enrolled && !check.Checked && !check.ProjectAssumptions &&
-                check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
+            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(TwoOrdinals));
+            Assert.That(run.Checks.All(check => !check.Enrolled && !check.Checked && !check.ProjectAssumptions &&
+                check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
             Assert.That(run.Entries, Is.Empty);
             Assert.That(run.Consumed, Is.Zero);
         }
@@ -144,9 +144,9 @@ public sealed class NativeTotalCandidateCoreTests
             Assert.That(run.Entries, Has.Length.EqualTo(1));
             Assert.That(run.Entries[0].Outcome, Is.Null);
             Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
-            Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(TwoOrdinals));
-            Assert.That(run.Checks.All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (!check.Enrolled && !check.Checked &&
-                check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedExpression)), Is.True);
+            Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(TwoOrdinals));
+            Assert.That(run.Checks.All(check => !check.Enrolled && !check.Checked &&
+                check.Evidence.Outcome == null && check.Evidence.Reason == WorkerClaimReason.UnsupportedExpression), Is.True);
             Assert.That(run.Consumed, Is.Zero);
         }
         else
@@ -161,9 +161,9 @@ public sealed class NativeTotalCandidateCoreTests
     {
         var candidate = DepthCandidate(safety, beyond, requires: false);
         var run = await RunAsync(candidate);
-        Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(InitialAndFinalOrdinals));
-        Assert.That(run.Checks.Take(2).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
-            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
+        Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(InitialAndFinalOrdinals));
+        Assert.That(run.Checks.Take(2).All(check => check.Enrolled && !check.Checked &&
+            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
         Assert.That(run.Checks[2].Checked, Is.True);
         Assert.That(run.Checks[2].Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(run.Checks[2].Evidence.Reason, Is.EqualTo(WorkerClaimReason.None));
@@ -213,8 +213,8 @@ public sealed class NativeTotalCandidateCoreTests
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
         var checks = checkBuilder.ToImmutable();
         Assert.That(checks, Has.Length.EqualTo(stage == "before" ? 0 : stage == "enrolled" ? 1 : 3));
-        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Length).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
-            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
+        Assert.That(checks.Take(stage == "checked" ? 2 : checks.Length).All(check => check.Enrolled && !check.Checked &&
+            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
         if (stage == "checked")
         {
             Assert.That(checks[2].Ordinal, Is.Zero);
@@ -234,8 +234,8 @@ public sealed class NativeTotalCandidateCoreTests
             "Contract.Ensures(Contract.Result<int>() == x / divisor); Contract.Ensures(Contract.Result<int>() >= 0); return x / divisor; } }");
         var total = preparation.Total!;
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var requires = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
-        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
+        var requires = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires).ToImmutableArray();
+        var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
         Assert.That(requires, Has.Length.EqualTo(3));
         Assert.That(ensures, Has.Length.EqualTo(2));
         Assert.That(candidate.Requires, Has.Length.EqualTo(requires.Length));
@@ -271,14 +271,14 @@ public sealed class NativeTotalCandidateCoreTests
         }, null, cancellation.Token, session, resource, () => session.ConsumedResourceCount)));
         var checks = checkBuilder.ToImmutable();
         Assert.That(checks, Has.Length.EqualTo(3));
-        Assert.That(checks.Take(2).Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.ClaimId)), Is.EqualTo(preparation.Entry.ClaimIds));
-        Assert.That(checks.Take(2).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
-            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
+        Assert.That(checks.Take(2).Select(check => check.ClaimId), Is.EqualTo(preparation.Entry.ClaimIds));
+        Assert.That(checks.Take(2).All(check => check.Enrolled && !check.Checked &&
+            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
         Assert.That(checks[2].ClaimId, Is.EqualTo(preparation.Entry.ClaimIds[0]));
         Assert.That(checks[2].Evidence.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(checks[2].Evidence.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(checks[2].Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)),
-            Is.EqualTo(preparation.Entry.Assumptions.OrderBy(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), StringComparer.Ordinal).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id))));
+        Assert.That(checks[2].Assumptions.Select(assumption => assumption.Id),
+            Is.EqualTo(preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).Select(assumption => assumption.Id)));
         Assert.That(session.ConsumedResourceCount, Is.GreaterThan(0));
     }
 
@@ -340,12 +340,12 @@ public sealed class NativeTotalCandidateCoreTests
     private static void AssertInitialAndProven(CoreRun run, int count)
     {
         System.ArgumentNullException.ThrowIfNull(run);
-        Assert.That(run.Checks.Select(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Ordinal)), Is.EqualTo(Enumerable.Range(0, count).Concat(Enumerable.Range(0, count))));
-        Assert.That(run.Checks.Take(count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && !check.Checked &&
-            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody)), Is.True);
-        Assert.That(run.Checks.Skip(count).All(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled && check.Checked && check.ProjectAssumptions &&
+        Assert.That(run.Checks.Select(check => check.Ordinal), Is.EqualTo(Enumerable.Range(0, count).Concat(Enumerable.Range(0, count))));
+        Assert.That(run.Checks.Take(count).All(check => check.Enrolled && !check.Checked &&
+            check.Evidence.Reason == WorkerClaimReason.UnsupportedBody), Is.True);
+        Assert.That(run.Checks.Skip(count).All(check => check.Enrolled && check.Checked && check.ProjectAssumptions &&
             check.Evidence.Outcome is ProvenOutcome && check.Evidence.Reason == WorkerClaimReason.None &&
-            check.Feasibility == PassiveCallableFeasibilityKind.Feasible && check.Vacuity == WorkerVacuityKind.None)), Is.True);
+            check.Feasibility == PassiveCallableFeasibilityKind.Feasible && check.Vacuity == WorkerVacuityKind.None), Is.True);
         Assert.That(run.Entries, Has.Length.EqualTo(1));
         Assert.That(run.Entries[0].Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(run.Entries[0].Reason, Is.EqualTo(WorkerClaimReason.None));

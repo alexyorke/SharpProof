@@ -161,7 +161,7 @@ internal sealed class ContractBinder
         return implementationBody == null
             ? ImmutableInterlocked.GetOrAdd(ref cache,
                 target,
-                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (BindCore(value, null, requiresOnly, cancellationToken)))
+                value => BindCore(value, null, requiresOnly, cancellationToken))
             : BindCore(target, implementationBody, requiresOnly, cancellationToken);
     }
 
@@ -253,9 +253,9 @@ internal sealed class ContractBinder
     {
         inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return inventory.Clauses.Any(static clause =>
-            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires &&
+            clause.Kind == BoundContractKind.Requires &&
             !clause.IsValid &&
-            clause.Placement != ContractClausePlacement.NestedCallable));
+            clause.Placement != ContractClausePlacement.NestedCallable);
     }
 
     // Classifies the valid contract invocations without lowering their

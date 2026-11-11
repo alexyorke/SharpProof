@@ -25,7 +25,7 @@ internal sealed partial class WorkerTests
             }
             """;
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        var target = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.EffectClaims.Length != 0));
+        var target = artifact.Callables.Single(callable => callable.EffectClaims.Length != 0);
         Assert.That(target.Total, Is.Not.Null);
         Assert.That(target.Total!.EffectsCompleteAtEntry, Is.EqualTo(readonlyState));
 

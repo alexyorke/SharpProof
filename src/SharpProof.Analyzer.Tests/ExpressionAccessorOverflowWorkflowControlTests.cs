@@ -37,7 +37,7 @@ public sealed class ExpressionAccessorOverflowWorkflowControlTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0046", "SP0047"],
             filePath: "OverflowSubject.cs");
         Assert.That(compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var declaration = root.DescendantNodes().OfType<PropertyDeclarationSyntax>().Single();

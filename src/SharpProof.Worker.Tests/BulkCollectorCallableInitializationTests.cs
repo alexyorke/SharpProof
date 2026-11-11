@@ -44,7 +44,7 @@ public sealed class BulkCollectorCallableInitializationTests
             Assert.That(field.Type.SpecialType, Is.EqualTo(SpecialType.System_Int32));
             Assert.That(fieldDeclaration, Is.TypeOf<SingleVariableDesignationSyntax>());
             Assert.That(owner.GetMembers().OfType<IFieldSymbol>(), Does.Contain(field));
-            Assert.That(owner.StaticConstructors.All(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.IsImplicitlyDeclared)), Is.True);
+            Assert.That(owner.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared), Is.True);
         }
 
         using var image = new MemoryStream();

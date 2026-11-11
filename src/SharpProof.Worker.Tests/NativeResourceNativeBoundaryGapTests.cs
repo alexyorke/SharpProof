@@ -183,17 +183,15 @@ internal sealed partial class NativeResourceContractTests
         var evidence = result.ResourceBound.RuntimePremises!;
         Assert.That(evidence, Is.Not.Null);
         Assert.That(evidence.Quantities, Has.Length.EqualTo(11));
-        Assert.That(evidence.Quantities.Select(static quantity => quantity is null ? throw new ArgumentNullException(nameof(quantity)) : quantity.UpperBound),
+        Assert.That(evidence.Quantities.Select(static quantity => quantity.UpperBound),
             Is.EqualTo(BoundaryRuntimeQuantities));
         var declarations = target.ForkJoinProjection!.RuntimePremises!.Inventory!.Declarations;
-        var usedIds = declarations.Quantities.Select(declaration => declaration is null ? throw new ArgumentNullException(nameof(declaration)) :
-            ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration)).ToHashSet(StringComparer.Ordinal);
+        var usedIds = declarations.Quantities.Select(declaration => ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration)).ToHashSet(StringComparer.Ordinal);
         usedIds.Add(ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations));
         Assert.That(usedIds, Has.Count.EqualTo(12));
-        usedIds.UnionWith(result.ResourceBound.MetadataAssumptions.Select(static dependency => dependency is null
-            ? throw new ArgumentNullException(nameof(dependency)) : dependency.AssumptionId));
+        usedIds.UnionWith(result.ResourceBound.MetadataAssumptions.Select(static dependency => dependency.AssumptionId));
         Assert.That(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used)
-            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id), Is.EquivalentTo(usedIds));
+            .Select(static assumption => assumption.Id), Is.EquivalentTo(usedIds));
         Assert.That(result.ProofCore, Does.Contain("resource-task-runtime-model:" + NativeTaskRuntimeCostVerifier.Model));
         Assert.That(result.ProofCore, Does.Contain("resource-runtime-premise-record:" + WorkerProtocolJson.RuntimePremiseRecordSha256(evidence)));
         Assert.That(result.ResourceBound.ObservedLowerBound, Is.Null);

@@ -183,7 +183,7 @@ internal sealed class AnalyzerSession
     internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
     {
         return [.. _selectedSemicolonAccessors.Keys
-            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!_semanticOutcomes.ContainsKey(method)))
+            .Where(method => !_semanticOutcomes.ContainsKey(method))
             .Select(static method =>
             {
                 method = RepositoryParameterGuard.NotNull(method, nameof(method));
