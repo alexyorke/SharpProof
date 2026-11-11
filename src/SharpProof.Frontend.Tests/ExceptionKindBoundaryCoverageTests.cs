@@ -133,9 +133,9 @@ public sealed class ExceptionKindBoundaryCoverageTests
     public void MetadataNameRejectsUndefinedKindAndPreservesCanonicalOverflowName()
     {
         var error = Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
-            CSharpOperationSemantics.ExceptionMetadataName((IrExceptionKind)int.MaxValue)));
+            IrExceptionKindFacts.MetadataName((IrExceptionKind)int.MaxValue)));
         Assert.That(error!.ParamName, Is.EqualTo("kind"));
-        Assert.That(CSharpOperationSemantics.ExceptionMetadataName(IrExceptionKind.Overflow),
+        Assert.That(IrExceptionKindFacts.MetadataName(IrExceptionKind.Overflow),
             Is.EqualTo("System.OverflowException"));
     }
 

@@ -61,7 +61,6 @@ internal sealed class CompilerSpecificationMethodBinding(
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var identity = assembly.Identity;
-        var token = identity.PublicKeyToken.IsDefaultOrEmpty ? string.Empty : HashEncoding.ToLowerHex(identity.PublicKeyToken);
-        return approved.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == identity.Name && candidate.PublicKeyToken == token));
+        return approved.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ApiSpecAssemblyMatching.Matches(candidate, identity));
     }
 }

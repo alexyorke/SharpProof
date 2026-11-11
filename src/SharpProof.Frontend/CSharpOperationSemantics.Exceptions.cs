@@ -5,23 +5,6 @@ internal static partial class CSharpOperationSemantics
     private static readonly ImmutableArray<IrExceptionKind> RuntimeExceptionKinds =
         Enum.GetValues(typeof(IrExceptionKind)).Cast<IrExceptionKind>().ToImmutableArray();
 
-    internal static string ExceptionMetadataName(IrExceptionKind kind)
-    {
-        return kind switch
-        {
-            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
-            IrExceptionKind.Overflow => "System.OverflowException",
-            IrExceptionKind.NullReference => "System.NullReferenceException",
-            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
-            IrExceptionKind.ArgumentOutOfRange => "System.ArgumentOutOfRangeException",
-            IrExceptionKind.InvalidCast => "System.InvalidCastException",
-            IrExceptionKind.Argument => "System.ArgumentException",
-            // Its hierarchy is just Exception and Object, so only those catch it.
-            IrExceptionKind.Unknown or IrExceptionKind.Explicit => "System.Exception",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
-    }
-
     // Resolve the runtime assembly that owns System.Object. A source-defined
     // same-name exception must never impersonate a local scalar fault.
     internal static bool TryCatchKinds(Compilation compilation, ITypeSymbol? catchType,
@@ -39,7 +22,7 @@ internal static partial class CSharpOperationSemantics
         var matched = ImmutableArray.CreateBuilder<IrExceptionKind>();
         foreach (var kind in RuntimeExceptionKinds)
         {
-            var runtime = core.GetTypeByMetadataName(ExceptionMetadataName(kind));
+            var runtime = core.GetTypeByMetadataName(IrExceptionKindFacts.MetadataName(kind));
             if (runtime == null)
             {
                 kinds = default;
