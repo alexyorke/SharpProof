@@ -25,7 +25,6 @@
     <Project Path="src/SharpProof.Host/SharpProof.Host.csproj" />
     <Project Path="src/SharpProof.Ir.Tests/SharpProof.Ir.Tests.csproj" />
     <Project Path="src/SharpProof.Ir/SharpProof.Ir.csproj" />
-    <Project Path="src/SharpProof.Logging/SharpProof.Logging.csproj" />
     <Project Path="src/SharpProof.Package.IntegrationTests/SharpProof.Package.IntegrationTests.csproj" />
     <Project Path="src/SharpProof.Package/SharpProof.Package.csproj" />
     <Project Path="src/SharpProof.Smt.Tests/SharpProof.Smt.Tests.csproj" />

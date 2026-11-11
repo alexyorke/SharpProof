@@ -5,7 +5,7 @@
 `System.Console.Out` or `System.Console.Error`. The rule resolves symbols,
 so similarly named methods and injected `TextWriter` instances are allowed.
 
-Command-line tools use `SharpProof.Logging.RepositoryLogger` to preserve
+Command-line tools use the worker's `RepositoryLogger` to preserve
 their existing stdout/stderr protocol. The logger accepts writers so tests can
 capture output and entry points can use the current console streams.
 

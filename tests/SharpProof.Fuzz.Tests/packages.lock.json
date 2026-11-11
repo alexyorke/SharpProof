@@ -145,7 +145,6 @@
           "SharpProof.CompilerCollector": "[1.0.0-preview.2, )",
           "SharpProof.Frontend": "[1.0.0-preview.2, )",
           "SharpProof.Host": "[1.0.0-preview.2, )",
-          "SharpProof.Logging": "[1.0.0-preview.2, )",
           "SharpProof.Smt": "[1.0.0-preview.2, )",
           "SharpProof.Testing": "[1.0.0-preview.2, )",
           "SharpProof.Worker": "[1.0.0-preview.2, )"
@@ -155,9 +154,6 @@
         "type": "Project"
       },
       "sharpproof.ir": {
-        "type": "Project"
-      },
-      "sharpproof.logging": {
         "type": "Project"
       },
       "sharpproof.smt": {
@@ -185,7 +181,6 @@
         "dependencies": {
           "SharpProof.CompilerArtifact": "[1.0.0-preview.2, )",
           "SharpProof.Host": "[1.0.0-preview.2, )",
-          "SharpProof.Logging": "[1.0.0-preview.2, )",
           "SharpProof.Smt": "[1.0.0-preview.2, )",
           "SharpProof.Specs": "[1.0.0-preview.2, )"
         }

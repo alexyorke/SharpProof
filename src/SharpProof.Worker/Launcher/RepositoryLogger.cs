@@ -1,11 +1,11 @@
 using System;
 using System.IO;
 
-namespace SharpProof.Logging;
+namespace SharpProof.Worker;
 
 // Preserve the command-line tools' stdout/stderr protocol while keeping
 // terminal writes behind one logging boundary.
-public sealed class RepositoryLogger
+internal sealed class RepositoryLogger
 {
     private readonly TextWriter output;
     private readonly TextWriter error;
