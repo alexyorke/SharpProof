@@ -515,8 +515,11 @@ switch ($Command) {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
         Invoke-PipelineCommand 'corpus' 'Release'
         Invoke-PipelineCommand 'perf-baseline' 'Release'
-        Invoke-PipelineCommand 'perf-self' 'Release'
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
+        # Last: its bootstrap build would leave the fuzz runner's outputs
+        # up to date (the fuzz receipt rejects them as stale), and its
+        # self-applied rebuilds rewrite shared bin outputs.
+        Invoke-PipelineCommand 'perf-self' 'Release'
     }
     'security' {
         Invoke-DependencyAudit

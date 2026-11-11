@@ -19,7 +19,7 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Retained and rotating fuzz | `tooling fuzz-nightly -Configuration Release` | Bounded clean-source campaign with validated per-run results |
 | Verification performance | `tooling perf-baseline` | Verifies the pinned corpus on one solver lane and writes per-callable solver work and time to `artifacts/perf` |
 | Self-verification cost | `tooling perf-self` | Verifies every tracked `src/` project with SharpProof applied, writes each worker result to `artifacts/perf/self/<project>.json` and per-project totals to `artifacts/perf/self-summary.md`; advisory |
-| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline, self-verification cost and bounded fuzz; CI uploads all evidence |
+| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline, bounded fuzz and, last, self-verification cost; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
 The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns test parallelism and wall-time budgets. A successful selected test or feedback profile establishes only its selected scope.
