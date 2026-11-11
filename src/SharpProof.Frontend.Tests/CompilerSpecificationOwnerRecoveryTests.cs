@@ -49,7 +49,7 @@ public sealed class CompilerSpecificationOwnerRecoveryTests
         var ensures = (IInvocationOperation)model.GetOperation(ensuresSyntax)!;
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         var requires = new TotalContractBinder(compilation, factory).BindTotalRequires(context);

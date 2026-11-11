@@ -53,7 +53,7 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
         Assert.That(binary.OperatorMethod, Is.Null);
         Assert.That(binary.IsLifted, Is.False);
         TestContext.WriteLine($"Recovery binary type: kind={binary.Type?.TypeKind}, errorSymbol={binary.Type is IErrorTypeSymbol}, special={binary.Type?.SpecialType}, display={binary.Type?.ToDisplayString()}");
-        var observationFactory = new IrFactory(IrExecutionSemantics.Total);
+        var observationFactory = new IrFactory();
         var observationContext = new TotalLoweringContext(observationFactory, method);
         var observationBuilder = new IrProgramBuilder(observationFactory);
         var observationEntry = observationBuilder.CreateBlock("recovery-classification-observation-only");
@@ -78,7 +78,7 @@ public sealed class CompilerErrorEmptyConcatenationApiTests
 
         // This failed compilation supplies only a real expression API input.
         // Inspect its owned builder output, without CFG preparation or replay.
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.Target, Is.SameAs(method));
         Assert.That(context.Factory, Is.SameAs(factory));

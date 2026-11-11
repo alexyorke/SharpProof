@@ -17,7 +17,7 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
+        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
         context.ModelReceiver();
         if (target.Method.IsAsync)
         {
@@ -71,7 +71,7 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
+        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
         {
             CaptureCallFrames = true,
             CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
@@ -297,7 +297,7 @@ internal static class CompilerTotalCallableLowerer
         { reason = "UnsupportedEntryInitialization"; return null; }
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), owner.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree])) { CaptureShadowCallAncestry = true };
+        var context = new TotalLoweringContext(new IrFactory(), owner.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree])) { CaptureShadowCallAncestry = true };
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();

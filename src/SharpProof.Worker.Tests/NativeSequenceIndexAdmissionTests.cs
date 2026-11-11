@@ -37,7 +37,7 @@ public sealed class NativeSequenceIndexAdmissionTests
 
     private static async Task CheckGuardedStore(int width, bool hasSign, bool falsePostcondition)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var indexType = factory.GetOrCreateIntegerType(width, hasSign);
         var admitted = width < 32 || width == 32 && hasSign;

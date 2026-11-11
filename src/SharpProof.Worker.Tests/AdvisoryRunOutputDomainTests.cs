@@ -12,7 +12,7 @@ public sealed class AdvisoryRunOutputDomainTests
     [Test]
     public void WidenPreservesReachableIdentityBesideActualUnreachableOutput()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var reachableProgram = Build(factory, value, false);
         var unreachableProgram = Build(factory, value, true);
@@ -45,7 +45,7 @@ public sealed class AdvisoryRunOutputDomainTests
     [Test]
     public void HavocUsesOnlyTheReachabilityOfActualRunOutputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var reachableResult = new CoreIrAdvisoryInterpreter(Build(factory, value, false), [value])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(3)), token: TestContext.CurrentContext.CancellationToken);
@@ -75,7 +75,7 @@ public sealed class AdvisoryRunOutputDomainTests
     [Test]
     public void SetReferenceAcceptsLatticeBottomBesideActualReferenceOutputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         var nonNullBuilder = new IrProgramBuilder(factory);
         var nonNullEntry = nonNullBuilder.CreateBlock();

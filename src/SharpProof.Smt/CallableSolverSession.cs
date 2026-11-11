@@ -26,10 +26,6 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _options = ArgumentNullGuard.NotNull(options, nameof(options));
-        if (factory.Semantics != IrExecutionSemantics.Total)
-        {
-            throw new ArgumentException("A callable bitvector session requires Total IR semantics.", nameof(factory));
-        }
         _runner = new SmtNativeRunner(ArgumentNullGuard.NotNull(createContext, nameof(createContext)), retireAfterFailure: true, disposeOwned: DisposeOwned);
         try
         {

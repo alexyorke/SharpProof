@@ -73,7 +73,7 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
         Assert.That(binder.GetClauseInventory(target).Callable, Is.SameAs(implementation));
         var ownImplementation = binder.Bind(implementation);
         Assert.That(ownImplementation.IsSuccess, Is.True, ownImplementation.Failure.ToString());
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var result = new TotalContractBinder(compilation, factory).BindTotal(new TotalLoweringContext(factory, target));
         // The Total binder rejects constructed partial targets outright.
         Assert.That(result.IsSuccess, Is.False);

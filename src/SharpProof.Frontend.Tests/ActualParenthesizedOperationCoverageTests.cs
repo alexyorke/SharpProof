@@ -30,7 +30,7 @@ public sealed class ActualParenthesizedOperationCoverageTests
             var operation = compilation.GetSemanticModel(tree).GetOperation(syntax)!;
             Assert.That(operation, Is.InstanceOf<IParenthesizedOperation>());
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             var builder = new IrProgramBuilder(factory);
             var entry = builder.CreateBlock("entry");

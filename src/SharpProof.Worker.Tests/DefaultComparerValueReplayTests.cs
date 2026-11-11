@@ -18,7 +18,7 @@ internal sealed class DefaultComparerValueReplayTests
     public void ApprovedValuesObserveTheActualCachedInstance(string primitive)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var term = Value(factory, primitive);
         var result = PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, PassiveCallableVcPlan.ReadDefaultComparer);
         Assert.That(result, Is.Not.Null);
@@ -36,7 +36,7 @@ internal sealed class DefaultComparerValueReplayTests
     public void UnapprovedValuesNeverExecuteTheObserver(string scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var term = Value(factory, scenario is "symbolic" or "System_Boolean" ? scenario : "System_Int32", scenario);
         var invoked = false;
         Assert.That(PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, primitive =>
@@ -52,7 +52,7 @@ internal sealed class DefaultComparerValueReplayTests
     [TestCase(true)]
     public void ObservedValuesDoNotErasePreviouslyConsumedApproximation(bool approximate)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("comparer-value-replay");
@@ -82,7 +82,7 @@ internal sealed class DefaultComparerValueReplayTests
     public void UnavailableOrInvalidObservationsCannotReturnAValue(string scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation("comparer-value-replay"), Value(factory, "System_Int32"));
@@ -101,7 +101,7 @@ internal sealed class DefaultComparerValueReplayTests
     public void FailedObservationsStayUnavailable(string failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, Value(factory, "System_Int32"), _ => failure switch
         {
             "null" => null,

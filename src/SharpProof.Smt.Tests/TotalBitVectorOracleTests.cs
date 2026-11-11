@@ -17,7 +17,7 @@ public sealed class TotalBitVectorOracleTests
     [TestCase(64, true)]
     public async Task TotalIntegerOperatorsAgreeWithIndependentZ3Completion(int width, bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var x = factory.CreateVariable("x", type);
         var y = factory.CreateVariable("y", type);
@@ -86,7 +86,7 @@ public sealed class TotalBitVectorOracleTests
     [TestCase(64, true)]
     public async Task TotalShiftsAgreeWithClrShiftOperators(int width, bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var x = factory.CreateVariable("x", type);
         var y = factory.CreateVariable("y", type);
@@ -141,7 +141,7 @@ public sealed class TotalBitVectorOracleTests
     [TestCase(16)]
     public void NarrowShiftsHaveNoClrMeaning(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, true);
         var x = factory.CreateVariable("x", type);
         var term = factory.Binary(IrBinaryOperator.ShiftLeft, factory.Variable(x), factory.IntegerBits(type, 1));

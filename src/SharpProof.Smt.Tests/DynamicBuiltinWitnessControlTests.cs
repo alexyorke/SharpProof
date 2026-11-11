@@ -10,7 +10,7 @@ public sealed class DynamicBuiltinWitnessControlTests
     [TestCase(true)]
     public async Task DistinctArrayTypesRequireConcreteAliasReplay(bool requireAlias)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.GetOrCreateSequenceType(factory.BooleanType));
         var second = factory.CreateVariable("second", factory.GetOrCreateSequenceType(factory.IntegerType));
         var assumptionsBuilder = ImmutableArray.CreateBuilder<Assumption>();

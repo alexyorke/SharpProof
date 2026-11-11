@@ -217,8 +217,7 @@ internal static class CompilerTotalCallableArtifactCodec
             .Distinct().OrderBy(index => index).ToImmutableArray();
         var decoded = PortableIrGraphCodec.Decode(artifact.Graph!, externalVariables, externalOperations, cancellationToken);
         var factory = decoded.Factory;
-        Require(factory.Semantics == IrExecutionSemantics.Total &&
-            (entryOnly ? decoded.Program == null && artifact.Result == -1 : decoded.Program != null) &&
+        Require((entryOnly ? decoded.Program == null && artifact.Result == -1 : decoded.Program != null) &&
             decoded.Roots.Length == (artifact.Clauses.Length + artifact.CallPreconditions.Length) * 2,
             "The Total graph has an invalid mode or root closure.");
         foreach (var term in artifact.Graph.Terms)

@@ -49,7 +49,7 @@ public sealed class RepeatedRequiresDefaultWorkApiCoverageTests
             var targetGraph = ControlFlowGraph.Create(target, model)!;
             var helperGraph = ControlFlowGraph.Create(helper, model)!;
             var helperSymbol = (IMethodSymbol)model.GetDeclaredSymbol(helper)!;
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(target)!);
             var preparedCount = 0;
             bool Prepare(TotalLoweringContext candidate)

@@ -51,7 +51,7 @@ public sealed partial class DotnetApiInventoryTests
             var invocation = (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
             if (invocation.TargetMethod.GetDocumentationCommentId() != api)
             { return false; }
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
             var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
                 static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);

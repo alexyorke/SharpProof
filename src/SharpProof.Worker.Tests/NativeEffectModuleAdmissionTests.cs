@@ -19,7 +19,7 @@ public sealed class NativeEffectModuleAdmissionTests
         var budgets = new WorkerBudgets();
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
         var expectedDepth = budgets.MaximumExpressionDepth + (beyond ? 1 : 0);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var builder = new IrProgramBuilder(factory);
@@ -65,7 +65,7 @@ public sealed class NativeEffectModuleAdmissionTests
     [TestCase(true)]
     public async Task EffectModuleAdmissionRetainsActualReturnCoupling(bool matched)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("effect-module-return-coupling");

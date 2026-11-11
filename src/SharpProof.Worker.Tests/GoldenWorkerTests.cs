@@ -71,7 +71,7 @@ public sealed class GoldenWorkerTests
         {
             foreach (var chooseOld in ImmutableArray.Create(false, true))
             {
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
                 PassiveParameterBinding Parameter(string name, IrTypeId parameterType)
                 {
@@ -1221,7 +1221,7 @@ public sealed class GoldenWorkerTests
         Assert.That(scenario, Is.AnyOf("replay-postcondition-approximation", "replay-guard-approximation",
             "replay-spec-result-unbound", "replay-spec-result-substitution", "replay-input-bound", "replay-input-no-provider",
             "replay-guard-unresolved"));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = factory.CreateVariable("entry", factory.IntegerType);
         var body = factory.CreateVariable("body", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -1256,23 +1256,20 @@ public sealed class GoldenWorkerTests
     private static async Task<string> BooleanModels()
     {
         var output = new StringBuilder();
-        foreach (var semantics in ImmutableArray.Create(IrExecutionSemantics.Total))
+        var factory = new IrFactory();
+        var parameter = factory.CreateVariable("entry", factory.BooleanType);
+        using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
+        foreach (var expected in ImmutableArray.Create(false, true))
         {
-            var factory = new IrFactory(semantics);
-            var parameter = factory.CreateVariable("entry", factory.BooleanType);
-            using var backend = new CallableSolverSession(factory, new IrSmtBackendOptions());
-            foreach (var expected in ImmutableArray.Create(false, true))
-            {
-                var bound = factory.Binary(IrBinaryOperator.Equal, factory.Variable(parameter), factory.Boolean(expected));
-                var query = new VerificationQuery(factory,
-                    [new Assumption(factory, bound, new LoweredJustification(factory.CreateOperation()))],
-                    new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [parameter]);
-                var outcome = await new ProofKernel(backend).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
-                Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
-                var value = ((RefutedOutcome)outcome).Model.Assignments[parameter];
-                Assert.That(value.Boolean, Is.EqualTo(expected));
-                output.AppendLine(CultureInfo.InvariantCulture, $"model: {semantics} {value.Boolean} outcome=Refuted");
-            }
+            var bound = factory.Binary(IrBinaryOperator.Equal, factory.Variable(parameter), factory.Boolean(expected));
+            var query = new VerificationQuery(factory,
+                [new Assumption(factory, bound, new LoweredJustification(factory.CreateOperation()))],
+                new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [parameter]);
+            var outcome = await new ProofKernel(backend).VerifyAsync(query, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
+            var value = ((RefutedOutcome)outcome).Model.Assignments[parameter];
+            Assert.That(value.Boolean, Is.EqualTo(expected));
+            output.AppendLine(CultureInfo.InvariantCulture, $"model: {value.Boolean} outcome=Refuted");
         }
         return output.ToString();
     }
@@ -1283,7 +1280,7 @@ public sealed class GoldenWorkerTests
         var isSigned = scenario[6] == 's';
         Assert.That(scenario[6], Is.AnyOf('s', 'u'));
         var width = int.Parse(scenario[7..], CultureInfo.InvariantCulture);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var bits = width == 64 ? ulong.MaxValue : (1UL << width) - 1;
         var parameter = factory.CreateVariable("entry", type);

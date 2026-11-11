@@ -43,7 +43,7 @@ public sealed class TotalMaterializationArityTests
             .OfType<IInvocationOperation>().Single();
         Assert.That(invocation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(invocation.Arguments, Has.Length.EqualTo(argumentCount));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var api = ContractApiSymbols.TryCreate(compilation)!;
         Assert.That(api, Is.Not.Null);

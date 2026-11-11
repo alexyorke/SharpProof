@@ -75,7 +75,7 @@ public sealed class CompilerErrorNameOfFieldAssignmentApiTests
 
         // This actual failed-method symbol owns only an expression API frame.
         // No CFG, candidate program, preparation status or negative replay exists.
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.Target, Is.SameAs(method));
         Assert.That(context.Factory, Is.SameAs(factory));

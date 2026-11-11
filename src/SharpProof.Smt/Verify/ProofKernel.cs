@@ -222,7 +222,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
             var type = query.Factory.GetVariableInfo(assignment.Key).Type;
             return type == assignment.Value.Type &&
                 (type == query.Factory.BooleanType || query.Factory.GetTypeInfo(type).Kind == IrTypeKind.Integer ||
-                    query.Factory.Semantics == IrExecutionSemantics.Total && IsReferenceDomain(type));
+                    IsReferenceDomain(type));
         }
 
         bool IsReferenceDomain(IrTypeId type)

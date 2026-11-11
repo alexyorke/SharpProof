@@ -27,7 +27,7 @@ public sealed class NativeReturnDomainAdmissionTests
     {
         System.ArgumentNullException.ThrowIfNull(actual);
         System.ArgumentNullException.ThrowIfNull(declared);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("return-domain-admission");

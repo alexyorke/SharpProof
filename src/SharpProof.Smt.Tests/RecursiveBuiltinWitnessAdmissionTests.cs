@@ -23,7 +23,7 @@ public sealed class RecursiveBuiltinWitnessAdmissionTests
         var root = await tree.GetRootAsync().ConfigureAwait(false);
         var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
         var graph = ControlFlowGraph.Create(syntax, model);
         Assert.That(graph, Is.Not.Null);

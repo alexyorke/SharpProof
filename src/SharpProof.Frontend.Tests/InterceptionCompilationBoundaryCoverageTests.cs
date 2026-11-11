@@ -30,7 +30,7 @@ public sealed class InterceptionCompilationBoundaryCoverageTests
         var targetSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(targetSyntax)!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), target);
+        var context = new TotalLoweringContext(new IrFactory(), target);
         var clause = new RoslynTotalExpressionLowerer(context).LowerClause(operation);
         Assert.That(clause.Classification.IsExact, Is.False);
         Assert.That(clause.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedInvocationShape));

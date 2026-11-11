@@ -133,7 +133,7 @@ public sealed class CompilerGraphSemanticModelInvariantTests
     {
         System.ArgumentNullException.ThrowIfNull(target);
         System.ArgumentNullException.ThrowIfNull(graph);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         var lowering = RoslynProgramLowering.LowerCandidate(graph, context, static _ => true, TestContext.CurrentContext.CancellationToken);

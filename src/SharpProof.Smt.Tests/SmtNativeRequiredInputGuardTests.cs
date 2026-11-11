@@ -52,7 +52,7 @@ public sealed class SmtNativeRequiredInputGuardTests
 
         Assert.That(error!.ParamName, Is.EqualTo("factory"));
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = SmtNativeUtilities.CreateBooleanValue(factory, expression);
         Assert.That(value, Is.Not.Null);
         Assert.That(value!.Boolean, Is.True);

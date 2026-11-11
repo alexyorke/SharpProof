@@ -70,7 +70,7 @@ public sealed class CompilerCfgConstructionBoundaryTests
             var actualIfCount = tree.GetRoot().DescendantNodes().OfType<IfStatementSyntax>().Count();
             Assert.That(actualIfCount, Is.EqualTo(expectedIfCount));
 
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var method = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
             var context = new TotalLoweringContext(factory, method);
             var lowering = RoslynProgramLowering.LowerCandidate(graph, context);

@@ -331,10 +331,8 @@ internal sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     {
         var value = DifferentialIntegerCorpus.InterestingIntegers[
             _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Length)];
-        // Total factories use signed 32-bit integers by default. Keep boundary
+        // Factories use signed 32-bit integers by default. Keep boundary
         // samples at that width instead of constructing invalid 64-bit literals.
-        return _factory.Semantics == IrExecutionSemantics.Total
-            ? Math.Max(int.MinValue, Math.Min(int.MaxValue, value))
-            : value;
+        return Math.Max(int.MinValue, Math.Min(int.MaxValue, value));
     }
 }

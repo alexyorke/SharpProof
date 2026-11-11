@@ -98,10 +98,6 @@ internal sealed partial class TotalLoweringContext
         Target = ArgumentNullGuard.NotNull(target, nameof(target));
         _document = ArgumentNullGuard.NotNull(document, nameof(document));
         _allowGenericContainer = allowGenericContainer;
-        if (factory.Semantics != IrExecutionSemantics.Total)
-        {
-            throw new ArgumentException("Candidate lowering requires Total IR semantics.", nameof(factory));
-        }
         _types = new RoslynTypeMapper(factory);
         Parameters = [.. target.Parameters.Skip(leadingParameters).Select(parameter =>
         {

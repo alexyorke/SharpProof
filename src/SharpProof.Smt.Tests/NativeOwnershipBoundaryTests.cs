@@ -23,15 +23,4 @@ public sealed class NativeOwnershipBoundaryTests
         Assert.That(nativeObject!.GetValue(expression), Is.EqualTo(IntPtr.Zero));
     }
 
-    [Test]
-    public void LegacySemanticsCannotEnterTheBitvectorBackend()
-    {
-        var error = Assert.Throws<ArgumentException>((Action)(() =>
-        {
-            using var backend = new CallableSolverSession(
-                new IrFactory(IrExecutionSemantics.Legacy), new IrSmtBackendOptions());
-        }));
-
-        Assert.That(error!.ParamName, Is.EqualTo("factory"));
-    }
 }

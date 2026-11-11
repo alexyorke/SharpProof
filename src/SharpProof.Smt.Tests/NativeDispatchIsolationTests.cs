@@ -129,7 +129,7 @@ public sealed class NativeDispatchIsolationTests : IDisposable
             {
                 ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
                 var occupyPool = args.Length == 1 && args[0] == "busy";
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var x = factory.CreateVariable("x", factory.GetOrCreateIntegerType(32, true));
                 var one = factory.Integer(1);
                 var equalsOne = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), one);

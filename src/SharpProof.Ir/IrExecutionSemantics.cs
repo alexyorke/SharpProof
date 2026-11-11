@@ -2,13 +2,6 @@ using System.Collections.Immutable;
 
 namespace SharpProof.Ir;
 
-// Legacy remains the authority during the dual-pipeline migration.
-internal enum IrExecutionSemantics
-{
-    Legacy = 0,
-    Total = 1
-}
-
 internal sealed class IrSourceSpan
 {
     // Line and column are one-based display positions; zero means unknown.

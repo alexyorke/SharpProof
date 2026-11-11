@@ -101,7 +101,7 @@ public sealed class VisualBasicCompoundShiftNearbyControlsTests
         Assert.That(assignment.InConversion.IsUserDefined, Is.False);
         Assert.That(assignment.OutConversion.IsUserDefined, Is.False);
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var graph = ControlFlowGraph.Create(method, model)!;
         Assert.That(context.HasScalarSignature, Is.True);

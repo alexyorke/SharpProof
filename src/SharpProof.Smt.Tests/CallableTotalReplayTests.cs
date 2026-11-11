@@ -11,7 +11,7 @@ internal sealed class CallableTotalReplayTests
     [TestCase(true)]
     public async Task OriginalBodyReadsValidatedOldHeapRoles(bool array)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var entry = factory.CreateVariable("a", type);
         var current = factory.CreateVariable("b", type);
@@ -85,7 +85,7 @@ internal sealed class CallableTotalReplayTests
     public async Task TotalPostconditionRequiresAnExplicitSuccessfulGuard(string scenario, AbstentionReason reason)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new CallableReplayContext(null, true, ImmutableDictionary<IrVarId, IrVarId>.Empty,
             ImmutableDictionary<IrVarId, IrVarId?>.Empty, [], factory.Boolean(false),
             ImmutableDictionary<IrVarId, (BigInteger, BigInteger)>.Empty, 100, [],
@@ -101,7 +101,7 @@ internal sealed class CallableTotalReplayTests
     [Test]
     public async Task Unsigned64ModelAndDomainReplayKeepTheHighBit()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, false);
         var variable = factory.CreateVariable("value", type);
         var value = factory.CreateIntegerValue(type, ulong.MaxValue);
@@ -123,7 +123,7 @@ internal sealed class CallableTotalReplayTests
     public async Task TrivialCallableReplayRequiresValidatedEntryEvidence(
         int input, bool missingPreState, bool refuted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var entry = factory.CreateVariable("entry", factory.IntegerType);
         var old = factory.CreateVariable("old", factory.IntegerType);
         var constraint = factory.Binary(IrBinaryOperator.GreaterThanOrEqual,
@@ -161,7 +161,7 @@ internal sealed class CallableTotalReplayTests
     private static async Task<ProofOutcome> Replay(string scenario)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = factory.CreateVariable("canonical", factory.IntegerType);
         var bodyParameter = factory.CreateVariable("body", factory.IntegerType);
         var temporary = factory.CreateVariable("temporary", factory.IntegerType);

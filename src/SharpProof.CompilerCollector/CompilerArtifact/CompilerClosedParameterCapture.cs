@@ -123,7 +123,7 @@ internal static class CompilerClosedParameterCapture
                     ImmutableArray.CreateRange(reader.GetBlobBytes(attribute.Value)), minimum, maximum));
             }
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken);
         if (binding.Failure == ContractBindingFailure.ContractApiUnavailable && result.Count == 0)
         { return true; }

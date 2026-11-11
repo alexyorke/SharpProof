@@ -9,7 +9,7 @@ public sealed class HornSigned64BoundaryStateTests
     [Test]
     public async Task CountupFromSigned64MinimumHasKernelCheckedBound()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, true);
         var variable = factory.CreateVariable("current", type);
         var current = factory.Variable(variable);

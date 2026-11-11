@@ -132,7 +132,7 @@ internal sealed class NativeTaskContextDispatchStorageTests
         {
             Owner = child.Owner with { CallableId = "root:fork-child:" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) }
         }).ToImmutableArray();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new CompilerTotalParameter(factory.CreateVariable("entry:n", factory.IntegerType),
             factory.CreateVariable("current:n", factory.IntegerType), factory.CreateVariable("old:n", factory.IntegerType));
         return (projection with { Children = entries, ConfiguredAwait = configured }, new("root", factory, [parameter], []));

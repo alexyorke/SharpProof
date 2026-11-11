@@ -52,7 +52,7 @@ public sealed class IteratorRequiresSessionApiCoverageTests
         Assert.That(invocation.Instance, Is.Null);
         Assert.That(invocation.Arguments, Has.Length.EqualTo(1));
         Assert.That(invocation.Arguments[0].Value.ConstantValue.Value, Is.EqualTo(17));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var caller = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(target)!);
         var prepared = 0;
         bool PrepareCallee(TotalLoweringContext candidate)

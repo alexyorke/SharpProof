@@ -12,7 +12,7 @@ public sealed class NativeLoopCallObligationTests
     [TestCase(true)]
     public async Task NaturalLoopObligationsKeepOriginalCallWitnesses(bool predicate)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var builder = new IrProgramBuilder(factory);
@@ -80,7 +80,7 @@ public sealed class NativeLoopCallObligationTests
     public async Task LoopObligationsReadTheActualMarkerPrefixState(string kind, bool proven)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var builder = new IrProgramBuilder(factory);

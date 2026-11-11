@@ -27,7 +27,7 @@ public sealed class NativeBooleanEqualityDispatchTests
     [Test]
     public async Task BooleanEqualitySymmetryIsProvenThroughThePublicBackend()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var left = factory.Variable(factory.CreateVariable("left", factory.BooleanType));
         var right = factory.Variable(factory.CreateVariable("right", factory.BooleanType));
         var equality = factory.Binary(IrBinaryOperator.Equal, left, right);

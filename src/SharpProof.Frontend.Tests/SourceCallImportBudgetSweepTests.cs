@@ -49,7 +49,7 @@ public sealed class SourceCallImportBudgetSweepTests
             var limitSeen = false;
             for (var available = 0; available <= RoslynTotalProgramLowerer.MaximumRegionSteps; available++)
             {
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var context = new TotalLoweringContext(factory, targetSymbol);
                 bool Prepare(TotalLoweringContext candidate)
                 {

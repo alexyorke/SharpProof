@@ -16,7 +16,7 @@ public sealed class ResourceMemoryReplayTests
     {
         ArgumentNullException.ThrowIfNull(regionName);
         var region = Enum.Parse<IrWriteRegion>(regionName);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -44,7 +44,7 @@ public sealed class ResourceMemoryReplayTests
     {
         if (mutation < 0 || mutation > 2)
         { throw new ArgumentOutOfRangeException(nameof(mutation)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -85,7 +85,7 @@ public sealed class ResourceMemoryReplayTests
     [Test]
     public void AForeignInstructionCannotHideBehindTheOwnedFinalReturn()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var returned = builder.Return(builder.CreateBlock(), factory.CreateOperation());
         var program = builder.Build();
@@ -106,7 +106,7 @@ public sealed class ResourceMemoryReplayTests
     [Test]
     public void RepeatedInstructionExecutionsRequireAnAdmittedRepetitionModel()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var loop = builder.CreateBlock();
@@ -125,7 +125,7 @@ public sealed class ResourceMemoryReplayTests
     [Test]
     public void CancellationCannotPublishPartiallyCollectedLifetimeEvidence()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var returned = builder.Return(builder.CreateBlock(), factory.CreateOperation());
         var program = builder.Build();
@@ -147,7 +147,7 @@ public sealed class ResourceMemoryReplayTests
     {
         if (width is not (0 or 8 or 16 or 32 or 64))
         { throw new ArgumentOutOfRangeException(nameof(width)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var element = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, signed: false);
         var array = factory.GetOrCreateSequenceType(element);
         var target = factory.CreateVariable("array", array);
@@ -173,7 +173,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true, 33)]
     public void AllocationObservationsCannotReplaceLiteralExtentsOnVoidReturns(bool text, int observedLength)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = text ? factory.StringType : factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -207,7 +207,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true, true)]
     public void GenuineInputDependentAllocationExtentsRemainReplayable(bool text, bool expression)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = text ? factory.StringType : factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -236,7 +236,7 @@ public sealed class ResourceMemoryReplayTests
     {
         if (kind < 0 || kind > 3)
         { throw new ArgumentOutOfRangeException(nameof(kind)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (kind < 2)
@@ -262,7 +262,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void BorrowedInputCannotBecomeOwnedThroughCopyOrReturn(bool copy)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var array = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", array);
         var output = factory.CreateVariable("output", array);
@@ -281,7 +281,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void ObservationFailuresStayUnknownAfterLaterCallbacks(bool approximate)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var returned = builder.Return(entry, factory.CreateOperation());
@@ -305,7 +305,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void ProgramGraphBudgetsRejectOversizedArtifactsBeforeEvidence(bool blocks)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation());
@@ -328,22 +328,6 @@ public sealed class ResourceMemoryReplayTests
         Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayBudgetExceeded"));
     }
 
-    [Test]
-    public void LegacyExecutionCannotAcquireTotalLifetimeEvidence()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Legacy);
-        var builder = new IrProgramBuilder(factory);
-        var returned = builder.Return(builder.CreateBlock(), factory.CreateOperation());
-        var program = builder.Build();
-        var execution = new IrProgramInterpreter(factory).Execute(program, null, 10, TestContext.CurrentContext.CancellationToken);
-        var replay = new ResourceMemoryReplay(program);
-        replay.Observe(returned, null, false);
-        var check = replay.Complete(execution, Layout, TestContext.CurrentContext.CancellationToken);
-        Assert.That(check.Bounds, Is.Null);
-        Assert.That(check.UnknownReason, Is.EqualTo("MemoryReplayRequiresTotalSemantics"));
-        Assert.That(ResourceMemoryProgram.Evaluate(program, Layout, TestContext.CurrentContext.CancellationToken).UnknownReason, Is.EqualTo("MemoryProgramRequiresTotalSemantics"));
-    }
-
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
@@ -351,7 +335,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(4)]
     public void StringAllocationObservationsNeedFreshKnownIdentities(int mutation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var first = factory.CreateVariable("first", factory.StringType);
@@ -392,7 +376,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(2)]
     public void ScalarAssignmentObservationsMustHaveTheDeclaredType(int mutation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var variable = factory.CreateVariable("value", factory.IntegerType);
@@ -417,7 +401,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(2)]
     public void FreshAndClearedFieldReadsRespectReplaySupport(int stores)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -463,7 +447,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true, true)]
     public void ReferenceCastsAndStoredFieldAliasesKeepTheirExpectedIdentity(bool fieldRead, bool corrupt)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -516,7 +500,7 @@ public sealed class ResourceMemoryReplayTests
     public void AliasObservationsCannotReducePeakStorageBeforeAReferenceComparison(string mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var array = factory.GetOrCreateSequenceType(factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -559,7 +543,7 @@ public sealed class ResourceMemoryReplayTests
     public void ReferenceAliasObservationsCannotForgeAnOwnedFieldReceiver(string mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -614,7 +598,7 @@ public sealed class ResourceMemoryReplayTests
     public void FieldStoreObservationsNeedAnOwnedReceiverAndMatchingOwnedValue(string mutation)
     {
         ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -659,7 +643,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void EmptyStringsCanShareTheirAnchorButOpaqueStringsCannotAcquireOwnership(bool empty)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var input = factory.CreateVariable("input", factory.StringType);
@@ -681,7 +665,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void ReplayReadAndExpressionDepthLimitsPublishNoPartialBounds(bool manyReads)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (manyReads)
@@ -709,7 +693,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void StringAndObjectReplayRequireACompatibleLayout(bool text)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = text ? factory.StringType : factory.ObjectType;
@@ -760,7 +744,7 @@ public sealed class ResourceMemoryReplayTests
     {
         if (mutation < 0 || mutation > 3)
         { throw new ArgumentOutOfRangeException(nameof(mutation)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var node = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node");
         factory.RegisterClosedClassReferenceType(node, null);
         factory.RegisterObjectStorageType(node, [ResourceStorageKind.Reference]);
@@ -814,7 +798,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true, 32, 40, 72)]
     public void CompletedConcreteArraysHaveObservedRetainedAndAuxiliaryCosts(bool temporary, int peak, int retained, int cumulative)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -839,7 +823,7 @@ public sealed class ResourceMemoryReplayTests
     [TestCase(true)]
     public void ExceptionalAndTruncatedExecutionsCannotSupplyLifetimeNumbers(bool loop)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (loop)
@@ -861,7 +845,7 @@ public sealed class ResourceMemoryReplayTests
     [Test]
     public void ApproximateResultsCannotSupplyLifetimeNumbers()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var value = factory.CreateVariable("value", factory.BooleanType);
@@ -878,7 +862,7 @@ public sealed class ResourceMemoryReplayTests
     [Test]
     public void UnobservedAndForeignInstructionsCannotBecomeWitnesses()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation());

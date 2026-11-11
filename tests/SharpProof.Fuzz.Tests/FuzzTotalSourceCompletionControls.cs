@@ -41,7 +41,7 @@ public sealed class FuzzTotalSourceCompletionControls
             static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
             StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var bindingBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         var formula = LowerActual("Target");
         var completion = LowerActual("NormalCompletion");

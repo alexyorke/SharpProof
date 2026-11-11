@@ -53,7 +53,7 @@ public sealed class GoldenLoweringTests
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target")).ToImmutableArray();
         var method = methods.Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Body != null || node.ExpressionBody != null));
         var total = fixture.Source.StartsWith("// golden-mode: Total\n", StringComparison.Ordinal);
-        var factory = new IrFactory(total ? IrExecutionSemantics.Total : IrExecutionSemantics.Legacy);
+        var factory = new IrFactory();
         var model = compilation.GetSemanticModel(tree);
         var graph = ControlFlowGraph.Create(method, model)!;
         TotalLoweringContext? context = null;
@@ -84,7 +84,6 @@ public sealed class GoldenLoweringTests
         var printer = new IrPrinter(factory);
         var termBuilder = ImmutableDictionary.CreateBuilder<IrId, IrTerm>();
         var output = new StringBuilder();
-        output.AppendLine(CultureInfo.InvariantCulture, $"mode: {factory.Semantics}");
         output.AppendLine(CultureInfo.InvariantCulture, $"classification: {result.Classification.Decision}/{result.Classification.Abstention}");
         output.AppendLine(CultureInfo.InvariantCulture, $"entry: {result.Program.Entry}");
         if (context != null)

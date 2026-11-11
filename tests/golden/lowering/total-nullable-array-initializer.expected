@@ -1,4 +1,3 @@
-mode: Total
 classification: ClosedAbstention/UnsupportedOperationKind
 entry: b0
 result: v0:int[width=32,signed=True]

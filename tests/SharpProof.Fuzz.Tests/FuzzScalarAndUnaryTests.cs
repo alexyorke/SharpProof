@@ -34,7 +34,7 @@ public sealed class FuzzScalarAndUnaryTests
     [Test]
     public void IrUnaryCandidatesRetainTypeAndReduceNestedOperand()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.Variable(factory.CreateVariable("value", factory.IntegerType));
         var parent = factory.Unary(IrUnaryOperator.Negate,
             factory.Binary(IrBinaryOperator.Add, variable, factory.Integer(2)));

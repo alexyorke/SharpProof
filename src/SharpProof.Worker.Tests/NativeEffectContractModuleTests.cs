@@ -22,7 +22,7 @@ internal sealed class NativeEffectContractModuleTests
     {
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(facet);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var lockSite = factory.CreateOperation("module-lock");
@@ -100,7 +100,7 @@ internal sealed class NativeEffectContractModuleTests
         int facetValue, WorkerEffectSet bound, WorkerEffectCapabilitySet capabilities, bool allowed)
     {
         var facet = (IrOpaqueCallEffects)facetValue;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation(IrOpaqueCallSite.Describe(facet, "EffectModuleBoundary"));

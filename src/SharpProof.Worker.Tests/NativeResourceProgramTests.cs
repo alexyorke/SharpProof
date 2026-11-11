@@ -120,7 +120,7 @@ public sealed class NativeResourceProgramTests
     [TestCase(10)]
     public void AllocationSuccessConditioningRequiresTheClosedCompilerChoiceShape(int mutation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var choiceBlock = builder.CreateBlock();
@@ -159,7 +159,7 @@ public sealed class NativeResourceProgramTests
 
     private static CompilerTotalCallablePreparation Owner()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation("return"));
@@ -502,7 +502,7 @@ public sealed class NativeResourceProgramTests
     [Test]
     public void CompositionBudgetStopsDeepSymbolicCostsBeforePublishingBounds()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

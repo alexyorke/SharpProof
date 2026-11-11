@@ -9,7 +9,7 @@ internal sealed class IrConcreteReplayWitnessTests
     [TestCase(true)]
     public void ObservedValuesAreExactOnlyWhenTheTrustedHostSuppliesThem(bool confirmed)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -29,7 +29,7 @@ internal sealed class IrConcreteReplayWitnessTests
     [TestCase(IrHavocOrigin.SpecResult)]
     public void ConcreteObservationsCannotOverrideOtherHavocOrigins(IrHavocOrigin origin)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -47,7 +47,7 @@ internal sealed class IrConcreteReplayWitnessTests
     [Test]
     public void ConfirmingALaterValueDoesNotEraseAnEarlierApproximationRead()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var unknown = factory.CreateVariable("unknown", factory.BooleanType);
         var observed = factory.CreateVariable("observed", factory.BooleanType);
         var confirmed = factory.CreateVariable("confirmed", factory.BooleanType);
@@ -70,7 +70,7 @@ internal sealed class IrConcreteReplayWitnessTests
     [Test]
     public void AConfirmedValueOfTheWrongTypeStillFailsClosed()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -94,7 +94,7 @@ internal sealed class IrConcreteReplayWitnessTests
     public void FrameworkReplayDescriptorsAreExactAndCanonical(string primitive)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var site = factory.CreateOperation(IrOpaqueCallSite.DefaultComparerReplay(primitive));
         Assert.That(IrOpaqueCallSite.DefaultComparerReplayPrimitive(factory, site), Is.EqualTo(primitive));
         Assert.That(IrOpaqueCallSite.DefaultComparerReplayPrimitive(factory, factory.CreateOperation()), Is.Null);
@@ -110,7 +110,7 @@ internal sealed class IrConcreteReplayWitnessTests
     public void UnknownFrameworkReplayDescriptorsAreRejected(string primitive)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() => IrOpaqueCallSite.DefaultComparerReplay(primitive)));
         Assert.That(IrOpaqueCallSite.DefaultComparerReplayPrimitive(factory,
             factory.CreateOperation("framework-default-comparer:" + primitive)), Is.Null);

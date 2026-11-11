@@ -14,7 +14,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     public void ActualIntegerNumeralsPreserveWidthAndMaskedBits(string text, int width, ulong bits)
     {
         System.ArgumentNullException.ThrowIfNull(text);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var literal = context.MkInt(text);
         var result = SmtNativeUtilities.DecodeIntegerLiteral(factory, literal, out var kind);
@@ -30,7 +30,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     [TestCase(64, 18446744073709551615UL)]
     public void ActualBitvectorNumeralsPreserveTheirUnsignedBitPatterns(int width, ulong bits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var literal = context.MkBV(bits, (uint)width);
         var result = SmtNativeUtilities.DecodeIntegerLiteral(factory, literal, out var kind);
@@ -42,7 +42,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     [TestCase(128)]
     public void ActualUnsupportedBitvectorWidthsAreRejected(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var literal = context.MkBV(1UL, (uint)width);
         Assert.That(SmtNativeUtilities.DecodeIntegerLiteral(factory, literal, out _), Is.Null);
@@ -53,7 +53,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     public void ActualOutOfRangeIntegerNumeralsAreRejected(string text)
     {
         System.ArgumentNullException.ThrowIfNull(text);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var literal = context.MkInt(text);
         Assert.That(SmtNativeUtilities.DecodeIntegerLiteral(factory, literal, out _), Is.Null);
@@ -62,7 +62,7 @@ public sealed class NativeIntegerLiteralDecoderTests
     [Test]
     public void ActualRealLiteralIsRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var literal = context.MkReal("1/2");
         Assert.That(SmtNativeUtilities.DecodeIntegerLiteral(factory, literal, out _), Is.Null);

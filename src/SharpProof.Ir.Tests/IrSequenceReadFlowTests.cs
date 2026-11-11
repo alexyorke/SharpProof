@@ -9,7 +9,7 @@ public sealed class IrSequenceReadFlowTests
     [TestCase(true)]
     public void AReplacementDoesNotHideAnEarlierReadOfTheInput(bool allocate)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", type);
         var size = factory.CreateVariable("size", factory.IntegerType);
@@ -28,7 +28,7 @@ public sealed class IrSequenceReadFlowTests
     [TestCase(true)]
     public void AReadAfterAJoinRequiresAllocationOnEveryIncomingPath(bool both)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", type);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
@@ -50,7 +50,7 @@ public sealed class IrSequenceReadFlowTests
     [Test]
     public void AnAliasCapturedBeforeReplacementRetainsItsIncomingOwnership()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", type);
         var alias = factory.CreateVariable("alias", type);
@@ -66,7 +66,7 @@ public sealed class IrSequenceReadFlowTests
     [TestCase(true)]
     public void ALoopBackedgeCannotMakeTheFirstIterationInputFresh(bool allocatedOnEntry)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var input = factory.CreateVariable("input", type);
         var size = factory.CreateVariable("size", factory.IntegerType);

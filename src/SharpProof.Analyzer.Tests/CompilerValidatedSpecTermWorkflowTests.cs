@@ -28,7 +28,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
     {
         var condition = ValidateMaxPostcondition(new SpecUnaryDeclaration(IrUnaryOperator.Not,
             new SpecBooleanDeclaration(value), IrTypeKind.Boolean));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(32, true);
         AssertBoolean(factory, CompilerTotalSpecTermInstantiator.Instantiate(factory,
             condition, [factory.Integer(integer, 1), factory.Integer(integer, 2)], integer, 0), expected);
@@ -45,7 +45,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
             first, second, IrTypeKind.Integer);
         var condition = ValidateMaxPostcondition(new SpecBinaryDeclaration(IrBinaryOperator.Equal,
             maximum, new SpecIntegerDeclaration(7), IrTypeKind.Boolean));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(32, true);
         AssertBoolean(factory, CompilerTotalSpecTermInstantiator.Instantiate(factory, condition,
             [factory.Integer(integer, left), factory.Integer(integer, right)], integer, 0), true);
@@ -57,7 +57,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
         var condition = ValidateMaxPostcondition(new SpecBinaryDeclaration(IrBinaryOperator.Equal,
             new SpecVariableDeclaration(SpecVariableRole.Parameter, 0, IrTypeKind.Integer),
             new SpecIntegerDeclaration(long.MaxValue), IrTypeKind.Boolean), wide: true);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(64, true);
         AssertBoolean(factory, CompilerTotalSpecTermInstantiator.Instantiate(factory, condition,
             [factory.Integer(integer, long.MaxValue), factory.Integer(integer, 0)], integer, 0), true);
@@ -69,7 +69,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
         var condition = ValidateMaxPostcondition(new SpecBinaryDeclaration(IrBinaryOperator.LessThan,
             new SpecUnaryDeclaration(IrUnaryOperator.Negate, new SpecIntegerDeclaration(1), IrTypeKind.Integer),
             new SpecIntegerDeclaration(0), IrTypeKind.Boolean));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(32, true);
         Assert.That((Action)(() => CompilerTotalSpecTermInstantiator.Instantiate(factory, condition,
             [factory.Integer(integer, 1), factory.Integer(integer, 2)], integer, 0)),
@@ -95,7 +95,7 @@ public sealed class CompilerValidatedSpecTermWorkflowTests
         var table = ApiSpecTable.Create([new ApiSpecDeclaration(template.Target, template.Facets,
             [new SpecPostconditionDeclaration(condition, template.Facets.Effects.Evidence)])]);
         var validated = table.Templates.Single().Postconditions.Single().Condition;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That((Action)(() => CompilerTotalSpecTermInstantiator.Instantiate(factory, validated,
             [factory.String("text")], factory.IntegerType, 0)),
             Throws.TypeOf<ArgumentException>().With.Message.EqualTo("A specification-pack Total term has an invalid type."));

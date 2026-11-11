@@ -55,7 +55,7 @@ public sealed partial class DotnetApiInventoryTests
                     var model = compilation.GetSemanticModel(tree);
                     var target = model.GetDeclaredSymbol(syntax)!;
                     var operation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
-                    var factory = new IrFactory(IrExecutionSemantics.Total);
+                    var factory = new IrFactory();
                     var lowered = new RoslynTotalExpressionLowerer(new TotalLoweringContext(factory, target)).LowerClause(operation);
                     if (!lowered.Classification.IsExact)
                     { return false; }

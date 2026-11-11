@@ -6,7 +6,7 @@ internal sealed class HornTermFoldTests
     [Test]
     public void EmptyTermSequenceHasNoFoldResult()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(SmtNativeUtilities.Fold(factory, IrBinaryOperator.Add, []), Is.Null);
     }
 
@@ -17,7 +17,7 @@ internal sealed class HornTermFoldTests
     [TestCase(IrBinaryOperator.Subtract)]
     public void AValidSingletonSequenceRetainsTheExactFactoryTerm(IrBinaryOperator operation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = operation is IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse
             ? factory.BooleanType : factory.IntegerType;
         var term = factory.Variable(factory.CreateVariable("singleton", type));
@@ -30,7 +30,7 @@ internal sealed class HornTermFoldTests
     public void TwoIntegerTermsHaveIndependentlyExpectedEightBitResults(
         IrBinaryOperator operation, ulong leftBits, ulong rightBits, ulong expectedBits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, true);
         var left = factory.IntegerBits(type, leftBits);
         var right = factory.IntegerBits(type, rightBits);
@@ -42,7 +42,7 @@ internal sealed class HornTermFoldTests
     [TestCase(IrBinaryOperator.OrElse, true)]
     public void TwoBooleanTermsHaveIndependentlyExpectedTruthValues(IrBinaryOperator operation, bool expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var result = SmtNativeUtilities.Fold(factory, operation, [factory.Boolean(true), factory.Boolean(false)]);
         Assert.That(result, Is.SameAs(factory.Boolean(expected)));
     }
@@ -50,7 +50,7 @@ internal sealed class HornTermFoldTests
     [Test]
     public void SubtractionAccumulatesInSourceSequenceOrder()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var result = SmtNativeUtilities.Fold(factory, IrBinaryOperator.Subtract,
             [factory.Integer(20), factory.Integer(5), factory.Integer(3)]);
         Assert.That(result, Is.SameAs(factory.Integer(12)));

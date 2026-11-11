@@ -12,7 +12,7 @@ public sealed class CanonicalCacheIdentityControlTests
     [TestCase(true, true)]
     public async Task SameCacheKeepsItsIdentityThroughAnObjectView(bool array, bool wrongClaim)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm cached = array ? factory.EmptyArray(factory.GetOrCreateSequenceType(factory.IntegerType)) : factory.String(string.Empty);
         var view = factory.CreateVariable("view", factory.ObjectType);
         var alias = factory.Binary(IrBinaryOperator.Equal, factory.Variable(view), factory.Cast(factory.ObjectType, cached));
@@ -28,7 +28,7 @@ public sealed class CanonicalCacheIdentityControlTests
     [Test]
     public async Task DifferentArrayTypeViewsCanAliasOneUncachedZeroLengthArray()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.GetOrCreateSequenceType(factory.IntegerType));
         var second = factory.CreateVariable("second", factory.GetOrCreateSequenceType(factory.GetOrCreateIntegerType(32, false)));
         var alias = factory.Binary(IrBinaryOperator.Equal,

@@ -36,7 +36,7 @@ public sealed class ScalarCacheEffectRouteCoverageTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
         var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var lowering = TotalBodyLowering.Lower(compilation, ControlFlowGraph.Create(syntax, model)!, context, default);
         Assert.That(lowering.IsExact, Is.True);

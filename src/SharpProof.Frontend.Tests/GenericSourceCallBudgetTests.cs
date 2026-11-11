@@ -25,7 +25,7 @@ public sealed class GenericSourceCallBudgetTests
         var successful = false;
         for (var available = 0; available <= 128; available++)
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
             var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
             Assert.That(session.Spend(RoslynTotalProgramLowerer.MaximumRegionSteps - available), Is.True);

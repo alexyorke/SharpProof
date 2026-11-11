@@ -38,7 +38,7 @@ public sealed class VisualBasicUnusedLocalAdmissionCensus
                 Assert.That(actual, Is.EqualTo(7), item.Name);
                 var graph = ControlFlowGraph.Create(tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single(), compilation.GetSemanticModel(tree))!;
                 var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var context = new TotalLoweringContext(factory, target);
                 Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True, item.Name);
                 var lowered = RoslynProgramLowering.LowerCandidate(graph, context);

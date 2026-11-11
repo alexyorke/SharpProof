@@ -37,7 +37,7 @@ public sealed class ScalarPatternConstantApiCoverageTests
         Assert.That(SymbolEqualityComparer.Default.Equals(pattern.Pattern.InputType, pattern.Value.Type), Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(pattern.Pattern.NarrowedType, pattern.Value.Type), Is.True);
         var operand = PatternOperand(pattern.Pattern, relational);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var expectedType = new RoslynTypeMapper(factory).GetTypeId(pattern.Value.Type);
         TestContext.WriteLine($"recovery operand: kind={operand.Kind}, type={operand.Type?.TypeKind}/{operand.Type?.SpecialType}, " +
             $"constant={operand.ConstantValue.HasValue}/{(operand.ConstantValue.HasValue ? operand.ConstantValue.Value : null)}");

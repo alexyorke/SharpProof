@@ -11,7 +11,7 @@ public sealed class IrSnapshotEvaluationDepthBoundaryTests
     [TestCase(true, 3)]
     public void CachedOwnerSnapshotSelectionRespectsTheFixedEvaluationDepth(bool chooseOld, int expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var current = factory.CreateVariable("current", factory.ObjectType);
         var old = factory.CreateVariable("old", factory.ObjectType);
         var flag = factory.CreateVariable("choose-old", factory.BooleanType);

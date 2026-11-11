@@ -9,7 +9,7 @@ public sealed class HornInequalityStateTests
     [TestCase(32)]
     public async Task CountdownWithInequalityBodyHasKernelCheckedEstablishmentPreservationAndSafety(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, true);
         var wideType = factory.GetOrCreateIntegerType(64, true);
         var variable = factory.CreateVariable("remaining", type);

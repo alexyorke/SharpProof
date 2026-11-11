@@ -1217,7 +1217,7 @@ internal sealed class NativeForkJoinProjectionTests
     private static CompilerTotalEntryPreparation Root(CompilerForkJoinProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        var factory = new SharpProof.Ir.IrFactory(SharpProof.Ir.IrExecutionSemantics.Total);
+        var factory = new SharpProof.Ir.IrFactory();
         var parameters = projection.RootParameterNames.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) :
             new CompilerTotalParameter(factory.CreateVariable("entry:" + name, factory.IntegerType),
                 factory.CreateVariable("current:" + name, factory.IntegerType), factory.CreateVariable("old:" + name, factory.IntegerType))).ToImmutableArray();

@@ -21,28 +21,6 @@ public sealed class ResourceIrCoverageTests
     }
 
     [Test]
-    public void LegacyIntegersCannotCertifyAClosureCaptureStorageWidth()
-    {
-        var factory = new IrFactory();
-        var frameType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
-        var frame = factory.CreateVariable("frame", frameType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock();
-        var allocation = builder.Allocate(entry, factory.CreateOperation(IrClosureFrameSite.Description), frameType, frame);
-        var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
-            IrClosureFrameSite.FieldName(0), factory.IntegerType, false);
-        var store = builder.FieldStore(entry, factory.CreateOperation(), IrWriteRegion.Field,
-            factory.Cast(factory.ObjectType, factory.Variable(frame)), field, factory.Integer(1));
-
-        var admitted = IrClosureFrameSite.TryGetCapture(factory, allocation, store, 0,
-            ResourceStorageKind.Word32, out var captured);
-
-        Assert.That(factory.GetTypeInfo(factory.IntegerType).Width, Is.Zero);
-        Assert.That(admitted, Is.False);
-        Assert.That(captured.IsDefault, Is.True);
-    }
-
-    [Test]
     public void DetachedUnknownTypeCannotCertifyClosureStorage()
     {
         // Public factories reject undefined type kinds. Exercise the detached
@@ -130,7 +108,7 @@ public sealed class ResourceIrCoverageTests
     [Test]
     public void ObservedArraysCannotUseACorruptedIntegerStorageWidth()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var arrayType = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -167,7 +145,7 @@ public sealed class ResourceIrCoverageTests
     [TestCase(33, false)]
     public void ReferenceResolutionHonorsItsDepthBoundary(int depth, bool accepted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("owner", factory.ObjectType);
         var value = factory.CreateReferenceValue(factory.ObjectType, new object());
         var values = new Dictionary<IrVarId, IrValue> { [variable] = value };
@@ -181,7 +159,7 @@ public sealed class ResourceIrCoverageTests
     [TestCase(true)]
     public void PrimitiveAndNullObservationsCannotInventAnOwnedObjectIdentity(bool nullValue)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owned = factory.CreateReferenceValue(factory.ObjectType, new object());
         var identities = new List<IrValue> { owned };
         var value = nullValue ? factory.CreateNullValue(factory.ObjectType) : factory.CreateIntegerValue(0);
@@ -196,7 +174,7 @@ public sealed class ResourceIrCoverageTests
     {
         var instructionBudget = ResourceMemoryTrace.MaximumEvents / 4;
         var allocations = instructionBudget - (oneTooMany ? 0 : 1);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         for (var index = 0; index < allocations; index++)
@@ -252,7 +230,7 @@ public sealed class ResourceIrCoverageTests
     [Test]
     public void DetachedEarlierReturnCannotPublishAPartialAllocationEnvelope()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("allocated", factory.ObjectType);

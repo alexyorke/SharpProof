@@ -12,7 +12,7 @@ public sealed class CanonicalCacheDynamicViewTests
         object runtimeCache = unsignedCache ? Array.Empty<uint>() : Array.Empty<int>();
         object runtimeView = unsignedCache ? (int[])runtimeCache : (uint[])runtimeCache;
         Assert.That(ReferenceEquals(runtimeCache, runtimeView), Is.True);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.GetOrCreateIntegerType(32, !unsignedCache));
         var otherType = factory.GetOrCreateSequenceType(factory.GetOrCreateIntegerType(32, unsignedCache));
         var cached = factory.Cast(factory.ObjectType, factory.EmptyArray(type));

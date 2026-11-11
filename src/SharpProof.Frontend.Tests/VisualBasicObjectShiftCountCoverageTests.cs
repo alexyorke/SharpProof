@@ -83,7 +83,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         Assert.That(operation.OutConversion.IsUserDefined, Is.False);
         Assert.That(operation.Value.Type!.SpecialType, Is.EqualTo(SpecialType.System_Object));
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(SymbolEqualityComparer.Default.Equals(operation.Target.Type, target.Parameters[0].Type), Is.True);
@@ -104,7 +104,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
 
         var control = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Control").OfType<IMethodSymbol>().Single();
-        var controlFactory = new IrFactory(IrExecutionSemantics.Total);
+        var controlFactory = new IrFactory();
         var controlContext = new TotalLoweringContext(controlFactory, control);
         var controlGraph = ControlFlowGraph.Create(methods[1], model)!;
         Assert.That(controlContext.OwnsBody(controlGraph.OriginalOperation), Is.True);

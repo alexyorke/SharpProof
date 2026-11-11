@@ -22,7 +22,7 @@ public sealed partial class DotnetApiInventoryTests
                     { return false; }
                     var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Check");
                     var model = compilation.GetSemanticModel(tree);
-                    var factory = new IrFactory(IrExecutionSemantics.Total);
+                    var factory = new IrFactory();
                     var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
                     var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
                         static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);

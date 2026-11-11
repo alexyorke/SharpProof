@@ -10,7 +10,7 @@ public sealed class FuzzTypedDomainRegressionTests
     [TestCase(64)]
     public async Task SignedIntegerDomainUsesTheVariablesActualType(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, signed: true);
         var variable = factory.CreateVariable("value", type);
         var formula = factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable),

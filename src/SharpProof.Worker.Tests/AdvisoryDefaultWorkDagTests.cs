@@ -72,7 +72,7 @@ public sealed class AdvisoryDefaultWorkDagTests
     }
     private static (IrProgram Program, IrVarId Input, IrVarId MarkerVariable, IrAssignInstruction Marker) Build(int depth)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = factory.CreateVariable("input", factory.IntegerType);
         var markerVariable = factory.CreateVariable("marker", factory.BooleanType);
         IrTerm term = factory.Variable(input);

@@ -412,7 +412,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var enabled = factory.CreateVariable("enabled", factory.BooleanType);
         var satisfiable = factory.Binary(
@@ -485,7 +485,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm any = factory.Boolean(false);
         for (var index = 0; index < 32; index++)
         {
@@ -538,7 +538,7 @@ public sealed class FuzzRunnerTests
         int expectedFalse,
         int expectedUndefined)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
 
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(
@@ -565,7 +565,7 @@ public sealed class FuzzRunnerTests
             throw new ArgumentOutOfRangeException(nameof(seed));
         }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
         var result = await PartialTermSmtDifferentialOracle.CompareAsync(factory, generated, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement), result.Detail);
@@ -576,7 +576,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = PartialTermSmtCaseGenerator.Create(factory, 0);
         var second = PartialTermSmtCaseGenerator.Create(factory, 8);
         var printer = new IrPrinter(factory);
@@ -587,7 +587,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var goal = new Goal(
             factory,
@@ -659,7 +659,7 @@ public sealed class FuzzRunnerTests
     [Test]
     public async Task IrShrinkerIsDeterministicAndPreservesMismatch()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var variableTerm = factory.Variable(variable);
         var formula = factory.Binary(

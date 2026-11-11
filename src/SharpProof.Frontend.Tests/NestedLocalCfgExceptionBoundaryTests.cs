@@ -28,7 +28,7 @@ public sealed class NestedLocalCfgExceptionBoundaryTests
 
         var method = subject.Graph.LocalFunctions.Single();
         var graph = subject.Graph.GetLocalFunctionControlFlowGraph(method);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));

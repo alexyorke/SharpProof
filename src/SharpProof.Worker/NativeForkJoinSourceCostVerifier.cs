@@ -144,7 +144,7 @@ internal static class NativeForkJoinSourceCostVerifier
         try
         {
             if (string.IsNullOrWhiteSpace(root.CallableId) || projection.RootCallableId != root.CallableId || root.HasReceiver ||
-                root.Factory is null || root.Factory.Semantics != IrExecutionSemantics.Total || root.Parameters.IsDefault || root.Clauses.IsDefault ||
+                root.Factory is null || root.Parameters.IsDefault || root.Clauses.IsDefault ||
                 projection.RootParameterNames.IsDefault || projection.RootParameterNames.Length != root.Parameters.Length ||
                 root.Parameters.Length > ResourceExpression.MaximumNodes || projection.Children.IsDefault || projection.Children.Length is < 2 or > 16)
             { return Unknown("ForkJoinRootOwnershipInvalid"); }

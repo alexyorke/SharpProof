@@ -13,7 +13,7 @@ public sealed class NativeAcyclicLoopAdmissionTests
     [TestCase(true)]
     public async Task AcyclicOwnedProgramsNeedNoLoopEncodingAndRetainNativeProof(bool diamond)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var input = new PassiveParameterBinding(factory.CreateVariable("input:entry", factory.BooleanType),
             factory.CreateVariable("input:current", factory.BooleanType), factory.CreateVariable("input:old", factory.BooleanType));
         var result = factory.CreateVariable("result", factory.BooleanType);

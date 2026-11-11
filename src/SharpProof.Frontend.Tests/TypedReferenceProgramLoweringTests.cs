@@ -87,7 +87,7 @@ public sealed class TypedReferenceProgramLoweringTests
     [Test]
     public void ExistingTotalReplayDistinguishesNullLengthAndSequenceIdentity()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var left = factory.CreateVariable("left", sequenceType);
         var right = factory.CreateVariable("right", sequenceType);

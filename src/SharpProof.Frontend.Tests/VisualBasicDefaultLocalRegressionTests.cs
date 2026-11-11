@@ -31,7 +31,7 @@ public sealed class VisualBasicDefaultLocalRegressionTests
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
             var graph = ControlFlowGraph.Create(syntax, model)!;
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             var lowered = RoslynProgramLowering.LowerCandidate(graph, context);

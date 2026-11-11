@@ -12,7 +12,7 @@ public sealed class StackCountWitnessTests
     [TestCase(int.MaxValue)]
     public void CountPreferenceDoesNotNarrowProofsAndOversizedWitnessesAreRejected(int count)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("stack", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:stack:count", factory.IntegerType, false);
         var read = factory.PureOpaque(field, factory.Variable(variable));

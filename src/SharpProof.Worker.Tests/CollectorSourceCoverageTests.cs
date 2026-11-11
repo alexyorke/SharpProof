@@ -91,9 +91,7 @@ public sealed class CollectorSourceCoverageTests
         {
             Assert.That(trees, Has.Count.EqualTo(1));
             Assert.That(references, Is.Not.Empty);
-            Assert.That(preparation.Total!.Program.Factory.Semantics,
-                Is.EqualTo(IrExecutionSemantics.Total));
-            Assert.That(preparation.Total.EffectsCompleteAtEntry, Is.True);
+            Assert.That(preparation.Total!.EffectsCompleteAtEntry, Is.True);
             Assert.That(decoded.Total, Is.Not.Null);
             Assert.That(artifact.Compilation.SyntaxTrees, Has.Length.EqualTo(1));
         }

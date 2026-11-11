@@ -2232,7 +2232,7 @@ public sealed class NativeTaskCarrierStorageTests
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single();
         var projection = CompilerForkJoinResourceLowering.Lower(method, compilation, "root", TestContext.CurrentContext.CancellationToken).Projection!;
         Assert.That(projection, Is.Not.Null);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new CompilerTotalParameter(factory.CreateVariable("entry:n", factory.IntegerType),
             factory.CreateVariable("current:n", factory.IntegerType), factory.CreateVariable("old:n", factory.IntegerType));
         return (compilation, method, projection, new("root", factory, [parameter], []));

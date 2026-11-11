@@ -46,7 +46,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
             Assert.That(method.Parameters, Has.Length.EqualTo(1));
             Assert.That(SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, method.ReturnType), Is.True);
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var mapped = CompilerSpecificationScalarDomain.MapType(factory, method.ReturnType);
         using (Assert.EnterMultipleScope())
         {

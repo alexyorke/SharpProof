@@ -15,7 +15,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var (compilation, target) = Import("Valid");
         Assert.That(target.Parameters[0].GetAttributes().Single().ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
             Is.EqualTo(ImmutableArray.Create<object>(-2L, 2L)));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var result = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -45,7 +45,7 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var invalid = target.Parameters.Last().GetAttributes().Single();
         Assert.That(invalid.ConstructorArguments.Select(argument => ((argument.Kind == Microsoft.CodeAnalysis.TypedConstantKind.Array) ? throw new System.ArgumentException("Value must be initialized.", nameof(argument)) : (argument.Value))),
             Is.EqualTo(ImmutableArray.Create<object>(2L, 1L)));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var result = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(context, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));

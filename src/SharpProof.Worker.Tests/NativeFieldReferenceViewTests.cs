@@ -130,7 +130,7 @@ public sealed class NativeFieldReferenceViewTests
 
     private static TypedScenario CreateTypedScenario(string typeName, bool upcastStoreView)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (fieldType, isBoolean, width, signed) = typeName switch
         {
             "Boolean" => (factory.BooleanType, true, 0, false),
@@ -191,7 +191,7 @@ public sealed class NativeFieldReferenceViewTests
 
     private static Scenario CreateScenario(bool upcastStoreView)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "BoxRef");
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), boxType, "field:Value",
             factory.IntegerType, isStatic: false);

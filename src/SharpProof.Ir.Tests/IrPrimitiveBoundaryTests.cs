@@ -30,7 +30,7 @@ public sealed class IrPrimitiveBoundaryTests
     [Test]
     public void ArrayStorageCompatibilityRequiresSequenceTypes()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
         Assert.That(IrArrayStorage.CompatibleIntegerViews(factory, factory.IntegerType, sequence), Is.False);
         Assert.That(IrArrayStorage.CompatibleIntegerViews(factory, sequence, factory.IntegerType), Is.False);
@@ -43,7 +43,7 @@ public sealed class IrPrimitiveBoundaryTests
         Assert.Throws<ArgumentException>((Action)(() => factory.CreateVariable(" ", factory.IntegerType)));
         Assert.Throws<ArgumentException>((Action)(() => factory.Binary(IrBinaryOperator.Equal, factory.Integer(0), factory.Boolean(false))));
         var integer = (IrIntegerTerm)factory.Integer(3);
-        Assert.That(integer.Width, Is.Zero);
+        Assert.That(integer.Width, Is.EqualTo(32));
         Assert.That(integer.Value, Is.EqualTo(3));
         Assert.That(factory.CreateVariable("valid", factory.IntegerType).IsDefault, Is.False);
     }

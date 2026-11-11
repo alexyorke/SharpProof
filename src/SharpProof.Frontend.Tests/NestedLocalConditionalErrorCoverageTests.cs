@@ -126,7 +126,7 @@ public sealed class NestedLocalConditionalErrorCoverageTests
         Assert.That(local.Name, Is.EqualTo("Local"));
         Assert.That(SymbolEqualityComparer.Default.Equals(local.ContainingSymbol.OriginalDefinition, target.OriginalDefinition), Is.True);
         var graph = outer.GetLocalFunctionControlFlowGraph(local);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, local);
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

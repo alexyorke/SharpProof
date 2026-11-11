@@ -8,7 +8,7 @@ public sealed class IrWriteObserverTests
     [Test]
     public void InvalidFieldStoreDoesNotNotifyWriteObservers()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);

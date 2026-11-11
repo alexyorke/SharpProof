@@ -22,7 +22,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(
             Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!, context, static _ => true, null,
@@ -56,7 +56,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var target = model.GetDeclaredSymbol(syntax)!;
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         var admitted = session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph);
@@ -85,7 +85,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out _), Is.True);
@@ -102,7 +102,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
         var invocation = (IInvocationOperation)model.GetOperation(methods[0].ExpressionBody!.Expression)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(methods[0])!);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out _), Is.True);
@@ -131,7 +131,7 @@ public sealed class ArrayReceiverModelOwnershipTests
             .SelectMany(operation => operation is null ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf())
             .OfType<IInvocationOperation>().Single() :
             (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
@@ -173,7 +173,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var locals = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>().ToImmutableArray();
         var read = (IMethodSymbol)model.GetDeclaredSymbol(locals[0])!;
         var other = (IMethodSymbol)model.GetDeclaredSymbol(locals[1])!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var frame = new TotalLoweringContext(factory, read);
         frame.SpecializeArrayParameter(read.Parameters[0], compilation.CreateArrayTypeSymbol(compilation.GetSpecialType(SpecialType.System_Int32)));
         Assert.That(frame.Type(read.TypeParameters[0]), Is.EqualTo(factory.IntegerType));
@@ -204,7 +204,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
             method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var invocation = (IInvocationOperation)model.GetOperation(syntax.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.True);
@@ -222,7 +222,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
             method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var session = new TotalSourceCallSession(compilation, static _ => true, null, default);
         Assert.That(session.TryPrepare(context, invocation.TargetMethod, null, invocation.Arguments, out var frame, out var graph), Is.False);
@@ -239,7 +239,7 @@ public sealed class ArrayReceiverModelOwnershipTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
             method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
         var target = model.GetDeclaredSymbol(syntax)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.KnownScalarType(target.TypeParameters[0]), Is.Null);
         Assert.That(context.KnownScalarType(null), Is.Null);

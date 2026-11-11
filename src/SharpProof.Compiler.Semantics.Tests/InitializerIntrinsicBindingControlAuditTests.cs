@@ -28,7 +28,7 @@ public sealed class InitializerIntrinsicBindingControlAuditTests
         var constructor = compilation.GetTypeByMetadataName("Subject")!.InstanceConstructors
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == 1));
         var inventory = new ContractClauseInventoryBuilder(compilation).Create(constructor);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binder = new ContractBinder(compilation);
         var totalBinder = new TotalContractBinder(binder, factory);
         var legacy = binder.Bind(constructor);

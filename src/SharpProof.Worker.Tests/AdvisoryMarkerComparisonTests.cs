@@ -90,7 +90,7 @@ internal sealed class AdvisoryMarkerComparisonTests
     [Test]
     public void OwnedNonComparisonMarkerRetainsUnknownBooleanInterval()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var resultVariable = factory.CreateVariable("result", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
@@ -112,7 +112,7 @@ internal sealed class AdvisoryMarkerComparisonTests
     [Test]
     public void OwnedBooleanLiteralMarkerRetainsSingletonTrue()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var resultVariable = factory.CreateVariable("result", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -131,7 +131,7 @@ internal sealed class AdvisoryMarkerComparisonTests
     private static (IrProgram Program, IrVarId Left, IrVarId Right, IrVarId Result, IrAssignInstruction Marker)
         Build(IrBinaryOperator operation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.IntegerType);
         var right = factory.CreateVariable("right", factory.IntegerType);
         var result = factory.CreateVariable("result", factory.BooleanType);

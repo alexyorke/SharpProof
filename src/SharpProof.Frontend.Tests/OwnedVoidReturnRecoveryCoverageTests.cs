@@ -81,7 +81,7 @@ public sealed class OwnedVoidReturnRecoveryCoverageTests
             Assert.That(graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).Where(value => value != null), Is.Empty);
         }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.Factory, Is.SameAs(factory));
         Assert.That(SymbolEqualityComparer.Default.Equals(context.Target, target), Is.True);

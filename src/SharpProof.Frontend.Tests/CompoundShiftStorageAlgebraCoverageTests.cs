@@ -15,7 +15,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     [TestCase(0, false)]
     public void OwnedStorageRuleRetainsRejectedCountDomain(int countWidth, bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var countType = countWidth == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(countWidth, isSigned);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var count = factory.CreateVariable("count", countType);
@@ -31,7 +31,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     [TestCase(true)]
     public void OwnedNarrowStorageRequiresKnownCheckedContext(bool invalidCount)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var valueType = factory.GetOrCreateIntegerType(8, true);
         var countType = invalidCount ? factory.BooleanType : factory.IntegerType;
         var value = factory.CreateVariable("value", valueType);
@@ -49,7 +49,7 @@ public sealed class CompoundShiftStorageAlgebraCoverageTests
     [TestCase(true, 17, 34, false)]
     public void OwnedNarrowStoragePreservesValueAndOverflowFault(bool isChecked, int input, int expected, bool overflow)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, true);
         var value = factory.CreateVariable("value", type);
         var count = factory.CreateVariable("count", factory.IntegerType);

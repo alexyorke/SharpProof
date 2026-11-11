@@ -43,7 +43,7 @@ public sealed class TotalClosedAttributeBoundarySampleTests
         Assert.That(target.Parameters, Has.Length.EqualTo(1));
         Assert.That(target.Parameters[0].GetAttributes(), Has.Length.EqualTo(1));
         Assert.That(target.GetReturnTypeAttributes(), Has.Length.EqualTo(1));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var bound = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());

@@ -13,7 +13,7 @@ public sealed class NativeTypedModuleAdmissionTests
     [TestCase(true, true)]
     public async Task LegalSequenceTypesRespectTheNativeModuleAdmissionDomain(bool nested, bool resultBinding)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flat = factory.GetOrCreateSequenceType(factory.IntegerType);
         var type = nested ? factory.GetOrCreateSequenceType(flat) : flat;
         var builder = new IrProgramBuilder(factory);

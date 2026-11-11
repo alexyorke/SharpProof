@@ -192,7 +192,6 @@ internal sealed class CompilerCallableLowererTests
             "Verify");
 
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
     [Test]
@@ -249,7 +248,6 @@ internal sealed class CompilerCallableLowererTests
 
         var preparation = CompilerManifestArtifactJson.DecodeCallables(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
     }
 
     [Test]

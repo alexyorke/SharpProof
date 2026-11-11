@@ -65,7 +65,7 @@ public sealed class DictionaryClauseAdmissionBoundaryTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         context.TrackDefaultDictionaries(ControlFlowGraph.Create(syntax, model)!);
         return (model, syntax, context);
     }

@@ -43,14 +43,13 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 "error:" + CompilerIdentityBridge.CreateTypeDisplay(type));
         }
 
-        if (_factory.Semantics == IrExecutionSemantics.Total &&
-            CSharpOperationSemantics.MapType(_factory, type.SpecialType) is { } scalar)
+        if (CSharpOperationSemantics.MapType(_factory, type.SpecialType) is { } scalar)
         {
             return scalar;
         }
 
         // Total IR keeps multidimensional arrays as opaque references.
-        if (type is IArrayTypeSymbol array && (array.IsSZArray || _factory.Semantics != IrExecutionSemantics.Total))
+        if (type is IArrayTypeSymbol array && (array.IsSZArray))
         {
             var element = GetTypeId(array.ElementType);
             return _factory.GetOrCreateSequenceType(
@@ -67,7 +66,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
             _factory.GetOrCreateReferenceType(
                 CompilerIdentityBridge.InternType(_factory, type),
                 CompilerIdentityBridge.CreateTypeDisplay(type));
-        if (_factory.Semantics == IrExecutionSemantics.Total && _factory.GetTypeInfo(mapped).Kind == IrTypeKind.Reference)
+        if (_factory.GetTypeInfo(mapped).Kind == IrTypeKind.Reference)
         {
             if (!_closedSealedTypes.TryGetValue(type, out var certified))
             {

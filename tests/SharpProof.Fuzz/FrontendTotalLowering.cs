@@ -140,7 +140,7 @@ internal sealed class FrontendTotalBody
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(syntax);
         ArgumentNullException.ThrowIfNull(model);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var graph = ControlFlowGraph.Create(syntax, model, cancellationToken) ??
             throw new InvalidOperationException("The method has no control-flow graph.");

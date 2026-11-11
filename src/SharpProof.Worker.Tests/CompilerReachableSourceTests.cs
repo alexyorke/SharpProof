@@ -313,7 +313,6 @@ public sealed class CompilerReachableSourceTests
     [TestCase("root")]
     [TestCase("root-swap")]
     [TestCase("edge")]
-    [TestCase("graph")]
     [TestCase("location")]
     [TestCase("document")]
     [TestCase("unreachable")]
@@ -362,13 +361,6 @@ public sealed class CompilerReachableSourceTests
             case "edge":
                 {
                     leaf = leaf with { Callees = ["wrong"] };
-                    graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
-                    artifact = artifact with { ReachableSource = graph };
-                }
-                break;
-            case "graph":
-                {
-                    leaf = leaf with { Graph = leaf.Graph! with { Semantics = IrExecutionSemantics.Legacy } };
                     graph = graph with { Bodies = graph.Bodies.ReplaceReference(graph.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Graph != null && !body.IsCallSkeleton)), leaf) };
                     artifact = artifact with { ReachableSource = graph };
                 }

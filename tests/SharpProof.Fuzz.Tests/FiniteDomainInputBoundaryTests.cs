@@ -12,7 +12,7 @@ public sealed class FiniteDomainInputBoundaryTests
     [TestCase(false)]
     public void CandidateEnumerationRejectsMissingOwnedInputs(bool missingFactory)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var term = factory.Boolean(true);
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
@@ -34,7 +34,7 @@ public sealed class FiniteDomainInputBoundaryTests
     [TestCase(false)]
     public void FormulaValidationRejectsMissingOwnedInputs(bool missingFactory)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var formula = factory.Boolean(true);
         var error = Assert.Throws<ArgumentNullException>((Action)(() =>
         {
@@ -48,7 +48,7 @@ public sealed class FiniteDomainInputBoundaryTests
     [Test]
     public void OwnedIntegerTermIsRejectedAsANonBooleanFormula()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var error = Assert.Throws<ArgumentException>((Action)(() =>
         {
             _ = FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, factory.Integer(1), cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -60,7 +60,7 @@ public sealed class FiniteDomainInputBoundaryTests
     [Test]
     public async Task OwnedStringEqualityAbstainsOutsideTheFiniteScalarDomain()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         var formula = factory.Binary(IrBinaryOperator.Equal, factory.Variable(text), factory.String("sample"));
         Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
@@ -77,7 +77,7 @@ public sealed class FiniteDomainInputBoundaryTests
     [Test]
     public void TotalOwnedDivisionRemainsDefinedAndProducesActualPreparation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
         var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
@@ -94,23 +94,11 @@ public sealed class FiniteDomainInputBoundaryTests
         Assert.That(atZero.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(atZero.Value!.Integer, Is.EqualTo(-1));
     }
-    [Test]
-    public void LegacyOwnedDivisionDoesNotProduceAPreparedFormula()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Legacy);
-        var value = factory.CreateVariable("value", factory.IntegerType);
-        var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), factory.Variable(value));
-        var formula = factory.Binary(IrBinaryOperator.GreaterThan, division, factory.Integer(0));
-        Assert.That(FiniteDomainSmtDifferentialOracle.IsDefinedForAllAssignments(factory, formula, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
-        Assert.That(FiniteDomainSmtDifferentialOracle.TryPrepareForCampaign(factory, formula,
-            TestContext.CurrentContext.CancellationToken, out var prepared), Is.False);
-        Assert.That(prepared, Is.Null);
-    }
 
     [Test]
     public async Task GuardedOwnedDivisionRetainsPreparedAndDirectNativeAgreement()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var variable = factory.Variable(value);
         var division = factory.Binary(IrBinaryOperator.Divide, factory.Integer(1), variable);

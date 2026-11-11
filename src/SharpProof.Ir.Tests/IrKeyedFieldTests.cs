@@ -10,7 +10,7 @@ public sealed class IrKeyedFieldTests
     [TestCase(long.MaxValue)]
     public void ObservedEntryCellsPreserveTypedKeysSnapshotsAndInvalidation(long bits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var keyType = factory.GetOrCreateIntegerType(64, true);
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var old = factory.CreateVariable("old", factory.ObjectType);
@@ -38,7 +38,7 @@ public sealed class IrKeyedFieldTests
     [Test]
     public void ObservedEntryCellRejectsNonIntegerKeysAndWrongValueTypes()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:map", factory.IntegerType, false, factory.IntegerType);
         var state = new IrObjectState();
@@ -55,7 +55,7 @@ public sealed class IrKeyedFieldTests
     [TestCase(long.MaxValue)]
     public void KeyedStoresUseReceiverFieldAndFullWidthKeyIdentity(long key)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var keyType = factory.GetOrCreateIntegerType(64, true);
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var alias = factory.CreateVariable("alias", factory.ObjectType);
@@ -83,7 +83,7 @@ public sealed class IrKeyedFieldTests
     [TestCase(true)]
     public void UnknownWritesInvalidateKeyedCellsAndFreshDefaults(bool restore)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:presence", factory.BooleanType, false, factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -104,7 +104,7 @@ public sealed class IrKeyedFieldTests
     [Test]
     public void FieldStoresRejectMissingExtraAndWronglyTypedKeys()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.Variable(factory.CreateVariable("owner", factory.ObjectType));
         var keyed = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:keyed", factory.IntegerType, false, factory.IntegerType);
         var plain = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:plain", factory.IntegerType, false);
@@ -121,7 +121,7 @@ public sealed class IrKeyedFieldTests
     [Test]
     public void NonIntegerOpaqueArgumentsDoNotBecomeHeapReads()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:not-keyed-storage", factory.IntegerType, false, factory.BooleanType);
         var read = factory.PureOpaque(member, factory.Variable(owner), factory.Boolean(true));

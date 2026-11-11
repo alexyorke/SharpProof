@@ -36,7 +36,7 @@ public sealed class PartialNativeObservationControls
             StringComparer.Ordinal);
         Assert.That(methods, Has.Count.EqualTo(3));
         var model = compilation.GetSemanticModel(tree);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = LowerActual("Target");
         var control = LowerActual("Control");
         var unsupported = LowerActual("Unsupported");

@@ -2104,7 +2104,6 @@ internal sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
-        Assert.That(backend.Query.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(response.ClaimResults.Single().ProofCore, Is.Empty);
     }
     [Test]
@@ -2130,9 +2129,6 @@ internal sealed partial class WorkerTests
             record.Outcome,
             Is.EqualTo(WorkerClaimOutcome.Proven),
             record.Reason.ToString());
-        Assert.That(
-            backend.Query.Factory.Semantics,
-            Is.EqualTo(IrExecutionSemantics.Total));
         var userAssumptions = record.Assumptions
             .Where(static evidence =>
                 evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.UserAssume)).ToImmutableArray();
@@ -3443,10 +3439,6 @@ internal sealed partial class WorkerTests
             Assert.That(withArtifact.SpecificationPackIds.Single(), Is.EqualTo("dotnet.scalar"));
         }
 
-        { withArtifact = withArtifact with { Callables = withArtifact.Callables.ReplaceReference(withArtifact.Callables.Single(), withArtifact.Callables.Single() with { Total = withArtifact.Callables.Single().Total! with { Graph = withArtifact.Callables.Single().Total!.Graph with { Semantics = IrExecutionSemantics.Legacy } } }) }; }
-        Assert.That(
-            new Action(() => CompilerManifestArtifactJson.DecodeCallables(withArtifact, cancellationToken: TestContext.CurrentContext.CancellationToken)),
-            Throws.TypeOf<InvalidDataException>());
     }
 
     [TestCase("Contract.Result<int>() == (left >= right ? left : right)", WorkerClaimOutcome.Proven)]
@@ -3827,7 +3819,6 @@ internal sealed partial class WorkerTests
 
         Assert.That(response.Errors, Is.Empty);
         AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
-        Assert.That(backend.Query.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(response.ClaimResults.Single().ProofCore,
             Does.Not.Contain("spec:bcl.string.concat.string-string"));
     }

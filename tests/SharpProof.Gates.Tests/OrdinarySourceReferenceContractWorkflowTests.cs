@@ -48,7 +48,7 @@ public sealed class OrdinarySourceReferenceContractWorkflowTests
             Is.EqualTo("SharpProof.Attributes.PositiveAttribute"));
         var session = new AnalyzerSession(compilation, CompilerConfiguration.AdvisoryAll, TestContext.CurrentContext.CancellationToken);
         Assert.That(session.HasPotentialCallPreconditions(method), Is.True);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());

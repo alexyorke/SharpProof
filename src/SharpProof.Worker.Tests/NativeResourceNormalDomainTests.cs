@@ -12,7 +12,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(11)]
     public void BranchSnapshotFoldingCannotFollowEdgesAfterTheSharedBudgetIsExhausted(int reserve)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
@@ -34,7 +34,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(96, false)]
     public void DeepArrayExtentSnapshotsRemainUnknownWithoutInventingNormalCompletion(int aliases, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var current = factory.CreateVariable("extent", factory.IntegerType);
@@ -62,7 +62,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(IrBinaryOperator.Divide)]
     public void NumericSnapshotExpressionsCannotBecomeBooleanFacts(IrBinaryOperator operation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.IntegerType);
         var right = factory.CreateVariable("right", factory.IntegerType);
         var definitions = new Dictionary<IrVarId, IrTerm>
@@ -80,7 +80,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(4, true)]
     public void AllocationSuccessRecognitionCannotBorrowBudgetFromItsContinuation(int budget, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var failure = builder.CreateBlock();
@@ -115,7 +115,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(IrBinaryOperator.GreaterThanOrEqual, false)]
     public void ImmutableIntegerSnapshotsSelectOnlyTheProvedNormalEdge(IrBinaryOperator operation, bool taken)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var left = factory.CreateVariable("left", factory.IntegerType);
@@ -141,7 +141,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(true, true, true)]
     public void BooleanSnapshotsPreserveNegationAndBothShortCircuitOperators(bool first, bool second, bool disjunction)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var left = factory.CreateVariable("left", factory.BooleanType);
@@ -165,7 +165,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(2, true)]
     public void DivisionNeedsAnImmutablePositiveDivisor(int divisor, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var denominator = factory.CreateVariable("denominator", factory.IntegerType);
@@ -182,7 +182,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(8, 256, false)]
     public void ConvertedDivisorsRequireAValuePreservingConstant(int width, int divisor, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var wide = factory.GetOrCreateIntegerType(64, signed: true);
@@ -200,7 +200,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(3)]
     public void PreconditionsCannotSilentlyRestrictTheNormalDomain(int mode)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         builder.Return(builder.CreateBlock(), factory.CreateOperation());
         var clause = new CompilerTotalClause(CompilerContractKind.Requires, factory.Boolean(mode != 1), factory.Boolean(mode != 2),
@@ -215,7 +215,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(true)]
     public void ExhaustedInstructionBudgetsAndAbsentReturnsDoNotEstablishNormalCompletion(bool exhausted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (exhausted)
@@ -233,7 +233,7 @@ internal sealed class NativeResourceNormalDomainTests
     [Test]
     public void BodyAbstractionsAndCancellationCannotPublishNormalCompletionEvidence()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         builder.Return(builder.CreateBlock(), factory.CreateOperation());
         var owner = new CompilerTotalCallablePreparation("owner", builder.Build(), [], null, []) { IsBodyAbstraction = true };
@@ -251,7 +251,7 @@ internal sealed class NativeResourceNormalDomainTests
     {
         if (aliases is not (30 or 31))
         { throw new ArgumentOutOfRangeException(nameof(aliases)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var current = factory.CreateVariable("divisor", factory.IntegerType);
@@ -276,7 +276,7 @@ internal sealed class NativeResourceNormalDomainTests
     public void OneSharedBudgetCoversClausesRegionsInstructionsAndReturnTerms(int clauses, string expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         builder.Return(builder.CreateBlock(), factory.CreateOperation(), factory.Integer(7));
         var clause = new CompilerTotalClause(CompilerContractKind.Requires, factory.Boolean(true), factory.Boolean(true),
@@ -291,7 +291,7 @@ internal sealed class NativeResourceNormalDomainTests
     [TestCase(32, false)]
     public void BooleanSnapshotDepthCannotDiscardAnUnprovedExceptionalEdge(int aliases, bool admitted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var current = factory.CreateVariable("condition", factory.BooleanType);

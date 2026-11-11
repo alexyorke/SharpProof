@@ -506,7 +506,7 @@ internal sealed class IrProgramTests
                     resultVariable,
                     member,
                     factory.Null(receiverType),
-                    DivisionByZero(factory));
+                    UnboundRead(factory));
             });
     }
 
@@ -534,7 +534,7 @@ internal sealed class IrProgramTests
                     resultVariable,
                     builder.SequenceLocation(
                         factory.Null(sequenceType),
-                        DivisionByZero(factory)));
+                        UnboundRead(factory)));
             });
     }
 
@@ -551,7 +551,7 @@ internal sealed class IrProgramTests
             sequence,
             "failing-store",
             "failing-return",
-            DivisionByZero(factory));
+            UnboundRead(factory));
         var (boundsProgram, boundsStore) = BuildStoreProgram(
             factory,
             sequence,
@@ -568,11 +568,11 @@ internal sealed class IrProgramTests
 
         Assert.That(
             failing.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(failing.Instruction, Is.SameAs(failingStore));
         Assert.That(
-            failing.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+            failing.Unsupported!.Reason,
+            Is.EqualTo(IrUnsupportedReason.MissingVariable));
         Assert.That(
             bounds.Status,
             Is.EqualTo(IrProgramExecutionStatus.Exception));
@@ -641,11 +641,11 @@ internal sealed class IrProgramTests
 
         Assert.That(
             result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
+            Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(result.Instruction, Is.SameAs(instruction));
         Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+            result.Unsupported!.Reason,
+            Is.EqualTo(IrUnsupportedReason.MissingVariable));
     }
 
     private static IrProgram CreateShape()
@@ -664,12 +664,10 @@ internal sealed class IrProgramTests
         return builder.Build();
     }
 
-    private static IrTerm DivisionByZero(IrFactory factory)
+    // Reading an unbound variable stops evaluation; Total arithmetic never faults.
+    private static IrVariableTerm UnboundRead(IrFactory factory)
     {
         System.ArgumentNullException.ThrowIfNull(factory);
-        return factory.Binary(
-            IrBinaryOperator.Divide,
-            factory.Integer(1),
-            factory.Integer(0));
+        return factory.Variable(factory.CreateVariable("unbound", factory.IntegerType));
     }
 }

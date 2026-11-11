@@ -56,7 +56,7 @@ internal static class CompilerReachableSourceValidator
             if (body.Graph != null)
             {
                 var decoded = PortableIrGraphCodec.Decode(body.Graph, externalVariableIndices: null, cancellationToken: cancellationToken);
-                Require(decoded.Factory.Semantics == IrExecutionSemantics.Total && decoded.Program != null &&
+                Require(decoded.Program != null &&
                     decoded.Program.Blocks.Length <= 4096 && decoded.Instructions.Length <= 4096);
                 graphBuilder.AddUnique(body.BodyId, decoded);
                 foreach (var operation in body.Graph.Operations)

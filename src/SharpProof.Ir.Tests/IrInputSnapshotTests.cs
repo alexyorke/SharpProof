@@ -9,7 +9,7 @@ public sealed class IrInputSnapshotTests
     [Test]
     public void ReadObserverCannotChangeTheCapturedVariableEnvironment()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.IntegerType);
         var second = factory.CreateVariable("second", factory.IntegerType);
         // The mutable input dictionary is the ownership boundary under test.
@@ -35,7 +35,7 @@ public sealed class IrInputSnapshotTests
     [Test]
     public void ReadObserverCannotChangeReadOnlyDictionaryFallbackSnapshot()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.IntegerType);
         var second = factory.CreateVariable("second", factory.IntegerType);
         // Mutating this backing input during observation is the subject under test.
@@ -62,8 +62,8 @@ public sealed class IrInputSnapshotTests
     [Test]
     public void CapturedDictionaryPreservesItsKeyComparer()
     {
-        var otherFactory = new IrFactory(IrExecutionSemantics.Total);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var otherFactory = new IrFactory();
+        var factory = new IrFactory();
         var other = otherFactory.CreateVariable("other", otherFactory.IntegerType);
         var current = factory.CreateVariable("current", factory.IntegerType);
         var comparer = EqualityComparer<IrVarId>.Create(

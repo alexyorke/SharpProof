@@ -9,7 +9,7 @@ public sealed class IrResourceBoundTests
     [Test]
     public void AcyclicOrderingDoesNotReturnAnIncompleteOrderWhenBudgetIsSpent()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation(), factory.Integer(1));
@@ -51,7 +51,7 @@ public sealed class IrResourceBoundTests
     private static (IrInterpreter Interpreter, IrTerm Read, System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue> Values,
         IrHeap Heap, IrVarId First) BuildSnapshotSelectionFixture(int leafCount, bool chooseFirst)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence = factory.CreateSequenceValue(type, [factory.CreateIntegerValue(3)]);
         var heap = new IrHeap();

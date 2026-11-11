@@ -546,7 +546,7 @@ internal sealed class IrInterpreter(IrFactory factory)
 
         if (_factory.GetTypeInfo(left.Type).Width != 0)
         {
-            var typed = IrBitVectorOperations.Evaluate(@operator, left.IntegerData, right.IntegerData, _factory.Semantics);
+            var typed = IrBitVectorOperations.Evaluate(@operator, left.IntegerData, right.IntegerData);
             return typed.Kind switch
             {
                 IrScalarResultKind.Integer => Value(_factory.CreateIntegerValueFromBits(left.Type, typed.Bits)),
@@ -594,8 +594,7 @@ internal sealed class IrInterpreter(IrFactory factory)
             (IrValueKind.Boolean, IrValueKind.Boolean) => left.Boolean == right.Boolean,
             (IrValueKind.Integer, IrValueKind.Integer) => left.IntegerBits == right.IntegerBits,
             (IrValueKind.String, IrValueKind.String) =>
-                _factory.Semantics == IrExecutionSemantics.Total ? ReferenceEquals(left.String, right.String) :
-                    string.Equals(left.String, right.String, StringComparison.Ordinal),
+                ReferenceEquals(left.String, right.String),
             (IrValueKind.Reference, IrValueKind.Reference) =>
                 ReferenceEquals(left.Reference, right.Reference),
             (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left.SequenceIdentity, right.SequenceIdentity),
@@ -684,8 +683,7 @@ internal sealed class IrInterpreter(IrFactory factory)
                 return Value(_factory.CreateNullValue(targetType));
             }
 
-            return CastFault(targetType, IrExceptionKind.NullReference,
-                "Null cannot be unboxed to a non-nullable IR type.");
+            return DefaultValue(targetType);
         }
 
         // Literal and supplied string values have a concrete identity.
@@ -704,8 +702,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         }
 
         // A Total array widened to object keeps the array as its identity.
-        if (targetType == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence &&
-            _factory.Semantics == IrExecutionSemantics.Total)
+        if (targetType == _factory.ObjectType && operand.Value.Kind == IrValueKind.Sequence)
         { return Value(_factory.CreateReferenceValue(targetType, operand.Value.SequenceIdentity)); }
 
         if (operand.Value.Kind != IrValueKind.Reference)
@@ -717,15 +714,14 @@ internal sealed class IrInterpreter(IrFactory factory)
         // Total casts between class types keep the reference; a downcast's
         // type test is a separate approximated guard.
         if (targetType == _factory.ObjectType ||
-            target.Kind == IrTypeKind.Reference && _factory.Semantics == IrExecutionSemantics.Total)
+            target.Kind == IrTypeKind.Reference)
         { return Value(_factory.CreateReferenceValue(targetType, operand.Value.Reference)); }
 
         if (target.Kind == IrTypeKind.String)
         {
             return operand.Value.Reference is string value
                 ? Text(value)
-                : CastFault(targetType, IrExceptionKind.InvalidCast,
-                    "The concrete reference is not a string.");
+                : DefaultValue(targetType);
         }
         if (target.Kind == IrTypeKind.Integer)
         {
@@ -745,19 +741,17 @@ internal sealed class IrInterpreter(IrFactory factory)
                 };
                 return bits.HasValue
                     ? Value(_factory.CreateIntegerValueFromBits(targetType, bits.Value))
-                    : CastFault(targetType, IrExceptionKind.InvalidCast, "The boxed integer has a different width or signedness.");
+                    : DefaultValue(targetType);
             }
             return operand.Value.Reference is long value
                 ? Integer(value)
-                : CastFault(targetType, IrExceptionKind.InvalidCast,
-                    "The concrete reference does not contain a boxed integer.");
+                : DefaultValue(targetType);
         }
         if (target.Kind == IrTypeKind.Boolean)
         {
             return operand.Value.Reference is bool value
                 ? Boolean(value)
-                : CastFault(targetType, IrExceptionKind.InvalidCast,
-                    "The concrete reference does not contain a boxed boolean.");
+                : DefaultValue(targetType);
         }
 
         return Unsupported(IrUnsupportedReason.UnsupportedCast,
@@ -776,8 +770,7 @@ internal sealed class IrInterpreter(IrFactory factory)
 
         if (value.Value!.Kind == IrValueKind.Null)
         {
-            return _factory.Semantics == IrExecutionSemantics.Total ? Integer(0)
-                : Fault(IrExceptionKind.NullReference, "Length was requested from null.");
+            return Integer(0);
         }
 
         return value.Value.Kind switch
@@ -803,7 +796,7 @@ internal sealed class IrInterpreter(IrFactory factory)
         }
 
         var invalid = ValidateSequenceAccess(sequence.Value!, index.Value!);
-        if (invalid?.Status == IrEvaluationStatus.Exception && _factory.Semantics == IrExecutionSemantics.Total)
+        if (invalid?.Status == IrEvaluationStatus.Exception)
         {
             return DefaultValue(access.Type);
         }
@@ -826,12 +819,6 @@ internal sealed class IrInterpreter(IrFactory factory)
             : InvalidValue("The stored array element has an incompatible view.");
     }
 
-    private IrEvaluationResult CastFault(IrTypeId type, IrExceptionKind kind, string detail)
-    {
-        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        return _factory.Semantics == IrExecutionSemantics.Total ? DefaultValue(type) : Fault(kind, detail);
-    }
 
     private IrEvaluationResult DefaultValue(IrTypeId type)
     {

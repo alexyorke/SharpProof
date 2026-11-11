@@ -93,7 +93,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     public void RequiresOnlySkipsUnsupportedActualAssumeAndEnsuresBeforeLowering()
     {
         var compilation = Compile(SourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, "DirectCases", "UnsupportedNonRequires");
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -134,7 +134,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     public void LocalVariableRawCandidateRejectsAtomicallyAfterActualCanonicalPrefix()
     {
         var compilation = Compile(SourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, "DirectCases", "AtomicPrefix");
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));
@@ -166,7 +166,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     public void ActualStaticAndInstanceSourceFramesRejectCrossWiredContexts()
     {
         var compilation = Compile(SourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var staticTarget = Method(compilation, "StaticTarget", "Run");
         var instanceTarget = Method(compilation, "InstanceTarget", "Run");
         Assert.That(staticTarget.IsStatic, Is.True);
@@ -215,7 +215,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     public void ActualCompanionParameterCountMismatchRejectsAsModuleInput()
     {
         var compilation = Compile(SourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sourceTarget = Method(compilation, "StaticTarget", "Run");
         var destinationTarget = Method(compilation, "TwoParameterTarget", "Run");
         var resolver = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken);
@@ -259,7 +259,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
             }
             """;
         var compilation = Compile(sourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, "OrderedTarget", "Run");
         var context = new TotalLoweringContext(factory, target);
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -306,7 +306,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     public void RequiredMaterializationArgumentsRejectNull()
     {
         var compilation = Compile(SourceText);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, "StaticTarget", "Run");
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(resolution.Failure, Is.EqualTo(ContractBindingFailure.None));

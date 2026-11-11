@@ -15,7 +15,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void InterpreterRejectsNullProgramAndDefaultVariableList()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation());
@@ -38,7 +38,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void ScalarTransferUsesActualIntegerTypesForInvalidAndBottomInputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integerType = factory.GetTypeInfo(factory.IntegerType);
         var zero = IntervalValue.Constant(0);
         var one = IntervalValue.Constant(1);
@@ -60,7 +60,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void MemoryHavocReportsItsGapAndPreservesScalarFacts()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -81,7 +81,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void AssumeOfNegatedComparisonRefinesTheActualInputInterval()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var lessThanFive = factory.Binary(
             IrBinaryOperator.LessThan, factory.Variable(value), factory.Integer(5));
@@ -105,7 +105,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void AssumeFalseProducesAnUnreachableOutputThroughRun()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -126,7 +126,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void UnsupportedLoadReportsGapAndForgetsOnlyItsDestination()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
         var sequence = factory.CreateVariable("sequence", sequenceType);
         var loaded = factory.CreateVariable("loaded", factory.IntegerType);
@@ -150,7 +150,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void UnsupportedAssertionInstructionReturnsARealGapTopState()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -173,7 +173,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void SingletonConditionalAndStringEqualityUseCurrentProgramFacts()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
         var scalar = factory.CreateVariable("scalar", factory.IntegerType);
         var conditionalText = factory.CreateVariable("conditionalText", factory.StringType);
@@ -208,7 +208,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void DeepTermsAndOpaqueReferenceUseConservativeBoundaries()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
         var input = factory.CreateVariable("input", factory.IntegerType);
         var deepValue = factory.CreateVariable("deepValue", factory.IntegerType);
@@ -259,7 +259,7 @@ public sealed class AdvisoryAlgorithmBoundaryTests
     [Test]
     public void OwnedComparisonMarkersResolveDefiniteOutcomesFromIntervals()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var lower = factory.CreateVariable("lower", factory.IntegerType);
         var upper = factory.CreateVariable("upper", factory.IntegerType);
         var equal = factory.CreateVariable("equal", factory.BooleanType);

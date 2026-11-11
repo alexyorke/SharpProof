@@ -39,7 +39,7 @@ public sealed class GoldenAnalyzerTests
         foreach (var syntax in tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
                      .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal))
         {
-            var context = new SharpProof.Frontend.TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total),
+            var context = new SharpProof.Frontend.TotalLoweringContext(new IrFactory(),
                 (Microsoft.CodeAnalysis.IMethodSymbol)Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetDeclaredSymbol(model, syntax)!);
             var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
             var lowering = SharpProof.Frontend.RoslynProgramLowering.LowerCandidate(graph, context);

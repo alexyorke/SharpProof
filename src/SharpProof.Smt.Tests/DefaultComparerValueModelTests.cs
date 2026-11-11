@@ -5,7 +5,7 @@ internal sealed class DefaultComparerValueModelTests
     [Test]
     public async Task KernelRejectsAnObservedCacheClaimedAsAForeignNominalView()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var declared = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "declared");
         var foreign = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "foreign");
         var variable = factory.CreateVariable("value", foreign);
@@ -29,7 +29,7 @@ internal sealed class DefaultComparerValueModelTests
     [Test]
     public async Task ConflictingObservedIdentitiesCannotValidateAnAliasedModel()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "first");
         var second = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "second");
         var firstMember = factory.GetOrCreateMember(factory.CreateIdentity(), first,
@@ -61,7 +61,7 @@ internal sealed class DefaultComparerValueModelTests
     public async Task CachedValuesRequireConsistentConcreteObservations(string scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.ObjectType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "framework-default-comparer-value:" + "System_Int32", factory.ObjectType, true, []);
