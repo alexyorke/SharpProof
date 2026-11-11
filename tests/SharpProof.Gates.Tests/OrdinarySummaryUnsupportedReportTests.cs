@@ -76,7 +76,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
         {
             var treeRoot = await tree.GetRootAsync();
             foreach (var invocation in treeRoot.DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "global::SharpProof.Attributes.Contract.Requires")))
+                .Where(invocation => invocation.Expression.ToString() == "global::SharpProof.Attributes.Contract.Requires"))
             {
                 Assert.That(((CSharpParseOptions)tree.Options).PreprocessorSymbolNames,
                     Does.Contain(SharpProof.Attributes.Contract.ConditionalSymbol));
@@ -84,17 +84,17 @@ public sealed class OrdinarySummaryUnsupportedReportTests
                 var method = (IMethodSymbol)model.GetSymbolInfo(invocation).Symbol!;
                 Assert.That(SymbolEqualityComparer.Default.Equals(method.ContainingType,
                     compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")), Is.True);
-                var clause = preparation.Total!.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires &&
+                var clause = preparation.Total!.Clauses.Single(clause => clause.Kind == CompilerContractKind.Requires &&
                     preparation.Total.Program.Factory.GetOperationInfo(clause.Operation).SourceSpan is { } source &&
                     source.Document == Path.GetFullPath(tree.FilePath) && source.Start == invocation.SpanStart &&
-                    source.Length == invocation.Span.Length));
-                Assert.That(preparation.Entry.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition &&
-                    assumption.Id == clause.AssumptionId)), Is.True);
+                    source.Length == invocation.Span.Length);
+                Assert.That(preparation.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition &&
+                    assumption.Id == clause.AssumptionId), Is.True);
             }
         }
         ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
         var evidence = await NativeEffectSiteVerifier.VerifyEffectContractAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
-        await TestContext.Progress.WriteLineAsync($"Unsupported native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparation.Total != null}; complete={preparation.Total?.EffectsCompleteAtEntry}; abstraction={preparation.Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Kind)))}");
+        await TestContext.Progress.WriteLineAsync($"Unsupported native: outcome={evidence.Outcome?.GetType().Name ?? "null"}; reason={evidence.Reason}; total={preparation.Total != null}; complete={preparation.Total?.EffectsCompleteAtEntry}; abstraction={preparation.Total?.IsBodyAbstraction}; inputKinds={string.Join(",", evidence.EntryModel.Values.Select(value => value.Kind))}");
         return evidence;
     }
 
@@ -119,7 +119,7 @@ public sealed class OrdinarySummaryUnsupportedReportTests
                     .Append(SharpProof.Attributes.Contract.ConditionalSymbol))));
         }
         compilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(trees.ToImmutable());
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return compilation;
     }
 }

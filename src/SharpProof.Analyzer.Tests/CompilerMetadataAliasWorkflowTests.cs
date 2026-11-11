@@ -48,8 +48,8 @@ public sealed class CompilerMetadataAliasWorkflowTests
             Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
                 "net8.0", [], TestContext.CurrentContext.CancellationToken);
-            var authority = captured.References.SelectMany(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Modules)).Single(module =>
-                module is null ? throw new System.ArgumentNullException(nameof(module)) : (Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath)));
+            var authority = captured.References.SelectMany(item => item.Modules).Single(module =>
+                Path.GetFullPath(module.Path) == Path.GetFullPath(dependencyPath));
             Assert.That(authority.SizeBytes, Is.EqualTo(originalImage.Length));
             await File.WriteAllBytesAsync(dependencyPath, (replaceBackingFile ? replacementImage : originalImage).ToArray());
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
@@ -183,7 +183,7 @@ public sealed class CompilerMetadataAliasWorkflowTests
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [], references);
             Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+                diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var captured = CompilerCompilationCapture.Capture(compilation, directory,
                 "net8.0", [], TestContext.CurrentContext.CancellationToken);
             var prepared = CompilerTotalCallableLowerer.PrepareShadowCallers(compilation,
@@ -243,9 +243,9 @@ public sealed class CompilerMetadataAliasWorkflowTests
             var artifact = CompilerManifestArtifactJson.Deserialize(aliased, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var original = CompilerManifestArtifactJson.Deserialize(single, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var aliasedReference = artifact.Compilation.References.Single(static reference =>
-                reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Aliases.SequenceEqual(AlternateAlias));
+                reference.Aliases.SequenceEqual(AlternateAlias));
             var originalReference = original.Compilation.References.Single(reference =>
-                reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Identity == aliasedReference.Identity);
+                reference.Identity == aliasedReference.Identity);
             var normalized = artifact with { Compilation = artifact.Compilation with { References = original.Compilation.References } };
             using (Assert.EnterMultipleScope())
             {

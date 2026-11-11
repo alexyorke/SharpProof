@@ -20,7 +20,7 @@ public sealed class DirectConsoleWriteAnalyzerTests
     {
         System.ArgumentNullException.ThrowIfNull(call);
         var diagnostics = await AnalyzeAsync("class Subject { void Run() { " + call + " } }");
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(ImmutableArray.Create(DirectConsoleWriteAnalyzer.DiagnosticId)));
     }
 
@@ -88,7 +88,7 @@ public sealed class DirectConsoleWriteAnalyzerTests
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return await compilation.WithAnalyzers(
             [new DirectConsoleWriteAnalyzer()]).GetAnalyzerDiagnosticsAsync();
     }

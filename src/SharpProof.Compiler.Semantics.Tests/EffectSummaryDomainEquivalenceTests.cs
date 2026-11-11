@@ -60,10 +60,10 @@ public sealed class EffectSummaryDomainEquivalenceTests
         var graph = new DataflowGraph<EffectSummary>(
             [
                 new(0, state =>
-                    state is null ? throw new System.ArgumentNullException(nameof(state)) : ((state.AnalysisIncompleteReason & BothReasons) == BothReasons
+                    (state.AnalysisIncompleteReason & BothReasons) == BothReasons
                         ? receiverWrite
-                        : callPreconditionNotProven)),
-                new(1, state => state is null ? throw new System.ArgumentNullException(nameof(state)) : (state))
+                        : callPreconditionNotProven),
+                new(1, state => state)
             ],
             [
                 new(0, 0),

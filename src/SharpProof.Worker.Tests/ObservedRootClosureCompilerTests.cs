@@ -83,7 +83,7 @@ public sealed class ObservedRootClosureCompilerTests
                 Assert.That(constructor.IsConstructor, Is.True);
                 Assert.That(constructor.DeclaringType!.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false), Is.True);
                 Assert.That(constructor.DeclaringType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType), Is.EquivalentTo(shape == "zero-loop" ? new[] { typeof(int), typeof(Func<int>) } : shape == "local-array" ? new[] { typeof(int[]) } : new[] { typeof(int) }));
+                    .Select(static field => field.FieldType), Is.EquivalentTo(shape == "zero-loop" ? new[] { typeof(int), typeof(Func<int>) } : shape == "local-array" ? new[] { typeof(int[]) } : new[] { typeof(int) }));
             }
             var target = method.CreateDelegate<Func<int, object?>>();
             for (var warm = 0; warm < 16; warm++)

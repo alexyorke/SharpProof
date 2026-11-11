@@ -198,7 +198,7 @@ public sealed class NativeHornApplicationReconstructionTests
         var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
         try
         {
-            ImmutableArray<IrTerm?> operands = [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (DecodeGround(factory, argument)))];
+            ImmutableArray<IrTerm?> operands = [.. arguments.Select(argument => DecodeGround(factory, argument))];
             return SmtNativeUtilities.ReconstructHornApplication(factory, expression, operands);
         }
         finally

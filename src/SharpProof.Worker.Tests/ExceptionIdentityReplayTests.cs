@@ -46,14 +46,14 @@ public sealed class ExceptionIdentityReplayTests
             TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                errors.Select(static diagnostic => diagnostic.ToString())));
 
         var method = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Compare")
@@ -212,7 +212,7 @@ public sealed class ExceptionIdentityReplayTests
             string.Join(
                 Environment.NewLine,
                 emit.Diagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                    diagnostic.ToString())));
         return MetadataReference.CreateFromImage(
             ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))),
             new MetadataReferenceProperties(

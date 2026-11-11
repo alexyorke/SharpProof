@@ -104,9 +104,9 @@ internal static class CompilerClosedParameterCapture
                     signature.RemainingBytes != 0)
                 { return false; }
                 var expectedConstructor = expected.InstanceConstructors.SingleOrDefault(candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == (inRange ? 2 : 0) &&
+                    candidate.Parameters.Length == (inRange ? 2 : 0) &&
                     candidate.Parameters.All(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
-                        parameter.Type.SpecialType == SpecialType.System_Int64))));
+                        parameter.Type.SpecialType == SpecialType.System_Int64)));
                 if (expectedConstructor == null ||
                     attribute.Constructor.Kind == HandleKind.MethodDefinition &&
                     (expectedConstructor.MetadataToken != MetadataTokens.GetToken(attribute.Constructor) ||

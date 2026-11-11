@@ -62,7 +62,7 @@ internal static class CompilationModelProvider
         root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var index = OwnershipCache.GetValue(
             root,
-            static compilation => compilation is null ? throw new System.ArgumentNullException(nameof(compilation)) : (TreeOwnershipIndex.Create(compilation)));
+            static compilation => TreeOwnershipIndex.Create(compilation));
         if (index.IsAmbiguous(tree))
         {
             throw new ArgumentException(

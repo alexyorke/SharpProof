@@ -94,7 +94,7 @@ public sealed class TypedMetadataCallTests
         { Assert.That(runtime, Is.EqualTo(expected)); }
         var artifact = subject.CreateArtifact();
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var total = preparations.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total!;
+        var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var factory = total.Program.Factory;
         var entry = total.Parameters.Single().Entry;
@@ -126,7 +126,7 @@ public sealed class TypedMetadataCallTests
         Assert.That(subject.Invoke(0), Is.EqualTo(1));
         Assert.That(subject.InvokeRoot(0), Is.EqualTo(1));
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var total = preparations.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total!;
+        var total = preparations.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!;
         Assert.That(total, Is.Not.Null);
         var input = total.Parameters.Single().Entry;
         var execution = new IrProgramInterpreter(total.Program.Factory).Execute(total.Program,

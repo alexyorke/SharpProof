@@ -27,13 +27,13 @@ public sealed class CorpusSnapshotWorkflowTests
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
         var method = manifest["methods"]!.AsArray().Single(static item =>
-            item is null ? throw new ArgumentNullException(nameof(item)) : item["id"]!.GetValue<string>() == "OSS0139")!;
+            item!["id"]!.GetValue<string>() == "OSS0139")!;
         var file = manifest["files"]!.AsArray().Single(item =>
-            item is null ? throw new ArgumentNullException(nameof(item)) : item["path"]!.GetValue<string>() == method["path"]!.GetValue<string>())!;
+            item!["path"]!.GetValue<string>() == method["path"]!.GetValue<string>())!;
         var source = file["content"]!.GetValue<string>();
         var syntax = await CSharpSyntaxTree.ParseText(source).GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var declaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(static item =>
-            item is null ? throw new ArgumentNullException(nameof(item)) : item.Identifier.ValueText == "UniversalHash" && item.ParameterList.Parameters[0].Type!.ToString() == "int");
+            item.Identifier.ValueText == "UniversalHash" && item.ParameterList.Parameters[0].Type!.ToString() == "int");
         // In this private fixture, an explicit message removes the resource
         // advisory while unsupported static initialization still prevents a
         // native purity proof. The reviewed corpus itself remains untouched.
@@ -43,7 +43,7 @@ public sealed class CorpusSnapshotWorkflowTests
         var changed = source.Replace(declaration.ToFullString(), replacement, StringComparison.Ordinal);
         var changedSyntax = await CSharpSyntaxTree.ParseText(changed).GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var changedDeclaration = changedSyntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(item =>
-            item is null ? throw new ArgumentNullException(nameof(item)) : item.SpanStart == declaration.SpanStart);
+            item.SpanStart == declaration.SpanStart);
         file["content"] = changed;
         file["contentSha256"] = OpenSourceCorpusCatalog.ComputeNormalizedSha256(changed);
         method["declarationSha256"] = OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(changedDeclaration));
@@ -56,7 +56,7 @@ public sealed class CorpusSnapshotWorkflowTests
             Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
             Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownReasons.Single(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
+            Assert.That(result.UnknownReasons.Single(static item => item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
             Assert.That(result.Failures, Does.Contain("Corpus produced a new unreviewed Unknown reason 'silent-unclassified' (1 cases)."));
             Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for OSS0139.baseline:"));
         }
@@ -91,23 +91,23 @@ public sealed class CorpusSnapshotWorkflowTests
         var corpusDirectory = CopyCorpus(temporary.FullName);
         var snapshotPath = Path.Combine(corpusDirectory, "expected.canonical.snapshot");
         var rows = CorpusSnapshotFormat.ReadDataLines(snapshotPath).ToBuilder();
-        var changedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E01.baseline|", StringComparison.Ordinal)));
+        var changedRow = rows.Single(static row => row.StartsWith("E01.baseline|", StringComparison.Ordinal));
         var fields = ImmutableArray.CreateBuilder<string>();
         fields.AddRange(changedRow.Split('|'));
         Assert.That(fields[1], Is.EqualTo("Proven"));
         fields[1] = "Unknown";
         rows[rows.IndexOf(changedRow)] = string.Join('|', fields.ToImmutable());
-        var allowedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal)));
+        var allowedRow = rows.Single(static row => row.StartsWith("OSS0003.baseline|", StringComparison.Ordinal));
         var allowedFields = ImmutableArray.CreateBuilder<string>();
         allowedFields.AddRange(allowedRow.Split('|'));
         Assert.That(allowedFields[1], Is.EqualTo("Unknown"));
         allowedFields[1] = "Proven";
         rows[rows.IndexOf(allowedRow)] = string.Join('|', allowedFields.ToImmutable());
-        var removedRow = rows.Single(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.StartsWith("E02.baseline|", StringComparison.Ordinal)));
+        var removedRow = rows.Single(static row => row.StartsWith("E02.baseline|", StringComparison.Ordinal));
         rows.Remove(removedRow);
         rows.Add("obsolete-case-a|Proven|Proven|");
         rows.Add("obsolete-case-b|Proven|Proven|");
-        var changedSnapshot = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row), StringComparer.Ordinal));
+        var changedSnapshot = CorpusSnapshotFormat.Render(rows.ToImmutable().OrderBy(static row => row, StringComparer.Ordinal));
         await File.WriteAllTextAsync(snapshotPath, changedSnapshot);
         var allowancePath = Path.Combine(corpusDirectory, "proven-to-unknown.json");
         const string allowance = """
@@ -118,7 +118,7 @@ public sealed class CorpusSnapshotWorkflowTests
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
         var misclassified = manifest["methods"]!.AsArray()
-            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method!["id"]!.GetValue<string>() == "OSS0003"))!;
+            .Single(static method => method!["id"]!.GetValue<string>() == "OSS0003")!;
         Assert.That(misclassified["support"]!.GetValue<string>(), Is.EqualTo("IntentionallyUnsupported"));
         Assert.That(misclassified["expectedVerdict"]!.GetValue<string>(), Is.EqualTo("Unknown"));
         misclassified["support"] = "Supported";

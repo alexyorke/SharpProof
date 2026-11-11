@@ -34,7 +34,7 @@ public sealed class EffectContractAttributeDiagnosticsTests
             AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
             Assert.That(
                 diagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start)),
+                    diagnostic.Location.SourceSpan.Start),
                 Is.EqualTo(ImmutableArray.Create(source.IndexOf(
                         "EffectContract((SharpProofEffect)(1L << 40)",
                         StringComparison.Ordinal), source.IndexOf(

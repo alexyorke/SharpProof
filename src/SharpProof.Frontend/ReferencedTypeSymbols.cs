@@ -80,9 +80,9 @@ internal static class ReferencedTypeSymbols
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var snapshot = CachedSnapshots.GetValue(
             assembly,
-            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new TypeSnapshot(
+            value => new TypeSnapshot(
                 GetAll(value.GlobalNamespace, cancellationToken)
-                    .ToImmutableArray())));
+                    .ToImmutableArray()));
         foreach (var type in snapshot.Types)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -156,7 +156,7 @@ namespace SharpProof.Package.Test
             TrustedChildEnvironment.Apply(
                 startInfo,
                 validatedDotNetHostPath: null,
-                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.GetValueOrDefault(name)));
+                name => inheritedEnvironment.GetValueOrDefault(name));
             using var process = System.Diagnostics.Process.Start(startInfo)!;
             Assert.That(process.WaitForExit(TimeSpan.FromSeconds(5)), Is.True);
             Assert.That(process.ExitCode, Is.Zero);
@@ -174,9 +174,9 @@ namespace SharpProof.Package.Test
             TrustedChildEnvironment.Apply(
                 startInfo,
                 "/trusted/dotnet/dotnet",
-                name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.TryGetValue(name, out var value)
+                name => inheritedEnvironment.TryGetValue(name, out var value)
                     ? value
-                    : null));
+                    : null);
 
             using (Assert.EnterMultipleScope())
             {
@@ -233,9 +233,9 @@ namespace SharpProof.Package.Test
 
             Assert.That(
                 TrustedChildEnvironment.FindUnsafeRuntimeVariable(
-                    name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (inheritedEnvironment.TryGetValue(name, out var value)
+                    name => inheritedEnvironment.TryGetValue(name, out var value)
                         ? value
-                        : null)),
+                        : null),
                 Is.EqualTo(variable));
         }
     }

@@ -76,7 +76,7 @@ internal sealed class GeneratedCSharpExpression
         BooleanValue = booleanValue;
         StringValue = stringValue;
         Children = children;
-        NodeCount = 1 + children.Sum(static child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.NodeCount));
+        NodeCount = 1 + children.Sum(static child => child.NodeCount);
     }
 
     public GeneratedExpressionKind Kind { get; }
@@ -1037,8 +1037,8 @@ internal static class FrontendDifferentialOracle
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .OrderBy(
-                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ParseMethodIndex(
-                    method.Identifier.ValueText)))
+                static method => ParseMethodIndex(
+                    method.Identifier.ValueText))
             .ToImmutableArray();
         if (methodSyntaxes.Length != generatedCases.Length)
         {
@@ -1169,8 +1169,8 @@ internal static class FrontendDifferentialOracle
         var generatedTypes = compilationUnit
             .DescendantNodes()
             .OfType<ClassDeclarationSyntax>()
-            .Where(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Identifier.ValueText ==
-                "SharpProofGeneratedFrontendEdges"))
+            .Where(static type => type.Identifier.ValueText ==
+                "SharpProofGeneratedFrontendEdges")
             .ToImmutableArray();
         if (generatedTypes.Length != 1)
         {
@@ -2008,10 +2008,10 @@ internal static class CSharpStructuralShrinker
 
         return StructuralShrinkCandidates.GetCandidates(
             expression,
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Children),
+            static value => value.Children,
             static (parent, child) => child is null ? throw new System.ArgumentNullException(nameof(child)) : parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Type == child.Type),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.NodeCount),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Render()),
+            static value => value.NodeCount,
+            static value => value.Render(),
             GetDomainCandidates,
             TryReplaceChild,
             StringComparer.Ordinal);

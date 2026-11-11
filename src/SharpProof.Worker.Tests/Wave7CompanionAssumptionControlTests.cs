@@ -81,7 +81,7 @@ public sealed class Wave7CompanionAssumptionControlTests
         var claim = response.ClaimResults.Single();
         Assert.That(claim.Outcome, Is.EqualTo(expected), claim.Reason.ToString());
         Assert.That(claim.Vacuity, Is.EqualTo(vacuity));
-        Assert.That(claim.Assumptions.Count(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)), Is.EqualTo(assumptions));
+        Assert.That(claim.Assumptions.Count(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume), Is.EqualTo(assumptions));
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
     }
 }

@@ -51,9 +51,9 @@ internal static class WorkerApiSpecTestFixtures
                         null,
                         evidence)),
                 [.. (postconditions ?? []).Select(
-                    condition => condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(
+                    condition => new SpecPostconditionDeclaration(
                         condition,
-                        evidence)))])
+                        evidence))])
         ]).Templates.Single();
     }
 }

@@ -20,7 +20,7 @@ public sealed partial class DotnetApiInventoryTests
                 "var copy = data.GetRange(0, 3); copy[0] = 29; data[2] = 31; return copy.Count * 1000 + data[0] * 100 + copy[1] * 10 + copy[2];";
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target() { " + body + " } }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

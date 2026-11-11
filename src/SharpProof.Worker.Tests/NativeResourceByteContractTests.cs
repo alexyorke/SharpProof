@@ -31,7 +31,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(dependency.CatalogSha256, Is.EqualTo(ResourceRuntimeLayout.ContentSha256.ToUpperInvariant()));
         Assert.That(dependency.ReferenceSha256, Is.EqualTo(target.Compilation.ResourceMetadataReferences[0].Modules[0].Sha256));
         Assert.That(dependency.EvidenceSource, Is.EqualTo(ResourceRuntimeLayout.EvidenceSource));
-        Assert.That(result.Assumptions.Single(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used).Id,
+        Assert.That(result.Assumptions.Single(static assumption => assumption.Used).Id,
             Is.EqualTo(dependency.AssumptionId));
     }
 
@@ -119,8 +119,8 @@ internal sealed partial class NativeResourceContractTests
         var target = Read(CreateArtifact(Source("[ResourceUpperBound(ResourceMetric.AllocatedElements, 3)] [ResourceUpperBound(ResourceMetric.AllocatedBytes, 0)]",
             "var a=new int[3];"), reviewedRuntime: true, x64: true));
         var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
-        var elements = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound?.Metric == WorkerResourceMetric.AllocatedElements);
-        var bytes = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound?.Metric == WorkerResourceMetric.AllocatedBytes);
+        var elements = results.Single(static result => result.ResourceBound?.Metric == WorkerResourceMetric.AllocatedElements);
+        var bytes = results.Single(static result => result.ResourceBound?.Metric == WorkerResourceMetric.AllocatedBytes);
         Assert.That(elements.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(elements.ResourceBound!.MetadataAssumptions, Is.Empty);
         Assert.That(elements.Assumptions.Any(static assumption => assumption is not null && assumption.Used), Is.False);

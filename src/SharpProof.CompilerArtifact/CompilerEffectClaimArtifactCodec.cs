@@ -86,7 +86,7 @@ internal static class CompilerEffectClaimArtifactCodec
             .Add(value.Certainty)
             .Add(constraint.AllowedEffects)
             .Add(constraint.AllowedCapabilities);
-        foreach (var type in constraint.AllowedExceptionTypes.OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), StringComparer.Ordinal))
+        foreach (var type in constraint.AllowedExceptionTypes.OrderBy(static item => item, StringComparer.Ordinal))
         { hash.Add(type); }
         if (constraint.ResourceUpperBound is { } resource)
         {

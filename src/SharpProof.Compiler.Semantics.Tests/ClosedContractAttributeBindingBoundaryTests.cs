@@ -16,7 +16,7 @@ public sealed class ClosedContractAttributeBindingBoundaryTests
         var invalid = original.WithChangedText(Microsoft.CodeAnalysis.Text.SourceText.From(
             original.GetText().ToString().Replace("[Positive]", "[Positive(0)]", StringComparison.Ordinal)));
         var compilation = admitted.ReplaceSyntaxTree(original, invalid);
-        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
         var target = compilation.GetTypeByMetadataName("Target")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
         var parameter = target.Parameters.Single();
         var api = ContractApiSymbols.TryCreate(compilation)!;

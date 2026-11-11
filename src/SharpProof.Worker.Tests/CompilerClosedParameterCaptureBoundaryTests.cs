@@ -83,11 +83,11 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")!
             .GetMembers("Requires").OfType<IMethodSymbol>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 1 &&
-                candidate.Parameters[0].Type.SpecialType == SpecialType.System_Boolean));
+            .Single(candidate => candidate.Parameters.Length == 1 &&
+                candidate.Parameters[0].Type.SpecialType == SpecialType.System_Boolean);
         var expected = ContractSelectionInventory.ForCompilation(compilation).Positive;
         Assert.That(expected, Is.Not.Null);
-        var expectedConstructor = expected!.InstanceConstructors.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.IsEmpty));
+        var expectedConstructor = expected!.InstanceConstructors.Single(candidate => candidate.Parameters.IsEmpty);
         Assert.That(method.Parameters, Has.Length.EqualTo(1));
         Assert.That(method.ContainingAssembly.Identity, Is.EqualTo(expected.ContainingAssembly.Identity));
         var row = Definition(reader, local).GetParameters().Single();
@@ -125,8 +125,8 @@ public sealed class CompilerClosedParameterCaptureBoundaryTests
 
         Assert.That(CompilerClosedParameterCapture.TryCapture(compilation, reader, method,
             orderedRows, TestContext.CurrentContext.CancellationToken, out var attributes), Is.True);
-        Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ParameterOrdinal)), Is.EqualTo(ExpectedParameterOrdinals));
-        Assert.That(attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Kind)), Is.EqualTo(ExpectedAttributeKinds));
+        Assert.That(attributes.Select(attribute => attribute.ParameterOrdinal), Is.EqualTo(ExpectedParameterOrdinals));
+        Assert.That(attributes.Select(attribute => attribute.Kind), Is.EqualTo(ExpectedAttributeKinds));
         Assert.That(attributes[1].Minimum, Is.EqualTo(1));
         Assert.That(attributes[1].Maximum, Is.EqualTo(10));
     }

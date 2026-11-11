@@ -23,9 +23,9 @@ internal sealed partial class TotalLoweringContext
         // already known; with neither, the pass would record nothing.
         if (!TrackingBases(graph).Arrays && _arrayReceivers.Count == 0 && _arrayCaptures.Count == 0)
         { return; }
-        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue is { } branchValue ? ImmutableArray.Create(branchValue) : ImmutableArray<IOperation>.Empty)))
-            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).ToImmutableArray();
+        var operations = graph.Blocks.SelectMany(block => block.Operations
+            .Concat(block.BranchValue is { } branchValue ? ImmutableArray.Create(branchValue) : ImmutableArray<IOperation>.Empty))
+            .SelectMany(operation => operation.DescendantsAndSelf()).ToImmutableArray();
         var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);
         var definitionOrder = ImmutableArray.CreateBuilder<ISymbol>();
         var captures = ImmutableDictionary.CreateBuilder<CaptureId, ImmutableArray<IOperation>.Builder>();
@@ -141,9 +141,9 @@ internal sealed partial class TotalLoweringContext
     internal void TrackDefaultComparers(ControlFlowGraph graph)
     {
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations
-            .Concat(block.BranchValue is { } branchValue ? ImmutableArray.Create(branchValue) : ImmutableArray<IOperation>.Empty)))
-            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).ToImmutableArray();
+        var operations = graph.Blocks.SelectMany(block => block.Operations
+            .Concat(block.BranchValue is { } branchValue ? ImmutableArray.Create(branchValue) : ImmutableArray<IOperation>.Empty))
+            .SelectMany(operation => operation.DescendantsAndSelf()).ToImmutableArray();
         var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);
         var definitionOrder = ImmutableArray.CreateBuilder<ISymbol>();
         var captures = ImmutableDictionary.CreateBuilder<CaptureId, ImmutableArray<IOperation>.Builder>();
@@ -249,7 +249,7 @@ internal sealed partial class TotalLoweringContext
         bool ResolveNullableDefinitions(ImmutableArray<IOperation>.Builder values, int depth)
         {
             values = RepositoryParameterGuard.NotNull(values, nameof(values));
-            return values.Count != 0 && values.All(value => value is null ? throw new ArgumentNullException(nameof(value)) : ResolveNullable(value, depth + 1));
+            return values.Count != 0 && values.All(value => ResolveNullable(value, depth + 1));
         }
 
         bool ResolveNullable(IOperation operation, int depth)
@@ -427,15 +427,13 @@ internal sealed partial class TotalLoweringContext
                     !SymbolEqualityComparer.Default.Equals(owner, actualOwner))
                 {
                     definition = actualOwner.GetTypeMembers(named.Name, named.Arity).Single(candidate =>
-                        candidate is null ? throw new ArgumentNullException(nameof(candidate)) : SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, named.OriginalDefinition));
+                        SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, named.OriginalDefinition));
                 }
-                var arguments = named.TypeArguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : Substitute(argument, depth + 1)!).ToImmutableArray();
+                var arguments = named.TypeArguments.Select(argument => Substitute(argument, depth + 1)!).ToImmutableArray();
                 if (!SymbolEqualityComparer.Default.Equals(definition, named.ConstructedFrom) ||
                     arguments.Where((argument, index) => argument is null ? throw new ArgumentNullException(nameof(argument)) : !SymbolEqualityComparer.Default.Equals(argument, named.TypeArguments[index])).Any())
                 {
-                    var annotations = arguments.Select(static argument => argument is null
-                        ? throw new ArgumentNullException(nameof(argument))
-                        : argument.NullableAnnotation).ToImmutableArray();
+                    var annotations = arguments.Select(static argument => argument.NullableAnnotation).ToImmutableArray();
                     return arguments.Length == 0 ? definition : definition.Construct(arguments, annotations);
                 }
             }
@@ -507,8 +505,7 @@ internal sealed partial class TotalLoweringContext
         _receiverElements[declared] = actual;
         _types.TypeSpecializer = SpecializeReceiverElement;
         var type = Type(actual);
-        Parameters = [.. Parameters.Select(binding => binding is null ? throw new ArgumentNullException(nameof(binding)) :
-            SymbolEqualityComparer.Default.Equals(binding.Parameter.Type, declared) && Factory.GetVariableInfo(binding.Entry).Type != type
+        Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter.Type, declared) && Factory.GetVariableInfo(binding.Entry).Type != type
                 ? new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
                     Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type)) : binding)];
         if (SymbolEqualityComparer.Default.Equals(Target.ReturnType, declared) && Result is { } result && Factory.GetVariableInfo(result).Type != type)
@@ -536,8 +533,7 @@ internal sealed partial class TotalLoweringContext
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         scalar = RepositoryParameterGuard.NotNull(scalar, nameof(scalar));
         SpecializeTypeParameter((ITypeParameterSymbol)parameter.Type, scalar);
-        Parameters = [.. Parameters.Select(binding => binding is null ? throw new ArgumentNullException(nameof(binding)) :
-            SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
+        Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
                 ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(scalar)),
                     Factory.CreateVariable("current:" + parameter.Ordinal, Type(scalar)), Factory.CreateVariable("old:" + parameter.Ordinal, Type(scalar))) : binding)];
     }
@@ -553,10 +549,10 @@ internal sealed partial class TotalLoweringContext
             SpecializeTypeParameter(element, array.ElementType);
 
         }
-        Parameters = [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
+        Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
             ? new TotalParameterBinding(parameter, Factory.CreateVariable("entry:" + parameter.Ordinal, Type(array)),
                 Factory.CreateVariable("current:" + parameter.Ordinal, Type(array)),
-                Factory.CreateVariable("old:" + parameter.Ordinal, Type(array))) : binding))];
+                Factory.CreateVariable("old:" + parameter.Ordinal, Type(array))) : binding)];
     }
 
     internal IOperation? ArrayCollectionReceiver(IPropertyReferenceOperation property)

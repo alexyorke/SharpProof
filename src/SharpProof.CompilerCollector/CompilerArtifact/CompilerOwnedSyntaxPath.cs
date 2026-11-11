@@ -20,7 +20,7 @@ internal static class CompilerOwnedSyntaxPath
                 return;
             }
             path.Add(current.Parent.ChildNodes().TakeWhile(
-                child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!SyntaxSite.IsSame(child, current))).Count());
+                child => !SyntaxSite.IsSame(child, current)).Count());
         }
         writer.Add(path.Count);
         foreach (var ordinal in path.ToImmutable().Reverse())

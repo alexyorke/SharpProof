@@ -98,10 +98,10 @@ public sealed class TotalProgramSourceReplayTests
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
         Assert.That(emission.Emit.Diagnostics.Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
             Does.Contain("CS0220"));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id),
             Does.Contain("CS0220"));
         var replay = new TotalProgramSourceReplay(12348);
         Func<Task> compare = () => replay.CompareBatchAsync([new(member, [7L], false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -138,7 +138,7 @@ public sealed class TotalProgramSourceReplayTests
         Assert.That(reference.Classifications.All(item => item.Exact &&
             item.Execution == IrProgramExecutionStatus.Unsupported), Is.True);
         var replay = new TotalProgramSourceReplay(12350);
-        var cases = members.Select(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (new TotalProgramSourceCase(member, [7L], false))).ToImmutableArray();
+        var cases = members.Select(member => new TotalProgramSourceCase(member, [7L], false)).ToImmutableArray();
         await replay.CompareBatchAsync(cases.Take(33).ToImmutableArray(), 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         await replay.CompareBatchAsync(cases.Skip(33).ToImmutableArray(), 33, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
@@ -192,9 +192,9 @@ public sealed class TotalProgramSourceReplayTests
         var model = compilation.GetSemanticModel(tree);
         var methods = ImmutableDictionaryCapture.Create(
             tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal))),
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item);
+            .Where(method => method.Identifier.ValueText.StartsWith("Target", StringComparison.Ordinal)),
+            method => method.Identifier.ValueText,
+            static item => item);
         Assert.That(methods.Keys, Is.EquivalentTo(names));
         var context = new AssemblyLoadContext("TotalSourceReplayControl", isCollectible: true);
         try
@@ -220,8 +220,8 @@ public sealed class TotalProgramSourceReplayTests
                 {
                     var entries = ImmutableDictionaryCapture.Create(
                         loweringContext.Parameters,
-                        binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-                        binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L)));
+                        binding => binding.Entry,
+                        binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type, 7L));
                     execution = new IrProgramInterpreter(factory).Execute(lowering.Program, entries).Status;
                 }
                 classifications.Add((lowering.IsExact, lowering.Classification.Abstention.ToString(), execution));

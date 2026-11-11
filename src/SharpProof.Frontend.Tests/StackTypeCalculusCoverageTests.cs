@@ -107,7 +107,7 @@ public sealed class StackTypeCalculusCoverageTests
         var tree = CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.CSharp12), "stack-shape.cs");
         _compilation = CSharpCompilation.Create("StackShapeOracle", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(_compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(_compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         _model = _compilation.GetSemanticModel(tree);
         using var image = new MemoryStream();
         var emitted = _compilation.Emit(image);
@@ -322,7 +322,7 @@ public sealed class StackTypeCalculusCoverageTests
     {
         System.ArgumentNullException.ThrowIfNull(method);
         var syntax = _model.SyntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == method)).ExpressionBody!.Expression;
+            .Single(candidate => candidate.Identifier.ValueText == method).ExpressionBody!.Expression;
         return _model.GetOperation(syntax)!;
     }
 

@@ -42,7 +42,7 @@ public sealed class FuzzStructuralInputsTests
 
         Assert.That(candidates, Is.Not.Empty);
         Assert.That(IrStructuralShrinker.GetCandidates(factory, parent), Is.EqualTo(candidates));
-        Assert.That(candidates.Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id)), Is.Unique);
+        Assert.That(candidates.Select(candidate => candidate.Id), Is.Unique);
         foreach (var candidate in candidates)
         {
             Assert.That(candidate.Type, Is.EqualTo(parent.Type));

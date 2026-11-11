@@ -49,7 +49,7 @@ public sealed partial class DotnetApiInventoryTests
                         "(" + values[left] + ").CompareTo(" + values[right] + ")";
                     var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check() => " + expression + "; }");
                     var compilation = references.AddSyntaxTrees(tree);
-                    if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+                    if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
                     { return false; }
                     var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
                     var model = compilation.GetSemanticModel(tree);

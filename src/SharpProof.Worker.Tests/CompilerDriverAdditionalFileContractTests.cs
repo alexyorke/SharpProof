@@ -140,7 +140,7 @@ public sealed class CompilerDriverAdditionalFileContractTests
             "/analyzer:" + collectorPath,
             "/analyzerconfig:" + configPath,
             "/additionalfile:" + additionalPath));
-        arguments.AddRange(references.Select(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : ("/reference:" + path)));
+        arguments.AddRange(references.Select(path => "/reference:" + path));
         arguments.Add(sourcePath);
         var originalOutput = Console.Out;
         using var output = new StringWriter(CultureInfo.InvariantCulture);

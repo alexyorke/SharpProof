@@ -48,8 +48,7 @@ public sealed class ResourceBoundsDiagnosticBoundaryTests
         // driver API cannot admit the genuine speculative model tested here.
 #pragma warning disable CS0618
         var context = new SyntaxNodeAnalysisContext(declaration, symbol, model, options,
-            reports.Add, static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) :
-                diagnostic.Id == "SP0060", token);
+            reports.Add, static diagnostic => diagnostic.Id == "SP0060", token);
 #pragma warning restore CS0618
         Assert.That(registration.MethodAction, Is.Not.Null);
         registration.MethodAction!(context);

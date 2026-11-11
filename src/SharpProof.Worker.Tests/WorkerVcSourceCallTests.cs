@@ -28,7 +28,7 @@ public sealed class WorkerVcSourceCallTests
                 [System.Diagnostics.Conditional("ABSENT")] private static void Log(int value) { }
             }
             """, cacheEnabled: false);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(target)!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
@@ -115,7 +115,7 @@ public sealed class WorkerVcSourceCallTests
             .Replace("private static int Callee", "private static int Forward(int value) { return Callee(value); } private static int Callee", StringComparison.Ordinal)
             : FilterUnwindSource;
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -179,7 +179,7 @@ public sealed class WorkerVcSourceCallTests
     public async Task SourceCallUsesOwnedFramesForNativeProofRefutationAndCache(bool capture)
     {
         using var project = new ShadowTestProject(capture ? ArgumentCaptureSource : ScalarCallSource, cacheEnabled: true);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -194,7 +194,7 @@ public sealed class WorkerVcSourceCallTests
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(capture ? 33 : 1)));
         Assert.That(execution.GetCurrentValue(target.Total.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(capture ? 4 : 0)));
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>(), Is.Empty);
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>(), Is.Empty);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         for (var invocation = 0; invocation < 2; invocation++)
         {
@@ -203,7 +203,7 @@ public sealed class WorkerVcSourceCallTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response, target.Entry.CallableId);
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
@@ -221,7 +221,7 @@ public sealed class WorkerVcSourceCallTests
                 private static int Callee(int value) { Contract.Requires(false); return value + 1; }
             }
             """);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(PassiveCallableArtifactAdapter.Enroll(target)!, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
@@ -235,7 +235,7 @@ public sealed class WorkerVcSourceCallTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -257,7 +257,7 @@ public sealed class WorkerVcSourceCallTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response, target.Entry.CallableId);
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }
@@ -268,9 +268,9 @@ public sealed class WorkerVcSourceCallTests
         System.ArgumentNullException.ThrowIfNull(callableId);
         System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
-        var ordinals = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == callableId && claim.Kind == WorkerClaimKind.Postcondition))
-            .ToImmutableDictionary(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId), claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal), StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
+        var ordinals = response.Manifest.Claims.Where(claim => claim.CallableId == callableId && claim.Kind == WorkerClaimKind.Postcondition)
+            .ToImmutableDictionary(claim => claim.ClaimId, claim => claim.Ordinal, StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToImmutableArray();
     }
 
     [TestCase(false)]
@@ -281,7 +281,7 @@ public sealed class WorkerVcSourceCallTests
             : "private static int Callee(int value) { Contract.Assume(value == 0); return value + 1; }";
         var call = asynchronous ? "Callee(x); return x;" : "return Callee(x);";
         using var project = new ShadowTestProject("using SharpProof.Attributes; public static class Subject { public static int Target(int x) { Contract.Ensures(false); " + call + " } " + callee + " }");
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total!.IsBodyAbstraction, Is.EqualTo(asynchronous));
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
@@ -296,7 +296,7 @@ public sealed class WorkerVcSourceCallTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = TestCompilation.CreateExact("SourceCallLegacyPreservation", [("Subject.cs", source)]);
-        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(value => value.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var withTotal = CompilerLoweredArtifact.Encode(preparation);
         var legacy = CompilerLoweredArtifact.Encode(preparation with { Total = null });

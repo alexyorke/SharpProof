@@ -16,7 +16,7 @@ internal static class ExplicitThrowSites
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
         { return []; }
         description = IsExact(factory, site) ? description[ExactPrefix.Length..] : description[Prefix.Length..];
-        return [.. description.Split(';').Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.Length != 0)).Distinct(StringComparer.Ordinal)];
+        return [.. description.Split(';').Where(name => name.Length != 0).Distinct(StringComparer.Ordinal)];
     }
 
     internal static bool IsExact(IrFactory factory, OperationId site)

@@ -53,7 +53,7 @@ internal sealed class RootParameterClosurePlanTests
         string[] names = ["first", "local"];
         ResourceStorageKind[] fields = [ResourceStorageKind.Word32, ResourceStorageKind.Word64];
         Assert.That(plan!.Captures.Select(static capture =>
-            capture is null ? throw new System.ArgumentNullException(nameof(capture)) : capture.Name), Is.EqualTo(names));
+            capture.Name), Is.EqualTo(names));
         Assert.That(plan.Fields, Is.EqualTo(fields));
         Assert.That(plan.HasLocals, Is.True);
     }
@@ -112,7 +112,7 @@ internal sealed class RootParameterClosurePlanTests
             var count = ResourceAllocationShape.MaximumFields + (budget == "captures" ? 1 : budget == "cache-fields-at-limit" ? -1 : 0);
             var names = Enumerable.Range(0, count).Select(static index => "p" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
             parameters = string.Join(",", names.Select(static name =>
-                name is null ? throw new System.ArgumentNullException(nameof(name)) : "int " + name));
+                "int " + name));
             var values = string.Join(",", names);
             if (budget == "captures")
             { body = "=>()=>GC.KeepAlive(new int[]{" + values + "});"; }
@@ -173,7 +173,7 @@ internal sealed class RootParameterClosurePlanTests
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>();
         foreach (var declaration in methods.Where(static declaration =>
-            declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : declaration.Identifier.ValueText is "Target" or "Other"))
+            declaration.Identifier.ValueText is "Target" or "Other"))
         {
             var operation = model.GetOperation(declaration)!;
             var creation = operation.Descendants().OfType<IDelegateCreationOperation>().Single();
@@ -202,7 +202,7 @@ internal sealed class RootParameterClosurePlanTests
         var compilation = CSharpCompilation.Create("RootClosureBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return (compilation, compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single());
     }
 }

@@ -157,7 +157,7 @@ public sealed class FuzzRunnerTests
             serial.Passed,
             Is.True,
             string.Join(Environment.NewLine, serial.Failures.Select(
-                static failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.ToString()))));
+                static failure => failure.ToString())));
         Assert.That(parallel.Passed, Is.True);
         Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
         Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
@@ -359,10 +359,10 @@ public sealed class FuzzRunnerTests
         var results = FrontendDifferentialOracle.CompareBatch(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         Assert.That(
-            results.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)),
+            results.Select(static result => result.Status),
             Is.All.EqualTo(FuzzOracleStatus.Agreement),
             string.Join(Environment.NewLine, results.Select(
-                static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
+                static result => result.Detail)));
         Assert.That(
             results[0].ExceptionKind,
             Is.EqualTo(IrExceptionKind.NullReference));

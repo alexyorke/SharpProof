@@ -126,7 +126,7 @@ public sealed class TypedCheckedArithmeticTests
         System.ArgumentNullException.ThrowIfNull(rightType);
         System.ArgumentNullException.ThrowIfNull(targetType);
         using var subject = TypedProgramSubject.Create(members);
-        var compounds = subject.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).SelectMany(Descendants)
+        var compounds = subject.Graph.Blocks.SelectMany(block => block.Operations).SelectMany(Descendants)
             .OfType<Microsoft.CodeAnalysis.Operations.ICompoundAssignmentOperation>().ToImmutableArray();
         Assert.That(compounds, Is.Not.Empty);
         foreach (var operation in compounds)
@@ -150,7 +150,7 @@ public sealed class TypedCheckedArithmeticTests
         var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(FrontendTestHelpers.WrapSubjectMembers("public static " + members));
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("PromotionProbe", [tree], TestMetadataReferences.Platform,
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)).ToImmutableArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToImmutableArray();
         Assert.That(errors, Has.Length.EqualTo(1));
         Assert.That(errors[0].Id, Is.EqualTo("CS0266"));
     }
@@ -211,8 +211,8 @@ public sealed class TypedCheckedArithmeticTests
         if (arguments.IsDefault)
         { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(members);
-        var display = arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument is char character
-            ? ((int)character).ToString(CultureInfo.InvariantCulture) : Convert.ToString(argument, CultureInfo.InvariantCulture)));
+        var display = arguments.Select(argument => argument is char character
+            ? ((int)character).ToString(CultureInfo.InvariantCulture) : Convert.ToString(argument, CultureInfo.InvariantCulture));
         return new TestCaseData(members, arguments).SetName("Checked oracle: " + members + " [" + string.Join(",", display) + "]");
     }
 }

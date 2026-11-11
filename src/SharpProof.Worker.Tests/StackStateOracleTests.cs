@@ -46,10 +46,10 @@ public sealed class StackStateOracleTests
             cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single().Total!;
         var factory = total.Program.Factory;
-        var count = total.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrAssignInstruction>().Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Value)
-            .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
-            .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
+        var count = total.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAssignInstruction>().Select(instruction => instruction.Value)
+            .OfType<IrBinaryTerm>().Where(term => term.Operator == IrBinaryOperator.BitwiseAnd)
+            .Select(term => term.Left).OfType<IrOpaqueTerm>().First();
         var parameter = total.Parameters.Single().Entry;
         var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         inputBuilder[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,

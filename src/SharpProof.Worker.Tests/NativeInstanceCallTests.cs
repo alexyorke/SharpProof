@@ -193,7 +193,7 @@ internal sealed class NativeInstanceCallTests
         System.ArgumentNullException.ThrowIfNull(types);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; " + Nodes + types);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (effects ? preparation.EffectClaims.Length != 0
-            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
+        return preparations.Single(preparation => effects ? preparation.EffectClaims.Length != 0
+            : preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 }

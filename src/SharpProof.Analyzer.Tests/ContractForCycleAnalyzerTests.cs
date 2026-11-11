@@ -41,14 +41,14 @@ public sealed class ContractForCycleAnalyzerTests
         compilation = compilation.AddSyntaxTrees(excluded);
         var candidates = ContractForValidationEngine.FindCandidates(
             compilation,
-            tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"),
+            tree => tree.FilePath != "excluded.cs",
             TestContext.CurrentContext.CancellationToken);
 
         var diagnostics = ContractForValidationEngine.Validate(
             compilation,
             candidates,
             TestContext.CurrentContext.CancellationToken,
-            tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath != "excluded.cs"));
+            tree => tree.FilePath != "excluded.cs");
 
         Assert.That(diagnostics, Is.Empty);
     }
@@ -105,18 +105,18 @@ public sealed class ContractForCycleAnalyzerTests
             """);
 
         var cycleDiagnostics = diagnostics
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SPCF0010"))
+            .Where(static diagnostic => diagnostic.Id == "SPCF0010")
             .ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                diagnostics.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(
                     ["SPCF0010", "SP0047", "SPCF0010", "SP0047"]));
             Assert.That(
                 cycleDiagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                        System.Globalization.CultureInfo.InvariantCulture))),
+                    diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture)),
                 Is.EqualTo(
                     [
                         "Contract companion 'LeftContracts' targets " +

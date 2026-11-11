@@ -28,9 +28,9 @@ internal static class ApiSpecContentDigest
             }
 
             foreach (var assembly in target.ApprovedAssemblies
-                         .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Name), StringComparer.Ordinal)
-                         .ThenBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.PublicKeyToken), StringComparer.OrdinalIgnoreCase)
-                         .ThenBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ReferenceFamily)))
+                         .OrderBy(static item => item.Name, StringComparer.Ordinal)
+                         .ThenBy(static item => item.PublicKeyToken, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(static item => item.ReferenceFamily))
             {
                 hash.Add("assembly")
                     .Add(assembly.Name)
@@ -47,7 +47,7 @@ internal static class ApiSpecContentDigest
                 .Add(facets.Allocation.Evidence.Source);
             var exceptionMetadataNames = facets.Throws.ExceptionMetadataNames
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(static name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal)
+                .OrderBy(static name => name, StringComparer.Ordinal)
                 .ToImmutableArray();
             hash.Add(facets.Throws.Behavior)
                 .Add(exceptionMetadataNames.Length)

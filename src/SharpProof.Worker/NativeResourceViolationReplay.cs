@@ -198,7 +198,7 @@ internal static class NativeResourceViolationReplay
                     Kind = formatted.Kind,
                     Value = formatted.Value
                 };
-            }).OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Variable, StringComparer.Ordinal)];
+            }).OrderBy(static value => value.Variable, StringComparer.Ordinal)];
             return result;
         }
     }

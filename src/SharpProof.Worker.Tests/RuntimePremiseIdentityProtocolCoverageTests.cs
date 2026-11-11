@@ -27,8 +27,7 @@ internal sealed class RuntimePremiseIdentityProtocolCoverageTests
         // internal mirror by name. Both must name the same reviewed deployment for each value.
         static ImmutableArray<(string Name, int Value)> Members<TEnum>() where TEnum : struct, Enum
         {
-            return [.. Enum.GetNames<TEnum>().Select(static name => name is null ? throw new ArgumentNullException(nameof(name)) :
-                (name, Convert.ToInt32(Enum.Parse<TEnum>(name), System.Globalization.CultureInfo.InvariantCulture)))];
+            return [.. Enum.GetNames<TEnum>().Select(static name => (name, Convert.ToInt32(Enum.Parse<TEnum>(name), System.Globalization.CultureInfo.InvariantCulture)))];
         }
 
         Assert.That(

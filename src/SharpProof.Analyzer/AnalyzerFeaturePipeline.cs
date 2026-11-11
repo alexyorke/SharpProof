@@ -88,11 +88,11 @@ internal static partial class AnalyzerFeaturePipeline
         if (isGenerated && method.PartialDefinitionPart is { } definition)
         {
             isGenerated = definition.DeclaringSyntaxReferences.All(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (AnalyzerGeneratedCodePolicy.IsGenerated(
+                AnalyzerGeneratedCodePolicy.IsGenerated(
                     definition,
                     reference.SyntaxTree,
                     context.Compilation,
-                    context.CancellationToken)));
+                    context.CancellationToken));
         }
         if (isGenerated)
         {
@@ -488,12 +488,12 @@ internal static partial class AnalyzerFeaturePipeline
                 MethodKind.EventAdd or
                 MethodKind.EventRemove &&
             method.DeclaringSyntaxReferences.Any(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax(cancellationToken) is AccessorDeclarationSyntax
+                reference.GetSyntax(cancellationToken) is AccessorDeclarationSyntax
                 {
                     Body: null,
                     ExpressionBody: null,
                     SemicolonToken.RawKind: not 0
-                }));
+                });
     }
 
     internal static void AnalyzeMemberInitializer(
@@ -780,7 +780,7 @@ internal static partial class AnalyzerFeaturePipeline
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(operationBlocks.IsDefault, nameof(operationBlocks), "Array must be initialized.");
         var operationSyntax = operationBlocks
-            .OrderByDescending(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.Span.Length))
+            .OrderByDescending(static operation => operation.Syntax.Span.Length)
             .FirstOrDefault()?.Syntax;
         foreach (var reference in method.DeclaringSyntaxReferences)
         {

@@ -33,8 +33,7 @@ public sealed class ResultTypeCodeFixTests
             Assert.That(text, Is.EqualTo(Source(expected)));
             Assert.That(await AnalyzeAsync(changed), Is.Empty);
             var compilation = await changed.Project.GetCompilationAsync();
-            Assert.That(compilation!.GetDiagnostics().Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) :
-                item.Severity == DiagnosticSeverity.Error), Is.Empty);
+            Assert.That(compilation!.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
         }
     }
 
@@ -47,8 +46,7 @@ public sealed class ResultTypeCodeFixTests
         var document = CreateDocument(workspace, expression);
         var root = await document.GetSyntaxRootAsync();
         var invocation = root!.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
-            .First(static node => node is null ? throw new ArgumentNullException(nameof(node)) :
-                node.Expression.ToString().StartsWith("Contract.Result", StringComparison.Ordinal));
+            .First(static node => node.Expression.ToString().StartsWith("Contract.Result", StringComparison.Ordinal));
         // Even a stale/misassigned diagnostic must not offer an unrelated repair.
         var descriptor = new DiagnosticDescriptor("SP0024", "Usage", "Usage", "Usage", DiagnosticSeverity.Error, true);
         var fixes = await GetFixesAsync(document, Diagnostic.Create(descriptor, invocation.GetLocation(),
@@ -104,8 +102,7 @@ public sealed class ResultTypeCodeFixTests
             "using SharpProof.Attributes; public static class Fixture { " + member + " }"));
         var root = await document.GetSyntaxRootAsync();
         var invocation = root!.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
-            .First(static node => node is null ? throw new ArgumentNullException(nameof(node)) :
-                node.Expression.ToString().Contains("Result<long>", StringComparison.Ordinal));
+            .First(static node => node.Expression.ToString().Contains("Result<long>", StringComparison.Ordinal));
         var diagnostic = Diagnostic.Create(
             new DiagnosticDescriptor("SP0024", "Usage", "Usage", "Usage", DiagnosticSeverity.Error, true),
             invocation.GetLocation(),

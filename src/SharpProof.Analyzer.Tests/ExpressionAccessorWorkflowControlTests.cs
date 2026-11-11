@@ -40,7 +40,7 @@ public sealed class ExpressionAccessorWorkflowControlTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0002", "SP0047"],
             filePath: "Subject.cs");
         Assert.That(compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var root = await tree.GetRootAsync();
         var declaration = root.DescendantNodes().OfType<BasePropertyDeclarationSyntax>().Single();

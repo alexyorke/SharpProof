@@ -73,7 +73,7 @@ public sealed class DiagnosticTransportPathMappingControlsAuditTests
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True,
-            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ToString()))));
+            string.Join(Environment.NewLine, emitted.Diagnostics.Select(static item => item.ToString())));
         RuntimeAssemblyTestHost.WithRuntimeAssembly("DiagnosticTransportPathMappingAudit", image, assembly =>
         {
             System.ArgumentNullException.ThrowIfNull(assembly);

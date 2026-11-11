@@ -63,7 +63,7 @@ public sealed class CompilerReportingTests
         var compilation = TestCompilation.CreateExact("DocumentIdentityTests", Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, paths.Select((path, index) =>
             path is null ? throw new System.ArgumentNullException(nameof(path)) : ((path, "public static class Subject" + index + " { public static int Root() => " + index + "; }"))).ToImmutableArray());
         var snapshots = CompilerCompilationCapture.CaptureTrees(compilation, TestContext.CurrentContext.CancellationToken);
-        Assert.That(snapshots.Select(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path)).Distinct(StringComparer.Ordinal).Count(),
+        Assert.That(snapshots.Select(static snapshot => snapshot.Path).Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(paths.Length));
         var trees = compilation.SyntaxTrees;
         for (var ordinal = 0; ordinal < trees.Length; ordinal++)
@@ -73,7 +73,7 @@ public sealed class CompilerReportingTests
             Assert.That(snapshots[ordinal].TextLength, Is.EqualTo(independentlyCaptured.TextLength));
             var originalPath = string.IsNullOrEmpty(paths[ordinal])
                 ? $"<compiler-generated:{ordinal}>" : CompilerCaptureIdentity.NormalizePath(paths[ordinal]);
-            if (!snapshots.Take(ordinal).Any(snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Path == originalPath)))
+            if (!snapshots.Take(ordinal).Any(snapshot => snapshot.Path == originalPath))
             { Assert.That(snapshots[ordinal].Path, Is.EqualTo(originalPath)); }
         }
     }

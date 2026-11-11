@@ -177,7 +177,7 @@ internal sealed class AnalyzerCoreClausePlacementModuleTests
         var source = "using System; using SharpProof.Attributes; public static class Fixture { " +
             "public static void Target(bool condition) { " + body + " } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var emitted = new MemoryStream();
         Assert.That(compilation.Emit(emitted).Success, Is.True);
         var tree = compilation.SyntaxTrees.Single();

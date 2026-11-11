@@ -51,7 +51,7 @@ internal static class HornInvariantSearch
             var rules = ImmutableArray.CreateBuilder<BoolExpr>();
             foreach (var clause in clauses)
             {
-                var body = clause.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (Atom(encoder.EncodeBoolean(assumption.Predicate, _meter)))).ToImmutableList();
+                var body = clause.Assumptions.Select(assumption => Atom(encoder.EncodeBoolean(assumption.Predicate, _meter))).ToImmutableList();
                 foreach (var (guards, head) in Heads(encoder.EncodeBoolean(clause.Goal.Predicate, _meter)))
                 { rules.Add((BoolExpr)Integer(Own(context.MkImplies(Own(context.MkAnd([.. body, .. guards])), head)))); }
             }
@@ -71,7 +71,7 @@ internal static class HornInvariantSearch
             {
                 var rule = Ackermann(converted);
                 var (constants, constantOrder) = CollectIntegerConstants(rule);
-                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constantOrder.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : constants[name])], rule)));
+                fixedpoint.AddRule(constants.Count == 0 ? rule : Own(context.MkForall([.. constantOrder.Select(name => constants[name])], rule)));
             }
             if (fixedpoint.Query(Own((BoolExpr)context.MkApp(_error))) != Status.UNSATISFIABLE)
             { return proposals.ToImmutable(); }
@@ -100,7 +100,7 @@ internal static class HornInvariantSearch
         private BoolExpr Ackermann(BoolExpr rule)
         {
             var (constants, _) = CollectIntegerConstants(rule);
-            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name), StringComparer.Ordinal).ToImmutableArray();
+            var applied = constants.Keys.Where(_applied.ContainsKey).OrderBy(name => name, StringComparer.Ordinal).ToImmutableArray();
             var congruence = ImmutableArray.CreateBuilder<BoolExpr>();
             // A bitvector unknown keeps its signed range.
             foreach (var name in applied)
@@ -162,7 +162,7 @@ internal static class HornInvariantSearch
                 var arguments = expression.Args.Select(Integer).ToImmutableArray();
                 if (!_relations.TryGetValue(name, out var relation))
                 {
-                    relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
+                    relation = context.MkFuncDecl(name, [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
                     _relations.AddUnique(name, relation);
                     _relationOrder.Add(relation);
                 }
@@ -186,7 +186,7 @@ internal static class HornInvariantSearch
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED)
             {
                 var function = expression.FuncDecl.Name.ToString();
-                var key = function + "(" + string.Join(",", operands.Select(operand => operand is null ? throw new System.ArgumentNullException(nameof(operand)) : (operand.Id.ToString(CultureInfo.InvariantCulture)))) + ")";
+                var key = function + "(" + string.Join(",", operands.Select(operand => operand.Id.ToString(CultureInfo.InvariantCulture))) + ")";
                 if (!_applications.TryGetValue(key, out var application))
                 {
                     var name = "applied" + _applications.Count.ToString(CultureInfo.InvariantCulture);
@@ -252,7 +252,7 @@ internal static class HornInvariantSearch
         {
             expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             return expression.IsApp && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED &&
-                encoder.Relations!.Values.Any(relation => relation is null ? throw new System.ArgumentNullException(nameof(relation)) : (relation.Name.ToString() == expression.FuncDecl.Name.ToString()));
+                encoder.Relations!.Values.Any(relation => relation.Name.ToString() == expression.FuncDecl.Name.ToString());
         }
 
         private bool ContainsRelation(Expr expression)
@@ -281,7 +281,7 @@ internal static class HornInvariantSearch
             _meter.Consume();
             if (IsRelation(expression))
             {
-                if (!applications.Any(application => application is null ? throw new System.ArgumentNullException(nameof(application)) : (application.Equals(expression))))
+                if (!applications.Any(application => application.Equals(expression)))
                 { applications.Add(expression); }
                 return;
             }
@@ -301,11 +301,11 @@ internal static class HornInvariantSearch
             if (IsRelation(goal))
             { return [([], goal)]; }
             if (goal.IsAnd)
-            { return [.. goal.Args.SelectMany(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Heads((BoolExpr)argument)))]; }
+            { return [.. goal.Args.SelectMany(argument => Heads((BoolExpr)argument))]; }
             if (goal.IsOr && goal.Args.Count(ContainsRelation) == 1)
             {
-                var guards = goal.Args.Where(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (!ContainsRelation(argument)))
-                    .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Own(context.MkNot((BoolExpr)argument)))).ToImmutableArray();
+                var guards = goal.Args.Where(argument => !ContainsRelation(argument))
+                    .Select(argument => Own(context.MkNot((BoolExpr)argument))).ToImmutableArray();
                 return [.. Heads((BoolExpr)goal.Args.Single(ContainsRelation)).Select(head => (guards.Concat(head.Guards).ToImmutableArray(), head.Head))];
             }
             throw new UnsupportedIrEncodingException();

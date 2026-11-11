@@ -29,7 +29,7 @@ internal sealed partial record CallableEntryFeasibility
         System.ArgumentNullException.ThrowIfNull(proofCore);
         System.ArgumentNullException.ThrowIfNull(usedAssumptionIds);
         var evidence = proofCore
-            .Where(static label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (!string.IsNullOrWhiteSpace(label)))
+            .Where(static label => !string.IsNullOrWhiteSpace(label))
             .ToImmutableArray();
         return evidence.IsDefaultOrEmpty
             ? Unknown(WorkerClaimReason.MalformedBackendResult)
@@ -39,7 +39,7 @@ internal sealed partial record CallableEntryFeasibility
                 evidence,
                 usedAssumptionIds
                     .Where(static id =>
-                        id is null ? throw new System.ArgumentNullException(nameof(id)) : (!string.IsNullOrWhiteSpace(id)))
+                        !string.IsNullOrWhiteSpace(id))
                     .ToImmutableHashSet(
                         StringComparer.Ordinal));
     }
@@ -84,7 +84,7 @@ internal static class CallableProofCore
         System.ArgumentNullException.ThrowIfNull(labels);
         return labels
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal);
+            .OrderBy(static label => label, StringComparer.Ordinal);
     }
 
     internal static IEnumerable<string> AssumptionIds(
@@ -96,11 +96,11 @@ internal static class CallableProofCore
         ArgumentNullException.ThrowIfNull(assumptionIds);
         return proofCore
             .Select(justification =>
-                justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (assumptionIds.TryGetValue(
+                assumptionIds.TryGetValue(
                     justification,
                     out var assumptionId)
                     ? assumptionId
-                    : null))
+                    : null)
             .OfType<string>();
     }
 }

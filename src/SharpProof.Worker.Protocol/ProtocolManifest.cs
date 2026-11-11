@@ -38,9 +38,9 @@ internal static partial class WorkerProtocolJson
             callable.ClaimIds = [
                 .. (EmptyIfDefault(callable.ClaimIds))
                     .OrderBy(id =>
-                        id is null ? throw new System.ArgumentNullException(nameof(id)) : (FindClaimOrdinal(claimsById, id)))
+                        FindClaimOrdinal(claimsById, id))
                     .ThenBy(
-                        static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id),
+                        static id => id,
                         StringComparer.Ordinal)
             ];
             callable.Assumptions =

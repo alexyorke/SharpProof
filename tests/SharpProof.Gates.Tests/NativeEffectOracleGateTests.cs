@@ -78,10 +78,10 @@ internal sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
-        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
+        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
-        Assert.That(report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == "OSS0199")).NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(report.Rows.Single(row => row.MethodId == "OSS0199").NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         await TestContext.Progress.WriteLineAsync($"Exception oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; " +
             $"{report.NativeRefuted} refuted; {report.RuntimeWitnesses} runtime confirmations; {report.WallSeconds:F1}s.");
     }
@@ -134,7 +134,7 @@ internal sealed class NativeEffectOracleGateTests
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var span = method.GetLocation().GetLineSpan();
         return new(2, [], [new("test", "sample.cs", "test", source)],
             [new("sample", "test", "sample.cs", span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1,
@@ -191,9 +191,9 @@ internal sealed class NativeEffectOracleGateTests
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
-        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
+        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.Passed, Is.True);
-        var retained = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == "OSS0199"));
+        var retained = report.Rows.Single(row => row.MethodId == "OSS0199");
         Assert.That(retained.RuntimeOracle, Is.EqualTo("Confirmed"));
         Assert.That(retained.RuntimeChecks, Is.EqualTo(2));
         Assert.That(retained.AllocatedBytes, Is.Zero);
@@ -330,7 +330,7 @@ internal sealed class NativeEffectOracleGateTests
         var report = await NativeEffectOracleGate.RunAsync(root, purity: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
         Assert.That(report.Exhaustive, Is.True);
-        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
+        Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
         Assert.That(report.Passed, Is.True);
         await TestContext.Progress.WriteLineAsync($"Purity oracle: {report.CheckedMethodCount} methods; {report.NativeProven} proven; {report.NativeRefuted} refuted.");

@@ -53,18 +53,18 @@ public sealed class CompilerTotalCallableArtifactTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var total = preparations.Single(static preparation =>
-            preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Total is { CallPreconditions.Length: 1 })).Total!;
-        var instructions = total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+            preparation.Total is { CallPreconditions.Length: 1 }).Total!;
+        var instructions = total.Program.Blocks.SelectMany(static block => block.Instructions).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(total.IsBodyAbstraction, Is.False);
             Assert.That(instructions.OfType<IrAllocationInstruction>()
-                .Any(static allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Target != null)), Is.True);
+                .Any(static allocation => allocation.Target != null), Is.True);
             Assert.That(instructions.OfType<IrHavocInstruction>()
-                .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation && havoc.Variables.Length == 1)), Is.True);
+                .Any(static havoc => havoc.Origin == IrHavocOrigin.Approximation && havoc.Variables.Length == 1), Is.True);
             Assert.That(instructions.Single(instruction =>
-                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == total.CallPreconditions[0].Instruction)), Is.TypeOf<IrAssignInstruction>());
+                instruction.Id == total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
         }
     }
 
@@ -75,7 +75,7 @@ public sealed class CompilerTotalCallableArtifactTests
             [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("public sealed class G<T> { } public static class C { " +
                 "public static void Target(G<Missing> input) { } }")],
             TestMetadataReferences.Platform, TestCompilation.CreateOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS0246")), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS0246"), Is.True);
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Target").OfType<Microsoft.CodeAnalysis.IMethodSymbol>().Single();
         Assert.That(SharpProof.Frontend.CompilerIdentityBridge.IsClosedSealedReferenceType(method.Parameters[0].Type, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
     }
@@ -85,11 +85,11 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var artifact = CreateArtifact(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
         var graph = artifact.Callables.Single().Total!.Graph;
-        Assert.That(graph.Types.Count(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ClosedSealedReference)), Is.EqualTo(3));
+        Assert.That(graph.Types.Count(type => type.ClosedSealedReference), Is.EqualTo(3));
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var encoded = CompilerTotalCallableArtifactCodec.Encode(preparations.Single().Total)!;
-        Assert.That(encoded.Graph.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ClosedSealedReference)), Is.EqualTo(graph.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ClosedSealedReference))));
+        Assert.That(encoded.Graph.Types.Select(type => type.ClosedSealedReference), Is.EqualTo(graph.Types.Select(type => type.ClosedSealedReference)));
     }
 
     [TestCase(0)]
@@ -387,23 +387,23 @@ public sealed class CompilerTotalCallableArtifactTests
     private static (string OwnerId, CompilerTotalCallableArtifact Artifact) CreateShadowBodyArtifact()
     {
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
-        var callable = artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }));
+        var callable = artifact.Callables.Single(static owner => owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 });
         // A shadow body has no manifest, so it cannot own a claim.
-        var total = callable.Total! with { CallPreconditions = [.. callable.Total!.CallPreconditions.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row with { ClaimId = null }))] };
+        var total = callable.Total! with { CallPreconditions = [.. callable.Total!.CallPreconditions.Select(static row => row with { ClaimId = null })] };
         {
             total = total with { EffectsCompleteAtEntry = false };
             callable = callable with { Total = total };
-            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }), callable) };
         }
         {
             total = total with { ValidEffectClaimIds = [] };
             callable = callable with { Total = total };
-            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }), callable) };
         }
         {
             total = total with { ExceptionConstraints = [] };
             callable = callable with { Total = total };
-            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 })), callable) };
+            artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(static owner => owner.Total is { Clauses.Length: 0, CallPreconditions.Length: 2 }), callable) };
         }
         return (callable.CallableId, total);
     }
@@ -541,7 +541,7 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var original = prepared.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)).Total!;
+        var original = prepared.Single(owner => owner.Total?.CallPreconditions.Length == 2).Total!;
         var first = original.CallPreconditions[0];
         var second = original.CallPreconditions[1];
         var modified = mutation switch
@@ -553,16 +553,16 @@ public sealed class CompilerTotalCallableArtifactTests
             "site" => original with
             {
                 CallPreconditions = [first, second with { ClauseSite = original.Program.Blocks
-                .SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == second.Instruction)).Operation }]
+                .SelectMany(block => block.Instructions).Single(instruction => instruction.Id == second.Instruction).Operation }]
             },
             _ => throw new AssertionException("Unknown mutation.")
         };
         var encoded = CompilerTotalCallableArtifactCodec.Encode(modified)!;
-        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length == 2)) with { Total = encoded }) }; }
-        var variables = encoded.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old)))
+        { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(owner => owner.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(owner => owner.Total?.CallPreconditions.Length == 2) with { Total = encoded }) }; }
+        var variables = encoded.Parameters.SelectMany(parameter => ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.Old))
             .Concat(encoded.Result == -1 ? ImmutableArray<int>.Empty : ImmutableArray.Create(encoded.Result)).Distinct().OrderBy(index => index).ToImmutableArray();
-        var operations = encoded.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Operation))
-            .Concat(encoded.CallPreconditions.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.ClauseSite))).Distinct().OrderBy(index => index).ToImmutableArray();
+        var operations = encoded.Clauses.Select(clause => clause.Operation)
+            .Concat(encoded.CallPreconditions.Select(call => call.ClauseSite)).Distinct().OrderBy(index => index).ToImmutableArray();
         Assert.DoesNotThrow(new Action(() => PortableIrGraphCodec.Decode(encoded.Graph, variables, operations, TestContext.CurrentContext.CancellationToken)));
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -581,61 +581,61 @@ public sealed class CompilerTotalCallableArtifactTests
         System.ArgumentNullException.ThrowIfNull(mutation);
         var artifact = CreateArtifact(GoldenTest.Load("worker", "reachable-call-precondition-artifact").Source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out _, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var total = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)).Total!;
+        var total = artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2).Total!;
         var row = total.CallPreconditions[0];
         switch (mutation)
         {
             case "missing":
                 {
                     total = total with { CallPreconditions = [] };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "duplicate":
                 {
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(1, total.CallPreconditions[1] with { InstructionIndex = row.InstructionIndex }) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "index":
                 {
                     row = row with { InstructionIndex = -1 };
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "callee":
                 {
                     row = row with { CalleeIdentity = "" };
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "ordinal":
                 {
                     row = row with { ClauseOrdinal = -1 };
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "site":
                 {
                     row = row with { ClauseSite = -1 };
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "root":
                 {
                     row = row with { ValueRoot = row.SafeRoot };
                     total = total with { CallPreconditions = total.CallPreconditions.SetItem(0, row) };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
             case "abstraction":
                 {
                     total = total with { IsBodyAbstraction = true };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)), artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length == 2)) with { Total = total }) };
+                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2), artifact.Callables.Single(callable => callable.Total?.CallPreconditions.Length == 2) with { Total = total }) };
                 }
                 break;
         }
@@ -656,8 +656,8 @@ public sealed class CompilerTotalCallableArtifactTests
             }
             """);
         var graph = artifact.Callables.Single().Total!.Graph;
-        var comparison = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.Binary &&
-            (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual));
+        var comparison = graph.Terms.Single(term => term.Kind == IrTermKind.Binary &&
+            (IrBinaryOperator)term.A == IrBinaryOperator.NotEqual);
         (comparison, graph) = graph.ChangeRow(comparison, comparison with { C = comparison.B });
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -696,8 +696,8 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         var artifact = CreateArtifact(EmptyArraySource);
         var graph = artifact.Callables.Single().Total!.Graph;
-        var empty = graph.Terms.Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Kind == IrTermKind.EmptyArray));
-        (empty, graph) = graph.ChangeRow(empty, empty with { Type = PortableGraphChanges.FindIndex(graph.Types, type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Boolean)) });
+        var empty = graph.Terms.Single(term => term.Kind == IrTermKind.EmptyArray);
+        (empty, graph) = graph.ChangeRow(empty, empty with { Type = PortableGraphChanges.FindIndex(graph.Types, type => type.Kind == IrTypeKind.Boolean) });
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.Throws<JsonException>(new Action(() => CompilerManifestArtifactJson.DeserializePrepared(json, out _, cancellationToken: TestContext.CurrentContext.CancellationToken)));
@@ -726,12 +726,12 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(preparation.Total, Is.Null);
         var entry = preparation.TotalEntry!;
         Assert.That(entry, Is.Not.Null);
-        Assert.That(entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.All.EqualTo(CompilerContractKind.Requires));
+        Assert.That(entry.Clauses.Select(clause => clause.Kind), Is.All.EqualTo(CompilerContractKind.Requires));
         Assert.That(entry.Clauses.Single().AssumptionId, Is.EqualTo(preparation.Entry.Assumptions.Single().Id));
         var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Kind, Is.EqualTo(contradictory ? CallableEntryFeasibilityKind.Contradictory : CallableEntryFeasibilityKind.Feasible));
         if (contradictory)
-        { Assert.That(result.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id)))); }
+        { Assert.That(result.UsedAssumptionIds, Is.EquivalentTo(preparation.Entry.Assumptions.Select(assumption => assumption.Id))); }
     }
 
     [TestCase("body")]
@@ -879,9 +879,9 @@ public sealed class CompilerTotalCallableArtifactTests
         var preparation = preparations.Single();
         var total = preparation.Total!;
         Assert.That(total, Is.Not.Null);
-        Assert.That(total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)),
-            Is.EqualTo(roundTrip.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
-        Assert.That(total.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).AssumptionId,
+        Assert.That(total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).Select(clause => clause.ClaimId),
+            Is.EqualTo(roundTrip.Manifest.Claims.Select(claim => claim.ClaimId)));
+        Assert.That(total.Clauses.Single(clause => clause.Kind == CompilerContractKind.Requires).AssumptionId,
             Is.EqualTo(roundTrip.Manifest.Callables.Single().Assumptions.Single().Id));
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(candidate.CallableId, Is.EqualTo(preparation.Entry.CallableId));
@@ -974,7 +974,7 @@ public sealed class CompilerTotalCallableArtifactTests
                 return 10 / d;
             } }
             """);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)),
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions),
             Has.Some.TypeOf<IrThrowInstruction>());
         var checkedClause = await Check(preparation, 0);
         Assert.That(checkedClause.Outcome, Is.TypeOf<ProvenOutcome>(), checkedClause.Reason.ToString());
@@ -1007,7 +1007,7 @@ public sealed class CompilerTotalCallableArtifactTests
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         var total = artifact.Callables.Single().Total;
         Assert.That(total, Is.Not.Null, "A supported source document lost candidate admission.");
-        Assert.That(total!.Graph.Operations.Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan != null)).Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan!.Document)),
+        Assert.That(total!.Graph.Operations.Where(operation => operation.SourceSpan != null).Select(operation => operation.SourceSpan!.Document),
             Is.All.EqualTo(artifact.Compilation.SyntaxTrees.Single().Path));
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(prepared.Single().Total, Is.Not.Null);
@@ -1023,13 +1023,13 @@ public sealed class CompilerTotalCallableArtifactTests
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All, discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
-        var documents = artifact.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!)).ToImmutableArray();
-        Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Document)), Is.EquivalentTo(artifact.Compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))));
-        Assert.That(documents.Select(span => span is null ? throw new System.ArgumentNullException(nameof(span)) : (span.Start)).Distinct().Count(), Is.EqualTo(1));
-        Assert.That(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Location.Path)), Is.All.EqualTo("mapped.cs"));
+        var documents = artifact.Callables.Select(callable => callable.Total!.Graph.Operations[callable.Total.Clauses[1].Operation].SourceSpan!).ToImmutableArray();
+        Assert.That(documents.Select(span => span.Document), Is.EquivalentTo(artifact.Compilation.SyntaxTrees.Select(tree => tree.Path)));
+        Assert.That(documents.Select(span => span.Start).Distinct().Count(), Is.EqualTo(1));
+        Assert.That(artifact.Manifest.Claims.Select(claim => claim.Location.Path), Is.All.EqualTo("mapped.cs"));
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(prepared, Has.Length.EqualTo(2));
-        Assert.That(prepared.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total)), Is.All.Not.Null);
+        Assert.That(prepared.Select(callable => callable.Total), Is.All.Not.Null);
     }
 
     [Test]
@@ -1221,7 +1221,7 @@ public sealed class CompilerTotalCallableArtifactTests
     {
         System.ArgumentNullException.ThrowIfNull(total);
         return total.IsBodyAbstraction ||
-            total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Call));
+            total.Graph.Blocks.SelectMany(block => block.Instructions).Any(instruction => instruction.Kind == IrInstructionKind.Call);
     }
 
     internal static CompilerManifestArtifact CreateArtifact(string source,

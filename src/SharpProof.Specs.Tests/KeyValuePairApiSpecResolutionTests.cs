@@ -24,11 +24,11 @@ public sealed class KeyValuePairApiSpecResolutionTests
                 var getter = pair.GetMembers(name).OfType<IPropertySymbol>().Single().GetMethod!;
                 Assert.That(resolved.TryGet(getter, out _), Is.True);
             }
-            foreach (var method in pair.GetMembers().OfType<IMethodSymbol>().Where(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.MethodKind == MethodKind.Constructor || method.Name is "ToString" or "Deconstruct"))
+            foreach (var method in pair.GetMembers().OfType<IMethodSymbol>().Where(method => method.MethodKind == MethodKind.Constructor || method.Name is "ToString" or "Deconstruct"))
             {
                 Assert.That(resolved.TryGet(method, out _), Is.False, method.ToDisplayString());
             }
-            Assert.That(ApiSpecTable.Default.Templates.Where(template => template is null ? throw new ArgumentNullException(nameof(template)) : template.Target.WitnessIdentifier.StartsWith("bcl.key-value-pair.", StringComparison.Ordinal)).SelectMany(template => template is null ? throw new ArgumentNullException(nameof(template)) : template.Postconditions), Is.Empty);
+            Assert.That(ApiSpecTable.Default.Templates.Where(template => template.Target.WitnessIdentifier.StartsWith("bcl.key-value-pair.", StringComparison.Ordinal)).SelectMany(template => template.Postconditions), Is.Empty);
         }
     }
 
@@ -47,6 +47,6 @@ public sealed class KeyValuePairApiSpecResolutionTests
     private static CSharpCompilation FrameworkCompilation()
     {
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        return CSharpCompilation.Create("PairResolution", references: paths.Select(path => path is null ? throw new ArgumentNullException(nameof(path)) : MetadataReference.CreateFromFile(path)));
+        return CSharpCompilation.Create("PairResolution", references: paths.Select(path => MetadataReference.CreateFromFile(path)));
     }
 }

@@ -219,7 +219,7 @@ public sealed class ResourceRuntimeLayoutTests
         Assert.That(first.Target, Is.Not.SameAs(second.Target));
         var child = first.Target!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
         Assert.That(child, Has.Length.EqualTo(2));
-        Assert.That(child.Any(field => field is null ? throw new ArgumentNullException(nameof(field)) : ReferenceEquals(field.GetValue(first.Target), root)), Is.True);
+        Assert.That(child.Any(field => ReferenceEquals(field.GetValue(first.Target), root)), Is.True);
         Assert.That(first(), Is.EqualTo(10));
         Assert.That(second(), Is.EqualTo(11));
         Assert.That(Measure(() => outer(3)), Is.EqualTo(96));
@@ -252,7 +252,7 @@ public sealed class ResourceRuntimeLayoutTests
         Assert.That(root, Is.Not.Null);
         var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
         Assert.That(fields, Has.Length.EqualTo(2));
-        var cache = fields.Single(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(Func<int, Func<int>>));
+        var cache = fields.Single(static field => field.FieldType == typeof(Func<int, Func<int>>));
         Assert.That(cache.GetValue(root), Is.Null);
         var middle = outer();
         Assert.That(cache.GetValue(root), Is.SameAs(middle));
@@ -272,7 +272,7 @@ public sealed class ResourceRuntimeLayoutTests
         Assert.That(root, Is.Not.Null);
         var fields = root!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
         Assert.That(fields, Has.Length.EqualTo(2));
-        var array = fields.Single(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int[]));
+        var array = fields.Single(static field => field.FieldType == typeof(int[]));
         Assert.That(array.GetValue(root), Has.Length.EqualTo(2));
         Assert.That(outer(3)(), Is.EqualTo(12));
         Assert.That(Measure(() => outer(3)), Is.EqualTo(96));

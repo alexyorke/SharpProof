@@ -52,14 +52,14 @@ internal sealed class WorkerTcbEdgeCaseTests
                 }
             }
             """);
-        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         switch (kind)
         {
             case MalformedBodyKind.MissingAssignmentSource:
-                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Assign)) with { B = -1 }) } }) }; }
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction.Kind == IrInstructionKind.Assign), instructions.First(instruction => instruction.Kind == IrInstructionKind.Assign) with { B = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnboundCall:
-                var call = instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return));
+                var call = instructions.First(instruction => instruction.Kind == IrInstructionKind.Return);
                 {
                     {
                         var changedFixture = artifact.Callables.Single().Total!.Graph.ChangeRow(call, call with { Kind = IrInstructionKind.Call });
@@ -76,10 +76,10 @@ internal sealed class WorkerTcbEdgeCaseTests
                 }
                 break;
             case MalformedBodyKind.MissingBranchCondition:
-                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Branch)) with { A = -1 }) } }) }; }
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction.Kind == IrInstructionKind.Branch), instructions.First(instruction => instruction.Kind == IrInstructionKind.Branch) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.MissingReturnValue:
-                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)), instructions.First(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Return)) with { A = -1 }) } }) }; }
+                { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions.First(instruction => instruction.Kind == IrInstructionKind.Return), instructions.First(instruction => instruction.Kind == IrInstructionKind.Return) with { A = -1 }) } }) }; }
                 break;
             case MalformedBodyKind.UnsupportedInstruction:
                 { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = artifact.Callables.Single().Total!.Graph.ReplaceRow(instructions[0], instructions[0] with { Kind = (IrInstructionKind)int.MaxValue }) } }) }; }
@@ -218,7 +218,7 @@ internal sealed class WorkerTcbEdgeCaseTests
         var result = await VerifyNativeSourceAsync(project);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
-        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).Used, Is.True);
     }
 
     [TestCase(true, WorkerClaimOutcome.Proven)]

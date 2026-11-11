@@ -18,7 +18,7 @@ public sealed class CacheEvidenceOrderingControlTests
         using var directory = new TempDirectory("cache-ordering-control-");
         var manifest = new WorkerClaimManifest
         {
-            Callables = [.. s_unordered.Select(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (new WorkerCallableManifestEntry
+            Callables = [.. s_unordered.Select(id => new WorkerCallableManifestEntry
             {
                 CallableId = id,
                 SelectedFeatures = [WorkerSelectedFeature.Contracts],
@@ -32,8 +32,8 @@ public sealed class CacheEvidenceOrderingControlTests
                     Column = 1
                 },
                 ClaimIds = [id + ".claim"]
-            }))],
-            Claims = [.. s_unordered.Select(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (new WorkerClaimManifestEntry
+            })],
+            Claims = [.. s_unordered.Select(id => new WorkerClaimManifestEntry
             {
                 ClaimId = id + ".claim", CallableId = id, Ordinal = 0,
                 Kind = WorkerClaimKind.Postcondition, Evidence = WorkerClaimEvidence.DirectClause,
@@ -45,26 +45,26 @@ public sealed class CacheEvidenceOrderingControlTests
                     Line = 1,
                     Column = 1
                 }
-            }))]
+            })]
         };
         WorkerProtocolJson.SealManifest(manifest);
         var inputHash = new string('b', 64);
         var budgets = new WorkerBudgets();
         var response = WorkerResultAssembler.Create(
             inputHash, manifest, WorkerRunStatus.Complete, WorkerRunFailureReason.None,
-            manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
+            manifest.Callables.Select(callable => new WorkerCallableResult
             {
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Complete,
                 Reason = WorkerCallableCoverageReason.None
-            })),
-            manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new WorkerClaimResult
+            }),
+            manifest.Claims.Select(claim => new WorkerClaimResult
             {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Proven,
                 Reason = WorkerClaimReason.None,
                 ProofCore = ["z", "a"]
-            })), budgets, WorkerCacheStatus.Written, 0);
+            }), budgets, WorkerCacheStatus.Written, 0);
         response.CallableResults = [.. response.CallableResults.Reverse()];
         response.ClaimResults = [.. response.ClaimResults.Reverse()];
         foreach (var claim in response.ClaimResults)
@@ -78,10 +78,10 @@ public sealed class CacheEvidenceOrderingControlTests
         Assert.That(cached, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(cached!.CallableResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId)), Is.EqualTo(s_ordered));
-            Assert.That(cached.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId)), Is.EqualTo(s_orderedClaims));
-            Assert.That(cached.ClaimResults.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ProofCore.SequenceEqual(s_ordered))), Is.True);
-            Assert.That(cached.ClaimResults.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)), Is.True);
+            Assert.That(cached!.CallableResults.Select(result => result.CallableId), Is.EqualTo(s_ordered));
+            Assert.That(cached.ClaimResults.Select(result => result.ClaimId), Is.EqualTo(s_orderedClaims));
+            Assert.That(cached.ClaimResults.All(result => result.ProofCore.SequenceEqual(s_ordered)), Is.True);
+            Assert.That(cached.ClaimResults.All(result => result.Outcome == WorkerClaimOutcome.Proven), Is.True);
             Assert.That(VerificationCache.IsCacheable(cached, inputHash, manifest), Is.True);
         }
     }

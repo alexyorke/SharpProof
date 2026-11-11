@@ -27,7 +27,7 @@ internal static class CompilerIdentityBridge
             else
             {
                 closed = current is INamedTypeSymbol named && !named.IsUnboundGenericType &&
-                    named.TypeArguments.All(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Closed(argument, depth + 1))) &&
+                    named.TypeArguments.All(argument => Closed(argument, depth + 1)) &&
                     (named.ContainingType == null || Closed(named.ContainingType, depth + 1));
             }
             visited[current] = closed;

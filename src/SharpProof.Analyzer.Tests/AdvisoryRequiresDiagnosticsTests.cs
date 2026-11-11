@@ -32,8 +32,8 @@ public sealed class AdvisoryRequiresDiagnosticsTests
             "public static int Caller() { " + (emptyReason ? "[SharpProofSuppress(\"\")] " : "") +
             "static int Local() => Need(0); return Local(); } }",
             "contracts", ["SP0027", "SP0024"]);
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0027")), Is.EqualTo(1));
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(emptyReason ? 1 : 0));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SP0027"), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(emptyReason ? 1 : 0));
     }
 
     [TestCase(false)]
@@ -94,7 +94,7 @@ public sealed class AdvisoryRequiresDiagnosticsTests
             "public sealed class Gate { private int _level; public int Level { get => _level; set { Contract.Requires(value > 0); _level = value; } } } " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

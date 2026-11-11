@@ -32,9 +32,9 @@ internal sealed class WorkerVcLoopTests
         var builder = new IrProgramBuilder(total.Program.Factory);
         var blocks = ImmutableDictionaryCapture.Create(
             total.Program.Blocks,
-            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id),
-            block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (builder.CreateBlock()));
-        var pointBlock = total.Program.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrAssumeInstruction))));
+            block => block.Id,
+            block => builder.CreateBlock());
+        var pointBlock = total.Program.Blocks.Single(block => block.Instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrAssumeInstruction)));
         builder.SetEntry(blocks[total.Program.Entry]);
         foreach (var block in total.Program.Blocks)
         {
@@ -148,7 +148,7 @@ internal sealed class WorkerVcLoopTests
                 boundedBackend, budget, () => boundedBackend.ConsumedResourceCount)));
             Assert.That(boundedBackend.ConsumedResourceCount, Is.Zero);
         }
-        Assert.That(plan.EnsuresQuery(0).Assumptions.All(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification is not UserAssumedJustification)), Is.True);
+        Assert.That(plan.EnsuresQuery(0).Assumptions.All(assumption => assumption.Justification is not UserAssumedJustification), Is.True);
         using var solver = new PassiveCallableSolver(plan);
         Assert.That((await solver.VerifyFeasibilityAsync(cancellationToken: TestContext.CurrentContext.CancellationToken)).Kind, Is.EqualTo(PassiveCallableFeasibilityKind.Feasible), kind);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>(), kind);
@@ -163,9 +163,9 @@ internal sealed class WorkerVcLoopTests
             if (invocation == 1)
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             var posts = Postconditions(response);
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)), kind);
-            Assert.That(posts.SelectMany(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions)).Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
+            Assert.That(posts.SelectMany(result => result.Assumptions).Any(assumption => assumption.Used), Is.False);
             Assert.That(posts[1].Model, Is.Not.Empty, kind);
         }
     }
@@ -181,10 +181,10 @@ internal sealed class WorkerVcLoopTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
-        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+        Assert.That(posts.Select(result => result.Outcome),
             Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
         Assert.That(posts[1].Reason, Is.EqualTo(WorkerClaimReason.SolverIncomplete));
-        Assert.That(posts.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Vacuity == WorkerVacuityKind.None)), Is.True);
+        Assert.That(posts.All(result => result.Vacuity == WorkerVacuityKind.None), Is.True);
     }
 
     [TestCase("assume", WorkerVacuityKind.NoModeledNormalReturn, true)]
@@ -206,7 +206,7 @@ internal sealed class WorkerVcLoopTests
         var post = Postconditions(response).Single();
         Assert.That(post.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         Assert.That(post.Vacuity, Is.EqualTo(expected));
-        Assert.That(post.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)), Is.EqualTo(conditional));
+        Assert.That(post.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(conditional));
     }
 
     [Test]
@@ -225,7 +225,7 @@ internal sealed class WorkerVcLoopTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var posts = Postconditions(response);
-        Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+        Assert.That(posts.Select(result => result.Outcome),
             Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
         Assert.That(posts[1].Model, Is.Not.Empty);
     }
@@ -234,8 +234,8 @@ internal sealed class WorkerVcLoopTests
     {
         System.ArgumentNullException.ThrowIfNull(response);
         Assert.That(response.Errors, Is.Empty);
-        var ids = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
-        return response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))).ToImmutableArray();
+        var ids = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition)
+            .Select(claim => claim.ClaimId).ToImmutableHashSet(StringComparer.Ordinal);
+        return response.ClaimResults.Where(result => ids.Contains(result.ClaimId)).ToImmutableArray();
     }
 }

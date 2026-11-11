@@ -186,14 +186,14 @@ public sealed class PropertyInitializerIntrinsicOwnershipAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
     }
 
     private static string DescribeDiagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
-            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
+            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
+            $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
     }
 }

@@ -30,7 +30,7 @@ public sealed class CompilerSpecificationScalarDomainWorkflowTests
             }
             """, []).WithAssemblyName("ScalarDomain_" + sourceType);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var image = AnalyzerTestHost.EmitImage(compilation);
         Assert.That(image, Is.Not.Empty);
         var method = (IMethodSymbol)compilation.GetTypeByMetadataName("ScalarDomainProbe")!

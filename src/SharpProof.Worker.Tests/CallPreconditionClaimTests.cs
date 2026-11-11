@@ -15,9 +15,9 @@ internal static class WorkerResponseClaims
     internal static ImmutableArray<WorkerClaimResult> DeclaredClaims(this WorkerVerifyResponse response)
     {
         System.ArgumentNullException.ThrowIfNull(response);
-        var calls = response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition))
-            .Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
-        return [.. response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (!calls.Contains(result.ClaimId)))];
+        var calls = response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.CallPrecondition)
+            .Select(static claim => claim.ClaimId).ToImmutableHashSet(StringComparer.Ordinal);
+        return [.. response.ClaimResults.Where(result => !calls.Contains(result.ClaimId))];
     }
 }
 
@@ -40,7 +40,7 @@ public sealed class CallPreconditionClaimTests
         using var project = new ShadowTestProject(source, cacheEnabled);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete), () => string.Join("; ", response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete), () => string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
         return response;
     }
 
@@ -49,8 +49,8 @@ public sealed class CallPreconditionClaimTests
         System.ArgumentNullException.ThrowIfNull(response);
         System.ArgumentNullException.ThrowIfNull(caller);
         return [.. response.Manifest.Claims
-            .Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition && claim.CallableId.Contains(caller, StringComparison.Ordinal)))
-            .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : ((claim, response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId)))))];
+            .Where(claim => claim.Kind == WorkerClaimKind.CallPrecondition && claim.CallableId.Contains(caller, StringComparison.Ordinal))
+            .Select(claim => (claim, response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId))))];
     }
 
     private static (WorkerClaimManifestEntry Claim, WorkerClaimResult Result) SingleCallClaim(WorkerVerifyResponse response, string caller)
@@ -68,7 +68,7 @@ public sealed class CallPreconditionClaimTests
         var source = Subject("public static int Caller() { return F(-1); }");
         var response = await Verify(source);
         var (claim, result) = SingleCallClaim(response, "Subject.Caller");
-        var caller = response.Manifest.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("Subject.Caller", StringComparison.Ordinal)));
+        var caller = response.Manifest.Callables.Single(callable => callable.CallableId.Contains("Subject.Caller", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
@@ -90,7 +90,7 @@ public sealed class CallPreconditionClaimTests
         var response = await Verify(Subject("private static int Forward(int value) => F(value);"));
         var (_, result) = SingleCallClaim(response, "Subject.Forward");
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-        var input = result.Model.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable == "parameter:0"));
+        var input = result.Model.Single(value => value.Variable == "parameter:0");
         Assert.That(long.Parse(input.Value, System.Globalization.CultureInfo.InvariantCulture), Is.LessThanOrEqualTo(0));
     }
 
@@ -102,10 +102,10 @@ public sealed class CallPreconditionClaimTests
         System.ArgumentNullException.ThrowIfNull(attribute);
         var response = await Verify(Subject(attribute + " public static int Caller() { " + clause + " return F(-1); }"));
         var (_, call) = SingleCallClaim(response, "Subject.Caller");
-        var other = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Subject.Caller", StringComparison.Ordinal) && claim.Kind != WorkerClaimKind.CallPrecondition));
+        var other = response.Manifest.Claims.Single(claim => claim.CallableId.Contains("Subject.Caller", StringComparison.Ordinal) && claim.Kind != WorkerClaimKind.CallPrecondition);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == other.ClaimId)).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(response.ClaimResults.Single(result => result.ClaimId == other.ClaimId).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(call.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
@@ -127,7 +127,7 @@ public sealed class CallPreconditionClaimTests
     {
         var response = await Verify(Subject("public static int Caller(int y) { Contract.Requires(y > 1); return F(y); }"));
         var (_, result) = SingleCallClaim(response, "Subject.Caller");
-        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).Used, Is.True);
     }
 
     [Test]
@@ -234,7 +234,7 @@ public sealed class CallPreconditionClaimTests
     {
         var response = await Verify(Subject("public static int Caller() { return F(System.Environment.TickCount); }"));
         var (_, result) = SingleCallClaim(response, "Subject.Caller");
-        var caller = response.CallableResults.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("Subject.Caller", StringComparison.Ordinal)));
+        var caller = response.CallableResults.Single(callable => callable.CallableId.Contains("Subject.Caller", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
@@ -387,7 +387,7 @@ public sealed class CallPreconditionClaimTests
     public async Task CallerWithoutACheckedCallIsNotPublished()
     {
         var response = await Verify(Subject("public static int Caller(int y) { if (false) { return F(-1); } return y; }"));
-        Assert.That(response.Manifest.Callables.Select(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)), Has.None.Contains("Subject.Caller"));
+        Assert.That(response.Manifest.Callables.Select(static callable => callable.CallableId), Has.None.Contains("Subject.Caller"));
     }
 
     [Test]
@@ -413,7 +413,7 @@ public sealed class CallPreconditionClaimTests
             System.ArgumentNullException.ThrowIfNull(version);
             var source = Subject("public static int Caller() { return F(1); }").Replace("public static class Subject",
                 "[assembly: System.Reflection.AssemblyVersion(\"" + version + "\")]\npublic static class Subject", StringComparison.Ordinal);
-            return CompilerTotalCallableArtifactTests.CreateArtifact(source).Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition)).ClaimId;
+            return CompilerTotalCallableArtifactTests.CreateArtifact(source).Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition).ClaimId;
         }
         Assert.That(ClaimId("2.0.0.0"), Is.EqualTo(ClaimId("1.0.0.0")));
     }
@@ -448,13 +448,13 @@ public sealed class CallPreconditionClaimTests
             public static int Caller() { return F(1); }
             public static int Unrelated(int x) { var y = x + 1; return System.Math.Max(y, 2); }
             """));
-        var compilation = discovery.Targets.Keys.First(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Name == "F")).ContainingAssembly;
+        var compilation = discovery.Targets.Keys.First(static method => method.Name == "F").ContainingAssembly;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(compilation.Name, Is.EqualTo("CallCensus"));
             Assert.That(discovery.BoundCallSyntax, Is.Not.Empty);
-            Assert.That(discovery.BoundCallSyntax.Select(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.ToString())), Has.None.Contains("Max"));
-            Assert.That(discovery.BoundCallSyntax.Select(static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Ancestors().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().First().Identifier.ValueText)), Has.All.EqualTo("Caller"));
+            Assert.That(discovery.BoundCallSyntax.Select(static node => node.ToString()), Has.None.Contains("Max"));
+            Assert.That(discovery.BoundCallSyntax.Select(static node => node.Ancestors().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().First().Identifier.ValueText), Has.All.EqualTo("Caller"));
         }
     }
 
@@ -573,7 +573,7 @@ public sealed class CallPreconditionClaimTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
-            Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
+            Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
         }
     }
 
@@ -586,7 +586,7 @@ public sealed class CallPreconditionClaimTests
             public static class B { public static int Declared(int x) { Contract.Ensures(Contract.Result<int>() == x); return x; } }
             public static class Z { public static int F(int x) { Contract.Requires(x > 0); return x; } }
             """);
-        ImmutableArray<CompilerCallablePreparation> targets = [.. project.Snapshot.Callables.OrderBy(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal)];
+        ImmutableArray<CompilerCallablePreparation> targets = [.. project.Snapshot.Callables.OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal)];
         Assert.That(targets[0].Entry.CallableId, Does.Contain("A.Caller"));
         Assert.That(targets[SharpProofWorker.VerificationOrder(targets)[^1]].Entry.CallableId, Does.Contain("A.Caller"));
     }
@@ -599,7 +599,7 @@ public sealed class CallPreconditionClaimTests
         var artifact = CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.Effects,
             new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build(), WorkerBudgets.DefaultMaximumExpressionDepth,
             TestContext.CurrentContext.CancellationToken);
-        Assert.That(artifact.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
+        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
     }
 
     [Test]
@@ -624,7 +624,7 @@ public sealed class CallPreconditionClaimTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         System.ArgumentNullException.ThrowIfNull(change);
-        var caller = artifact.Callables.Single(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total is { CallPreconditions.Length: 1 }));
+        var caller = artifact.Callables.Single(static callable => callable.Total is { CallPreconditions.Length: 1 });
         var total = caller.Total! with { CallPreconditions = [change(caller.Total.CallPreconditions[0])] };
         return artifact with { Callables = artifact.Callables.Replace(caller, caller with { Total = total }) };
     }
@@ -633,11 +633,11 @@ public sealed class CallPreconditionClaimTests
     public void ArtifactBindsEachClaimToItsRow()
     {
         var artifact = CallArtifact();
-        var row = artifact.Callables.Single(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total is { CallPreconditions.Length: 1 })).Total!.CallPreconditions[0];
+        var row = artifact.Callables.Single(static callable => callable.Total is { CallPreconditions.Length: 1 }).Total!.CallPreconditions[0];
         using (Assert.EnterMultipleScope())
         {
             Assert.That(row.ClaimId, Is.Not.Null);
-            Assert.That(artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition)).ClaimId, Is.EqualTo(row.ClaimId));
+            Assert.That(artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition).ClaimId, Is.EqualTo(row.ClaimId));
         }
     }
 
@@ -648,7 +648,7 @@ public sealed class CallPreconditionClaimTests
     public void ArtifactRejectsAClaimRowThatDoesNotMatchTheManifest(string mutation)
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
-        var artifact = WithCallRow(CallArtifact(), row => row is null ? throw new System.ArgumentNullException(nameof(row)) : mutation switch
+        var artifact = WithCallRow(CallArtifact(), row => mutation switch
         {
             "missing" => row with { ClaimId = null },
             "foreign" => row with { ClaimId = "spc1:foreign" },
@@ -663,7 +663,7 @@ public sealed class CallPreconditionClaimTests
     {
         System.ArgumentNullException.ThrowIfNull(change);
         System.ArgumentNullException.ThrowIfNull(manifest);
-        var claim = manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition));
+        var claim = manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition);
         var changed = manifest with { Claims = manifest.Claims.Replace(claim, change(claim)) };
         changed.Hash = string.Empty;
         return changed;
@@ -677,37 +677,37 @@ public sealed class CallPreconditionClaimTests
     {
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(mutation);
-        var manifest = Resealed(CallArtifact().Manifest, claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : mutation switch
+        var manifest = Resealed(CallArtifact().Manifest, claim => mutation switch
         {
             "missing-target" => claim with { CallPrecondition = null },
             "blank-callee" => claim with { CallPrecondition = claim.CallPrecondition! with { Callee = " " } },
             "negative-clause" => claim with { CallPrecondition = claim.CallPrecondition! with { ClauseOrdinal = -1 } },
             _ => claim with { Evidence = WorkerClaimEvidence.Attribute }
         });
-        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Has.Member(expected));
+        Assert.That(WorkerProtocolJson.ValidateManifest(manifest).Errors.Select(static error => error.Code), Has.Member(expected));
     }
 
     [Test]
     public void ManifestRejectsATargetOnAnotherClaimKind()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Subject("public static int Caller() { Contract.Ensures(Contract.Result<int>() == -1); return F(-1); }"));
-        var ensures = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition));
-        var call = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition));
+        var ensures = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Postcondition);
+        var call = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition);
         var changed = artifact.Manifest with { Claims = artifact.Manifest.Claims.Replace(ensures, ensures with { CallPrecondition = call.CallPrecondition }) };
-        Assert.That(WorkerProtocolJson.ValidateManifest(changed).Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Has.Member("manifest.claim_call_precondition"));
+        Assert.That(WorkerProtocolJson.ValidateManifest(changed).Errors.Select(static error => error.Code), Has.Member("manifest.claim_call_precondition"));
     }
 
     [Test]
     public void ManifestRejectsACallClaimOrderedBeforeAPostcondition()
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(Subject("public static int Caller() { Contract.Ensures(Contract.Result<int>() == -1); return F(-1); }"));
-        var ensures = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition));
-        var call = artifact.Manifest.Claims.Single(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition));
+        var ensures = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.Postcondition);
+        var call = artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition);
         var changed = artifact.Manifest with
         {
             Claims = artifact.Manifest.Claims.Replace(ensures, ensures with { Ordinal = call.Ordinal }).Replace(call, call with { Ordinal = ensures.Ordinal })
         };
-        Assert.That(WorkerProtocolJson.ValidateManifest(changed).Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Has.Member("manifest.claim_order"));
+        Assert.That(WorkerProtocolJson.ValidateManifest(changed).Errors.Select(static error => error.Code), Has.Member("manifest.claim_order"));
     }
 
     [Test]
@@ -716,6 +716,6 @@ public sealed class CallPreconditionClaimTests
         var response = await Verify(Subject("public static int Caller() { return F(-1); }"));
         var (_, result) = SingleCallClaim(response, "Subject.Caller");
         var changed = response with { ClaimResults = response.ClaimResults.Replace(result, result with { Vacuity = WorkerVacuityKind.NoModeledNormalReturn, ProofCore = ["core"] }) };
-        Assert.That(WorkerProtocolJson.Validate(changed, response.InputHash, response.Manifest).Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Has.Member("response.vacuity"));
+        Assert.That(WorkerProtocolJson.Validate(changed, response.InputHash, response.Manifest).Errors.Select(static error => error.Code), Has.Member("response.vacuity"));
     }
 }

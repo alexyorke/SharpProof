@@ -120,12 +120,12 @@ public sealed class CompilerParameterAttributeReferenceRejectionTests
                 TestMetadataReferences.WithSharpProof.Add(libraryReference));
             var consumerImage = Emit(consumer);
             var consumerHasForeignReference = consumer.References.Select(consumer.GetAssemblyOrModuleSymbol)
-                .OfType<IAssemblySymbol>().Any(assembly => assembly is null ? throw new System.ArgumentNullException(nameof(assembly)) : (assembly.Name == foreignName));
+                .OfType<IAssemblySymbol>().Any(assembly => assembly.Name == foreignName);
             Assert.That(consumerHasForeignReference, Is.False);
             if (attributePath != null)
             {
                 Assert.That(consumer.References.OfType<PortableExecutableReference>()
-                    .Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.FilePath == attributePath)), Is.False);
+                    .Any(reference => reference.FilePath == attributePath), Is.False);
             }
 
             var selected = ContractSelectionInventory.ForCompilation(consumer).Positive;

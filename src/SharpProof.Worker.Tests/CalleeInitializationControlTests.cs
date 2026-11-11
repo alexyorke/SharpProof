@@ -32,9 +32,9 @@ internal sealed class CalleeInitializationControlTests
         Assert.That(response.Errors, Is.Empty);
         var callable = project.Snapshot.CompilerManifest.Callables.Single();
         var purity = callable.EffectClaims.Single().ClaimId;
-        Assert.That(response.ClaimResults.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId == purity)).Outcome, Is.EqualTo(pure));
+        Assert.That(response.ClaimResults.Single(row => row.ClaimId == purity).Outcome, Is.EqualTo(pure));
         if (field != "static Other() { }")
-        { Assert.That(response.ClaimResults.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.ClaimId != purity)).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
+        { Assert.That(response.ClaimResults.Single(row => row.ClaimId != purity).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
     }
 
     [Test]

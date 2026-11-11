@@ -46,7 +46,7 @@ public sealed class IteratorRootAdmissionControlTests
             TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity is DiagnosticSeverity.Warning or DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.True);
@@ -116,7 +116,7 @@ public sealed class IteratorRootAdmissionControlTests
                 PreparedEffectContractKind = effectClaim.ContractKind.ToString(),
                 ValidEffectClaimIds = preparation.Total?.ValidEffectClaimIds,
                 EntryAssumptions = preparation.Entry.Assumptions,
-                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToImmutableArray(),
+                TotalClauseKinds = preparation.Total?.Clauses.Select(clause => clause.Kind.ToString()).ToImmutableArray(),
                 CallPreconditionCount = preparation.Total?.CallPreconditions.Length,
                 NativeBodyAssumptions = native.BodyAssumptions.Select(operation => operation.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(operation)) : (operation.ToString())).ToImmutableArray(),
                 EmptyStatements,

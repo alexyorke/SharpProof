@@ -115,7 +115,7 @@ public sealed class ParameterGuardAnalyzerTests
             }
             """;
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
     }
     [Test]
@@ -137,7 +137,7 @@ public sealed class ParameterGuardAnalyzerTests
 
         var diagnostics = await Analyze(source);
 
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create(
                 "Parameter 'text' has no explicit guard")));
     }
@@ -187,7 +187,7 @@ public sealed class ParameterGuardAnalyzerTests
 
         var diagnostics = await Analyze(source);
 
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
     }
 
@@ -202,7 +202,7 @@ public sealed class ParameterGuardAnalyzerTests
             }
             """;
 
-        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(ImmutableArray.Create(ParameterGuardAnalyzer.DiagnosticId)));
         Assert.That(await Analyze(source, "Sample.g.cs"), Is.Empty);
     }
@@ -234,7 +234,6 @@ public sealed class ParameterGuardAnalyzerTests
             """;
 
         Assert.That((await Analyze(source)).Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) :
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
@@ -250,7 +249,6 @@ public sealed class ParameterGuardAnalyzerTests
             """;
 
         Assert.That((await Analyze(source)).Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) :
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
@@ -267,7 +265,6 @@ public sealed class ParameterGuardAnalyzerTests
             """;
 
         Assert.That((await Analyze(source)).Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) :
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
@@ -284,7 +281,7 @@ public sealed class ParameterGuardAnalyzerTests
             }
             """;
 
-        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EquivalentTo(ImmutableArray.Create(
                 "Parameter 'values' has no explicit guard",
                 "Parameter 'index' has no explicit guard",
@@ -306,7 +303,7 @@ public sealed class ParameterGuardAnalyzerTests
             }
             """;
 
-        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That((await Analyze(source)).Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'limited' has no explicit guard")));
     }
 
@@ -362,7 +359,7 @@ public sealed class ParameterGuardAnalyzerTests
             """;
 
         Assert.That((await Analyze(source)).Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
     [Test]

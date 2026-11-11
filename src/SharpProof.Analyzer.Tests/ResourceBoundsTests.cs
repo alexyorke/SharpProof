@@ -15,7 +15,7 @@ public sealed partial class ResourceBoundsTests
         ArgumentNullException.ThrowIfNull(parameters);
         var compilation = AnalyzerTestHost.CreateCompilation(
             $"public static class C {{ public static void M({parameters}) {{ {body} }} }}", []);
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new ArgumentNullException(nameof(d)) : d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);

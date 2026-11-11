@@ -309,8 +309,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         var hasSharpProofAssemblyAttribute =
             compilation.Assembly.GetAttributes().Any(
             static attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (IsSharpProofAttributesNamespace(
-                    attribute.AttributeClass?.ContainingNamespace)));
+                IsSharpProofAttributesNamespace(
+                    attribute.AttributeClass?.ContainingNamespace));
         return hasSharpProofAssemblyAttribute
             ? AdvisoryActivation.Full
             : MayContainExternalClosedPreconditions(
@@ -471,7 +471,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             // The pinned compiler returns only sealed AssemblyMetadata or ModuleMetadata copies.
             return metadata is AssemblyMetadata assembly
                 ? assembly.GetModules().Any(static module =>
-                    module is null ? throw new System.ArgumentNullException(nameof(module)) : (ModuleContainsClosedPrecondition(module.GetMetadataReader())))
+                    ModuleContainsClosedPrecondition(module.GetMetadataReader()))
                 : ModuleContainsClosedPrecondition(((ModuleMetadata)metadata).GetMetadataReader());
         }
         catch (Exception exception) when (exception is ArgumentException or BadImageFormatException or
@@ -557,19 +557,19 @@ internal sealed partial class SharpProofAnalyzerEngine
                     method.GetReturnTypeAttributes(),
                     closedContractAttributes) ||
                 method.Parameters.Any(parameter =>
-                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ContainsClosedContractAttribute(
+                    ContainsClosedContractAttribute(
                         parameter.GetAttributes(),
-                        closedContractAttributes))))
+                        closedContractAttributes)))
             {
                 return true;
             }
         }
 
         return type.GetTypeMembers().Any(nested =>
-            nested is null ? throw new System.ArgumentNullException(nameof(nested)) : (TypeContainsClosedPrecondition(
+            TypeContainsClosedPrecondition(
                 nested,
                 closedContractAttributes,
-                cancellationToken)));
+                cancellationToken));
     }
 
     private static bool ContainsClosedContractAttribute(
@@ -577,10 +577,10 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes)
     {
         return attributes.Any(attribute =>
-            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (closedContractAttributes.Any(expected =>
+            closedContractAttributes.Any(expected =>
                 expected is null ? throw new System.ArgumentNullException(nameof(expected)) : (SymbolEqualityComparer.Default.Equals(
                     attribute.AttributeClass?.OriginalDefinition,
-                    expected.OriginalDefinition)))));
+                    expected.OriginalDefinition))));
     }
 
     private static bool IsContractApiCandidate(ExpressionSyntax expression)
@@ -662,7 +662,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         foreach (var tree in compilation.SyntaxTrees)
         {
             foreach (var node in tree.GetRoot(cancellationToken).DescendantNodes(
-                         static node => node is null ? throw new System.ArgumentNullException(nameof(node)) : node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax))
+                         static node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (node is UsingDirectiveSyntax { Alias: { } alias })
@@ -718,7 +718,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
         return [.. CompilerConfigurationValidation.GetIssues(compilation, analyzerOptions, configuration, cancellationToken)
-            .Select(static issue => issue is null ? throw new ArgumentNullException(nameof(issue)) : CreateInvalidConfigurationDiagnostic(issue.Value, issue.Location))];
+            .Select(static issue => CreateInvalidConfigurationDiagnostic(issue.Value, issue.Location))];
     }
 
     private static Action<CompilationAnalysisContext>

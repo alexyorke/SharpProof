@@ -663,7 +663,7 @@ internal sealed partial class IrCallInstruction
         }
         {
             var callResult = IrProgramCallHostExecution.Execute(
-                state.Interpreter._factory, call, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (interpreter.Evaluate(term, values, cancellationToken)), state.CallHost);
+                state.Interpreter._factory, call, term => interpreter.Evaluate(term, values, cancellationToken), state.CallHost);
             if (callResult.Status != IrEvaluationStatus.Value)
             {
                 return IrProgramInterpreter.FromEvaluation(callResult, call, values, state.Steps);

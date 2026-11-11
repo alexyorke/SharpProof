@@ -179,26 +179,26 @@ internal sealed class PassiveCallableVcBuilder
         var program = _program;
         _hasStringConcat = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
-            program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
-                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (HasStringConcat(instruction switch
+            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+                HasStringConcat(instruction switch
                 {
                     IrAssignInstruction assign => assign.Value,
                     IrBranchInstruction branch => branch.Condition,
                     IrAssumeInstruction assume => assume.Condition,
                     IrReturnInstruction returned => returned.Value,
                     _ => null
-                })));
-        var stringAllocationSites = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAllocationInstruction>().Where(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.AllocatedType == _factory.StringType))
-            .Select(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Operation)).ToImmutableHashSet();
+                }));
+        var stringAllocationSites = program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAllocationInstruction>().Where(allocation => allocation.AllocatedType == _factory.StringType)
+            .Select(allocation => allocation.Operation).ToImmutableHashSet();
         _hasUnmodeledStringAllocations = _candidate.Requires.Concat(_candidate.Ensures)
             .Any(clause => HasStringConcat(clause.Value) || HasStringConcat(clause.Safe)) ||
-            program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
-                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrAssignInstruction assign && !_callMarkers.ContainsKey(assign.Id) &&
+            program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+                instruction is IrAssignInstruction assign && !_callMarkers.ContainsKey(assign.Id) &&
                     HasStringConcat(assign.Value) && !stringAllocationSites.Contains(assign.Operation) ||
                 instruction is IrReturnInstruction returned && HasStringConcat(returned.Value) ||
                 instruction is IrBranchInstruction branch && HasStringConcat(branch.Condition) ||
-                instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition)));
+                instruction is IrAssumeInstruction assume && HasStringConcat(assume.Condition));
         var order = IrBlockOrder.TryCreateAcyclicOrder(program, amount => { Spend(amount); return true; }, out var failure);
         if (failure != IrAcyclicOrderFailure.None ||
             _candidate.Result is { } result && !Scalar(_factory.GetVariableInfo(result).Type) ||
@@ -258,7 +258,7 @@ internal sealed class PassiveCallableVcBuilder
             var site = block.Instructions[0].Operation;
             var predecessors = _incoming[blockId];
             IrTerm reach = Fresh(_factory.BooleanType);
-            Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.Reach)))), site, "reach");
+            Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge.Reach))), site, "reach");
             var state = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             var stateOrder = ImmutableArray.CreateBuilder<IrVarId>();
             void SetState(IrVarId variable /* SPINT001: all values valid - preserve dictionary key storage semantics */, IrTerm replacement)
@@ -271,16 +271,16 @@ internal sealed class PassiveCallableVcBuilder
             foreach (var variable in predecessors[0].State.Keys.OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)))
             {
                 Spend(predecessors.Count);
-                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (!edge.State.ContainsKey(variable))))
+                if (predecessors.Any(edge => !edge.State.ContainsKey(variable)))
                 { continue; }
                 var incomingValue = predecessors[0].State[variable];
-                if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.State[variable].Id == incomingValue.Id)))
+                if (predecessors.All(edge => edge.State[variable].Id == incomingValue.Id))
                 {
                     state.AddUnique(variable, incomingValue);
                     stateOrder.Add(variable);
                     continue;
                 }
-                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (HasStringConcat(edge.State[variable]))))
+                if (predecessors.Any(edge => HasStringConcat(edge.State[variable])))
                 {
                     // As at the assignment, keep a concatenation's value
                     // expression: SAT replay cannot reproduce the identity of a
@@ -299,10 +299,10 @@ internal sealed class PassiveCallableVcBuilder
                 stateOrder.Add(variable);
             }
             IrTerm? pendingException = null;
-            if (predecessors.All(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.PendingException != null)))
+            if (predecessors.All(edge => edge.PendingException != null))
             {
                 pendingException = predecessors[0].PendingException!;
-                if (predecessors.Any(edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge.PendingException!.Id != pendingException.Id)))
+                if (predecessors.Any(edge => edge.PendingException!.Id != pendingException.Id))
                 {
                     pendingException = Fresh(_factory.IntegerType);
                     foreach (var predecessor in predecessors)
@@ -382,8 +382,8 @@ internal sealed class PassiveCallableVcBuilder
                             { _freshReferences.Add((reach, allocated, allocation.Operation)); }
                             // Entry field values denote objects that existed before
                             // this allocation, even when no local holds them.
-                            foreach (var existing in stateOrder.Select((IrVarId variable /* SPINT001: all values valid - retain dictionary key storage semantics */) => state[variable]).Concat(_entryFieldReferenceOrder.Select((IrId id /* SPINT001: all values valid - retain dictionary key storage semantics */) => _entryFieldReferences[id])).Where(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (!stringAllocation && (value.Type == allocated.Type || referenceObject &&
-                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))).Distinct())
+                            foreach (var existing in stateOrder.Select((IrVarId variable /* SPINT001: all values valid - retain dictionary key storage semantics */) => state[variable]).Concat(_entryFieldReferenceOrder.Select((IrId id /* SPINT001: all values valid - retain dictionary key storage semantics */) => _entryFieldReferences[id])).Where(value => !stringAllocation && (value.Type == allocated.Type || referenceObject &&
+                                _factory.GetTypeInfo(value.Type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String)).Distinct())
                             {
                                 Spend();
                                 var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;

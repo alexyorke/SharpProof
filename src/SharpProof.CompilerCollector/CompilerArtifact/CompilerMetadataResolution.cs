@@ -167,7 +167,7 @@ internal static class CompilerMetadataResolution
             if (hashes.Count == 1)
             {
                 return [matches
-                    .OrderBy(static match => match is null ? throw new System.ArgumentNullException(nameof(match)) : (match.Path), StringComparer.Ordinal)
+                    .OrderBy(static match => match.Path, StringComparer.Ordinal)
                     .First()];
             }
         }
@@ -209,14 +209,14 @@ internal static class CompilerMetadataResolution
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly.GetAttributes().Any(static attribute =>
-            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is
+            attribute.AttributeClass is
             {
                 MetadataName: "ReferenceAssemblyAttribute",
                 ContainingNamespace: { } containingNamespace
             } &&
             HasNamespace(
                 containingNamespace,
-                ["System", "Runtime", "CompilerServices"])));
+                ["System", "Runtime", "CompilerServices"]));
     }
 
     internal static bool HasNamespace(

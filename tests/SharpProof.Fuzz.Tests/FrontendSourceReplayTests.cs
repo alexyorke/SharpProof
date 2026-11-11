@@ -56,9 +56,9 @@ public sealed class FrontendSourceReplayTests
         AssertActualCompilation(source, [First, Second], [7, 31], [true, true]);
         var results = FrontendDifferentialOracle.CompareSourceBatch(source, [First, Second], cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(results.Length, Is.EqualTo(2));
-        Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(FuzzOracleStatus.Agreement),
-            string.Join(Environment.NewLine, results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Detail))));
-        Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ExceptionKind)), Is.All.Null);
+        Assert.That(results.Select(result => result.Status), Is.All.EqualTo(FuzzOracleStatus.Agreement),
+            string.Join(Environment.NewLine, results.Select(result => result.Detail)));
+        Assert.That(results.Select(result => result.ExceptionKind), Is.All.Null);
     }
 
     [Test]
@@ -67,7 +67,7 @@ public sealed class FrontendSourceReplayTests
         const string source = "#error actual-source-replay-rejection\n";
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Any(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS1029")), Is.True);
+            diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS1029"), Is.True);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.False);
@@ -116,7 +116,7 @@ public sealed class FrontendSourceReplayTests
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var emission = GeneratedCompilationEmitter.Emit(compilation, TestContext.CurrentContext.CancellationToken);
         using var image = emission.Image;
         Assert.That(emission.Emit.Success, Is.True,
@@ -124,7 +124,7 @@ public sealed class FrontendSourceReplayTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .OrderBy(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText), StringComparer.Ordinal).ToImmutableArray();
+            .OrderBy(method => method.Identifier.ValueText, StringComparer.Ordinal).ToImmutableArray();
         Assert.That(methods.Length, Is.EqualTo(inputs.Length));
         var context = new AssemblyLoadContext("FrontendSourceReplayPremise", isCollectible: true);
         try

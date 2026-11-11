@@ -104,8 +104,8 @@ public sealed class AllocationOracleCompilationOptionsTests
         Assert.That(measured.Bytes, Is.Zero);
         Assert.That(measured.Throws, Is.Zero);
         var report = await NativeEffectOracleGate.ObserveAsync(compilation, ["a", "b"], RepositoryLayout.FindRoot(), "test", 2, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var positive = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == (positiveFirst ? "a" : "b")));
-        var negative = report.Rows.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId == (positiveFirst ? "b" : "a")));
+        var positive = report.Rows.Single(row => row.MethodId == (positiveFirst ? "a" : "b"));
+        var negative = report.Rows.Single(row => row.MethodId == (positiveFirst ? "b" : "a"));
         await LogAsync($"nullReceiver={nullReceiver}; positiveFirst={positiveFirst}", measured.Bytes, measured.Il, positive);
         await TestContext.Progress.WriteLineAsync($"negative native={negative.NativeOutcome}; oracle={negative.RuntimeOracle}; bytes32={negative.AllocatedBytes}; ILOracle={negative.AllocationIlOracle}");
         Assert.That(positive.NativeOutcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -133,7 +133,7 @@ public sealed class AllocationOracleCompilationOptionsTests
         System.ArgumentNullException.ThrowIfNull(source);
         var tree = CSharpSyntaxTree.ParseText(source);
         var methods = ImmutableArray.CreateBuilder<OpenSourceCorpusMethod>();
-        foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target")))
+        foreach (var method in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Where(method => method.Identifier.ValueText == "Target"))
         {
             var owner = ((ClassDeclarationSyntax)method.Parent!).Identifier.ValueText;
             var id = owner == "C" ? "sample" : (owner == "Positive") == positiveFirst ? "a" : "b";

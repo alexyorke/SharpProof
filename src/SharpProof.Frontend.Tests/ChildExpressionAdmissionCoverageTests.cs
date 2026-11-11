@@ -37,7 +37,7 @@ public sealed class ChildExpressionAdmissionCoverageTests
         Assert.That(subject.Lower().IsExact, Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
+            .Single(declaration => declaration.Identifier.ValueText == "Target");
         var invocation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var clause = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(invocation);
         Assert.That(clause.Classification.IsExact, Is.False);
@@ -83,7 +83,7 @@ public sealed class ChildExpressionAdmissionCoverageTests
         System.ArgumentNullException.ThrowIfNull(subject);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
+            .Single(declaration => declaration.Identifier.ValueText == "Target");
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var builder = new IrProgramBuilder(subject.Factory);
         var entry = builder.CreateBlock("entry");

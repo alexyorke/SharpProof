@@ -46,7 +46,7 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         source.Append('}');
         var compilation = AnalyzerGateHost.CreateCompilation(source.ToString(),
             "OrdinaryNativeDiagnosticState", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -92,9 +92,9 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.CallableResults, Has.Length.EqualTo(mutationCount + 1));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(mutationCount + 1));
-        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Proven)), Is.EqualTo(1));
-        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Unknown)), Is.EqualTo(mutationCount));
-        Assert.That(response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)), Is.Zero);
+        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Proven), Is.EqualTo(1));
+        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Unknown), Is.EqualTo(mutationCount));
+        Assert.That(response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Refuted), Is.Zero);
 
         using var diagnostics = JsonDocument.Parse(NativeCorpusVerifier.CaptureWorkerDiagnostics(response, request.Budgets));
         var root = diagnostics.RootElement;

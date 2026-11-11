@@ -116,8 +116,8 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(frame, Is.Not.SameAs(receiver));
         var fields = frame!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
         Assert.That(fields, Has.Length.EqualTo(2));
-        Assert.That(fields.Count(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int)), Is.EqualTo(1));
-        Assert.That(fields.Any(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(ReceiverIndependentFactory)), Is.False);
+        Assert.That(fields.Count(static field => field.FieldType == typeof(int)), Is.EqualTo(1));
+        Assert.That(fields.Any(static field => field.FieldType == typeof(ReceiverIndependentFactory)), Is.False);
         var inner = outer();
         Assert.That(inner.Target, Is.SameAs(frame));
         Assert.That((object)outer(), Is.SameAs(inner));
@@ -255,8 +255,8 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(frame, Is.Not.Null);
             var fields = frame!.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             Assert.That(fields, Has.Length.EqualTo(2));
-            var captured = fields.Single(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(int));
-            var cache = fields.Single(field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(Func<int>));
+            var captured = fields.Single(field => field.FieldType == typeof(int));
+            var cache = fields.Single(field => field.FieldType == typeof(Func<int>));
             Assert.That(captured.GetValue(frame), Is.EqualTo(value));
             Assert.That(cache.GetValue(frame), Is.Null);
             var inner = outer();

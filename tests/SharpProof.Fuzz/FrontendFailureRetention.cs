@@ -40,8 +40,8 @@ internal static class FrontendFailureRetention
             ? original
             : CSharpStructuralShrinker.Minimize(
                 original,
-                candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (FuzzRunner.IsSemanticMismatch(
-                    FrontendDifferentialOracle.Compare(candidate, cancellationToken))),
+                candidate => FuzzRunner.IsSemanticMismatch(
+                    FrontendDifferentialOracle.Compare(candidate, cancellationToken)),
                 cancellationToken);
         var minimizedResult = FrontendDifferentialOracle.Compare(
             minimized, cancellationToken);

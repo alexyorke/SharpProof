@@ -95,7 +95,7 @@ internal static class AnalyzerGeneratedCodePolicy
     {
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return GeneratedPathSuffixes.Any(suffix =>
-            suffix is null ? throw new System.ArgumentNullException(nameof(suffix)) : (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)));
+            path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasGeneratedHeader(
@@ -115,9 +115,9 @@ internal static class AnalyzerGeneratedCodePolicy
             }
 
             var comment = trivia.ToString();
-            if (GeneratedHeaderTokens.Any(token => token is null ? throw new System.ArgumentNullException(nameof(token)) : (comment.IndexOf(
+            if (GeneratedHeaderTokens.Any(token => comment.IndexOf(
                     token,
-                    StringComparison.OrdinalIgnoreCase) >= 0)))
+                    StringComparison.OrdinalIgnoreCase) >= 0))
             {
                 return true;
             }
@@ -155,9 +155,9 @@ internal static class AnalyzerGeneratedCodePolicy
         foreach (var scope in scopes.ToImmutable())
         {
             if (scope.GetAttributes().Any(attribute =>
-                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(
+                    SymbolEqualityComparer.Default.Equals(
                         attribute.AttributeClass?.OriginalDefinition,
-                        generatedCode.OriginalDefinition))))
+                        generatedCode.OriginalDefinition)))
             {
                 return true;
             }

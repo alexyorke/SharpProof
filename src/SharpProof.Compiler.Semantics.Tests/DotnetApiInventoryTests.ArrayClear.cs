@@ -21,7 +21,7 @@ public sealed partial class DotnetApiInventoryTests
         var tree = CSharpSyntaxTree.ParseText("public static class ClearProbe { public static int Check(int[] data, int start, int length) { var alias = data; System.Array.Clear(data" +
             (whole ? "" : ", start, length") + "); return alias[0] + alias[1] + alias[2] + alias[3]; } }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

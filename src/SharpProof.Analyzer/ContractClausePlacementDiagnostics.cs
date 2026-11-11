@@ -66,10 +66,10 @@ internal sealed class ContractClausePlacementDiagnostics(
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return inventory.Clauses
-            .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement == ContractClausePlacement.NestedCallable))
-            .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (SharpProof.Frontend.Host.CompilationModelProvider
+            .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
+            .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, clause.Invocation.Syntax.SyntaxTree)
-                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart)))
+                .GetEnclosingSymbol(clause.Invocation.Syntax.SpanStart))
             .OfType<IMethodSymbol>()
             .Distinct<IMethodSymbol>(SymbolEqualityComparer.Default);
     }

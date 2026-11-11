@@ -46,13 +46,13 @@ internal static class NativeCorpusVerifier
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
-            var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId, static result => result is null ? throw new ArgumentNullException(nameof(result)) : result, StringComparer.Ordinal);
-            var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal);
+            var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result.ClaimId, static result => result, StringComparer.Ordinal);
+            var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
             return [.. discovery.Targets.Values.Concat(discovery.ContractCallers)
-                .Where(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (claimsByCallable[target.Entry.CallableId].Any()))
-                .Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (new NativeCorpusVerdict(target.Declaration, target.Method,
+                .Where(target => claimsByCallable[target.Entry.CallableId].Any())
+                .Select(target => new NativeCorpusVerdict(target.Declaration, target.Method,
                     Combine(claimsByCallable[target.Entry.CallableId].Select(claim => results.TryGetValue(claim.ClaimId, out var result)
-                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + "."))))))];
+                        ? result.Outcome : throw new InvalidDataException("The worker returned no result for claim " + claim.ClaimId + ".")))))];
         }
         finally
         { directory.Delete(recursive: true); }
@@ -65,7 +65,7 @@ internal static class NativeCorpusVerifier
         {
             var failure = new InvalidOperationException("The worker did not complete the corpus artifact (" + response.RunStatus + ", " +
                 response.FailureReason + "): " +
-                string.Join("; ", response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
+                string.Join("; ", response.Errors.Select(static error => error.Code + ": " + error.Message)));
             failure.Data["SharpProof.Corpus.WorkerFailure"] = CaptureWorkerDiagnostics(response, budgets);
             if (compilerManifestSha256 != null)
             { failure.Data["SharpProof.Corpus.CompilerManifestSha256"] = compilerManifestSha256; }
@@ -85,17 +85,17 @@ internal static class NativeCorpusVerifier
             response.Summary.ElapsedMilliseconds,
             Budgets = budgets,
             CallableCount = response.CallableResults.Length,
-            IncompleteCallableCount = response.CallableResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete)),
-            IncompleteCallables = response.CallableResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage != WorkerCallableCoverage.Complete))
-                .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout))
-                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.CallableId), StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
-                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { CallableId = result.CallableId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() })),
+            IncompleteCallableCount = response.CallableResults.Count(static result => result.Coverage != WorkerCallableCoverage.Complete),
+            IncompleteCallables = response.CallableResults.Where(static result => result.Coverage != WorkerCallableCoverage.Complete)
+                .OrderByDescending(static result => result.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout)
+                .ThenBy(static result => result.CallableId, StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
+                .Select(static result => new { CallableId = result.CallableId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.CallableId.Length)], Coverage = result.Coverage.ToString(), Reason = result.Reason.ToString() }),
             ClaimCount = response.ClaimResults.Length,
-            ClaimsWithReasonCount = response.ClaimResults.Count(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None)),
-            ClaimsWithReasons = response.ClaimResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason != WorkerClaimReason.None))
-                .OrderByDescending(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout))
-                .ThenBy(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId), StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
-                .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (new { ClaimId = result.ClaimId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() }))
+            ClaimsWithReasonCount = response.ClaimResults.Count(static result => result.Reason != WorkerClaimReason.None),
+            ClaimsWithReasons = response.ClaimResults.Where(static result => result.Reason != WorkerClaimReason.None)
+                .OrderByDescending(static result => result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout)
+                .ThenBy(static result => result.ClaimId, StringComparer.Ordinal).Take(CorpusExecutionDefaults.MaximumWorkerDiagnosticItems)
+                .Select(static result => new { ClaimId = result.ClaimId[..Math.Min(CorpusExecutionDefaults.MaximumDiagnosticIdentityCharacters, result.ClaimId.Length)], Outcome = result.Outcome.ToString(), Reason = result.Reason.ToString() })
         });
     }
 

@@ -26,8 +26,8 @@ public sealed class MetadataClauseOriginTests
         var decoded = CompilerTotalCallableArtifactCodec.DecodeShadowBodyCore(body.CallableId, detached,
             TestContext.CurrentContext.CancellationToken, references);
         var row = decoded.CallPreconditions.Single();
-        Assert.That(decoded.Program.Factory.GetOperationInfo(decoded.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAssignInstruction>().Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == row.Instruction)).Operation).SourceSpan!.Document,
+        Assert.That(decoded.Program.Factory.GetOperationInfo(decoded.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAssignInstruction>().Single(instruction => instruction.Id == row.Instruction).Operation).SourceSpan!.Document,
             Is.EqualTo("Caller.cs"));
         Assert.That(decoded.Program.Factory.GetOperationInfo(row.ClauseSite).SourceSpan == null, Is.EqualTo(metadata));
         Assert.That(row.MetadataClause == null, Is.EqualTo(!metadata));
@@ -123,9 +123,7 @@ public sealed class MetadataClauseOriginTests
                 references = [];
                 break;
             case "wrong-owner":
-                references = [.. references.Select(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-                    reference with { Modules = [.. reference.Modules.Select(module => module is null ? throw new ArgumentNullException(nameof(module)) :
-                        module with { Sha256 = new string('0', 64) })] })];
+                references = [.. references.Select(reference => reference with { Modules = [.. reference.Modules.Select(module => module with { Sha256 = new string('0', 64) })] })];
                 break;
             case "remove-row":
                 { dto = dto with { CallPreconditions = [] }; }

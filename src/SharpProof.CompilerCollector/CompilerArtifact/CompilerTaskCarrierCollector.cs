@@ -88,7 +88,7 @@ internal sealed class CompilerTaskCarrierCollector
             reader = ArgumentNullGuard.NotNull(reader, nameof(reader));
             var metadata = reader.GetMetadataReader();
             var methods = activations.Forwarders.Select(static forwarder =>
-                forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)
+                forwarder.ChildMethodToken)
                 .Distinct().OrderBy(static token => token).ToImmutableArray();
             var bodies = ImmutableArray.CreateBuilder<(int MethodToken, ValidatedSourceBody Body)>(methods.Length);
             foreach (var token in methods)
@@ -213,9 +213,9 @@ internal sealed class CompilerTaskCarrierCollector
             var child = invocation.TargetMethod;
             var imported = assembly.GetTypeByMetadataName(MetadataName(child.ContainingType));
             var candidates = imported?.GetMembers(child.MetadataName).OfType<IMethodSymbol>().Where(candidate =>
-                candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.IsStatic && candidate.ReturnsVoid &&
+                candidate.IsStatic && candidate.ReturnsVoid &&
                 candidate.Arity == 0 && candidate.Parameters.Length == child.Parameters.Length && candidate.Parameters.All(static parameter =>
-                    parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind == RefKind.None &&
+                    parameter.RefKind == RefKind.None &&
                     parameter.Type.SpecialType == SpecialType.System_Int32)).ToArray();
             if (candidates is not { Length: 1 })
             { return new(null, "TaskCallbackSourceTargetUnavailable"); }
@@ -358,7 +358,7 @@ internal sealed class CompilerTaskCarrierCollector
         cancellation.ThrowIfCancellationRequested();
         var state = assembly.GetTypeByMetadataName(machine.MetadataName);
         var entries = state?.GetMembers("MoveNext").OfType<IMethodSymbol>().Where(static candidate =>
-            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Parameters.IsEmpty && candidate.Arity == 0).ToArray();
+            candidate.Parameters.IsEmpty && candidate.Arity == 0).ToArray();
         if (entries is not { Length: 1 })
         { return new(null, "TaskRootExceptionBoundaryMethodUnavailable"); }
         return ReadEmission<CompilerTaskRootExceptionBoundaryCapture>(image, reader =>
@@ -721,18 +721,15 @@ internal sealed class CompilerTaskCarrierCollector
         var type = assembly.GetTypeByMetadataName(MetadataName(method.ContainingType));
         if (type is null)
         { return Unknown("TaskCarrierRootMetadataUnavailable"); }
-        var roots = type.GetMembers(method.MetadataName).OfType<IMethodSymbol>().Where(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-            candidate.IsStatic && candidate.Arity == 0 && candidate.Parameters.Length == method.Parameters.Length &&
-            candidate.Parameters.All(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                parameter.Type.SpecialType == SpecialType.System_Int32)).ToArray();
+        var roots = type.GetMembers(method.MetadataName).OfType<IMethodSymbol>().Where(candidate => candidate.IsStatic && candidate.Arity == 0 && candidate.Parameters.Length == method.Parameters.Length &&
+            candidate.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32)).ToArray();
         if (roots.Length != 1)
         { return Unknown("TaskCarrierRootMetadataAmbiguous"); }
         var framework = plan.Join.TargetMethod.ContainingAssembly.Identity.ToString();
         CompilerTaskCarrierType? stateMachine = null;
         if (plan.ConfiguredAwait)
         {
-            var attributes = roots[0].GetAttributes().Where(attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
-                attribute.AttributeClass is { Name: "AsyncStateMachineAttribute" } attributeType &&
+            var attributes = roots[0].GetAttributes().Where(attribute => attribute.AttributeClass is { Name: "AsyncStateMachineAttribute" } attributeType &&
                 NamespaceName(attributeType.ContainingNamespace) == "System.Runtime.CompilerServices" &&
                 attributeType.ContainingAssembly.Identity.ToString() == framework).ToArray();
             if (attributes.Length != 1 || attributes[0].ConstructorArguments.Length != 1 ||
@@ -822,7 +819,7 @@ internal sealed class CompilerTaskCarrierCollector
         type = ArgumentNullGuard.NotNull(type, nameof(type));
         framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
         if (!Generated(type, framework) || type.IsGenericType || type.BaseType?.SpecialType is not (SpecialType.System_Object or SpecialType.System_ValueType) ||
-            type.GetAttributes().Any(static attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) : attribute.AttributeClass?.Name == "StructLayoutAttribute"))
+            type.GetAttributes().Any(static attribute => attribute.AttributeClass?.Name == "StructLayoutAttribute"))
         { return null; }
         var metadataName = MetadataName(type);
         if (string.IsNullOrWhiteSpace(metadataName) || metadataName.Length > 4096 || metadataName.Any(static character => char.IsControl(character)))
@@ -857,8 +854,7 @@ internal sealed class CompilerTaskCarrierCollector
     {
         symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
         framework = ArgumentNullGuard.NotNull(framework, nameof(framework));
-        return symbol.GetAttributes().Any(attribute => attribute is null ? throw new ArgumentNullException(nameof(attribute)) :
-            attribute.AttributeClass?.Name == "CompilerGeneratedAttribute" &&
+        return symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.Name == "CompilerGeneratedAttribute" &&
             NamespaceName(attribute.AttributeClass.ContainingNamespace) == "System.Runtime.CompilerServices" &&
             attribute.AttributeClass.ContainingAssembly.Identity.ToString() == framework);
     }

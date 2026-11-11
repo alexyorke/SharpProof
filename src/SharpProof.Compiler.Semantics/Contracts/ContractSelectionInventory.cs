@@ -39,7 +39,7 @@ internal sealed class ContractSelectionInventory
         Compilation compilation)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        return Cache.GetValue(compilation, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
+        return Cache.GetValue(compilation, static value => new(value));
     }
 
     internal INamedTypeSymbol? ContractFor
@@ -164,7 +164,7 @@ internal sealed class ContractSelectionInventory
         var selected = ContractSelectionFeatures.None;
         if (hasContractClause ||
             method.Parameters.Any(parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(IsClosedContract))) ||
+                parameter.GetAttributes().Any(IsClosedContract)) ||
             method.GetReturnTypeAttributes().Any(IsClosedContract))
         {
             selected |= ContractSelectionFeatures.Contracts;

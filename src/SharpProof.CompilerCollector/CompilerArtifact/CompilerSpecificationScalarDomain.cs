@@ -9,7 +9,7 @@ internal static class CompilerSpecificationScalarDomain
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        parameters = method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (MapType(factory, parameter.Type))).ToImmutableArray();
+        parameters = method.Parameters.Select(parameter => MapType(factory, parameter.Type)).ToImmutableArray();
         resultType = MapType(factory, method.ReturnType);
         integerType = default;
         if (resultType.IsDefault || parameters.Any(type => type.IsDefault))

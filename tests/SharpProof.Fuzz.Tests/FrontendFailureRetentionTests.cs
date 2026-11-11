@@ -42,7 +42,7 @@ public sealed class FrontendFailureRetentionTests
             cases = cases.Length,
             agreements,
             semanticFailures,
-            sources = cases.Select(generated => generated is null ? throw new System.ArgumentNullException(nameof(generated)) : (generated.Source)).ToImmutableArray(),
+            sources = cases.Select(generated => generated.Source).ToImmutableArray(),
             outcomes = results
         });
         var evidenceRoot = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT")
@@ -130,7 +130,7 @@ public sealed class FrontendFailureRetentionTests
         var minimized = FuzzRunner.IsCompilationFailure(observed)
             ? original
             : CSharpStructuralShrinker.Minimize(original,
-                candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (FuzzRunner.IsSemanticMismatch(FrontendDifferentialOracle.Compare(candidate, cancellationToken: TestContext.CurrentContext.CancellationToken))), cancellationToken: TestContext.CurrentContext.CancellationToken);
+                candidate => FuzzRunner.IsSemanticMismatch(FrontendDifferentialOracle.Compare(candidate, cancellationToken: TestContext.CurrentContext.CancellationToken)), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = FrontendDifferentialOracle.Compare(minimized, cancellationToken: TestContext.CurrentContext.CancellationToken);
         return new(original, minimized, observed, result,
             new(index, seed, "frontend", original.Source, minimized.Source, result.Detail));
@@ -196,9 +196,9 @@ public sealed class FrontendFailureRetentionTests
         foreach (var parent in parents)
         {
             var candidates = CSharpStructuralShrinker.GetCandidates(parent);
-            var childSources = parent.Children.Select(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Render())).ToImmutableHashSet(StringComparer.Ordinal);
-            Assert.That(candidates.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Kind == parent.Kind &&
-                !childSources.Contains(candidate.Render()))), Is.True, parent.Render());
+            var childSources = parent.Children.Select(child => child.Render()).ToImmutableHashSet(StringComparer.Ordinal);
+            Assert.That(candidates.Any(candidate => candidate.Kind == parent.Kind &&
+                !childSources.Contains(candidate.Render())), Is.True, parent.Render());
             foreach (var candidate in candidates)
             {
                 Assert.That(candidate.Type, Is.EqualTo(parent.Type));
@@ -211,7 +211,7 @@ public sealed class FrontendFailureRetentionTests
                 });
             }
         }
-        Assert.That(parents.Select(parent => parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Kind)).Distinct().Count(), Is.EqualTo(20));
+        Assert.That(parents.Select(parent => parent.Kind).Distinct().Count(), Is.EqualTo(20));
         return caseBuilder.ToImmutable();
     }
 }

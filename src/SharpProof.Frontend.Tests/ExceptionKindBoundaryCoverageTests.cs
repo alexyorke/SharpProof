@@ -36,7 +36,7 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var tree = CSharpSyntaxTree.ParseText("namespace System { public class ArgumentException : Exception { public ArgumentException(string message) {} } } public static class Subject { public static object Target() => new System.ArgumentException(\"message\"); }");
         var compilation = CSharpCompilation.Create("SourceExceptionLookalike", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         var creation = (IObjectCreationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(CSharpOperationSemantics.IsAuditedMessageExceptionDeclaration(creation.Constructor!), Is.False);
@@ -85,7 +85,7 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var missing = CSharpCompilation.Create("MissingFrameworkCatch", subject.Compilation.SyntaxTrees, references: [],
             options: (CSharpCompilationOptions)subject.Compilation.Options);
         Assert.That(missing.GetSpecialType(SpecialType.System_Object).TypeKind, Is.EqualTo(TypeKind.Error));
-        Assert.That(missing.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS0518")), Is.True);
+        Assert.That(missing.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS0518"), Is.True);
         using var image = new System.IO.MemoryStream();
         Assert.That(missing.Emit(image).Success, Is.False);
         Assert.That(CSharpOperationSemantics.TryCatchKinds(missing, null, out var rejected), Is.False);
@@ -112,7 +112,7 @@ public sealed class ExceptionKindBoundaryCoverageTests
         var tree = CSharpSyntaxTree.ParseText("public class Derived : MissingBase { } public static class Subject { public static object Target() => new Derived(); }");
         var compilation = CSharpCompilation.Create("MissingExceptionBase", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS0246")), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS0246"), Is.True);
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var syntax = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();

@@ -76,8 +76,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
                 Measure("int/string", stringTarget, expected: false)
             ];
             control = Measure("control", controlTarget, expected: true);
-            var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
-            var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
+            var hasBox = instructions.Any(instruction => instruction.OpCode == "box");
+            var hasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst");
             var noInlining = (generic.GetMethodImplementationFlags() & MethodImplAttributes.NoInlining) != 0;
             await Save(evidenceDirectory, "runtime-observations.json", new
             {
@@ -129,10 +129,10 @@ public sealed class GenericTestedTypeAllocationAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() })).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(claim => new { Outcome = claim.Outcome.ToString(), Reason = claim.Reason.ToString() }).ToImmutableArray(),
             Cases = cases,
             Control = control,
-            AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.AllocatedBytes > 0)),
+            AnyObservedAllocation = cases.Any(observed => observed.AllocatedBytes > 0),
             FrozenRule = "Observed allocation > 0 implies the allocation-free claim cannot be Proven. Zero measured allocation rejects this hypothesis for the tested runtime."
         });
         Assert.That(response.Errors, Is.Empty);
@@ -172,8 +172,8 @@ public sealed class GenericTestedTypeAllocationAuditTests
     private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .Where(field => field.FieldType == typeof(OpCode))
+            .Select(field => (OpCode)field.GetValue(null)!)
             .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)

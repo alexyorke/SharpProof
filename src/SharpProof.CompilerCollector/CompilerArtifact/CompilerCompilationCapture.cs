@@ -62,7 +62,7 @@ internal static class CompilerCompilationCapture
         {
             compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
             HasDirective = compilation.SyntaxTrees.Any(
-                tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (HasResolverDirective(tree, cancellationToken)));
+                tree => HasResolverDirective(tree, cancellationToken));
         }
 
         internal bool HasDirective { get; }
@@ -168,11 +168,11 @@ internal static class CompilerCompilationCapture
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         return SyntaxTreeCaches.GetValue(
             compilation,
-            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new SyntaxTreeCache(
+            value => new SyntaxTreeCache(
                 value,
                 capturedTreeOrdinal,
                 capturedText,
-                cancellationToken))).Trees;
+                cancellationToken)).Trees;
     }
 
     internal static bool TryGetCapturedTreeTextLength(
@@ -247,7 +247,7 @@ internal static class CompilerCompilationCapture
         if (supersedes || options.MetadataReferenceResolver?.ResolveMissingAssemblies == true ||
             ResolverDirectiveCaches.GetValue(
                 compilation,
-                value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new ResolverDirectiveCache(value, cancellationToken))).HasDirective)
+                value => new ResolverDirectiveCache(value, cancellationToken)).HasDirective)
         {
             throw new InvalidOperationException(
             "Reference supersession and resolver directives are unsupported.");
@@ -299,9 +299,9 @@ internal static class CompilerCompilationCapture
                 compilation.References,
                 ReferenceCaptureLimits.Default,
                 cancellationToken),
-            AdditionalFiles = [.. additionalFiles.Select(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (CaptureAdditionalFile(
-                file, normalizedProject, cancellationToken))).OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Path), StringComparer.Ordinal)
-                .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Sha256), StringComparer.Ordinal)]
+            AdditionalFiles = [.. additionalFiles.Select(file => CaptureAdditionalFile(
+                file, normalizedProject, cancellationToken)).OrderBy(static file => file.Path, StringComparer.Ordinal)
+                .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
         };
     }
     internal static CompilerSyntaxTreeSnapshot CaptureTree(
@@ -358,10 +358,10 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
-            PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            PreprocessorSymbols = [.. parse.PreprocessorSymbolNames.OrderBy(static value => value, StringComparer.Ordinal)],
             EffectivePreprocessorSymbols = [
                 .. CSharpPreprocessorSymbols.GetDefined(tree, cancellationToken)
-                    .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)
+                    .OrderBy(static value => value, StringComparer.Ordinal)
             ],
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
@@ -426,9 +426,9 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
                 "A compiler reference exceeds the module count limit.");
         }
         var moduleEntries = backingModules
-            .Select(static module => module is null ? throw new System.ArgumentNullException(nameof(module)) : ((
+            .Select(static module => (
                 Module: module,
-                Name: ReadModuleName(module.GetMetadataReader()))))
+                Name: ReadModuleName(module.GetMetadataReader())))
             .ToImmutableArray();
         if (moduleEntries.Length > 1)
         {
@@ -536,7 +536,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
             HasRecursiveAliases = CompilerOptionWireMappings.ReadInternalBoolean(
                 reference.Properties,
                 "HasRecursiveAliases"),
-            Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal)],
+            Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
             Modules = modules.ToImmutable()

@@ -66,7 +66,7 @@ public sealed class CorpusDeclarationWorkflowTests
         System.ArgumentNullException.ThrowIfNull(source);
         var root = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
         var declaration = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Value"));
+            .Single(static method => method.Identifier.ValueText == "Value");
         var span = declaration.GetLocation().GetLineSpan();
         var file = new OpenSourceCorpusFile("fixture", "ordinary.cs",
             OpenSourceCorpusCatalog.ComputeNormalizedSha256(source), source);

@@ -17,7 +17,7 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]));
+        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree]);
         context.ModelReceiver();
         if (target.Method.IsAsync)
         {
@@ -27,26 +27,23 @@ internal static class CompilerTotalCallableLowerer
                 target.Entry.CallableId, target.Entry.Assumptions, cancellationToken);
             if (ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) is not { ConfiguredAwait: true } ||
                 !target.Claims.IsEmpty || target.EffectClaims.IsEmpty ||
-                target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                    !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
+                target.EffectClaims.Any(static claim => !claim.HasValidConstraint || claim.Entry.EffectContractKind != WorkerEffectContractKind.ResourceUpperBound) ||
                 runtimeAssumptions is null ||
-                target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                    assumption.Kind != WorkerAssumptionKind.TrustedBoundary &&
+                target.Entry.Assumptions.Any(assumption => assumption.Kind != WorkerAssumptionKind.TrustedBoundary &&
                     !(assumption.Kind == WorkerAssumptionKind.UserAssume && runtimeAssumptions.Contains(assumption.Id))))
             { return null; }
             return new(target.Entry.CallableId, context.Factory,
-                [.. context.Inputs.Select(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                    new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], []);
+                [.. context.Inputs.Select(static parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))], []);
         }
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotalRequires(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
+        var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToImmutableArray();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions ||
             binding.Clauses.Length != preconditions.Length)
         { return null; }
         return new(target.Entry.CallableId, context.Factory,
-            [.. context.Inputs.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState)))],
+            [.. context.Inputs.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             [.. binding.Clauses.Select((clause, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new CompilerTotalClause(CompilerContractKind.Requires,
                 clause.Value, clause.SafeCondition, clause.SourceOperation, null, preconditions[ordinal].Id)))))])
         { HasReceiver = context.Receiver != null };
@@ -71,11 +68,10 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree]))
+        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree])
         {
             CaptureCallFrames = true,
-            CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
+            CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
         };
         context.ModelReceiver();
         // An auto-property accessor has no body to carry contract clauses.
@@ -85,19 +81,18 @@ internal static class CompilerTotalCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!binding.IsSuccess || binding.Clauses.Length > CompilerArtifactLimits.MaximumInstructions)
         { return null; }
-        var ensures = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToImmutableArray();
+        var ensures = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Ensures).ToImmutableArray();
         // A postcondition on an overridable method is a contract for every
         // override; only effect claims, which describe this body, are verified.
         if (ensures.Length != 0 && (target.Method.IsVirtual || target.Method.IsOverride))
         { return null; }
-        var requires = binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)).ToImmutableArray();
-        var preconditions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)).ToImmutableArray();
+        var requires = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires).ToImmutableArray();
+        var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToImmutableArray();
         var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
             target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
-        var assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) :
-            assumption.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(assumption.Id)).ToImmutableArray();
+        var assumptions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(assumption.Id)).ToImmutableArray();
         if (ensures.Length != target.Claims.Length || requires.Length != preconditions.Length ||
-            binding.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) != assumptions.Length)
+            binding.Clauses.Count(clause => clause.Kind == BoundContractKind.Assume) != assumptions.Length)
         { return null; }
         for (var ordinal = 0; ordinal < ensures.Length; ordinal++)
         {
@@ -140,11 +135,11 @@ internal static class CompilerTotalCallableLowerer
         if (!lowering.IsExact || lowering.Program.Blocks.Length > CompilerArtifactLimits.MaximumInstructions)
         {
             if (lowering.ConstructionLimitExceeded || graph == null || graph.Blocks.Length > CompilerArtifactLimits.MaximumInstructions ||
-                graph.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Length)) > CompilerArtifactLimits.MaximumInstructions ||
-                binding.Clauses.Any(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) ||
-                context.Receiver is { } receiver && binding.Clauses.Any(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (IrTraversal.CollectVariables([clause.Value, clause.SafeCondition])
-                    .Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == receiver.Entry || variable == receiver.Current || variable == receiver.PreState)))) ||
-                context.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (!Primitive(parameter.Entry))) ||
+                graph.Blocks.Sum(block => block.Operations.Length) > CompilerArtifactLimits.MaximumInstructions ||
+                binding.Clauses.Any(clause => clause.Kind == BoundContractKind.Assume) ||
+                context.Receiver is { } receiver && binding.Clauses.Any(clause => IrTraversal.CollectVariables([clause.Value, clause.SafeCondition])
+                    .Any(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == receiver.Entry || variable == receiver.Current || variable == receiver.PreState))) ||
+                context.Parameters.Any(parameter => !Primitive(parameter.Entry)) ||
                 context.Result is { } resultVariable && !Primitive(resultVariable) ||
                 context.Parameters.Length * 2 + 2 > CompilerArtifactLimits.MaximumInstructions)
             { return null; }
@@ -158,7 +153,7 @@ internal static class CompilerTotalCallableLowerer
                 builder.Assign(block, site, parameter.PreState, context.Factory.Variable(parameter.Entry));
             }
             var havocVariables = ImmutableArray.CreateBuilder<IrVarId>();
-            havocVariables.AddRange(context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Current)));
+            havocVariables.AddRange(context.Parameters.Select(parameter => parameter.Current));
             if (context.Result is { } resultId)
             { havocVariables.Add(resultId); }
             if (havocVariables.Count == 0)
@@ -180,22 +175,22 @@ internal static class CompilerTotalCallableLowerer
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
         ImmutableArray<TotalInputBinding> inputs = isBodyAbstraction
-            ? [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input)] : context.Inputs;
+            ? [.. context.Parameters.Select(parameter => parameter.Input)] : context.Inputs;
         return new(target.Entry.CallableId, program,
-            [.. inputs.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState)))],
+            [.. inputs.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result,
-            [.. binding.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new CompilerTotalClause(CompilerLoweringWireMappings.ToCompiler(clause.Kind),
+            [.. binding.Clauses.Select(clause => new CompilerTotalClause(CompilerLoweringWireMappings.ToCompiler(clause.Kind),
                 clause.Value, clause.SafeCondition, clause.SourceOperation,
                 clause.Kind == BoundContractKind.Ensures ? target.Claims[claimOrdinal++].Entry.ClaimId : null,
                 clause.Kind == BoundContractKind.Requires ? preconditions[assumptionOrdinal++].Id :
-                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null)))], isBodyAbstraction)
+                    clause.Kind == BoundContractKind.Assume ? assumptions[userAssumptionOrdinal++].Id : null))], isBodyAbstraction)
         {
             HasReceiver = inputs.Length != context.Parameters.Length,
             DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
             EffectsCompleteAtEntry = lowering.SourceInitializationEffectsComplete &&
                 HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
-            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.HasValidConstraint))
-                .Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence.ClaimId)).OrderBy(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)],
+            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
+                .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
@@ -227,7 +222,7 @@ internal static class CompilerTotalCallableLowerer
         RepositoryParameterGuard.ThrowIfMissing(capturedReferences is { IsDefault: true }, nameof(capturedReferences));
         if (enableMetadataRequires && capturedReferences is null)
         { return new([], [new(0, 0, 0, "MissingMetadataOwnership")]); }
-        if (compilation.References.Any(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference)))
+        if (compilation.References.Any(static reference => reference is CompilationReference))
         { return new([], [new(0, 0, 0, "UnsupportedSourceReference")]); }
         var trees = compilation.SyntaxTrees;
         if (trees.Length > CompilerArtifactLimits.MaximumInstructions)
@@ -255,12 +250,12 @@ internal static class CompilerTotalCallableLowerer
         var discovery = builder.Build();
         var gaps = inventory.Gaps.ToBuilder();
         var prepared = ImmutableArray.CreateBuilder<CompilerShadowPreparation>();
-        var published = discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))
+        var published = discovery.Manifest.Callables.Select(static entry => entry.CallableId)
             .ToImmutableHashSet(StringComparer.Ordinal);
         // Use producer-owned paths instead of caller-supplied reporting metadata.
         var authoritativeTrees = CompilerCompilationCapture.CaptureTrees(compilation, cancellationToken).ToImmutableArray();
         var initializationFree = CreateShadowInitializationPredicate(compilation, cancellationToken);
-        foreach (var owner in inventory.Owners.OrderBy(static owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.CallableId), StringComparer.Ordinal))
+        foreach (var owner in inventory.Owners.OrderBy(static owner => owner.CallableId, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (published.Contains(owner.CallableId) || !owner.DiscoveryComplete)
@@ -297,7 +292,7 @@ internal static class CompilerTotalCallableLowerer
         { reason = "UnsupportedEntryInitialization"; return null; }
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(), owner.Method, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (documents[tree])) { CaptureShadowCallAncestry = true };
+        var context = new TotalLoweringContext(new IrFactory(), owner.Method, tree => documents[tree]) { CaptureShadowCallAncestry = true };
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
             cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -318,7 +313,7 @@ internal static class CompilerTotalCallableLowerer
             cancellationToken.ThrowIfCancellationRequested();
         }
         return new(owner.CallableId, lowering.Program,
-            [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState)))],
+            [.. context.Parameters.Select(parameter => new CompilerTotalParameter(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result, [], false)
         {
             CallPreconditions = CreateCallPreconditions(lowering)
@@ -333,7 +328,7 @@ internal static class CompilerTotalCallableLowerer
             .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
                 pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
                 MetadataOrigin(pair.Value.MetadataClause))
-            { Ancestry = [.. pair.Value.Ancestry.Select(hop => hop is null ? throw new System.ArgumentNullException(nameof(hop)) : (new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site)))] })];
+            { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })];
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
@@ -395,9 +390,9 @@ internal static class CompilerTotalCallableLowerer
         for (var current = type; current != null; current = current.ContainingType)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (--remaining < 0 || current.StaticConstructors.Any(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (!constructor.IsImplicitlyDeclared)))
+            if (--remaining < 0 || current.StaticConstructors.Any(constructor => !constructor.IsImplicitlyDeclared))
             { return false; }
-            foreach (var member in current.GetMembers().Where(member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.IsStatic && member is IFieldSymbol { IsConst: false } or IPropertySymbol)))
+            foreach (var member in current.GetMembers().Where(member => member.IsStatic && member is IFieldSymbol { IsConst: false } or IPropertySymbol))
             {
                 foreach (var reference in member.DeclaringSyntaxReferences)
                 {
@@ -440,8 +435,8 @@ internal static class CompilerTotalCallableLowerer
                 if (member is INamespaceOrTypeSymbol nested)
                 { pending = pending.Push(nested); }
                 if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
-                        attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                        CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))))
+                        attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
+                        CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"])))
                 { return false; }
             }
         }
@@ -542,8 +537,8 @@ internal static class CompilerTotalCallableLowerer
                     if (member is INamespaceOrTypeSymbol nested)
                     { pending = pending.Push(nested); }
                     if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
-                            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                            CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"]))) &&
+                            attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
+                            CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"])) &&
                         (!NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType)))
                     { return false; }
                 }
@@ -583,7 +578,7 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             return statement switch
             {
-                BlockSyntax block => block.Statements.All(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (NoFaultStatement(child, model, initializedOwner))),
+                BlockSyntax block => block.Statements.All(child => NoFaultStatement(child, model, initializedOwner)),
                 EmptyStatementSyntax or ReturnStatementSyntax { Expression: null } => true,
                 ExpressionStatementSyntax expression => NoFaultStore(model.GetOperation(expression.Expression, cancellationToken), initializedOwner),
                 _ => false

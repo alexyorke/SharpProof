@@ -77,7 +77,7 @@ internal sealed partial class TotalLoweringContext
     private int _temporary;
 
     public TotalLoweringContext(IrFactory factory, IMethodSymbol target)
-        : this(factory, target, tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath))
+        : this(factory, target, tree => string.IsNullOrEmpty(tree.FilePath) ? "source" : tree.FilePath)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
@@ -162,14 +162,14 @@ internal sealed partial class TotalLoweringContext
     { return Target.MethodKind == MethodKind.Constructor ? null : ReceiverValue(state); }
 
     internal ImmutableArray<TotalInputBinding> Inputs =>
-        Receiver == null ? [.. Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input)]
-            : [.. Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : parameter.Input), Receiver];
+        Receiver == null ? [.. Parameters.Select(parameter => parameter.Input)]
+            : [.. Parameters.Select(parameter => parameter.Input), Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; private set; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.
-    public ImmutableArray<IrVarId> EntryVariables => [.. Inputs.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry))];
+    public ImmutableArray<IrVarId> EntryVariables => [.. Inputs.Select(binding => binding.Entry)];
 
     // A virtual or overriding body is lowered as written; callers dispatching
     // to it are a separate concern, so only a body-free method is excluded.
@@ -180,8 +180,8 @@ internal sealed partial class TotalLoweringContext
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
-        Parameters.All(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : ((binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter)) &&
-            CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type))) &&
+        Parameters.All(binding => (binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter)) &&
+            CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
 
     // A `ref` or `in` parameter of a scalar or reference type that the body
@@ -202,7 +202,7 @@ internal sealed partial class TotalLoweringContext
             { expression = parenthesized.Expression; }
             return expression is Microsoft.CodeAnalysis.CSharp.Syntax.IdentifierNameSyntax identifier && identifier.Identifier.ValueText == name;
         }
-        return !Target.DeclaringSyntaxReferences[0].GetSyntax().DescendantNodes().Any(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node switch
+        return !Target.DeclaringSyntaxReferences[0].GetSyntax().DescendantNodes().Any(node => node switch
         {
             Microsoft.CodeAnalysis.CSharp.Syntax.AssignmentExpressionSyntax assignment => Names(assignment.Left),
             Microsoft.CodeAnalysis.CSharp.Syntax.PrefixUnaryExpressionSyntax prefix => Names(prefix.Operand),
@@ -211,7 +211,7 @@ internal sealed partial class TotalLoweringContext
                 Names(argument.Expression),
             Microsoft.CodeAnalysis.CSharp.Syntax.RefExpressionSyntax reference => Names(reference.Expression),
             _ => false
-        }));
+        });
     }
 
     internal bool OwnsBody(IOperation body)
@@ -229,13 +229,13 @@ internal sealed partial class TotalLoweringContext
     }
 
     internal bool OwnsParameter(IParameterSymbol parameter)
-    { parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter)); return Parameters.Any(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter))); }
+    { parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter)); return Parameters.Any(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)); }
 
     internal IrVarId Variable(ISymbol symbol, TotalParameterState state = TotalParameterState.Current)
     {
         if (symbol is IParameterSymbol parameter)
         {
-            var binding = Parameters.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (SymbolEqualityComparer.Default.Equals(item.Parameter, parameter)));
+            var binding = Parameters.Single(item => SymbolEqualityComparer.Default.Equals(item.Parameter, parameter));
             return state switch
             {
                 TotalParameterState.Entry => binding.Entry,
@@ -507,7 +507,7 @@ internal sealed partial class TotalLoweringContext
     }
 
     internal ImmutableArray<FrontendVariableBinding> Variables =>
-        [.. Parameters.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (new FrontendVariableBinding(binding.Parameter, binding.Current)))
-            .Concat(_localOrder.Select(symbol => symbol is null ? throw new ArgumentNullException(nameof(symbol)) : new FrontendVariableBinding(symbol, _locals[symbol])))];
+        [.. Parameters.Select(binding => new FrontendVariableBinding(binding.Parameter, binding.Current))
+            .Concat(_localOrder.Select(symbol => new FrontendVariableBinding(symbol, _locals[symbol])))];
     internal ImmutableArray<IrVarId> Captures => [.. _captures.Values.OrderBy(value => value.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(value)) : (value.Value))];
 }

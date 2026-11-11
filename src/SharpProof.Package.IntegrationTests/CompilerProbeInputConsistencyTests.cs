@@ -53,7 +53,7 @@ public sealed class CompilerProbeInputConsistencyTests
             .GetAnalyzerDiagnosticsAsync();
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo([CompilerProbeContract.FailureDiagnosticId]));
         Assert.That(File.Exists(outputPath), Is.False);
     }

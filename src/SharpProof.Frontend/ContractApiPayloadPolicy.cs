@@ -206,11 +206,11 @@ internal sealed class ContractApiPayloadPolicy
         key = RepositoryParameterGuard.NotNull(key, nameof(key));
         owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         return owner.GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (string.Equals(
+            .Where(attribute => string.Equals(
                 attribute.Key,
                 key,
-                StringComparison.Ordinal)))
-            .Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.Value))
+                StringComparison.Ordinal))
+            .Select(static attribute => attribute.Value)
             .Distinct(StringComparer.Ordinal)
             .ToImmutableArray();
     }

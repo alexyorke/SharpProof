@@ -44,7 +44,7 @@ public sealed class CompilerScriptIdentityBoundaryTests
         var compilation = CSharpCompilation.CreateScriptCompilation("ScriptIdentity", tree,
             regular.References, regular.Options, returnType: typeof(object));
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();

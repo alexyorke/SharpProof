@@ -39,7 +39,7 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
                     """, path: "input.vb")],
                 supported.References, new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             : supported;
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -66,7 +66,7 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
         {
             Assert.That(compilation.Language, Is.EqualTo(LanguageNames.CSharp));
             Assert.That(outcome, Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
-            Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ExpectedIds));
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(ExpectedIds));
             var call = declaration.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
             Assert.That(diagnostics.Single().Location.SourceTree, Is.SameAs(declaration.SyntaxTree));
             Assert.That(diagnostics.Single().Location.SourceSpan, Is.EqualTo(call.Span));
@@ -80,8 +80,8 @@ public sealed class AnalyzerCoreAdvisoryLanguageBoundaryTests
         System.ArgumentNullException.ThrowIfNull(source);
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             .WithSpecificDiagnosticOptions(new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id),
-                static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id == "SP0027" ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress),
+                static descriptor => descriptor.Id,
+                static descriptor => descriptor.Id == "SP0027" ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress,
                 StringComparer.Ordinal));
         return CSharpCompilation.Create("AnalyzerFixture",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview), "input.cs")],

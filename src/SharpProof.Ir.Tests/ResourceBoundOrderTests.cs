@@ -139,8 +139,8 @@ public sealed class ResourceBoundOrderTests
         Assert.That(upper.NodeCount, Is.LessThanOrEqualTo(ResourceExpression.MaximumNodes));
         Assert.That(limit.NodeCount, Is.LessThanOrEqualTo(ResourceExpression.MaximumNodes));
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(upper.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal % 7, cancellation),
-            Is.EqualTo(limit.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : input.Ordinal % 7, cancellation)));
+        Assert.That(upper.Evaluate(static input => input.Ordinal % 7, cancellation),
+            Is.EqualTo(limit.Evaluate(static input => input.Ordinal % 7, cancellation)));
         Action compare = () => ResourceBoundOrder.Proves(upper, limit, cancellation);
         Assert.Throws<ResourceExpressionLimitException>(compare);
     }

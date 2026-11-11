@@ -34,7 +34,7 @@ internal static class TotalCallableVerifier
         if (entry == null)
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
         ValidateEntryOwner(preparation, entry);
-        if (entry.Clauses.Any(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth))))
+        if (entry.Clauses.Any(clause => ExceedsDepth(clause.Value, clause.Safe, budgets.MaximumExpressionDepth)))
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.UnsupportedExpression); }
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(entry.Clauses.Length + (entry.HasReceiver ? 1 : 0));
         var labels = ImmutableDictionary.CreateBuilder<ProofJustification, string>();
@@ -103,7 +103,7 @@ internal static class TotalCallableVerifier
         if (candidate == null)
         { return; }
         var total = preparation.Total!;
-        var ensures = total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).ToImmutableArray();
+        var ensures = total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
         ImmutableDictionary<string, string> requiresByLabel = null!;
         ImmutableArray<WorkerAssumptionEvidence> canonicalAssumptions = default;
         ImmutableDictionary<OperationId, string> assumesByOperation = null!;
@@ -116,7 +116,7 @@ internal static class TotalCallableVerifier
         {
             var requiresBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
             var requiresOrdinal = 0;
-            foreach (var clause in total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)))
+            foreach (var clause in total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 requiresBuilder.AddUnique("requires:" + (requiresOrdinal++).ToString(CultureInfo.InvariantCulture),
@@ -127,10 +127,10 @@ internal static class TotalCallableVerifier
 
         void PrepareAssumptionProjection()
         {
-            canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Id), StringComparer.Ordinal).ToImmutableArray();
-            assumesByOperation = ImmutableDictionaryCapture.Create(total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Assume)),
-                clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : clause.Operation,
-                clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : clause.AssumptionId
+            canonicalAssumptions = preparation.Entry.Assumptions.OrderBy(assumption => assumption.Id, StringComparer.Ordinal).ToImmutableArray();
+            assumesByOperation = ImmutableDictionaryCapture.Create(total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Assume),
+                clause => clause.Operation,
+                clause => clause.AssumptionId
                     ?? throw new System.IO.InvalidDataException("An assume clause has no assumption identifier."));
         }
 
@@ -279,9 +279,9 @@ internal static class TotalCallableVerifier
         { return CallableEntryFeasibility.Unknown(entry.Reason); }
         if (entry.Outcome is RefutedOutcome)
         { return CallableEntryFeasibility.Feasible; }
-        var core = entry.Core.Where(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label != PassiveCallableVcBuilder.ReceiverLabel)).ToImmutableArray();
-        if (entry.Outcome is not ProvenOutcome || core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (!requiresByLabel.ContainsKey(label))))
+        var core = entry.Core.Where(label => label != PassiveCallableVcBuilder.ReceiverLabel).ToImmutableArray();
+        if (entry.Outcome is not ProvenOutcome || core.Any(label => !requiresByLabel.ContainsKey(label)))
         { return CallableEntryFeasibility.Unknown(WorkerClaimReason.MalformedBackendResult); }
-        return CallableEntryFeasibility.Contradictory(core, core.Select(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (requiresByLabel[label])));
+        return CallableEntryFeasibility.Contradictory(core, core.Select(label => requiresByLabel[label]));
     }
 }

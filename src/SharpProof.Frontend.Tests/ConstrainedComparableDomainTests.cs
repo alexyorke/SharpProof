@@ -40,9 +40,7 @@ public sealed class ConstrainedComparableDomainTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().First();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         var callerGraph = ControlFlowGraph.Create(syntax, model)!;
-        var invocation = callerGraph.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) :
-            block.Operations.Concat(block.BranchValue is { } branch ? ImmutableArray.Create(branch) : ImmutableArray<IOperation>.Empty)).SelectMany(operation => operation is null
-                ? throw new ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).OfType<IInvocationOperation>().Single();
+        var invocation = callerGraph.Blocks.SelectMany(block => block.Operations.Concat(block.BranchValue is { } branch ? ImmutableArray.Create(branch) : ImmutableArray<IOperation>.Empty)).SelectMany(operation => operation.DescendantsAndSelf()).OfType<IInvocationOperation>().Single();
         bool PrepareCallee(TotalLoweringContext frame)
         {
             ArgumentNullException.ThrowIfNull(frame);
@@ -125,7 +123,7 @@ public sealed class ConstrainedComparableDomainTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target<T>(T x, T y) where T : System.IComparable<T> => x.CompareTo(y); }");
         var compilation = CSharpCompilation.Create("ComparableReceiver", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(invocation.TargetMethod.OriginalDefinition.GetDocumentationCommentId(), Is.EqualTo("M:System.IComparable`1.CompareTo(`0)"));

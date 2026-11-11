@@ -186,7 +186,7 @@ internal static class EffectContractMappings
         declared.IncludesUnknown ||
         !actual.IncludesUnknown &&
         actual.Types.All(thrown =>
-            thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (declared.Types.Any(allowed => allowed is null ? throw new System.ArgumentNullException(nameof(allowed)) : (EffectTypeFacts.IsDerivedFrom(thrown, allowed)))));
+            declared.Types.Any(allowed => allowed is null ? throw new System.ArgumentNullException(nameof(allowed)) : (EffectTypeFacts.IsDerivedFrom(thrown, allowed))));
     }
 
     private const EffectContractKind ImpureState =

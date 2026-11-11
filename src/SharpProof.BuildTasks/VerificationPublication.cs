@@ -36,7 +36,7 @@ internal sealed class VerificationPublication
             }
         }
         var options = optionBuilder.ToImmutable();
-        if (!options.Keys.Any(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (key.StartsWith("--publish-", StringComparison.Ordinal))))
+        if (!options.Keys.Any(key => key.StartsWith("--publish-", StringComparison.Ordinal)))
         { return null; }
         foreach (var required in ImmutableArray.Create("--request", "--result", "--publish-request", "--publish-result", "--publish-compiler-manifest"))
         {

@@ -28,7 +28,7 @@ public sealed class ContractInvocationShapeTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression.ToString() == name));
+            .Single(call => call.Expression.ToString() == name);
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
         Assert.That(invocation.SemanticModel!.Compilation, Is.SameAs(compilation));
         Assert.That(invocation.TargetMethod.Name, Is.EqualTo(name));

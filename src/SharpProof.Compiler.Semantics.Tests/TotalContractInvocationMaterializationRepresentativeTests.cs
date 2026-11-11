@@ -69,16 +69,16 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
             context, api, new ContractIntrinsicValidator(api), resolution, candidates, requiresOnly: false);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
         AssertTruth(factory, context, result.Clauses);
-        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence)), Is.All.EqualTo(
+        Assert.That(result.Clauses.Select(clause => clause.Evidence), Is.All.EqualTo(
             companion ? BoundContractEvidence.Companion : BoundContractEvidence.CompilerBoundInvocation));
-        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.SourceSyntax!.Span)),
+        Assert.That(result.Clauses.Select(clause => clause.SourceSyntax!.Span),
             Is.EqualTo(candidates.Select(candidate => ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Syntax.Span)))));
-        Assert.That(result.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)),
+        Assert.That(result.Clauses.Select(clause => clause.DiagnosticText),
             Is.EqualTo(candidates.Select(candidate => ((candidate.Invocation is null) ? throw new System.ArgumentException("Value must be initialized.", nameof(candidate)) : (candidate.Invocation.Arguments[0].Value.Syntax.ToString())))));
         var requires = TotalContractInvocationMaterialization.Bind(
             context, api, new ContractIntrinsicValidator(api), resolution, candidates, requiresOnly: true);
         Assert.That(requires.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(requires.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));
+        Assert.That(requires.Clauses.Select(clause => clause.Kind), Is.EqualTo(ImmutableArray.Create(BoundContractKind.Requires)));
     }
 
     [Test]
@@ -138,7 +138,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
         ImmutableArray<BoundTotalContractClause> clauses)
     {
         System.ArgumentNullException.ThrowIfNull(factory);
-        Assert.That(clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(
+        Assert.That(clauses.Select(clause => clause.Kind), Is.EqualTo(
             ImmutableArray.Create(BoundContractKind.Requires, BoundContractKind.Assume, BoundContractKind.Ensures)));
         var result = context.Result ?? throw new AssertionException("Boolean target must own a result variable.");
         var parameter = context.Parameters.Single();
@@ -167,8 +167,8 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
     private static ImmutableArray<ContractInvocationCandidate> Candidates(EffectiveContractSourceResolution resolution)
     {
         System.ArgumentNullException.ThrowIfNull(resolution);
-        return [.. resolution.Inventory.Clauses.Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
-            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation)))];
+        return [.. resolution.Inventory.Clauses.Where(static occurrence => occurrence.IsValid)
+            .Select(static occurrence => new ContractInvocationCandidate(occurrence.Kind, occurrence.Invocation))];
     }
 
     private static IMethodSymbol Method(CSharpCompilation compilation, string typeName, string methodName)

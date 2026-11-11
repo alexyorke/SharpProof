@@ -14,8 +14,8 @@ internal sealed partial class TotalLoweringContext
         if (_trackingBases is { } known && ReferenceEquals(known.Graph, graph))
         { return (known.Arrays, known.Dictionaries, known.HashSets, known.Lists); }
         bool arrays = false, dictionaries = false, hashSets = false, lists = false;
-        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
-            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf());
+        var operations = graph.Blocks.SelectMany(block => block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
+            .SelectMany(operation => operation.DescendantsAndSelf());
         foreach (var operation in graph.OriginalOperation.DescendantsAndSelf().Concat(operations))
         {
             arrays |= operation.Type is IArrayTypeSymbol { IsSZArray: true } array && CSharpOperationSemantics.IsScalar(array.ElementType);
@@ -40,10 +40,10 @@ internal sealed partial class TotalLoweringContext
         // caller already proved. Without either, the pass would track nothing.
         var bases = TrackingBases(graph);
         if (!(hashSetOrigins ? bases.HashSets : lists ? bases.Lists : bases.Dictionaries) &&
-            !(identityOnly && tracked.Any(static symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : symbol is IParameterSymbol)))
+            !(identityOnly && tracked.Any(static symbol => symbol is IParameterSymbol)))
         { return; }
-        var operations = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
-            .SelectMany(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : operation.DescendantsAndSelf()).ToImmutableArray();
+        var operations = graph.Blocks.SelectMany(block => block.Operations.Concat(block.BranchValue == null ? ImmutableArray<IOperation>.Empty : ImmutableArray.Create(block.BranchValue)))
+            .SelectMany(operation => operation.DescendantsAndSelf()).ToImmutableArray();
         var definitions = ImmutableDictionary.CreateBuilder<ISymbol, ImmutableArray<IOperation>.Builder>(SymbolEqualityComparer.Default);
         var captures = ImmutableDictionary.CreateBuilder<CaptureId, ImmutableArray<IOperation>.Builder>();
         var definitionOrder = ImmutableArray.CreateBuilder<ISymbol>();
@@ -158,7 +158,7 @@ internal sealed partial class TotalLoweringContext
         bool All(ImmutableArray<IOperation>.Builder values, int depth)
         {
             values = RepositoryParameterGuard.NotNull(values, nameof(values));
-            return values.Count != 0 && values.All(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : Resolve(value, depth + 1));
+            return values.Count != 0 && values.All(value => Resolve(value, depth + 1));
         }
         bool Resolve(IOperation operation, int depth)
         {

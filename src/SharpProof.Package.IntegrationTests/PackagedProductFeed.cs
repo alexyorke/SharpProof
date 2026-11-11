@@ -90,7 +90,7 @@ internal sealed class PackagedProductFeed : IDisposable
     {
         System.ArgumentNullException.ThrowIfNull(id);
         return Packages.Single(package =>
-            package is null ? throw new System.ArgumentNullException(nameof(package)) : (string.Equals(package.Id, id, StringComparison.Ordinal)));
+            string.Equals(package.Id, id, StringComparison.Ordinal));
     }
 
     internal string GetPackagePath(string id)
@@ -103,7 +103,7 @@ internal sealed class PackagedProductFeed : IDisposable
     {
         System.ArgumentNullException.ThrowIfNull(id);
         return SymbolPackages.Single(package =>
-            package is null ? throw new System.ArgumentNullException(nameof(package)) : (string.Equals(package.Id, id, StringComparison.Ordinal))).Path;
+            string.Equals(package.Id, id, StringComparison.Ordinal)).Path;
     }
 
     public void Dispose()
@@ -219,12 +219,12 @@ internal sealed class PackagedProductFeed : IDisposable
                 source,
                 "*",
                 SearchOption.TopDirectoryOnly)
-            .Where(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (string.Equals(
+            .Where(path => string.Equals(
                 Path.GetExtension(path),
                 extension,
-                StringComparison.OrdinalIgnoreCase)))
+                StringComparison.OrdinalIgnoreCase))
             .Select(ReadPackage)
-            .OrderBy(package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (s_expectedPackageIds.IndexOf(package.Id)))
+            .OrderBy(package => s_expectedPackageIds.IndexOf(package.Id))
         ];
     }
 
@@ -235,7 +235,7 @@ internal sealed class PackagedProductFeed : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfEqual(expectedIds.IsDefault, true);
         System.ArgumentNullException.ThrowIfNull(kind);
-        if (!packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id))
+        if (!packages.Select(static package => package.Id)
                 .SequenceEqual(expectedIds, StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
@@ -245,10 +245,10 @@ internal sealed class PackagedProductFeed : IDisposable
                 string.Join(
                     ", ",
                     packages.Select(static package =>
-                        package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Id + " " + package.Version))));
+                        package.Id + " " + package.Version)));
         }
 
-        if (packages.Select(static package => package is null ? throw new System.ArgumentNullException(nameof(package)) : (package.Version))
+        if (packages.Select(static package => package.Version)
                 .Distinct(StringComparer.Ordinal).Count() != 1)
         {
             throw new InvalidOperationException(
@@ -262,13 +262,13 @@ internal sealed class PackagedProductFeed : IDisposable
         var document = PackageNuspecReader.Read(path);
         var metadata = document.Root?.Elements()
             .Single(element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "metadata")) ??
+                element.Name.LocalName == "metadata") ??
             throw new InvalidDataException(
                 "Package nuspec metadata was not found: " + path);
         var id = metadata.Elements()
-            .Single(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "id")).Value;
+            .Single(element => element.Name.LocalName == "id").Value;
         var version = metadata.Elements()
-            .Single(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "version")).Value;
+            .Single(element => element.Name.LocalName == "version").Value;
         return new PackagedPackage(id, version, path);
     }
 
@@ -359,9 +359,9 @@ internal static class PackageNuspecReader
         System.ArgumentNullException.ThrowIfNull(packagePath);
         using var archive = ZipFile.OpenRead(packagePath);
         var nuspec = archive.Entries.Single(entry =>
-            entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FullName.EndsWith(
+            entry.FullName.EndsWith(
                 ".nuspec",
-                StringComparison.OrdinalIgnoreCase)));
+                StringComparison.OrdinalIgnoreCase));
         using var stream = nuspec.Open();
         return XDocument.Load(stream);
     }

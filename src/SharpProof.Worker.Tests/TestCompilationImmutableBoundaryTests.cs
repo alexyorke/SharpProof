@@ -19,9 +19,9 @@ public sealed class TestCompilationImmutableBoundaryTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(compilation.AssemblyName, Is.EqualTo(assemblyName));
-            Assert.That(compilation.SyntaxTrees.Select(tree => tree is null ? throw new ArgumentNullException(nameof(tree)) : tree.FilePath),
+            Assert.That(compilation.SyntaxTrees.Select(tree => tree.FilePath),
                 Is.EqualTo(ImmutableArray.Create("shared.cs", "shared.cs")));
-            Assert.That(compilation.SyntaxTrees.Select(tree => tree is null ? throw new ArgumentNullException(nameof(tree)) : tree.ToString()),
+            Assert.That(compilation.SyntaxTrees.Select(tree => tree.ToString()),
                 Is.EqualTo(ImmutableArray.Create(first, second)));
         }
     }

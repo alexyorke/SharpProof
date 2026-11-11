@@ -22,10 +22,10 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         Assert.That(body, Does.Contain("int L1()"));
 
         var original = CompileForType(body + " Out: return x;", "int");
-        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
+        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic.ToString()))}");
 
         var errors = CompileForType(body + " Out: return x;", "bool");
-        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
+        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}");
     }
 
     [TestCase(251270, "bool", 4)]
@@ -43,24 +43,24 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         Assert.That(body, Does.Contain("int L1()"));
 
         var original = CompileForType(body + " Out: return x;", "int");
-        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
+        Assert.That(original, Is.Empty, $"seed {seed} must compile before retyping: {string.Join(" | ", original.Select(diagnostic => diagnostic.ToString()))}");
 
         var errors = CompileForType(body + " Out: return x;", type);
-        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}");
+        Assert.That(errors, Is.Empty, $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}");
     }
 
     [Test]
     public void NearbyTopLevelBoolReturnStillCompiles()
     {
         var errors = CompileForType("x++; Out: return x;", "bool");
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
     }
 
     [Test]
     public void NearbyTopLevelVoidReturnStillCompiles()
     {
         var errors = CompileForType("if (x == 0) return x++; Out: return x;", "void");
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
     }
 
     [Test]
@@ -99,13 +99,13 @@ public sealed class ControlFlowRetypeCompileRegressionTests
         var source = $"public static class C {{ public static int State; public static {type} Target(int x) {{ {retyped} }} }}";
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", [source])!;
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
 
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
         Assert.That(emission.Success, Is.True,
-            string.Join(" | ", emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+            string.Join(" | ", emission.Diagnostics.Select(diagnostic => diagnostic.ToString())));
         stream.Position = 0;
         var context = new AssemblyLoadContext("retype-regression", isCollectible: true);
         try
@@ -132,7 +132,7 @@ public sealed class ControlFlowRetypeCompileRegressionTests
             $"public static {type} Target(int x) {{ ", runtime])!;
         var compilation = (CSharpCompilation)Invoke(generator, "Compile", [source])!;
         return compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
     }
 
     private static object? Invoke(Type type, string name, ImmutableArray<object?> arguments)

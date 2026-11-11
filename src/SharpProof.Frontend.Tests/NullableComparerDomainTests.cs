@@ -19,7 +19,7 @@ public sealed class NullableComparerDomainTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(System.Collections.Generic.Comparer<int> comparer, int x, int y) => comparer.Compare(x, y); }");
         var compilation = CSharpCompilation.Create("NullableComparerClause", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory();
@@ -56,7 +56,7 @@ public sealed class NullableComparerDomainTests
         var tree = CSharpSyntaxTree.ParseText(source);
         var compilation = CSharpCompilation.Create("ReceiverEntryOwnership", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);

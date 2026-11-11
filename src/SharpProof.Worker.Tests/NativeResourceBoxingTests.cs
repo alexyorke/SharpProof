@@ -103,7 +103,7 @@ internal sealed partial class NativeResourceContractTests
             "for(int i=0;i<3;i++) { object value=i; }"), reviewedRuntime: true, x64: true));
         var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
         Assert.That(results.All(static result => result is not null && result.Outcome == WorkerClaimOutcome.Proven), Is.True);
-        var bytes = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound!.Metric == WorkerResourceMetric.AllocatedBytes);
+        var bytes = results.Single(static result => result.ResourceBound!.Metric == WorkerResourceMetric.AllocatedBytes);
         Assert.That(bytes.ResourceBound!.InferredUpperBound, Is.EqualTo("72"));
     }
 

@@ -30,7 +30,7 @@ internal sealed class ContractIntrinsicValidator
             ? body.DescendantsAndSelf()
             : WalkCallableBoundary(body);
         foreach (var use in operations
-                     .Select(static operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((Operation: operation, Target: GetReferencedMethod(operation))))
+                     .Select(static operation => (Operation: operation, Target: GetReferencedMethod(operation)))
                      .Where(static use => use.Target != null)
                      .OrderBy(static use => use.Operation.Syntax.SpanStart))
         {
@@ -75,7 +75,7 @@ internal sealed class ContractIntrinsicValidator
 
         var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
         foreach (var operation in WalkCallableBoundary(initializer)
-                     .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Syntax.SpanStart)))
+                     .OrderBy(static value => value.Syntax.SpanStart))
         {
             if (operation is IAnonymousFunctionOperation anonymous)
             {

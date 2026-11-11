@@ -185,7 +185,7 @@ internal static class TotalProgramDifferentialOracle
         // Only generated length-only cases may abstract malformed UTF-16.
         // Source replay preserves exact text and rejects unrepresentable values.
         var result = value is string text ? factory.CreateStringValue(abstractStringContents ? new string('\0', text.Length) : text)
-            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases, abstractStringContents))))
+            : value is Array array ? factory.CreateSequenceValue(type, array.Cast<object>().Select(element => Value(factory, info.ElementType!.Value, element, aliases, abstractStringContents)))
             : factory.CreateReferenceValue(type, value);
         typed.AddUnique(value, result);
         return result;
@@ -207,7 +207,7 @@ internal static class TotalProgramDifferentialOracle
         { return nonnull; }
         var observed = factory.Binary(IrBinaryOperator.AndAlso, nonnull,
             factory.Binary(IrBinaryOperator.Equal, factory.Length(term), factory.Integer(value.Kind == IrValueKind.String ? value.String.Length : value.Elements.Length)));
-        if (value.Kind == IrValueKind.Sequence && value.Elements.All(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Kind is IrValueKind.Boolean or IrValueKind.Integer)))
+        if (value.Kind == IrValueKind.Sequence && value.Elements.All(element => element.Kind is IrValueKind.Boolean or IrValueKind.Integer))
         {
             for (var index = 0; index < value.Elements.Length; index++)
             {

@@ -216,7 +216,7 @@ public sealed class NativeResourceAllocationTests
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
-            .Single(static candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identifier.ValueText == "Target");
+            .Single(static candidate => candidate.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var analysis = ResourceBoundsAnalysis.Analyze((Microsoft.CodeAnalysis.IMethodSymbol)model.GetDeclaredSymbol(method)!,

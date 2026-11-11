@@ -21,7 +21,7 @@ public sealed class CompilerDiagnosticWorkflowTests
         System.ArgumentNullException.ThrowIfNull(expected);
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static void Value() { int unused; } }");
-        var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS0168"));
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS0168");
         var options = compilation.Options.WithSpecificDiagnosticOptions(
             ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(diagnostic.Id, severity));
         var canonical = CorpusGate.CanonicalizeDiagnostic(diagnostic, options);
@@ -33,7 +33,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static void Value() { int unused; } }");
-        var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS0168"));
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS0168");
         var options = compilation.Options.WithSpecificDiagnosticOptions(
             ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(diagnostic.Id, ReportDiagnostic.Suppress));
         var error = Assert.Throws<InvalidOperationException>((Action)(() =>
@@ -46,7 +46,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var original = AnalyzerGateHost.CreateCompilation("public static class C { }");
         var compilation = original.WithOptions(original.Options.WithOutputKind(OutputKind.ConsoleApplication));
-        var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS5001"));
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS5001");
         Assert.That(diagnostic.Location, Is.EqualTo(Location.None));
         Assert.That(CorpusGate.CanonicalizeDiagnostic(diagnostic, compilation.Options),
             Does.StartWith("CS5001@Error@none@"));
@@ -57,10 +57,10 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static int Value() => MissingValue; }");
-        var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS0103"));
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS0103");
         var error = Assert.Throws<InvalidDataException>((Action)(() =>
             AnalyzerGateHost.ThrowIfCompilationHasErrors(compilation, 1,
-                static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (new InvalidDataException(message)), TestContext.CurrentContext.CancellationToken)));
+                static message => new InvalidDataException(message), TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo(diagnostic.ToString()));
     }
 
@@ -69,7 +69,7 @@ public sealed class CompilerDiagnosticWorkflowTests
     {
         var compilation = AnalyzerGateHost.CreateCompilation(
             "public static class C { public static void Value() { int unused; } }");
-        var diagnostic = compilation.GetDiagnostics().Single(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Id == "CS0168"));
+        var diagnostic = compilation.GetDiagnostics().Single(static item => item.Id == "CS0168");
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment([diagnostic], [])));
         Assert.That(error!.ParamName, Is.EqualTo("assignmentCounts"));

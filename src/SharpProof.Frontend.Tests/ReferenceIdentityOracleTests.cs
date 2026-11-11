@@ -26,7 +26,7 @@ public sealed class ReferenceIdentityOracleTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static bool Target(object left, object right) => object.ReferenceEquals(objB: right, objA: left); }");
         var compilation = CSharpCompilation.Create("ReferenceIdentityOracle", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var factory = new IrFactory();

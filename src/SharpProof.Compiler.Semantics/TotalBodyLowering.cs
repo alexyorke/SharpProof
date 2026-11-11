@@ -56,8 +56,8 @@ internal static class TotalBodyLowering
                 cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)
             { return false; }
-            frame.SourceCallPreconditions = [.. contracts.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
-                .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation)))];
+            frame.SourceCallPreconditions = [.. contracts.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires)
+                .Select(clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
             var syntax = frame.Target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
             var operation = CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree)
                 .GetOperation(syntax, cancellationToken);
@@ -89,8 +89,8 @@ internal static class TotalBodyLowering
             return true;
         }, resolveIl == null ? null : (method, token) => method is null ? throw new System.ArgumentNullException(nameof(method)) : (TrustedContractEffects(contracts, method) == null ? resolveIl(method, token) : null),
             cancellationToken,
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (ResolveScalarModel(method, context.Factory, apiSpecs) ?? resolveScalarModel?.Invoke(method)),
-            prepareMetadata, opaqueCalls, method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpaqueEffects(contracts, apiSpecs, method)), approximateElementReads, pinElementReads, stopAtFirstAbstention);
+            method => ResolveScalarModel(method, context.Factory, apiSpecs) ?? resolveScalarModel?.Invoke(method),
+            prepareMetadata, opaqueCalls, method => OpaqueEffects(contracts, apiSpecs, method), approximateElementReads, pinElementReads, stopAtFirstAbstention);
     }
 
     internal static TotalScalarCallModel? ResolveScalarModel(IMethodSymbol method, IrFactory factory, ResolvedApiSpecTable apiSpecs)
@@ -177,8 +177,8 @@ internal static class TotalBodyLowering
     private static bool HasParameterContracts(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        return method.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes())).Any(attribute =>
-            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ContainingNamespace is { Name: "Attributes", ContainingNamespace: { Name: "SharpProof", ContainingNamespace.IsGlobalNamespace: true } }));
+        return method.Parameters.SelectMany(parameter => parameter.GetAttributes()).Any(attribute =>
+            attribute.AttributeClass?.ContainingNamespace is { Name: "Attributes", ContainingNamespace: { Name: "SharpProof", ContainingNamespace.IsGlobalNamespace: true } });
     }
 
     private static IrOpaqueCallEffects ContractEffects(EffectProjection declared /* SPINT001: all values valid - every effect bitset is projected, including unknown and empty sets */)
@@ -211,13 +211,13 @@ internal static class TotalBodyLowering
     internal static bool MutatesElements(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Any(instruction =>
-            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction { Receiver: null, Target: null } or
-                IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter }));
+        return program.Blocks.SelectMany(block => block.Instructions).Any(instruction =>
+            instruction is IrCallInstruction { Receiver: null, Target: null } or
+                IrWriteInstruction { Region: IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter });
     }
 
     internal static IEnumerable<IrTerm> BodyTerms(IrProgram program)
-    { program = RepositoryParameterGuard.NotNull(program, nameof(program)); return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).SelectMany(IrInstructionFacts.ReadTerms); }
+    { program = RepositoryParameterGuard.NotNull(program, nameof(program)); return program.Blocks.SelectMany(block => block.Instructions).SelectMany(IrInstructionFacts.ReadTerms); }
 
     internal static bool ReadsElements(IrFactory factory, IEnumerable<IrTerm> terms)
     {

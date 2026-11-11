@@ -149,8 +149,7 @@ public sealed partial class ResourceBoundsTests
             }
             """;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(source, null, ["SP0060"]);
-        var root = diagnostics.Single(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) :
-            diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture).StartsWith("Method 'Root':", StringComparison.Ordinal));
+        var root = diagnostics.Single(diagnostic => diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture).StartsWith("Method 'Root':", StringComparison.Ordinal));
         Assert.That(root.Properties["ResourceStatus"], Is.EqualTo("Proven"));
         Assert.That(root.Properties["ResourceCostModel"], Is.EqualTo("loop-entries-and-primitive-array-elements-v3"));
         Assert.That(root.Properties["ResourceExpressionModel"], Is.EqualTo("1"));

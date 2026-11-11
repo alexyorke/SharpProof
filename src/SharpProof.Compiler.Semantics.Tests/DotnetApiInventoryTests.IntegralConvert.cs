@@ -44,7 +44,7 @@ public sealed partial class DotnetApiInventoryTests
             var expression = type == "bool" ? (number.IsZero ? "false" : "true") : "(" + type + ")(" + edge + ")";
             var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static long Check() { return System.Convert.ToInt64(value: " + expression + "); } }");
             var compilation = references.AddSyntaxTrees(tree);
-            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
             { return false; }
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
             var model = compilation.GetSemanticModel(tree);

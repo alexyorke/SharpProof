@@ -107,10 +107,10 @@ public sealed class OperationThrowClassificationCoverageTests
         var compilation = CSharpCompilation.Create(
             "ThrowClassification", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)),
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error),
             Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target")).ExpressionBody!.Expression;
+            .Single(method => method.Identifier.ValueText == "Target").ExpressionBody!.Expression;
         return FrontendTestHelpers.TryGetExpressionOperation(
             compilation.GetSemanticModel(tree), syntax)!;
     }

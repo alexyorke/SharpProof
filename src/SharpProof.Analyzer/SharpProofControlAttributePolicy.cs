@@ -54,7 +54,7 @@ internal static class SharpProofControlAttributePolicy
             var location = attribute.ApplicationSyntaxReference?
                 .GetSyntax(cancellationToken).GetLocation() ??
                 symbol.Locations.FirstOrDefault(static candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource)) ??
+                    candidate.IsInSource) ??
                 Location.None;
             ReportRejectedContractApi(
                 symbol.Name,
@@ -101,7 +101,7 @@ internal static class SharpProofControlAttributePolicy
             _ => default
         };
         foreach (var attribute in attributeLists.SelectMany(
-                     static list => list is null ? throw new System.ArgumentNullException(nameof(list)) : (list.Attributes)))
+                     static list => list.Attributes))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var constructor = semanticModel.GetSymbolInfo(
@@ -214,7 +214,7 @@ internal static class SharpProofControlAttributePolicy
 
         var location =
             attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
-            symbol.Locations.FirstOrDefault(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource)) ??
+            symbol.Locations.FirstOrDefault(static candidate => candidate.IsInSource) ??
             Location.None;
         ReportInvalidReasonDiagnostic(
             suppressing, reason, location, reportDiagnostic);

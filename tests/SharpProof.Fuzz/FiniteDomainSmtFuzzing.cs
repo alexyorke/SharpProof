@@ -55,8 +55,8 @@ internal static class FiniteDomainSmtDifferentialOracle
             formula,
             variables,
             static evaluated =>
-                evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
-                evaluated.Value is { Kind: IrValueKind.Boolean }),
+                evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean },
             requireMatch: true,
             cancellationToken: cancellationToken);
     }
@@ -72,8 +72,8 @@ internal static class FiniteDomainSmtDifferentialOracle
             return false;
         }
         return SearchFiniteDomain(factory, safety, domain!.Variables,
-            static evaluated => evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
-                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true }),
+            static evaluated => evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: true },
             requireMatch: true, cancellationToken);
     }
     internal sealed class ValidatedFiniteDomain
@@ -248,12 +248,12 @@ internal static class FiniteDomainSmtDifferentialOracle
                 formula,
                 variables,
                 static evaluated =>
-                    evaluated is null ? throw new System.ArgumentNullException(nameof(evaluated)) : (evaluated.Status == IrEvaluationStatus.Value &&
+                    evaluated.Status == IrEvaluationStatus.Value &&
                     evaluated.Value is
                     {
                         Kind: IrValueKind.Boolean,
                         Boolean: true
-                    }),
+                    },
                 requireMatch: false,
                 cancellationToken: cancellationToken)
             ? FiniteDomainSatisfiability.Satisfiable
@@ -614,8 +614,8 @@ internal static class IrStructuralShrinker
             IrTraversal.GetChildren,
             static (parent, child) => child is null ? throw new System.ArgumentNullException(nameof(child)) : parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (parent.Type == child.Type),
             StructuralSize,
-            static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Id),
-            value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (GetDomainCandidates(factory, value)),
+            static candidate => candidate.Id,
+            value => GetDomainCandidates(factory, value),
             (value, index, replacement) => replacement is null ? throw new System.ArgumentNullException(nameof(replacement)) : value is null ? throw new System.ArgumentNullException(nameof(value)) : (TryReplaceChild(
                 factory,
                 value,

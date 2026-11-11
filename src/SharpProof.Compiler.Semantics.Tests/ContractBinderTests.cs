@@ -310,7 +310,7 @@ internal sealed class ContractBinderTests
                 {
                     Assert.That(
                         requires.Contracts!.Clauses.Select(
-                            static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
+                            static clause => clause.Kind),
                         Is.EqualTo([BoundContractKind.Requires]),
                         methodName);
                 }
@@ -811,15 +811,15 @@ internal sealed class ContractBinderTests
         Assert.That(result.Contracts!.Clauses.Length, Is.EqualTo(4));
         Assert.That(
             result.Contracts.Clauses.Count(static clause =>
-                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)),
+                clause.Kind == BoundContractKind.Requires),
             Is.EqualTo(3));
         Assert.That(
             result.Contracts.Clauses.Count(static clause =>
-                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)),
+                clause.Kind == BoundContractKind.Ensures),
             Is.EqualTo(1));
         Assert.That(
             result.Contracts.Clauses.All(static clause =>
-                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)),
+                clause.Evidence == BoundContractEvidence.ClosedAttribute),
             Is.True);
     }
 
@@ -1641,7 +1641,7 @@ internal sealed class ContractBinderTests
             var type = Compilation.GetTypeByMetadataName(typeName) ??
                        throw new InvalidOperationException(typeName);
             var constructor = type.InstanceConstructors.Single(
-                static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!method.IsImplicitlyDeclared));
+                static method => !method.IsImplicitlyDeclared);
             return _binder.Bind(constructor);
         }
 
@@ -1653,7 +1653,7 @@ internal sealed class ContractBinderTests
                        throw new InvalidOperationException(typeName);
             var method = type.GetMembers()
                 .OfType<IMethodSymbol>()
-                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.MethodKind == methodKind));
+                .Single(candidate => candidate.MethodKind == methodKind);
             return _binder.Bind(method);
         }
 
@@ -1672,7 +1672,7 @@ internal sealed class ContractBinderTests
             var invocation = declaration.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Single(candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Expression switch
+                    candidate.Expression switch
                     {
                         MemberAccessExpressionSyntax member =>
                             member.Name.Identifier.ValueText ==
@@ -1680,7 +1680,7 @@ internal sealed class ContractBinderTests
                         SimpleNameSyntax name =>
                             name.Identifier.ValueText == calledMethodName,
                         _ => false
-                    }));
+                    });
             var model = Compilation.GetSemanticModel(
                 invocation.SyntaxTree);
             var target = model.GetSymbolInfo(invocation).Symbol as
@@ -1713,8 +1713,8 @@ internal sealed class ContractBinderTests
             return type.GetMembers(methodName)
                 .OfType<IMethodSymbol>()
                 .Single(method =>
-                    method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters.Length == parameterCount &&
-                    method.IsStatic == isStatic));
+                    method.Parameters.Length == parameterCount &&
+                    method.IsStatic == isStatic);
         }
 
     }

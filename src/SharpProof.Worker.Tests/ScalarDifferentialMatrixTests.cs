@@ -380,9 +380,9 @@ public sealed class ScalarDifferentialMatrixTests
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
         var supportedResults = response.ClaimResults;
         var proven = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)).ToImmutableArray();
+            result.Outcome == WorkerClaimOutcome.Proven).ToImmutableArray();
         var refuted = supportedResults.Where(static result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)).ToImmutableArray();
+            result.Outcome == WorkerClaimOutcome.Refuted).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(supportedResults, Has.Length.EqualTo(64));
@@ -390,45 +390,45 @@ public sealed class ScalarDifferentialMatrixTests
                 proven,
                 Has.Length.EqualTo(48));
             Assert.That(
-                proven.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
+                proven.Select(static result => result.Reason),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 refuted,
                 Has.Length.EqualTo(16));
             Assert.That(
-                refuted.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                refuted.Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
-                supportedResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
+                supportedResults.Select(static result => result.Reason),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 response.CallableResults.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
+                    result.Coverage),
                 Is.All.EqualTo(WorkerCallableCoverage.Complete));
         }
         foreach (var item in SupportedCases)
         {
             var methodResults = supportedResults.Where(result =>
-                result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
+                CallableId(response, result).Contains(
                     "." + item.MethodName + "(",
-                    StringComparison.Ordinal))).ToImmutableArray();
+                    StringComparison.Ordinal)).ToImmutableArray();
             Assert.That(
                 methodResults.Where(result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) is 0 or 1))
-                    .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                    ClaimOrdinal(response, result) is 0 or 1)
+                    .Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven),
                 item.MethodName);
             Assert.That(
                 methodResults.Where(result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) == 2))
-                    .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                    ClaimOrdinal(response, result) == 2)
+                    .Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Refuted),
                 item.MethodName);
             var counterexample = methodResults.Single(result =>
-                result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) == 2));
+                ClaimOrdinal(response, result) == 2);
             Assert.That(
                 counterexample.Model.Single(value =>
-                    value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Variable == "parameter:0")).Value,
+                    value.Variable == "parameter:0").Value,
                 Is.EqualTo(Format(item.BoundaryValues[^1])),
                 item.MethodName);
         }
@@ -456,18 +456,18 @@ public sealed class ScalarDifferentialMatrixTests
 
             var comparisonName = "Compare" + item.MethodName;
             var comparisonResults = supportedResults.Where(result =>
-                result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
+                CallableId(response, result).Contains(
                     "." + comparisonName + "(",
-                    StringComparison.Ordinal))).ToImmutableArray();
+                    StringComparison.Ordinal)).ToImmutableArray();
             Assert.That(
                 comparisonResults.Where(result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) < 4))
-                    .Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                    ClaimOrdinal(response, result) < 4)
+                    .Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven),
                 comparisonName);
             Assert.That(
                 comparisonResults.Single(result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (ClaimOrdinal(response, result) == 4)).Outcome,
+                    ClaimOrdinal(response, result) == 4).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 comparisonName);
             var comparison = RequireRuntimeMethod(subject, comparisonName);
@@ -515,14 +515,14 @@ public sealed class ScalarDifferentialMatrixTests
                 response.ClaimResults,
                 Has.Length.EqualTo(WideningCases.Length));
             Assert.That(
-                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                response.ClaimResults.Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
+                response.ClaimResults.Select(static result => result.Reason),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 response.CallableResults.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
+                    result.Coverage),
                 Is.All.EqualTo(WorkerCallableCoverage.Complete));
         }
 
@@ -572,14 +572,14 @@ public sealed class ScalarDifferentialMatrixTests
                 response.ClaimResults,
                 Has.Length.EqualTo(ArithmeticCases.Length));
             Assert.That(
-                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+                response.ClaimResults.Select(static result => result.Outcome),
                 Is.All.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
-                response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
+                response.ClaimResults.Select(static result => result.Reason),
                 Is.All.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 response.CallableResults.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage)),
+                    result.Coverage),
                 Is.All.EqualTo(WorkerCallableCoverage.Complete));
         }
 
@@ -588,9 +588,9 @@ public sealed class ScalarDifferentialMatrixTests
         foreach (var item in ArithmeticCases)
         {
             var result = response.ClaimResults.Single(candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (CallableId(response, candidate).Contains(
+                CallableId(response, candidate).Contains(
                     "." + item.MethodName + "(",
-                    StringComparison.Ordinal)));
+                    StringComparison.Ordinal));
             var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             var execution = ExecuteIr(target, item.Inputs);
@@ -661,9 +661,9 @@ public sealed class ScalarDifferentialMatrixTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         var conversions = response.ClaimResults
-            .Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (CallableId(response, result).Contains(
+            .Where(result => CallableId(response, result).Contains(
                 "Conversion(",
-                StringComparison.Ordinal)))
+                StringComparison.Ordinal))
             .ToImmutableArray();
         var methodNames = ImmutableArray.Create(
             "UncheckedLongConversion",
@@ -679,7 +679,7 @@ public sealed class ScalarDifferentialMatrixTests
             foreach (var methodName in methodNames)
             {
                 var conversion = conversions.Single(result =>
-                    result is null ? throw new ArgumentNullException(nameof(result)) : CallableId(response, result).Contains(
+                    CallableId(response, result).Contains(
                         "." + methodName + "(",
                         StringComparison.Ordinal));
                 Assert.That(conversion.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -708,7 +708,7 @@ public sealed class ScalarDifferentialMatrixTests
     private static string CreateSource()
     {
         var methods = SupportedCases.Select(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : ($$"""
+            $$"""
                 public static {{item.TypeName}} {{item.MethodName}}(
                     {{item.TypeName}} value,
                     bool chooseFirst) {
@@ -731,9 +731,9 @@ public sealed class ScalarDifferentialMatrixTests
                     value = snapshot;
                     return value;
                 }
-            """));
+            """);
         var comparisons = SupportedCases.Select(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : ($$"""
+            $$"""
                 public static int Compare{{item.MethodName}}(
                     {{item.TypeName}} left,
                     {{item.TypeName}} right) {
@@ -759,7 +759,7 @@ public sealed class ScalarDifferentialMatrixTests
                     }
                     return 1;
                 }
-            """));
+            """);
         return
             """
             using SharpProof.Attributes;
@@ -779,14 +779,14 @@ public sealed class ScalarDifferentialMatrixTests
     private static string CreateWideningSource()
     {
         var methods = WideningCases.Select(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : ($$"""
+            $$"""
                 public static {{item.TargetType}} {{item.MethodName}}(
                     {{item.SourceType}} value) {
                     Contract.Ensures(
                         Contract.Result<{{item.TargetType}}>() == value);
                     return ({{item.TargetType}})value;
                 }
-            """));
+            """);
         return
             """
             using SharpProof.Attributes;
@@ -892,10 +892,10 @@ public sealed class ScalarDifferentialMatrixTests
         System.ArgumentNullException.ThrowIfNull(response);
         System.ArgumentNullException.ThrowIfNull(result);
         return response.Manifest.Claims.Single(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (string.Equals(
+            string.Equals(
                 claim.ClaimId,
                 result.ClaimId,
-                StringComparison.Ordinal))).Ordinal;
+                StringComparison.Ordinal)).Ordinal;
     }
 
     private static string CallableId(
@@ -905,10 +905,10 @@ public sealed class ScalarDifferentialMatrixTests
         System.ArgumentNullException.ThrowIfNull(response);
         System.ArgumentNullException.ThrowIfNull(result);
         return response.Manifest.Claims.Single(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (string.Equals(
+            string.Equals(
                 claim.ClaimId,
                 result.ClaimId,
-                StringComparison.Ordinal))).CallableId;
+                StringComparison.Ordinal)).CallableId;
     }
 
     private static string Format(object value)
@@ -1000,7 +1000,7 @@ public sealed class ScalarDifferentialMatrixTests
             sourceType,
             targetType,
             SupportedCases.Single(item =>
-                item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.MethodName == sourceName)).BoundaryValues);
+                item.MethodName == sourceName).BoundaryValues);
     }
 
     private static ArithmeticCase Binary(
@@ -1193,9 +1193,9 @@ public sealed class ScalarDifferentialMatrixTests
         {
             System.ArgumentNullException.ThrowIfNull(methodName);
             return _callables.Single(target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId.Contains(
+                target.Entry.CallableId.Contains(
                     "." + methodName + "(",
-                    StringComparison.Ordinal)));
+                    StringComparison.Ordinal));
         }
 
         internal RuntimeAssembly EmitRuntimeAssembly()
@@ -1209,7 +1209,7 @@ public sealed class ScalarDifferentialMatrixTests
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                        diagnostic.ToString())));
             image.Position = 0;
             var context = new AssemblyLoadContext(
                 "SharpProof.ScalarDifferential." +

@@ -15,21 +15,18 @@ internal sealed class NativeResourceLayoutBinding
             !(_target.Compilation.TargetFramework == "net8.0" || (_target.Compilation.TargetFramework?.StartsWith("net8.0-", StringComparison.Ordinal) ?? false)) ||
             _target.Compilation.ResourceMetadataReferences is not { Length: > 0 } references || references.Any(static reference => reference is null))
         { return null; }
-        var candidates = references.Where(static reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-            reference.Kind == "Assembly" && reference.Identity is { } identity && ResourceLayoutCatalog.IsReviewedReference(identity)).ToArray();
+        var candidates = references.Where(static reference => reference.Kind == "Assembly" && reference.Identity is { } identity && ResourceLayoutCatalog.IsReviewedReference(identity)).ToArray();
         if (candidates.Length == 0)
         { return null; }
-        var identities = candidates.Select(static reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Identity)
+        var identities = candidates.Select(static reference => reference.Identity)
             .Distinct(StringComparer.Ordinal).ToArray();
         // One core-library identity is captured for this layout dependency.
-        if (identities.Length != 1 || candidates.Any(static reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-                reference.Modules is not { Length: 1 } || reference.Modules[0] is null || !WorkerProtocolJson.IsSha256(reference.Modules[0].Sha256)))
+        if (identities.Length != 1 || candidates.Any(static reference => reference.Modules is not { Length: 1 } || reference.Modules[0] is null || !WorkerProtocolJson.IsSha256(reference.Modules[0].Sha256)))
         { return null; }
-        var hashes = candidates.Select(static reference => reference is null ? throw new ArgumentNullException(nameof(reference)) : reference.Modules[0].Sha256)
+        var hashes = candidates.Select(static reference => reference.Modules[0].Sha256)
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var id = ResourceLayoutCatalog.AssumptionId(_target.Entry.CallableId, identities[0]);
-        if (hashes.Length != 1 || !_target.Entry.Assumptions.Any(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
+        if (hashes.Length != 1 || !_target.Entry.Assumptions.Any(assumption => assumption.Id == id && assumption.Kind == WorkerAssumptionKind.TrustedBoundary))
         { return null; }
         _bound = new()
         {
@@ -51,7 +48,7 @@ internal sealed class NativeResourceLayoutBinding
         if (_bound is not { } dependency || result.ResourceBound is null || result.Outcome is not (WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted))
         { throw new ArgumentException("A byte proof requires its owned layout dependency.", nameof(result)); }
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used)
-            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id), StringComparer.Ordinal)
+            .Select(static assumption => assumption.Id), StringComparer.Ordinal)
         { dependency.AssumptionId };
         result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(_target, used.ToImmutableHashSet(StringComparer.Ordinal));
         result = result with { ResourceBound = result.ResourceBound! with { MetadataAssumptions = [.. result.ResourceBound.MetadataAssumptions, dependency] } };

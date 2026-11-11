@@ -68,7 +68,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var actualEntry = await solver.VerifyEntryAsync(cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualEntry.Outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(actualEntry.Reason, Is.EqualTo(WorkerClaimReason.None));
-        var requires = ImmutableDictionaryCapture.Create(target.Total!.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))
+        var requires = ImmutableDictionaryCapture.Create(target.Total!.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)
             .Select((clause, ordinal) => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : ((Label: "requires:" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 Id: clause.AssumptionId!))), row => row.Label, row => row.Id, StringComparer.Ordinal);
         var valid = TotalCallableVerifier.ProjectEntry(actualEntry, requires);
@@ -77,7 +77,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var actualBody = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(actualBody.Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That(actualBody.Reason, Is.EqualTo(WorkerClaimReason.None));
-        Assert.That(actualBody.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("input:disjoint:", StringComparison.Ordinal))), Is.True);
+        Assert.That(actualBody.Core.Any(label => label.StartsWith("input:disjoint:", StringComparison.Ordinal)), Is.True);
         // Wrong semantic family: reject the actual body proof rather than enrolling it as an entry proof.
         var rejected = TotalCallableVerifier.ProjectEntry(actualBody, requires);
         Assert.That(rejected.Kind, Is.EqualTo(CallableEntryFeasibilityKind.Unknown));
@@ -154,7 +154,7 @@ public sealed class ActualNativeProjectionAdmissionTests
         var response = WorkerResultAssembler.Create(project.Bind().InputHash, project.Snapshot.CompilerManifest.Manifest,
             status, failure, [callable], [result], project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
         var json = WorkerProtocolJson.SerializeResponse(response);
         var roundTrip = WorkerProtocolJson.DeserializeResponse(json)
             ?? throw new AssertionException("The canonical response did not deserialize.");

@@ -82,7 +82,7 @@ internal static class OpenSourceCorpusCatalog
     {
         ArgumentNullException.ThrowIfNull(document);
         return [.. document.Methods.Select(static method =>
-            method is null ? throw new System.ArgumentNullException(nameof(method)) : (new CorpusCase(
+            new CorpusCase(
                 $"{method.Id}.baseline",
                 method.Id,
                 CorpusVariant.Baseline,
@@ -91,7 +91,7 @@ internal static class OpenSourceCorpusCatalog
                 method.Support,
                 string.Empty,
                 CorpusOrigin.OpenSource,
-                $"{method.SourceId}:{method.Path}:{method.StartLine}")))];
+                $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
     }
 
     internal static string ComputeNormalizedSha256(string normalizedValue)
@@ -128,9 +128,9 @@ internal static class OpenSourceCorpusCatalog
     {
         System.ArgumentNullException.ThrowIfNull(methods);
         return methods
-            .Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (GetSourceFileKey(
+            .Select(static method => GetSourceFileKey(
                 method.SourceId,
-                method.Path)))
+                method.Path))
             .Distinct(StringComparer.Ordinal)
             .Count();
     }
@@ -411,8 +411,8 @@ internal static class OpenSourceCorpusCatalog
                     EndLine: lineSpan.EndLinePosition.Line + 1);
             })
             .ToImmutableDictionary(
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray()));
+                static group => group.Key,
+                static group => group.ToImmutableArray());
     }
 
     internal static MethodDeclarationSyntax FindDeclaration(
@@ -493,7 +493,7 @@ internal static class OpenSourceCorpusCatalog
         System.ArgumentNullException.ThrowIfNull(description);
         if (string.IsNullOrWhiteSpace(path) ||
             Path.IsPathRooted(path) ||
-            path.Split('/', '\\').Any(static part => part is null ? throw new System.ArgumentNullException(nameof(part)) : (part == "..")) ||
+            path.Split('/', '\\').Any(static part => part == "..") ||
             path.Contains('|', StringComparison.Ordinal) ||
             path.Any(static character => character is '\r' or '\n' ||
                 char.IsControl(character)))
@@ -533,7 +533,7 @@ internal static class OpenSourceCorpusCatalog
             !relative.Split(
                     Path.DirectorySeparatorChar,
                     Path.AltDirectorySeparatorChar)
-                .Any(static part => part is null ? throw new System.ArgumentNullException(nameof(part)) : (part == ".."));
+                .Any(static part => part == "..");
     }
 
     internal static string ResolvePath(string path)

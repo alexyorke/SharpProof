@@ -159,14 +159,14 @@ internal static class WorkerResultAssembler
         }
         var assumptionsByCallable = assumptionsByCallableBuilder.ToImmutable();
         return Create(inputHash, manifest, status, failureReason,
-            callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (new WorkerCallableResult
+            callables.Select(callable => new WorkerCallableResult
             {
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Incomplete,
                 Reason = callableReason,
                 Assumptions = WorkerProtocolJson.EmptyIfDefault(callable.Assumptions)
-            })),
-            claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new WorkerClaimResult
+            }),
+            claims.Select(claim => new WorkerClaimResult
             {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Unknown,
@@ -183,7 +183,7 @@ internal static class WorkerResultAssembler
                         out var assumptions)
                     ? []
                     : assumptions
-            })),
+            }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, runErrors, requestHash, versions);
     }
 
@@ -193,8 +193,8 @@ internal static class WorkerResultAssembler
         RepositoryParameterGuard.RequireInitialized(callables.IsDefault, nameof(callables), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         var kinds = ImmutableDictionary.CreateBuilder<string, WorkerAssumptionKind>(StringComparer.Ordinal);
-        foreach (var assumption in callables.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))
-            .Concat(claims.SelectMany(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? [])))))
+        foreach (var assumption in callables.SelectMany(static value => WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? []))
+            .Concat(claims.SelectMany(static value => WorkerProtocolJson.EmptyIfDefault(value?.Assumptions ?? []))))
         {
             if (assumption == null || string.IsNullOrWhiteSpace(assumption.Id))
             {
@@ -413,9 +413,9 @@ internal static class WorkerResultAssembler
         var directInfrastructureFailure =
             owned.Length != 0 &&
             owned.All(static claim =>
-                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim?.Outcome == WorkerClaimOutcome.Unknown &&
+                claim?.Outcome == WorkerClaimOutcome.Unknown &&
                 claim?.Reason is WorkerClaimReason.InfrastructureFailure or
-                    WorkerClaimReason.BackendUnavailable)) &&
+                    WorkerClaimReason.BackendUnavailable) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
         var compatibleSemanticFallback =

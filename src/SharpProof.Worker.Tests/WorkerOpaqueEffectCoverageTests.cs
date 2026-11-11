@@ -49,7 +49,7 @@ internal sealed partial class WorkerTests
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = response.ClaimResults.Single(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (GetCallableId(response, claim).Contains(".Caller(", StringComparison.Ordinal)));
+            GetCallableId(response, claim).Contains(".Caller(", StringComparison.Ordinal));
 
         using (Assert.EnterMultipleScope())
         {

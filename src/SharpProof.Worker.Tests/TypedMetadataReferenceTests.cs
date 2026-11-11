@@ -123,8 +123,8 @@ public sealed class TypedMetadataReferenceTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(subject.CreateArtifact(), cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single();
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrAssignInstruction>().Any(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat })), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAssignInstruction>().Any(assign => assign.Value is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat }), Is.True);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out _, out _, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.False);
@@ -348,7 +348,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         using var pe = new PEReader(bytes);
         var reader = pe.GetMetadataReader();
         Assert.That(body.ModuleMvid, Is.EqualTo(reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D")));
-        Assert.That(body.ParameterAttributes.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AttributeToken)).Distinct().Count(), Is.EqualTo(expectedCount));
+        Assert.That(body.ParameterAttributes.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(expectedCount));
         foreach (var row in body.ParameterAttributes)
         {
             Assert.That(row.MethodToken, Is.EqualTo(method.MetadataToken));
@@ -463,7 +463,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var reversed = binding.Clauses.Reverse().ToImmutableArray();
         Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(reversed, body.ParameterAttributes,
             TestContext.CurrentContext.CancellationToken, out var paired), Is.True);
-        Assert.That(paired.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AttributeToken)).Distinct().Count(), Is.EqualTo(2));
+        Assert.That(paired.Select(static row => row.AttributeToken).Distinct().Count(), Is.EqualTo(2));
         for (var ordinal = 0; ordinal < reversed.Length; ordinal++)
         {
             Assert.That(paired[ordinal].ClauseOrdinal, Is.EqualTo(ordinal));
@@ -473,7 +473,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
             Assert.That(paired[ordinal].Kind, Is.EqualTo(reversed[ordinal].Validation.Kind.ToString()));
             Assert.That(paired[ordinal].Minimum, Is.EqualTo(reversed[ordinal].Validation.Minimum));
             Assert.That(paired[ordinal].Maximum, Is.EqualTo(reversed[ordinal].Validation.Maximum));
-            Assert.That(paired[ordinal].AttributeToken, Is.EqualTo(body.ParameterAttributes.Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == paired[ordinal].Kind)).AttributeToken));
+            Assert.That(paired[ordinal].AttributeToken, Is.EqualTo(body.ParameterAttributes.Single(row => row.Kind == paired[ordinal].Kind).AttributeToken));
         }
         Assert.That(CompilerTotalIlBodyProvider.TryPairMetadataRequires(
             [binding.Clauses[0], binding.Clauses[0]], body.ParameterAttributes, TestContext.CurrentContext.CancellationToken, out _), Is.False, "A metadata token cannot be consumed twice.");

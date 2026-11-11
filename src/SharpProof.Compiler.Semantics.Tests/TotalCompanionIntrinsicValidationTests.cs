@@ -44,7 +44,7 @@ internal sealed class TotalCompanionIntrinsicValidationTests
         if (expected == ContractBindingFailure.None)
         {
             Assert.That(total.Clauses, Has.Length.EqualTo(2));
-            Assert.That(total.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.Companion)), Is.True);
+            Assert.That(total.Clauses.All(clause => clause.Evidence == BoundContractEvidence.Companion), Is.True);
         }
     }
 }

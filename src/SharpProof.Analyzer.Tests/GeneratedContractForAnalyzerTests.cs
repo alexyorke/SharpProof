@@ -52,7 +52,7 @@ public sealed class GeneratedContractForAnalyzerTests
         {
             Assert.That(valid, Is.Empty);
             Assert.That(
-                malformed.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                malformed.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(["SPCF0004"]));
         }
     }
@@ -130,7 +130,7 @@ public sealed class GeneratedContractForAnalyzerTests
             features: features);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             expected ? Is.EqualTo(["SPCF0001"]) : Is.Empty);
     }
 
@@ -164,10 +164,10 @@ public sealed class GeneratedContractForAnalyzerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                forward.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                forward.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(["SPCF0004"]));
             Assert.That(
-                reverse.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                reverse.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(["SPCF0004"]));
         }
     }
@@ -204,7 +204,7 @@ public sealed class GeneratedContractForAnalyzerTests
         AnalyzerTestHost.AssertIds(diagnostics, ["SPCF0002", "SPCF0002"]);
         Assert.That(
             diagnostics.Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (Path.GetFileName(diagnostic.Location.SourceTree?.FilePath))),
+                Path.GetFileName(diagnostic.Location.SourceTree?.FilePath)),
             Is.EqualTo(["GeneratedContracts.g.cs", "input.cs"]));
     }
 
@@ -247,7 +247,7 @@ public sealed class GeneratedContractForAnalyzerTests
             Assert.That(conflicting, Is.Empty);
             Assert.That(invalid, Is.Empty);
             Assert.That(
-                matching.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+                matching.Select(static diagnostic => diagnostic.Id),
                 Is.EqualTo(["SPCF0004"]));
         }
     }

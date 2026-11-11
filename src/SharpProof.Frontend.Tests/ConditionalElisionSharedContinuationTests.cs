@@ -20,10 +20,10 @@ public sealed class ConditionalElisionSharedContinuationTests
         Assert.That(subject.Context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
         Assert.That(subject.Graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
         var conditions = subject.Graph.Blocks.Where(block =>
-            block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable && block.ConditionKind != ControlFlowConditionKind.None)).ToImmutableArray();
+            block.IsReachable && block.ConditionKind != ControlFlowConditionKind.None).ToImmutableArray();
         Assert.That(conditions.Length, Is.GreaterThanOrEqualTo(4));
-        var throws = subject.Graph.Blocks.Where(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.IsReachable &&
-            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
+        var throws = subject.Graph.Blocks.Where(block => block.IsReachable &&
+            block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToImmutableArray();
         Assert.That(throws.Length, Is.EqualTo(2));
         var emission = new CSharpInvocationEmissionPolicy(subject.Compilation);
         foreach (var block in conditions.Concat(throws))

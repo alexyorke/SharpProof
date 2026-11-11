@@ -59,8 +59,7 @@ public sealed class ResourceExpressionTests
         Assert.That(first.ToDisplayString(), Is.EqualTo(second.ToDisplayString()));
         Assert.That(first.Equals(second), Is.False);
         var maximum = ResourceExpression.Max(first, second);
-        var value = maximum.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) :
-            input.Ordinal == 0 ? 2 : 7, TestContext.CurrentContext.CancellationToken);
+        var value = maximum.Evaluate(input => input.Ordinal == 0 ? 2 : 7, TestContext.CurrentContext.CancellationToken);
         Assert.That(value, Is.EqualTo(new BigInteger(7)));
     }
 

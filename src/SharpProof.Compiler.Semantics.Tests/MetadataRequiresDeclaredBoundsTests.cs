@@ -81,8 +81,8 @@ public sealed class MetadataRequiresDeclaredBoundsTests
         var target = compilation.GetTypeByMetadataName("DeclaredBounds")!.GetMembers(methodName).OfType<IMethodSymbol>().Single();
         Assert.That(target.DeclaringSyntaxReferences, Is.Empty);
         Assert.That(target.IsStatic, Is.True);
-        Assert.That(target.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind == RefKind.None &&
-            parameter.Type.SpecialType == SpecialType.System_Int32)), Is.True);
+        Assert.That(target.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
+            parameter.Type.SpecialType == SpecialType.System_Int32), Is.True);
         return (compilation, target);
     }
 }

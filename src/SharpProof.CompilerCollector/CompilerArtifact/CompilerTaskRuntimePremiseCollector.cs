@@ -52,17 +52,14 @@ internal static class CompilerTaskRuntimePremiseCollector
         root = ArgumentNullGuard.NotNull(root, nameof(root));
         callableId = ArgumentNullGuard.NotNull(callableId, nameof(callableId));
         cancellation.ThrowIfCancellationRequested();
-        var attributes = root.GetAttributes().Where(static attribute => attribute is null
-            ? throw new ArgumentNullException(nameof(attribute))
-            : MetadataName(attribute.AttributeClass) is DeploymentAttributeName or QuantityAttributeName).ToArray();
+        var attributes = root.GetAttributes().Where(static attribute => MetadataName(attribute.AttributeClass) is DeploymentAttributeName or QuantityAttributeName).ToArray();
         if (attributes.Length == 0)
         { return new(null, "TaskRuntimePremisesNotDeclared"); }
         if (!ResourceTaskRuntimePremiseIdentity.IsRootCallableId(callableId) ||
             !StringComparer.Ordinal.Equals(callableId, SemanticClaimIdentity.CreateCallableId(root)) || root.MethodKind != MethodKind.Ordinary ||
             !root.IsStatic || root.Arity != 0 || root.ContainingType.IsGenericType)
         { return new(null, "TaskRuntimePremisesInvalid"); }
-        var assemblies = root.ContainingModule.ReferencedAssemblySymbols.Where(static candidate => candidate is null
-            ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identity.Name == AssemblyName).ToArray();
+        var assemblies = root.ContainingModule.ReferencedAssemblySymbols.Where(static candidate => candidate.Identity.Name == AssemblyName).ToArray();
         if (assemblies.Length != 1 || assemblies[0].Identity.Version != typeof(CompilerTaskRuntimePremiseCollector).Assembly.GetName().Version ||
             !string.IsNullOrEmpty(assemblies[0].Identity.CultureName))
         { return new(null, "TaskRuntimePremisesAttributeIdentityInvalid"); }
@@ -144,7 +141,7 @@ internal static class CompilerTaskRuntimePremiseCollector
     private static bool MetadataType(INamedTypeSymbol? type, TypeKind kind)
     {
         return type is not null && type.TypeKind == kind && type.Arity == 0 &&
-            !type.Locations.Any(static location => location is null ? throw new ArgumentNullException(nameof(location)) : location.IsInSource);
+            !type.Locations.Any(static location => location.IsInSource);
     }
 
     private static string? MetadataName(INamedTypeSymbol? type)
@@ -179,8 +176,7 @@ internal static class CompilerTaskRuntimePremiseCollector
         var constructor = attribute.AttributeConstructor;
         if (constructor is null || !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, expected) || constructor.IsStatic ||
             constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility != Accessibility.Public ||
-            constructor.Parameters.Length != 3 || constructor.Parameters.Any(static parameter => parameter is null
-                ? throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind != RefKind.None || parameter.IsOptional))
+            constructor.Parameters.Length != 3 || constructor.Parameters.Any(static parameter => parameter.RefKind != RefKind.None || parameter.IsOptional))
         { return false; }
         return SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, enumeration) &&
             constructor.Parameters[1].Type.SpecialType == (deployment ? SpecialType.System_String : SpecialType.System_Int64) &&

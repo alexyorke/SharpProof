@@ -296,12 +296,12 @@ internal static partial class SemanticClaimIdentity
         local = RepositoryParameterGuard.NotNull(local, nameof(local));
         writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         var declaration = local.DeclaringSyntaxReferences
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax())).FirstOrDefault();
+            .Select(static reference => reference.GetSyntax()).FirstOrDefault();
         var owner = (local.ContainingSymbol as IMethodSymbol)?.DeclaringSyntaxReferences
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
-            .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (declaration != null &&
+            .Select(static reference => reference.GetSyntax())
+            .FirstOrDefault(syntax => declaration != null &&
                 syntax.SyntaxTree == declaration.SyntaxTree &&
-                syntax.Span.Contains(declaration.Span)));
+                syntax.Span.Contains(declaration.Span));
         CompilerOwnedSyntaxPath.Write(writer, declaration, owner);
     }
 
@@ -474,7 +474,7 @@ internal static partial class SemanticClaimIdentity
             var declaration = nested.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ??
                 throw new InvalidOperationException("A nested method target has no source declaration.");
             var container = declaration.Ancestors().FirstOrDefault(static node =>
-                node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node))) ??
+                node is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax || IsNestedCallableSyntax(node)) ??
                 declaration.SyntaxTree.GetRoot();
             if (!IsNestedCallableSyntax(declaration) &&
                 TryWriteQueryTargetIdentity(writer, nested, declaration, context))
@@ -486,7 +486,7 @@ internal static partial class SemanticClaimIdentity
             var ordinal = 0;
             var found = false;
             foreach (var node in container.DescendantNodes(node =>
-                         node is null ? throw new System.ArgumentNullException(nameof(node)) : (ReferenceEquals(node, container) || !IsNestedCallableSyntax(node))))
+                         ReferenceEquals(node, container) || !IsNestedCallableSyntax(node)))
             {
                 if (!IsNestedCallableSyntax(node))
                 {
@@ -519,16 +519,16 @@ internal static partial class SemanticClaimIdentity
         foreach (var query in declaration.AncestorsAndSelf().OfType<QueryExpressionSyntax>())
         {
             var sourceDeclaration = context.Source.DeclaringSyntaxReferences
-                .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax()))
-                .FirstOrDefault(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.SyntaxTree == query.SyntaxTree &&
-                    syntax.Span.Contains(query.Span)));
+                .Select(static reference => reference.GetSyntax())
+                .FirstOrDefault(syntax => syntax.SyntaxTree == query.SyntaxTree &&
+                    syntax.Span.Contains(query.Span));
             if (sourceDeclaration == null || context.Model.SyntaxTree != query.SyntaxTree ||
                 context.Model.GetOperation(query) is not { } queryOperation)
             { continue; }
             var syntaxPath = ImmutableArray.CreateBuilder<int>();
             for (var current = (SyntaxNode)query; !HasSameSite(current, sourceDeclaration); current = current.Parent!)
             {
-                syntaxPath.Add(current.Parent!.ChildNodes().TakeWhile(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (!HasSameSite(child, current))).Count());
+                syntaxPath.Add(current.Parent!.ChildNodes().TakeWhile(child => !HasSameSite(child, current)).Count());
             }
             var pending = ImmutableArray.CreateBuilder<(IOperation Operation, ImmutableArray<int> Path)>();
             pending.Add((queryOperation, []));
@@ -673,7 +673,7 @@ internal static partial class SemanticClaimIdentity
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return ContainsFunctionPointer(method.ReturnType) ||
             method.Parameters.Any(static parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ContainsFunctionPointer(parameter.Type)));
+                ContainsFunctionPointer(parameter.Type));
     }
 
     private static bool ContainsFunctionPointer(ITypeSymbol type)

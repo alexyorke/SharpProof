@@ -87,12 +87,12 @@ public sealed class InterceptorDispatchLoweringRegressionTests
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
-            string.Join(Environment.NewLine, errors.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ToString()))));
+            string.Join(Environment.NewLine, errors.Select(static value => value.ToString())));
 
         var model = compilation.GetSemanticModel(callerTree);
         var operation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
@@ -104,7 +104,7 @@ public sealed class InterceptorDispatchLoweringRegressionTests
         var method = callerTree.GetRoot()
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
+            .Single(static declaration => declaration.Identifier.ValueText == "Target");
         var graph = ControlFlowGraph.Create(method, model);
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method)!);

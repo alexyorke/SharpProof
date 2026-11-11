@@ -23,7 +23,7 @@ public sealed class ConditionalMetadataSymbolReaderTests
                 public static void Target() { }
             }
             """);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
             Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);

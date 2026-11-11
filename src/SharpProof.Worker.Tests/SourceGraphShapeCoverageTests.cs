@@ -22,7 +22,7 @@ public sealed class SourceGraphShapeCoverageTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var local = tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>()
-            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.Text == "Local"));
+            .Single(node => node.Identifier.Text == "Local");
         var method = (IMethodSymbol)model.GetDeclaredSymbol(local)!;
 
         var graph = TotalSourceCallSession.CreateGraph(local, method, model, default);
@@ -45,7 +45,7 @@ public sealed class SourceGraphShapeCoverageTests
         var compilation = TestCompilation.Create("Pr275ConstructorGraph",
             "internal sealed class Subject { " + declarations + " }");
         var method = compilation.GetTypeByMetadataName("Subject")!.InstanceConstructors
-            .Single(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.Parameters.Length == 1));
+            .Single(constructor => constructor.Parameters.Length == 1);
         var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
 
         var graph = TotalSourceCallSession.CreateGraph(declaration, method,

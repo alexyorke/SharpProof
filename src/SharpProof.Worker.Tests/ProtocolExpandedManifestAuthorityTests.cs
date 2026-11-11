@@ -64,7 +64,7 @@ public sealed class ProtocolExpandedManifestAuthorityTests
         Assert.That(validation.IsValid, Is.EqualTo(!rejected));
         if (rejected)
         {
-            Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("manifest.hash_payload_size"));
+            Assert.That(validation.Errors.Select(static error => error.Code), Does.Contain("manifest.hash_payload_size"));
             Assert.That((Action)(() => WorkerProtocolJson.ComputeManifestHash(decoded.Manifest)), Throws.TypeOf<InvalidDataException>());
         }
         using var directory = new TempDirectory("bound-expanded-manifest-");

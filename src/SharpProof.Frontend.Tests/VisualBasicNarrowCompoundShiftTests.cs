@@ -94,7 +94,7 @@ public sealed class VisualBasicNarrowCompoundShiftTests
         System.ArgumentNullException.ThrowIfNull(input);
         System.ArgumentNullException.ThrowIfNull(graph);
         System.ArgumentNullException.ThrowIfNull(compilation);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -128,9 +128,9 @@ public sealed class VisualBasicNarrowCompoundShiftTests
         var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
-        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
-                binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count)));
+        var environment = ImmutableDictionaryCapture.Create(context.Parameters, binding => binding.Entry,
+            binding => factory.CreateIntegerValue(factory.GetVariableInfo(binding.Entry).Type,
+                binding.Parameter.Ordinal == 0 ? Convert.ToInt64(input, CultureInfo.InvariantCulture) : count));
         var replay = new IrProgramInterpreter(factory).Execute(lowering.Program, environment);
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (overflow)

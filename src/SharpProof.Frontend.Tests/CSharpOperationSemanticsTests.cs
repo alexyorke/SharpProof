@@ -86,8 +86,8 @@ public sealed class CSharpOperationSemanticsTests
         }
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         var expression = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
-        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b)));
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding.Current,
+            binding => subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b));
         Assert.That(subject.Invoke([a, b]), Is.InstanceOf<ArithmeticException>());
         Assert.That(expression.Classification.IsExact, Is.True);
         Assert.That(new IrInterpreter(subject.Factory).Evaluate(expression.SafeCondition, environment).Value!.Boolean, Is.False);
@@ -108,8 +108,8 @@ public sealed class CSharpOperationSemanticsTests
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         var expression = new RoslynTotalExpressionLowerer(subject.Context).LowerClause(operation);
         Assert.That(expression.Classification.IsExact, Is.True);
-        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Current),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b)));
+        var environment = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding.Current,
+            binding => subject.Value(binding.Current, binding.Parameter.Ordinal == 0 ? a : b));
         var interpreter = new IrInterpreter(subject.Factory);
         Assert.That(interpreter.Evaluate(expression.SafeCondition, environment).Value!.Boolean, Is.EqualTo(safe));
         Assert.That(interpreter.Evaluate(expression.Value, environment).Value!.Boolean, Is.EqualTo(value));

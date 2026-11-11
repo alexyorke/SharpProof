@@ -13,7 +13,7 @@ internal static partial class WorkerProtocolJson
             UncheckedCallSites = manifest.UncheckedCallSites,
             Hash = string.Empty,
             Callables = [.. (EmptyIfDefault(manifest.Callables)).Select(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry == null ? null! : new WorkerCallableManifestEntry
+                entry == null ? null! : new WorkerCallableManifestEntry
                 {
                     CallableId = entry.CallableId,
                     SelectedFeatures = entry.SelectedFeatures,
@@ -26,7 +26,7 @@ internal static partial class WorkerProtocolJson
                             Id = assumption.Id,
                             Kind = assumption.Kind
                         }))]
-                }))],
+                })],
             Claims = manifest.Claims
         };
         Canonicalize(payload);

@@ -30,7 +30,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(ImmutableArray.Create(
                 CancellationFlowAnalyzer.MissingTokenId,
                 CancellationFlowAnalyzer.MissingTokenId,
@@ -58,9 +58,9 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source.Replace("DISABLED_TOKEN", "None", StringComparison.Ordinal));
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == CancellationFlowAnalyzer.DroppedTokenId)), Is.EqualTo(4));
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == CancellationFlowAnalyzer.NoTokenId)), Is.EqualTo(1));
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == CancellationFlowAnalyzer.OptionalTokenId)), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.DroppedTokenId), Is.EqualTo(4));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.NoTokenId), Is.EqualTo(1));
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == CancellationFlowAnalyzer.OptionalTokenId), Is.EqualTo(1));
     }
 
     [Test]
@@ -79,7 +79,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
     }
 
@@ -123,7 +123,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
     }
 
@@ -163,7 +163,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.DroppedTokenId]));
     }
 
@@ -184,7 +184,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.MissingTokenId]));
     }
 
@@ -202,7 +202,7 @@ public sealed class CancellationFlowAnalyzerTests
         var diagnostics = await Analyze(
             source.Replace("DISABLED_TOKEN", "None", StringComparison.Ordinal),
             assemblyName: "Sample.Test");
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
     }
 
@@ -219,7 +219,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source, assemblyName: "Sample.Test");
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
     }
 
@@ -235,7 +235,7 @@ public sealed class CancellationFlowAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source, assemblyName: "Sample.Test");
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.OptionalTokenId]));
     }
 
@@ -308,7 +308,7 @@ public sealed class CancellationFlowAnalyzerTests
             .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
         var operation = compilation.GetSemanticModel(tree).GetOperation(declaration)!;
         Assert.That(operation.DescendantsAndSelf().Any(static child =>
-            child is null ? throw new ArgumentNullException(nameof(child)) : child.Kind == OperationKind.Parenthesized), Is.False);
+            child.Kind == OperationKind.Parenthesized), Is.False);
         Assert.That(await Analyze(source), Is.Empty);
     }
 

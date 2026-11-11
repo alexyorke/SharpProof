@@ -23,11 +23,11 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.DeclaringSyntaxReferences.Any(reference =>
+                candidate.DeclaringSyntaxReferences.Any(reference =>
                     reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.SyntaxTree == declaration.SyntaxTree &&
                     reference.GetSyntax(cancellationToken) is
                         TypeDeclarationSyntax owner &&
-                    owner.Span == declaration.Span))))
+                    owner.Span == declaration.Span)))
             .ToImmutableArray();
         return TrySingle(matches, out constructor);
     }
@@ -54,8 +54,8 @@ internal static class PrimaryConstructorCallableInventory
 
         var matches = type.InstanceConstructors
             .Where(static candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsImplicitlyDeclared &&
-                candidate.Parameters.IsEmpty))
+                candidate.IsImplicitlyDeclared &&
+                candidate.Parameters.IsEmpty)
             .ToImmutableArray();
         return TrySingle(matches, out constructor);
     }

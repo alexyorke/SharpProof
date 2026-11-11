@@ -97,8 +97,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
                 TargetNoInlining = (targetFlags & MethodImplAttributes.NoInlining) != 0,
                 ControlNoInlining = (controlFlags & MethodImplAttributes.NoInlining) != 0,
                 TargetNoOptimization = (targetFlags & MethodImplAttributes.NoOptimization) != 0,
-                HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
-                HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
+                HasBox = instructions.Any(instruction => instruction.OpCode == "box"),
+                HasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst"),
                 IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
@@ -140,17 +140,17 @@ public sealed class GenericTestedTypeBoundaryAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            Claims = response.ClaimResults.Select(claim => new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             Cases = cases,
             NativeExpectation = preserveProof ? "Proven preservation control" : "Exploratory nullable outcome; no fixed outcome",
             SubjectBytes = "Exploratory actual counts, with no zero or positive allocation prerequisite",
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven.",
-            ObservedPositiveAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0))
+            ObservedPositiveAllocation = cases.Any(observed => observed.Target.AllocatedBytes > 0)
         });
         Assert.That(response.Errors, Is.Empty);
         Assert.That(project.Request.Cache.Enabled, Is.False);
@@ -347,8 +347,8 @@ public sealed class GenericTestedTypeBoundaryAuditTests
     private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .Where(field => field.FieldType == typeof(OpCode))
+            .Select(field => (OpCode)field.GetValue(null)!)
             .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)

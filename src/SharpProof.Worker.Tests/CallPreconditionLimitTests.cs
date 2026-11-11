@@ -45,7 +45,7 @@ public sealed class CallPreconditionLimitTests
     private static int Count(CompilerManifestArtifact artifact, WorkerClaimKind kind)
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
-        return artifact.Manifest.Claims.Count(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : claim.Kind == kind);
+        return artifact.Manifest.Claims.Count(claim => claim.Kind == kind);
     }
 
     [Test]
@@ -80,7 +80,7 @@ public sealed class CallPreconditionLimitTests
             Assert.That(Count(artifact, WorkerClaimKind.Postcondition), Is.EqualTo(3));
             Assert.That(Count(artifact, WorkerClaimKind.CallPrecondition), Is.Zero);
             Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(6));
-            Assert.That(artifact.Manifest.Callables.Select(static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId),
+            Assert.That(artifact.Manifest.Callables.Select(static callable => callable.CallableId),
                 Has.None.Contains("Simple").And.None.Contains("Looping").And.Exactly(3).Contains("Declared"));
         }
     }
@@ -94,17 +94,17 @@ public sealed class CallPreconditionLimitTests
         var budgets = new WorkerBudgets { MethodWallTimeMilliseconds = 100 };
         using var worker = SharpProofWorker.CreateNative(budgets);
         var response = await worker.VerifyAsync(project.Request with { Budgets = budgets }, project.Snapshot, TestContext.CurrentContext.CancellationToken);
-        var claims = response.Manifest.Claims.ToImmutableDictionary(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : claim.ClaimId,
+        var claims = response.Manifest.Claims.ToImmutableDictionary(static claim => claim.ClaimId,
             StringComparer.Ordinal);
-        var unknown = response.ClaimResults.Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : result.Outcome == WorkerClaimOutcome.Unknown)
-            .Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (Claim: claims[result.ClaimId], Result: result)).ToImmutableArray();
+        var unknown = response.ClaimResults.Where(static result => result.Outcome == WorkerClaimOutcome.Unknown)
+            .Select(result => (Claim: claims[result.ClaimId], Result: result)).ToImmutableArray();
         var timedOut = unknown.Where(static item => item.Claim.Kind == WorkerClaimKind.CallPrecondition &&
             item.Result.Reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout).ToImmutableArray();
         var (exitCode, output) = Report(response);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(timedOut, Is.Not.Empty);
-            Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : result.Outcome),
+            Assert.That(response.ClaimResults.Select(static result => result.Outcome),
                 Has.None.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(exitCode, Is.EqualTo(unknown.Length == timedOut.Length ? 0 : 6), output);
             Assert.That(output, Does.Contain(FormattableString.Invariant(

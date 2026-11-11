@@ -342,12 +342,12 @@ public sealed class ContractApiPolicyBoundaryTests
         var compilation = CSharpCompilation.Create("ContractPolicyEvidence_" + Guid.NewGuid().ToString("N"),
             [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(kind, optimizationLevel: OptimizationLevel.Release));
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(error => error.ToString())));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
-        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
     }
 
@@ -372,7 +372,7 @@ public sealed class ContractApiPolicyBoundaryTests
         System.ArgumentNullException.ThrowIfNull(result);
         var compilation = ShapeConsumer(ShapeSource(result, old, requires));
         var contract = compilation.GetTypeByMetadataName("Fixture.Contract")!;
-        Assert.That(contract.Locations.All(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
+        Assert.That(contract.Locations.All(location => location.IsInMetadata), Is.True);
         var shape = ShapeValidator(compilation).TryResolve(contract);
         Assert.That(shape.HasValue, Is.EqualTo(accepted));
         if (accepted)

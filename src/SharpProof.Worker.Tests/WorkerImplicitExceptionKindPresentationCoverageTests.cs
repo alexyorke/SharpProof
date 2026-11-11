@@ -27,16 +27,16 @@ internal sealed partial class WorkerTests
         Assert.That(preparation.IsSuccess, Is.True, preparation.FailureReason.ToString());
         Assert.That(preparation.Total, Is.Not.Null);
         var total = preparation.Total!;
-        var instructions = total.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = total.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         var faults = instructions.OfType<IrThrowInstruction>()
-            .Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.ExceptionKind == IrExceptionKind.InvalidCast)).ToImmutableArray();
+            .Where(instruction => instruction.ExceptionKind == IrExceptionKind.InvalidCast).ToImmutableArray();
         Assert.That(faults, Has.Length.EqualTo(1));
         var kind = faults[0].ExceptionKind;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(total.IsBodyAbstraction, Is.False);
             Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
-                instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.True);
+                instruction.Origin == IrHavocOrigin.Approximation), Is.True);
             Assert.That(total.ExceptionConstraints.Single().AllowedKinds, Does.Contain(kind));
             Assert.That(IrExceptionKindFacts.MetadataName(kind), Is.EqualTo("System.InvalidCastException"));
         }
