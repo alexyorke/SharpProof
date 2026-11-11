@@ -55,8 +55,8 @@ Entries describe repository changes, not package publication. Confirm available 
   `[ModuleInitializer]` and treated a longer walk as finding one. So every purity,
   allocation, capability and effect-contract claim in a larger assembly stayed
   Unknown, and so did exception claims, whose module check shared the bound. The
-  search is now an exact syntax pass, once per compilation. It still finds module
-  initializers that are nested, partial or attached through an alias. Two NodaTime
+  search now visits every method member, accessors and operators included, once
+  per compilation, with no symbol bound. Two NodaTime
   corpus methods, `JulianYearMonthDayCalculator.IsLeapYear` and
   `RegularYearMonthDayCalculator.GetMonthsInYear`, are now Proven. A third,
   `ValueCursor.Match`, is now Refuted: it advances the cursor.

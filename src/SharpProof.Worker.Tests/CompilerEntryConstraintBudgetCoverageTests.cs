@@ -18,8 +18,10 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
     [TestCase("fields-after", 2048, 0, true)]
     [TestCase("fields-after", 4096, 0, false)]
     [TestCase("module", 0, 1, true)]
-    [TestCase("module", 4093, 0, true)]
-    [TestCase("module", 4095, 0, false)]
+    // The module-initializer search is exact, so assembly size no longer
+    // drops entry completeness or the exception constraint.
+    [TestCase("module", 4093, 1, true)]
+    [TestCase("module", 4095, 1, true)]
     [TestCase("empty-body", 1, 1, false)]
     [TestCase("empty-body", 4096, 0, false)]
     [TestCase("constructor-reference", 1, 1, false)]

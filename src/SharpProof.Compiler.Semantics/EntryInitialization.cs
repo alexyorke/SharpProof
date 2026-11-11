@@ -73,11 +73,12 @@ internal static class EntryInitialization
         return true;
     }
 
-    // The source methods marked [ModuleInitializer]. C# admits the attribute
-    // only on a method declared as a type member, so a syntax pass that
-    // skips member bodies sees every candidate; only declarations with an
-    // attribute list are bound. The pass is exact whatever the assembly's
-    // size, and runs once per compilation.
+    // Every method of the assembly marked [ModuleInitializer]: ordinary
+    // methods and also accessors, operators, conversions, destructors and
+    // the accessors a `method:` target reaches, so the walk visits every
+    // method member of every type rather than declarations of one syntax
+    // kind. It is exact whatever the assembly's size, and runs once per
+    // compilation.
     internal static ImmutableArray<IMethodSymbol> ModuleInitializers(CSharpCompilation compilation,
         CancellationToken cancellationToken)
     {
@@ -85,20 +86,16 @@ internal static class EntryInitialization
         if (ModuleInitializerSets.TryGetValue(compilation, out var known))
         { return known.Methods; }
         var methods = ImmutableArray.CreateBuilder<IMethodSymbol>();
-        foreach (var tree in compilation.SyntaxTrees)
+        var pending = new Stack<INamespaceOrTypeSymbol>();
+        pending.Push(compilation.Assembly.GlobalNamespace);
+        while (pending.Count != 0)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            SemanticModel? model = null;
-            foreach (var declaration in tree.GetRoot(cancellationToken)
-                         .DescendantNodes(static node => node is not (BaseMethodDeclarationSyntax or BasePropertyDeclarationSyntax or
-                             BaseFieldDeclarationSyntax or GlobalStatementSyntax or EnumDeclarationSyntax or DelegateDeclarationSyntax))
-                         .OfType<MethodDeclarationSyntax>()
-                         .Where(static declaration => declaration.AttributeLists.Count != 0))
+            foreach (var member in pending.Pop().GetMembers())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                model ??= Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-                if (model.GetDeclaredSymbol(declaration, cancellationToken) is { } method &&
-                    method.GetAttributes().Any(IsModuleInitializerAttribute))
+                if (member is INamespaceOrTypeSymbol nested)
+                { pending.Push(nested); }
+                else if (member is IMethodSymbol method && method.GetAttributes().Any(IsModuleInitializerAttribute))
                 { methods.Add(method); }
             }
         }
