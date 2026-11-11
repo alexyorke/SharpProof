@@ -102,7 +102,7 @@ internal static partial class CSharpOperationSemantics
 
     // -1 is callback-free for the audited inputs; a nonnegative ordinal requires
     // a nonnull message. Unlisted signatures retain full runtime effects.
-    // The pinned .NET 10.0.14 profiles are checked against actual CLR culture
+    // The pinned .NET 10.0.15 profiles are checked against actual CLR culture
     // and inner-exception callbacks by ExceptionConstructorProfileOracleTests.
     internal static int? ExceptionConstructorMessageGuard(IMethodSymbol constructor)
     {

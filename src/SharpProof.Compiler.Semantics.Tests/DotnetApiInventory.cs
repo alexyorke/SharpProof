@@ -9,7 +9,7 @@ namespace SharpProof.Compiler.Semantics.Test;
 // predicates. It never grants support based on an API name alone.
 internal static class DotnetApiInventory
 {
-    internal const string PackVersion = "10.0.14";
+    internal const string PackVersion = "10.0.15";
     internal const string Framework = "net10.0";
     internal sealed record Row(string Assembly, string Id, string Kind, string Evidence)
     {
