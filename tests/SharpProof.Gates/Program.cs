@@ -47,6 +47,12 @@ internal static class Program
                 var wallTime = System.Diagnostics.Stopwatch.StartNew();
                 var result = await CorpusGate.RunAsync(root, cancellation.Token).ConfigureAwait(false);
                 Log.Error($"Corpus gate wall time: {wallTime.Elapsed.TotalSeconds:F1}s.");
+                foreach (var coverage in result.OpenSourceCoverage)
+                {
+                    Log.Error($"Corpus source {coverage.SourceId}: {coverage.Methods} methods, " +
+                        $"{coverage.Supported} supported, {coverage.Proven} Proven, " +
+                        $"{coverage.Refuted} Refuted, {coverage.Unknown} Unknown.");
+                }
                 Log.Info(
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;

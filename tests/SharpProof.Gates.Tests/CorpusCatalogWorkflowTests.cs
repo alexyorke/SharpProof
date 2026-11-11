@@ -105,7 +105,8 @@ public sealed class CorpusCatalogWorkflowTests
         var candidates = document.Files.SelectMany(file =>
         {
             System.ArgumentNullException.ThrowIfNull(file);
-            var root = CSharpSyntaxTree.ParseText(file.Content).GetCompilationUnitRoot();
+            var root = CSharpSyntaxTree.ParseText(file.Content, OpenSourceCorpusCatalog.GetParseOptions(
+                OpenSourceCorpusCatalog.GetCompilationOptions(document, file.SourceId))).GetCompilationUnitRoot();
             return OpenSourceCorpusCatalog.BuildDeclarationIndex(root).Values
                 .Where(static declarations => declarations.Length == 1)
                 .Select(declarations =>

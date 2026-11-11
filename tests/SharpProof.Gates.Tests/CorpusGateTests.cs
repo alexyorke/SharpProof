@@ -239,16 +239,24 @@ public sealed class CorpusGateTests
     private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
 
     [Test]
-    public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
+    public void OssImporterRejectsLicensesWithAppendedRestrictions()
     {
         var repositoryRoot = RepositoryLayout.FindRoot();
-        var license = File.ReadAllText(Path.Combine(
-            repositoryRoot, "tests/SharpProof.Gates", "Corpus",
-            "third-party", "aalhour-C-Sharp-Algorithms-LICENSE.txt"));
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            OpenSourceCorpusImporter.ValidateReviewedMitLicense(
-                license + "\nAdditional restriction: no commercial use.\n")));
+        var configuration = OpenSourceCorpusImporter.LoadSources(repositoryRoot);
+        foreach (var source in configuration.Sources)
+        {
+            foreach (var reviewed in source.Notices.Prepend(source.License))
+            {
+                var copy = File.ReadAllText(Path.Combine(
+                    OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot),
+                    "third-party", source.Id, reviewed.Path));
+                Assert.That(OpenSourceCorpusImporter.ValidateReviewedUpstreamFile(source.Id, reviewed, copy.Replace("\n", "\r\n", StringComparison.Ordinal)),
+                    Is.EqualTo(copy));
+                Assert.Throws<InvalidDataException>((Action)(() =>
+                    OpenSourceCorpusImporter.ValidateReviewedUpstreamFile(source.Id, reviewed,
+                        copy + "\nAdditional restriction: no commercial use.\n")));
+            }
+        }
     }
 
     [TestCase("https://github.com/aalhour/C-Sharp-Algorithms.git", "https://github.com/aalhour/C-Sharp-Algorithms")]
@@ -339,11 +347,11 @@ public sealed class CorpusGateTests
         using var temporary = new TempDirectory("SharpProof.Gates.Test-catalog-");
         var corpus = Path.Combine(temporary.FullName, "tests/SharpProof.Gates", "Corpus");
         Directory.CreateDirectory(corpus);
-        foreach (var source in document.Sources)
+        foreach (var copied in document.Sources.SelectMany(static source => source.NoticeFiles.Select(static notice => notice.File).Prepend(source.LicenseFile)))
         {
-            var destination = Path.Combine(corpus, source.LicenseFile);
+            var destination = Path.Combine(corpus, copied);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(Path.Combine(repository, "tests/SharpProof.Gates", "Corpus", source.LicenseFile), destination);
+            File.Copy(Path.Combine(repository, "tests/SharpProof.Gates", "Corpus", copied), destination);
         }
         var manifestPath = Path.Combine(corpus, "oss-methods.json");
         File.WriteAllText(manifestPath, JsonSerializer.Serialize(document));
@@ -895,31 +903,40 @@ public sealed class CorpusGateTests
     {
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
-        var selectedFileCount = document.Methods
-            .Select(static method => method.Path)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var configuration = OpenSourceCorpusImporter.LoadSources(root);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(document.SchemaVersion, Is.EqualTo(2));
-            Assert.That(document.Sources, Has.Length.EqualTo(1));
-            Assert.That(document.Sources[0].Repository, Is.EqualTo(
-                "https://github.com/aalhour/C-Sharp-Algorithms"));
-            Assert.That(document.Sources[0].Commit, Has.Length.EqualTo(40));
-            Assert.That(document.Sources[0].LicenseSpdx, Is.EqualTo("MIT"));
-            Assert.That(document.Methods, Has.Length.EqualTo(200));
+            Assert.That(document.SchemaVersion, Is.EqualTo(OpenSourceCorpusCatalog.SchemaVersion));
+            Assert.That(document.Sources.Select(static source => source.Id),
+                Is.EqualTo(configuration.Sources.Select(static source => source.Id)));
+            Assert.That(document.Sources.Select(static source => source.LicenseSpdx).Distinct(),
+                Is.EquivalentTo(OpenSourceCorpusCatalog.AllowedLicenses));
+            foreach (var (pinned, reviewed) in document.Sources.Zip(configuration.Sources))
+            {
+                Assert.That(pinned.Repository, Is.EqualTo(reviewed.Repository));
+                Assert.That(pinned.Commit, Is.EqualTo(reviewed.Commit));
+                Assert.That(pinned.LicenseSpdx, Is.EqualTo(reviewed.LicenseSpdx));
+                Assert.That(pinned.LicenseSha256, Is.EqualTo(reviewed.License.Sha256));
+                Assert.That(pinned.NoticeFiles.Select(static notice => notice.Sha256),
+                    Is.EqualTo(reviewed.Notices.Select(static notice => notice.Sha256)));
+                Assert.That(pinned.Compilation.Nullable, Is.EqualTo(reviewed.Compilation.Nullable));
+                Assert.That(pinned.Compilation.CheckOverflow, Is.EqualTo(reviewed.Compilation.CheckOverflow));
+                Assert.That(pinned.Compilation.GlobalUsings, Is.EqualTo(reviewed.Compilation.GlobalUsings));
+                Assert.That(pinned.Compilation.PreprocessorSymbols, Is.EqualTo(reviewed.Compilation.PreprocessorSymbols));
+                var methods = document.Methods.Where(method => method.SourceId == pinned.Id).ToImmutableArray();
+                Assert.That(methods, Has.Length.EqualTo(reviewed.MethodQuota), pinned.Id);
+                Assert.That(methods.Select(static method => method.Path).Distinct(StringComparer.Ordinal).Count(),
+                    Is.GreaterThanOrEqualTo(OpenSourceCorpusCatalog.MinimumSourceFileCount), pinned.Id);
+            }
+            Assert.That(document.Methods, Has.Length.EqualTo(configuration.Sources.Sum(static source => source.MethodQuota)));
             Assert.That(
                 document.Methods.Count(static method =>
                     method.Support == CorpusSupport.Supported),
-                Is.EqualTo(17));
+                Is.EqualTo(28));
             Assert.That(
                 document.Methods.Select(static method => method.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
-            Assert.That(
-                selectedFileCount,
-                Is.GreaterThanOrEqualTo(
-                    OpenSourceCorpusCatalog.MinimumSourceFileCount));
             Assert.That(
                 document.Methods.Select(static method =>
                     method.DeclarationSha256).Distinct(StringComparer.Ordinal)
@@ -949,33 +966,47 @@ public sealed class CorpusGateTests
             result.Failures,
             Is.Empty,
             string.Join(Environment.NewLine, result.Failures));
+        var document = OpenSourceCorpusCatalog.Load(root);
+        var syntheticCases = CorpusCatalog.CreateSyntheticCases();
+        var supportedOpenSource = document.Methods.Count(static method => method.Support == CorpusSupport.Supported);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Passed, Is.True);
-            Assert.That(result.CaseCount, Is.EqualTo(462));
-            Assert.That(result.BaseCaseCount, Is.EqualTo(228));
-            Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
-            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(17));
-            Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
+            Assert.That(result.CaseCount, Is.EqualTo(syntheticCases.Length + document.Methods.Length));
+            Assert.That(result.BaseCaseCount, Is.EqualTo(CorpusCatalog.Seeds.Length + document.Methods.Length));
+            Assert.That(result.OpenSourceMethodCount, Is.EqualTo(document.Methods.Length));
+            Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(supportedOpenSource));
+            Assert.That(result.OpenSourceFileCount, Is.EqualTo(OpenSourceCorpusCatalog.CountSourceFiles(document.Methods)));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(243));
+            Assert.That(result.SupportedCaseCount,
+                Is.EqualTo(syntheticCases.Count(static item => item.Support == CorpusSupport.Supported) + supportedOpenSource));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(219));
+                Is.EqualTo(result.CaseCount - result.SupportedCaseCount));
+            Assert.That(result.OpenSourceCoverage, Is.EqualTo(document.Sources.Select(source =>
+            {
+                var methods = document.Methods.Where(method => method.SourceId == source.Id).ToImmutableArray();
+                return new CorpusSourceCoverage(source.Id, methods.Length,
+                    methods.Count(static method => method.Support == CorpusSupport.Supported),
+                    methods.Count(static method => method.ExpectedVerdict == CorpusVerdict.Proven),
+                    methods.Count(static method => method.ExpectedVerdict == CorpusVerdict.Refuted),
+                    methods.Count(static method => method.ExpectedVerdict is CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown));
+            })));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(219));
-            Assert.That(result.SilentUnknownCount, Is.Zero);
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
+            Assert.That(result.UnknownCount, Is.EqualTo(501));
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(7));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(508));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
 , static item => item.Reason, static item => item.Count),
                 Is.EquivalentTo(
                     ImmutableDictionaryCapture.Create(ImmutableArray.Create(
-                        new KeyValuePair<string, int>("SP0002", 122),
+                        new KeyValuePair<string, int>("SP0002", 186),
                         new KeyValuePair<string, int>("SP0016", 18),
                         new KeyValuePair<string, int>("SP0045", 9),
                         new KeyValuePair<string, int>("SP0046", 9),
-                        new KeyValuePair<string, int>("SP0047", 61)),
+                        new KeyValuePair<string, int>("SP0047", 279),
+                        new KeyValuePair<string, int>("silent-unclassified", 7)),
                         static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
             Assert.That(
                 result.UnknownRate,
@@ -1237,12 +1268,22 @@ public sealed class IndependentPinnedRequiresCensusTests
             .Select(static line => line.Split('|')[0]).ToImmutableArray();
         Assert.That(contractIds, Is.EquivalentTo(pinnedContractIds));
         var document = OpenSourceCorpusCatalog.Load(root);
-        Assert.That(document.Methods, Has.Length.EqualTo(200));
-        var oss = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
-        var ossRows = Census(oss, out var ossDeclarations, out var ossDeclaredRequires);
+        Assert.That(document.Methods, Has.Length.EqualTo(500));
+        // Each pinned source is its own assembly.
+        var probes = OpenSourceCorpusRunner.PrepareExceptionProbes(document, TestContext.CurrentContext.CancellationToken, purity: true);
+        Assert.That(probes, Has.Length.EqualTo(document.Sources.Length));
+        var ossRows = ImmutableArray<Row>.Empty;
+        var ossDeclarations = 0;
+        var ossTrees = 0;
+        foreach (var (oss, _) in probes)
+        {
+            ossRows = ossRows.AddRange(Census(oss, out var declared, out var ossDeclaredRequires));
+            Assert.That(ossDeclaredRequires, Is.Zero);
+            ossDeclarations += declared;
+            ossTrees += oss.SyntaxTrees.Length;
+        }
         Assert.That(ossRows, Is.Empty);
-        Assert.That(ossDeclaredRequires, Is.Zero);
         await TestContext.Progress.WriteLineAsync($"independent-census synthetic={synthetic.Length} methodDeclarations={declarations} requiresObligations={obligations} " +
-            $"ossSelected={document.Methods.Length} ossTrees={oss.SyntaxTrees.Length} ossMethodDeclarations={ossDeclarations} ossRequiresObligations={ossRows.Length}");
+            $"ossSelected={document.Methods.Length} ossTrees={ossTrees} ossMethodDeclarations={ossDeclarations} ossRequiresObligations={ossRows.Length}");
     }
 }

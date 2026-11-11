@@ -58,10 +58,22 @@ internal static class NativeEffectOracleGate
             Methods = [.. document.Methods.OrderBy(method => method.Id, StringComparer.Ordinal)
                 .Take(maximumMethods == 0 ? document.Methods.Length : maximumMethods)]
         };
-        var report = await ObserveAsync(OpenSourceCorpusRunner.PrepareExceptionProbe(selected, cancellationToken, allocations, purity, capabilities, summary),
-            selected.Methods.Select(method => method.Id).ToImmutableArray(), root,
-            universeSha256, document.Methods.Length, cancellationToken, allocations, purity, capabilities, summary).ConfigureAwait(false);
-        return report with { WallSeconds = wall.Elapsed.TotalSeconds };
+        // Each source is its own assembly; merge the per-source reports.
+        var reports = ImmutableArray.CreateBuilder<NativeEffectOracleReport>();
+        foreach (var (compilation, methodIds) in OpenSourceCorpusRunner.PrepareExceptionProbes(
+                     selected, cancellationToken, allocations, purity, capabilities, summary))
+        {
+            reports.Add(await ObserveAsync(compilation, methodIds, root, universeSha256, document.Methods.Length,
+                cancellationToken, allocations, purity, capabilities, summary).ConfigureAwait(false));
+        }
+        var rows = reports.SelectMany(static report => report.Rows).OrderBy(static row => row.MethodId, StringComparer.Ordinal).ToImmutableArray();
+        return Summarize(universeSha256, document.Methods.Length, rows, wall.Elapsed.TotalSeconds) with
+        {
+            ContractKind = reports[0].ContractKind,
+            ReachableSourceBodyCount = reports.Sum(static report => report.ReachableSourceBodyCount),
+            ReachableSourceMayDivergeCount = reports.Sum(static report => report.ReachableSourceMayDivergeCount),
+            ReachableSourceUnknownEffectCount = reports.Sum(static report => report.ReachableSourceUnknownEffectCount)
+        };
     }
 
     internal static async Task<NativeEffectOracleReport> ObserveAsync(CSharpCompilation compilation,

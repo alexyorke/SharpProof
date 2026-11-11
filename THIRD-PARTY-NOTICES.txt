@@ -1886,3 +1886,34 @@ Microsoft.DotNet.Arcade.Sdk and eng/common bootstrapper scripts
 Version: 9.0.0-beta.26523.9
 Source: https://github.com/dotnet/arcade/tree/1141c9df487f40450bc0ab7444f8941b863528dd
 License: MIT (https://github.com/dotnet/arcade/blob/1141c9df487f40450bc0ab7444f8941b863528dd/LICENSE.TXT)
+
+Repository test corpus sources (not redistributed in any package)
+
+The corpus gate under tests/SharpProof.Gates/Corpus embeds pinned source text
+from the projects below. Each project's license and notice files are copied
+verbatim under tests/SharpProof.Gates/Corpus/third-party/<source-id>/, and
+tests/SharpProof.Gates/Corpus/sources.json records their reviewed SHA-256.
+
+C-Sharp-Algorithms
+Source: https://github.com/aalhour/C-Sharp-Algorithms/tree/b82432474a916ac784cd1446eabcba615c333463
+License: MIT
+Copyright (c) 2015 Ahmad Alhour
+
+MoreLINQ
+Source: https://github.com/morelinq/MoreLINQ/tree/d217ab1e8eac68247650c27e977b767dd66bcab0
+License: Apache-2.0; MoreLinq/Lookup.cs and MoreLinq/UnreachableException.cs
+are MIT-licensed (Microsoft Corporation; .NET Foundation and Contributors)
+Copyright (c) 2008 Jonathan Skeet and MoreLINQ contributors (per-file headers)
+
+Noda Time
+Source: https://github.com/nodatime/nodatime/tree/6e024ddefed3ea21169f0eca5ab5c32312adb9cf
+License: Apache-2.0, with the NOTICE file copied alongside it (portions derived
+from Joda Time 1.6.0, copyright 2001-2009 Stephen Colebourne)
+Copyright The Noda Time Authors
+
+Humanizer v2.14.1
+Source: https://github.com/Humanizr/Humanizer/tree/3ebc38de585fc641a04b0e78ed69468453b0f8a1
+License: MIT
+Copyright (c) .NET Foundation and Contributors
+src/Humanizer/Bytes: MIT, Copyright (c) 2013-2017 Omar Khudeira
+src/Humanizer/Inflections: MIT, Copyright (c) 2013 Scott Kirkland

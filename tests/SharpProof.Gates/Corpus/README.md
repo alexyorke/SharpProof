@@ -1,30 +1,37 @@
 # Open-source corpus provenance
 
-The source corpus includes 200 selected methods from a real buildable library, separate from synthetic metamorphic cases. Transformed seeds do not count toward the OSS floor.
+The corpus includes 500 selected methods from four real, buildable libraries, separate from synthetic metamorphic cases. Transformed seeds do not count toward the OSS floor. Measuring several unrelated codebases keeps the reported coverage honest: one algorithms library alone overstates how much ordinary code the verifier handles.
 
-## Pinned source and license
+## Pinned sources and licenses
 
-| Field | Value |
-| --- | --- |
-| Repository identity | `https://github.com/aalhour/C-Sharp-Algorithms` |
-| Commit | `b82432474a916ac784cd1446eabcba615c333463` |
-| License | MIT |
-| Included roots | `Algorithms/`, `DataStructures/` |
-| Selected declarations | 200 across 87 source files |
+[sources.json](sources.json) is the reviewed importer configuration. Each entry pins a full commit and lists the license and notice files with the SHA-256 of their reviewed text, the source roots and excludes, a method quota, and the compile settings that change meaning (nullable context, checked arithmetic, global usings, preprocessor symbols).
 
-The lock also embeds 100 source files needed to compile the pinned bundle; 87 contain selected declarations. Included dependency files do not count as extra selected methods.
+| Source | Repository | Commit | License | Roots | Methods (files) | Supported | Proven / Refuted / Unknown |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `aalhour-c-sharp-algorithms` | `https://github.com/aalhour/C-Sharp-Algorithms` | `b82432474a916ac784cd1446eabcba615c333463` | MIT | `Algorithms/`, `DataStructures/` | 200 (87) | 17 | 9 / 8 / 183 |
+| `morelinq` | `https://github.com/morelinq/MoreLINQ` | `d217ab1e8eac68247650c27e977b767dd66bcab0` | Apache-2.0 | `MoreLinq/` | 100 (100) | 2 | 2 / 0 / 98 |
+| `nodatime` | `https://github.com/nodatime/nodatime` | `6e024ddefed3ea21169f0eca5ab5c32312adb9cf` | Apache-2.0 | `src/NodaTime/` | 100 (100) | 0 | 0 / 0 / 100 |
+| `humanizer` | `https://github.com/Humanizr/Humanizer` | `3ebc38de585fc641a04b0e78ed69468453b0f8a1` (v2.14.1) | MIT | `src/Humanizer/` | 100 (100) | 9 | 9 / 0 / 91 |
 
-[oss-methods.json](oss-methods.json) stores upstream source, file hashes, method hashes, source paths/line ranges, expected verdicts, and independent support classifications. The copied [MIT notice](third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt) is checked in.
+Unknown includes silent Unknown (no diagnostic and no proof): 1 in MoreLINQ, 5 in NodaTime, and 1 in Humanizer. The gate prints this table's last three columns per source on every run.
 
-The importer requires a clean upstream checkout with the expected origin. Selection is round-robin across source files. Gate validation checks distinct locations/hashes, full commit provenance, license identity, a 200-500 method range, and at least 25 source files.
+Source notes:
+
+- MoreLINQ compiles with its net9.0 symbols. Its generated `Extensions.g.cs` and `Extensions.ToDataTable.g.cs` wrappers are excluded; nothing else depends on them. `Lookup.cs` and `UnreachableException.cs` are MIT-licensed by their own headers, which stay embedded in the pinned text; `COPYING.txt` repeats that notice.
+- NodaTime compiles with its net8.0 symbols, nullable enabled, and checked arithmetic, as its build does. Its Apache `NOTICE.txt` is copied with the license.
+- Humanizer is pinned at release v2.14.1 because later commits generate locale code with a source generator, which a BCL-only build cannot run. The T4-generated `FluentDate` files are excluded. `Bytes/` and `Inflections/` carry their own MIT licenses, copied as notices.
+
+The lock embeds every C# file under each source's roots (less excludes): 604 files. Included dependency files do not count as extra selected methods. [oss-methods.json](oss-methods.json) stores each source's pin, license and notice hashes and compile settings, file hashes, method hashes, source paths and line ranges, expected verdicts, and independent support classifications. License and notice copies live under [third-party/](third-party/) as `third-party/<source-id>/<upstream path>`.
+
+Gate validation accepts MIT and Apache-2.0 only, checks full commit pins, license and notice hashes, distinct locations and declaration hashes, a 200-500 method range, and at least 25 source files. The importer also requires each source's selection to span at least 25 files.
 
 ## Instrumentation and observations
 
-Source text is pinned with normalized LF line endings. At test time the runner adds `[SharpProof.Attributes.EnforcePure]` to selected declarations without rewriting bodies, signatures, or dependencies, then compiles the pinned bundle together.
+Source text is pinned with normalized LF line endings and no byte-order mark. At test time the runner adds `[SharpProof.Attributes.EnforcePure]` to selected declarations without rewriting bodies, signatures, or dependencies. Each source compiles as its own assembly (`SharpProofOssCorpus.<source-id>`) against the runtime's BCL and SharpProof's attributes only; a source that needs a NuGet package fails to compile and cannot be added. Syntax trees carry source-qualified paths (`<source-id>/<path>`), so diagnostic locations stay distinct across sources.
 
 Portable diagnostics and native semantic outcomes are observed separately. Native verification consumes the compiler-produced artifact and runs the worker. Unsupported targets remain explicit; silence is not proof.
 
-The [ratchet](unknown-reason-ratchet.json) sets floors for supported cases overall and supported OSS methods, a cap on total Unknown, and independent reason-bucket caps; the file holds the current values. Support labels are reviewed evidence, not derived from the expected verdict.
+The [ratchet](unknown-reason-ratchet.json) sets floors for supported cases overall and supported OSS methods, a cap on total Unknown, and independent reason-bucket caps; the file holds the current values. Support labels are reviewed evidence, not derived from the expected verdict. The 2026-11 review marked a new method Supported only when its observed Proven verdict was checked against the body (constant or concatenation results, `[Conditional("DEBUG")]` calls removed in release builds, and modular arithmetic); every other new method is IntentionallyUnsupported.
 
 ### Reviewed exceptional-resource correction (OSS0015)
 
@@ -34,18 +41,24 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
-## Reproduce or update
+## Reproduce, update, or add a source
 
-Use a persistent canonical container workspace so edits survive. Inside its shell, clone and pin the upstream checkout, then invoke the importer:
+Use a persistent canonical container workspace so edits survive (`docker compose run --rm tooling dev`, or the Dev Container). Inside its shell, clone the upstream repository, check out the commit pinned in `sources.json`, and import it:
 
 ```text
-git clone https://github.com/aalhour/C-Sharp-Algorithms /tmp/sharpproof-upstream
-git -C /tmp/sharpproof-upstream checkout b82432474a916ac784cd1446eabcba615c333463
-pwsh -NoLogo -NoProfile -File tests/SharpProof.Gates/Corpus/Import-OssCorpus.ps1 -UpstreamRoot /tmp/sharpproof-upstream
+git clone https://github.com/morelinq/MoreLINQ /tmp/upstream/morelinq
+git -C /tmp/upstream/morelinq checkout d217ab1e8eac68247650c27e977b767dd66bcab0
+pwsh -NoLogo -NoProfile -File tests/SharpProof.Gates/Corpus/Import-OssCorpus.ps1 -UpstreamRoot /tmp/upstream/morelinq
 ```
 
-The target clone path must be unused. The commands above run inside the canonical container, not a host PowerShell session.
+The importer finds the source by the checkout's `origin`, requires a clean checkout whose HEAD is the pinned commit, checks that the commit exists on the approved repository, and re-reads the license and notices against their reviewed hashes. It reads only committed blobs. It then merges that one source into the manifest: other sources are untouched, methods still present keep their IDs, support labels, and order, and the snapshot is regenerated. Re-importing at the same pins is byte-identical.
 
-Review regenerated provenance, copied license, semantic expectations, and canonical snapshot. The importer preserves support by declaration hash and rejects unclassified new methods. Changing upstream commit requires explicit review and an updated pin here.
+To add a source:
 
-For observation-only updates, run `sp corpus-update -Configuration Release` without the importer. It does not silently replace the upstream source lock. See the [gate guide](../README.md) for classifications and invariance checks.
+1. Check the license is MIT or Apache-2.0 for every file under the roots, including vendored components, and that the code builds without NuGet packages (polyfill and analyzer packages are fine when the BCL already provides the types).
+2. Append an entry to `sources.json`: a lowercase `id`, the repository URL, the full commit, the SPDX license, `license`/`notices` with the SHA-256 of each file's LF-normalized text (ending in one newline), `roots`, `excludes` (a file path, or a directory ending in `/`), `methodQuota`, and the upstream build's compile settings. Keep the quota total at 500 or less.
+3. Run the import with `-Draft`. New methods are appended from the next free `OSSnnnn` ID with `"support": "Unspecified"` and their observed verdicts, and the catalog rejects the manifest until each is labeled.
+4. Review every new method: mark it `Supported` only after checking its Proven or Refuted verdict against the body, and `IntentionallyUnsupported` otherwise. Then import again without `-Draft` and confirm nothing else changes.
+5. Update the ratchet with the measured gate numbers, the table above, the [gate guide](../README.md), and `THIRD-PARTY-NOTICES.txt`.
+
+Changing a pinned commit is a reviewed change too: methods that disappear are dropped (later IDs shift down), and replacements are appended. For observation-only updates, run `sp corpus-update -Configuration Release` without the importer; it does not replace the source lock. See the [gate guide](../README.md) for classifications and invariance checks.

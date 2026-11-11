@@ -53,11 +53,13 @@ public sealed class CorpusSnapshotWorkflowTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Passed, Is.False);
-            Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(219));
+            // The reviewed corpus already has seven silent Unknowns; this
+            // fixture adds an eighth above the ratcheted ceiling.
+            Assert.That(result.SilentUnknownCount, Is.EqualTo(8));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(508));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownReasons.Single(static item => item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
-            Assert.That(result.Failures, Does.Contain("Corpus produced a new unreviewed Unknown reason 'silent-unclassified' (1 cases)."));
+            Assert.That(result.UnknownReasons.Single(static item => item.Reason == "silent-unclassified").Count, Is.EqualTo(8));
+            Assert.That(result.Failures, Does.Contain("Corpus Unknown reason 'silent-unclassified' regressed from the ratcheted maximum 7 to 8."));
             Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for OSS0139.baseline:"));
         }
     }
@@ -80,7 +82,7 @@ public sealed class CorpusSnapshotWorkflowTests
             Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, previousSource);
         }
         Assert.That(await File.ReadAllBytesAsync(snapshotPath), Is.EqualTo(before));
-        Assert.That(CorpusSnapshotFormat.ReadDataLines(snapshotPath), Has.Length.EqualTo(462));
+        Assert.That(CorpusSnapshotFormat.ReadDataLines(snapshotPath), Has.Length.EqualTo(762));
         Assert.That(Directory.EnumerateFiles(corpusDirectory, ".sharpproof-corpus-*", SearchOption.AllDirectories), Is.Empty);
     }
 
@@ -139,7 +141,7 @@ public sealed class CorpusSnapshotWorkflowTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Passed, Is.False);
-            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot has 463 cases but generator produced 462."));
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot has 763 cases but generator produced 762."));
             Assert.That(result.Failures, Has.Some.StartsWith("Snapshot verdict for E01.baseline is Unknown"));
             Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for E01.baseline:"));
             Assert.That(result.Failures, Does.Contain("Missing snapshot entry: E02.baseline."));

@@ -10,15 +10,15 @@ The gate checks canonical observations, reviewed support classifications, metamo
 
 ## Case universe
 
-The checked-in corpus has 228 base cases:
+The checked-in corpus has 528 base cases:
 
-- 200 distinct open-source methods from the pinned MIT-licensed C-Sharp-Algorithms source bundle.
+- 500 distinct open-source methods from four pinned sources: C-Sharp-Algorithms (200, MIT), MoreLINQ (100, Apache-2.0), NodaTime (100, Apache-2.0), and Humanizer (100, MIT).
 - 18 synthetic effect-contract seeds.
 - 10 synthetic compiler-bound call-precondition seeds.
 
-Effect seeds have nine source forms and precondition seeds have ten. Those 262 metamorphic cases plus 200 OSS targets yield 462 recorded cases. Renames, escaped identifiers, trivia, parentheses, temporaries, constant branches, named arguments, formal renames where applicable, and independent statement reordering test invariance.
+Effect seeds have nine source forms and precondition seeds have ten. Those 262 metamorphic cases plus 500 OSS targets yield 762 recorded cases. Renames, escaped identifiers, trivia, parentheses, temporaries, constant branches, named arguments, formal renames where applicable, and independent statement reordering test invariance.
 
-The open-source floor counts original declarations only, not transformations. [Corpus provenance](Corpus/README.md) describes the source pin, hashes, licensing, and instrumentation.
+The open-source floor counts original declarations only, not transformations. Each source compiles as its own assembly against the BCL, and the gate reports supported, Proven, Refuted, and Unknown counts per source. [Corpus provenance](Corpus/README.md) describes the source pins, hashes, licensing, instrumentation, and how to add a source.
 
 ## Observations and native evidence
 
