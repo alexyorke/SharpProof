@@ -18,7 +18,7 @@ try {
         $tool = $tools.$name
         $download = Join-Path $temporaryRoot $name
         # Tool hosts can return transient gateway errors during image builds.
-        Invoke-WebRequest -Uri $tool.url -OutFile $download -MaximumRetryCount 3 -RetryIntervalSec 5
+        Invoke-WebRequest -Uri $tool.url -OutFile $download -MaximumRetryCount 3 -RetryIntervalSec 5 -ConnectionTimeoutSeconds 30 -OperationTimeoutSeconds 300
         if ((Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ine $tool.sha256) {
             throw "Downloaded $name does not match its pinned SHA256."
         }

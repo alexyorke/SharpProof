@@ -139,7 +139,7 @@ internal sealed class WorkspaceCoverageRegressionTests
                 Assert.That(arguments, Does.Contain("-getItem:PackageReference"));
                 var properties = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
-                    ["NETCoreSdkVersion"] = "10.0.403",
+                    ["NETCoreSdkVersion"] = "10.0.404",
                     ["SharpProofProfile"] = "strict",
                     ["SharpProofFeatures"] = "all",
                     ["SharpProofVerify"] = "true",

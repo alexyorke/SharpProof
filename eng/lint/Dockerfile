@@ -11,11 +11,11 @@ COPY --from=zizmor /usr/bin/zizmor /usr/local/bin/zizmor
 COPY --from=lychee /usr/local/bin/lychee /usr/local/bin/lychee
 COPY eng/lint/package*.json /opt/sharpproof/lint/
 # Every download is pinned: npm by its lockfile, ApiCompat by this checksum.
-ADD --checksum=sha256:9f1ff5a1a05d8086f78af35ecaa6346c15dd8619026bf61303350a11f7a6978e https://api.nuget.org/v3-flatcontainer/microsoft.dotnet.apicompat.tool/10.0.403/microsoft.dotnet.apicompat.tool.10.0.403.nupkg /tmp/lint-tools/
+ADD --checksum=sha256:41cac2f03e95d1423a40332df037fdccfeb22710cb362744210a359f3e064724 https://api.nuget.org/v3-flatcontainer/microsoft.dotnet.apicompat.tool/10.0.404/microsoft.dotnet.apicompat.tool.10.0.404.nupkg /tmp/lint-tools/
 RUN export HOME=/tmp/lint-home DOTNET_CLI_HOME=/tmp/lint-dotnet NUGET_PACKAGES=/tmp/lint-nuget \
     && node /usr/local/lib/node_modules/npm/bin/npm-cli.js ci --prefix /opt/sharpproof/lint --ignore-scripts --no-audit --no-fund \
     && printf '<configuration><packageSources><clear /><add key="pinned" value="/tmp/lint-tools" /></packageSources></configuration>' > /tmp/lint-tools/nuget.config \
-    && dotnet tool install Microsoft.DotNet.ApiCompat.Tool --version 10.0.403 --tool-path /opt/sharpproof/tools --configfile /tmp/lint-tools/nuget.config \
+    && dotnet tool install Microsoft.DotNet.ApiCompat.Tool --version 10.0.404 --tool-path /opt/sharpproof/tools --configfile /tmp/lint-tools/nuget.config \
     && rm -rf /tmp/lint-tools
 ENV PATH="/opt/sharpproof/lint/node_modules/.bin:/opt/sharpproof/tools:${PATH}"
 USER sharpproof
