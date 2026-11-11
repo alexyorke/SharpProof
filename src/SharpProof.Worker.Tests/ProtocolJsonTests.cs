@@ -611,9 +611,9 @@ internal sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("48"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(71));
-            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(8));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("49"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(72));
+            Assert.That(WorkerManifestVersions.Current, Is.EqualTo(9));
             Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
             Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));
             Assert.That(WorkerResourceModels.AllocationLayout, Is.EqualTo(SharpProof.Ir.ResourceRuntimeLayout.ModelId));
@@ -727,7 +727,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("48"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("49"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(

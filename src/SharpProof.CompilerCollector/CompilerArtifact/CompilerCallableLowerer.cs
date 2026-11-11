@@ -12,6 +12,7 @@ internal sealed class CompilerCallableLowerer
     private readonly ImmutableArray<CompilerReferenceSnapshot>? _capturedReferences;
     private readonly ContractBinder _contracts;
     private readonly CompilerSpecificationPackConfiguration _specificationPackAuthority;
+    private readonly CompilerContractExports _contractExports;
 
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
@@ -27,10 +28,12 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         CompilerSpecificationPackConfiguration specificationPackAuthority,
         ImmutableArray<CompilerSyntaxTreeSnapshot>? capturedTrees = null,
-        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences = null)
+        ImmutableArray<CompilerReferenceSnapshot>? capturedReferences = null,
+        CompilerContractExports? contractExports = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _compilation = compilation;
+        _contractExports = contractExports ?? CompilerContractExports.Empty;
         _taskCarriers = new(compilation);
         _capturedTrees = capturedTrees is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedTrees)) : capturedTrees;
         _capturedReferences = capturedReferences is { IsDefault: true } ? throw new ArgumentNullException(nameof(capturedReferences)) : capturedReferences;
@@ -44,7 +47,8 @@ internal sealed class CompilerCallableLowerer
         var capturedTrees = _capturedTrees ?? CompilerCompilationCapture.CaptureTrees(_compilation, cancellationToken).ToImmutableArray();
         WorkerDiagnosticContext? diagnostic = null;
         var total = CompilerTotalCallableLowerer.Prepare(_compilation, target, capturedTrees,
-            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken, detail => { if (detail is null) { throw new ArgumentNullException(nameof(detail)); } diagnostic = detail; });
+            _capturedReferences.HasValue ? _capturedReferences.Value : null, _specificationPackAuthority, cancellationToken, detail => { if (detail is null) { throw new ArgumentNullException(nameof(detail)); } diagnostic = detail; },
+            _contractExports);
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,

@@ -39,6 +39,9 @@ internal sealed record CompilerCompilationSnapshot
     public ImmutableArray<CompilerReferenceSnapshot> ResourceMetadataReferences { get; init; } = [];
     [JsonIgnore]
     public ImmutableArray<CompilerAdditionalFileSnapshot> AdditionalFiles { get; init; } = [];
+    // The contract exports of referenced projects this compilation accepted.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public ImmutableArray<CompilerContractExportSnapshot> ContractExports { get; init; }
 }
 
 internal enum CompilerReportDiagnostic

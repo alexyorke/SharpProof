@@ -26,6 +26,9 @@ internal sealed partial class ClaimManifestBuilder(
 
 #pragma warning restore CA2000
 
+    // The accepted contract exports of referenced projects in this build.
+    internal CompilerContractExports ContractExports { get; init; } = CompilerContractExports.Empty;
+
     private const string TopLevelMainCallableId =
         "M:Program.<Main>$(System.String[])";
 
@@ -187,7 +190,7 @@ internal sealed partial class ClaimManifestBuilder(
                 }
                 cancellationToken.ThrowIfCancellationRequested();
                 var operation = (IMethodBodyOperation)model.GetOperation(declaration, cancellationToken)!;
-                var owned = PotentialCalls(method, operation, _effectSession.HasPotentialCallPreconditions);
+                var owned = PotentialCalls(method, operation, HasPotentialCallPreconditions);
                 const bool complete = true;
                 var id = published.TryGetValue(method, out var selected)
                     ? selected.Entry.CallableId : SemanticClaimIdentity.CreateCallableId(method);

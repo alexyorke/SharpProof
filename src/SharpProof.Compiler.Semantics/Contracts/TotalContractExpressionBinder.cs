@@ -161,6 +161,18 @@ internal sealed class TotalContractBinder
         return BindTotalCore(context, null, requiresOnly: true, cancellationToken, includeAttributes: false);
     }
 
+    // The Requires written for a callable in this compilation, for its
+    // contract export. Closed parameter attributes are left out: they travel
+    // in the callable's binary and are checked from there.
+    internal TotalContractBindingResult BindTotalSourceRequires(TotalLoweringContext context,
+        CancellationToken cancellationToken)
+    {
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
+        if (context.Target.DeclaringSyntaxReferences.Length == 0)
+        { return new([], ContractBindingFailure.UnsupportedTarget, context.Origin); }
+        return BindTotalCore(context, null, requiresOnly: true, cancellationToken, includeAttributes: false);
+    }
+
     private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody,
         bool requiresOnly, CancellationToken cancellationToken, bool includeAttributes = true)
     {

@@ -50,6 +50,22 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Check the `Contract.Requires` of project references built in the same build. A
+  verified project now writes a contract export per target framework
+  (`obj/.../SharpProof/contracts-export.json`) with the clauses of its public and
+  internal callables that read only parameters, as portable IR. An MSBuild step
+  inside each compilation stamps it with the produced reference and implementation
+  images, or removes it when the compilation did not complete a capture. A
+  referencing project passes each project reference's export to its compiler as an
+  additional file and accepts it only when the stamp names the exact reference image
+  it compiled against. A call that is not dispatched then checks the exported
+  clauses; the claim names the exporting project (`ExportedBy`) and cites the
+  clause's file and line there. A stale, forged or incomplete export, and a clause
+  that reads a field or `this`, leave the call unchecked and counted; nothing is
+  assumed after the call. Packages, separately built assemblies and other target
+  frameworks have no export. This can fail existing builds: a call that violates a
+  referenced project's `Requires` is now refuted. Protocol 49, manifest 9, cache 72
+  and compiler artifact 60.
 - Check preconditions at calls into other assemblies. A call that is not dispatched
   and not generic now checks the callee's closed parameter attributes (`[NonNull]`,
   `[Positive]`, `[InRange]`), read from the referenced image whose hash the compiler
