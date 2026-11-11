@@ -178,14 +178,7 @@ internal static class CompilerCallPreconditionClaims
     {
         calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity));
         origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
-        return new WorkerMetadataClauseLocation
-        {
-            Assembly = origin.AssemblyIdentity,
-            Member = WorkerCallPreconditionTarget.StableCallee(calleeIdentity),
-            Parameter = origin.ParameterOrdinal,
-            Attribute = origin.Kind == "InRange"
-                ? FormattableString.Invariant($"InRange({origin.Minimum}, {origin.Maximum})") : origin.Kind
-        };
+        return origin.ClaimTarget(calleeIdentity);
     }
 
     private static WorkerSourceLocation Project(ImmutableDictionary<string, SyntaxTree> documents, IrSourceSpan span)
