@@ -1,0 +1,6 @@
+# ci.sh builds the lint image from the exact tooling image it pulled. Without
+# this override, `docker compose run lint` resolves the lint build's
+# `service:tooling` context and rebuilds the tooling image from source.
+services:
+  lint:
+    build: !reset null
