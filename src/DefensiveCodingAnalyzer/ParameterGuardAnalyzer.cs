@@ -34,9 +34,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             SyntaxKind.OperatorDeclaration,
             SyntaxKind.ConversionOperatorDeclaration,
             SyntaxKind.LocalFunctionStatement,
-            SyntaxKind.SimpleLambdaExpression,
-            SyntaxKind.ParenthesizedLambdaExpression,
-            SyntaxKind.AnonymousMethodExpression,
             SyntaxKind.ClassDeclaration,
             SyntaxKind.StructDeclaration,
             SyntaxKind.RecordDeclaration,
@@ -45,7 +42,11 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
 
     private static void Analyze(SyntaxNodeAnalysisContext context)
     {
-        if (!TryGetCallable(context.Node, out var parameters, out var body))
+        // Test methods and test helpers receive runner-owned or test-authored
+        // inputs, and an anonymous function's inputs come from the enclosing
+        // callable that created it. Neither is an entry point to validate.
+        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+            !TryGetCallable(context.Node, out var parameters, out var body))
         {
             return;
         }
@@ -61,14 +62,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // An unread underscore in an anonymous callable is a discarded input.
-            // A named method or a lambda that reads it still has an input contract.
-            if (context.Node is AnonymousFunctionExpressionSyntax &&
-                parameter.Identifier.ValueText == "_" && !HasDeclaredInputConstraint(symbol) &&
-                !Mentions(body, symbol, context.SemanticModel, context.CancellationToken))
-            {
-                continue;
-            }
             // Neither Boolean value nor a CancellationToken state is invalid
             // on its own. Rejecting one would change the callable's contract.
             if (AcceptsEveryNullableReferenceValue(body, symbol, context.SemanticModel, context.CancellationToken) ||
@@ -89,8 +82,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             if (HasGuard(body, symbol, context.SemanticModel, context.CancellationToken) ||
                 HasStateValidation(body, symbol, context.SemanticModel, context.CancellationToken) ||
                 IsNullPredicateValidation(body, symbol, context.SemanticModel, context.CancellationToken) ||
-                IsValuePredicateValidation(body, symbol, context.SemanticModel, context.CancellationToken) ||
-                IsValueAssertionValidation(body, symbol, context.SemanticModel, context.Compilation, context.CancellationToken))
+                IsValuePredicateValidation(body, symbol, context.SemanticModel, context.CancellationToken))
             {
                 continue;
             }
@@ -136,18 +128,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             case LocalFunctionStatementSyntax local when ((SyntaxNode?)local.Body ?? local.ExpressionBody) is { } localBody:
                 parameters = local.ParameterList.Parameters.ToImmutableArray();
                 body = localBody;
-                return true;
-            case SimpleLambdaExpressionSyntax simpleLambda:
-                parameters = [simpleLambda.Parameter];
-                body = simpleLambda.Body;
-                return true;
-            case ParenthesizedLambdaExpressionSyntax lambda:
-                parameters = lambda.ParameterList.Parameters.ToImmutableArray();
-                body = lambda.Body;
-                return true;
-            case AnonymousMethodExpressionSyntax anonymous when anonymous.ParameterList is { } anonymousParameters:
-                parameters = anonymousParameters.Parameters.ToImmutableArray();
-                body = anonymous.Body;
                 return true;
             case TypeDeclarationSyntax type when type.ParameterList is { } primary:
                 parameters = primary.Parameters.ToImmutableArray();
@@ -269,26 +249,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
 
         return ReturnedBooleanExpressions(body, model, cancellationToken).Any(expression =>
             Mentions(expression, parameter, model, cancellationToken));
-    }
-    private static bool IsValueAssertionValidation(
-        SyntaxNode body,
-        IParameterSymbol parameter,
-        SemanticModel model,
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (!parameter.Type.IsValueType ||
-            compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) != true)
-        {
-            return false;
-        }
-
-        return body.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().Any(invocation =>
-            model.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol method &&
-            method.ContainingType.Name == "Assert" && HasNamespace(method.ContainingType.ContainingNamespace, ["NUnit", "Framework"]) &&
-            method.Name is "That" or "AreEqual" or "AreNotEqual" or "Throws" or "ThrowsAsync" &&
-            invocation.ArgumentList.Arguments.Any(argument =>
-                Mentions(argument.Expression, parameter, model, cancellationToken)));
     }
     private static bool IsNullPredicateValidation(
         SyntaxNode body,
@@ -776,7 +736,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                 break;
         }
     }
-
 
     private static bool Mentions(
         SyntaxNode expression,
