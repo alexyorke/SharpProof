@@ -51,6 +51,17 @@ internal static class Program
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
+            if (command == "perf-baseline")
+            {
+                var output = args.Length == 3 && args[1] == "--output" ? args[2]
+                    : args.Length == 1 ? Path.Combine(root, "artifacts", "perf")
+                    : throw new ArgumentException("Use perf-baseline [--output <directory>].", nameof(args));
+                var report = await PerfBaseline.MeasureAsync(root, cancellation.Token).ConfigureAwait(false);
+                var (verdict, failed) = PerfBaseline.Compare(root, report);
+                await PerfBaseline.WriteAsync(output, report, PerfBaseline.Summarize(report, verdict), cancellation.Token).ConfigureAwait(false);
+                Log.Info(verdict);
+                return failed ? 1 : 0;
+            }
             if (command == "corpus-update")
             {
                 await CorpusGate.WriteActualSnapshotAsync(root, cancellation.Token)
@@ -58,7 +69,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|perf-baseline|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
             return 2;
         }

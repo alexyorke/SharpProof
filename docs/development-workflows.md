@@ -17,7 +17,8 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Coverage | `tooling coverage` | Release Cobertura line coverage of the C# sources, merged into `artifacts/coverage/summary.md` |
 | Clean package graph | `tooling pack -Configuration Release` | Exact-commit product packages; `tooling pack-tool` packs the optional developer packages |
 | Retained and rotating fuzz | `tooling fuzz-nightly -Configuration Release` | Bounded clean-source campaign with validated per-run results |
-| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus and bounded fuzz; CI uploads all evidence |
+| Verification performance | `tooling perf-baseline` | Verifies the pinned corpus on one solver lane and writes per-callable solver work and time to `artifacts/perf` |
+| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline and bounded fuzz; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
 The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns test parallelism and wall-time budgets. A successful selected test or feedback profile establishes only its selected scope.

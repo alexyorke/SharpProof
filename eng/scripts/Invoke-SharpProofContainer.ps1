@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'perf-baseline', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -367,6 +367,7 @@ switch ($Command) {
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
         Invoke-PipelineCommand 'corpus' 'Release'
+        Invoke-PipelineCommand 'perf-baseline' 'Release'
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
     }
     'security' {
@@ -567,7 +568,7 @@ switch ($Command) {
             'Sample validation failed.' `
         ([ordered]@{ Configuration = $Configuration; PackageSource = $PackageSource }).AsReadOnly()
     }
-    { $_ -in @('corpus', 'corpus-update') } {
+    { $_ -in @('corpus', 'corpus-update', 'perf-baseline') } {
         $gateMode = $Command
         $gateProject = 'tests/SharpProof.Gates/SharpProof.Gates.csproj'
         Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')

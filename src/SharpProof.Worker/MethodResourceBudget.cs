@@ -42,6 +42,20 @@ internal sealed class MethodResourceBudget(
 
     internal bool IsExceeded => GetConsumedResourceCount() > _methodRlimit;
 
+    // Solver work actually counted for this method. Unlike the budget view, it
+    // excludes the fixed reservations made when no backend counter exists.
+    internal long MeasuredResourceCount
+    {
+        get
+        {
+            var measured = _completedResourceCount;
+            foreach (var counter in _resourceCounters)
+            { measured = checked(measured + counter.Consumed); }
+            return _readConsumedResourceCount == null ? measured :
+                checked(measured + Math.Max(0, _readConsumedResourceCount() - _startingResourceCount));
+        }
+    }
+
     private long GetConsumedResourceCount()
     {
         var additional = _completedResourceCount;

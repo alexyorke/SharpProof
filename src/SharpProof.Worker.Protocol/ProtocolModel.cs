@@ -6,13 +6,13 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "46";
+    public const string Current = "47";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 69;
+    public const int Current = 70;
 }
 
 internal static class WorkerManifestVersions
@@ -707,6 +707,28 @@ internal sealed record WorkerVerificationSummary
     public WorkerBudgets Budgets { get; init; } = new();
     [JsonRequired]
     public long ElapsedMilliseconds { get; init; }
+    // Measured solver work and time for each callable verified in this run.
+    // Absent on cache hits, where no callable was verified.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerCostReport? Costs { get; init; }
+}
+
+internal sealed record WorkerCostReport
+{
+    [JsonRequired]
+    [JsonConverter(typeof(ProtocolArrayJsonConverter))]
+    public ImmutableArray<WorkerCallableCost> Callables { get; set; } = [];
+}
+
+internal sealed record WorkerCallableCost
+{
+    [JsonRequired]
+    public string CallableId { get; init; } = string.Empty;
+    // Z3 resource units: deterministic for a fixed solver build and input.
+    [JsonRequired]
+    public long ConsumedRlimit { get; init; }
+    [JsonRequired]
+    public long ElapsedMilliseconds { get; init; }
 }
 
 internal sealed record WorkerProtocolError
@@ -1104,7 +1126,29 @@ internal static class WorkerProtocolMetadata
             (value.Versions != null
             && WorkerProtocolMetadata.IsVersionsValid(value.Versions))),
         new("summary.elapsed", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => value.ElapsedMilliseconds >= 0),
+        new("summary.costs", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => IsCostReportValid(value.Costs)),
     ];
+    internal static bool IsCostReportValid(WorkerCostReport? /* SPINT001: all values valid - absent costs are valid */ value)
+    {
+        if (value == null)
+        {
+            return true;
+        }
+        if (value.Callables.IsDefault)
+        {
+            return false;
+        }
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var cost in value.Callables)
+        {
+            if (cost == null || string.IsNullOrWhiteSpace(cost.CallableId) || !seen.Add(cost.CallableId) ||
+                cost.ConsumedRlimit < 0 || cost.ElapsedMilliseconds < 0)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
     internal static bool IsProtocolErrorValid(WorkerProtocolError value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));

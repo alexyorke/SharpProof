@@ -5,7 +5,8 @@ internal static partial class CallableVerificationPolicy
     internal static async Task<CallableVerificationResult> VerifyNativeTargetAsync(
         /* SPINT001: all values valid - Null represents an unavailable backend for native verification. */ ISmtBackend backend, CompilerCallablePreparation target, WorkerBudgets budgets,
         Func<long>? readConsumedResourceCount, int methodWallTimeMilliseconds,
-        CancellationTokenSource projectBoundary, CancellationToken callerCancellation)
+        CancellationTokenSource projectBoundary, CancellationToken callerCancellation,
+        Action<long>? /* SPINT001: all values valid - null skips cost measurement */ reportConsumedResources = null)
     {
         ArgumentNullGuard.NotNull(target, nameof(target));
         ArgumentNullGuard.NotNull(budgets, nameof(budgets));
@@ -22,9 +23,10 @@ internal static partial class CallableVerificationPolicy
         var hasPostconditions = target.Entry.ClaimIds.Any(id => !effects.ContainsKey(id) && !calls.Contains(id));
         var entryPublished = false;
         var entryFeasibility = CallableEntryFeasibility.Feasible;
+        MethodResourceBudget? measuredBudget = null;
         try
         {
-            var resourceBudget = new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
+            var resourceBudget = measuredBudget = new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit);
             if (hasPostconditions && target.Total != null)
             {
                 await TotalCallableVerifier.VerifyAsync(target, budgets, check =>
@@ -75,6 +77,23 @@ internal static partial class CallableVerificationPolicy
         {
             return Interrupted(WorkerHost.IsBackendUnavailable(exception) ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.InfrastructureFailure,
                 WorkerCallableCoverageReason.InfrastructureFailure);
+        }
+        finally
+        {
+            ReportCost();
+        }
+
+        // Cost reporting is diagnostic; a counter that cannot be read leaves the cost unreported.
+        void ReportCost()
+        {
+            if (measuredBudget == null || reportConsumedResources == null)
+            { return; }
+            long consumed;
+            try
+            { consumed = measuredBudget.MeasuredResourceCount; }
+            catch (Exception exception) when (exception is InvalidOperationException or OverflowException)
+            { return; }
+            reportConsumedResources(consumed);
         }
 
         void PublishEntry(CallableEntryFeasibility entry)
