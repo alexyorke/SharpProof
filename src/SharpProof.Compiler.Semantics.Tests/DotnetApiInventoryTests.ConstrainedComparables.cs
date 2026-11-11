@@ -18,9 +18,9 @@ public sealed partial class DotnetApiInventoryTests
                     var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Check() => Compare<" + type + ">(" + values[left] + ", " + values[right] + "); " +
                         "static int Compare<T>(T x, T y) where T : System.IComparable<T> => x.CompareTo(y); }");
                     var compilation = references.AddSyntaxTrees(tree);
-                    if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+                    if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
                     { return false; }
-                    var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Check");
+                    var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Check");
                     var model = compilation.GetSemanticModel(tree);
                     var factory = new IrFactory();
                     var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);

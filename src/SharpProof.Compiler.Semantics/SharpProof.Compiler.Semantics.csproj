@@ -14,7 +14,7 @@
     <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs" Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
     <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />

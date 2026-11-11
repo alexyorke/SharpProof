@@ -56,15 +56,15 @@ public sealed class IntegralConvertOracleTests
         var tree = CSharpSyntaxTree.ParseText("namespace System { public static class Convert { public static long ToInt64(int value) => 42; } } public static class Probe { public static long Target(int value) { return System.Convert.ToInt64(value); } }");
         var compilation = CSharpCompilation.Create("SourceConvert", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
-        Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new ArgumentNullException(nameof(havoc)) : IrOpaqueCallSite.IntegralConvertInitializationPrimitive(factory, havoc.Operation) != null), Is.False);
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => IrOpaqueCallSite.IntegralConvertInitializationPrimitive(factory, havoc.Operation) != null), Is.False);
     }
 
     [TestCase("sbyte", "-128")]

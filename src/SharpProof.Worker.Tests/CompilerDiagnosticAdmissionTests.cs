@@ -47,7 +47,7 @@ public sealed class CompilerDiagnosticAdmissionTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
-            Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("compiler_manifest.invalid"));
+            Assert.That(response.Errors.Select(error => error.Code), Does.Contain("compiler_manifest.invalid"));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }

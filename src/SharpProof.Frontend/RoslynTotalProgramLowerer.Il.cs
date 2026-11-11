@@ -337,8 +337,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
-        var replacements = ImmutableDictionaryCapture.Create(frame.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
-            parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
+        var replacements = ImmutableDictionaryCapture.Create(frame.Parameters, parameter => parameter.Entry,
+            parameter => arguments[parameter.Parameter.Ordinal]);
         for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)
         {
             SpendRegion();

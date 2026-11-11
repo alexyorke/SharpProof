@@ -168,7 +168,7 @@ public sealed class AdvisoryScalarIntervalBoundaryTests
     private static void BindCore(string scenario)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        RecordBinding(scenario, typeof(CoreTransfer), "SharpProof.Analyzer.Core");
+        RecordBinding(scenario, typeof(CoreTransfer), "SharpProof.Analyzer");
     }
 
     private static void RecordBinding(string scenario, Type implementationType, string expectedAssembly)

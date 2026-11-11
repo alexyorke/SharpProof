@@ -30,11 +30,10 @@ internal static class WorkerCallPreconditionCoverage
             (IsTimingOnly(claim, result) ? timedOut : blocking).Add(claim.CallableId);
         }
         return response.CallableResults
-            .Where(callable => callable is null ? throw new ArgumentNullException(nameof(callable)) :
-                callable.Coverage == WorkerCallableCoverage.Incomplete &&
+            .Where(callable => callable.Coverage == WorkerCallableCoverage.Incomplete &&
                 callable.Reason is WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout &&
                 timedOut.Contains(callable.CallableId) && !blocking.Contains(callable.CallableId))
-            .Select(static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId)
+            .Select(static callable => callable.CallableId)
             .ToImmutableHashSet(StringComparer.Ordinal);
     }
 
@@ -45,9 +44,8 @@ internal static class WorkerCallPreconditionCoverage
         response = RepositoryParameterGuard.NotNull(response, nameof(response));
         var claims = Claims(response);
         return response.Manifest.UncheckedCallSites + response.ClaimResults
-            .Where(result => result is null ? throw new ArgumentNullException(nameof(result)) :
-                claims.TryGetValue(result.ClaimId, out var claim) && IsTimingOnly(claim, result))
-            .Select(result => result is null ? throw new ArgumentNullException(nameof(result)) : claims[result.ClaimId].Location)
+            .Where(result => claims.TryGetValue(result.ClaimId, out var claim) && IsTimingOnly(claim, result))
+            .Select(result => claims[result.ClaimId].Location)
             .Distinct()
             .Count();
     }

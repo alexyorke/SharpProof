@@ -105,8 +105,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(dependency.WitnessIdentifier, Is.EqualTo(ResourceLayoutCatalog.Witness));
         var binding = new NativeResourceLayoutBinding(target);
         Assert.That(binding.Bind(), Is.Not.Null);
-        target.Entry.Assumptions = target.Entry.Assumptions.Where(assumption => assumption is null ?
-            throw new ArgumentNullException(nameof(assumption)) : assumption.Id != dependency.AssumptionId).ToImmutableArray();
+        target.Entry.Assumptions = target.Entry.Assumptions.Where(assumption => assumption.Id != dependency.AssumptionId).ToImmutableArray();
         Assert.That(binding.Bind(), Is.Null, "Rebinding must discard the previously owned layout dependency.");
         Action staleProjection = () => binding.Project(proven);
         Assert.Throws<ArgumentException>(staleProjection);

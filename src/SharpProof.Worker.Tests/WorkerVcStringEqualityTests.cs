@@ -123,10 +123,10 @@ internal sealed class WorkerVcStringEqualityTests
     {
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal)));
-        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId))).ToImmutableArray();
-        Assert.That(claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome)).ToImmutableArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
-            string.Join(", ", claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason))));
+            callable.CallableId.Contains(".Greeting(", StringComparison.Ordinal));
+        var claims = response.ClaimResults.Where(result => callable.ClaimIds.Contains(result.ClaimId)).ToImmutableArray();
+        Assert.That(claims.Select(claim => claim.Outcome).ToImmutableArray(), Has.Length.EqualTo(2).And.All.EqualTo(WorkerClaimOutcome.Proven),
+            string.Join(", ", claims.Select(claim => claim.Reason)));
     }
 
     // A string equal in content to a literal need not be the literal's object.
@@ -141,7 +141,7 @@ internal sealed class WorkerVcStringEqualityTests
         System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal)));
-        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
+            callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal));
+        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
     }
 }

@@ -18,7 +18,7 @@ public sealed class BulkCompilerChildGuardCoverageTests
         Assert.That(subject.Invoke([17]), Is.True);
         Assert.That(subject.Invoke(["word"]), Is.InstanceOf<InvalidCastException>());
         var tree = subject.Compilation.SyntaxTrees.Single();
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Helper");
         var model = subject.Compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = (IIsTypeOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;

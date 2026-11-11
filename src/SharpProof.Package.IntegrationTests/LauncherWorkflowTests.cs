@@ -114,7 +114,7 @@ internal sealed class LauncherWorkflowTests
             Assert.That(response.RunStatus, Is.EqualTo(invalidAuthority ? WorkerRunStatus.Failed : WorkerRunStatus.TimedOut));
             Assert.That(response.FailureReason, Is.EqualTo(invalidAuthority ? WorkerRunFailureReason.MalformedResult : WorkerRunFailureReason.None));
             Assert.That(response.InputHash, Is.Not.EqualTo(WorkerResultAssembler.EmptyInputHash));
-            Assert.That(response.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code)),
+            Assert.That(response.Errors.Select(static item => item.Code),
                 invalidAuthority ? Does.Contain("worker.malformed_result") : Does.Contain(WorkerProtocolErrorCodes.WorkerTimeout));
             if (!invalidAuthority)
             {
@@ -266,7 +266,7 @@ internal sealed class LauncherWorkflowTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
-            Assert.That(response.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Code)), Does.Contain("budgets.parallelism"));
+            Assert.That(response.Errors.Select(static item => item.Code), Does.Contain("budgets.parallelism"));
             Assert.That(response.Manifest.Claims, Is.Empty);
             Assert.That(response.ClaimResults, Is.Empty);
         }

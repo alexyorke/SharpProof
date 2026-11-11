@@ -26,8 +26,7 @@ internal static partial class CompilerLoweredArtifact
         entry = ArgumentNullGuard.NotNull(entry, nameof(entry));
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         cancellation.ThrowIfCancellationRequested();
-        var resources = claims.Where(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound).ToArray();
+        var resources = claims.Where(claim => claim.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound).ToArray();
         if (resources.Length == 0)
         {
             if (artifact.ResourceProgram is not null || artifact.ResourceUnknownReason is not null)

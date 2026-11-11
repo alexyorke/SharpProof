@@ -58,8 +58,8 @@ internal static class AdvisoryRequiresDiagnostics
         if (!facts.Accepted)
         { return AnalyzerSemanticOutcome.Unknown; }
         var outcome = AnalyzerSemanticOutcome.Unknown;
-        foreach (var snapshot in facts.Markers.Where(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Value is { IsSingleton: true, SingletonValue: 0 }))
-            .GroupBy(static snapshot => snapshot is null ? throw new System.ArgumentNullException(nameof(snapshot)) : (snapshot.Marker.Id)).Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First())))
+        foreach (var snapshot in facts.Markers.Where(static snapshot => snapshot.Value is { IsSingleton: true, SingletonValue: 0 })
+            .GroupBy(static snapshot => snapshot.Marker.Id).Select(static group => group.First()))
         {
             var call = calls[snapshot.Marker];
             var location = body.Locate(snapshot.Marker.Operation) ?? Location.None;
@@ -89,12 +89,12 @@ internal static class AdvisoryRequiresDiagnostics
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
-        return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
+        return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation switch
         {
             IInvocationOperation invocation => session.HasPotentialCallPreconditions(invocation.TargetMethod),
             IObjectCreationOperation { Constructor: { } constructor } => session.HasPotentialCallPreconditions(constructor),
             _ => false
-        })) == true;
+        }) == true;
     }
 
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
@@ -102,7 +102,7 @@ internal static class AdvisoryRequiresDiagnostics
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
         var terms = ImmutableStack<IrTerm>.Empty;
-        foreach (var instruction in program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)))
+        foreach (var instruction in program.Blocks.SelectMany(static block => block.Instructions))
         {
             variables.UnionWith(IrInstructionFacts.WrittenVariables(instruction));
             foreach (var term in IrInstructionFacts.ReadTerms(instruction))

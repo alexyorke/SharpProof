@@ -16,7 +16,7 @@ internal sealed class ContractApiMetadataNameMatcher
 
         var parts = ImmutableInterlocked.GetOrAdd(ref _parts,
             metadataName,
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new MetadataNameParts(value)));
+            static value => new MetadataNameParts(value));
         return string.Equals(
             type.MetadataName,
             parts.TypeName,

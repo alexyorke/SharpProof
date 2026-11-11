@@ -74,7 +74,7 @@ public sealed class NativeConstructionAdmissionTests
         var ensures = new PassiveContractClause(factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(input.Current), factory.Boolean(false)), factory.Boolean(true), site);
         var candidate = new PassiveCallableCandidate("bounded-expansion-admission", builder.Build(), [input], null, [], [ensures]);
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).Count(), Is.LessThan(PassiveCallableVcBuilder.MaximumSteps));
         Assert.That(PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken), Has.Length.EqualTo(1));
         foreach (var value in ImmutableArray.Create(false, true))
         {

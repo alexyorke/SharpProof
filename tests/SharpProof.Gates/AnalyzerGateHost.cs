@@ -112,15 +112,14 @@ internal static class AnalyzerGateHost
     /// </summary>
     internal static readonly ImmutableArray<string> DiagnosticIds =
         [.. GeneratedDiagnosticDescriptors.SupportedDiagnostics
-            .Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id))
+            .Select(static descriptor => descriptor.Id)
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (id), StringComparer.Ordinal)];
+            .OrderBy(static id => id, StringComparer.Ordinal)];
 
     private static readonly ImmutableDictionary<string, ReportDiagnostic>
         DiagnosticOptions = GeneratedDiagnosticDescriptors.SupportedDiagnostics.ToImmutableDictionary(
-            static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id,
-            static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) :
-                descriptor.IsEnabledByDefault ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress,
+            static descriptor => descriptor.Id,
+            static descriptor => descriptor.IsEnabledByDefault ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress,
             StringComparer.Ordinal);
     private static readonly AnalyzerOptions EmptyAnalyzerOptions =
         new(
@@ -162,8 +161,8 @@ internal static class AnalyzerGateHost
         ThrowIfCompilationHasErrors(
             compilation,
             int.MaxValue,
-            static errors => errors is null ? throw new System.ArgumentNullException(nameof(errors)) : (new InvalidOperationException(
-                "Corpus source did not compile:" + Environment.NewLine + errors)),
+            static errors => new InvalidOperationException(
+                "Corpus source did not compile:" + Environment.NewLine + errors),
             cancellationToken);
         return compilation;
     }
@@ -238,8 +237,8 @@ internal static class AnalyzerGateHost
         return [.. (await withAnalyzers
                 .GetAnalyzerDiagnosticsAsync(cancellationToken)
                 .ConfigureAwait(false))
-            .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)];
+            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
     internal static void ThrowIfCompilationHasErrors(
@@ -252,9 +251,9 @@ internal static class AnalyzerGateHost
         ArgumentNullException.ThrowIfNull(createException);
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                diagnostic.Severity == DiagnosticSeverity.Error)
             .Take(limit)
-            .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
+            .Select(static diagnostic => diagnostic.ToString())
             .ToImmutableArray();
         if (errors.Length != 0)
         {
@@ -266,7 +265,7 @@ internal static class AnalyzerGateHost
     {
         var trustedPlatformAssemblies = TrustedPlatformAssemblyPaths.Get();
         ImmutableArray<MetadataReference> references = [.. trustedPlatformAssemblies
-            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)))
+            .Select(static path => MetadataReference.CreateFromFile(path))
             .Append(
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))
@@ -318,7 +317,7 @@ internal static class AnalyzerGateHost
                 string.Join(
                     Environment.NewLine,
                     emit.Diagnostics.Select(static diagnostic =>
-                        diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                        diagnostic.ToString())));
         }
 
         // The production artifact capture requires a file-backed reference.
@@ -364,7 +363,7 @@ internal static class AnalyzerGateHost
         {
             System.ArgumentNullException.ThrowIfNull(method);
             var sourceLocation = method.Locations
-                .FirstOrDefault(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
+                .FirstOrDefault(static location => location.IsInSource);
             var sourceTree = sourceLocation?.SourceTree;
             var sourceFilePath = sourceTree?.FilePath ?? string.Empty;
             var sourceTreeOrdinal = sourceTree != null &&

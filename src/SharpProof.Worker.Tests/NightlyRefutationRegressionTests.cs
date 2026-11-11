@@ -94,7 +94,7 @@ public sealed class NightlyRefutationRegressionTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,
                 nullableContextOptions: NullableContextOptions.Enable));
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var temp = new TempDirectory("sharpproof-nightly-regression-");
         var manifestPath = Path.Combine(temp.FullName, "manifest.json");
         var optionsBuilder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -117,7 +117,7 @@ public sealed class NightlyRefutationRegressionTests
                 concurrentAnalysis: false, logAnalyzerExecutionTime: false));
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         Assert.That(exceptions.ToImmutable(), Is.Empty);
-        Assert.That(diagnostics.Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id is "AD0001" or "SP0049" or "SP0025")), Is.Empty);
+        Assert.That(diagnostics.Where(d => d.Id is "AD0001" or "SP0049" or "SP0025"), Is.Empty);
         Assert.That(File.Exists(manifestPath), Is.True);
         var artifact = CompilerManifestArtifactJson.Deserialize(await File.ReadAllTextAsync(manifestPath), cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var project = new ShadowTestProject(artifact);
@@ -126,8 +126,8 @@ public sealed class NightlyRefutationRegressionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         return response.ClaimResults.Single(result =>
-            result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId &&
-                claim.CallableId.Contains("Target", StringComparison.Ordinal)))));
+            artifact.Manifest.Claims.Any(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId == result.ClaimId &&
+                claim.CallableId.Contains("Target", StringComparison.Ordinal))));
     }
 
     private sealed class OptionsProvider(ImmutableDictionary<string, string> values) : AnalyzerConfigOptionsProvider

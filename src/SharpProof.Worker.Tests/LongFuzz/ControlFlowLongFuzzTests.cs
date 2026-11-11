@@ -343,7 +343,7 @@ public sealed class ControlFlowLongFuzzTests
             case "dnt":
                 {
                     header = "[DoesNotThrow] " + signature;
-                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is not null));
+                    var run = runs.FirstOrDefault(r => r.ExceptionType is not null);
                     truthViolation = run is null ? null : "threw " + run.ExceptionType!.Name + " at x=" + run.X;
                     break;
                 }
@@ -354,16 +354,16 @@ public sealed class ControlFlowLongFuzzTests
                             "SharpProofEffect.Allocates | SharpProofEffect.Throws, ThrownExceptions = new[] { " +
                             "typeof(System.ArgumentException), typeof(System.InvalidOperationException) })] " + signature
                         : "[AllowedExceptions(typeof(System.ArgumentException), typeof(System.InvalidOperationException))] " + signature;
-                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is not null &&
+                    var run = runs.FirstOrDefault(r => r.ExceptionType is not null &&
                         !typeof(ArgumentException).IsAssignableFrom(r.ExceptionType) &&
-                        !typeof(InvalidOperationException).IsAssignableFrom(r.ExceptionType)));
+                        !typeof(InvalidOperationException).IsAssignableFrom(r.ExceptionType));
                     truthViolation = run is null ? null : "threw " + run.ExceptionType!.Name + " at x=" + run.X;
                     break;
                 }
             case "pure":
                 {
                     header = "[EnforcePure] " + signature;
-                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.StateWrites != 0 || r.LockEntries != 0));
+                    var run = runs.FirstOrDefault(r => r.StateWrites != 0 || r.LockEntries != 0);
                     truthViolation = run is null ? null : run.StateWrites != 0
                         ? "wrote State " + run.StateWrites + " time(s), final " + run.State + ", at x=" + run.X
                         : "entered lock " + run.LockEntries + " time(s) at x=" + run.X;
@@ -371,7 +371,7 @@ public sealed class ControlFlowLongFuzzTests
                 }
             default:
                 {
-                    var run = runs.FirstOrDefault(r => r is null ? throw new System.ArgumentNullException(nameof(r)) : (r.ExceptionType is null));
+                    var run = runs.FirstOrDefault(r => r.ExceptionType is null);
                     if (run is null)
                     {
                         session.Count("no-normal-run");
@@ -400,7 +400,7 @@ public sealed class ControlFlowLongFuzzTests
             if (response.Errors.Length > 0)
             {
                 session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, claim, "", "", runtime,
-                    string.Join(" | ", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))), source));
+                    string.Join(" | ", response.Errors.Select(error => error.Code + ":" + error.Message)), source));
                 return;
             }
             if (response.ClaimResults.Length != 1)
@@ -483,9 +483,9 @@ public sealed class ControlFlowLongFuzzTests
         var root = CSharpSyntaxTree.ParseText(prefix + parseable + " } }",
             new CSharpParseOptions(LanguageVersion.CSharp12)).GetRoot();
         var returns = root.DescendantNodes().OfType<ReturnStatementSyntax>()
-            .Where(statement => statement is null ? throw new System.ArgumentNullException(nameof(statement)) : (statement.Expression is not null &&
-                !statement.Ancestors().Any(ancestor => ancestor is null ? throw new System.ArgumentNullException(nameof(ancestor)) : (ancestor is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))))
-            .OrderByDescending(statement => statement is null ? throw new System.ArgumentNullException(nameof(statement)) : (statement.SpanStart));
+            .Where(statement => statement.Expression is not null &&
+                !statement.Ancestors().Any(ancestor => ancestor is null ? throw new System.ArgumentNullException(nameof(ancestor)) : (ancestor is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax)))
+            .OrderByDescending(statement => statement.SpanStart);
         foreach (var statement in returns)
         {
             var expression = statement.Expression!;
@@ -508,7 +508,7 @@ public sealed class ControlFlowLongFuzzTests
     private static bool HasErrors(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        return compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error));
+        return compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     private static CSharpCompilation Compile(string source)

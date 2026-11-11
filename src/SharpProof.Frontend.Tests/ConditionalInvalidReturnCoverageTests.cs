@@ -61,14 +61,14 @@ public sealed class ConditionalInvalidReturnCoverageTests
     public void OmittedStatementEmitsAndReplaysSeven()
     {
         var compilation = CreateCompilation(OmittedStatementSource);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var (graph, context, factory, invocation) = CreateCandidate(compilation);
         var emission = new CSharpInvocationEmissionPolicy(compilation);
         Assert.That(emission.IsElided(invocation), Is.True);
-        var branch = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return));
+        var branch = graph.Blocks.Single(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return);
         Assert.That(branch.BranchValue, Is.InstanceOf<ILiteralOperation>());
         Assert.That(emission.IsElided(branch.BranchValue!), Is.False);
         var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
@@ -99,15 +99,15 @@ public sealed class ConditionalInvalidReturnCoverageTests
         }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(expectedErrors));
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors.Select(diagnostic => diagnostic.Id), Is.EqualTo(expectedErrors));
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.False);
-        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(expectedErrors));
+        Assert.That(emitted.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.Id), Is.EqualTo(expectedErrors));
         var (graph, context, factory, invocation) = CreateCandidate(compilation);
-        var branch = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return));
+        var branch = graph.Blocks.Single(block => block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Return);
         Assert.That(branch.IsReachable, Is.True);
         Assert.That(branch.ConditionKind, Is.EqualTo(ControlFlowConditionKind.None));
         Assert.That(branch.Operations, Is.Empty);
@@ -161,7 +161,7 @@ public sealed class ConditionalInvalidReturnCoverageTests
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var target = model.GetDeclaredSymbol(syntax)!;
         var invocationSyntax = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         Assert.That(model.GetOperation(invocationSyntax), Is.InstanceOf<IInvocationOperation>());

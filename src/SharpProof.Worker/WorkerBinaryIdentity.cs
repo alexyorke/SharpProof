@@ -28,7 +28,7 @@ internal static class WorkerBinaryIdentity
             .Append(Path.Combine(directory, "Microsoft.Z3.dll"))
             .Where(File.Exists)
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (Path.GetFileName(file)), StringComparer.Ordinal);
+            .OrderBy(static file => Path.GetFileName(file), StringComparer.Ordinal);
         using var hash = new CanonicalHashWriter();
         foreach (var file in files)
         {

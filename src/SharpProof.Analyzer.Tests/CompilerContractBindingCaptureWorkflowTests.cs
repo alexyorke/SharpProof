@@ -30,7 +30,7 @@ public sealed class CompilerContractBindingCaptureWorkflowTests
                 }
             }
             """, [], filePath: "binding.cs");
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var method = compilation.GetTypeByMetadataName("Subject")!
             .GetMembers("Identity").OfType<IMethodSymbol>().Single();
         var binding = new ContractBinder(compilation).Bind(method);
@@ -57,7 +57,7 @@ public sealed class CompilerContractBindingCaptureWorkflowTests
     private static async Task<CompilerManifestArtifact> CaptureAsync(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var directory = Path.Combine(Path.GetTempPath(), "SharpProofBindingCapture-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try

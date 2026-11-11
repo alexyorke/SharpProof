@@ -20,23 +20,20 @@
     <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)src\SharpProof.Analyzer\SharpProof.Analyzer.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <ProjectReference Include="$(_SharpProofAnalyzerConsumerDirectory)src\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj"
-                      ReferenceOutputAssembly="false" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Analyzer.Core.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Compiler.Semantics.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Dataflow.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Frontend.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Ir.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\SharpProof.Specs.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Buffers.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Memory.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Numerics.Vectors.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Reflection.Metadata.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll" />
-    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\System.Threading.Tasks.Extensions.dll" />
-    <Analyzer Update="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(Configuration)\netstandard2.0\*"
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\SharpProof.Compiler.Semantics.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\SharpProof.Dataflow.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\SharpProof.Frontend.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\SharpProof.Ir.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\SharpProof.Specs.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Buffers.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Collections.Immutable.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Memory.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Numerics.Vectors.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Reflection.Metadata.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll" />
+    <Analyzer Include="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\System.Threading.Tasks.Extensions.dll" />
+    <Analyzer Update="$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(Configuration)\netstandard2.0\*"
               SharpProofSourceTreeDependencyGroup="Portable" />
   </ItemGroup>
 
@@ -61,9 +58,6 @@
       <_SharpProofMappedAnalyzerProjectReference
           Include="@(ProjectReferenceWithConfiguration)"
           Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.Analyzer'" />
-      <_SharpProofMappedAnalyzerCoreProjectReference
-          Include="@(ProjectReferenceWithConfiguration)"
-          Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.Analyzer.Core'" />
       <_SharpProofMappedCollectorProjectReference
           Include="@(ProjectReferenceWithConfiguration)"
           Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.CompilerCollector'" />
@@ -77,11 +71,7 @@
     <PropertyGroup Condition="'@(_SharpProofMappedAnalyzerProjectReference)' != ''">
       <_SharpProofMappedAnalyzerConfiguration>@(_SharpProofMappedAnalyzerProjectReference->'%(Configuration)')</_SharpProofMappedAnalyzerConfiguration>
       <_SharpProofMappedAnalyzerConfiguration Condition="'$(_SharpProofMappedAnalyzerConfiguration)' == ''">$(Configuration)</_SharpProofMappedAnalyzerConfiguration>
-    </PropertyGroup>
-    <PropertyGroup Condition="'@(_SharpProofMappedAnalyzerCoreProjectReference)' != ''">
-      <_SharpProofMappedAnalyzerCoreConfiguration>@(_SharpProofMappedAnalyzerCoreProjectReference->'%(Configuration)')</_SharpProofMappedAnalyzerCoreConfiguration>
-      <_SharpProofMappedAnalyzerCoreConfiguration Condition="'$(_SharpProofMappedAnalyzerCoreConfiguration)' == ''">$(Configuration)</_SharpProofMappedAnalyzerCoreConfiguration>
-      <_SharpProofMappedAnalyzerDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer.Core\$(_SharpProofMappedAnalyzerCoreConfiguration)\netstandard2.0</_SharpProofMappedAnalyzerDependencyDirectory>
+      <_SharpProofMappedAnalyzerDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)artifacts\bin\SharpProof.Analyzer\$(_SharpProofMappedAnalyzerConfiguration)\netstandard2.0</_SharpProofMappedAnalyzerDependencyDirectory>
     </PropertyGroup>
     <PropertyGroup Condition="'@(_SharpProofMappedCollectorProjectReference)' != ''">
       <_SharpProofMappedCollectorConfiguration>@(_SharpProofMappedCollectorProjectReference->'%(Configuration)')</_SharpProofMappedCollectorConfiguration>

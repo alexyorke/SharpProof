@@ -73,7 +73,7 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                         $"{measured.Name}: bytes{MeasurementCount}={measured.Target.AllocatedBytes}; " +
                         $"native={observation.Outcome}/{observation.Reason}");
                 }
-                if (observation.Cases.All(measured => measured is null ? throw new System.ArgumentNullException(nameof(measured)) : (measured.Target.AllocatedBytes == 0)))
+                if (observation.Cases.All(measured => measured.Target.AllocatedBytes == 0))
                 {
                     Assert.That(observation.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
                         observation.Boundary + ": existing-behavior preservation control for the four sampled inputs; " +
@@ -126,8 +126,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
                 TargetNoOptimization = (flags & MethodImplAttributes.NoOptimization) != 0,
                 ControlNoInlining = (controlFlags & MethodImplAttributes.NoInlining) != 0,
                 ControlNoOptimization = (controlFlags & MethodImplAttributes.NoOptimization) != 0,
-                HasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box")),
-                HasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst")),
+                HasBox = instructions.Any(instruction => instruction.OpCode == "box"),
+                HasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst"),
                 IlHex = Convert.ToHexString(il.AsSpan()),
                 Instructions = instructions,
                 Cases = cases,
@@ -170,21 +170,21 @@ public sealed class GenericFixedTestedTypeControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = discovery.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            ManifestClaims = discovery.Manifest.Claims.Select(claim => new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToImmutableArray(),
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            }).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(claim => new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             Cases = cases,
-            AnyObservedAllocation = cases.Any(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes > 0)),
-            AllFourObservedZero = cases.All(observed => observed is null ? throw new System.ArgumentNullException(nameof(observed)) : (observed.Target.AllocatedBytes == 0)),
+            AnyObservedAllocation = cases.Any(observed => observed.Target.AllocatedBytes > 0),
+            AllFourObservedZero = cases.All(observed => observed.Target.AllocatedBytes == 0),
             FrozenCorrectnessRule = "Any observed allocation > 0 implies the corresponding universal ZeroAllocations claim cannot be Proven.",
             FrozenPreservationControl = "When all four sampled inputs are zero-byte observations, preserve existing Proven behavior; sampling does not establish zero allocation for every T or runtime."
         });
@@ -281,8 +281,8 @@ public sealed class GenericFixedTestedTypeControlAuditTests
     private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .Where(field => field.FieldType == typeof(OpCode))
+            .Select(field => (OpCode)field.GetValue(null)!)
             .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)

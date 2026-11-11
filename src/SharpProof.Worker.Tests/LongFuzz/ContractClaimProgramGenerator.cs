@@ -387,7 +387,7 @@ internal sealed class ContractClaimProgramGenerator(Random random)
     {
         System.ArgumentNullException.ThrowIfNull(scope);
         var assignable = ImmutableArray.CreateBuilder<string>();
-        assignable.AddRange(scope.Where(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (name.StartsWith('v') || name.StartsWith('t'))));
+        assignable.AddRange(scope.Where(name => name.StartsWith('v') || name.StartsWith('t')));
         assignable.Add("x");
         assignable.Add("y");
         assignable.Add("State");

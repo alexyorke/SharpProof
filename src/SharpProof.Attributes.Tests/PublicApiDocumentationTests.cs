@@ -145,7 +145,7 @@ internal sealed class PublicApiDocumentationTests
             : "(" + string.Join(
                 ",",
                 parameters.Select(static parameter =>
-                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (GetParameterTypeName(parameter.ParameterType)))) + ")";
+                    GetParameterTypeName(parameter.ParameterType))) + ")";
         return "M:" + GetTypeName(declaringType) + "." + name + parameterList;
     }
 
@@ -184,11 +184,11 @@ internal sealed class PublicApiDocumentationTests
         System.ArgumentNullException.ThrowIfNull(name);
         Assert.That(
             member.Elements(elementName).Any(element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (string.Equals(
+                string.Equals(
                     (string?)element.Attribute("name"),
                     name,
                     StringComparison.Ordinal) &&
-                !string.IsNullOrWhiteSpace(element.Value))),
+                !string.IsNullOrWhiteSpace(element.Value)),
             Is.True,
             id + " must document " + elementName + " '" + name + "'.");
     }

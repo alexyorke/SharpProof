@@ -22,9 +22,9 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
         }
 
         var errors = Compile(source).GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         Assert.That(errors, Is.Empty,
-            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())))}\n{source}");
+            $"seed {seed}: {string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString()))}\n{source}");
     }
 
     [Test]
@@ -53,8 +53,8 @@ public sealed class ContractClaimCheckedConstantCompileRegressionTests
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors, Is.Empty, string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())));
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(" | ", emit.Diagnostics));

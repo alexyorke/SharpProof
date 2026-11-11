@@ -62,8 +62,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ControlFlowRegionKind.Try or ControlFlowRegionKind.TryAndCatch or ControlFlowRegionKind.Catch or
                     ControlFlowRegionKind.TryAndFinally or ControlFlowRegionKind.Finally or
                     ControlFlowRegionKind.FilterAndHandler or ControlFlowRegionKind.Filter) ||
-                region.Locals.Any(local => local is null ? throw new System.ArgumentNullException(nameof(local)) : ((local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name)) && !IsSynchronizationLocal(graph, local) ||
-                    local.RefKind != RefKind.None || !CSharpOperationSemantics.IsValueDomain(local.Type))))
+                region.Locals.Any(local => (local.IsImplicitlyDeclared || string.IsNullOrEmpty(local.Name)) && !IsSynchronizationLocal(graph, local) ||
+                    local.RefKind != RefKind.None || !CSharpOperationSemantics.IsValueDomain(local.Type)))
             { throw new RegionIncompleteException(); }
             if (region.Kind == ControlFlowRegionKind.Catch)
             {
@@ -82,7 +82,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             if (region.Kind == ControlFlowRegionKind.Filter)
             {
                 var parent = region.EnclosingRegion ?? throw new RegionIncompleteException();
-                var caught = parent.NestedRegions.SingleOrDefault(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Catch)) ?? throw new RegionIncompleteException();
+                var caught = parent.NestedRegions.SingleOrDefault(child => child.Kind == ControlFlowRegionKind.Catch) ?? throw new RegionIncompleteException();
                 var filter = new RegionFilter(region, caught, _context.Temporary(RegionInteger),
                     RegionBlock("filter:accepted"), RegionBlock("filter:rejected"));
                 _regionFilters.AddUnique(region, filter);
@@ -173,11 +173,11 @@ internal sealed partial class RoslynTotalProgramLowerer
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         local = RepositoryParameterGuard.NotNull(local, nameof(local));
         return local.IsImplicitlyDeclared && local.Type.SpecialType == SpecialType.System_Boolean &&
-            graph.Blocks.Any(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations.Any(operation =>
+            graph.Blocks.Any(block => block.Operations.Any(operation =>
                 operation is null ? throw new System.ArgumentNullException(nameof(operation)) : ((operation is IExpressionStatementOperation statement ? statement.Operation : operation) is IInvocationOperation invocation &&
                 invocation.IsImplicit && CSharpOperationSemantics.IsMonitorAttempt(invocation) && invocation.Arguments.Length == 2 &&
                 invocation.Arguments[1].Value is ILocalReferenceOperation reference &&
-                SymbolEqualityComparer.Default.Equals(reference.Local, local)))));
+                SymbolEqualityComparer.Default.Equals(reference.Local, local))));
     }
 
     private (BasicBlock? Block, int Operation) RegionLocalInitialization()
@@ -341,8 +341,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
         return _context.Result is { } result && source.Predecessors.Any(predecessor =>
-                predecessor is null ? throw new System.ArgumentNullException(nameof(predecessor)) : (predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
-                (predecessor.Source.IsReachable || _compilerElision.IsRestored(predecessor.Source))))
+                predecessor.Semantics == ControlFlowBranchSemantics.Regular &&
+                (predecessor.Source.IsReachable || _compilerElision.IsRestored(predecessor.Source)))
             ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type)
             : null;
     }
@@ -419,7 +419,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     }
                 }
                 else if (parent.Kind == ControlFlowRegionKind.TryAndFinally)
-                { throughFinally.Add(parent.NestedRegions.SingleOrDefault(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (child.Kind == ControlFlowRegionKind.Finally)) ?? throw new RegionIncompleteException()); }
+                { throughFinally.Add(parent.NestedRegions.SingleOrDefault(child => child.Kind == ControlFlowRegionKind.Finally) ?? throw new RegionIncompleteException()); }
             }
         }
         return EnterRegionFinallyChain(throughFinally.ToImmutable(), target, token.Site, token,

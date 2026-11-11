@@ -166,7 +166,7 @@ public sealed class BulkCoreApiTests
         var method = compilation.GetSpecialType(SpecialType.System_String)
             .GetMembers("IsNullOrEmpty")
             .OfType<IMethodSymbol>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 1));
+            .Single(candidate => candidate.Parameters.Length == 1);
 
         Assert.That(session.HasCreatedApiSpecs, Is.False);
         var specs = session.ApiSpecs;
@@ -432,7 +432,7 @@ public sealed class BulkCoreApiTests
             .Single();
         var ordinaryMethod = root.DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Local"));
+            .Single(method => method.Identifier.ValueText == "Local");
 
         SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
             localFunction,
@@ -456,11 +456,11 @@ public sealed class BulkCoreApiTests
         var diagnostics = diagnosticBuilder.ToImmutable();
         Assert.That(diagnostics, Has.Length.EqualTo(2));
         Assert.That(
-            diagnostics.All(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")),
+            diagnostics.All(static diagnostic => diagnostic.Id == "SP0024"),
             Is.True);
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture))),
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture)),
             Has.All.Contain("expected a non-empty reason"));
     }
 
@@ -533,7 +533,7 @@ public sealed class BulkCoreApiTests
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         Assert.That(
-            emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)),
+            emit.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
             Is.Empty);
         Assert.That(emit.Success, Is.True, string.Join(Environment.NewLine, emit.Diagnostics));
         return (compilation, ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length))));

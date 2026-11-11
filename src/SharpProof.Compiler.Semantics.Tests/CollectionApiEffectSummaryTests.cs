@@ -10,8 +10,8 @@ public sealed class CollectionApiEffectSummaryTests
     public void KnownExceptionAndAllocationFacetsSurviveUnknownIndexerEffects()
     {
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? throw new InvalidOperationException("Runtime references unavailable.")).Split(Path.PathSeparator).ToImmutableArray();
-        var compilation = CSharpCompilation.Create("CollectionEffectProjection", references: paths.Append(typeof(Contract).Assembly.Location).Distinct(StringComparer.Ordinal).Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))));
-        var getter = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.GetMembers().OfType<IPropertySymbol>().Single(property => property is null ? throw new global::System.ArgumentNullException(nameof(property)) : (property.IsIndexer)).GetMethod!;
+        var compilation = CSharpCompilation.Create("CollectionEffectProjection", references: paths.Append(typeof(Contract).Assembly.Location).Distinct(StringComparer.Ordinal).Select(path => MetadataReference.CreateFromFile(path)));
+        var getter = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.GetMembers().OfType<IPropertySymbol>().Single(property => property.IsIndexer).GetMethod!;
         var summary = new ExternalEffectResolver(compilation, ApiSpecTable.Default).Resolve(getter);
         using (Assert.EnterMultipleScope())
         {

@@ -51,7 +51,7 @@ public sealed class NativeCompilerEntryConstraintReplayTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.CallPreconditions, Is.Not.Empty);
         Assert.That(preparation.Total.DisjointInputs, Is.Not.Empty);

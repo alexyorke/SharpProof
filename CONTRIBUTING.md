@@ -12,7 +12,7 @@ For a bug, reproduce the failure or trace the incorrect behavior before editing.
 
 | Change | Start here | First useful check |
 | --- | --- | --- |
-| Portable diagnostic | `SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, analyzer tests | Focused analyzer regression and diagnostic help link |
+| Portable diagnostic | `SharpProof.Analyzer`, analyzer tests | Focused analyzer regression and diagnostic help link |
 | Contract API/docs | `SharpProof.Attributes`, Attributes tests | Public API/XML checks and documentation snippets |
 | Language semantics | Collector, frontend, verifier and replay boundaries | A compiler-backed regression covering affected stages |
 | Package/MSBuild integration | `SharpProof.Package`, `SharpProof.Verifier`, package tests | Package-backed external consumer reproducing the issue |

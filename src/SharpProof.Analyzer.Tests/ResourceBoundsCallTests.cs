@@ -11,11 +11,10 @@ public sealed partial class ResourceBoundsTests
     {
         ArgumentNullException.ThrowIfNull(source);
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new ArgumentNullException(nameof(d)) :
-            d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identifier.ValueText == "Root");
+            .Single(candidate => candidate.Identifier.ValueText == "Root");
         var model = compilation.GetSemanticModel(tree);
         return ResourceBoundsAnalysis.Analyze((IMethodSymbol)model.GetDeclaredSymbol(method)!,
             method.Body is { } body ? model.GetOperation(body) : model.GetOperation(method.ExpressionBody!.Expression),
@@ -137,11 +136,10 @@ public sealed partial class ResourceBoundsTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation("public static class C { " +
             "public static void Root() {var before=new int[2]; Leaf();} static void Leaf(); }", []);
-        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "CS0501"), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic.Id == "CS0501"), Is.True);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(static candidate =>
-            candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Identifier.ValueText == "Root");
+            candidate.Identifier.ValueText == "Root");
         var model = compilation.GetSemanticModel(tree);
         var result = ResourceBoundsAnalysis.Analyze((IMethodSymbol)model.GetDeclaredSymbol(method)!,
             model.GetOperation(method.Body!), TestContext.CurrentContext.CancellationToken);

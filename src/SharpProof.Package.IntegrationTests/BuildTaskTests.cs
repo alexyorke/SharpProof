@@ -745,7 +745,7 @@ public sealed class BuildTaskTests
             { await System.Threading.Tasks.Task.Delay(10); }
             Assert.That(File.Exists(marker), Is.True,
                 "The actual child must publish its closed PID before its process deadline. Exit=" + task.ExitCode +
-                "; messages=" + string.Join(";", engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
+                "; messages=" + string.Join(";", engine.Messages.Select(message => message.Message)));
             var processId = int.Parse(await File.ReadAllTextAsync(marker), CultureInfo.InvariantCulture);
             Assert.That(processId, Is.GreaterThan(0));
             Assert.That(IsProcessRunning(processId), Is.True);
@@ -944,7 +944,7 @@ public sealed class BuildTaskTests
         {
             Assert.That(task.ExitCode, Is.EqualTo(exitCode));
             Assert.That(
-                engine.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+                engine.Errors.Select(static error => error.Code),
                 Does.Contain("SP0047"));
             Assert.That(
                 task.HasStructuredError,
@@ -1048,7 +1048,7 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.Zero);
                 Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(6)));
                 Assert.That(
-                    engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
+                    engine.Messages.Select(static message => message.Message),
                     Has.Some.Contains("descendant holding its output"));
             }
         }
@@ -1174,7 +1174,7 @@ public sealed class BuildTaskTests
         }
 
         Assert.That(task.Execute(), Is.False);
-        Assert.That(engine.Errors.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Message)), Has.Some.Contains(expectedError));
+        Assert.That(engine.Errors.Select(static item => item.Message), Has.Some.Contains(expectedError));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "result.json")), Is.EqualTo("result"));
@@ -1206,7 +1206,7 @@ public sealed class BuildTaskTests
         Assert.That(task.Execute(), Is.True);
         Assert.That(engine.Errors, Is.Empty);
         Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "unrelated.txt")), Is.EqualTo("unrelated.txt"));
-        Assert.That(names.Take(4).Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : (File.Exists(Path.Combine(directory.FullName, name)))), Is.All.False);
+        Assert.That(names.Take(4).Select(name => File.Exists(Path.Combine(directory.FullName, name))), Is.All.False);
     }
 
     [Test]
@@ -1360,9 +1360,9 @@ public sealed class BuildTaskTests
         Assert.That(File.ReadAllText(Path.Combine(directory.FullName, "completed.txt")), Is.EqualTo("completed"));
         Assert.That(task.ExitCode, Is.EqualTo(3));
         Assert.That(task.HasStructuredError, Is.False);
-        Assert.That(engine.Messages.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Message)),
+        Assert.That(engine.Messages.Select(static item => item.Message),
             Has.Some.Contains("SharpProof worker result could not be published"));
-        Assert.That(engine.Messages.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Message)),
+        Assert.That(engine.Messages.Select(static item => item.Message),
             Has.None.Contains("SharpProof evidence:"));
         foreach (var path in stable)
         {
@@ -1443,7 +1443,7 @@ public sealed class BuildTaskTests
                 }
             }
             Assert.That(publishing, Is.True, "The launcher must acquire a publication member after the child exits. " +
-                string.Join(Environment.NewLine, engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
+                string.Join(Environment.NewLine, engine.Messages.Select(static message => message.Message)));
             task.Cancel();
 
             Assert.That(await execution.WaitAsync(TimeSpan.FromSeconds(5)), Is.True);
@@ -1519,7 +1519,7 @@ public sealed class BuildTaskTests
             Assert.That(task.ExitCode, Is.EqualTo(LinuxProcessControlConstants.TimeoutExitCode));
             Assert.That(task.HasStructuredError, Is.False);
             Assert.That(engine.Errors, Is.Empty);
-            Assert.That(engine.Messages.Select(static message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
+            Assert.That(engine.Messages.Select(static message => message.Message),
                 Has.Some.Contains("descendant holding its output"));
             foreach (var path in stable)
             {
@@ -1742,9 +1742,9 @@ public sealed class BuildTaskTests
     {
         ArgumentNullException.ThrowIfNull(root);
         var muxer = Path.Combine(root, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
-        var appHost = Path.Combine(root, "sdk", "10.0.403", OperatingSystem.IsWindows() ? "MSBuild.exe" : "MSBuild");
+        var appHost = Path.Combine(root, "sdk", "10.0.404", OperatingSystem.IsWindows() ? "MSBuild.exe" : "MSBuild");
         var coreLibrary = Path.Combine(root, "shared", "Microsoft.NETCore.App", "10.0.12", "System.Private.CoreLib.dll");
-        var entryAssembly = Path.Combine(root, "sdk", "10.0.403", "MSBuild.dll");
+        var entryAssembly = Path.Combine(root, "sdk", "10.0.404", "MSBuild.dll");
         Directory.CreateDirectory(Path.Combine(root, "host", "fxr"));
         foreach (var file in ImmutableArray.Create<string>(muxer, appHost, coreLibrary, entryAssembly))
         {

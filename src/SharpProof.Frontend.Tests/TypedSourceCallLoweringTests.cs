@@ -24,7 +24,7 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(execution.ConsumedApproximation, Is.False);
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
-        Assert.That(lowering.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+        Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions)
             .OfType<IrAllocationInstruction>().Count(), Is.EqualTo(1));
     }
 
@@ -69,8 +69,8 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(shadow.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
         var body = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(body.IsExact, Is.True, body.Classification.Abstention.ToString());
-        Assert.That(body.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
+        Assert.That(body.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
     }
 
     [TestCase("int Target(int x) { _ = Helper(x++); return x; } static int Helper(int value) => value + 1;", 3, 4)]
@@ -92,7 +92,7 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(execution.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
         if (members.Contains("new int[]", StringComparison.Ordinal))
         {
-            Assert.That(lowering.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions)
                 .OfType<IrAllocationInstruction>().Count(), Is.EqualTo(1));
         }
     }
@@ -117,7 +117,7 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(lowered.IsShadowCallSkeleton, Is.True);
         Assert.That(lowered.IsExact, Is.False);
         Assert.That(lowered.PreservedSourceCalls, Has.Count.EqualTo(count));
-        Assert.That(lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Count(),
+        Assert.That(lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Count(),
             Is.EqualTo(count));
         Assert.That(subject.Execute(lowered, [3]).Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
     }

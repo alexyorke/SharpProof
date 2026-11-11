@@ -484,8 +484,8 @@ public sealed class SetupInitializerConfigurationCoverageTests
         await fixture.WriteAsync("app/Consumer.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
         _ = await SetupInitializer.InitializeAsync(Path.Combine(fixture.Root, "app/Consumer.csproj"), "portable", true, null, TestContext.CurrentContext.CancellationToken);
         var mapped = XDocument.Load(Path.Combine(fixture.Root, "app/NuGet.Config")).Descendants("packageSource")
-            .Single(static source => source is null ? throw new ArgumentNullException(nameof(source)) : (string?)source.Attribute("key") == "nuget.org")
-            .Elements("package").Select(static package => package is null ? throw new ArgumentNullException(nameof(package)) : (string?)package.Attribute("pattern"));
+            .Single(static source => (string?)source.Attribute("key") == "nuget.org")
+            .Elements("package").Select(static package => (string?)package.Attribute("pattern"));
         Assert.That(mapped, Is.EquivalentTo(ImmutableArray.Create("*", "SharpProof*")));
     }
 

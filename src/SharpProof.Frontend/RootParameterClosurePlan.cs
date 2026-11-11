@@ -13,7 +13,7 @@ internal sealed class RootParameterClosurePlan
     internal IMethodSymbol Lambda { get; }
     internal ImmutableArray<ResourceStorageKind> Fields { get; }
     internal ImmutableArray<ISymbol> Captures { get; }
-    internal bool HasLocals => Captures.Any(static capture => capture is null ? throw new ArgumentNullException(nameof(capture)) : capture is ILocalSymbol);
+    internal bool HasLocals => Captures.Any(static capture => capture is ILocalSymbol);
 
     private RootParameterClosurePlan(IMethodSymbol lambda, ImmutableArray<ResourceStorageKind> fields, ImmutableArray<ISymbol> captures)
     {
@@ -42,7 +42,7 @@ internal sealed class RootParameterClosurePlan
         cancellationToken.ThrowIfCancellationRequested();
         if (compilation == null || method is not { IsAsync: false, IsGenericMethod: false, MethodKind: MethodKind.Ordinary } ||
             method.ContainingType.IsGenericType || !method.ContainingType.IsReferenceType || method.ReturnType.TypeKind != TypeKind.Delegate ||
-            method.Parameters.Any(static parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.RefKind != RefKind.None) ||
+            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             method.DeclaringSyntaxReferences.Length != 1 ||
             method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not MethodDeclarationSyntax declaration ||
             !compilation.ContainsSyntaxTree(declaration.SyntaxTree))
@@ -173,7 +173,7 @@ internal sealed class RootParameterClosurePlan
             { return null; }
         }
         var fields = ImmutableArray.CreateBuilder<ResourceStorageKind>();
-        var orderedCaptures = captures.OrderBy(capture => capture is null ? throw new ArgumentNullException(nameof(capture)) : capture is IParameterSymbol parameter ? parameter.Ordinal : method.Parameters.Length + locals.IndexOf((ILocalSymbol)capture)).ToImmutableArray();
+        var orderedCaptures = captures.OrderBy(capture => capture is IParameterSymbol parameter ? parameter.Ordinal : method.Parameters.Length + locals.IndexOf((ILocalSymbol)capture)).ToImmutableArray();
         foreach (var capture in orderedCaptures)
         {
             var type = capture is IParameterSymbol parameter ? parameter.Type : ((ILocalSymbol)capture).Type;

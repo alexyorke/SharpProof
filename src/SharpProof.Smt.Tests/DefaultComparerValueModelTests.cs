@@ -19,7 +19,7 @@ internal sealed class DefaultComparerValueModelTests
         var result = BackendCheckResult.Satisfiable(new BackendModel([KeyValuePair.Create(variable, factory.CreateReferenceValue(foreign, identity))]));
         var kernel = new ProofKernel(new FixedBackend(result))
         {
-            ConcreteOpaqueValueProvider = term => term is null ? throw new ArgumentNullException(nameof(term)) : factory.CreateReferenceValue(term.Type, identity)
+            ConcreteOpaqueValueProvider = term => factory.CreateReferenceValue(term.Type, identity)
         };
         var outcome = await kernel.VerifyAsync(query, TestContext.CurrentContext.CancellationToken);
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
@@ -42,8 +42,7 @@ internal sealed class DefaultComparerValueModelTests
         var secondInstance = new object();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions())
         {
-            ConcreteOpaqueValueProvider = term => term is null ? throw new ArgumentNullException(nameof(term)) :
-                factory.CreateReferenceValue(term.Type, term.Member == firstMember ? firstInstance : secondInstance)
+            ConcreteOpaqueValueProvider = term => factory.CreateReferenceValue(term.Type, term.Member == firstMember ? firstInstance : secondInstance)
         };
         var assumption = new Assumption(factory, factory.Binary(IrBinaryOperator.Equal,
             factory.Cast(factory.ObjectType, left), factory.Cast(factory.ObjectType, right)), new LoweredJustification(factory.CreateOperation()));

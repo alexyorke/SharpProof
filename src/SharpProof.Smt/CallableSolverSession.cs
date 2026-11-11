@@ -30,7 +30,7 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
         try
         {
             _solver = _runner.Context.MkSolver();
-            _encoder = new BvEncoder(_runner.Context, factory, _owner, concreteOpaqueValueProvider: term => term is null ? throw new ArgumentNullException(nameof(term)) : ConcreteOpaqueValueProvider?.Invoke(term));
+            _encoder = new BvEncoder(_runner.Context, factory, _owner, concreteOpaqueValueProvider: term => ConcreteOpaqueValueProvider?.Invoke(term));
         }
         catch { _runner.Dispose(); throw; }
     }

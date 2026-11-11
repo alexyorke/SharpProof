@@ -156,10 +156,9 @@ internal sealed class ResourceTaskRuntimeAttributeTests
         ArgumentNullException.ThrowIfNull(attributeType);
         var constructor = attributeType.GetConstructors().Single();
         Assert.That(constructor.GetParameters(), Has.Length.EqualTo(3));
-        Assert.That(constructor.GetParameters().Any(static parameter => parameter is null
-            ? throw new ArgumentNullException(nameof(parameter)) : parameter.IsOptional || parameter.HasDefaultValue), Is.False);
+        Assert.That(constructor.GetParameters().Any(static parameter => parameter.IsOptional || parameter.HasDefaultValue), Is.False);
         Assert.That(attributeType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Any(static property => property is null ? throw new ArgumentNullException(nameof(property)) : property.CanWrite), Is.False);
+            .Any(static property => property.CanWrite), Is.False);
         var usage = attributeType.GetCustomAttribute<AttributeUsageAttribute>();
         Assert.That(usage, Is.Not.Null);
         Assert.That(usage!.ValidOn, Is.EqualTo(AttributeTargets.Method));

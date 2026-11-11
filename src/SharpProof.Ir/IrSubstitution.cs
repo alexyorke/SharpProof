@@ -198,7 +198,7 @@ internal static class IrSubstitution
             root,
             memo,
             (term, _, rewritten) => rewritten is null ? throw new System.ArgumentNullException(nameof(rewritten)) : term is null ? throw new System.ArgumentNullException(nameof(term)) : ((read != null && term is IrSequenceAccessTerm or IrOpaqueTerm
-                ? read(term, child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (rewritten[child.Id])) : null) ?? RewriteNode(factory, term, rewritten)),
+                ? read(term, child => rewritten[child.Id]) : null) ?? RewriteNode(factory, term, rewritten)),
             term =>
             {
                 if (term is not IrVariableTerm variable)

@@ -85,7 +85,7 @@ internal sealed partial class WorkerTests
                     evidence = evidence with { UnknownReason = "unknown" };
                     break;
                 case 11:
-                    claim.ProofCore = [.. core.Where(item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-input-model:", StringComparison.Ordinal))];
+                    claim.ProofCore = [.. core.Where(item => !item.StartsWith("resource-input-model:", StringComparison.Ordinal))];
                     break;
                 case 12:
                     bound = bound with { Expected = null };

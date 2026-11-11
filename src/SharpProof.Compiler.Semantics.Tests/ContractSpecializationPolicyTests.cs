@@ -15,7 +15,7 @@ public sealed class ContractSpecializationPolicyTests
         var definition = compilation.GetTypeByMetadataName("Target`1")!;
         var arguments = wrongArity ? ImmutableArray<ITypeSymbol>.Empty
             : ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
-        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
+        var annotations = arguments.Select(static argument => argument.NullableAnnotation).ToImmutableArray();
         if (wrongArity)
         {
             Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments, annotations)));
@@ -43,11 +43,11 @@ public sealed class ContractSpecializationPolicyTests
         var ownerDefinition = compilation.GetTypeByMetadataName("Target`1")!;
         var ownerArguments = ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
         var owner = ownerDefinition.Construct(ownerArguments,
-            ownerArguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray());
+            ownerArguments.Select(static argument => argument.NullableAnnotation).ToImmutableArray());
         var definition = owner.GetMembers("Echo").OfType<IMethodSymbol>().Single();
         var arguments = wrongArity ? ImmutableArray<ITypeSymbol>.Empty
             : ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_Int32));
-        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
+        var annotations = arguments.Select(static argument => argument.NullableAnnotation).ToImmutableArray();
         if (wrongArity)
         {
             Assert.Throws<ArgumentException>(new Action(() => definition.Construct(arguments, annotations)));
@@ -74,7 +74,7 @@ public sealed class ContractSpecializationPolicyTests
     {
         var compilation = CreateCompilation();
         var arguments = ImmutableArray.Create<ITypeSymbol>(compilation.GetSpecialType(SpecialType.System_String));
-        var annotations = arguments.Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.NullableAnnotation).ToImmutableArray();
+        var annotations = arguments.Select(static argument => argument.NullableAnnotation).ToImmutableArray();
         var constructed = compilation.GetTypeByMetadataName("Target`1")!.Construct(arguments, annotations);
         Assert.Throws<InvalidOperationException>(new Action(() => constructed.Construct(arguments, annotations)));
         Assert.Throws<InvalidOperationException>(new Action(() => ContractSpecializationPolicy.TrySpecialize(

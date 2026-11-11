@@ -19,7 +19,7 @@ public sealed class AdvisoryEmptyLengthRefinementRegressionTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int[]? items) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 
@@ -33,7 +33,7 @@ public sealed class AdvisoryEmptyLengthRefinementRegressionTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int[]? items) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 
@@ -45,7 +45,7 @@ public sealed class AdvisoryEmptyLengthRefinementRegressionTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(string? text) { if (text != null && text.Length == 0) return Need(text.Length); return 0; } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Is.EqualTo(["Call to 'Need' violates precondition 'value > 0'"]));
     }
 }

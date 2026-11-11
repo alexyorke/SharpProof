@@ -35,14 +35,14 @@ public sealed class OrdinaryExceptionBatchWorkflowTests
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken);
 
         var report = await NativeEffectOracleGate.ObserveAsync(compilation,
-            methods.Select(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id)).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2, cancellationToken: TestContext.CurrentContext.CancellationToken);
+            methods.Select(static method => method.Id).ToImmutableArray(), RepositoryLayout.FindRoot(), "ordinary-batch", 2, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(report.Rows, Has.Length.EqualTo(2));
             Assert.That(report.NativeRefuted, Is.EqualTo(2));
-            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.NativeOutcome)), Is.All.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(report.Rows.Select(static row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.RuntimeOracle)), Is.All.EqualTo("Confirmed"));
+            Assert.That(report.Rows.Select(static row => row.NativeOutcome), Is.All.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(report.Rows.Select(static row => row.RuntimeOracle), Is.All.EqualTo("Confirmed"));
             Assert.That(report.RuntimeWitnesses, Is.EqualTo(2));
             Assert.That(report.RuntimeContradictions, Is.Zero);
             Assert.That(report.Passed, Is.True);

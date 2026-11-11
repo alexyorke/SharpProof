@@ -122,8 +122,7 @@ internal sealed partial class ResourceBoundsAnalysis
         if (method.IsAsync || method.IsVirtual || method.IsAbstract || method.IsExtern ||
             method.ReturnsByRef || method.ReturnsByRefReadonly ||
             (!SupportedType(method.ReturnType) && !method.ReturnsVoid) ||
-            method.Parameters.Any(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                parameter.RefKind != RefKind.None || string.IsNullOrEmpty(parameter.Name) || !SupportedType(parameter.Type)))
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || string.IsNullOrEmpty(parameter.Name) || !SupportedType(parameter.Type)))
         {
             return new(null, "UnsupportedCallable");
         }
@@ -158,7 +157,7 @@ internal sealed partial class ResourceBoundsAnalysis
             { analysis._unknown ??= "AnalysisBudgetExceeded"; }
             return analysis._unknown is { } reason ? new(null, reason) : new(cost, null)
             {
-                Assumptions = [.. analysis._assumptions.OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value, StringComparer.Ordinal)]
+                Assumptions = [.. analysis._assumptions.OrderBy(static value => value, StringComparer.Ordinal)]
             };
         }
         catch (ResourceExpressionLimitException)
@@ -261,8 +260,7 @@ internal sealed partial class ResourceBoundsAnalysis
                     Visit(conditional.WhenTrue, depth + 1).Max(
                         conditional.WhenFalse is { } alternative ? Visit(alternative, depth + 1) : Cost.Zero));
                 break;
-            case IAnonymousFunctionOperation anonymous when _rootClosures.Values.Any(closure => closure is null
-                ? throw new ArgumentNullException(nameof(closure)) : SymbolEqualityComparer.Default.Equals(closure.Lambda, anonymous.Symbol)):
+            case IAnonymousFunctionOperation anonymous when _rootClosures.Values.Any(closure => SymbolEqualityComparer.Default.Equals(closure.Lambda, anonymous.Symbol)):
                 result = new(Bound.Zero, Bound.Zero, Bound.Zero, ResourceProgram.Managed(ResourceAllocationShape.Delegate()));
                 break;
             case IDelegateCreationOperation delegateCreation:

@@ -70,7 +70,7 @@ internal sealed class EffectContractWireParityTests
             source,
             new CSharpParseOptions(LanguageVersion.Preview));
         var parseErrors = syntaxTree.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         var executableSyntax = FindExecutableCatalogSyntax(syntaxTree.GetRoot());
 
@@ -78,14 +78,14 @@ internal sealed class EffectContractWireParityTests
         {
             Assert.That(parseErrors, Is.Empty, string.Join(
                 Environment.NewLine,
-                parseErrors.Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.ToString())));
+                parseErrors.Select(static diagnostic => diagnostic.ToString())));
             Assert.That(
                 executableSyntax,
                 Is.Empty,
                 string.Join(
                     ", ",
                     executableSyntax.Select(node =>
-                        node is null ? throw new ArgumentNullException(nameof(node)) : $"{node.Kind()}@{node.GetLocation().GetLineSpan().StartLinePosition}")));
+                        $"{node.Kind()}@{node.GetLocation().GetLineSpan().StartLinePosition}")));
 
             var executableProbe = CSharpSyntaxTree.ParseText("""
                 internal static class ExecutableProbe
@@ -115,7 +115,7 @@ internal sealed class EffectContractWireParityTests
         ArgumentNullException.ThrowIfNull(root);
         return root.DescendantNodesAndSelf()
             .Where(node =>
-                node is null ? throw new ArgumentNullException(nameof(node)) : node is BaseMethodDeclarationSyntax
+                node is BaseMethodDeclarationSyntax
                     or LocalFunctionStatementSyntax
                     or AnonymousFunctionExpressionSyntax
                     or StatementSyntax

@@ -81,7 +81,7 @@ internal sealed class ContractApiIdentityResolver
     {
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
+            static value => new(value));
     }
 
     internal INamedTypeSymbol? ResolveAttribute(string metadataName)
@@ -156,7 +156,7 @@ internal sealed class ContractApiIdentityResolver
     {
         if (candidate == null ||
             !_metadataNames.Matches(candidate, metadataName) ||
-            candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)) ||
+            candidate.Locations.Any(static location => location.IsInSource) ||
             IsCompilationReference(candidate.ContainingAssembly))
         {
             return false;
@@ -179,13 +179,13 @@ internal sealed class ContractApiIdentityResolver
         return assembly is not null &&
             ImmutableInterlocked.GetOrAdd(ref _compilationReferenceCache,
             assembly,
-            candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (_compilation.References.Any(reference =>
+            candidate => _compilation.References.Any(reference =>
                 reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference is CompilationReference &&
                 _compilation.GetAssemblyOrModuleSymbol(reference) is
                     IAssemblySymbol referenced &&
                 SymbolEqualityComparer.Default.Equals(
                     candidate,
-                    referenced)))));
+                    referenced))));
     }
 
     /// <summary>

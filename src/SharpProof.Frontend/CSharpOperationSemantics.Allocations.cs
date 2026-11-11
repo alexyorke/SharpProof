@@ -12,7 +12,7 @@ internal static partial class CSharpOperationSemantics
         } &&
             creation.Constructor.Parameters[0] is { Type.SpecialType: SpecialType.System_Char, RefKind: RefKind.None } &&
             creation.Constructor.Parameters[1] is { Type.SpecialType: SpecialType.System_Int32, RefKind: RefKind.None } &&
-            creation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == 0)
+            creation.Arguments.Single(argument => argument.Parameter?.Ordinal == 0)
                 .Value.ConstantValue is { HasValue: true, Value: char character } && !char.IsSurrogate(character);
     }
 
@@ -165,7 +165,7 @@ internal static partial class CSharpOperationSemantics
         foreach (var reference in type.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax declaration ||
-                declaration.ParameterList != null || !includeInitializers && declaration.Members.Any(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member switch
+                declaration.ParameterList != null || !includeInitializers && declaration.Members.Any(static member => member switch
                 {
                     Microsoft.CodeAnalysis.CSharp.Syntax.FieldDeclarationSyntax field => !IsStatic(field.Modifiers) &&
                         field.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),
@@ -174,7 +174,7 @@ internal static partial class CSharpOperationSemantics
                     Microsoft.CodeAnalysis.CSharp.Syntax.EventFieldDeclarationSyntax eventField => !IsStatic(eventField.Modifiers) &&
                         eventField.Declaration.Variables.Any(static variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Initializer != null)),
                     _ => false
-                })))
+                }))
             { return false; }
         }
         return true;

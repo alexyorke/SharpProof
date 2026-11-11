@@ -67,10 +67,10 @@ internal sealed partial class NativeSpecifiedCallTests
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         Assert.That(response.DeclaredClaims(), Has.Length.EqualTo(2));
-        var declaration = response.Manifest.Claims.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.Kind != WorkerClaimKind.CallPrecondition && claim.CallableId.Contains(".Target", StringComparison.Ordinal));
-        var target = response.ClaimResults.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId == declaration.ClaimId);
+        var declaration = response.Manifest.Claims.Single(claim => claim.Kind != WorkerClaimKind.CallPrecondition && claim.CallableId.Contains(".Target", StringComparison.Ordinal));
+        var target = response.ClaimResults.Single(claim => claim.ClaimId == declaration.ClaimId);
         Assert.That(target.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), target.Reason.ToString());
-        var standalone = response.DeclaredClaims().Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId != declaration.ClaimId);
+        var standalone = response.DeclaredClaims().Single(claim => claim.ClaimId != declaration.ClaimId);
         Assert.That(standalone.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 

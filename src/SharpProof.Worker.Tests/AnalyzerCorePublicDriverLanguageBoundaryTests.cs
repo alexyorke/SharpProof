@@ -33,7 +33,7 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
                 }
                 """)], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(external.GetDiagnostics().Where(static d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(external.GetDiagnostics().Where(static d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var externalImage = new MemoryStream();
         var externalEmit = external.Emit(externalImage);
         Assert.That(externalEmit.Success, Is.True, string.Join(Environment.NewLine, externalEmit.Diagnostics));
@@ -57,7 +57,7 @@ public sealed class AnalyzerCorePublicDriverLanguageBoundaryTests
                     }
                     """, path: "input.cs")], references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(static d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

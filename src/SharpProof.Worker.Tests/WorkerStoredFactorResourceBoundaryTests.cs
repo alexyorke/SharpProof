@@ -103,15 +103,15 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         Assert.That(preparation.Total.CallPreconditions, Has.Length.EqualTo(1));
-        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = preparation.Total.Program.Blocks.SelectMany(static block => block.Instructions).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>()
-            .Any(static havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
+            .Any(static havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
         Assert.That(instructions.Single(instruction =>
-            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id == preparation.Total.CallPreconditions[0].Instruction)), Is.TypeOf<IrAssignInstruction>());
+            instruction.Id == preparation.Total.CallPreconditions[0].Instruction), Is.TypeOf<IrAssignInstruction>());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate!, out var plan, out var failure, cancellationToken: TestContext.CurrentContext.CancellationToken),
@@ -137,10 +137,10 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
                 searchIsBoundedSearch = plan.LoopSearch.IsBoundedSearch,
                 proofQueryCount = proofQueries.Length,
                 searchQueryCount = searchQueries.Length,
-                proofAssumptionCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToImmutableArray(),
-                searchAssumptionCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions.Length)).ToImmutableArray(),
-                proofModelCounts = proofQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToImmutableArray(),
-                searchModelCounts = searchQueries.Select(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.ModelVariables.Length)).ToImmutableArray()
+                proofAssumptionCounts = proofQueries.Select(query => query.Assumptions.Length).ToImmutableArray(),
+                searchAssumptionCounts = searchQueries.Select(query => query.Assumptions.Length).ToImmutableArray(),
+                proofModelCounts = proofQueries.Select(query => query.ModelVariables.Length).ToImmutableArray(),
+                searchModelCounts = searchQueries.Select(query => query.ModelVariables.Length).ToImmutableArray()
             }));
         }
         var budgets = new WorkerBudgets();
@@ -174,7 +174,7 @@ public sealed class WorkerStoredFactorResourceBoundaryTests
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.Core, Is.Not.Empty);
             var ownedJustifications = plan.CallPreconditionQueries(0)
-                .SelectMany(query => query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Assumptions)).Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Justification)).ToImmutableHashSet();
+                .SelectMany(query => query.Assumptions).Select(assumption => assumption.Justification).ToImmutableHashSet();
             Assert.That(((ProvenOutcome)result.Outcome!).Core.All(ownedJustifications.Contains), Is.True);
         }
         else

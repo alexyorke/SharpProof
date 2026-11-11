@@ -56,13 +56,13 @@ internal sealed partial class WorkerTests
                     bound = bound with { ExecutionScope = scope == WorkerResourceModels.TaskJoinScope ? WorkerResourceModels.TaskSourceAllocationScope : WorkerResourceModels.TaskJoinScope };
                     break;
                 case "model":
-                    claim.ProofCore = [.. claim.ProofCore.Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !item.StartsWith("resource-task-model:", StringComparison.Ordinal))];
+                    claim.ProofCore = [.. claim.ProofCore.Where(static item => !item.StartsWith("resource-task-model:", StringComparison.Ordinal))];
                     break;
                 case "duplicate-model":
                     claim.ProofCore = [.. claim.ProofCore, "resource-task-model:" + bound.MetadataAssumptions.Single().RuntimeModel];
                     break;
                 case "projection":
-                    claim.ProofCore = [.. claim.ProofCore.Select(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.StartsWith("resource-task-projection:", StringComparison.Ordinal) ? "resource-task-projection:bad" : item)];
+                    claim.ProofCore = [.. claim.ProofCore.Select(static item => item.StartsWith("resource-task-projection:", StringComparison.Ordinal) ? "resource-task-projection:bad" : item)];
                     break;
                 case "duplicate-projection":
                     claim.ProofCore = [.. claim.ProofCore, "resource-task-projection:" + new string('a', 64)];
@@ -82,7 +82,7 @@ internal sealed partial class WorkerTests
                 case "stripped-task":
                     bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
                     bound = bound with { MetadataAssumptions = [] };
-                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption with { Used = false }).ToImmutableArray();
+                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption with { Used = false }).ToImmutableArray();
                     break;
                 case "witness":
                     bound = bound with { MetadataAssumptions = [bound.MetadataAssumptions.Single() with { WitnessIdentifier = "other" }] };
@@ -94,8 +94,7 @@ internal sealed partial class WorkerTests
             modified = modified with { ClaimResults = [claim with { ResourceBound = bound }] };
             var validation = WorkerProtocolJson.Validate(modified);
             Assert.That(validation.IsValid, Is.False, mutation);
-            Assert.That(validation.Errors.Any(static error => error is null ? throw new ArgumentNullException(nameof(error)) :
-                error.Code == "response.resource_evidence"), Is.True, mutation);
+            Assert.That(validation.Errors.Any(static error => error.Code == "response.resource_evidence"), Is.True, mutation);
         }
         var missing = JsonNode.Parse(json)!.AsObject();
         missing["claimResults"]![0]!["resourceBound"]!.AsObject().Remove("executionScope");
@@ -151,7 +150,7 @@ internal sealed partial class WorkerTests
                 case "stripped-task":
                     bound = bound with { ExecutionScope = WorkerResourceModels.CallableScope };
                     bound = bound with { MetadataAssumptions = [] };
-                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption with { Used = false }).ToImmutableArray();
+                    claim.Assumptions = claim.Assumptions.Select(assumption => assumption with { Used = false }).ToImmutableArray();
                     break;
                 case "storage-model":
                     claim.ProofCore = [.. claim.ProofCore.Where(static item => item is not null && !item.StartsWith("resource-task-storage-model:", StringComparison.Ordinal))];
@@ -165,7 +164,7 @@ internal sealed partial class WorkerTests
                 case "reference":
                     var storageDependency = bound.MetadataAssumptions.Single(static dependency => dependency is not null &&
                         dependency.RuntimeModel is WorkerResourceModels.TaskStorageModel or WorkerResourceModels.ConfiguredTaskStorageModel);
-                    bound = bound with { MetadataAssumptions = [.. bound.MetadataAssumptions.Select(dependency => dependency is null ? throw new ArgumentNullException(nameof(dependency)) : ReferenceEquals(dependency, storageDependency) ? dependency with { ReferenceSha256 = new string('a', 64) } : dependency)] };
+                    bound = bound with { MetadataAssumptions = [.. bound.MetadataAssumptions.Select(dependency => ReferenceEquals(dependency, storageDependency) ? dependency with { ReferenceSha256 = new string('a', 64) } : dependency)] };
                     break;
                 case "layout":
                     bound = bound with { MetadataAssumptions = [.. bound.MetadataAssumptions.Where(static dependency => dependency is not null && dependency.RuntimeModel != WorkerResourceModels.AllocationLayout)] };

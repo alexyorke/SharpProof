@@ -49,7 +49,7 @@ public sealed class ProtocolExpandedManifestAuditTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(validation.IsValid, Is.False);
-                Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+                Assert.That(validation.Errors.Select(static error => error.Code),
                     Does.Contain("manifest.hash_payload_size"));
             }
         }
@@ -71,7 +71,7 @@ public sealed class ProtocolExpandedManifestAuditTests
         Assert.That(validation.IsValid, Is.EqualTo(!invalidHash));
         if (invalidHash)
         {
-            Assert.That(validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)), Does.Contain("manifest.hash"));
+            Assert.That(validation.Errors.Select(static error => error.Code), Does.Contain("manifest.hash"));
         }
         using var directory = new TempDirectory("small-expanded-manifest-");
         var path = Path.Combine(directory.FullName, "response.json");

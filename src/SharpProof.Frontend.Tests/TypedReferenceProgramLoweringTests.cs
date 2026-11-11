@@ -67,9 +67,9 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls();
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
-        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
-                arguments[binding.Parameter.Ordinal], aliases)));
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding.Entry,
+            binding => Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type,
+                arguments[binding.Parameter.Ordinal], aliases));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         if (expected is Type)
         {
@@ -210,8 +210,8 @@ public sealed class TypedReferenceProgramLoweringTests
         var lowered = subject.LowerSourceCalls(false, opaqueCalls: opaqueCalls);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
         var aliases = ImmutableDictionary.CreateBuilder<IrTypeId, ImmutableDictionary<object, IrValue>.Builder>();
-        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases)));
+        var inputs = ImmutableDictionaryCapture.Create(subject.Context.Parameters, binding => binding.Entry,
+            binding => Value(subject.Factory, subject.Factory.GetVariableInfo(binding.Entry).Type, arguments[binding.Parameter.Ordinal], aliases));
         var replay = new IrProgramInterpreter(subject.Factory).Execute(lowered.Program, inputs);
         Assert.That(replay.ConsumedApproximation, Is.False);
         if (expected is Type fault)
@@ -291,7 +291,7 @@ public sealed class TypedReferenceProgramLoweringTests
         {
             IrTypeKind.String when input is string text => factory.CreateStringValue(new string('\0', text.Length)),
             IrTypeKind.Sequence when input is Array array => factory.CreateSequenceValue(type,
-                array.Cast<object>().Select(element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (Value(factory, info.ElementType!.Value, element, aliases)))),
+                array.Cast<object>().Select(element => Value(factory, info.ElementType!.Value, element, aliases))),
             IrTypeKind.Reference => factory.CreateReferenceValue(type, input),
             _ => throw new ArgumentException("The runtime value does not match the reference oracle type.", nameof(input))
         };

@@ -30,7 +30,7 @@ internal sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, Resolved
     private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs =
         ArgumentNullGuard.NotNull(specs, nameof(specs));
     private readonly ImmutableArray<ResolvedApiSpec> _orderedSpecs =
-        [.. ArgumentNullGuard.NotNull(specs, nameof(specs)).Values.OrderBy(static spec => spec is null ? throw new System.ArgumentNullException(nameof(spec)) : (spec.Template.Id.Value))];
+        [.. ArgumentNullGuard.NotNull(specs, nameof(specs)).Values.OrderBy(static spec => spec.Template.Id.Value)];
     public ImmutableArray<ResolvedApiSpec> Specs => _orderedSpecs;
     public ImmutableArray<ApiSpecResolutionFailure> Failures { get; } = (failures.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(failures)) : failures);
     public bool IsComplete => Failures.IsDefaultOrEmpty;
@@ -218,10 +218,10 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
 
         var normalized = DocumentationCommentId.GetSymbolsForDeclarationId(
                 target.DocumentationCommentId, compilation)
-            .Where(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(
+            .Where(candidate => SymbolEqualityComparer.Default.Equals(
                     candidate.ContainingType?.OriginalDefinition,
                     containingType.OriginalDefinition) &&
-                MatchesTarget(candidate, target)))
+                MatchesTarget(candidate, target))
             .Select(ResolvedApiSpecTable.NormalizeSymbol)
             .Where(static symbol => symbol != null)
             .Select(static symbol => symbol!)
@@ -315,7 +315,7 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
         var identity = assembly.Identity;
         var identityMatches = target.ApprovedAssemblies
-            .Where(approved => approved is null ? throw new System.ArgumentNullException(nameof(approved)) : ApiSpecAssemblyMatching.Matches(approved, identity))
+            .Where(approved => ApiSpecAssemblyMatching.Matches(approved, identity))
             .ToImmutableArray();
         if (identityMatches.Length == 0)
         {
@@ -340,8 +340,8 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         return (
             true,
             identityMatches.Any(approved =>
-                approved is null ? throw new System.ArgumentNullException(nameof(approved)) : ((approved.ReferenceFamily == ApiSpecReferenceFamily.Unspecified ||
-                 approved.ReferenceFamily == family))),
+                (approved.ReferenceFamily == ApiSpecReferenceFamily.Unspecified ||
+                 approved.ReferenceFamily == family)),
             family,
             path);
     }

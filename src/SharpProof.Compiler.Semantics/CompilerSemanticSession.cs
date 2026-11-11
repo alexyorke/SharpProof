@@ -50,8 +50,8 @@ internal sealed class CompilerSemanticSession
         IMethodSymbol method)
     {
         method = NormalizeMethod(method);
-        if (method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute))))))
+        if (method.Parameters.Any(parameter => parameter.GetAttributes().Any(attribute =>
+                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsClosedContract(attribute) || Attributes.IsRejectedClosedContract(attribute)))))
         {
             return true;
         }
@@ -60,7 +60,7 @@ internal sealed class CompilerSemanticSession
         return !binding.IsSuccess ||
             binding.Contracts is not { } contracts ||
             contracts.Clauses.Any(static clause =>
-                clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
+                clause.Kind == BoundContractKind.Requires);
     }
 
     internal ContractClauseInventory GetContractClauses(IMethodSymbol method)
@@ -105,8 +105,8 @@ internal sealed class CompilerSemanticSession
         method = NormalizeMethod(method);
         return method.DeclaringSyntaxReferences.IsEmpty &&
             method.Parameters.Any(parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes().Any(attribute =>
-                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsRejectedClosedContract(attribute)))));
+                parameter.GetAttributes().Any(attribute =>
+                    attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (Attributes.IsRejectedClosedContract(attribute))));
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> GetContractIntrinsicViolations(

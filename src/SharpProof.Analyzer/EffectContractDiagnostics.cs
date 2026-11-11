@@ -15,7 +15,7 @@ internal static class EffectContractDiagnostics
         _ = DecodeAllowedExceptions(
             Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session, reportDiagnostic);
         if (!attributes.Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract))))
+                ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract)))
         {
             return;
         }
@@ -90,7 +90,7 @@ internal static class EffectContractDiagnostics
         session = ArgumentNullGuard.NotNull(session, nameof(session));
         ArgumentNullGuard.NotNull(location, nameof(location));
         return [.. EffectClaimDeclarations.Declare(method, session.Semantics, cancellationToken)
-            .Select(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : new EffectClaimEvaluation(claim.Kind, claim.Attributes,
+            .Select(static claim => new EffectClaimEvaluation(claim.Kind, claim.Attributes,
                 claim.Outcome, claim.Reason, claim.Certainty, claim.Evidence, null,
                 claim.Constraint, null, Location.None, []))];
     }
@@ -113,16 +113,16 @@ internal static class EffectContractDiagnostics
         _ = DecodeAllowedExceptions(Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session,
             reportDiagnostic);
         var evaluations = Declare(method, location, session, cancellationToken);
-        if (evaluations.All(evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome == EffectEvaluationOutcome.Proven)) ||
+        if (evaluations.All(evaluation => evaluation.Outcome == EffectEvaluationOutcome.Proven) ||
             session.Compilation is not CSharpCompilation compilation ||
             method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is not { } declaration)
         { return evaluations; }
         // A bodyless declaration has only its trusted contract to report on.
         if (method is { IsAbstract: true } or { IsExtern: true })
         {
-            return [.. evaluations.Select(evaluation => evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            return [.. evaluations.Select(evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven &&
                 evaluation.Certainty == EffectEvaluationCertainty.TrustedCompleteBoundary
-                ? Report(evaluation, method.Name, "its trusted effect contract does not establish it") : evaluation))];
+                ? Report(evaluation, method.Name, "its trusted effect contract does not establish it") : evaluation)];
         }
         var analysis = AdvisoryEffectSites.Analyze(compilation, method, declaration, cancellationToken);
         if (analysis.Gap != null)
@@ -133,9 +133,9 @@ internal static class EffectContractDiagnostics
             return evaluations;
         }
         return [.. evaluations.Select(evaluation =>
-            evaluation is null ? throw new System.ArgumentNullException(nameof(evaluation)) : (evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            evaluation.Outcome != EffectEvaluationOutcome.Proven &&
             AdvisoryEffectClaims.FindViolation(evaluation.Kind, evaluation.Constraint, analysis.Sites, compilation) is { } violation
-                ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation))];
+                ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation)];
 
         EffectClaimEvaluation Report(EffectClaimEvaluation evaluation, string subject, string detail)
         {
@@ -228,7 +228,7 @@ internal static class EffectContractDiagnostics
         return string.Join(",", types
             .Select(FormatExceptionType)
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
+            .OrderBy(static value => value, StringComparer.Ordinal));
     }
 
     private static string FormatExceptionType(INamedTypeSymbol type)
@@ -256,6 +256,6 @@ internal static class EffectContractDiagnostics
     {
 
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
-        return [.. attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (ContractSelectionInventory.Is(attribute, expected)))];
+        return [.. attributes.Where(attribute => ContractSelectionInventory.Is(attribute, expected))];
     }
 }

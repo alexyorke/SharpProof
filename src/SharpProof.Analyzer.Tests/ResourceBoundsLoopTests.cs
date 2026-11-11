@@ -148,8 +148,7 @@ public sealed partial class ResourceBoundsTests
         ArgumentNullException.ThrowIfNull(body);
         var compilation = AnalyzerTestHost.CreateCompilation(
             "public static class C { public static void M() { " + body + " } }", []);
-        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "CS0266"), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic.Id == "CS0266"), Is.True);
         var tree = compilation.SyntaxTrees.Single();
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);

@@ -58,8 +58,7 @@ internal sealed partial class NativeResourceContractTests
             Assert.That(result.ProofCore, Does.Contain("resource-accounting:" + NativeResourceAccountingVerifier.ModelId));
             var dependency = result.ResourceBound.MetadataAssumptions.Single();
             Assert.That(dependency.WitnessIdentifier, Is.EqualTo("bcl.math.max.int32-int32"));
-            Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                assumption.Id == dependency.AssumptionId).Used, Is.True);
+            Assert.That(result.Assumptions.Single(assumption => assumption.Id == dependency.AssumptionId).Used, Is.True);
         }
         else
         {

@@ -48,14 +48,13 @@ internal sealed class CompilerCallableLowerer
         var entry = total == null
             ? CompilerTotalCallableLowerer.PrepareEntry(_compilation, target, capturedTrees, cancellationToken)
             : new CompilerTotalEntryPreparation(total.CallableId, total.Program.Factory, total.Parameters,
-                [.. total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires))])
+                [.. total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires)])
             { HasReceiver = total.HasReceiver };
         var reason = Classify(target, total != null, cancellationToken);
         ResourceProgram? resourceProgram = null;
         string? resourceUnknown = null;
         CompilerForkJoinProjection? forkJoin = null;
-        if (target.EffectClaims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
+        if (target.EffectClaims.Any(claim => claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound))
         {
             if (total is null || total.IsBodyAbstraction)
             {
@@ -74,8 +73,7 @@ internal sealed class CompilerCallableLowerer
                 resourceUnknown = resource.UnknownReason;
             }
         }
-        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim.Entry.ResourceUpperBound?.Metric is WorkerResourceMetric.AllocatedBytes or WorkerResourceMetric.PeakAuxiliaryBytes or WorkerResourceMetric.RetainedBytes))
         {
             var carriers = _taskCarriers.Capture(target.Method, target.Entry.CallableId, cancellationToken);
             if (carriers.Shapes is { } shapes)
@@ -87,16 +85,14 @@ internal sealed class CompilerCallableLowerer
                         RootExceptionBoundary = _taskCarriers.CaptureExceptionBoundary(target.Method, target.Entry.CallableId, cancellationToken),
                         CallbackActivations = _taskCarriers.CaptureCallbackActivations(target.Method, target.Entry.CallableId, cancellationToken),
                         SourceBodies = _taskCarriers.CaptureSourceBodies(target.Method, target.Entry.CallableId, cancellationToken),
-                        EmittedFaultBodies = target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-                            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes)
+                        EmittedFaultBodies = target.EffectClaims.Any(static claim => claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes)
                             ? _taskCarriers.CaptureEmittedFaultBodies(target.Method, target.Entry.CallableId, cancellationToken) : null
                     }
                 };
             }
             forkJoin = forkJoin with { Carriers = carriers };
         }
-        if (forkJoin != null && target.EffectClaims.Any(static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
+        if (forkJoin != null && target.EffectClaims.Any(static claim => claim.Entry.ResourceUpperBound?.Metric == WorkerResourceMetric.AllocatedBytes))
         {
             var declarations = CompilerTaskRuntimePremiseCollector.Parse(target.Method, target.Entry.CallableId, cancellationToken);
             if (declarations.UnknownReason != "TaskRuntimePremisesNotDeclared")
@@ -146,11 +142,10 @@ internal sealed class CompilerCallableLowerer
         var assumptions = ArgumentNullGuard.NotNull(target.Entry.Assumptions, nameof(target.Entry.Assumptions));
         var runtimeAssumptionIds = CompilerTaskRuntimePremiseCollector.VerifiedManifestAssumptionIds(target.Method,
             target.Entry.CallableId, target.Entry.Assumptions, cancellationToken) ?? ImmutableHashSet<string>.Empty;
-        if (contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires)) !=
-                assumptions.Count(static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.Kind == WorkerAssumptionKind.Precondition)) ||
-            contracts.Clauses.Count(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Assume)) !=
-                assumptions.Count(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) :
-                    evidence.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(evidence.Id)) ||
+        if (contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires) !=
+                assumptions.Count(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition) ||
+            contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Assume) !=
+                assumptions.Count(evidence => evidence.Kind == WorkerAssumptionKind.UserAssume && !runtimeAssumptionIds.Contains(evidence.Id)) ||
             !HasManifestParity(target, contracts))
         {
             return WorkerClaimReason.UnsupportedContract;
@@ -163,10 +158,10 @@ internal sealed class CompilerCallableLowerer
     private static bool HasManifestParity(ManifestCallableTarget target, BoundMethodContracts contracts)
     {
         contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
-        var ensures = contracts.Clauses.Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures)).ToImmutableArray();
+        var ensures = contracts.Clauses.Where(static clause => clause.Kind == BoundContractKind.Ensures).ToImmutableArray();
         if (ensures.Length != target.Claims.Length ||
             !target.Entry.ClaimIds.Take(target.Claims.Length).SequenceEqual(
-                target.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Entry.ClaimId)), StringComparer.Ordinal))
+                target.Claims.Select(static claim => claim.Entry.ClaimId), StringComparer.Ordinal))
         {
             return false;
         }

@@ -104,7 +104,7 @@ public sealed class TotalClaimResultTests
             runStatus, failureReason, [callable],
             [result], project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
         var json = WorkerProtocolJson.SerializeResponse(response);
         Assert.That(json, Is.Not.Empty);
     }
@@ -117,7 +117,7 @@ public sealed class TotalClaimResultTests
         System.ArgumentNullException.ThrowIfNull(fault);
         using var project = new ShadowTestProject(CompilerTotalCallableArtifactTests.DiamondSource);
         var checks = await Checks(project);
-        var check = checks.Values.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!item.Evidence.EntryModel.IsEmpty));
+        var check = checks.Values.Single(item => !item.Evidence.EntryModel.IsEmpty);
         var total = project.Snapshot.Callables.Single().Total!;
         var malformed = fault switch
         {
@@ -147,7 +147,7 @@ public sealed class TotalClaimResultTests
         };
         var result = CallableClaimResultAssembler.FromTotal(project.Snapshot.Callables.Single(), malformed);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used)), Is.False);
+        Assert.That(result.Assumptions.Any(assumption => assumption.Used), Is.False);
     }
 
     [Test]

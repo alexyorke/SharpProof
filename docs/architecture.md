@@ -12,7 +12,7 @@ SharpProof has a portable compiler analysis surface and a native build-verificat
 | `SharpProof.Ir` | Owned types, values, instructions, blocks, source provenance, evaluation |
 | `SharpProof.Dataflow` | Abstract domains and forward dataflow used by the analyzer's advisory interpreter and by effect summaries |
 | `SharpProof.Compiler.Semantics` | Shared compilation-bound configuration validation, callable discovery, effect declarations, and Total body lowering |
-| `SharpProof.Analyzer.Core` / `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
+| `SharpProof.Analyzer` | Portable diagnostics, activation, advisory analysis |
 | `SharpProof.CodeFixes` / `SharpProof.EditorSuggestions` | Optional editor code fixes and companion scaffolding suggestions |
 | `SharpProof.CompilerCollector` | Final-compilation manifest discovery and closed artifact production |
 | `SharpProof.CompilerArtifact` | Versioned compiler evidence, codecs, validation |

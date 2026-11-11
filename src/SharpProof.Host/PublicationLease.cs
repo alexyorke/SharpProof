@@ -100,7 +100,7 @@ internal sealed class PublicationLease : IDisposable
             // Win32 normalization can trim these aliases before full-path
             // validation sees them. Check the caller's spelling as well.
             if (path.Split(['\\', '/']).Any(static segment =>
-                segment is null ? throw new System.ArgumentNullException(nameof(segment)) : (segment is not ("." or "..") && (segment.EndsWith('.') || segment.EndsWith(' ')))))
+                segment is not ("." or "..") && (segment.EndsWith('.') || segment.EndsWith(' '))))
             {
                 throw new ArgumentException("SharpProof Windows paths must not have ambiguous trailing dots or spaces.");
             }

@@ -43,7 +43,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         var expected = (from left in Enumerable.Range(0, count)
                         from right in Enumerable.Range(left + 1, count - left - 1)
                         select (left, right)).Take(expectedPairs).ToImmutableArray();
-        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(expected));
+        Assert.That(pairs.Select(pair => (pair.Left, pair.Right)), Is.EqualTo(expected));
         foreach (var pair in pairs)
         {
             Assert.That(compilation.ClassifyConversion(method.Parameters[pair.Left].Type, method.Parameters[pair.Right].Type).Exists, Is.False);
@@ -72,7 +72,7 @@ public sealed class CompilerDisjointInputAnalysisTests
         }
         finally { runtime.Unload(); }
         var pairs = CompilerDisjointInputAnalysis.Collect(method, TestContext.CurrentContext.CancellationToken);
-        Assert.That(pairs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : ((pair.Left, pair.Right))), Is.EqualTo(ImmutableArray.Create((0, 2), (1, 2))));
+        Assert.That(pairs.Select(pair => (pair.Left, pair.Right)), Is.EqualTo(ImmutableArray.Create((0, 2), (1, 2))));
         foreach (var pair in pairs)
         {
             Assert.That(compilation.ClassifyConversion(method.Parameters[pair.Left].Type, method.Parameters[pair.Right].Type).Exists, Is.False);

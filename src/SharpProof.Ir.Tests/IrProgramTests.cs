@@ -216,10 +216,10 @@ internal sealed class IrProgramTests
         ImmutableArray<int> expectedIds = [0, 1, 2, 3, 4];
 
         Assert.That(
-            instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind)),
+            instructions.Select(static instruction => instruction.Kind),
             Is.EqualTo(expectedKinds));
         Assert.That(
-            instructions.Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id.Value)),
+            instructions.Select(static instruction => instruction.Id.Value),
             Is.EqualTo(expectedIds));
         Assert.That(
             ((IrLoadInstruction)instructions[1]).Location.Type,
@@ -253,18 +253,18 @@ internal sealed class IrProgramTests
         Assert.That(first.Entry, Is.Not.EqualTo(second.Entry));
         Assert.That(first.Entry.Value, Is.EqualTo(second.Entry.Value));
         Assert.That(
-            first.Blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value)),
-            Is.EqualTo(second.Blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))));
+            first.Blocks.Select(static block => block.Id.Value),
+            Is.EqualTo(second.Blocks.Select(static block => block.Id.Value)));
         Assert.That(
             first.Blocks
-                .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                .SelectMany(static block => block.Instructions)
                 .Select(static instruction =>
-                    instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id.Value, instruction.Kind))),
+                    (instruction.Id.Value, instruction.Kind)),
             Is.EqualTo(
                 second.Blocks
-                    .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                    .SelectMany(static block => block.Instructions)
                     .Select(static instruction =>
-                        instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id.Value, instruction.Kind)))));
+                        (instruction.Id.Value, instruction.Kind))));
         Assert.Throws<ArgumentException>(
             (Action)(() => first.GetBlock(second.Entry)));
     }

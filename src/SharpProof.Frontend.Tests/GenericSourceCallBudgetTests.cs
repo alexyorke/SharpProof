@@ -20,7 +20,7 @@ public sealed class GenericSourceCallBudgetTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method =>
-            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+            method.Identifier.ValueText == "Target");
         var invocation = (IInvocationOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
         var successful = false;
         for (var available = 0; available <= 128; available++)

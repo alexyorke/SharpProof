@@ -135,7 +135,7 @@ internal static class CompilerManifestArtifactJson
             {
                 CompilerDiagnostics = CompilerDiagnosticArtifactOrdering.Canonicalize(artifact.CompilerDiagnostics),
                 Callables = [.. artifact.Callables.OrderBy(
-                    static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId),
+                    static item => item.CallableId,
                     StringComparer.Ordinal)]
             };
         }
@@ -383,8 +383,8 @@ internal static class CompilerManifestArtifactJson
         manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return !callables.IsDefault && callables.Length == manifest.Callables.Length &&
         callables.All(static item => item != null) &&
-        callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item?.CallableId)).SequenceEqual(
-            manifest.Callables.Select(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId)),
+        callables.Select(static item => item?.CallableId).SequenceEqual(
+            manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
     }
 

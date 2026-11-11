@@ -47,7 +47,7 @@ public sealed class BulkWorkerApiTests
             Assert.That(plan.CallableId, Is.EqualTo(candidate.CallableId));
             Assert.That(queries, Is.Not.Empty);
             Assert.That(queries.All(query =>
-                query is null ? throw new System.ArgumentNullException(nameof(query)) : (query.Goal.Diagnostic == ProofDiagnosticKind.Precondition)), Is.True);
+                query.Goal.Diagnostic == ProofDiagnosticKind.Precondition), Is.True);
         }
     }
 
@@ -98,7 +98,7 @@ public sealed class BulkWorkerApiTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Total is { CallPreconditions.Length: > 0 }));
+            item.Total is { CallPreconditions.Length: > 0 });
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         return candidate!;
@@ -111,7 +111,7 @@ public sealed class BulkWorkerApiTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var preparation = preparations.Single(static item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+            item.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         Assert.That(preparation.Total!.CallPreconditions, Is.Not.Empty);
         Assert.That(preparation.Total.DisjointInputs, Is.Not.Empty);

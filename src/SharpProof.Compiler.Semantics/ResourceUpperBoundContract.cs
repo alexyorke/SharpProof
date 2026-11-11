@@ -20,7 +20,7 @@ internal static class ResourceUpperBoundContract
         { return null; }
         var sequenceLength = size.EndsWith(".Length", StringComparison.Ordinal);
         var name = sequenceLength ? size.Substring(0, size.Length - ".Length".Length) : size;
-        var parameter = method.Parameters.FirstOrDefault(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.Name == name);
+        var parameter = method.Parameters.FirstOrDefault(parameter => parameter.Name == name);
         if (parameter is null || parameter.RefKind != RefKind.None || parameter.Name.Length == 0 ||
             parameter.Name.Length > ResourceExpression.MaximumTextLength || parameter.Name.Any(static value => char.IsControl(value)))
         { return null; }

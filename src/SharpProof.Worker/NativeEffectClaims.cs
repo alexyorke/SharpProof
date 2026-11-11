@@ -21,15 +21,15 @@ internal static class NativeEffectClaims
         ArgumentNullException.ThrowIfNull(entry);
         // A trusted complete boundary is a declared assumption about a body
         // SharpProof does not see; it is published as declared.
-        var claims = target.EffectClaims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (IsNative(claim.ContractKind) &&
-            claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)).ToImmutableArray();
+        var claims = target.EffectClaims.Where(claim => IsNative(claim.ContractKind) &&
+            claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary).ToImmutableArray();
         // An invalid contract has nothing to verify, whatever the entry.
         bool Invalid(CompilerEffectClaimArtifact claim)
         { System.ArgumentNullException.ThrowIfNull(claim, nameof(claim)); return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
-        var invalid = claims.Where(Invalid).Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract))).ToImmutableArray();
+        var invalid = claims.Where(Invalid).Select(claim => Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract)).ToImmutableArray();
         foreach (var result in invalid)
         { publish?.Invoke(result); }
-        var validClaims = claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (!Invalid(claim))).ToImmutableArray();
+        var validClaims = claims.Where(claim => !Invalid(claim)).ToImmutableArray();
         if (validClaims.Length == 0)
         { return [.. invalid]; }
         resourceBudget ??= new MethodResourceBudget(null, budgets.QueryRlimit, budgets.MethodRlimit);
@@ -65,7 +65,7 @@ internal static class NativeEffectClaims
             {
                 ArgumentNullException.ThrowIfNull(claimId);
                 ArgumentNullException.ThrowIfNull(check);
-                if (claims.Any(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId == claimId))
+                if (claims.Any(claim => claim.ClaimId == claimId))
                 { Publish(Project(target, claimId, check)); }
             }).ConfigureAwait(false);
         foreach (var claim in claims)
@@ -98,7 +98,7 @@ internal static class NativeEffectClaims
         }
 
         ImmutableArray<WorkerClaimResult> OrderedResults()
-        { return [.. claims.Select(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : results[claim.ClaimId])]; }
+        { return [.. claims.Select(claim => results[claim.ClaimId])]; }
     }
 
     internal static WorkerClaimResult Unknown(CompilerCallablePreparation target, string claimId, WorkerClaimReason reason)
@@ -136,7 +136,7 @@ internal static class NativeEffectClaims
         ArgumentNullException.ThrowIfNull(check);
         var core = check.Core;
         RepositoryParameterGuard.RequireInitialized(core.IsDefault, nameof(core), "Array must be initialized.");
-        var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)).ToImmutableArray();
+        var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires).ToImmutableArray();
         var used = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
@@ -204,8 +204,8 @@ internal static class NativeEffectClaims
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
         System.ArgumentNullException.ThrowIfNull(program);
-        return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>()
-            .Any(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Operation == site && allocation.Length != null));
+        return program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>()
+            .Any(allocation => allocation.Operation == site && allocation.Length != null);
     }
 
     private static WorkerEffectSet WriteEffect(IrProgram program, OperationId site, bool receiver)
@@ -214,8 +214,8 @@ internal static class NativeEffectClaims
         System.ArgumentNullException.ThrowIfNull(program);
         if (receiver)
         { return WorkerEffectSet.WritesReceiverState; }
-        var region = program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrWriteInstruction>()
-            .FirstOrDefault(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == site))?.Region;
+        var region = program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>()
+            .FirstOrDefault(write => write.Operation == site)?.Region;
         return region switch
         {
             IrWriteRegion.Parameter => WorkerEffectSet.WritesArgumentState,

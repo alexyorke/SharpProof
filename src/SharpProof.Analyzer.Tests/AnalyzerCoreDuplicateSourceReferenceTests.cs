@@ -31,8 +31,8 @@ public sealed class AnalyzerCoreDuplicateSourceReferenceTests
         Assert.That(global.Compilation, Is.SameAs(origin));
         Assert.That(caller.References.Contains(aliased), Is.True);
         Assert.That(caller.References.Contains(global), Is.True);
-        Assert.That(origin.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        Assert.That(caller.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(origin.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(caller.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(origin), Is.Not.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(caller), Is.Not.Empty);
         Assert.That(caller.GetAssemblyOrModuleSymbol(aliased), Is.Null);

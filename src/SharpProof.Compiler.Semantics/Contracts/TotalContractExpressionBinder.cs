@@ -131,8 +131,8 @@ internal sealed class TotalContractBinder
         { return new([], ContractBindingFailure.ContractApiUnavailable); }
         if (!context.HasScalarSignature || context.Target.DeclaringSyntaxReferences.Length != 0)
         { return new([], ContractBindingFailure.UnsupportedTarget); }
-        var sites = context.Target.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new ContractMetadataValueSite(
-            parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry))));
+        var sites = context.Target.Parameters.Select(parameter => new ContractMetadataValueSite(
+            parameter, () => _factory.Variable(context.Parameters[parameter.Ordinal].Entry)));
         return ClosedContractAttributeBinding.BindMetadataValueSites(
             _factory, _classifier.Api.Selections, sites, cancellationToken);
     }
@@ -162,9 +162,9 @@ internal sealed class TotalContractBinder
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || ContractBinder.HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
         var candidates = resolution.Inventory.Clauses
-            .Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
-            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(
-                occurrence.Kind, occurrence.Invocation)))
+            .Where(static occurrence => occurrence.IsValid)
+            .Select(static occurrence => new ContractInvocationCandidate(
+                occurrence.Kind, occurrence.Invocation))
             .ToImmutableArray();
         var materialized = TotalContractInvocationMaterialization.Bind(
             context, _classifier.Api, _classifier.Intrinsics, resolution, candidates, requiresOnly);
@@ -182,7 +182,7 @@ internal sealed class TotalContractBinder
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
         var ordinal = 0;
-        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid)))
+        foreach (var occurrence in resolution.Inventory.Clauses.Where(occurrence => occurrence.IsValid))
         {
             context.ExcludeSpecificationCall(occurrence.Invocation);
             if (requiresOnly)

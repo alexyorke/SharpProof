@@ -21,7 +21,7 @@ public sealed class CorpusInputParserTests
     {
         var catalog = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
         var expected = catalog.Methods.ToImmutableDictionary(
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256), method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Support), StringComparer.Ordinal);
+            method => method.DeclarationSha256, method => method.Support, StringComparer.Ordinal);
         var actual = CorpusInputParsers.ReadExistingSupport(catalog);
         Assert.That(actual, Is.EquivalentTo(expected));
         Assert.That(actual.KeyComparer, Is.SameAs(StringComparer.Ordinal));

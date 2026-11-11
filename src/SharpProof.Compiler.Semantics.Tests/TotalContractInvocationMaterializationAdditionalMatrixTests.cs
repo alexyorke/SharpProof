@@ -126,7 +126,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var publicRequires = new TotalContractBinder(compilation, factory).BindTotalRequires(
             new TotalLoweringContext(factory, target));
         Assert.That(publicRequires.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(publicRequires.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)),
+        Assert.That(publicRequires.Clauses.Select(static clause => clause.Kind),
             Is.EqualTo(RequiresOnlyKinds));
     }
 
@@ -151,7 +151,7 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         var publicResult = new TotalContractBinder(compilation, factory).BindTotal(
             new TotalLoweringContext(factory, target));
         Assert.That(publicResult.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(publicResult.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ThreeClauseKinds));
+        Assert.That(publicResult.Clauses.Select(static clause => clause.Kind), Is.EqualTo(ThreeClauseKinds));
 
         var withRawLocal = candidates.Add(
             new ContractInvocationCandidate(BoundContractKind.Requires, rawInvocation));
@@ -274,8 +274,8 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
             context, api, new ContractIntrinsicValidator(api), resolution, candidates,
             requiresOnly: false);
         Assert.That(result.Failure, Is.EqualTo(ContractBindingFailure.None));
-        Assert.That(result.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.EqualTo(ThreeClauseKinds));
-        Assert.That(result.Clauses.Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.DiagnosticText)),
+        Assert.That(result.Clauses.Select(static clause => clause.Kind), Is.EqualTo(ThreeClauseKinds));
+        Assert.That(result.Clauses.Select(static clause => clause.DiagnosticText),
             Is.EqualTo(OrderedDiagnosticTexts));
 
         for (var index = 0; index < result.Clauses.Length; index++)
@@ -349,9 +349,9 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
     {
         System.ArgumentNullException.ThrowIfNull(resolution);
         return [.. resolution.Inventory.Clauses
-            .Where(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (occurrence.IsValid))
-            .Select(static occurrence => occurrence is null ? throw new System.ArgumentNullException(nameof(occurrence)) : (new ContractInvocationCandidate(
-                occurrence.Kind, occurrence.Invocation)))];
+            .Where(static occurrence => occurrence.IsValid)
+            .Select(static occurrence => new ContractInvocationCandidate(
+                occurrence.Kind, occurrence.Invocation))];
     }
 
     private static ImmutableArray<ContractInvocationCandidate> OfKind(
@@ -375,8 +375,8 @@ public sealed class TotalContractInvocationMaterializationAdditionalMatrixTests
         return resolution.Inventory.ImplementationBody!
             .DescendantsAndSelf()
             .OfType<IInvocationOperation>()
-            .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.TargetMethod.ContainingType.Name == "Ordinary" &&
-                invocation.TargetMethod.Name == methodName));
+            .Single(invocation => invocation.TargetMethod.ContainingType.Name == "Ordinary" &&
+                invocation.TargetMethod.Name == methodName);
     }
 
     private static IMethodSymbol Method(

@@ -19,19 +19,19 @@ public sealed class ExceptionConstructorProfileOracleTests
         var guarded = 0;
         var cases = 0;
         var mismatches = ImmutableArray.CreateBuilder<string>();
-        foreach (var type in core.GetTypes().Where(type => type is null ? throw new ArgumentNullException(nameof(type)) : type.IsVisible && !type.IsAbstract && !type.ContainsGenericParameters && typeof(Exception).IsAssignableFrom(type)))
+        foreach (var type in core.GetTypes().Where(type => type.IsVisible && !type.IsAbstract && !type.ContainsGenericParameters && typeof(Exception).IsAssignableFrom(type)))
         {
-            foreach (var constructor in type.GetConstructors().Where(constructor => constructor is null ? throw new ArgumentNullException(nameof(constructor)) : constructor.GetParameters().All(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.ParameterType == typeof(string) || parameter.ParameterType == typeof(Exception))))
+            foreach (var constructor in type.GetConstructors().Where(constructor => constructor.GetParameters().All(parameter => parameter.ParameterType == typeof(string) || parameter.ParameterType == typeof(Exception))))
             {
                 var parameters = constructor.GetParameters().ToImmutableArray();
-                var id = "M:" + type.FullName!.Replace('+', '.') + ".#ctor" + (parameters.Length == 0 ? "" : "(" + string.Join(",", parameters.Select(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.ParameterType.FullName)) + ")");
+                var id = "M:" + type.FullName!.Replace('+', '.') + ".#ctor" + (parameters.Length == 0 ? "" : "(" + string.Join(",", parameters.Select(parameter => parameter.ParameterType.FullName)) + ")");
                 var symbol = (IMethodSymbol)DocumentationCommentId.GetFirstSymbolForDeclarationId(id, compilation)!;
                 Assert.That(symbol, Is.Not.Null, id);
                 var guard = CSharpOperationSemantics.ExceptionConstructorMessageGuard(symbol);
                 signatures++;
                 if (guard is not null)
                 { guarded++; }
-                var combinations = (int)Math.Pow(3, parameters.Count(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) : parameter.ParameterType == typeof(string)));
+                var combinations = (int)Math.Pow(3, parameters.Count(parameter => parameter.ParameterType == typeof(string)));
                 for (var combination = 0; combination < combinations; combination++)
                 {
                     foreach (var throws in ImmutableArray.Create(false, true))

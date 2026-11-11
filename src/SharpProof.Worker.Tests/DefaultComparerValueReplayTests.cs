@@ -69,7 +69,7 @@ internal sealed class DefaultComparerValueReplayTests
         builder.Return(block, site, Value(factory, "System_Int32"));
         var options = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(false))
         {
-            ConcreteOpaqueValueProvider = term => term is null ? throw new ArgumentNullException(nameof(term)) : PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, PassiveCallableVcPlan.ReadDefaultComparer)
+            ConcreteOpaqueValueProvider = term => PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, PassiveCallableVcPlan.ReadDefaultComparer)
         };
         var result = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100, options);
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
@@ -120,7 +120,7 @@ internal sealed class DefaultComparerValueReplayTests
         var member = factory.GetOrCreateMember(factory.CreateIdentity(),
             scenario == "declaring-type" ? factory.StringType : type,
             scenario == "unowned" ? "ordinary" : IrOpaqueCallSite.DefaultComparerValuePrefix + primitive,
-            type, scenario != "instance", [.. arguments.Select(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Type)]);
+            type, scenario != "instance", [.. arguments.Select(argument => argument.Type)]);
         var receiver = scenario == "instance" ? factory.Null(type) : null;
         return scenario == "impure" ? factory.ImpureOpaque(factory.CreateOperation("ordinary"), member, receiver, arguments.ToArray()) :
             factory.PureOpaque(member, receiver, arguments.ToArray());

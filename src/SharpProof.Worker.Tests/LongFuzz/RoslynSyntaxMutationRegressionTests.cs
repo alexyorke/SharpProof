@@ -64,8 +64,8 @@ public sealed class RoslynSyntaxMutationRegressionTests
             TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.SpecificationPackIds, Is.Empty);
         var targets = artifact.Manifest.Claims.Where(claim =>
-            claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
-            claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
+            claim.CallableId.Contains("Target", StringComparison.Ordinal) &&
+            claim.Kind == WorkerClaimKind.Postcondition).ToImmutableArray();
         Assert.That(targets, Has.Length.EqualTo(1), source);
 
         using var project = new ShadowTestProject(artifact);
@@ -74,7 +74,7 @@ public sealed class RoslynSyntaxMutationRegressionTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty, source);
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True, source);
-        var results = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == targets[0].ClaimId)).ToImmutableArray();
+        var results = response.ClaimResults.Where(result => result.ClaimId == targets[0].ClaimId).ToImmutableArray();
         Assert.That(results, Has.Length.EqualTo(1), source);
         var result = results[0];
         return (source, variant, anchor, falseClaim, result.Outcome, result.Reason);
@@ -125,9 +125,9 @@ public sealed class RoslynSyntaxMutationRegressionTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         System.ArgumentNullException.ThrowIfNull(source);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         Assert.That(errors, Is.Empty,
-            string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))) + "\n" + source);
+            string.Join(" | ", errors.Select(error => error.ToString())) + "\n" + source);
     }
 
     private static int RunClr(CSharpCompilation compilation, int anchor)

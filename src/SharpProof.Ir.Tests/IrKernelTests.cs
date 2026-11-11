@@ -811,7 +811,7 @@ internal sealed class IrKernelTests
                 .ToImmutableArray();
             Assert.That(terms, Is.Unique);
             Assert.That(
-                terms.Select(static term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Operator)),
+                terms.Select(static term => term.Operator),
                 Is.EqualTo(operators));
         }
     }

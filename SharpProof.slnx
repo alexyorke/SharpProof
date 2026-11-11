@@ -3,7 +3,6 @@
     <Project Path="src/ConsoleLoggingAnalyzer.Tests/ConsoleLoggingAnalyzer.Tests.csproj" />
     <Project Path="src/ConsoleLoggingAnalyzer/ConsoleLoggingAnalyzer.csproj" />
     <Project Path="src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj" />
-    <Project Path="src/SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj" />
     <Project Path="src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj" />
     <Project Path="src/SharpProof.Analyzer/SharpProof.Analyzer.csproj" />
     <Project Path="src/SharpProof.Architecture.Tests/SharpProof.Architecture.Tests.csproj" />

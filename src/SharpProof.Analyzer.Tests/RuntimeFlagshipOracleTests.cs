@@ -187,8 +187,8 @@ public sealed class RuntimeFlagshipOracleTests
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         var actual = diagnostics
             .Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((diagnostic.Id, Method: ExtractQuotedName(
-                    diagnostic.GetMessage(CultureInfo.InvariantCulture)))))
+                (diagnostic.Id, Method: ExtractQuotedName(
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture))))
             .OrderBy(static item => item.Id, StringComparer.Ordinal)
             .ThenBy(static item => item.Method, StringComparer.Ordinal)
             .ToImmutableArray();

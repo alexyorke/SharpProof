@@ -22,7 +22,7 @@ public sealed partial class DotnetApiInventoryTests
         ArgumentNullException.ThrowIfNull(references);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target() { var data = new System.Collections.Generic.Queue<int>(1); var alias = data; data.Enqueue(17); alias.Enqueue(23); var first = data.Dequeue(); data.Enqueue(29); var other = new System.Collections.Generic.Queue<object>(); var item = new object(); other.Enqueue(item); other.Enqueue(null); return first * 10000 + alias.Dequeue() * 100 + data.Dequeue() + data.Count + (object.ReferenceEquals(other.Dequeue(), item) && other.Dequeue() == null ? 1 : 0); } }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();

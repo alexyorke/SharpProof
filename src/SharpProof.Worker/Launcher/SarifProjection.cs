@@ -29,29 +29,29 @@ internal static class SarifProjection
         var callableResults = response.CallableResults;
         var errors = response.Errors;
         var claims = ImmutableDictionaryCapture.Create(manifest.Claims,
-            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ClaimId,
-            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim, StringComparer.Ordinal);
+            static claim => claim.ClaimId,
+            static claim => claim, StringComparer.Ordinal);
         var callables = ImmutableDictionaryCapture.Create(manifest.Callables,
-            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable.CallableId,
-            static callable => callable is null ? throw new ArgumentNullException(nameof(callable)) : callable, StringComparer.Ordinal);
+            static callable => callable.CallableId,
+            static callable => callable, StringComparer.Ordinal);
         var timingOnly = WorkerCallPreconditionCoverage.TimingOnlyCallables(response);
         var resultBuilder = ImmutableArray.CreateBuilder<object>();
         resultBuilder.AddRange(claimResults
             .Select(result => ClaimResult(
                 request, result, RequireEntry(claims, result.ClaimId, "claim"), projectDirectory)));
         resultBuilder.AddRange(callableResults
-            .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete))
+            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
             .Select(result => IncompleteResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory,
                 timingOnly.Contains(result.CallableId))));
         resultBuilder.AddRange(callableResults
-            .Where(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Assumptions.Any(IsPolicyAssumption)))
+            .Where(static result => result.Assumptions.Any(IsPolicyAssumption))
             .Select(result => AssumptionResult(
                 request, result, RequireEntry(callables, result.CallableId, "callable"), projectDirectory)));
         var results = resultBuilder.ToImmutable();
         var notificationBuilder = ImmutableArray.CreateBuilder<object>();
         notificationBuilder.AddRange(errors.Select(
-            static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (Notification(error.Code, error.Message))));
+            static error => Notification(error.Code, error.Message)));
 
         if (runStatus != WorkerRunStatus.Complete &&
             notificationBuilder.Count == 0)
@@ -171,8 +171,8 @@ internal static class SarifProjection
             ? string.Empty
             : " [vacuous: " + result.Vacuity + "]";
         var implementationIlAssumption = result.ProofCore.Any(
-            static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
-                "il-summary:", StringComparison.Ordinal)))
+            static item => item.StartsWith(
+                "il-summary:", StringComparison.Ordinal))
             ? " [implementation-IL proof assumes the compile-time referenced binary is the runtime binary]"
             : string.Empty;
         var witness = effectWitness == null
@@ -190,7 +190,7 @@ internal static class SarifProjection
         if (result.ResourceBound?.MetadataAssumptions is { Length: > 0 } metadata)
         {
             resource += " [conditional resource metadata: " + string.Join(", ", metadata.Select(static item =>
-                item is null ? throw new ArgumentNullException(nameof(item)) : item.RuntimeModel + "/" + item.WitnessIdentifier)) + "]";
+                item.RuntimeModel + "/" + item.WitnessIdentifier)) + "]";
         }
         if (result.ResourceBound is { ExecutionScope: WorkerResourceModels.TaskJoinScope or WorkerResourceModels.TaskSourceAllocationScope or WorkerResourceModels.TaskStorageScope or WorkerResourceModels.TaskRuntimeScope } scoped)
         { resource += " [scope: " + scoped.ExecutionScope + "]"; }
@@ -510,6 +510,6 @@ internal static class SarifProjection
         return string.Join(
             "/",
             path.Split('/').Select(
-                static segment => segment is null ? throw new System.ArgumentNullException(nameof(segment)) : (Uri.EscapeDataString(segment))));
+                static segment => Uri.EscapeDataString(segment)));
     }
 }

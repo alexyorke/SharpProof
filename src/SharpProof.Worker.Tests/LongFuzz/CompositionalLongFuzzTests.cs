@@ -243,11 +243,11 @@ public sealed class CompositionalLongFuzzTests
         }
 
         var compilation = Compile(source, contractsEnabled: true);
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         if (errors.Length != 0)
         {
             session.RecordHit(new LongFuzzHit("GeneratorCompileError", LongFuzzHit.Error, seed, pair,
-                "", "", Format(witness), string.Join(" | ", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))), source));
+                "", "", Format(witness), string.Join(" | ", errors.Select(diagnostic => diagnostic.ToString())), source));
             return;
         }
         session.Count("claim-compiled:" + pair);
@@ -262,11 +262,11 @@ public sealed class CompositionalLongFuzzTests
         {
             session.RecordHit(new LongFuzzHit("WorkerErrors", LongFuzzHit.Error, seed, pair,
                 "", "", Format(witness), string.Join(" | ", response.Errors.Select(error =>
-                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))), source));
+                    error.Code + ":" + error.Message)), source));
             return;
         }
-        var claims = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (artifact.Manifest.Claims.Any(item =>
-            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal))))).ToImmutableArray();
+        var claims = response.ClaimResults.Where(result => artifact.Manifest.Claims.Any(item =>
+            item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == result.ClaimId && item.CallableId.Contains("Target", StringComparison.Ordinal)))).ToImmutableArray();
         if (claims.Length != 1)
         {
             session.RecordHit(new LongFuzzHit("ClaimSelectionError", LongFuzzHit.Error, seed, pair,
@@ -388,15 +388,15 @@ public sealed class CompositionalLongFuzzTests
         System.ArgumentNullException.ThrowIfNull(operation);
         if (claim == "[DoesNotThrow]")
         {
-            return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Exception is not null));
+            return runs.FirstOrDefault(run => run.Exception is not null);
         }
         if (claim == "[EnforcePure]")
         {
-            return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Writes != 0 || run.State != 0));
+            return runs.FirstOrDefault(run => run.Writes != 0 || run.State != 0);
         }
         var expected = operation.Name == "shift-divide" ? unchecked(atAnchor.Value!.Value + 1) :
             atAnchor.Value!.Value;
-        return runs.FirstOrDefault(run => run is null ? throw new System.ArgumentNullException(nameof(run)) : (run.Input == operation.Anchor && run.Exception is null && run.Value != expected));
+        return runs.FirstOrDefault(run => run.Input == operation.Anchor && run.Exception is null && run.Value != expected);
     }
 
     private static string ClaimName(string claim)
@@ -449,10 +449,10 @@ public sealed class CompositionalLongFuzzTests
         { throw new ArgumentNullException(nameof(inputs)); }
         System.ArgumentNullException.ThrowIfNull(source);
         var compilation = Compile(source, contractsEnabled: false);
-        var errors = compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+        var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         if (errors.Length != 0)
         {
-            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.ToString()))));
+            return new([], "generated program did not compile: " + string.Join(" | ", errors.Select(error => error.ToString())));
         }
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);

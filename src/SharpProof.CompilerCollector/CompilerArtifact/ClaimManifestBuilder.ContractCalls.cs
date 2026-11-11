@@ -61,10 +61,8 @@ internal sealed partial class ClaimManifestBuilder
         var constructors = false;
         var indexers = false;
         var callees = selected.Values
-            .Where(static target => target is null ? throw new ArgumentNullException(nameof(target)) :
-                target.Entry.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                    assumption.Kind == WorkerAssumptionKind.Precondition))
-            .Select(static target => target is null ? throw new ArgumentNullException(nameof(target)) : target.Method);
+            .Where(static target => target.Entry.Assumptions.Any(static assumption => assumption.Kind == WorkerAssumptionKind.Precondition))
+            .Select(static target => target.Method);
         foreach (var callee in callees.Concat(MetadataPreconditionCallees()))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -84,7 +82,7 @@ internal sealed partial class ClaimManifestBuilder
         foreach (var tree in _compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var alias in tree.GetRoot(cancellationToken).DescendantNodes(static node => node is null ? throw new ArgumentNullException(nameof(node)) : node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax).OfType<UsingDirectiveSyntax>())
+            foreach (var alias in tree.GetRoot(cancellationToken).DescendantNodes(static node => node is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax).OfType<UsingDirectiveSyntax>())
             {
                 if (alias.Alias is { } declared && alias.Name is { } target && names.Contains(RightmostName(target)))
                 { names.Add(declared.Name.Identifier.ValueText); }
@@ -99,9 +97,7 @@ internal sealed partial class ClaimManifestBuilder
     {
         foreach (var assembly in _compilation.SourceModule.ReferencedAssemblySymbols)
         {
-            if (!assembly.Modules.Any(static module => module is null ? throw new ArgumentNullException(nameof(module)) :
-                module.ReferencedAssemblySymbols.Any(static reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-                    reference.Identity.Name == "SharpProof.Attributes")))
+            if (!assembly.Modules.Any(static module => module.ReferencedAssemblySymbols.Any(static reference => reference.Identity.Name == "SharpProof.Attributes")))
             { continue; }
             var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty.Push(assembly.GlobalNamespace);
             while (!pending.IsEmpty)
@@ -113,8 +109,7 @@ internal sealed partial class ClaimManifestBuilder
                 {
                     if (member is INamespaceOrTypeSymbol nested)
                     { pending = pending.Push(nested); }
-                    else if (member is IMethodSymbol method && method.Parameters.Any(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                        parameter.GetAttributes().Any(_attributes.IsClosedContract)))
+                    else if (member is IMethodSymbol method && method.Parameters.Any(parameter => parameter.GetAttributes().Any(_attributes.IsClosedContract)))
                     { yield return method; }
                 }
             }

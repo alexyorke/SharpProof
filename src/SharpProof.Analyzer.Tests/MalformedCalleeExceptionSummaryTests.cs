@@ -29,7 +29,7 @@ public sealed class MalformedCalleeExceptionSummaryTests
         var errorSyntax = root.DescendantNodes()
             .OfType<IdentifierNameSyntax>()
             .Single(static syntax =>
-                syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "MissingException"));
+                syntax.Identifier.ValueText == "MissingException");
         var errorType = (INamedTypeSymbol)model.GetTypeInfo(errorSyntax).Type!;
         var anonymousSyntax = root.DescendantNodes()
             .OfType<AnonymousObjectCreationExpressionSyntax>()
@@ -48,7 +48,7 @@ public sealed class MalformedCalleeExceptionSummaryTests
             _ = CompilerExceptionTypeIdentity.Encode(anonymousType);
         }));
         var expected = string.Join(",", ImmutableArray.Create("<error-type>", CompilerExceptionTypeIdentity.Encode(validType))
-            .OrderBy(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value), StringComparer.Ordinal));
+            .OrderBy(static value => value, StringComparer.Ordinal));
         Assert.That(
             EffectContractDiagnostics.FormatTypes(
                 [errorType, anonymousType, validType]),

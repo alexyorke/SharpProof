@@ -148,7 +148,7 @@ internal readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         return new EffectThrowSet(
             [
                 .. distinct.OrderBy(
-                    static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type),
+                    static type => type,
                     EffectSymbolComparer<INamedTypeSymbol>.Instance)
             ],
             includesUnknown,
@@ -162,7 +162,7 @@ internal readonly struct EffectThrowSet : IEquatable<EffectThrowSet>
         return IncludesUnknown ||
             (_membership?.Contains(type) ??
                 Types.Any(candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(candidate, type))));
+                    SymbolEqualityComparer.Default.Equals(candidate, type)));
     }
 
     public bool IsSubsetOf(EffectThrowSet other)
@@ -293,7 +293,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
     private static SymbolSortKey GetSortKey(TSymbol symbol)
     {
         symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
-        return SortKeys.GetValue(symbol, static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new(value)));
+        return SortKeys.GetValue(symbol, static value => new(value));
     }
 
     private sealed class SymbolSortKey
@@ -303,7 +303,7 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
             symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             Identity = CanonicalIdentity(symbol);
             var location = symbol.Locations.FirstOrDefault(
-                static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsInSource));
+                static candidate => candidate.IsInSource);
             SourcePath = location?.SourceTree?.FilePath;
             SourceStart = location?.SourceSpan.Start ?? -1;
         }

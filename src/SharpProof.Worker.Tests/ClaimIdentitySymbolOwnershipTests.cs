@@ -126,7 +126,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
         var compilation = CreateCompilation("CSharp", CSharpMethods);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
-        var locals = ImmutableDictionaryCapture.Create(tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>(), syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText), syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!)));
+        var locals = ImmutableDictionaryCapture.Create(tree.GetRoot().DescendantNodes().OfType<LocalFunctionStatementSyntax>(), syntax => syntax.Identifier.ValueText, syntax => MethodOwner((IMethodSymbol)model.GetDeclaredSymbol(syntax)!));
         var source = locals["Leaf"];
         var parent = locals["Parent"];
         var definition = MethodOwner(compilation.GetTypeByMetadataName("HostContainer")!.GetMembers("Host")
@@ -199,7 +199,7 @@ public sealed class ClaimIdentitySymbolOwnershipTests
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release))
             : VisualBasicCompilation.Create("ClaimIdentityOwnership", [VisualBasicSyntaxTree.ParseText(source)], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

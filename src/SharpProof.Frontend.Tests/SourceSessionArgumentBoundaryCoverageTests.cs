@@ -31,7 +31,7 @@ public sealed class SourceSessionArgumentBoundaryCoverageTests
                 invocation.TargetMethod), Is.True);
         }
         var helperSyntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
+            .Single(method => method.Identifier.ValueText == "Helper");
         var helperGraph = ControlFlowGraph.Create(helperSyntax, subject.Compilation.GetSemanticModel(tree))!;
         bool PrepareCallee(TotalLoweringContext candidate)
         {

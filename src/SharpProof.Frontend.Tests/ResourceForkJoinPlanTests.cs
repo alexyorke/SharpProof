@@ -106,7 +106,7 @@ public sealed class ResourceForkJoinPlanTests
         var tree = CSharpSyntaxTree.ParseText("using System.Threading.Tasks; public static class C { public static Task Target(int n) => Task.WhenAll(Task.Run(() => " + call + "),Task.Run(() => " + call + ")); " + child + " }");
         var compilation = CSharpCompilation.Create("UnsupportedCallback", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(ResourceForkJoinPlan.TryCreate(Method(compilation, tree), compilation, TestContext.CurrentContext.CancellationToken), Is.Null);
     }
     [TestCase(2, true)]
@@ -174,7 +174,7 @@ public sealed class ResourceForkJoinPlanTests
             " static void Child(int n) { } static void MethodGroup() { } static int Value(int n) => n; }");
         var compilation = CSharpCompilation.Create("ClosedJoin", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return (compilation, Method(compilation, tree));
     }
 
@@ -183,7 +183,7 @@ public sealed class ResourceForkJoinPlanTests
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(tree);
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+            .Single(static method => method.Identifier.ValueText == "Target");
         return (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(declaration)!;
     }
 }

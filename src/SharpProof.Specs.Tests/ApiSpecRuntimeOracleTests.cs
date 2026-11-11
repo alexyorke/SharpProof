@@ -44,13 +44,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
         Assert.That(
             Witnesses.Keys,
             Is.EquivalentTo(templates.Select(static template =>
-                template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Target.WitnessIdentifier))));
+                template.Target.WitnessIdentifier)));
         foreach (var template in templates)
         {
             var identifier = template.Target.WitnessIdentifier;
             var row = Witnesses[identifier];
             var expectedFacets = ExpectedFacets(template);
-            var actualFacets = row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Facet)).ToImmutableArray();
+            var actualFacets = row.Facets.Select(static witness => witness.Facet).ToImmutableArray();
 
             using (Assert.EnterMultipleScope())
             {
@@ -63,15 +63,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     Is.EquivalentTo(expectedFacets),
                     identifier + " does not cover exactly its known facets.");
                 Assert.That(
-                    row.Facets.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.EdgeInputs)),
+                    row.Facets.Select(static witness => witness.EdgeInputs),
                     Has.All.Not.Empty,
                     identifier + " has a facet witness without named edge inputs.");
                 Assert.That(
-                    row.Postconditions.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.Index)),
+                    row.Postconditions.Select(static witness => witness.Index),
                     Is.EqualTo(Enumerable.Range(0, template.Postconditions.Length)),
                     identifier + " does not cover every postcondition exactly once.");
                 Assert.That(
-                    row.Postconditions.Select(static witness => witness is null ? throw new System.ArgumentNullException(nameof(witness)) : (witness.EdgeInputs)),
+                    row.Postconditions.Select(static witness => witness.EdgeInputs),
                     Has.All.Not.Empty,
                     identifier + " has a postcondition witness without named edge inputs.");
             }
@@ -610,7 +610,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Effects,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Effects.Effects),
+            static template => template.Facets.Effects.Effects,
             claim => observe() == claim,
             mutation);
     }
@@ -631,7 +631,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             edgeInputs,
             observeEffect,
             effectMutation,
-            [.. invokes.Select(invoke => invoke is null ? throw new System.ArgumentNullException(nameof(invoke)) : (new RuntimeEdge(prepare, invoke)))]);
+            [.. invokes.Select(invoke => new RuntimeEdge(prepare, invoke))]);
     }
 
     private static RowWitness ContractConditionRow(
@@ -713,7 +713,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Allocation,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Allocation.Behavior),
+            static template => template.Facets.Allocation.Behavior,
             claim => ObserveAllocation(edges) == claim,
             mutation);
     }
@@ -725,7 +725,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Allocation,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Allocation.Behavior),
+            static template => template.Facets.Allocation.Behavior,
             static claim => claim == SpecAllocationBehavior.MayAllocate,
             SpecAllocationBehavior.None);
     }
@@ -745,10 +745,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Throws,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (new ThrowClaim(
+            static template => new ThrowClaim(
                 template.Facets.Throws.Behavior,
-                template.Facets.Throws.ExceptionMetadataNames)),
-            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (MatchesThrowClaim(ObserveThrows(edges), claim)),
+                template.Facets.Throws.ExceptionMetadataNames),
+            claim => MatchesThrowClaim(ObserveThrows(edges), claim),
             mutation);
     }
 
@@ -763,10 +763,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Throws,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (new ThrowClaim(
+            static template => new ThrowClaim(
                 template.Facets.Throws.Behavior,
-                template.Facets.Throws.ExceptionMetadataNames)),
-            claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (MatchesThrowClaim(observed.Value, claim)),
+                template.Facets.Throws.ExceptionMetadataNames),
+            claim => MatchesThrowClaim(observed.Value, claim),
             mutation);
     }
 
@@ -780,7 +780,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Nullness,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Nullness.Result),
+            static template => template.Facets.Nullness.Result,
             claim => observe() == claim,
             mutation);
     }
@@ -795,7 +795,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Termination,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Termination!.Behavior),
+            static template => template.Facets.Termination!.Behavior,
             claim => ObserveTermination(observed.Value) == claim,
             mutation);
     }
@@ -810,7 +810,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         return new(
             FacetKind.Cardinality,
             edgeInputs,
-            static template => template is null ? throw new System.ArgumentNullException(nameof(template)) : (template.Facets.Cardinality.Result),
+            static template => template.Facets.Cardinality.Result,
             claim => observe() == claim,
             mutation);
     }
@@ -870,7 +870,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     {
         if (edges.IsDefault)
         { throw new ArgumentNullException(nameof(edges)); }
-        return edges.All(static edge => edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (edge())) ? SpecEffect.None : SpecEffect.Unknown;
+        return edges.All(static edge => edge()) ? SpecEffect.None : SpecEffect.Unknown;
     }
 
     private static SpecEffect ObservePureBclEffects(
@@ -944,7 +944,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         System.ArgumentNullException.ThrowIfNull(prepare);
         System.ArgumentNullException.ThrowIfNull(receiver);
         return invokes.All(invoke =>
-            invoke is null ? throw new System.ArgumentNullException(nameof(invoke)) : (ConstructorWritesReceiver(prepare, receiver, invoke)))
+            ConstructorWritesReceiver(prepare, receiver, invoke))
             ? SpecEffect.WritesReceiverState
             : SpecEffect.Unknown;
     }
@@ -961,7 +961,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         prepare();
         var target = receiver();
         var fields = InstanceFields(target.GetType());
-        var before = fields.Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.GetValue(target))).ToImmutableArray();
+        var before = fields.Select(field => field.GetValue(target)).ToImmutableArray();
         invoke();
         for (var index = 0; index < fields.Length; index++)
         {
@@ -1197,7 +1197,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         if (edges.IsDefault)
         { throw new ArgumentNullException(nameof(edges)); }
         var counts = edges.Select(static edge =>
-                edge is null ? throw new System.ArgumentNullException(nameof(edge)) : (Count((IEnumerable)edge()!)))
+                Count((IEnumerable)edge()!))
             .ToImmutableArray();
         if (counts.All(static count => count == 0))
         {

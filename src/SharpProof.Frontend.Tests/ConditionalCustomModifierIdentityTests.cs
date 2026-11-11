@@ -38,7 +38,7 @@ public sealed class ConditionalCustomModifierIdentityTests
         TestCompilation.AssertNoErrors(consumer);
         var subject = consumer.GetTypeByMetadataName("ModifierSubject")!;
         Assert.That(subject, Is.Not.Null);
-        Assert.That(subject.Locations.All(location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
+        Assert.That(subject.Locations.All(location => location.IsInMetadata), Is.True);
         var init = ((IPropertySymbol)subject.GetMembers("P").Single()).SetMethod!.ReturnTypeCustomModifiers;
         var otherInit = ((IPropertySymbol)subject.GetMembers("Q").Single()).SetMethod!.ReturnTypeCustomModifiers;
         var readOnly = ((IMethodSymbol)subject.GetMembers("R").Single()).RefCustomModifiers;

@@ -79,8 +79,8 @@ public sealed class CorpusCatalogWorkflowTests
         var originalPath = methods[1]!["path"]!.GetValue<string>();
         var firstPath = methods[0]!["path"]!.GetValue<string>();
         var files = manifest["files"]!.AsArray();
-        var firstFile = files.Single(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file!["path"]!.GetValue<string>() == firstPath))!;
-        var secondFile = files.Single(file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file!["path"]!.GetValue<string>() == originalPath))!;
+        var firstFile = files.Single(file => file!["path"]!.GetValue<string>() == firstPath)!;
+        var secondFile = files.Single(file => file!["path"]!.GetValue<string>() == originalPath)!;
         secondFile["content"] = firstFile["content"]!.DeepClone();
         secondFile["contentSha256"] = firstFile["contentSha256"]!.DeepClone();
         var duplicate = methods[0]!.DeepClone();
@@ -122,12 +122,12 @@ public sealed class CorpusCatalogWorkflowTests
                         OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(declaration)),
                         declaration.Identifier.ValueText, "effects", CorpusVerdict.Unknown, CorpusSupport.IntentionallyUnsupported);
                 });
-        }).DistinctBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.DeclarationSha256)).ToImmutableArray();
-        var groups = candidates.GroupBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (OpenSourceCorpusCatalog.GetSourceFileKey(method.SourceId, method.Path)))
-            .OrderByDescending(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()))
-            .ThenBy(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), StringComparer.Ordinal)
+        }).DistinctBy(static method => method.DeclarationSha256).ToImmutableArray();
+        var groups = candidates.GroupBy(static method => OpenSourceCorpusCatalog.GetSourceFileKey(method.SourceId, method.Path))
+            .OrderByDescending(static group => group.Count())
+            .ThenBy(static group => group.Key, StringComparer.Ordinal)
             .Take(OpenSourceCorpusCatalog.MinimumSourceFileCount - 1)
-            .Select(static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.ToImmutableArray())).ToImmutableArray();
+            .Select(static group => group.ToImmutableArray()).ToImmutableArray();
         Assert.That(groups, Has.Length.EqualTo(24));
         var selected = groups.Select(static group => group.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(group)) : (group[0]))
             .Concat(groups.SelectMany(static group => group.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(group)) : (group.Skip(1))))

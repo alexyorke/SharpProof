@@ -16,7 +16,7 @@ internal static class CompilerDiagnosticArtifactOrdering
     {
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return [.. diagnostics
-            .OrderBy(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item), Comparer)];
+            .OrderBy(static item => item, Comparer)];
     }
 
     internal static bool IsCanonical(ImmutableArray<CompilerDiagnosticArtifact> diagnostics)

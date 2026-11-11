@@ -71,18 +71,18 @@ public sealed class GenericTestedTypePatternControlAuditTests
         var model = compilation.GetSemanticModel(tree);
         var root = await tree.GetRootAsync(TestContext.CurrentContext.CancellationToken);
         var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node.Identifier.ValueText == "Target"));
+            .Single(node => node.Identifier.ValueText == "Target");
         var expression = method.Body!.Statements.OfType<ReturnStatementSyntax>().Single().Expression!;
         var operation = model.GetOperation(expression);
         var graph = ControlFlowGraph.Create(method, model, TestContext.CurrentContext.CancellationToken)!;
-        var flowPatterns = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.BranchValue)).OfType<IIsPatternOperation>().ToImmutableArray();
+        var flowPatterns = graph.Blocks.Select(block => block.BranchValue).OfType<IIsPatternOperation>().ToImmutableArray();
         var expectedPattern = form == "discard-declaration" ? OperationKind.DeclarationPattern : OperationKind.TypePattern;
         await Save(evidenceDirectory, form + "-shape.json", new
         {
             SourceSha256 = sourceHash,
             ExpectedPattern = expectedPattern.ToString(),
             Operation = Shape(operation),
-            FlowBranches = graph.Blocks.Select(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (new { block.Ordinal, Shape = Shape(block.BranchValue) })).ToImmutableArray(),
+            FlowBranches = graph.Blocks.Select(block => new { block.Ordinal, Shape = Shape(block.BranchValue) }).ToImmutableArray(),
             Roslyn = typeof(IOperation).Assembly.GetName().Version!.ToString(),
             Role = "Compiler/CFG setup qualification; shape mismatch is not a product allocation red."
         });
@@ -109,8 +109,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
             var controlFlags = controlMethod.GetMethodImplementationFlags();
             var il = generic.GetMethodBody()!.GetILAsByteArray()!.ToImmutableArray();
             var instructions = ReadIl(il.AsSpan());
-            var hasBox = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "box"));
-            var hasIsinst = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "isinst"));
+            var hasBox = instructions.Any(instruction => instruction.OpCode == "box");
+            var hasIsinst = instructions.Any(instruction => instruction.OpCode == "isinst");
             await Save(evidenceDirectory, form + "-runtime.json", new
             {
                 SourceSha256 = sourceHash,
@@ -174,18 +174,18 @@ public sealed class GenericTestedTypePatternControlAuditTests
             CacheEnabled = project.Request.Cache.Enabled,
             Budgets = project.Request.Budgets,
             Errors = response.Errors,
-            ManifestClaims = discovery.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            ManifestClaims = discovery.Manifest.Claims.Select(claim => new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToImmutableArray(),
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            }).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(claim => new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             Target = measured,
             Control = control,
             FrozenRule = "Observed allocation > 0 implies ZeroAllocations cannot be Proven. Zero measured allocation rejects this hypothesis for the tested form/runtime."
@@ -329,8 +329,8 @@ public sealed class GenericTestedTypePatternControlAuditTests
     private static ImmutableArray<IlInstruction> ReadIl(ReadOnlySpan<byte> bytes /* SPINT001: all values valid - an empty IL span yields an empty instruction vector */)
     {
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-            .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+            .Where(field => field.FieldType == typeof(OpCode))
+            .Select(field => (OpCode)field.GetValue(null)!)
             .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = ImmutableArray.CreateBuilder<IlInstruction>();
         for (var position = 0; position < bytes.Length;)

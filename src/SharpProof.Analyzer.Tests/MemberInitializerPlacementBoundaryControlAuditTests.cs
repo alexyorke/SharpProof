@@ -53,14 +53,14 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
         var suppress = compilation.GetTypeByMetadataName(
             "SharpProof.Attributes.SharpProofSuppressAttribute")!;
         var constructor = subject.InstanceConstructors.Single(
-            static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (!method.IsImplicitlyDeclared));
+            static method => !method.IsImplicitlyDeclared);
         var property = owners.OfType<IPropertySymbol>().Single();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(constructor.GetAttributes().Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, suppress))), Is.True);
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, suppress)), Is.True);
             Assert.That(property.GetAttributes().Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, suppress))), Is.True);
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, suppress)), Is.True);
         }
         var tree = compilation.SyntaxTrees.Single();
         foreach (var owner in owners)
@@ -94,7 +94,7 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
         {
             var syntax = await tree.GetRootAsync();
             var result = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-                .Single(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString() == "Contract.Result<int>"));
+                .Single(invocation => invocation.Expression.ToString() == "Contract.Result<int>");
             Assert.That(result.Span.ToString(), Is.EqualTo("[99..121)"));
         }
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, "contracts");
@@ -153,7 +153,7 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
                     _ => []
                 };
                 Assert.That(initializedOwners.Any(symbol =>
-                    symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (SymbolEqualityComparer.Default.Equals(symbol, owner))), Is.True);
+                    SymbolEqualityComparer.Default.Equals(symbol, owner)), Is.True);
                 if (declaredOwner is IPropertySymbol)
                 {
                     Assert.That(rawOwner, Is.AssignableTo<IFieldSymbol>());
@@ -183,7 +183,7 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(AnalyzerTestHost.EmitImage(compilation), Is.Not.Empty);
     }
 
@@ -191,11 +191,11 @@ public sealed class MemberInitializerPlacementBoundaryControlAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics
-            .OrderBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath), StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)
+            .OrderBy(static diagnostic => diagnostic.Location.SourceTree?.FilePath, StringComparer.Ordinal)
+            .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
             .Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
-                $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
+                $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
+                $"{diagnostic.Location.SourceSpan}|{diagnostic.GetMessage(CultureInfo.InvariantCulture)}"));
     }
 }

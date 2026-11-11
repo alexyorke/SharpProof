@@ -389,7 +389,7 @@ internal static class FuzzSourceCaseExecutor
 
         internal BooleanMethod Lower(string name, CancellationToken cancellationToken)
         {
-            var method = _methods.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == name));
+            var method = _methods.Single(method => method.Identifier.ValueText == name);
             var symbol = _model.GetDeclaredSymbol(method, cancellationToken) ??
                 throw new InvalidOperationException("The source method has no actual SDK symbol.");
             if (!symbol.IsStatic || symbol.ReturnType.SpecialType != SpecialType.System_Boolean)
@@ -410,7 +410,7 @@ internal static class FuzzSourceCaseExecutor
             {
                 term = expression.Value;
                 variables = [.. context.Parameters.Select(parameter =>
-                    parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new FrontendVariableBinding(parameter.Parameter, parameter.Entry)))];
+                    new FrontendVariableBinding(parameter.Parameter, parameter.Entry))];
             }
             else
             {

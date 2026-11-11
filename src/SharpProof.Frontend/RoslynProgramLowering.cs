@@ -30,7 +30,7 @@ internal static class RoslynProgramLowering
             CSharpOperationSemantics.HasSynchronizedEntry(context.Target) ||
             context.Target.AssociatedSymbol is not IPropertySymbol property ||
             !property.ContainingType.GetMembers().OfType<IFieldSymbol>().Any(field =>
-                field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property))))
+                SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)))
         { return null; }
         var getter = context.Target.MethodKind == MethodKind.PropertyGet;
         if (getter != (context.Result != null))

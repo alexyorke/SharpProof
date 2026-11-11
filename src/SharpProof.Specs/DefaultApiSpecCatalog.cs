@@ -270,7 +270,7 @@ internal sealed class ApiSpecTemplate
         (Receiver, Parameters, Result, Postconditions) =
             (receiver, parameters, result, postconditions);
         VariablesById = variables.ToImmutableDictionary(
-            static variable => variable is null ? throw new ArgumentNullException(nameof(variable)) : variable.Id);
+            static variable => variable.Id);
         VariablesBySlot = variablesBySlot;
         ValidatedTerms = validatedTerms;
     }

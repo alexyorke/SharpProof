@@ -152,7 +152,7 @@ public sealed class ToolApplicationTests
         using var error = new StringWriter(CultureInfo.InvariantCulture);
         Assert.That(await ToolApplication.RunAsync(json ? ["doctor", "--format", "json"] : ["doctor"],
             output, error, DiscoverSdk, TestContext.CurrentContext.CancellationToken), Is.Zero);
-        Assert.That(output.ToString(), Does.Contain("10.0.403").And.Contain("no project evaluation"));
+        Assert.That(output.ToString(), Does.Contain("10.0.404").And.Contain("no project evaluation"));
         if (json)
         {
             using var report = JsonDocument.Parse(output.ToString());
@@ -290,7 +290,7 @@ public sealed class ToolApplicationTests
     private static Task<string> DiscoverSdk(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult("10.0.403\n");
+        return Task.FromResult("10.0.404\n");
     }
 
     private static void CreateOversizedEvidence(string path)

@@ -10,12 +10,12 @@ namespace SharpProof.Worker.Test;
 internal static class ReviewedRuntimeReferences
 {
     private const string PackDirectory =
-        "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.33/ref/net8.0";
+        "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.34/ref/net8.0";
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> s_net8 = new(static () =>
         [.. Directory.GetFiles(PackDirectory, "*.dll")
             .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : (MetadataReference)MetadataReference.CreateFromFile(path))]);
+            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))]);
 
     internal static ImmutableArray<MetadataReference> Net8 => s_net8.Value;
 }

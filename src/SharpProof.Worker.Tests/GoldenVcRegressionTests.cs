@@ -36,29 +36,29 @@ public sealed class GoldenVcRegressionTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var snapshot = project.Bind();
         var response = await worker.VerifyAsync(project.Request, snapshot, TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.Errors, Is.Empty, string.Join(",", response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ":" + error.Message))));
+        Assert.That(response.Errors, Is.Empty, string.Join(",", response.Errors.Select(error => error.Code + ":" + error.Message)));
         Assert.That(response.ClaimResults, Is.Not.Empty);
         if (entryDepthLimited)
         {
-            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)), Is.All.EqualTo(WorkerClaimReason.UnsupportedExpression));
+            Assert.That(response.ClaimResults.Select(result => result.Outcome), Is.All.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(response.ClaimResults.Select(result => result.Reason), Is.All.EqualTo(WorkerClaimReason.UnsupportedExpression));
         }
         else if (depthLimited)
         {
-            Assert.That(response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            Assert.That(response.ClaimResults.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(WorkerClaimOutcome.Proven, WorkerClaimOutcome.Unknown)));
             Assert.That(response.ClaimResults[1].Reason, Is.EqualTo(WorkerClaimReason.DeepPostcondition));
         }
         else
         {
-            Assert.That(response.ClaimResults.All(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted)), Is.True,
-                string.Join(",", response.ClaimResults.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason))));
+            Assert.That(response.ClaimResults.All(result => result.Outcome is WorkerClaimOutcome.Proven or WorkerClaimOutcome.Refuted), Is.True,
+                string.Join(",", response.ClaimResults.Select(result => result.Reason)));
         }
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var rows = response.Manifest.Claims.Zip(response.ClaimResults, (claim, result) =>
             claim is null ? throw new System.ArgumentNullException(nameof(claim)) : result is null ? throw new System.ArgumentNullException(nameof(result)) : (claim.CallableId + " " + result.Outcome + "/" + result.Reason + "/" + result.Vacuity +
             " core=[" + string.Join(",", result.ProofCore) + "]" +
-            " assumptions=[" + string.Join(",", result.Assumptions.Select(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind + ":" + assumption.Used))) + "]"));
+            " assumptions=[" + string.Join(",", result.Assumptions.Select(assumption => assumption.Kind + ":" + assumption.Used)) + "]"));
         GoldenTest.Compare(fixture, string.Join("\n", rows) + "\n");
     }
 
@@ -68,10 +68,10 @@ public sealed class GoldenVcRegressionTests
         var callable = CompilerManifestArtifactJson.DecodeCallables(
             artifact, cancellationToken: TestContext.CurrentContext.CancellationToken).Single();
         var program = callable.Total!.Program;
-        var instructions = program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).ToImmutableArray();
+        var instructions = program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         var diagnostic = string.Join(Environment.NewLine, program.Blocks.Select(block =>
-            block is null ? throw new ArgumentNullException(nameof(block)) : $"{block.Id}: {string.Join("; ", block.Instructions.Select(instruction =>
-                instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction switch
+            $"{block.Id}: {string.Join("; ", block.Instructions.Select(instruction =>
+                instruction switch
                 {
                     IrAssignInstruction assign => $"assign {assign.Target} = {DescribeTerm(assign.Value)}",
                     IrBranchInstruction branch => $"branch {DescribeTerm(branch.Condition)} -> {branch.WhenTrue}/{branch.WhenFalse}",
@@ -82,7 +82,7 @@ public sealed class GoldenVcRegressionTests
         Assert.That(instructions.OfType<IrBranchInstruction>(), Is.Not.Empty,
             "The typed body must retain a control-flow branch." + Environment.NewLine + diagnostic);
         var assignedLiterals = instructions.OfType<IrAssignInstruction>()
-            .Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : IntegerLiteral(instruction.Value))
+            .Select(instruction => IntegerLiteral(instruction.Value))
             .Where(value => value.HasValue)
             .Select(value => value ?? throw new ArgumentNullException(nameof(value)))
             .ToImmutableArray();

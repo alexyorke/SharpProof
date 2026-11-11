@@ -100,7 +100,7 @@ internal sealed partial class PassiveLoopCutter
             return cutter.FindLoops()
                 ? [.. cutter._loops.OrderBy(loop => loop.Key.Value).Select(loop =>
                     new Loop(loop.Key, loop.Value.ToImmutable(), cutter._havoc[loop.Key], cutter._cells[loop.Key] is { } cells
-                        ? [.. cells.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : ((IrTerm)candidate.Factory.PureOpaque(cell.Field, cell.Target)))]
+                        ? [.. cells.Select(cell => (IrTerm)candidate.Factory.PureOpaque(cell.Field, cell.Target))]
                         : []))]
                 : [];
         }
@@ -119,7 +119,7 @@ internal sealed partial class PassiveLoopCutter
         { throw new ArgumentException("Invariants must be initialized.", nameof(invariants)); }
         var cutter = new PassiveLoopCutter(candidate, cancellation) { _invariants = invariants };
         try
-        { return cutter.FindLoops() && invariants.All(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (cutter._loops.ContainsKey(invariant.Header))) ? cutter.Encode(unroll: false) : null; }
+        { return cutter.FindLoops() && invariants.All(invariant => cutter._loops.ContainsKey(invariant.Header)) ? cutter.Encode(unroll: false) : null; }
         catch (ConstructionLimitException)
         { return null; }
     }
@@ -227,12 +227,12 @@ internal sealed partial class PassiveLoopCutter
             // after every path to that store assigned it.
             var copyBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             foreach (var group in instructions.SelectMany(IrInstructionFacts.WrittenVariables).Distinct()
-                .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (IrInstructionFacts.WrittenVariables(instruction).Contains(variable))).ToImmutableArray()))))
+                .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : ((Variable: variable, Writers: instructions.Where(instruction => IrInstructionFacts.WrittenVariables(instruction).Contains(variable)).ToImmutableArray()))))
             {
                 Spend(group.Writers.Length);
-                if (group.Writers.All(writer => writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (writer is IrAssignInstruction { Value: IrVariableTerm source } &&
-                        inputs.Contains(source.Variable) && !written.Contains(source.Variable))) &&
-                    group.Writers.Select(writer => writer is null ? throw new System.ArgumentNullException(nameof(writer)) : (((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable)).Distinct().Count() == 1)
+                if (group.Writers.All(writer => writer is IrAssignInstruction { Value: IrVariableTerm source } &&
+                        inputs.Contains(source.Variable) && !written.Contains(source.Variable)) &&
+                    group.Writers.Select(writer => ((IrVariableTerm)((IrAssignInstruction)writer).Value).Variable).Distinct().Count() == 1)
                 { copyBuilder.AddUnique(group.Variable, ((IrAssignInstruction)group.Writers[0]).Value); }
             }
             var copies = copyBuilder.ToImmutable();
@@ -298,8 +298,8 @@ internal sealed partial class PassiveLoopCutter
             }
             // Calls and memory havocs can change every cell. A fixed cell's
             // address must also remain stable when a guard selects its owner.
-            ImmutableArray<Cell>.Builder? cells = instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction ||
-                instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory })) ? null : ImmutableArray.CreateBuilder<Cell>();
+            ImmutableArray<Cell>.Builder? cells = instructions.Any(instruction => instruction is IrCallInstruction ||
+                instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory }) ? null : ImmutableArray.CreateBuilder<Cell>();
             bool StableAddress(IrTerm target)
             {
                 System.ArgumentNullException.ThrowIfNull(target);
@@ -312,7 +312,7 @@ internal sealed partial class PassiveLoopCutter
                 });
             }
             foreach (var write in cells == null ? [] : instructions.OfType<IrWriteInstruction>()
-                .Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown)))
+                .Where(write => write.Region is IrWriteRegion.Element or IrWriteRegion.Field or IrWriteRegion.Parameter or IrWriteRegion.Unknown))
             {
                 if (write.Region == IrWriteRegion.Element)
                 {
@@ -323,7 +323,7 @@ internal sealed partial class PassiveLoopCutter
                     ? IrSubstitution.Substitute(_candidate.Factory, write.Target, copiesBeforeStore[write.Id]) : null;
                 if (target == null || write.Index != null || !StableAddress(target))
                 { cells = null; break; }
-                if (!cells!.Any(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (cell.Target.Id == target.Id && cell.Field == write.Field!.Value)))
+                if (!cells!.Any(cell => cell.Target.Id == target.Id && cell.Field == write.Field!.Value))
                 { cells!.Add(new(target, write.Field!.Value, write)); }
             }
             _cells.AddUnique(header, cells == null ? null : cells.ToImmutable());
@@ -384,7 +384,7 @@ internal sealed partial class PassiveLoopCutter
                 RepositoryParameterGuard.ThrowIfMissing(cells is { IsDefault: true }, nameof(cells));
                 var memory = cells is null;
                 var values = cells is { } stored
-                    ? stored.Select(cell => cell is null ? throw new System.ArgumentNullException(nameof(cell)) : (_candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type))).ToImmutableArray()
+                    ? stored.Select(cell => _candidate.Factory.CreateVariable("loop:cell", cell.Store.Value!.Type)).ToImmutableArray()
                     : ImmutableArray<IrVarId>.Empty;
                 if (writes.Length != 0 || memory || values.Length != 0)
                 {
@@ -412,7 +412,7 @@ internal sealed partial class PassiveLoopCutter
             }
             if (!unroll)
             {
-                foreach (var invariant in _invariants.Where(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (invariant.Header == original)))
+                foreach (var invariant in _invariants.Where(invariant => invariant.Header == original))
                 {
                     Count();
                     builder.Assume(encoded, source.Instructions[0].Operation, invariant.Condition);
@@ -500,7 +500,7 @@ internal sealed partial class PassiveLoopCutter
         IrBlockId Checked(IrBlockId header, OperationId site, IrBlockId target)
         {
             RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-            if (unroll || !_invariants.Any(invariant => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (invariant.Header == header)))
+            if (unroll || !_invariants.Any(invariant => invariant.Header == header))
             { return target; }
             var check = CreateBlock("loop:invariant");
             Check(check, header, site);

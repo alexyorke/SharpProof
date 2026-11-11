@@ -225,7 +225,7 @@ public sealed class CompilerCaptureRequestWorkflowTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(2));
-                Assert.That(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).Distinct().Count(),
+                Assert.That(artifact.Manifest.Claims.Select(claim => claim.ClaimId).Distinct().Count(),
                     Is.EqualTo(2));
                 Assert.That(await File.ReadAllTextAsync(request + ".completed"),
                     Is.EqualTo("00112233445566778899aabbccddeeff"));

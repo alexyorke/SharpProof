@@ -62,8 +62,7 @@ public sealed partial class ResourceBoundsTests
     private static BigInteger Evaluate(ResourceBoundsAnalysis.Bound bound, int n, int m)
     {
         ArgumentNullException.ThrowIfNull(bound);
-        return bound.Expression.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) :
-            input.DisplayName == "n" ? n : m, TestContext.CurrentContext.CancellationToken);
+        return bound.Expression.Evaluate(input => input.DisplayName == "n" ? n : m, TestContext.CurrentContext.CancellationToken);
     }
 
     // The true count grows with n*m in the first shape.

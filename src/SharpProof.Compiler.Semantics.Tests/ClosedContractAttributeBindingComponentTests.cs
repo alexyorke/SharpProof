@@ -180,7 +180,7 @@ public sealed class ClosedContractAttributeBindingComponentTests
         using var image = new MemoryStream();
         var emit = compilation.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(System.Environment.NewLine,
-            emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
+            emit.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
         return compilation;
     }
 

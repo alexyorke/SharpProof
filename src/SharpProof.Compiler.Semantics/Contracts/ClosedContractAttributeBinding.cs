@@ -97,8 +97,8 @@ internal static class ClosedContractAttributeBinding
                     constructor.MethodKind != MethodKind.Constructor || constructor.IsStatic ||
                     !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attribute.AttributeClass) ||
                     constructor.Parameters.Length != expectedArguments ||
-                    constructor.Parameters.Any(static constructorParameter => constructorParameter is null ? throw new System.ArgumentNullException(nameof(constructorParameter)) : (constructorParameter.RefKind != RefKind.None ||
-                        constructorParameter.Type.SpecialType != SpecialType.System_Int64)) ||
+                    constructor.Parameters.Any(static constructorParameter => constructorParameter.RefKind != RefKind.None ||
+                        constructorParameter.Type.SpecialType != SpecialType.System_Int64) ||
                     attribute.ConstructorArguments.Length != expectedArguments || attribute.NamedArguments.Length != 0 ||
                     attribute.ConstructorArguments.Any(static argument => argument.Kind == TypedConstantKind.Error))
                 { return new([], ContractBindingFailure.InvalidClosedAttribute); }

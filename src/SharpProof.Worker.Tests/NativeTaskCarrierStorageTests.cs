@@ -78,7 +78,7 @@ public sealed class NativeTaskCarrierStorageTests
     public void GeneratedCarrierMetadataNamesHaveAnIndependentLengthBudget()
     {
         var names = Enumerable.Range(0, 17).Select(index => new string('N', 250) + index).ToArray();
-        var declarations = string.Concat(names.Select(static name => name is null ? throw new ArgumentNullException(nameof(name)) : "public class " + name + "{"));
+        var declarations = string.Concat(names.Select(static name => "public class " + name + "{"));
         var metadataName = string.Join("+", names) + "+Frame";
         Assert.That(metadataName.Length, Is.GreaterThan(4096));
         var (compilation, type) = CompileCarrierShape(declarations + "[CompilerGenerated] public class Frame {}" +
@@ -281,7 +281,7 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(capture.Inventory!.RootCallableId, Is.EqualTo("root"));
         Assert.That(capture.Inventory.ModuleSha256, Is.EqualTo(callbacks.ModuleSha256));
         Assert.That(capture.Inventory.MethodTokens.ToArray(), Is.EqualTo(callbacks.Forwarders.Select(forwarder =>
-            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken).Distinct().Order().ToArray()));
+            forwarder.ChildMethodToken).Distinct().Order().ToArray()));
         Assert.That(capture.Inventory.MethodTokens, Has.Length.EqualTo(1));
         var repeated = collector.CaptureSourceBodies(method, "root", cancellation);
         Assert.That(repeated.Inventory!.MethodTokens.ToArray(), Is.EqualTo(capture.Inventory.MethodTokens.ToArray()));
@@ -785,7 +785,6 @@ public sealed class NativeTaskCarrierStorageTests
         var compilation = initial.WithOptions(initial.Options.WithOptimizationLevel(optimization));
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.GetTypeByMetadataName("C")!.GetMembers("Root").OfType<IMethodSymbol>().Single(candidate =>
-            candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
             candidate.Parameters[0].Type.SpecialType == SpecialType.System_Int32);
         var collector = new CompilerTaskCarrierCollector(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;
@@ -806,7 +805,7 @@ public sealed class NativeTaskCarrierStorageTests
             Assert.That(callbacks.UnknownReason, Is.Null);
             Assert.That(callbacks.Activations!.Forwarders, Has.Length.EqualTo(3));
             Assert.That(callbacks.Activations.Forwarders.Select(static forwarder =>
-                forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken).Distinct().ToArray(),
+                forwarder.ChildMethodToken).Distinct().ToArray(),
                 Has.Length.EqualTo(1));
             Assert.That(bodies.UnknownReason, Is.Null);
             Assert.That(bodies.Inventory!.MethodTokens, Has.Length.EqualTo(1));
@@ -1085,7 +1084,7 @@ public sealed class NativeTaskCarrierStorageTests
             if (instruction.Offset < region.TryOffset || instruction.Offset >= region.TryOffset + region.TryLength)
             { outside.Add(instruction.Offset + ":" + instruction.RawCode + ":" + instruction.Operand); }
         }
-        Assert.That(outside.Any(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value.Contains(":Ldfld:", StringComparison.Ordinal)), Is.True);
+        Assert.That(outside.Any(static value => value.Contains(":Ldfld:", StringComparison.Ordinal)), Is.True);
         Assert.That(CompilerTaskCarrierCollector.ValidateExceptionBoundary(image, method,
             compilation.GetTypeByMetadataName("System.Exception")!.ContainingAssembly.Identity, 2,
             TestContext.CurrentContext.CancellationToken), Is.Null, string.Join(", ", outside));
@@ -1599,7 +1598,7 @@ public sealed class NativeTaskCarrierStorageTests
         var (shapes, projection, root) = Fixture(stateKind);
         var result = NativeTaskCarrierStorageVerifier.Check(shapes, projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.UnknownReason, Is.Null);
-        Assert.That(result.DirectUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 0,
+        Assert.That(result.DirectUpper!.Evaluate(static input => 0,
             TestContext.CurrentContext.CancellationToken), Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(result.AsyncBoxStateFields, Has.Length.EqualTo(stateFields));
         if (stateKind == 1)
@@ -1699,7 +1698,7 @@ public sealed class NativeTaskCarrierStorageTests
         Assert.That(decoded.Carriers.UnknownReason, Is.Null);
         var result = NativeTaskCarrierStorageVerifier.Check(decoded.Carriers.Shapes, decoded, root, Layout(), cancellation);
         Assert.That(result.UnknownReason, Is.Null);
-        Assert.That(result.DirectUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 0, cancellation),
+        Assert.That(result.DirectUpper!.Evaluate(static input => 0, cancellation),
             Is.GreaterThanOrEqualTo(new System.Numerics.BigInteger(216)));
         Assert.That(result.AsyncBoxStateFields.IsEmpty, Is.EqualTo(!configured));
     }
@@ -1867,7 +1866,7 @@ public sealed class NativeTaskCarrierStorageTests
         projection = projection with { Carriers = new(shapes, null) };
         var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.UnknownReason, Is.Null);
-        Assert.That(result.PeakUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 0,
+        Assert.That(result.PeakUpper!.Evaluate(static input => 0,
             TestContext.CurrentContext.CancellationToken), Is.EqualTo(new System.Numerics.BigInteger(expected)));
         Assert.That(result.RetainedUpper, Is.EqualTo(result.PeakUpper));
     }
@@ -1883,9 +1882,9 @@ public sealed class NativeTaskCarrierStorageTests
         projection = projection with { Carriers = new CompilerTaskCarrierCollector(compilation).Capture(method, "root", cancellation) };
         var result = NativeTaskStorageVerifier.Check(projection, root, Layout(), cancellation);
         Assert.That(result.UnknownReason, Is.Null);
-        Assert.That(result.PeakUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputSize, cancellation),
+        Assert.That(result.PeakUpper!.Evaluate(input => inputSize, cancellation),
             Is.EqualTo(new System.Numerics.BigInteger(expectedPeak)));
-        Assert.That(result.RetainedUpper!.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) : inputSize, cancellation),
+        Assert.That(result.RetainedUpper!.Evaluate(input => inputSize, cancellation),
             Is.EqualTo(new System.Numerics.BigInteger(448)));
     }
 
@@ -1989,7 +1988,7 @@ public sealed class NativeTaskCarrierStorageTests
     [Test]
     public void ReviewedCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
     {
-        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33/System.Private.CoreLib.dll");
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34/System.Private.CoreLib.dll");
         using var image = new PEReader(stream);
         var reader = image.GetMetadataReader();
         var task = RuntimeType(reader, "System.Threading.Tasks", "Task");
@@ -2145,7 +2144,7 @@ public sealed class NativeTaskCarrierStorageTests
     [Test]
     public void FaultCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
     {
-        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33/System.Private.CoreLib.dll");
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34/System.Private.CoreLib.dll");
         using var image = new PEReader(stream);
         var reader = image.GetMetadataReader();
         var task = RuntimeType(reader, "System.Threading.Tasks", "Task");

@@ -78,7 +78,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
@@ -252,9 +252,9 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         var targetSyntax = syntaxRoot.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var targetSymbol = (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!;
         var observedSyntax = syntaxRoot.DescendantNodes().OfType<VariableDeclaratorSyntax>()
-            .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText == "Observed"));
+            .Single(variable => variable.Identifier.ValueText == "Observed");
         var writtenSyntax = syntaxRoot.DescendantNodes().OfType<VariableDeclaratorSyntax>()
-            .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Identifier.ValueText == "Written"));
+            .Single(variable => variable.Identifier.ValueText == "Written");
         var observedSymbol = (IFieldSymbol)model.GetDeclaredSymbol(observedSyntax)!;
         var writtenSymbol = (IFieldSymbol)model.GetDeclaredSymbol(writtenSyntax)!;
         var assignmentStatement = (IExpressionStatementOperation)model.GetOperation(targetSyntax.Body!.Statements[3])!;
@@ -263,7 +263,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
         var returnedSyntax = ((ReturnStatementSyntax)targetSyntax.Body.Statements[4]).Expression!;
         var returnedReference = (IFieldReferenceOperation)model.GetOperation(returnedSyntax)!;
         var requirements = targetSyntax.Body.Statements.Take(2).Select(statement =>
-            statement is null ? throw new System.ArgumentNullException(nameof(statement)) : ((IInvocationOperation)((IExpressionStatementOperation)model.GetOperation(statement)!).Operation)).ToImmutableArray();
+            (IInvocationOperation)((IExpressionStatementOperation)model.GetOperation(statement)!).Operation).ToImmutableArray();
         var observationRequirement = (IBinaryOperation)requirements[1].Arguments.Single().Value;
         var requiredField = (IFieldReferenceOperation)observationRequirement.LeftOperand;
         var discovery = new ClaimManifestBuilder(compilation).Build();
@@ -293,8 +293,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             Assert.That(assignment.Value.ConstantValue.Value, Is.EqualTo(settings.StoredValue));
             Assert.That(observationRequirement.OperatorKind, Is.EqualTo(BinaryOperatorKind.Equals));
             Assert.That(observationRequirement.RightOperand.ConstantValue.Value, Is.EqualTo(0));
-            Assert.That(requirements.All(requirement => requirement is null ? throw new System.ArgumentNullException(nameof(requirement)) : (requirement.TargetMethod.Name == "Requires" &&
-                requirement.TargetMethod.ContainingType.ToDisplayString() == "SharpProof.Attributes.Contract")), Is.True);
+            Assert.That(requirements.All(requirement => requirement.TargetMethod.Name == "Requires" &&
+                requirement.TargetMethod.ContainingType.ToDisplayString() == "SharpProof.Attributes.Contract"), Is.True);
             Assert.That(observedSymbol.IsReadOnly, Is.EqualTo(settings.ReadOnlyObserved));
             Assert.That(writtenSymbol.IsReadOnly, Is.False);
             Assert.That(observedSyntax.Initializer, Is.Null);
@@ -313,7 +313,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             Written = writtenSymbol.ToDisplayString(),
             ObservedReadOnly = observedSymbol.IsReadOnly,
             WrittenReadOnly = writtenSymbol.IsReadOnly,
-            Requirements = requirements.Select(requirement => requirement is null ? throw new System.ArgumentNullException(nameof(requirement)) : (requirement.Syntax.ToString())).ToImmutableArray(),
+            Requirements = requirements.Select(requirement => requirement.Syntax.ToString()).ToImmutableArray(),
             Assignment = assignment.Syntax.ToString(),
             Return = returnedReference.Syntax.ToString(),
             RuntimeContractCallsRemoved = true
@@ -348,7 +348,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             ClrPostconditionHolds = actualReturn == 0,
             CapturedTotal = callable.Total != null,
             CapturedBodyAbstraction = callable.Total?.IsBodyAbstraction,
-            CapturedClauseKinds = callable.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString())).ToImmutableArray(),
+            CapturedClauseKinds = callable.Total?.Clauses.Select(clause => clause.Kind.ToString()).ToImmutableArray(),
             SelectedCallableId = selected.Entry.CallableId,
             ClaimId = claim.ClaimId,
             ClaimLocation = manifestClaim.Location,
@@ -389,7 +389,7 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             Assert.That(manifestClaim.Location.Start + manifestClaim.Location.Length, Is.LessThanOrEqualTo(targetSyntax.Span.End));
             Assert.That(artifact.Manifest.Callables.Single().Assumptions, Has.Length.EqualTo(2));
             Assert.That(artifact.Manifest.Callables.Single().Assumptions.All(assumption =>
-                assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition)), Is.True);
+                assumption.Kind == WorkerAssumptionKind.Precondition), Is.True);
             Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
             Assert.That(claim.ClaimId, Is.EqualTo(manifestClaim.ClaimId));
@@ -404,8 +404,8 @@ public sealed class ExplicitLayoutFieldAliasAuditTests
             {
                 Assert.That(callable.Total, Is.Not.Null);
                 Assert.That(callable.Total!.IsBodyAbstraction, Is.False);
-                Assert.That(callable.Total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)), Is.EqualTo(2));
-                Assert.That(callable.Total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)), Is.EqualTo(1));
+                Assert.That(callable.Total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Requires), Is.EqualTo(2));
+                Assert.That(callable.Total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Ensures), Is.EqualTo(1));
                 Assert.That(coverage.Coverage, Is.EqualTo(WorkerCallableCoverage.Complete));
                 Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
                 Assert.That(claim.Reason, Is.EqualTo(WorkerClaimReason.None));

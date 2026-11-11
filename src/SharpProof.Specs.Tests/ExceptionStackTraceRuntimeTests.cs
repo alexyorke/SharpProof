@@ -14,7 +14,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void CapturingAFreshSchedulerWrapperDoesNotCopyItsTracedInnerException()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var inner = new InvalidOperationException("scheduler-capture-inner");
@@ -51,7 +51,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void WarmSchedulerWrapperAllocationsFitTheReviewedInstanceShapeWithoutCopyingTheInnerPayload()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Assert.That(typeof(TaskSchedulerException).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Empty);
@@ -80,7 +80,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(1_000_000, true)]
     public void OneCallFreeSourceInvocationAppearsOnceInTheCapturedTrace(int iterations, bool forwarded)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Exception? fault = null;
@@ -90,11 +90,9 @@ internal sealed class ExceptionStackTraceRuntimeTests
         { fault = captured; }
         Assert.That(fault, Is.Not.Null);
         var trace = new System.Diagnostics.StackTrace(fault!, false);
-        var count = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
-            frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
+        var count = trace.GetFrames().Count(static frame => frame.GetMethod()?.Name == nameof(DirectSourceFrameProbe));
         Assert.That(count, Is.EqualTo(1));
-        var wrappers = trace.GetFrames().Count(static frame => frame is null ? throw new ArgumentNullException(nameof(frame)) :
-            frame.GetMethod()?.Name == nameof(DirectSourceForwarderProbe));
+        var wrappers = trace.GetFrames().Count(static frame => frame.GetMethod()?.Name == nameof(DirectSourceForwarderProbe));
         Assert.That(wrappers, Is.LessThanOrEqualTo(forwarded ? 1 : 0));
         Assert.That(count + wrappers, Is.LessThanOrEqualTo(forwarded ? 2 : 1));
     }
@@ -149,7 +147,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var count = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "materializations", int.MaxValue));
         var check = ResourceTaskFaultCarrierCatalog.BoundNativeDimensionFaultStrings(count, "Linux", layout, cancellation);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 7,
             cancellation), Is.EqualTo(new BigInteger(1792)));
         for (var depth = count.Depth; depth < ResourceExpression.MaximumDepth - 1; depth++)
         { count = ResourceExpression.Add(count, ResourceExpression.One); }
@@ -176,7 +174,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void DimensionFaultAllocationsFitMessageInstanceAndObservedTraceComponents()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(OperatingSystem.IsLinux(), Is.True);
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
@@ -252,7 +250,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         var attempts = ResourceExpression.InputSize(new ResourceInput(0, ResourceInputKind.NonNegativeScalar, "attempts", int.MaxValue));
         var check = ResourceTaskFaultCarrierCatalog.BoundNativeOomConstructorMessages(attempts, "Linux", layout, cancellation);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 3,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 3,
             cancellation), Is.EqualTo(new BigInteger(432)));
         for (var depth = attempts.Depth; depth < ResourceExpression.MaximumDepth; depth++)
         { attempts = ResourceExpression.Add(attempts, ResourceExpression.One); }
@@ -275,7 +273,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void WarmOomConstructorsFitTheIndependentInstanceAndNativeMessageComponents()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(OperatingSystem.IsLinux(), Is.True);
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
@@ -321,7 +319,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         var check = ResourceTaskFaultCarrierCatalog.BoundBestOomInstances(conversions,
             new("CoreCLR", "8.0.32", "x64", 8), TestContext.CurrentContext.CancellationToken);
         Assert.That(check.UnknownReason, Is.Null);
-        Assert.That(check.CumulativeUpper!.Evaluate(static input => input is null ? throw new ArgumentNullException(nameof(input)) : 7,
+        Assert.That(check.CumulativeUpper!.Evaluate(static input => 7,
             TestContext.CurrentContext.CancellationToken), Is.EqualTo(new BigInteger(952)));
     }
 
@@ -351,7 +349,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void UninitializedOomInstanceAllocationFitsTheReviewedShapeWithoutMessageConstruction()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Assert.That(typeof(OutOfMemoryException).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly), Is.Empty);
@@ -421,7 +419,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     public void PrimitiveFaultRawTracesFitTheIndependentSourceAndCatchFrames(ResourcePrimitiveHCallKind helper, int input, Type expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Exception? fault = null;
@@ -477,7 +475,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
         Assert.That(result.UnknownReason, Is.Null);
         Assert.That(result.RequiredRuntimeModel, Is.EqualTo(ResourceTaskFaultCarrierCatalog.TraceBufferModel));
         Assert.That(result.CumulativeUpper!.Evaluate(input =>
-            input is null ? throw new ArgumentNullException(nameof(input)) : values[input.Ordinal], cancellation), Is.EqualTo(expected));
+            values[input.Ordinal], cancellation), Is.EqualTo(expected));
     }
 
     [Test]
@@ -563,7 +561,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(8)]
     public void DynamicThrowAndDispatchAllocationsFitClosedBufferBudgets(int restores)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var method = new DynamicMethod("ThrowResolverTraceControl", typeof(void), [typeof(InvalidOperationException)],
@@ -624,7 +622,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public void NestedFreshFaultDoesNotInheritTheAmbientResolverCounter()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var method = new DynamicMethod("FreshResolverSeedControl", typeof(void), [typeof(InvalidOperationException)],
@@ -731,7 +729,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(15)]
     public void FreshClosedTraceAllocationsStayWithinTheRawBufferPrefixBound(int depth)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -779,7 +777,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [Test]
     public async Task CrossThreadDispatchUsesTheClosedRawTraceBudget()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -826,7 +824,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(true, true)]
     public async Task ContextWrappersRestoreFlowStateAndPreserveFaultIdentity(bool threadPool, bool faulting)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         var slot = new AsyncLocal<int>();
         var exception = new InvalidOperationException("context-copy-control");
         var observed = 0;
@@ -880,7 +878,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(15, true)]
     public void DispatchCaptureAndRestoreCopyOnlyTheirReviewedTracePayloads(int depth, bool restoring)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var exception = CaptureInsideBoundary(depth);
@@ -951,7 +949,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     [TestCase(32, 3)]
     public void CatchBoundarySeparatesOwnedTraceFramesFromAmbientCallers(int ambientDepth, int throwDepth)
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         var traceField = typeof(Exception).GetField("_stackTrace", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -1021,7 +1019,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     {
         if (family is < 0 or > 6)
         { throw new ArgumentOutOfRangeException(nameof(family)); }
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         for (var index = 0; index < 64; index++)
@@ -1081,7 +1079,7 @@ internal sealed class ExceptionStackTraceRuntimeTests
     {
         if (depth < 0 || depth > 15)
         { throw new ArgumentOutOfRangeException(nameof(depth)); }
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture,
             Is.EqualTo(System.Runtime.InteropServices.Architecture.X64));
         Action throwing = () =>

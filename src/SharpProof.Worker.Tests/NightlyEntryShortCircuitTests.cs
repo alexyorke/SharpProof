@@ -25,9 +25,9 @@ public sealed class NightlyEntryShortCircuitTests
         Assert.That(response.Errors, Is.Empty);
         var claim = response.ClaimResults.Single();
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
-        var callable = artifact.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var callable = artifact.Callables.Single(item => item.CallableId.Contains("Target", StringComparison.Ordinal));
         var total = callable.Total!;
-        var writes = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Count(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Write));
+        var writes = total.Graph.Blocks.SelectMany(block => block.Instructions).Count(instruction => instruction.Kind == IrInstructionKind.Write);
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted),
             "body=" + body + " requires=" + hasRequires + " reason=" + claim.Reason +
             " claimId=" + claim.ClaimId + " valid=" + total.ValidEffectClaimIds.Contains(claim.ClaimId) +

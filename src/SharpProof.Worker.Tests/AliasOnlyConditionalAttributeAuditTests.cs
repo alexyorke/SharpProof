@@ -33,10 +33,10 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     private static readonly ImmutableArray<string> ShadowAliases = ["Shadow"];
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group.Key, group => group.First());
 
     private const string NamespaceProducerSource = """
         namespace System.Diagnostics
@@ -174,13 +174,13 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             [tree], TestMetadataReferences.WithSharpProof.Add(shadow), producer.Options);
         var diagnostics = compilation.GetDiagnostics();
         await Save(directory, "caller-diagnostics.json", Diagnostics(diagnostics));
-        Assert.That(diagnostics.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(diagnostics.Where(item => item.Severity == DiagnosticSeverity.Error), Is.Empty);
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var targetSyntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var logSyntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Log"));
+            .Single(method => method.Identifier.ValueText == "Log");
         var target = (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!;
         var log = (IMethodSymbol)model.GetDeclaredSymbol(logSyntax)!;
         var discovery = new ClaimManifestBuilder(compilation).Build();
@@ -231,14 +231,14 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         var officialType = compilation.GetTypeByMetadataName("System.Diagnostics.ConditionalAttribute")!;
         var attributes = log.GetAttributes();
         var invocationSyntax = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" }));
+            .Single(call => call.Expression is IdentifierNameSyntax { Identifier.ValueText: "Log" });
         var invocation = (IInvocationOperation)model.GetOperation(invocationSyntax)!;
         var assignment = (ISimpleAssignmentOperation)invocation.Arguments.Single().Value;
         var parameter = (IParameterReferenceOperation)assignment.Target;
         var requires = targetSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" })).ToImmutableArray();
+            .Where(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Requires" }).ToImmutableArray();
         var selected = discovery.Targets.Values.Single();
-        var attributeObservations = attributes.Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
+        var attributeObservations = attributes.Select(attribute => new
         {
             Type = attribute.AttributeClass!.ToDisplayString(),
             Assembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
@@ -247,7 +247,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Argument = (string)attribute.ConstructorArguments.Single().Value!,
             IsPrivate = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, privateType),
             IsOfficial = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, officialType)
-        })).ToImmutableArray();
+        }).ToImmutableArray();
         await Save(directory, "source-and-compiler.json", new
         {
             Scenario = scenario,
@@ -291,17 +291,17 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(SymbolEqualityComparer.Default.Equals(parameter.Parameter, target.Parameters.Single()), Is.True);
         Assert.That(assignment.Value.ConstantValue.Value, Is.EqualTo(settings.Mixed ? 0 : 1));
         Assert.That(attributes.Length, Is.EqualTo(settings.Mixed ? 2 : 1));
-        Assert.That(attributeObservations.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate)), Is.EqualTo(settings.Official ? 0 : 1));
-        Assert.That(attributeObservations.Count(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsOfficial)), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
-        Assert.That(attributeObservations.All(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate || item.IsOfficial)), Is.True);
+        Assert.That(attributeObservations.Count(item => item.IsPrivate), Is.EqualTo(settings.Official ? 0 : 1));
+        Assert.That(attributeObservations.Count(item => item.IsOfficial), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
+        Assert.That(attributeObservations.All(item => item.IsPrivate || item.IsOfficial), Is.True);
         foreach (var attribute in attributes)
         {
             Assert.That(attribute.AttributeConstructor!.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_String));
             Assert.That(attribute.ConstructorArguments.Single().Kind, Is.EqualTo(TypedConstantKind.Primitive));
         }
-        Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsPrivate)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
+        Assert.That(attributeObservations.Where(item => item.IsPrivate).Select(item => item.Argument),
             Is.EqualTo(settings.Official ? ImmutableArray<string>.Empty : ImmutableArray.Create(settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT")));
-        Assert.That(attributeObservations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsOfficial)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Argument)),
+        Assert.That(attributeObservations.Where(item => item.IsOfficial).Select(item => item.Argument),
             Is.EqualTo(settings.Official || settings.Mixed ? ImmutableArray.Create(settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT")
                 : ImmutableArray<string>.Empty));
         Assert.That(target.IsStatic && target.Parameters.Single().RefKind == RefKind.None, Is.True);
@@ -337,7 +337,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         System.ArgumentNullException.ThrowIfNull(scenario);
         System.ArgumentNullException.ThrowIfNull(settings);
         System.ArgumentNullException.ThrowIfNull(source);
-        var capturedReference = artifact.Compilation.References.Single(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Aliases.Contains("Shadow")));
+        var capturedReference = artifact.Compilation.References.Single(reference => reference.Aliases.Contains("Shadow"));
         var capturedModule = capturedReference.Modules.Single();
         await Save(directory, "original-reference-capture.json", new
         {
@@ -374,7 +374,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             TotalPresent = captured.Total != null,
             TotalIsBodyAbstraction = captured.Total?.IsBodyAbstraction,
             PreparedTotalPresent = preparation.Total != null,
-            Clauses = captured.Total?.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind.ToString()))
+            Clauses = captured.Total?.Clauses.Select(clause => clause.Kind.ToString())
         });
         var budgets = project.Request.Budgets;
         var enrolled = PassiveCallableArtifactAdapter.Enroll(preparation);
@@ -479,8 +479,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(capturedReference.Aliases, Is.EqualTo(ShadowAliases));
         Assert.That(JsonSerializer.Serialize(roundTripReferences, WorkerProtocolJson.SharedOptions),
             Is.EqualTo(JsonSerializer.Serialize(artifact.Compilation.References, WorkerProtocolJson.SharedOptions)));
-        var roundTripShadow = roundTripReferences.Single(reference => reference is null
-            ? throw new ArgumentNullException(nameof(reference)) : reference.Aliases.SequenceEqual(ShadowAliases));
+        var roundTripShadow = roundTripReferences.Single(reference => reference.Aliases.SequenceEqual(ShadowAliases));
         Assert.That(roundTripShadow.Identity, Is.EqualTo(capturedReference.Identity));
         Assert.That(roundTripShadow.Aliases, Is.EqualTo(ShadowAliases));
         Assert.That(JsonSerializer.Serialize(roundTripShadow.Modules, WorkerProtocolJson.SharedOptions),
@@ -499,7 +498,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
         Assert.That(manifestClaim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
         Assert.That(preparation.Total.ValidEffectClaimIds, Does.Contain(manifestClaim.ClaimId));
         Assert.That(preparation.Total.ExceptionConstraints.Single().AllowedKinds, Is.Empty);
-        Assert.That(captured.Total.Clauses.Count(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Requires)),
+        Assert.That(captured.Total.Clauses.Count(clause => clause.Kind == CompilerContractKind.Requires),
             Is.EqualTo(settings.Mixed ? 1 : 0));
         Assert.That(artifact.Manifest.Callables.Single().Assumptions.Length, Is.EqualTo(settings.Mixed ? 1 : 0));
         Assert.That(project.Request.Cache.Enabled, Is.False);
@@ -598,7 +597,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             var target = targetMethod.CreateDelegate<Func<int, int>>();
             var targetIl = DecodeIl(targetMethod, callerBytes);
             var logIl = DecodeIl(logMethod, callerBytes);
-            var attributes = logMethod.GetCustomAttributesData().Select(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (new
+            var attributes = logMethod.GetCustomAttributesData().Select(attribute => new
             {
                 Type = attribute.AttributeType.FullName,
                 Assembly = attribute.AttributeType.Assembly.GetName().Name,
@@ -607,7 +606,7 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 Argument = (string)attribute.ConstructorArguments.Single().Value!,
                 IsPrivate = attribute.AttributeType.Assembly == producerAssembly,
                 IsOfficial = attribute.AttributeType == typeof(System.Diagnostics.ConditionalAttribute)
-            })).ToImmutableArray();
+            }).ToImmutableArray();
             await Save(directory, "decoded-il.json", new
             {
                 Target = targetIl,
@@ -637,9 +636,9 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
             Assert.That(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic |
                 BindingFlags.Static | BindingFlags.Instance), Is.Empty);
             Assert.That(logIl.Instructions.Single().OpCode, Is.EqualTo("ret"));
-            var calls = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "call" or "callvirt")).ToImmutableArray();
-            var stores = targetIl.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode is "starg" or "starg.s")).ToImmutableArray();
-            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "div"));
+            var calls = targetIl.Instructions.Where(instruction => instruction.OpCode is "call" or "callvirt").ToImmutableArray();
+            var stores = targetIl.Instructions.Where(instruction => instruction.OpCode is "starg" or "starg.s").ToImmutableArray();
+            var divisionInstruction = targetIl.Instructions.Single(instruction => instruction.OpCode == "div");
             Assert.That(calls.Length, Is.EqualTo(retained ? 1 : 0), "Requires is absent from the emitted caller.");
             Assert.That(stores.Length, Is.EqualTo(retained ? 1 : 0));
             if (retained)
@@ -653,18 +652,18 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 Assert.That(store.Offset, Is.LessThan(call.Offset));
                 Assert.That(call.Offset, Is.LessThan(divisionInstruction.Offset));
                 Assert.That(targetIl.Instructions.Count(instruction =>
-                    instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == (settings.Mixed ? "ldc.i4.0" : "ldc.i4.1"))), Is.EqualTo(1));
+                    instruction.OpCode == (settings.Mixed ? "ldc.i4.0" : "ldc.i4.1")), Is.EqualTo(1));
             }
             Assert.That(attributes.Length, Is.EqualTo(settings.Mixed ? 2 : 1));
-            Assert.That(attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate)), Is.EqualTo(settings.Official ? 0 : 1));
-            Assert.That(attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsOfficial)), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
-            Assert.That(attributes.All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate || attribute.IsOfficial)), Is.True);
-            foreach (var attribute in attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsPrivate)))
+            Assert.That(attributes.Count(attribute => attribute.IsPrivate), Is.EqualTo(settings.Official ? 0 : 1));
+            Assert.That(attributes.Count(attribute => attribute.IsOfficial), Is.EqualTo(settings.Official || settings.Mixed ? 1 : 0));
+            Assert.That(attributes.All(attribute => attribute.IsPrivate || attribute.IsOfficial), Is.True);
+            foreach (var attribute in attributes.Where(attribute => attribute.IsPrivate))
             {
                 Assert.That(attribute.Mvid, Is.EqualTo(producerPe.Mvid));
                 Assert.That(attribute.Argument, Is.EqualTo(settings.Mixed ? "PRIVATE_PRESENT" : "ABSENT"));
             }
-            foreach (var attribute in attributes.Where(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.IsOfficial)))
+            foreach (var attribute in attributes.Where(attribute => attribute.IsOfficial))
             {
                 Assert.That(attribute.Argument, Is.EqualTo(settings.Mixed ? "OFFICIAL_ABSENT" : "ABSENT"));
             }
@@ -676,9 +675,9 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
                 ExpectedThrows = throws,
                 HasValidPrecondition = !settings.Mixed || inputs.All(input => input == 1)
             });
-            Assert.That(observations.Select(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.ExceptionType)),
+            Assert.That(observations.Select(observation => observation.ExceptionType),
                 Is.All.EqualTo(throws ? typeof(DivideByZeroException).FullName : null));
-            Assert.That(observations.Select(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.Returned)), Is.All.EqualTo(throws ? (int?)null : 10));
+            Assert.That(observations.Select(observation => observation.Returned), Is.All.EqualTo(throws ? (int?)null : 10));
             Assert.That(!settings.Mixed || inputs.All(input => input == 1), Is.True);
         }
         finally
@@ -764,14 +763,14 @@ public sealed class AliasOnlyConditionalAttributeAuditTests
     private static ImmutableArray<object> Diagnostics(IEnumerable<Diagnostic> diagnostics)
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
-        return diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ((object)new
+        return diagnostics.Select(diagnostic => (object)new
         {
             diagnostic.Id,
             Severity = diagnostic.Severity.ToString(),
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
             Start = diagnostic.Location.SourceSpan.Start,
             Length = diagnostic.Location.SourceSpan.Length
-        })).ToImmutableArray();
+        }).ToImmutableArray();
     }
 
     private static Task Save(string directory, string name, object value)

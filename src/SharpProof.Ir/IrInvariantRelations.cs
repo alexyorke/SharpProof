@@ -17,7 +17,7 @@ internal static class IrInvariantRelations
         }
 
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
-            Prefix + ordinal.ToString(CultureInfo.InvariantCulture), factory.BooleanType, true, [.. state.Select(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (term.Type))]);
+            Prefix + ordinal.ToString(CultureInfo.InvariantCulture), factory.BooleanType, true, [.. state.Select(term => term.Type)]);
         return factory.PureOpaque(member, null, [.. state]);
     }
 

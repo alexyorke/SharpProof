@@ -570,6 +570,6 @@ internal sealed class ApiSpecValidationTests
                     null,
                     Evidence)),
             [.. postconditions.Select(condition =>
-                condition is null ? throw new System.ArgumentNullException(nameof(condition)) : (new SpecPostconditionDeclaration(condition, Evidence)))]);
+                new SpecPostconditionDeclaration(condition, Evidence))]);
     }
 }

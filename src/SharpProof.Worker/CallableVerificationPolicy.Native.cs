@@ -17,9 +17,9 @@ internal static partial class CallableVerificationPolicy
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
         var completed = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         var pending = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
-        var effects = ImmutableDictionaryCapture.Create(target.EffectClaims, evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (evidence.ClaimId), static evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : evidence, StringComparer.Ordinal);
+        var effects = ImmutableDictionaryCapture.Create(target.EffectClaims, evidence => evidence.ClaimId, static evidence => evidence, StringComparer.Ordinal);
         var calls = NativeCallPreconditionClaims.ClaimIds(target);
-        var hasPostconditions = target.Entry.ClaimIds.Any(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (!effects.ContainsKey(id) && !calls.Contains(id)));
+        var hasPostconditions = target.Entry.ClaimIds.Any(id => !effects.ContainsKey(id) && !calls.Contains(id));
         var entryPublished = false;
         var entryFeasibility = CallableEntryFeasibility.Feasible;
         try
@@ -39,7 +39,7 @@ internal static partial class CallableVerificationPolicy
             }
             if (!entryPublished)
             {
-                var entry = target.Entry.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition))
+                var entry = target.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)
                     ? await TotalCallableVerifier.VerifyEntryAsync(target, budgets, methodBoundary.Token, backend, resourceBudget).ConfigureAwait(false)
                     : CallableEntryFeasibility.Feasible;
                 PublishEntry(entry);
@@ -82,8 +82,8 @@ internal static partial class CallableVerificationPolicy
             System.ArgumentNullException.ThrowIfNull(entry);
             entryPublished = true;
             entryFeasibility = entry;
-            foreach (var evidence in target.EffectClaims.Where(evidence => evidence is null ? throw new System.ArgumentNullException(nameof(evidence)) : (!NativeEffectClaims.IsNative(evidence.ContractKind) ||
-                evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)))
+            foreach (var evidence in target.EffectClaims.Where(evidence => !NativeEffectClaims.IsNative(evidence.ContractKind) ||
+                evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary))
             {
                 var result = EffectClaimResultAssembler.Assemble(target, evidence, entry, methodBoundary.Token);
                 completed[result.ClaimId] = result;
@@ -93,8 +93,8 @@ internal static partial class CallableVerificationPolicy
         ImmutableArray<WorkerClaimResult> Fill(WorkerClaimReason reason, bool includePending = true)
         {
             var unknown = CallableClaimResultAssembler.Unknowns(target, reason);
-            return [.. unknown.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (completed.TryGetValue(result.ClaimId, out var published) ? published :
-                includePending && pending.TryGetValue(result.ClaimId, out var observed) ? observed : result))];
+            return [.. unknown.Select(result => completed.TryGetValue(result.ClaimId, out var published) ? published :
+                includePending && pending.TryGetValue(result.ClaimId, out var observed) ? observed : result)];
         }
 
         CallableVerificationResult Interrupted(WorkerClaimReason claimReason, WorkerCallableCoverageReason callableReason)

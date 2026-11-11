@@ -14,7 +14,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return null; }
         var valueBuilder = ImmutableArray.CreateBuilder<IrTerm>(invocation.Arguments.Length);
         valueBuilder.Count = invocation.Arguments.Length;
-        foreach (var argument in invocation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+        foreach (var argument in invocation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var value = Pin(invocation, LowerBodyValue(argument.Parameter!.Ordinal == 0 ? arrayOperation : argument.Value, block, depth + 1));
             if (!value.Classification.IsExact)

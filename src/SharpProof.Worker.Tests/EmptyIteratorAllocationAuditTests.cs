@@ -34,8 +34,8 @@ public sealed class EmptyIteratorAllocationAuditTests
     private static object? s_escaped;
     private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
     private static readonly ImmutableArray<Case> s_cases =
     [
@@ -90,11 +90,11 @@ public sealed class EmptyIteratorAllocationAuditTests
             emission.Success
         });
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
-        Assert.That(diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
-        var warnings = diagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Warning)).ToImmutableArray();
+        var warnings = diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning).ToImmutableArray();
         if (caseIndex == 3)
-        { Assert.That(warnings.All(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8321")), Is.True); }
+        { Assert.That(warnings.All(diagnostic => diagnostic.Id == "CS8321"), Is.True); }
         else
         { Assert.That(warnings, Is.Empty); }
         var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
@@ -106,8 +106,8 @@ public sealed class EmptyIteratorAllocationAuditTests
         var attribute = target.GetAttributes().Single();
         var attributeSyntax = (AttributeSyntax)(await attribute.ApplicationSyntaxReference!.GetSyntaxAsync());
         var callableId = DocumentationCommentId.CreateDeclarationId(target)!;
-        var ownYields = syntax.DescendantNodes(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is not LocalFunctionStatementSyntax &&
-            node is not AnonymousFunctionExpressionSyntax)).OfType<YieldStatementSyntax>().Count();
+        var ownYields = syntax.DescendantNodes(node => node is not LocalFunctionStatementSyntax &&
+            node is not AnonymousFunctionExpressionSyntax).OfType<YieldStatementSyntax>().Count();
         var allYields = syntax.DescendantNodes().OfType<YieldStatementSyntax>().Count();
         await Save(evidence, "symbol-ownership.json", new
         {
@@ -193,14 +193,14 @@ public sealed class EmptyIteratorAllocationAuditTests
         var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
-        var preparation = project.Snapshot.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == callableId));
+        var preparation = project.Snapshot.Callables.Single(item => item.Entry.CallableId == callableId);
         var native = await NativeEffectSiteVerifier.VerifyAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
-        var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        var allocations = preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAllocationInstruction>().ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
@@ -222,26 +222,26 @@ public sealed class EmptyIteratorAllocationAuditTests
             native.HasFeasibleEntryWitness,
             NativeAllocationWitness = native.AllocationWitness?.ToString(),
             NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
-            Allocations = allocations.Select(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (new
+            Allocations = allocations.Select(allocation => new
             {
                 Operation = allocation.Operation.ToString(),
                 Type = allocation.AllocatedType.ToString(),
                 Target = allocation.Target?.ToString(),
                 Length = allocation.Length?.ToString(),
                 MatchesWitness = allocation.Operation == native.AllocationWitness
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
             FailureReason = response.FailureReason.ToString(),
             response.Errors,
-            CallableResults = response.CallableResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
+            CallableResults = response.CallableResults.Select(item => new
             {
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToImmutableArray(),
-            Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
+            }).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(item => new
             {
                 item.ClaimId,
                 Outcome = item.Outcome.ToString(),
@@ -249,7 +249,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome?.ToString() ?? "SemanticNotProven"
         });
         using (Assert.EnterMultipleScope())
@@ -312,7 +312,7 @@ public sealed class EmptyIteratorAllocationAuditTests
                     Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
                     Assert.That(native.Outcome, Is.TypeOf<RefutedOutcome>());
                     Assert.That(native.AllocationWitness, Is.Not.Null);
-                    Assert.That(allocations.Count(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Operation == native.AllocationWitness)), Is.EqualTo(1));
+                    Assert.That(allocations.Count(allocation => allocation.Operation == native.AllocationWitness), Is.EqualTo(1));
                     Assert.That(claim.EffectCertainty, Is.EqualTo(WorkerEffectEvidenceCertainty.DefiniteViolation));
                     Assert.That(claim.EffectWitness, Is.Not.Null);
                     Assert.That(claim.EffectWitness!.Kind, Is.EqualTo("managed-allocation"));
@@ -430,7 +430,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             Assert.That(observation.DelegateMethodToken, Is.EqualTo(observation.MethodToken));
             Assert.That(observation.DelegateHasNoTarget, Is.True);
             Assert.That(observation.HasTypeInitializer, Is.False);
-            Assert.That(observation.Attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.TypeName == typeof(ZeroAllocationsAttribute).FullName)), Is.EqualTo(1));
+            Assert.That(observation.Attributes.Count(attribute => attribute.TypeName == typeof(ZeroAllocationsAttribute).FullName), Is.EqualTo(1));
             Assert.That(observation.Rounds, Has.Length.EqualTo(MeasurementRounds));
             foreach (var round in observation.Rounds)
             {
@@ -441,10 +441,10 @@ public sealed class EmptyIteratorAllocationAuditTests
                 else
                 { Assert.That(round.SubjectBytes, Is.Zero); }
             }
-            var allocations = observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "newobj")).ToImmutableArray();
+            var allocations = observation.Target.Instructions.Where(instruction => instruction.OpCode == "newobj").ToImmutableArray();
             if (caseIndex == 0)
             {
-                Assert.That(observation.Attributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName)), Is.EqualTo(1));
+                Assert.That(observation.Attributes.Count(attribute => attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName), Is.EqualTo(1));
                 Assert.That(observation.IteratorType, Is.Not.Null);
                 Assert.That(observation.IteratorMvid, Is.EqualTo(observation.PeMvid));
                 Assert.That(observation.IteratorDeclaringTypeMatches, Is.True);
@@ -462,7 +462,7 @@ public sealed class EmptyIteratorAllocationAuditTests
             else
             {
                 Assert.That(observation.IteratorType, Is.Null);
-                Assert.That(observation.Attributes.Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName)), Is.False);
+                Assert.That(observation.Attributes.Any(attribute => attribute.TypeName == typeof(IteratorStateMachineAttribute).FullName), Is.False);
                 if (caseIndex == 2)
                 {
                     Assert.That(observation.FirstIsNull, Is.False);

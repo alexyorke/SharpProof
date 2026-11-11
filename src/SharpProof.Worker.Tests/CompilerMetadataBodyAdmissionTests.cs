@@ -92,7 +92,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreatePlatformCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [MetadataReference.CreateFromFile(path)]);
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             Assert.That(compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract"), Is.Null);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!.GetMembers("Identity").Single();
             var captured = CompilerCompilationCapture.Capture(compilation, directory, "net8.0", [], TestContext.CurrentContext.CancellationToken);
@@ -141,11 +141,11 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 $"internal static class Caller {{ internal static int Invoke() => AnnotationSubject.Identity({arguments}); }}",
                 [MetadataReference.CreateFromFile(path)]);
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("AnnotationSubject")!
                 .GetMembers("Identity").Single();
             Assert.That(method.Parameters[0].GetAttributes(), Has.Length.EqualTo(annotations));
-            Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.Name == "TagAttribute")), Is.True);
+            Assert.That(method.Parameters[0].GetAttributes().All(attribute => attribute.AttributeClass!.Name == "TagAttribute"), Is.True);
             using var pe = new PEReader(image);
             var reader = pe.GetMetadataReader();
             var definition = reader.GetMethodDefinition((MethodDefinitionHandle)MetadataTokens.EntityHandle(method.MetadataToken));
@@ -193,7 +193,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
         try
         {
             var names = Enumerable.Range(0, owners).Select(index => $"N{index}").ToImmutableArray();
-            var source = string.Concat(names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ($"public class {name} {{\n"))) +
+            var source = string.Concat(names.Select(name => $"public class {name} {{\n")) +
                 "public static int Identity([SharpProof.Attributes.Positive] int value) { return value; }\n" +
                 new string('}', owners);
             var dependency = CreateCompilation(source, ImmutableArray<MetadataReference>.Empty).WithAssemblyName("OwnerAncestryDependency");
@@ -204,7 +204,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 $"internal static class Subject {{ internal static int Identity(int value) => {string.Join('.', names)}.Identity(value); }}",
                 [MetadataReference.CreateFromFile(path)]);
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName(string.Join('+', names))!
                 .GetMembers("Identity").Single();
             Assert.That(method.ContainingType.IsGenericType, Is.False);
@@ -271,7 +271,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
             var compilation = CreateCompilation(
                 "internal static class Subject { internal static int Identity(int value) => Dependency.Identity(value); }",
                 [MetadataReference.CreateFromFile(path)]);
-            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             var method = (IMethodSymbol)compilation.GetTypeByMetadataName("Dependency")!
                 .GetMembers("Identity").Single();
             Assert.That(method.GetReturnTypeAttributes(), Has.Length.EqualTo(returnAttributes.Length == 0 ? 0 : 1));
@@ -285,8 +285,8 @@ public sealed class CompilerMetadataBodyAdmissionTests
             }
             Assert.That(body, Is.Not.Null);
             var admitted = body!;
-            var module = captured.References.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules))
-                .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (Path.GetFullPath(candidate.Path) == Path.GetFullPath(path)));
+            var module = captured.References.SelectMany(reference => reference.Modules)
+                .Single(candidate => Path.GetFullPath(candidate.Path) == Path.GetFullPath(path));
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(admitted.Method, Is.SameAs(method));
@@ -348,7 +348,7 @@ public sealed class CompilerMetadataBodyAdmissionTests
         if (!result.Success)
         {
             throw new InvalidOperationException(string.Join(Environment.NewLine,
-                result.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                result.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
         }
         return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }

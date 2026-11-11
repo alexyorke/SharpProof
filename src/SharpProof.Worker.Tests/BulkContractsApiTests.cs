@@ -45,7 +45,7 @@ public sealed class BulkContractsApiTests
         var type = compilation.GetTypeByMetadataName("Subject")!;
         var property = memberKind == "property"
             ? type.GetMembers("Value").OfType<IPropertySymbol>().Single()
-            : type.GetMembers().OfType<IPropertySymbol>().Single(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.IsIndexer));
+            : type.GetMembers().OfType<IPropertySymbol>().Single(static candidate => candidate.IsIndexer);
         var accessor = property.GetMethod!;
         var declaration = property.DeclaringSyntaxReferences.Single().GetSyntax();
         var expectedExpression = memberKind == "property"
@@ -72,7 +72,7 @@ public sealed class BulkContractsApiTests
         TestCompilation.AssertNoErrors(compilation);
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream);
-        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(emitted.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(emitted.Success, Is.True);
         return compilation;
     }

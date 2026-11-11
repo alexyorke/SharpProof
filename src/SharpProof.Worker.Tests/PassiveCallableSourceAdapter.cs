@@ -20,7 +20,7 @@ internal sealed record PassiveSourceSubject(TotalLoweringContext Context,
         var compilation = TestCompilation.Create("PassiveCandidate", source);
         TestCompilation.AssertNoErrors(compilation);
         var method = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == methodName));
+            .Single(method => method.Identifier.ValueText == methodName);
         var model = compilation.GetSemanticModel(method.SyntaxTree);
         var context = new TotalLoweringContext(factory ?? new IrFactory(), (IMethodSymbol)model.GetDeclaredSymbol(method)!);
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context);
@@ -43,11 +43,11 @@ internal sealed record PassiveSourceSubject(TotalLoweringContext Context,
         { return null; }
         ImmutableArray<PassiveContractClause> Clauses(BoundContractKind kind)
         {
-            return [.. binding.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == kind))
-                .Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (new PassiveContractClause(clause.Value, clause.SafeCondition, clause.SourceOperation)))];
+            return [.. binding.Clauses.Where(clause => clause.Kind == kind)
+                .Select(clause => new PassiveContractClause(clause.Value, clause.SafeCondition, clause.SourceOperation))];
         }
         return new(context.Target.Name, lowering.Program,
-            [.. context.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState)))],
+            [.. context.Parameters.Select(parameter => new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.PreState))],
             context.Result, Clauses(BoundContractKind.Requires), Clauses(BoundContractKind.Ensures));
     }
     public TotalLoweringContext Context { get; init; } = Context ?? throw new System.ArgumentNullException(nameof(Context));

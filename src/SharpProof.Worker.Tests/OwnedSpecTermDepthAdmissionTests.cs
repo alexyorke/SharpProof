@@ -51,7 +51,7 @@ public sealed class OwnedSpecTermDepthAdmissionTests
         var analysisOptions = (CSharpParseOptions)tree.Options;
         Assert.That(analysisOptions.PreprocessorSymbolNames, Does.Contain(Contract.ConditionalSymbol));
         var runtimeOptions = analysisOptions.WithPreprocessorSymbols(
-            analysisOptions.PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol)));
+            analysisOptions.PreprocessorSymbolNames.Where(symbol => symbol != Contract.ConditionalSymbol));
         Assert.That(runtimeOptions.PreprocessorSymbolNames, Does.Not.Contain(Contract.ConditionalSymbol));
         var runtimeCompilation = compilation.RemoveAllSyntaxTrees()
             .AddSyntaxTrees(tree.WithRootAndOptions(tree.GetRoot(), runtimeOptions));

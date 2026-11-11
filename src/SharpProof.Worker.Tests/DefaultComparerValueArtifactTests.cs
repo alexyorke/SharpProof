@@ -30,8 +30,7 @@ internal sealed class DefaultComparerValueArtifactTests
         var callable = artifact.Callables.Single();
         var total = callable.Total!;
         var graph = total.Graph;
-        var index = graph.Members.IndexOf(graph.Members.FirstOrDefault(candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) :
-            candidate.Name.StartsWith(IrOpaqueCallSite.DefaultComparerValuePrefix, StringComparison.Ordinal))!);
+        var index = graph.Members.IndexOf(graph.Members.FirstOrDefault(candidate => candidate.Name.StartsWith(IrOpaqueCallSite.DefaultComparerValuePrefix, StringComparison.Ordinal))!);
         Assert.That(index, Is.GreaterThanOrEqualTo(0));
         var members = graph.Members.ToBuilder();
         var terms = graph.Terms.ToBuilder();
@@ -51,7 +50,7 @@ internal sealed class DefaultComparerValueArtifactTests
                 members[index] = member with { ParameterTypes = [member.ReturnType] };
                 break;
             case "impure":
-                var opaque = graph.Terms.Single(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Kind == IrTermKind.Opaque && term.A == index);
+                var opaque = graph.Terms.Single(term => term.Kind == IrTermKind.Opaque && term.A == index);
                 terms[graph.Terms.IndexOf(opaque)] = opaque with { C = 1 };
                 break;
         }

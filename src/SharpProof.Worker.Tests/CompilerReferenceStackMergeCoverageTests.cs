@@ -83,7 +83,7 @@ public sealed class CompilerReferenceStackMergeCoverageTests
         Assert.That(call.Method.Parameters[0].Type.SpecialType,
             Is.EqualTo(checkType == "string" ? SpecialType.System_String : SpecialType.System_Object));
         Assert.That(call.Method.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
-        Assert.That(code.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code is "Brtrue" or "Brfalse")), Is.True);
+        Assert.That(code.Any(instruction => instruction.Code is "Brtrue" or "Brfalse"), Is.True);
         Assert.That(Enumerable.Range(0, code.Length)
             .Count(index => TotalIlStack.Successors(code, index).Contains(callIndex)), Is.EqualTo(2),
             "Both actual ternary paths must join at the shared call.");

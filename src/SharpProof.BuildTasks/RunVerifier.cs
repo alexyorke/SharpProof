@@ -85,7 +85,7 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 CreateNoWindow = true
             };
             TrustedChildEnvironment.Apply(process.StartInfo, executable);
-            var childArguments = Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ItemSpec)).ToArray();
+            var childArguments = Arguments.Select(argument => argument.ItemSpec).ToArray();
             VerificationPublication? publication;
             try
             {

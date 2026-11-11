@@ -16,7 +16,7 @@ internal sealed class CompilerSpecificationMethodBinding(
             method.MethodKind != MethodKind.Ordinary ||
             !method.IsStatic ||
             method.TypeParameters.Length != 0 ||
-            method.Parameters.Any(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
+            method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             method.Parameters.Length != definition.ParameterTypes.Length ||
             !MatchesAssembly(method.ContainingAssembly, definition.Assemblies) ||
             !CompilerSpecificationScalarDomain.MatchesType(method.ReturnType, definition.ResultType))
@@ -61,6 +61,6 @@ internal sealed class CompilerSpecificationMethodBinding(
     {
         assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var identity = assembly.Identity;
-        return approved.Any(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ApiSpecAssemblyMatching.Matches(candidate, identity));
+        return approved.Any(candidate => ApiSpecAssemblyMatching.Matches(candidate, identity));
     }
 }

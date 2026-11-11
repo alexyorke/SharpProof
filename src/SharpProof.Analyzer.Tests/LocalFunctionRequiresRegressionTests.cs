@@ -33,7 +33,7 @@ public sealed class LocalFunctionRequiresRegressionTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

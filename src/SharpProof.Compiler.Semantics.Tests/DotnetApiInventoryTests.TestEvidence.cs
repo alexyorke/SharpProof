@@ -16,7 +16,7 @@ public sealed partial class DotnetApiInventoryTests
         global::System.ArgumentNullException.ThrowIfNull(compilation);
         if (inventory.IsDefault)
         { throw new ArgumentException("Array must be initialized.", nameof(inventory)); }
-        var rows = inventory.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Evidence.Contains("intrinsic=", StringComparison.Ordinal))).Select(row =>
+        var rows = inventory.Where(row => row.Evidence.Contains("intrinsic=", StringComparison.Ordinal)).Select(row =>
         {
             if (row.Evidence.Contains("intrinsic=guarded-exception-message-construction", StringComparison.Ordinal))
             {
@@ -188,7 +188,7 @@ public sealed partial class DotnetApiInventoryTests
         }).ToImmutableArray();
         ApiTestEvidence.Write(root, "intrinsic-test-evidence", rows);
         Assert.That(rows, Is.Not.Empty);
-        Assert.That(rows.Where(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status != "passed")).Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api + ": " + row.Detail)), Is.Empty, "Every inventoried intrinsic needs passing behavioral evidence; see intrinsic-test-evidence.md.");
+        Assert.That(rows.Where(row => row.Status != "passed").Select(row => row.Api + ": " + row.Detail), Is.Empty, "Every inventoried intrinsic needs passing behavioral evidence; see intrinsic-test-evidence.md.");
     }
 
     private static bool CheckReferenceIdentityIntrinsic(CSharpCompilation references, bool wrongClaim)
@@ -196,7 +196,7 @@ public sealed partial class DotnetApiInventoryTests
         ArgumentNullException.ThrowIfNull(references);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static bool Check(object a, object b) => object.ReferenceEquals(objB: b, objA: a); }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
@@ -231,7 +231,7 @@ public sealed partial class DotnetApiInventoryTests
             var expression = instance ? "((string?)" + leftLiteral + ").Equals((string?)" + rightLiteral + ")" : "string.Equals((string?)" + leftLiteral + ", (string?)" + rightLiteral + ")";
             var tree = CSharpSyntaxTree.ParseText("#nullable enable\npublic static class Probe { public static bool Check() => " + expression + "; }");
             var compilation = referenceCompilation.AddSyntaxTrees(tree);
-            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)))
+            if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
             {
                 return false;
             }

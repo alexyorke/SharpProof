@@ -369,14 +369,14 @@ internal static partial class PortableIrGraphCodec
             }
             else
             {
-                _blocks = [.. _program.Blocks.OrderBy(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id.Value))];
+                _blocks = [.. _program.Blocks.OrderBy(static block => block.Id.Value)];
             }
-            _blockIndices = Dense(_blocks.Select(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Id)));
+            _blockIndices = Dense(_blocks.Select(static block => block.Id));
             if (includeInstructionIndices)
             {
                 _instructionIndices = Dense(_blocks
-                    .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                    .Select(static instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Id)));
+                    .SelectMany(static block => block.Instructions)
+                    .Select(static instruction => instruction.Id));
             }
             var blocks = _blocks.Select(BlockRow).ToImmutableArray();
             _cancellationToken.ThrowIfCancellationRequested();
@@ -533,7 +533,7 @@ internal static partial class PortableIrGraphCodec
             DecodeTypes();
             DecodeIdentities();
             _variables = DecodeRows(_graph.Variables, "variable",
-                row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (_factory.CreateVariable(row.Name, Type(row.Type))));
+                row => _factory.CreateVariable(row.Name, Type(row.Type)));
             _members = DecodeRows(_graph.Members, "member", DecodeMember);
             _operations = DecodeRows(_graph.Operations, "operation",
                 DecodeOperation);

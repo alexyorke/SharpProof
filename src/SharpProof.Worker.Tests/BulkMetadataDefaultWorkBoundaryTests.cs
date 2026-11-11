@@ -130,7 +130,7 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         Assert.That(graph.Blocks, Has.Length.EqualTo(3));
         Assert.That(graph.Blocks[0].Kind, Is.EqualTo(BasicBlockKind.Entry));
         Assert.That(graph.Blocks[2].Kind, Is.EqualTo(BasicBlockKind.Exit));
-        Assert.That(graph.Blocks.All(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionalSuccessor == null)), Is.True);
+        Assert.That(graph.Blocks.All(block => block.ConditionalSuccessor == null), Is.True);
         Assert.That(graph.Blocks[0].FallThroughSuccessor!.Destination, Is.SameAs(graph.Blocks[1]));
         Assert.That(graph.Blocks[1].FallThroughSuccessor!.Destination, Is.SameAs(graph.Blocks[2]));
         Assert.That(graph.Blocks[1].FallThroughSuccessor!.Semantics, Is.EqualTo(ControlFlowBranchSemantics.Return));
@@ -194,8 +194,8 @@ public sealed class BulkMetadataDefaultWorkBoundaryTests
         if (expected.IsDefault)
         { throw new System.ArgumentException("Array must be initialized.", nameof(expected)); }
         Assert.That(expected, Has.Length.EqualTo(count));
-        Assert.That(body.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Code, instruction.Operand))), Is.EqualTo(expected));
-        Assert.That(body.Instructions.All(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == -1 && instruction.Method == null)), Is.True);
+        Assert.That(body.Instructions.Select(instruction => (instruction.Code, instruction.Operand)), Is.EqualTo(expected));
+        Assert.That(body.Instructions.All(instruction => instruction.Target == -1 && instruction.Method == null), Is.True);
     }
 
     private static CompilerShadowPreparationBatch Prepare(CSharpCompilation compilation, ImmutableArray<CompilerReferenceSnapshot> references)

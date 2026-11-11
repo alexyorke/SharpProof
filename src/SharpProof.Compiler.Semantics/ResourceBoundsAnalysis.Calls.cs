@@ -29,8 +29,7 @@ internal sealed partial class ResourceBoundsAnalysis
         { return constant.Value is string text ? Bound.Number(text.Length) : constant.Value is null ? Bound.Zero : null; }
         if (charged && operation is IObjectCreationOperation creation && CSharpOperationSemantics.IsRepeatedCharacterStringCreation(creation))
         {
-            return Size(creation.Arguments.Single(static argument => argument is null ? throw new ArgumentNullException(nameof(argument)) :
-                argument.Parameter!.Ordinal == 1).Value, charged);
+            return Size(creation.Arguments.Single(static argument => argument.Parameter!.Ordinal == 1).Value, charged);
         }
         return null;
     }
@@ -53,8 +52,7 @@ internal sealed partial class ResourceBoundsAnalysis
             target.IsGenericMethod || target.ContainingType.IsGenericType || target.ReducedFrom is not null ||
             target.MethodKind != MethodKind.Ordinary || target.ReturnsByRef || target.ReturnsByRefReadonly ||
             (!target.ReturnsVoid && !SupportedType(target.ReturnType)) ||
-            target.Parameters.Any(parameter => parameter is null ? throw new ArgumentNullException(nameof(parameter)) :
-                parameter.RefKind != RefKind.None || !SupportedType(parameter.Type)))
+            target.Parameters.Any(parameter => parameter.RefKind != RefKind.None || !SupportedType(parameter.Type)))
         { return Unknown("UnsupportedCall"); }
         // A source body alone says nothing about a type initializer that may
         // run on a call. Do not silently omit those allocations or callbacks.

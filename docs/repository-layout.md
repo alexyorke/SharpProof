@@ -9,10 +9,12 @@ Several test projects stay on `net8.0` after .NET 8 left support on 2026-11-10.
 They certify facts about the runtime they run on: the resource-bound model they
 check was reviewed against the CoreCLR 8.0.32 source, and they assert the exact
 runtime version and read `System.Private.CoreLib` metadata directly. The tests
-run on 8.0.33, the final .NET 8 release. Its only changes from 8.0.32
-([compare](https://github.com/dotnet/runtime/compare/v8.0.32...v8.0.33)) are in
-`System.Net.Sockets` and the bundled native Brotli decoder; no CoreLib or
-`src/coreclr` source changed, so the 8.0.32 review applies unchanged and the
+run on 8.0.34, the final .NET 8 release. Since 8.0.32 the only changes
+([8.0.33](https://github.com/dotnet/runtime/compare/v8.0.32...v8.0.33),
+[8.0.34](https://github.com/dotnet/runtime/compare/v8.0.33...v8.0.34)) are in
+networking, cryptography, the concise binary object format reader, the bundled Brotli decoder, and local labels in
+the amd64 virtual-call stub; no CoreLib source and no layout, allocation or
+exception code changed, so the 8.0.32 review applies unchanged and the
 product's `8.0.32` model identifiers stay as they are. Moving them to a newer
 runtime means re-auditing those facts, not changing a target framework. The worker's
 resource-lock witness is pinned the same way, to the CoreLib module of the

@@ -213,14 +213,14 @@ internal sealed class FrontendLoweringTests
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         Assert.That(
             errors,
             Is.Empty,
             string.Join(
                 Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                errors.Select(static diagnostic => diagnostic.ToString())));
 
         var subject = compilation.GetTypeByMetadataName("Subject`1")!;
         var echo = subject.GetMembers("Echo").OfType<IMethodSymbol>().Single();
@@ -229,15 +229,15 @@ internal sealed class FrontendLoweringTests
         var nullable = subject.GetMembers("Nullable").OfType<IMethodSymbol>().Single();
         var overloads = subject.GetMembers("Overload")
             .OfType<IMethodSymbol>()
-            .OrderBy(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Parameters[0].RefKind))
+            .OrderBy(static method => method.Parameters[0].RefKind)
             .ToImmutableArray();
         var local = tree.GetRoot().DescendantNodes()
             .OfType<LocalFunctionStatementSyntax>()
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetDeclaredSymbol(node)))
+            .Select(node => compilation.GetSemanticModel(tree).GetDeclaredSymbol(node))
             .Single()!;
         var anonymousType = tree.GetRoot().DescendantNodes()
             .OfType<AnonymousObjectCreationExpressionSyntax>()
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (compilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
+            .Select(node => compilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
             .Single()!;
         var constructed = subject.Construct(compilation.GetSpecialType(SpecialType.System_String));
         ImmutableArray<ITypeSymbol> types = [
@@ -302,7 +302,7 @@ internal sealed class FrontendLoweringTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var equivalentAnonymousType = tree.GetRoot().DescendantNodes()
             .OfType<AnonymousObjectCreationExpressionSyntax>()
-            .Select(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type))
+            .Select(node => equivalentCompilation.GetSemanticModel(tree).GetTypeInfo(node).Type)
             .Single()!;
         Assert.That(
             fallback,
@@ -521,7 +521,7 @@ internal sealed class FrontendLoweringTests
         var children = operation.ChildOperations.ToImmutableArray();
         return children.Length == 0
             ? depth
-            : children.Max(child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (MeasureOperationDepth(child, depth + 1)));
+            : children.Max(child => MeasureOperationDepth(child, depth + 1));
     }
     private sealed class CompiledMethod : IDisposable
     {
@@ -583,18 +583,18 @@ internal sealed class FrontendLoweringTests
                     nullableContextOptions: NullableContextOptions.Enable));
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                    diagnostic.Severity == DiagnosticSeverity.Error)
                 .ToImmutableArray();
             Assert.That(
                 diagnostics,
                 Is.Empty,
-                string.Join(Environment.NewLine, diagnostics.Select(static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.ToString()))));
+                string.Join(Environment.NewLine, diagnostics.Select(static value => value.ToString())));
 
             var model = compilation.GetSemanticModel(syntaxTree);
             var methodSyntax = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<MethodDeclarationSyntax>()
-                .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+                .Single(static method => method.Identifier.ValueText == "Target");
             var methodSymbol = (IMethodSymbol)model.GetDeclaredSymbol(methodSyntax)!;
             var root = model.GetOperation(methodSyntax) ??
                        model.GetOperation(

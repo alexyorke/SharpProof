@@ -72,7 +72,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var arguments = creation?.Arguments ?? invocation?.Arguments ?? property!.Arguments;
         var valuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
         valuesBuilder.Count = arguments.Length;
-        foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+        foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)

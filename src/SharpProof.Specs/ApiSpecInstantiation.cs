@@ -170,7 +170,7 @@ internal static partial class ApiSpecInstantiator
                     SpecBinaryDeclaration value => Binary(value),
                     SpecConditionalDeclaration value => Conditional(value),
                     _ => Child(((SpecLengthDeclaration)declaration).Value,
-                        child => child is null ? throw new System.ArgumentNullException(nameof(child)) : (_guarded_factory.Length(child)))
+                        child => _guarded_factory.Length(child))
                 };
             }
             catch (ArgumentException exception)
@@ -210,7 +210,7 @@ internal static partial class ApiSpecInstantiator
             unary = RepositoryParameterGuard.NotNull(unary, nameof(unary));
             return Child(
                 unary.Operand,
-                operand => operand is null ? throw new System.ArgumentNullException(nameof(operand)) : (_guarded_factory.Unary(unary.Operator, operand)));
+                operand => _guarded_factory.Unary(unary.Operator, operand));
         }
 
         private TermResult Binary(SpecBinaryDeclaration binary)

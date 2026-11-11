@@ -34,7 +34,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), path);
         var compilation = CSharpCompilation.Create("BoundSourceCallSubject", [tree], TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -48,8 +48,8 @@ public sealed class BoundSourceCallImportApiCoverageTests
             Assert.That(runtime.GetMethod("Helper")!.Invoke(null, [5]), Is.EqualTo(6));
             var model = compilation.GetSemanticModel(tree);
             var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().ToImmutableArray();
-            var targetSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Target"));
-            var helperSyntax = methods.Single(m => m is null ? throw new System.ArgumentNullException(nameof(m)) : (m.Identifier.ValueText == "Helper"));
+            var targetSyntax = methods.Single(m => m.Identifier.ValueText == "Target");
+            var helperSyntax = methods.Single(m => m.Identifier.ValueText == "Helper");
             var targetGraph = ControlFlowGraph.Create(targetSyntax, model)!;
             var helperGraph = ControlFlowGraph.Create(helperSyntax, model)!;
             var invocation = (IInvocationOperation)model.GetOperation(targetSyntax.ExpressionBody!.Expression)!;
@@ -72,16 +72,16 @@ public sealed class BoundSourceCallImportApiCoverageTests
                     Assert.That(binding.Clauses[0].Kind, Is.EqualTo(clauseKind == "assume" ? BoundContractKind.Assume : BoundContractKind.Requires));
                     Assert.That(factory.GetOperationInfo(binding.Clauses[0].SourceOperation).SourceSpan!.Document, Is.EqualTo(path));
                 }
-                candidate.SourceCallPreconditions = [.. binding.Clauses.Where(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (c.Kind == BoundContractKind.Requires))
-                    .Select(c => c is null ? throw new System.ArgumentNullException(nameof(c)) : (new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation)))];
+                candidate.SourceCallPreconditions = [.. binding.Clauses.Where(c => c.Kind == BoundContractKind.Requires)
+                    .Select(c => new TotalSourcePrecondition(c.Value, c.SafeCondition, c.SourceOperation))];
                 var prepared = RoslynProgramLowering.LowerCandidate(helperGraph, candidate);
                 Assert.That(candidate.Compilation, Is.SameAs(compilation));
                 Assert.That(prepared.IsExact, Is.True);
                 Assert.That(prepared.ConstructionLimitExceeded, Is.False);
-                Assert.That(prepared.Program.Blocks.SelectMany(b => b is null ? throw new System.ArgumentNullException(nameof(b)) : (b.Instructions)).OfType<IrAssumeInstruction>().Count(),
+                Assert.That(prepared.Program.Blocks.SelectMany(b => b.Instructions).OfType<IrAssumeInstruction>().Count(),
                     Is.EqualTo(clauseKind == "assume" ? 1 : 0));
                 var direct = new IrProgramInterpreter(factory).Execute(prepared.Program,
-                    ImmutableDictionaryCapture.Create(candidate.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(candidate.Parameters, p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5)));
                 Assert.That(direct.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(direct.ConsumedApproximation, Is.False);
                 Assert.That(direct.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));
@@ -103,7 +103,7 @@ public sealed class BoundSourceCallImportApiCoverageTests
                 Assert.That(lowered.IsExact, Is.True);
                 Assert.That(lowered.CallPreconditions, Has.Count.EqualTo(clauseKind == "requires" ? 1 : 0));
                 var replay = new IrProgramInterpreter(factory).Execute(lowered.Program,
-                    ImmutableDictionaryCapture.Create(context.Parameters, p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (p.Entry), p => p is null ? throw new System.ArgumentNullException(nameof(p)) : (factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5))));
+                    ImmutableDictionaryCapture.Create(context.Parameters, p => p.Entry, p => factory.CreateIntegerValue(factory.GetVariableInfo(p.Entry).Type, 5)));
                 Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
                 Assert.That(replay.ConsumedApproximation, Is.False);
                 Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(6)));

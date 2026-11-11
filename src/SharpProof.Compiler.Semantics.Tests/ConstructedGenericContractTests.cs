@@ -892,9 +892,9 @@ public sealed class ConstructedGenericContractTests
         return [.. tree.GetRoot()
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
-            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (invocation.Expression.ToString()
-                .StartsWith(expressionPrefix, StringComparison.Ordinal)))
-            .Select(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (semanticModel.GetSymbolInfo(invocation).Symbol))
+            .Where(invocation => invocation.Expression.ToString()
+                .StartsWith(expressionPrefix, StringComparison.Ordinal))
+            .Select(invocation => semanticModel.GetSymbolInfo(invocation).Symbol)
             .OfType<IMethodSymbol>()];
     }
 

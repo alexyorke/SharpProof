@@ -39,7 +39,7 @@ public sealed class FuzzSourceBooleanInputControls
         var names = Enumerable.Range(0, 17).Select(index =>
             FormattableString.Invariant($"value{index}")).ToImmutableArray();
         var finite = "public static bool Target(" +
-            string.Join(", ", names.Select(name => name is null ? throw new System.ArgumentNullException(nameof(name)) : ("bool " + name))) + ") => " +
+            string.Join(", ", names.Select(name => "bool " + name)) + ") => " +
             string.Join(" || ", names) + ";";
         var inputs = Enumerable.Repeat(false, names.Length).ToImmutableArray();
         AssertActualBooleanParameters(finite, inputs, false);
@@ -74,7 +74,7 @@ public sealed class FuzzSourceBooleanInputControls
         Assert.That(symbol!.IsStatic, Is.True);
         Assert.That(symbol.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         Assert.That(symbol.Parameters, Has.Length.EqualTo(inputs.Length));
-        Assert.That(symbol.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Boolean)), Is.True);
+        Assert.That(symbol.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Boolean), Is.True);
         var context = new AssemblyLoadContext("SharpProofSourceCampaignBoolean", isCollectible: true);
         try
         {

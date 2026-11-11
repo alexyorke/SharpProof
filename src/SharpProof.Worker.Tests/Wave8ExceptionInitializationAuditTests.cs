@@ -112,7 +112,7 @@ internal sealed class Wave8ExceptionInitializationAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
+        return preparations.Single(item => item.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
     }
 
     private static async Task<WorkerClaimOutcome> Publish(CompilerManifestArtifact artifact)

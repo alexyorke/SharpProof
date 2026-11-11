@@ -211,7 +211,7 @@ internal static class ContractForSymbolMatcher
         companionLayers = GetTypeLayers(companion);
         if (!contractTarget.IsOpen)
         {
-            return companionLayers.All(static layer => layer is null ? throw new System.ArgumentNullException(nameof(layer)) : (layer.Arity == 0));
+            return companionLayers.All(static layer => layer.Arity == 0);
         }
 
         var targetLayers = GetGenericTypeLayers(contractTarget.Target);
@@ -238,7 +238,7 @@ internal static class ContractForSymbolMatcher
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.GetMembers().OfType<IMethodSymbol>().Where(static method =>
-            method is null ? throw new System.ArgumentNullException(nameof(method)) : (method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false }));
+            method is { MethodKind: MethodKind.Ordinary, IsImplicitlyDeclared: false });
     }
 
     internal static ImmutableArray<CompanionDescriptor> DiscoverCompanions(
@@ -306,7 +306,7 @@ internal static class ContractForSymbolMatcher
         }
 
         var incoming = ImmutableDictionaryCapture.Create(byTypeOrder.Select(static pair => pair.Key),
-            static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type),
+            static type => type,
             static _ => 0,
             comparer).ToBuilder();
         foreach (var pair in byTypeOrder)
@@ -511,8 +511,8 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol type)
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        return companions.Any(companion => companion is null ? throw new System.ArgumentNullException(nameof(companion)) : (SymbolEqualityComparer.Default.Equals(
-            companion.Type.OriginalDefinition, type.OriginalDefinition)));
+        return companions.Any(companion => SymbolEqualityComparer.Default.Equals(
+            companion.Type.OriginalDefinition, type.OriginalDefinition));
     }
 
     internal static bool MemberSignaturesMatch(
@@ -581,8 +581,8 @@ internal static class ContractForSymbolMatcher
                     : state.companion.Type;
                 var selectedDefinition = state.definition;
                 var method = type.GetMembers(selectedDefinition.Name).OfType<IMethodSymbol>()
-                    .First(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(
-                        candidate.OriginalDefinition, selectedDefinition.OriginalDefinition)));
+                    .First(candidate => SymbolEqualityComparer.Default.Equals(
+                        candidate.OriginalDefinition, selectedDefinition.OriginalDefinition));
 
                 if (method.Arity != 0)
                 {
@@ -619,9 +619,9 @@ internal static class ContractForSymbolMatcher
                         companionLayers[index].Name,
                         companionLayers[index].Arity)
                     .FirstOrDefault(candidate =>
-                        candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (SymbolEqualityComparer.Default.Equals(
+                        SymbolEqualityComparer.Default.Equals(
                             candidate.OriginalDefinition,
-                            companionLayers[index].OriginalDefinition))) ??
+                            companionLayers[index].OriginalDefinition)) ??
                   throw new ArgumentException(
                       "The nested companion type could not be specialized.");
             if (definition.Arity == 0)
@@ -646,15 +646,15 @@ internal static class ContractForSymbolMatcher
         return !SymbolEqualityComparer.Default.Equals(
                    target, target.OriginalDefinition) ||
                GetTypeLayers(target.ContainingType).Any(layer =>
-                   layer is null ? throw new System.ArgumentNullException(nameof(layer)) : (!SymbolEqualityComparer.Default.Equals(
-                       layer, layer.OriginalDefinition)));
+                   !SymbolEqualityComparer.Default.Equals(
+                       layer, layer.OriginalDefinition));
     }
 
     private static ImmutableArray<INamedTypeSymbol> GetGenericTypeLayers(
         INamedTypeSymbol type)
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        return [.. GetTypeLayers(type).Where(static layer => layer is null ? throw new System.ArgumentNullException(nameof(layer)) : (layer.Arity > 0))];
+        return [.. GetTypeLayers(type).Where(static layer => layer.Arity > 0)];
     }
 
     private static ImmutableArray<INamedTypeSymbol> GetTypeLayers(
@@ -676,7 +676,7 @@ internal static class ContractForSymbolMatcher
         companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return GetOrdinaryMethods(target.ContainingType)
-            .Count(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (MemberSignaturesMatch(candidate, companion))) == 1;
+            .Count(candidate => MemberSignaturesMatch(candidate, companion)) == 1;
     }
 
     private static bool IsReceiver(IMethodSymbol target, IParameterSymbol receiver)
@@ -785,7 +785,7 @@ internal static class ContractForSymbolMatcher
         {
 
             RepositoryParameterGuard.RequireInitialized(modifiers.IsDefault, nameof(modifiers), "Array must be initialized.");
-            return modifiers.Where(static modifier => modifier is null ? throw new System.ArgumentNullException(nameof(modifier)) : (modifier.IsOptional || !IsCompilerInAttribute(modifier.Modifier)))
+            return modifiers.Where(static modifier => modifier.IsOptional || !IsCompilerInAttribute(modifier.Modifier))
                 .ToImmutableArray();
         }
     }
@@ -841,7 +841,7 @@ internal static class ContractForSymbolMatcher
         foreach (var constraint in left.ConstraintTypes)
         {
             var index = unmatched.FindIndex(candidate =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (TypesMatch(constraint, candidate, left.ContainingSymbol, right.ContainingSymbol)));
+                TypesMatch(constraint, candidate, left.ContainingSymbol, right.ContainingSymbol));
             if (index < 0)
             {
                 return false;
@@ -1084,8 +1084,8 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<INamedTypeSymbol> rightCallingConventions)
     {
         return CustomModifiersMatch(
-            left.Where(modifier => modifier is null ? throw new System.ArgumentNullException(nameof(modifier)) : (!IsCallingConventionModifier(modifier, leftCallingConventions))).ToImmutableArray(),
-            right.Where(modifier => modifier is null ? throw new System.ArgumentNullException(nameof(modifier)) : (!IsCallingConventionModifier(modifier, rightCallingConventions))).ToImmutableArray());
+            left.Where(modifier => !IsCallingConventionModifier(modifier, leftCallingConventions)).ToImmutableArray(),
+            right.Where(modifier => !IsCallingConventionModifier(modifier, rightCallingConventions)).ToImmutableArray());
     }
 
     private static bool IsCallingConventionModifier(
@@ -1094,9 +1094,9 @@ internal static class ContractForSymbolMatcher
     {
         modifier = RepositoryParameterGuard.NotNull(modifier, nameof(modifier));
         return callingConventions.Any(type =>
-            type is null ? throw new System.ArgumentNullException(nameof(type)) : (SymbolEqualityComparer.Default.Equals(
+            SymbolEqualityComparer.Default.Equals(
                 modifier.Modifier,
-                type)));
+                type));
     }
 
     private static bool FunctionPointerParametersMatch(

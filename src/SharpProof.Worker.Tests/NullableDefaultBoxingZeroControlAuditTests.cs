@@ -25,10 +25,10 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
     private static readonly ImmutableArray<byte> IdentityBody = [0x02, 0x2A];
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group.Key, group => group.First());
     private static volatile IComparable? _escaped;
 
     private const string BoundarySource = """
@@ -87,7 +87,7 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(compilation.Options.OptimizationLevel, Is.EqualTo(OptimizationLevel.Release));
         var root = await tree.GetRootAsync();
         var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var invocation = (IInvocationOperation)compilation.GetSemanticModel(tree)
             .GetOperation(syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
         var argument = invocation.Arguments.Single();
@@ -144,10 +144,10 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(nullable.OriginalDefinition.SpecialType, Is.EqualTo(SpecialType.System_Nullable_T));
         Assert.That(nullable.TypeArguments.Single().SpecialType, Is.EqualTo(SpecialType.System_Double));
         var attributes = invocation.TargetMethod.GetAttributes();
-        Assert.That(attributes.Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
-            "SharpProof.Attributes.SharpProofTrustedAttribute")), Is.True);
-        var effect = attributes.Single(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
-            "SharpProof.Attributes.EffectContractAttribute"));
+        Assert.That(attributes.Any(attribute => attribute.AttributeClass?.ToDisplayString() ==
+            "SharpProof.Attributes.SharpProofTrustedAttribute"), Is.True);
+        var effect = attributes.Single(attribute => attribute.AttributeClass?.ToDisplayString() ==
+            "SharpProof.Attributes.EffectContractAttribute");
         Assert.That(effect.ConstructorArguments.Single().Value, Is.EqualTo(0L));
         Assert.That(effect.NamedArguments.Single(pair => pair.Key == "Complete").Value.Value, Is.EqualTo(true));
         Assert.That(effect.NamedArguments.Single(pair => pair.Key == "PreconditionFree").Value.Value, Is.EqualTo(true));
@@ -242,9 +242,9 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
         Assert.That(response.Errors, Is.Empty);
         Assert.That(WorkerProtocolJson.Validate(response, project.Bind().InputHash, response.Manifest).IsValid, Is.True);
         var declaration = artifact.Manifest.Claims.Single();
-        var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == declaration.ClaimId));
-        var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == declaration.CallableId));
-        var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaration.CallableId));
+        var claim = response.ClaimResults.Single(result => result.ClaimId == declaration.ClaimId);
+        var captured = artifact.Callables.Single(callable => callable.CallableId == declaration.CallableId);
+        var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaration.CallableId);
         await File.WriteAllTextAsync(Path.Combine(evidence, "native-observation.json"),
             JsonSerializer.Serialize(new
             {
@@ -255,19 +255,19 @@ public sealed class NullableDefaultBoxingZeroControlAuditTests
                 claim.Vacuity,
                 CapturedTotal = captured.Total != null,
                 BodyAbstraction = captured.Total?.IsBodyAbstraction,
-                CandidateAllocationSites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                CandidateAllocationSites = preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions)
                     .OfType<IrAllocationInstruction>().Count()
             }, WorkerProtocolJson.SharedOptions));
         TestContext.WriteLine($"nullable-default-null; native={claim.Outcome}; reason={claim.Reason}; " +
-            $"subjectBytes={string.Join(",", rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes)))}; evidence={evidence}");
+            $"subjectBytes={string.Join(",", rows.Select(row => row.SubjectBytes))}; evidence={evidence}");
         Assert.Multiple((Action)(() =>
         {
             Assert.That(firstNull && secondNull && sameProbeReference, Is.True,
                 "Boxing default(double?) produces the null reference.");
-            Assert.That(rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0 && row.SubjectNull)), Is.True,
+            Assert.That(rows.All(row => row.SubjectBytes == 0 && row.SubjectNull), Is.True,
                 "The exact nullable-without-value subject is a zero-only control.");
-            Assert.That(rows.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.BeforeBytes == 0 && row.BeforeNull && row.AfterBytes == 0 &&
-                row.AfterNull && row.IdentityBytes == 0 && row.IdentityNull)), Is.True,
+            Assert.That(rows.All(row => row.BeforeBytes == 0 && row.BeforeNull && row.AfterBytes == 0 &&
+                row.AfterNull && row.IdentityBytes == 0 && row.IdentityNull), Is.True,
                 "Matching typed null and exact metadata identity controls must allocate zero bytes.");
             Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven),
                 "Preserve the current allocation-free native expectation for this exact null-only source. " + claim.Reason);
