@@ -168,9 +168,6 @@
       "sharpproof.ir": {
         "type": "Project"
       },
-      "sharpproof.logging": {
-        "type": "Project"
-      },
       "sharpproof.smt": {
         "type": "Project",
         "dependencies": {
@@ -189,7 +186,6 @@
         "dependencies": {
           "SharpProof.CompilerArtifact": "[1.0.0-preview.2, )",
           "SharpProof.Host": "[1.0.0-preview.2, )",
-          "SharpProof.Logging": "[1.0.0-preview.2, )",
           "SharpProof.Smt": "[1.0.0-preview.2, )",
           "SharpProof.Specs": "[1.0.0-preview.2, )"
         }

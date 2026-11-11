@@ -14,7 +14,7 @@ using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
 using SharpProof.Compiler.Semantics;
 using SharpProof.Frontend;
-using SharpProof.Logging;
+using SharpProof.Worker;
 
 namespace SharpProof.Worker.Test;
 

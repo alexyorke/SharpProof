@@ -1,4 +1,4 @@
-using SharpProof.Logging;
+using SharpProof.Worker;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;

@@ -16,7 +16,6 @@
                Private="true" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SharpProof.Logging\SharpProof.Logging.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.Attributes\SharpProof.Attributes.csproj" />
     <ProjectReference Include="..\..\src\SharpProof.CompilerCollector\SharpProof.CompilerCollector.csproj" />
