@@ -87,6 +87,11 @@ package layouts; their existing package layout and consumer checks remain requir
 This gate does not claim to verify behavioral compatibility. Advance the baseline
 only when intentionally accepting a compatibility change, with normal review.
 
+A baseline cannot contain a change before it merges, so a reviewed break is
+recorded in `api-compat-suppressions.xml` in the same change. Once the baseline
+advances past it, remove the entry (and the file when it is empty): ApiCompat
+rejects suppressions that no longer match a difference.
+
 ## Links
 
 The combined command checks links using `lychee.toml` and saves its detailed report
