@@ -19,46 +19,28 @@ internal sealed record OpenSourceCorpusImportPlan(
     public ImmutableArray<CorpusFileUpdate> Updates { get; init; } = Updates.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Updates)) : Updates;
 }
 
+// Imports one reviewed upstream source from Corpus/sources.json into the
+// checked-in manifest. Other sources, and the IDs of methods that stay
+// selected, are preserved; new methods are appended.
 internal static class OpenSourceCorpusImporter
 {
     internal const string SourceEnvironmentVariable =
         "SHARPPROOF_OSS_CORPUS_SOURCE";
-
-    private const string SourceId = "aalhour-c-sharp-algorithms";
-    private const string RepositoryUrl =
-        "https://github.com/aalhour/C-Sharp-Algorithms";
-    private const string LicenseRelativePath =
-        "third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt";
-    private const int TargetMethodCount =
-        OpenSourceCorpusCatalog.MinimumMethodCount;
-    private const string ReviewedMitLicense = """
-The MIT License (MIT)
-
-Copyright (c) 2015 Ahmad Alhour
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-""";
+    internal const string DraftEnvironmentVariable =
+        "SHARPPROOF_OSS_CORPUS_DRAFT";
+    internal const int SourcesSchemaVersion = 1;
+    private const char ByteOrderMark = (char)0xFEFF;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    private static readonly JsonSerializerOptions ConfigJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
 
@@ -75,13 +57,19 @@ SOFTWARE.
             return null;
         }
 
+        var draft = Environment.GetEnvironmentVariable(DraftEnvironmentVariable);
         return await PrepareAsync(
                 repositoryRoot,
                 upstreamRoot,
-                cancellationToken)
+                cancellationToken,
+                draft: string.Equals(draft, "1", StringComparison.Ordinal) ||
+                    string.Equals(draft, "true", StringComparison.OrdinalIgnoreCase))
             .ConfigureAwait(false);
     }
 
+    // A draft import writes newly selected methods with Unspecified support
+    // and their observed verdicts so a reviewer can label each one; the
+    // catalog rejects the manifest until every label is set.
     [SuppressMessage(
         "Globalization",
         "CA1308:Normalize strings to uppercase",
@@ -89,7 +77,8 @@ SOFTWARE.
     internal static async Task<OpenSourceCorpusImportPlan> PrepareAsync(
         string repositoryRoot,
         string upstreamRoot,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool draft = false)
     {
         System.ArgumentNullException.ThrowIfNull(repositoryRoot);
         System.ArgumentNullException.ThrowIfNull(upstreamRoot);
@@ -123,162 +112,382 @@ SOFTWARE.
                 ["config", "--get", "remote.origin.url"],
                 cancellationToken)
             .ConfigureAwait(false);
-        if (!string.Equals(
+        var configuration = LoadSources(repositoryRoot);
+        var source = configuration.Sources.FirstOrDefault(candidate => string.Equals(
                 NormalizeRepositoryUrl(remote),
-                RepositoryUrl,
-                StringComparison.OrdinalIgnoreCase))
-        {
+                candidate.Repository,
+                StringComparison.OrdinalIgnoreCase)) ??
             throw new InvalidDataException(
                 $"The upstream checkout has unexpected origin '{remote}'; " +
-                $"expected {RepositoryUrl}.");
+                "expected one of the repositories in sources.json: " +
+                string.Join(", ", configuration.Sources.Select(static candidate => candidate.Repository)) + ".");
+        if (!string.Equals(commit, source.Commit, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Upstream HEAD {commit} is not the commit pinned for " +
+                $"{source.Id} in sources.json ({source.Commit}).");
         }
 
         await VerifyCommitBelongsToApprovedRemoteAsync(
+                source.Repository,
                 commit,
                 cancellationToken)
             .ConfigureAwait(false);
-
-        var licenseText = OpenSourceCorpusCatalog.NormalizeLineEndings(
-            Encoding.UTF8.GetString(
-                (await ReadGitBlobAsync(
-                        resolvedUpstreamRoot,
-                        commit,
-                        "LICENSE",
-                        cancellationToken)
-                    .ConfigureAwait(false)).AsSpan()));
-        ValidateReviewedMitLicense(licenseText);
-
-        var (files, candidates) = await DiscoverSourcesAsync(
-                resolvedUpstreamRoot,
-                commit,
-                cancellationToken)
-            .ConfigureAwait(false);
-        var selected = SelectDiverseCandidates(candidates, TargetMethodCount);
 
         var corpusDirectory =
             OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
-        var existingSupport = LoadExistingSupport(corpusDirectory);
-        var licenseTargetPath = Path.GetFullPath(
-            Path.Combine(corpusDirectory, LicenseRelativePath));
-        OpenSourceCorpusCatalog.EnsureContained(
-            corpusDirectory,
-            licenseTargetPath);
-        var licenseContent = licenseText.EndsWith('\n')
-            ? licenseText
-            : licenseText + "\n";
-        var licenseHash = HashEncoding.ComputeSha256Hex(
-            (Encoding.UTF8.GetBytes(licenseContent)).ToImmutableArray());
-        var source = new OpenSourceCorpusSource(
-            SourceId,
-            RepositoryUrl,
+        var updates = ImmutableArray.CreateBuilder<CorpusFileUpdate>();
+        var license = await CopyReviewedFileAsync(
+                resolvedUpstreamRoot, corpusDirectory, source, source.License, updates, cancellationToken)
+            .ConfigureAwait(false);
+        var notices = ImmutableArray.CreateBuilder<OpenSourceCorpusNoticeFile>();
+        foreach (var notice in source.Notices)
+        {
+            notices.Add(await CopyReviewedFileAsync(
+                    resolvedUpstreamRoot, corpusDirectory, source, notice, updates, cancellationToken)
+                .ConfigureAwait(false));
+        }
+
+        var (files, candidates) = await DiscoverSourcesAsync(
+                resolvedUpstreamRoot,
+                source,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var existing = LoadExisting(corpusDirectory);
+        var manifestSource = new OpenSourceCorpusSource(
+            source.Id,
+            source.Repository,
             commit,
-            "MIT",
-            LicenseRelativePath,
-            licenseHash);
-        var provisionalMethods = selected
-            .Select((candidate, index) =>
-                candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ToMethod(
-                    $"OSS{index + 1:D4}",
-                    CorpusVerdict.SilentUnknown,
-                    existingSupport.TryGetValue(
-                        candidate.DeclarationSha256,
-                        out var support)
-                        ? support
-                        : CorpusSupport.Unspecified)))
+            source.LicenseSpdx,
+            license.File,
+            license.Sha256)
+        {
+            NoticeFiles = notices.ToImmutable(),
+            Compilation = source.Compilation
+        };
+        var merged = Merge(existing, manifestSource, files, candidates, source.MethodQuota);
+
+        // Observe only the imported source; other sources keep their
+        // reviewed expectations untouched.
+        var imported = merged.Methods
+            .Where(method => string.Equals(method.SourceId, source.Id, StringComparison.Ordinal))
             .ToImmutableArray();
-        var provisionalDocument = new OpenSourceCorpusDocument(
-            2,
-            [source],
-            files,
-            provisionalMethods);
         var observations = await OpenSourceCorpusRunner.ObserveAsync(
-                provisionalDocument,
+                new OpenSourceCorpusDocument(
+                    OpenSourceCorpusCatalog.SchemaVersion,
+                    [manifestSource],
+                    files,
+                    imported),
                 cancellationToken)
             .ConfigureAwait(false);
         var verdicts = observations.ToImmutableDictionary(
             static observation => observation.CaseId,
             static observation => observation.Verdict,
             StringComparer.Ordinal);
-        var methods = provisionalMethods
-            .Select(method => method with
-            {
-                ExpectedVerdict = verdicts.TryGetValue($"{method.Id}.baseline", out var verdict)
-                    ? verdict
-                    : throw new InvalidDataException(
-                        $"No baseline observation was produced for {method.Id}.")
-            })
-            .ToImmutableArray();
-        var document = provisionalDocument with
+        var document = merged with
         {
-            Methods = methods
+            Methods = [.. merged.Methods.Select(method =>
+                !string.Equals(method.SourceId, source.Id, StringComparison.Ordinal)
+                    ? method
+                    : method with
+                    {
+                        ExpectedVerdict = verdicts.TryGetValue($"{method.Id}.baseline", out var verdict)
+                            ? verdict
+                            : throw new InvalidDataException(
+                                $"No baseline observation was produced for {method.Id}.")
+                    })]
         };
 
-        var manifest = JsonSerializer.Serialize(document, JsonOptions)
-            .Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
-        var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
-        var unreviewedMethods = methods
+        var unreviewedMethods = imported
             .Where(static method =>
                 method.Support == CorpusSupport.Unspecified)
             .Select(static method => method.Id)
             .ToImmutableArray();
-        if (unreviewedMethods.Length != 0)
+        if (!draft && unreviewedMethods.Length != 0)
         {
             throw new InvalidDataException(
                 "The imported corpus contains methods without a reviewed " +
-                "support classification. Set each generated support field " +
-                $"before updating the snapshot: {string.Join(", ", unreviewedMethods)}");
+                "support classification. Run a draft import, set each generated " +
+                $"support field, and import again: {string.Join(", ", unreviewedMethods)}");
         }
-        return new OpenSourceCorpusImportPlan(
-            document,
-            [
-                new CorpusFileUpdate(licenseTargetPath, licenseContent),
-                new CorpusFileUpdate(manifestPath, manifest)
-            ]);
+
+        var manifest = JsonSerializer.Serialize(document, JsonOptions)
+            .Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
+        updates.Add(new CorpusFileUpdate(
+            Path.Combine(corpusDirectory, "oss-methods.json"),
+            manifest));
+        return new OpenSourceCorpusImportPlan(document, updates.ToImmutable());
     }
 
-    internal static void ValidateReviewedMitLicense(string licenseText)
+    internal static OpenSourceCorpusSourcesDocument LoadSources(string repositoryRoot)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryRoot);
+        var path = OpenSourceCorpusCatalog.GetSourcesConfigPath(repositoryRoot);
+        if (!File.Exists(path))
+        {
+            throw new InvalidDataException(
+                $"The OSS corpus source configuration is missing: {path}");
+        }
+
+        var document = JsonSerializer.Deserialize<OpenSourceCorpusSourcesDocument>(
+                File.ReadAllText(path),
+                ConfigJsonOptions) ??
+            throw new InvalidDataException("The OSS corpus source configuration is empty.");
+        ValidateSources(document);
+        return document;
+    }
+
+    internal static void ValidateSources(OpenSourceCorpusSourcesDocument document)
+    {
+        System.ArgumentNullException.ThrowIfNull(document);
+        if (document.SchemaVersion != SourcesSchemaVersion)
+        {
+            throw new InvalidDataException(
+                $"Unsupported OSS corpus source configuration schema {document.SchemaVersion}.");
+        }
+
+        if (document.Sources.IsDefaultOrEmpty || document.Sources.Any(static source => source is null))
+        {
+            throw new InvalidDataException(
+                "The OSS corpus source configuration must list its sources.");
+        }
+
+        var ids = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var source in document.Sources)
+        {
+            if (source.Id.Length == 0 ||
+                !source.Id.All(static character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-') ||
+                !ids.Add(source.Id))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source ID '{source.Id}' must be unique lowercase letters, digits, and hyphens.");
+            }
+
+            if (!Uri.TryCreate(source.Repository, UriKind.Absolute, out var repository) ||
+                repository.Scheme != Uri.UriSchemeHttps ||
+                !string.Equals(NormalizeRepositoryUrl(source.Repository), source.Repository, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source {source.Id} has an invalid repository URL.");
+            }
+
+            if (source.Commit.Length != 40 ||
+                source.Commit.Any(static character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source {source.Id} must pin a full Git commit.");
+            }
+
+            if (!OpenSourceCorpusCatalog.AllowedLicenses.Contains(source.LicenseSpdx, StringComparer.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source {source.Id} uses unsupported license " +
+                    $"{source.LicenseSpdx}; the corpus accepts " +
+                    $"{string.Join(" and ", OpenSourceCorpusCatalog.AllowedLicenses)} only.");
+            }
+
+            if (source.Notices.IsDefault || source.Roots.IsDefaultOrEmpty || source.Excludes.IsDefault ||
+                source.Notices.Prepend(source.License).Any(static file => file is null || !IsUpstreamPath(file.Path) ||
+                    file.Sha256.Length != 64) ||
+                source.Roots.Concat(source.Excludes).Any(static path => !IsUpstreamPath(path.TrimEnd('/'))))
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source {source.Id} has invalid license, notice, root, or exclude paths.");
+            }
+
+            if (source.MethodQuota <= 0)
+            {
+                throw new InvalidDataException(
+                    $"OSS corpus source {source.Id} must select at least one method.");
+            }
+
+            OpenSourceCorpusCatalog.ValidateCompilationOptions(source.Id, source.Compilation);
+        }
+
+        var total = document.Sources.Sum(static source => source.MethodQuota);
+        if (total > OpenSourceCorpusCatalog.MaximumMethodCount)
+        {
+            throw new InvalidDataException(
+                $"OSS corpus source quotas total {total} methods; at most " +
+                $"{OpenSourceCorpusCatalog.MaximumMethodCount} are allowed.");
+        }
+    }
+
+    private static bool IsUpstreamPath(string? path)
+    {
+        return !string.IsNullOrWhiteSpace(path) &&
+            !Path.IsPathRooted(path) &&
+            !path.Contains('\\', StringComparison.Ordinal) &&
+            path.Split('/').All(static part => part.Length != 0 && part is not ("." or "..")) &&
+            !path.Any(char.IsControl);
+    }
+
+    // The copy lives at third-party/<source-id>/<upstream path>.
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
+    private static async Task<OpenSourceCorpusNoticeFile> CopyReviewedFileAsync(
+        string upstreamRoot,
+        string corpusDirectory,
+        OpenSourceCorpusSourceConfig source,
+        OpenSourceCorpusUpstreamFile reviewed,
+        ImmutableArray<CorpusFileUpdate>.Builder updates,
+        CancellationToken cancellationToken)
+    {
+        System.ArgumentNullException.ThrowIfNull(updates);
+        var text = Encoding.UTF8.GetString(
+            (await ReadGitBlobAsync(
+                    upstreamRoot,
+                    source.Commit,
+                    reviewed.Path,
+                    cancellationToken)
+                .ConfigureAwait(false)).AsSpan());
+        var content = ValidateReviewedUpstreamFile(source.Id, reviewed, text);
+        var relative = $"third-party/{source.Id}/{reviewed.Path}";
+        var target = Path.GetFullPath(Path.Combine(corpusDirectory, relative));
+        OpenSourceCorpusCatalog.EnsureContained(corpusDirectory, target);
+        updates.Add(new CorpusFileUpdate(target, content));
+        return new OpenSourceCorpusNoticeFile(relative, reviewed.Sha256);
+    }
+
+    // Returns the normalized copy whose hash the reviewer recorded.
+    internal static string ValidateReviewedUpstreamFile(
+        string sourceId,
+        OpenSourceCorpusUpstreamFile reviewed,
+        string text)
+    {
+        System.ArgumentNullException.ThrowIfNull(sourceId);
+        System.ArgumentNullException.ThrowIfNull(reviewed);
+        System.ArgumentNullException.ThrowIfNull(text);
+        var normalized = OpenSourceCorpusCatalog.NormalizeLineEndings(text).TrimStart(ByteOrderMark);
+        var content = normalized.EndsWith('\n') ? normalized : normalized + "\n";
         if (!string.Equals(
-                OpenSourceCorpusCatalog.NormalizeLineEndings(licenseText).TrimEnd('\n'),
-                ReviewedMitLicense.TrimEnd('\n'),
+                OpenSourceCorpusCatalog.ComputeNormalizedSha256(content),
+                reviewed.Sha256,
                 StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                "The upstream license no longer has the reviewed MIT form.");
+                $"The upstream {reviewed.Path} of {sourceId} no longer has its reviewed text.");
         }
+
+        return content;
     }
 
-    private static ImmutableDictionary<string, CorpusSupport>
-        LoadExistingSupport(string corpusDirectory)
+    private static OpenSourceCorpusDocument? LoadExisting(string corpusDirectory)
     {
         System.ArgumentNullException.ThrowIfNull(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         if (!File.Exists(manifestPath))
         {
-            return ImmutableDictionary<string, CorpusSupport>.Empty;
+            return null;
         }
 
         var existing = JsonSerializer.Deserialize<OpenSourceCorpusDocument>(
             File.ReadAllText(manifestPath),
             JsonOptions) ?? throw new InvalidDataException(
             "The existing OSS corpus manifest is empty.");
-        return CorpusInputParsers.ReadExistingSupport(existing);
+        _ = CorpusInputParsers.ReadExistingSupport(existing);
+        return existing;
     }
 
+    // Replaces one source's entry and files. Its methods that are still
+    // candidates keep their order, support, and (absent removals) IDs; new
+    // selections fill the quota and are appended.
+    internal static OpenSourceCorpusDocument Merge(
+        OpenSourceCorpusDocument? existing,
+        OpenSourceCorpusSource source,
+        ImmutableArray<OpenSourceCorpusFile> files,
+        ImmutableArray<ImportCandidate> candidates,
+        int quota)
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        RepositoryParameterGuard.RequireInitialized(files.IsDefault, nameof(files), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
+        var existingSources = existing is null || existing.Sources.IsDefault ? [] : existing.Sources;
+        var existingFiles = existing is null || existing.Files.IsDefault ? [] : existing.Files;
+        var existingMethods = existing is null || existing.Methods.IsDefault ? [] : existing.Methods;
+        bool IsImported(string sourceId)
+        {
+            System.ArgumentNullException.ThrowIfNull(sourceId);
+            return string.Equals(sourceId, source.Id, StringComparison.Ordinal);
+        }
+
+        var otherHashes = existingMethods
+            .Where(method => !IsImported(method.SourceId))
+            .Select(static method => method.DeclarationSha256)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var available = candidates
+            .Where(candidate => !otherHashes.Contains(candidate.DeclarationSha256))
+            .ToImmutableArray();
+        var byHash = available.ToImmutableDictionary(
+            static candidate => candidate.DeclarationSha256,
+            StringComparer.Ordinal);
+        var kept = existingMethods
+            .Where(method => IsImported(method.SourceId) && byHash.ContainsKey(method.DeclarationSha256))
+            .OrderBy(static method => method.Id, StringComparer.Ordinal)
+            .Take(quota)
+            .ToImmutableArray();
+        var keptHashes = kept.Select(static method => method.DeclarationSha256)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var fill = SelectRoundRobin(
+            [.. available.Where(candidate => !keptHashes.Contains(candidate.DeclarationSha256))],
+            quota - kept.Length);
+        var selectedPaths = kept.Select(method => byHash[method.DeclarationSha256])
+            .Concat(fill)
+            .ToImmutableArray();
+        if (selectedPaths.Length != quota)
+        {
+            throw new InvalidDataException(
+                $"Only {selectedPaths.Length} distinct upstream methods were found; " +
+                $"{quota} are required.");
+        }
+
+        RequireFileSpread(selectedPaths);
+        var keptByHash = kept.ToImmutableDictionary(
+            static method => method.DeclarationSha256,
+            StringComparer.Ordinal);
+        var ordered = existingMethods
+            .OrderBy(static method => method.Id, StringComparer.Ordinal)
+            .Where(method => !IsImported(method.SourceId) || keptByHash.ContainsKey(method.DeclarationSha256))
+            .Select(method => IsImported(method.SourceId)
+                ? byHash[method.DeclarationSha256].ToMethod(
+                    method.Id, method.ExpectedVerdict, method.Support)
+                : method)
+            .Concat(fill.Select(static candidate => candidate.ToMethod(
+                string.Empty, CorpusVerdict.SilentUnknown, CorpusSupport.Unspecified)))
+            .Select(static (method, index) => method with { Id = $"OSS{index + 1:D4}" })
+            .ToImmutableArray();
+
+        var retainedSources = existingSources.Where(static candidate => candidate is not null).ToImmutableArray();
+        var sources = retainedSources.Any(candidate => IsImported(candidate.Id))
+            ? retainedSources.Select(candidate => IsImported(candidate.Id) ? source : candidate)
+            : retainedSources.Append(source);
+        var sourceOrder = sources.Select(static candidate => candidate.Id).ToImmutableArray();
+        return new OpenSourceCorpusDocument(
+            OpenSourceCorpusCatalog.SchemaVersion,
+            [.. sources],
+            [.. existingFiles.Where(file => !IsImported(file.SourceId))
+                .Concat(files)
+                .OrderBy(file => sourceOrder.IndexOf(file.SourceId))
+                .ThenBy(static file => file.Path, StringComparer.Ordinal)],
+            ordered);
+    }
+
+    // Lists every tracked C# file under the roots (less excludes) at the
+    // pinned commit, and the methods the gate can instrument.
     internal static async Task<(
         ImmutableArray<OpenSourceCorpusFile> Files,
         ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
         string upstreamRoot,
-        string commit,
+        OpenSourceCorpusSourceConfig source,
         CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(commit);
+        System.ArgumentNullException.ThrowIfNull(source);
         System.ArgumentNullException.ThrowIfNull(upstreamRoot);
-        var sourceRoots = ImmutableArray.Create(
-            Path.Combine(upstreamRoot, "Algorithms"),
-            Path.Combine(upstreamRoot, "DataStructures"));
-        foreach (var sourceRoot in sourceRoots)
+        foreach (var root in source.Roots)
         {
+            var sourceRoot = Path.Combine(upstreamRoot, root);
             if (!Directory.Exists(sourceRoot))
             {
                 throw new InvalidDataException(
@@ -286,36 +495,39 @@ SOFTWARE.
             }
         }
 
+        var parseOptions = OpenSourceCorpusCatalog.GetParseOptions(source.Compilation);
         var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
         var declarationHashes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
-                ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
+                ["ls-tree", "-r", "--name-only", source.Commit, "--", .. source.Roots],
                 cancellationToken)
             .ConfigureAwait(false);
         foreach (var relativePath in trackedPaths
                      .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                      .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
+                     .Where(path => !IsExcluded(source.Excludes, path))
                      .OrderBy(static path => path, StringComparer.Ordinal))
         {
+            // A byte-order mark is encoding, not source text.
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 Encoding.UTF8.GetString(
                     (await ReadGitBlobAsync(
                             upstreamRoot,
-                            commit,
+                            source.Commit,
                             relativePath,
                             cancellationToken)
-                        .ConfigureAwait(false)).AsSpan()));
+                        .ConfigureAwait(false)).AsSpan())).TrimStart(ByteOrderMark);
             files.Add(
                 new OpenSourceCorpusFile(
-                    SourceId,
+                    source.Id,
                     relativePath,
                     OpenSourceCorpusCatalog.ComputeNormalizedSha256(content),
                     content));
             var tree = CSharpSyntaxTree.ParseText(
                 content,
-                AnalyzerGateHost.ParseOptions,
+                parseOptions,
                 relativePath,
                 cancellationToken: cancellationToken);
             foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
@@ -332,12 +544,11 @@ SOFTWARE.
                     OpenSourceCorpusCatalog.GetDeclaration(method);
                 var hash =
                     OpenSourceCorpusCatalog.ComputeNormalizedSha256(declaration);
-                if (declarationHashes.Contains(hash))
+                if (!declarationHashes.Add(hash))
                 {
                     continue;
                 }
 
-                declarationHashes.Add(hash);
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
@@ -345,10 +556,20 @@ SOFTWARE.
                         lineSpan.StartLinePosition.Line + 1,
                         lineSpan.EndLinePosition.Line + 1,
                         hash,
-                        method.Identifier.ValueText));
+                        method.Identifier.ValueText)
+                    { SourceId = source.Id });
             }
         }
         return (files.ToImmutable(), candidates.ToImmutable());
+    }
+
+    // An exclude names a file or, with a trailing slash, a directory.
+    private static bool IsExcluded(ImmutableArray<string> excludes, string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        return excludes.Any(exclude => exclude.EndsWith('/')
+            ? path.StartsWith(exclude, StringComparison.Ordinal)
+            : string.Equals(path, exclude, StringComparison.Ordinal));
     }
 
     private static bool IsCandidate(MethodDeclarationSyntax method)
@@ -370,13 +591,7 @@ SOFTWARE.
         ImmutableArray<ImportCandidate> candidates,
         int count)
     {
-
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
-        var byFile = candidates
-            .GroupBy(static candidate => candidate.Path, StringComparer.Ordinal)
-            .OrderBy(static group => group.Key, StringComparer.Ordinal)
-            .Select(static group => group.ToImmutableArray())
-            .ToImmutableArray();
         ValidateCapacity(count);
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1512:Use ArgumentOutOfRangeException throw helper",
             Justification = "Preserve the former builder's capacity exception without an ActualValue.")]
@@ -385,7 +600,30 @@ SOFTWARE.
             if (capacity < 0)
             { throw new ArgumentOutOfRangeException(nameof(capacity)); }
         }
-        var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
+        var selected = SelectRoundRobin(candidates, count);
+        if (selected.Length != count)
+        {
+            throw new InvalidDataException(
+                $"Only {selected.Length} distinct upstream methods were found; " +
+                $"{count} are required.");
+        }
+
+        RequireFileSpread(selected);
+        return selected;
+    }
+
+    // Round-robin across source files, in path order, so no file dominates.
+    private static ImmutableArray<ImportCandidate> SelectRoundRobin(
+        ImmutableArray<ImportCandidate> candidates,
+        int count)
+    {
+        RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
+        var byFile = candidates
+            .GroupBy(static candidate => candidate.Path, StringComparer.Ordinal)
+            .OrderBy(static group => group.Key, StringComparer.Ordinal)
+            .Select(static group => group.ToImmutableArray())
+            .ToImmutableArray();
+        var selected = ImmutableArray.CreateBuilder<ImportCandidate>(Math.Max(count, 0));
         for (var offset = 0; selected.Count < count; offset++)
         {
             var addedThisRound = false;
@@ -408,13 +646,12 @@ SOFTWARE.
                 break;
             }
         }
-        if (selected.Count != count)
-        {
-            throw new InvalidDataException(
-                $"Only {selected.Count} distinct upstream methods were found; " +
-                $"{count} are required.");
-        }
 
+        return selected.ToImmutable();
+    }
+
+    private static void RequireFileSpread(ImmutableArray<ImportCandidate> selected)
+    {
         var fileCount = selected
             .Select(static candidate => candidate.Path)
             .Distinct(StringComparer.Ordinal)
@@ -425,8 +662,6 @@ SOFTWARE.
                 $"The selected corpus spans {fileCount} files; " +
                 $"{OpenSourceCorpusCatalog.MinimumSourceFileCount} are required.");
         }
-
-        return selected.ToImmutable();
     }
 
     internal static async Task<string> ReadGitAsync(
@@ -544,9 +779,11 @@ SOFTWARE.
     }
 
     private static async Task VerifyCommitBelongsToApprovedRemoteAsync(
+        string repositoryUrl,
         string commit,
         CancellationToken cancellationToken)
     {
+        System.ArgumentNullException.ThrowIfNull(repositoryUrl);
         System.ArgumentNullException.ThrowIfNull(commit);
         var verificationRoot = Directory.CreateTempSubdirectory(
             "SharpProof-OSS-origin-");
@@ -563,7 +800,7 @@ SOFTWARE.
                         "fetch",
                         "--no-tags",
                         "--quiet",
-                        RepositoryUrl,
+                        repositoryUrl,
                         "+refs/heads/*:refs/sharpproof-approved/*"
                     ],
                     cancellationToken)
@@ -581,7 +818,7 @@ SOFTWARE.
             {
                 throw new InvalidDataException(
                     $"Upstream HEAD {commit} is not a commit from the " +
-                    $"approved repository {RepositoryUrl}.",
+                    $"approved repository {repositoryUrl}.",
                     exception);
             }
         }
@@ -617,6 +854,7 @@ SOFTWARE.
                 support);
         }
         public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+        public string SourceId { get; init; } = string.Empty;
         public string DeclarationSha256 { get; init; } = DeclarationSha256 ?? throw new System.ArgumentNullException(nameof(DeclarationSha256));
         public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
     }

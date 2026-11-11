@@ -14,12 +14,55 @@ internal static class OpenSourceCorpusRunner
 {
     private const string AnnotationKind = "SharpProofOssCorpusMethod";
 
+    // Each source compiles and verifies as its own assembly. Observations
+    // follow the document's method order.
     internal static async Task<ImmutableArray<CorpusObservation>> ObserveAsync(
         OpenSourceCorpusDocument document,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
-        var prepared = Prepare(document, "global::SharpProof.Attributes.EnforcePure", cancellationToken);
+        var bySource = ImmutableDictionary.CreateBuilder<string, CorpusObservation>(StringComparer.Ordinal);
+        foreach (var source in SplitBySource(document))
+        {
+            foreach (var observation in await ObserveSourceAsync(source, document, cancellationToken).ConfigureAwait(false))
+            {
+                bySource.Add(observation.CaseId, observation);
+            }
+        }
+
+        return [.. document.Methods.Select(method => bySource[$"{method.Id}.baseline"])];
+    }
+
+    // One document per source with selected methods: its files and methods,
+    // in document order. Sources without a selected method are not compiled.
+    internal static ImmutableArray<OpenSourceCorpusDocument> SplitBySource(
+        OpenSourceCorpusDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var sourceIds = document.Methods.Select(static method => method.SourceId)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (sourceIds.Length <= 1 &&
+            document.Files.All(file => sourceIds.Contains(file.SourceId, StringComparer.Ordinal)))
+        {
+            return [document];
+        }
+
+        return [.. sourceIds.Select(id => document with
+        {
+            Sources = [.. (document.Sources.IsDefault ? [] : document.Sources)
+                .Where(source => source is not null && string.Equals(source.Id, id, StringComparison.Ordinal))],
+            Files = [.. document.Files.Where(file => string.Equals(file.SourceId, id, StringComparison.Ordinal))],
+            Methods = [.. document.Methods.Where(method => string.Equals(method.SourceId, id, StringComparison.Ordinal))]
+        })];
+    }
+
+    private static async Task<ImmutableArray<CorpusObservation>> ObserveSourceAsync(
+        OpenSourceCorpusDocument document,
+        OpenSourceCorpusDocument loaded,
+        CancellationToken cancellationToken)
+    {
+        var prepared = Prepare(document, "global::SharpProof.Attributes.EnforcePure", cancellationToken, loaded: loaded);
         var compilation = prepared.Compilation;
         var targetMap = prepared.Targets;
         var diagnosticsByMethod = ImmutableDictionaryCapture.Create(
@@ -140,17 +183,35 @@ internal static class OpenSourceCorpusRunner
                     item.Diagnostic.Location)));
     }
 
+    // A probe compilation for a single-source document.
     internal static CSharpCompilation PrepareExceptionProbe(OpenSourceCorpusDocument document, CancellationToken cancellationToken,
         bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return Prepare(document, summary
+        var sources = SplitBySource(document);
+        if (sources.Length != 1)
+        {
+            throw new ArgumentException("A single probe compilation needs a single-source document; use PrepareExceptionProbes.", nameof(document));
+        }
+
+        return PrepareExceptionProbes(document, cancellationToken, allocations, purity, capabilities, summary)[0].Compilation;
+    }
+
+    // One probe compilation per source, with the corpus method IDs it declares.
+    internal static ImmutableArray<(CSharpCompilation Compilation, ImmutableArray<string> MethodIds)> PrepareExceptionProbes(
+        OpenSourceCorpusDocument document, CancellationToken cancellationToken,
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var attribute = summary
             ? "global::SharpProof.Attributes.EffectContract(global::SharpProof.Attributes.SharpProofEffect.None)"
             : capabilities
             ? "global::SharpProof.Attributes.AllowedCapabilities(global::SharpProof.Attributes.SharpProofCapability.None)"
             : purity ? "global::SharpProof.Attributes.EnforcePure" : allocations
-            ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow", cancellationToken,
-            includeExternalEffectsFixture: purity || capabilities || summary).Compilation;
+            ? "global::SharpProof.Attributes.ZeroAllocations" : "global::SharpProof.Attributes.DoesNotThrow";
+        return [.. SplitBySource(document).Select(source => (
+            Prepare(source, attribute, cancellationToken, includeExternalEffectsFixture: purity || capabilities || summary, loaded: document).Compilation,
+            source.Methods.Select(static method => method.Id).ToImmutableArray()))];
     }
 
     internal static string? CorpusMethodId(SyntaxNode? declaration)
@@ -163,26 +224,31 @@ internal static class OpenSourceCorpusRunner
     }
 
     private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken,
-        bool includeExternalEffectsFixture = true)
+        bool includeExternalEffectsFixture = true, OpenSourceCorpusDocument? loaded = null)
     {
         System.ArgumentNullException.ThrowIfNull(effectAttribute);
-        var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(document);
-        var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(document);
+        // A per-source split reuses the parse caches of the catalog-loaded document.
+        var parsedFiles = OpenSourceCorpusCatalog.GetParsedFiles(loaded ?? document);
+        var declarationIndexes = OpenSourceCorpusCatalog.GetDeclarationIndexes(loaded ?? document);
+        var sourceId = document.Files.Select(static file => file.SourceId)
+            .Concat(document.Methods.Select(static method => method.SourceId))
+            .Distinct(StringComparer.Ordinal)
+            .SingleOrDefault() ?? string.Empty;
+        var options = OpenSourceCorpusCatalog.GetCompilationOptions(document, sourceId);
+        var pinned = !document.Sources.IsDefault &&
+            document.Sources.Any(source => source is not null && string.Equals(source.Id, sourceId, StringComparison.Ordinal));
+        var parseOptions = OpenSourceCorpusCatalog.GetParseOptions(options);
         var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
             document.Files.Length + 1);
-        trees.Add(CSharpSyntaxTree.ParseText(
-            """
-            global using System;
-            global using System.Collections.Generic;
-            global using System.IO;
-            global using System.Linq;
-            global using System.Threading;
-            global using System.Threading.Tasks;
-            """,
-            AnalyzerGateHost.ParseOptions,
-            "__SharpProofOssCorpusGlobalUsings.cs",
-            Encoding.UTF8,
-            cancellationToken));
+        if (!options.GlobalUsings.IsDefaultOrEmpty)
+        {
+            trees.Add(CSharpSyntaxTree.ParseText(
+                string.Concat(options.GlobalUsings.Select(static name => $"global using {name};\n")),
+                parseOptions,
+                "__SharpProofOssCorpusGlobalUsings.cs",
+                Encoding.UTF8,
+                cancellationToken));
+        }
 
         var methodsByFile = document.Methods
             .GroupBy(
@@ -211,7 +277,7 @@ internal static class OpenSourceCorpusRunner
                 ? parsedRoot
                 : CSharpSyntaxTree.ParseText(
                         OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
-                        AnalyzerGateHost.ParseOptions,
+                        parseOptions,
                         file.Path,
                         Encoding.UTF8,
                         cancellationToken)
@@ -233,10 +299,13 @@ internal static class OpenSourceCorpusRunner
                         rewritten,
                         selected[original].Id, effectAttribute)));
             }
+            // Pinned sources get source-qualified paths, which keep diagnostics
+            // from same-named files in different sources apart. Test fixtures
+            // without a source entry keep their bare paths.
             var tree = CSharpSyntaxTree.Create(
                 root,
-                AnalyzerGateHost.ParseOptions,
-                file.Path,
+                parseOptions,
+                pinned ? $"{sourceId}/{file.Path}" : file.Path,
                 Encoding.UTF8);
             trees.Add(tree);
             foreach (var declaration in tree.GetCompilationUnitRoot(
@@ -264,16 +333,19 @@ internal static class OpenSourceCorpusRunner
 
         var template = AnalyzerGateHost.CreateCompilation(
             string.Empty,
-            "SharpProofOssCorpus",
+            sourceId.Length == 0 ? "SharpProofOssCorpus" : $"SharpProofOssCorpus.{sourceId}",
             includeExternalEffectsFixture: includeExternalEffectsFixture && effectAttribute is not ("global::SharpProof.Attributes.DoesNotThrow" or "global::SharpProof.Attributes.ZeroAllocations"));
         var compilation = template
+            .WithOptions(template.Options
+                .WithNullableContextOptions(options.Nullable ? NullableContextOptions.Enable : NullableContextOptions.Disable)
+                .WithOverflowChecks(options.CheckOverflow))
             .RemoveSyntaxTrees(template.SyntaxTrees)
-            .AddSyntaxTrees(trees.MoveToImmutable());
+            .AddSyntaxTrees(trees.ToImmutable());
         AnalyzerGateHost.ThrowIfCompilationHasErrors(
             compilation,
             CorpusExecutionDefaults.MaximumReportedDiagnostics,
-            static errors => new InvalidDataException(
-                "The pinned OSS corpus did not compile:" +
+            errors => new InvalidDataException(
+                $"The pinned OSS corpus source '{sourceId}' did not compile against the BCL:" +
                 Environment.NewLine + errors),
             cancellationToken);
 

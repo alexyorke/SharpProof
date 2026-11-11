@@ -72,7 +72,9 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "ordinary source fixture"]);
         var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
         var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>
-            await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName, commit, TestContext.CurrentContext.CancellationToken)));
+            await OpenSourceCorpusImporter.DiscoverSourcesAsync(upstream.FullName,
+                OpenSourceCorpusImporterTests.TestSource(commit, ApprovedRepository, "license\n"),
+                TestContext.CurrentContext.CancellationToken)));
         Assert.That(error!.Message, Is.EqualTo(
             $"Expected upstream source directory is missing: {Path.Combine(upstream.FullName, "DataStructures")}"));
         Assert.That(await GitAsync(upstream.FullName, ["status", "--porcelain"]), Is.Empty);
@@ -80,6 +82,7 @@ public sealed class CorpusImportWorkflowTests
 
     [TestCase("reviewed")]
     [TestCase("unreviewed")]
+    [TestCase("draft")]
     [TestCase("empty-manifest")]
     public async Task ImportUsesCommittedOrdinarySourceAndReviewedClassifications(string review)
     {
@@ -90,7 +93,7 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, ["config", "user.name", "SharpProof Test"]);
         await GitAsync(upstream.FullName, ["config", "user.email", "test@example.invalid"]);
         var pinned = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
-        var pinnedSource = pinned.Sources.Single();
+        var pinnedSource = pinned.Sources[0];
         var license = await File.ReadAllTextAsync(Path.Combine(
             RepositoryLayout.FindRoot(), "tests/SharpProof.Gates", "Corpus", pinnedSource.LicenseFile));
         await File.WriteAllTextAsync(Path.Combine(upstream.FullName, "LICENSE"), license);
@@ -112,15 +115,17 @@ public sealed class CorpusImportWorkflowTests
         await GitAsync(upstream.FullName, ["commit", "--quiet", "-m", "ordinary source fixture"]);
         await GitAsync(upstream.FullName, ["remote", "add", "origin", ApprovedRepository]);
         var commit = await GitAsync(upstream.FullName, ["rev-parse", "HEAD"]);
+        var configured = OpenSourceCorpusImporterTests.TestSource(commit, ApprovedRepository, license);
         var (files, candidates) = await OpenSourceCorpusImporter.DiscoverSourcesAsync(
-            upstream.FullName, commit, TestContext.CurrentContext.CancellationToken);
+            upstream.FullName, configured, TestContext.CurrentContext.CancellationToken);
         var selected = OpenSourceCorpusImporter.SelectDiverseCandidates(candidates, 200);
         var corpusDirectory = OpenSourceCorpusCatalog.GetCorpusDirectory(target.FullName);
         Directory.CreateDirectory(corpusDirectory);
+        await OpenSourceCorpusImporterTests.WriteSourcesAsync(target.FullName, configured);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         if (review == "reviewed")
         {
-            var document = new OpenSourceCorpusDocument(2,
+            var document = new OpenSourceCorpusDocument(OpenSourceCorpusCatalog.SchemaVersion,
                 [pinnedSource with { Commit = commit }], files,
                 selected.Select((candidate, index) => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ToMethod(
                     $"OSS{index + 1:D4}", CorpusVerdict.Proven, CorpusSupport.Supported))).ToImmutableArray());
@@ -141,6 +146,23 @@ public sealed class CorpusImportWorkflowTests
         {
             Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", configPath);
             Environment.SetEnvironmentVariable(OpenSourceCorpusImporter.SourceEnvironmentVariable, upstream.FullName);
+            if (review == "draft")
+            {
+                var draft = await OpenSourceCorpusImporter.PrepareAsync(target.FullName, upstream.FullName,
+                    TestContext.CurrentContext.CancellationToken, draft: true);
+                Assert.That(File.Exists(manifestPath), Is.False);
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(draft.Document.Methods, Has.Length.EqualTo(200));
+                    Assert.That(draft.Document.Methods.Select(static method => method.Support),
+                        Is.All.EqualTo(CorpusSupport.Unspecified));
+                    Assert.That(draft.Document.Methods.Select(static method => method.ExpectedVerdict),
+                        Is.All.EqualTo(CorpusVerdict.Proven));
+                    Assert.That(draft.Document.Methods.Select(static method => method.Id),
+                        Is.EqualTo(Enumerable.Range(1, 200).Select(static index => $"OSS{index:D4}")));
+                }
+                return;
+            }
             if (review != "reviewed")
             {
                 var error = Assert.ThrowsAsync<InvalidDataException>((Func<Task>)(async () =>

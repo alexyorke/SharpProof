@@ -8,7 +8,7 @@ namespace SharpProof.Gates.Test;
 public sealed class OracleWorkflowInputTests
 {
     [TestCase(-1)]
-    [TestCase(201)]
+    [TestCase(501)]
     public void PinnedOracleRejectsLimitsOutsideItsMethodUniverse(int limit)
     {
         var error = Assert.ThrowsAsync<ArgumentOutOfRangeException>((Func<Task>)(async () =>

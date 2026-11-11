@@ -23,6 +23,7 @@ multitargeted
 mvid
 nameof
 netstandard
+noda
 noncanonical
 noncapturing
 nonexhaustive

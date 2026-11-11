@@ -17,8 +17,8 @@ internal sealed class NativeEffectOracleGateTests
 {
     // The receipt hashes the complete manifest, including review metadata.
     // The reviewed OSS0015 correction (Corpus/README.md) reclassifies one method; all pinned source and declaration hashes
-    // remain unchanged and all 200 methods still belong to the oracle universe.
-    private const string ReviewedUniverseSha256 = "54681BB07D6BBE8A8110B032773A64A2E3269A84625327B9D51DA20B6855C7D5";
+    // remain unchanged. The universe spans every pinned source's methods (500 since the multi-source corpus).
+    private const string ReviewedUniverseSha256 = "4431116D1F730EA2F86FE9959F3B779AF7F9FEAE9F0303074B6077FF2FF2541F";
 
     [Test]
     public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()
@@ -74,7 +74,7 @@ internal sealed class NativeEffectOracleGateTests
     {
         var root = RepositoryLayout.FindRoot();
         var report = await NativeEffectOracleGate.RunAsync(root, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(report.UniverseMethodCount, Is.EqualTo(200));
+        Assert.That(report.UniverseMethodCount, Is.EqualTo(OpenSourceCorpusCatalog.Load(root).Methods.Length));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(report.UniverseMethodCount));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
@@ -188,7 +188,7 @@ internal sealed class NativeEffectOracleGateTests
         var root = RepositoryLayout.FindRoot();
         var report = await NativeEffectOracleGate.RunAsync(root, allocations: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(report.ContractKind, Is.EqualTo("ZeroAllocations"));
-        Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
+        Assert.That(report.CheckedMethodCount, Is.EqualTo(OpenSourceCorpusCatalog.Load(root).Methods.Length));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
@@ -328,7 +328,7 @@ internal sealed class NativeEffectOracleGateTests
     {
         var root = RepositoryLayout.FindRoot();
         var report = await NativeEffectOracleGate.RunAsync(root, purity: true, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(report.CheckedMethodCount, Is.EqualTo(200));
+        Assert.That(report.CheckedMethodCount, Is.EqualTo(OpenSourceCorpusCatalog.Load(root).Methods.Length));
         Assert.That(report.Exhaustive, Is.True);
         Assert.That(report.Rows.Select(row => row.MethodId), Is.EquivalentTo(OpenSourceCorpusCatalog.Load(root).Methods.Select(method => method.Id)));
         Assert.That(report.UniverseSha256, Is.EqualTo(ReviewedUniverseSha256));
