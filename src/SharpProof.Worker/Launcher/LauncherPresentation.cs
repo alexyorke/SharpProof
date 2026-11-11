@@ -42,7 +42,7 @@ internal static partial class LauncherPresentation
     {
         ArgumentNullException.ThrowIfNull(claim);
         return claim.CallPrecondition is not { } call ? string.Empty
-            : FormattableString.Invariant($" Call to {SharpProof.Worker.Protocol.WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} at {SourcePrefix(call.ClauseLocation)}.");
+            : FormattableString.Invariant($" Call to {SharpProof.Worker.Protocol.WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} {call.DescribeClause(SourcePrefix)}.");
     }
 
     private static string EffectKind(

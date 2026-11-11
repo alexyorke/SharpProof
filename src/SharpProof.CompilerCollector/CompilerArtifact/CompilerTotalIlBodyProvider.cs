@@ -13,6 +13,7 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private readonly CompilerMetadataResolution.MetadataResolutionContext _resolution = new(ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
     private readonly ImmutableDictionary<string, ImmutableArray<byte>>.Builder _images = ImmutableDictionary.CreateBuilder<string, ImmutableArray<byte>>(StringComparer.Ordinal);
     private readonly ImmutableDictionary<string, TotalIlBody?>.Builder _bodies = ImmutableDictionary.CreateBuilder<string, TotalIlBody?>(StringComparer.Ordinal);
+    private readonly ImmutableDictionary<string, TotalMetadataImage?>.Builder _attributes = ImmutableDictionary.CreateBuilder<string, TotalMetadataImage?>(StringComparer.Ordinal);
     private ImmutableArray<CompilerReferenceSnapshot> _capturedReferences = references is { IsDefault: true } ? throw new ArgumentNullException(nameof(references)) : references ?? default;
 
     internal TotalIlBody? Resolve(IMethodSymbol method, CancellationToken cancellationToken)
@@ -31,6 +32,92 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
         { result = null; }
         _bodies.Add(key, result);
         return result;
+    }
+
+    // The closed parameter attributes of a callee in another assembly, read
+    // from the same hashed image Roslyn bound, without admitting its body: a
+    // reference assembly, whose bodies do not run, qualifies. Null when the
+    // image cannot be authenticated or an attribute cannot be paired.
+    internal TotalMetadataImage? ResolveParameterAttributes(IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!method.DeclaringSyntaxReferences.IsEmpty || SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, compilation.Assembly) ||
+            !SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
+        { return null; }
+        var key = method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken;
+        if (_attributes.TryGetValue(key, out var cached))
+        { return cached; }
+        TotalMetadataImage? result;
+        try
+        { result = ReadAttributes(method, cancellationToken); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or
+            BadImageFormatException or InvalidOperationException or OverflowException)
+        { result = null; }
+        _attributes.Add(key, result);
+        return result;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "The metadata resolution caches the backing module and returns it to every lookup; disposing it here would invalidate later reads.")]
+    private TotalMetadataImage? ReadAttributes(IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        if (Authenticate(method, cancellationToken) is not { } image)
+        { return null; }
+        using var pe = new PEReader(image.Bytes);
+        if (!pe.HasMetadata)
+        { return null; }
+        var reader = pe.GetMetadataReader();
+        if (!CompilerCompilationCapture.MetadataEquals(image.Backing.GetMetadataReader(), reader) ||
+            reader.GetGuid(reader.GetModuleDefinition().Mvid).ToString("D") != image.Authority.Mvid ||
+            !CompilerMetadataResolution.TryGetMethodDefinition(reader, method.MetadataToken, out _, out var definition) ||
+            reader.GetString(definition.Name) != method.MetadataName ||
+            MetadataTokens.GetToken(definition.GetDeclaringType()) != method.ContainingType.MetadataToken ||
+            !CompilerClosedParameterCapture.TryCapture(compilation, reader, method, definition.GetParameters(), cancellationToken,
+                out var parameterAttributes))
+        { return null; }
+        return new(method, image.Authority.Sha256, image.Authority.Name, image.Authority.Mvid, parameterAttributes);
+    }
+
+    private sealed class AuthenticatedImage(ImmutableArray<byte> bytes, CompilerReferenceModuleSnapshot authority, ModuleMetadata backing)
+    {
+        internal ImmutableArray<byte> Bytes { get; } = bytes.IsDefault ? throw new ArgumentOutOfRangeException(nameof(bytes)) : bytes;
+        internal CompilerReferenceModuleSnapshot Authority { get; } = authority ?? throw new ArgumentNullException(nameof(authority));
+        internal ModuleMetadata Backing { get; } = backing ?? throw new ArgumentNullException(nameof(backing));
+    }
+
+    // The referenced module's bytes, when they hash to the snapshot the
+    // artifact records for it.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+        Justification = "The metadata resolution caches the backing module and returns it to every lookup; disposing it here would invalidate later reads.")]
+    private AuthenticatedImage? Authenticate(IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        if (!_resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name, cancellationToken,
+                out _, out var backing, out var path))
+        { return null; }
+        if (_capturedReferences.IsDefault)
+        {
+            _capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
+                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
+        }
+        var authority = _capturedReferences.SelectMany(item => item.Modules).FirstOrDefault(module =>
+            module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path));
+        if (authority == null || authority.SizeBytes <= 0 || authority.SizeBytes > CompilerReferenceLimits.MaximumModuleBytes)
+        { return null; }
+        if (!_images.TryGetValue(path, out var bytes))
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length != authority.SizeBytes)
+            { return null; }
+            var input = new byte[(int)stream.Length];
+            FillExactly(stream, input, cancellationToken);
+            using var buffer = new MemoryStream(input, writable: false);
+            if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
+            { return null; }
+            bytes = input.ToImmutableArray();
+            _images.Add(path, bytes);
+        }
+        return new(bytes, authority, backing);
     }
 
     internal static void FillExactly(Stream stream, byte[] destination, CancellationToken cancellationToken)
@@ -82,30 +169,10 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private TotalIlBody? Read(IMethodSymbol method, CancellationToken cancellationToken)
     {
         if (!_resolution.TryFindReference(method.ContainingAssembly.Identity, method.ContainingModule.Name, cancellationToken,
-                out var reference, out var backing, out var path) || _resolution.Resolve(reference) is not IAssemblySymbol assembly)
+                out var reference, out _, out _) || _resolution.Resolve(reference) is not IAssemblySymbol assembly ||
+            Authenticate(method, cancellationToken) is not { } image)
         { return null; }
-        if (_capturedReferences.IsDefault)
-        {
-            _capturedReferences = CompilerCompilationCapture.CaptureReferences(compilation.References,
-                CompilerCompilationCapture.ReferenceCaptureLimits.Default, cancellationToken);
-        }
-        var authority = _capturedReferences.SelectMany(item => item.Modules).FirstOrDefault(module =>
-            module.Name == method.ContainingModule.Name && Path.GetFullPath(module.Path) == Path.GetFullPath(path));
-        if (authority == null || authority.SizeBytes <= 0 || authority.SizeBytes > CompilerReferenceLimits.MaximumModuleBytes)
-        { return null; }
-        if (!_images.TryGetValue(path, out var bytes))
-        {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (stream.Length != authority.SizeBytes)
-            { return null; }
-            var input = new byte[(int)stream.Length];
-            FillExactly(stream, input, cancellationToken);
-            using var buffer = new MemoryStream(input, writable: false);
-            if (CompilerCompilationCapture.Hash(buffer, cancellationToken) != authority.Sha256)
-            { return null; }
-            bytes = input.ToImmutableArray();
-            _images.Add(path, bytes);
-        }
+        var (bytes, authority, backing) = (image.Bytes, image.Authority, image.Backing);
         using var pe = new PEReader(bytes);
         if (!pe.HasMetadata || pe.PEHeaders.CorHeader is not { } corHeader ||
             (corHeader.Flags & CorFlags.ILOnly) == 0 ||

@@ -6,18 +6,18 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "46";
+    public const string Current = "47";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 69;
+    public const int Current = 70;
 }
 
 internal static class WorkerManifestVersions
 {
-    public const int Current = 7;
+    public const int Current = 8;
 }
 
 internal static class WorkerLauncherDefaults
@@ -355,15 +355,31 @@ internal sealed record WorkerSourceLocation
 }
 
 // The callee clause a call-precondition claim checks. The claim's own location
-// is the call.
+// is the call. A clause in source has a ClauseLocation; a closed attribute read
+// from another assembly's metadata has a MetadataClause instead.
 internal sealed record WorkerCallPreconditionTarget
 {
     [JsonRequired]
     public string Callee { get; init; } = string.Empty;
     [JsonRequired]
     public int ClauseOrdinal { get; init; }
-    [JsonRequired]
-    public WorkerSourceLocation ClauseLocation { get; init; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerSourceLocation? ClauseLocation { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkerMetadataClauseLocation? MetadataClause { get; init; }
+    // The calling project declared this clause, in a companion, for a callee
+    // in another assembly; the callee's own binary does not carry it.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CallerDeclared { get; init; }
+
+    // Where the clause is declared, for a message.
+    internal string DescribeClause(Func<WorkerSourceLocation, string> source)
+    {
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        var declared = ClauseLocation is { } location ? "at " + source(location)
+            : MetadataClause is { } metadata ? metadata.Describe() : string.Empty;
+        return CallerDeclared ? declared + ", declared by the calling project" : declared;
+    }
 
     // The callee without its assembly identity, which carries a version.
     internal static string StableCallee(string callee)
@@ -371,6 +387,29 @@ internal sealed record WorkerCallPreconditionTarget
         callee = RepositoryParameterGuard.NotNull(callee, nameof(callee));
         var separator = callee.LastIndexOf("::", StringComparison.Ordinal);
         return separator < 0 ? callee : callee.Substring(separator + 2);
+    }
+}
+
+// A closed parameter attribute of a callee in another assembly. Metadata has
+// no source span, so the clause is named by its assembly, its member, the
+// parameter it guards and the attribute itself.
+internal sealed record WorkerMetadataClauseLocation
+{
+    [JsonRequired]
+    public string Assembly { get; init; } = string.Empty;
+    [JsonRequired]
+    public string Member { get; init; } = string.Empty;
+    [JsonRequired]
+    public int Parameter { get; init; }
+    [JsonRequired]
+    public string Attribute { get; init; } = string.Empty;
+
+    // The assembly by simple name: its identity carries a version.
+    internal string Describe()
+    {
+        var comma = Assembly.IndexOf(',');
+        var name = comma < 0 ? Assembly : Assembly.Substring(0, comma);
+        return FormattableString.Invariant($"[{Attribute}] on parameter {Parameter} in {name}");
     }
 }
 
@@ -1040,7 +1079,17 @@ internal static class WorkerProtocolMetadata
         if (kind != WorkerClaimKind.CallPrecondition)
         { return target is null; }
         return target is not null && !string.IsNullOrWhiteSpace(target.Callee) && target.ClauseOrdinal >= 0 &&
-            target.ClauseLocation is not null && IsSourceLocationValid(target.ClauseLocation);
+            (target.ClauseLocation is { } location
+                ? target.MetadataClause is null && IsSourceLocationValid(location)
+                : target.MetadataClause is { } metadata && !target.CallerDeclared && IsMetadataClauseValid(metadata));
+    }
+    internal static bool IsMetadataClauseValid(WorkerMetadataClauseLocation metadata)
+    {
+        metadata = RepositoryParameterGuard.NotNull(metadata, nameof(metadata));
+        return !string.IsNullOrWhiteSpace(metadata.Assembly) && metadata.Assembly.Length <= 4096 &&
+            !string.IsNullOrWhiteSpace(metadata.Member) && metadata.Member.Length <= 4096 &&
+            metadata.Parameter is >= 0 and < 128 &&
+            !string.IsNullOrWhiteSpace(metadata.Attribute) && metadata.Attribute.Length <= 256;
     }
     internal static readonly ImmutableArray<WorkerProtocolRule<WorkerClaimManifestEntry>> ManifestClaimRules = [
         new("claim_resource_constraint", static value /* SPINT001: all values valid - Validator.Rules rejects null before any predicate runs */ => HasValidResourceConstraint(value.EffectContractKind, value.ResourceUpperBound)),

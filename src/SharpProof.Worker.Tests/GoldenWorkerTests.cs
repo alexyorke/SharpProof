@@ -197,7 +197,7 @@ public sealed class GoldenWorkerTests
             output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal.ToString(CultureInfo.InvariantCulture));
             output.AppendLine(FormattableString.Invariant($"  call: {claim.Location.Line}:{claim.Location.Column}"));
             output.AppendLine("  callee: " + WorkerCallPreconditionTarget.StableCallee(claim.CallPrecondition!.Callee));
-            output.AppendLine(FormattableString.Invariant($"  clause: {claim.CallPrecondition.ClauseOrdinal} at line {claim.CallPrecondition.ClauseLocation.Line}"));
+            output.AppendLine(FormattableString.Invariant($"  clause: {claim.CallPrecondition.ClauseOrdinal} at line {claim.CallPrecondition.ClauseLocation!.Line}"));
             output.AppendLine("  outcome: " + result.Outcome);
             output.AppendLine("  reason: " + result.Reason);
             output.AppendLine("  vacuity: " + result.Vacuity);

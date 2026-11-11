@@ -2799,6 +2799,7 @@ internal sealed partial class WorkerTests
         }
     }
 
+    // The body is never expanded; its call stays opaque.
     [Test]
     public void ImplementationIlRejectsStackDepthBeyondDeclaredMaximum()
     {
@@ -2832,7 +2833,12 @@ internal sealed partial class WorkerTests
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
         var preparation = new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(preparation.Total, Is.Not.Null);
-        Assert.That(preparation.Total!.IsBodyAbstraction, Is.True);
+        var instructions = preparation.Total!.Program.Blocks.SelectMany(static block => block.Instructions).ToImmutableArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.Total.IsBodyAbstraction, Is.False);
+            Assert.That(instructions.OfType<SharpProof.Ir.IrCallInstruction>(), Is.Not.Empty);
+        }
     }
 
     [Test]

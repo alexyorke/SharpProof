@@ -37,8 +37,12 @@ internal sealed class TotalShadowCallHop(string callerIdentity, string calleeIde
     internal IrSourceSpan Site { get; } = (site ?? throw new System.ArgumentNullException(nameof(site)));
 }
 
-internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe, TotalMetadataPrecondition? metadataClause = null, ImmutableArray<TotalShadowCallHop> ancestry = default)
+// A caller-declared row checks a clause the calling project declared for a
+// callee in another assembly, through a companion.
+internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe, TotalMetadataPrecondition? metadataClause = null, ImmutableArray<TotalShadowCallHop> ancestry = default,
+    bool callerDeclared = false)
 {
+    internal bool CallerDeclared { get; } = callerDeclared;
     internal string CalleeIdentity { get; } = (calleeIdentity ?? throw new System.ArgumentNullException(nameof(calleeIdentity)));
     internal int ClauseOrdinal { get; } = clauseOrdinal;
     internal OperationId ClauseSite { get; } = (clauseSite.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauseSite)) : clauseSite);

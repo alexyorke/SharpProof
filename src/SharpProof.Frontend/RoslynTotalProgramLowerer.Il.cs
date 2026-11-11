@@ -10,6 +10,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // The matched provider admits static methods; Roslyn binds one argument per parameter.
         var arguments = ImmutableArray.CreateBuilder<IrTerm>(body.Method.Parameters.Length);
         arguments.Count = body.Method.Parameters.Length;
+        var preconditions = _calls?.MetadataRequiresEnabled == true ? null : PrepareMetadataCallee(body.Method);
         foreach (var argument in invocation.Arguments)
         {
             SpendRegion();
@@ -18,7 +19,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             block = value.Continuation;
             if (!value.Classification.IsExact)
             { return null; }
-            if (_calls?.MetadataRequiresEnabled == true)
+            if (_calls?.MetadataRequiresEnabled == true || preconditions != null)
             {
                 var captured = _context.Temporary(value.Value.Type);
                 _builder.Assign(block, _context.Site(argument), captured, value.Value);
@@ -27,6 +28,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             else
             { arguments[parameter.Ordinal] = value.Value; }
         }
+        if (preconditions != null)
+        { RecordMetadataCallPreconditions(invocation, preconditions, arguments.ToImmutable(), block); }
         var region = _regionGraph == null ? null : _regionSource.EnclosingRegion;
         var filter = region == null ? null : EnclosingRegionFilter(region);
         var anchor = _context.Site(invocation);
@@ -330,6 +333,95 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (operation is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return CSharpOperationSemantics.IntegerArithmetic(factory, operation, left, right, code.Contains("_ovf")); }
         return CSharpOperationSemantics.DivideOrRemainder(factory, operation, left, right);
+    }
+
+    private TotalLoweringContext? PrepareMetadataCallee(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return _calls?.PrepareMetadataCallee(_context, method);
+    }
+
+    // The clauses of a call into another assembly, checked before the callee
+    // runs: first those of a companion the calling project declares, then the
+    // callee's closed parameter attributes. Each is an obligation of this
+    // caller, never an assumption after the call. `arguments` is indexed by
+    // parameter ordinal and holds values pinned where they were evaluated.
+    private void RecordMetadataCallPreconditions(IOperation call, TotalLoweringContext frame, ImmutableArray<IrTerm> arguments,
+        IrBlockId block)
+    {
+        call = RepositoryParameterGuard.NotNull(call, nameof(call));
+        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
+        RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (arguments.Length != frame.Parameters.Length)
+        { throw new RegionIncompleteException(); }
+        var factory = _context.Factory;
+        var site = _context.Site(call);
+        var callSpan = factory.GetOperationInfo(site).SourceSpan;
+        var values = ImmutableArray.CreateBuilder<IrTerm>(frame.Parameters.Length);
+        foreach (var parameter in frame.Parameters)
+        {
+            // A value whose type does not reconcile with the parameter's leaves
+            // the whole call unchecked, and counted, rather than half checked.
+            if (ParameterValue(arguments[parameter.Parameter.Ordinal], factory.GetVariableInfo(parameter.Entry).Type) is not { } value)
+            { return; }
+            values.Add(value);
+        }
+        var bound = values.MoveToImmutable();
+        var replacements = ImmutableDictionaryCapture.Create(frame.Parameters.Select((parameter, index) => (parameter, index)),
+            pair => pair.parameter.Entry, pair => bound[pair.index]);
+        var identity = CompilerIdentityBridge.CreateSymbolDisplay(frame.Target);
+        ImmutableArray<TotalShadowCallHop> ancestry = [];
+        if ((_captureShadowCallAncestry || _context.CaptureCallFrames) && callSpan != null)
+        {
+            ancestry = _shadowAncestry.Add(new(CompilerIdentityBridge.CreateSymbolDisplay(_context.Target), identity, callSpan));
+        }
+        var ordinal = 0;
+        foreach (var clause in frame.SourceCallPreconditions)
+        {
+            SpendRegion();
+            if (!_calls!.Spend() ||
+                !IrCallPreconditionMarker.TryCreateName(identity, ordinal, callSpan, factory.GetOperationInfo(clause.ClauseSite).SourceSpan, out var name))
+            { throw new RegionIncompleteException(); }
+            Record(name, new(identity, ordinal, clause.ClauseSite, IrSubstitution.Substitute(factory, clause.Value, replacements),
+                IrSubstitution.Substitute(factory, clause.Safe, replacements), ancestry: ancestry, callerDeclared: true));
+            ordinal++;
+        }
+        foreach (var clause in frame.MetadataCallPreconditions)
+        {
+            SpendRegion();
+            if (!_calls!.Spend() || !IrCallPreconditionMarker.TryCreateMetadataName(identity, ordinal, callSpan, clause.EvidenceDigest, out var name))
+            { throw new RegionIncompleteException(); }
+            Record(name, new(identity, ordinal, clause.ClauseSite, IrSubstitution.Substitute(factory, clause.Value, replacements),
+                IrSubstitution.Substitute(factory, clause.Safe, replacements), clause, ancestry));
+            ordinal++;
+        }
+
+        void Record(string name, TotalCallPrecondition obligation)
+        {
+            name = RepositoryParameterGuard.NotNull(name, nameof(name));
+            obligation = RepositoryParameterGuard.ValidateInitialized(obligation, obligation.Value is null, nameof(obligation), "Value must be initialized.");
+            var marker = _builder.Assign(block, site, _context.Temporary(factory.BooleanType, name),
+                factory.Binary(IrBinaryOperator.AndAlso, obligation.Safe, obligation.Value));
+            _callPreconditions.AddUnique(marker, obligation);
+        }
+    }
+
+    private IrTerm? ParameterValue(IrTerm value, IrTypeId type)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        var factory = _context.Factory;
+        if (value.Type == type)
+        { return value; }
+        var target = factory.GetTypeInfo(type).Kind;
+        if (value is IrNullTerm)
+        { return target is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ? factory.Null(type) : null; }
+        // The casts the artifact admits: reference to reference, and any
+        // reference, string or array value to object.
+        var source = factory.GetTypeInfo(value.Type).Kind;
+        return target == IrTypeKind.Reference && (source == IrTypeKind.Reference ||
+            type == factory.ObjectType && source is IrTypeKind.String or IrTypeKind.Sequence) ? Bridge(value, type) : null;
     }
 
     private void RecordMetadataPreconditions(TotalLoweringContext frame, ImmutableArray<IrTerm> arguments, IrBlockId block, OperationId site)

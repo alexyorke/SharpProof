@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 58;
+    internal const int Current = 59;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -125,6 +125,9 @@ internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction
     public IrTerm Value { get; init; } = Value ?? throw new ArgumentNullException(nameof(Value));
     public IrTerm Safe { get; init; } = Safe ?? throw new ArgumentNullException(nameof(Safe));
     internal ImmutableArray<CompilerShadowCallHop> Ancestry { get; init; } = [];
+    // A companion clause the calling project declared for a callee in another
+    // assembly. It is reported, not serialized: the claim carries it.
+    internal bool CallerDeclared { get; init; }
     // The call-precondition claim that checks this row. A row without one
     // belongs to a callee verified on its own.
     internal string? ClaimId { get; init; }
@@ -193,6 +196,20 @@ internal sealed record CompilerMetadataClauseOrigin(string AssemblyIdentity, str
     public string Kind { get; init; } = Kind ?? throw new ArgumentNullException(nameof(Kind));
     public ImmutableArray<byte> ConstructorSignature { get; init; } = ConstructorSignature.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ConstructorSignature)) : ConstructorSignature;
     public ImmutableArray<byte> ValueBlob { get; init; } = ValueBlob.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(ValueBlob)) : ValueBlob;
+
+    // The claim target this evidence describes. The producer writes it and the
+    // codec requires the manifest target to equal it field for field.
+    internal WorkerMetadataClauseLocation ClaimTarget(string calleeIdentity)
+    {
+        calleeIdentity = calleeIdentity ?? throw new ArgumentNullException(nameof(calleeIdentity));
+        return new WorkerMetadataClauseLocation
+        {
+            Assembly = AssemblyIdentity,
+            Member = WorkerCallPreconditionTarget.StableCallee(calleeIdentity),
+            Parameter = ParameterOrdinal,
+            Attribute = Kind == "InRange" ? FormattableString.Invariant($"InRange({Minimum}, {Maximum})") : Kind
+        };
+    }
 }
 
 internal sealed record CompilerTotalCallPreconditionArtifact

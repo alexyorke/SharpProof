@@ -2820,6 +2820,48 @@ public sealed class WorkerMsBuildIntegrationTests
             Is.All.EqualTo(WorkerClaimOutcome.Proven));
     }
 
+    // A real referenced project: the consumer compiles against its reference
+    // assembly, which keeps the closed parameter attributes.
+    [Test]
+    public async Task StrictBuildChecksClosedAttributesOfAReferencedProject()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateWithLibrary("""
+            public static class Consumer {
+                public static int BadNull() { return Remote.Length(null); }
+                public static int BadRange() { return Remote.Pick(10); }
+                public static int Good(string text, int index) { return text != null && index >= 0 && index <= 9 ? Remote.Length(text) + Remote.Pick(index) : 0; }
+                public static int Dispatched(Shape shape) { return shape.Area(0); }
+            }
+            """, """
+            using SharpProof.Attributes;
+            public static class Remote {
+                public static int Length([NonNull] string text) => text.Length;
+                public static int Pick([InRange(0, 9)] int index) => index;
+            }
+            public class Shape { public virtual int Area([Positive] int side) => side * side; }
+            """);
+        var build = await project.BuildAsync(verify: null, [("SharpProofProfile", "strict")]);
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        var outcomes = response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.CallPrecondition)
+            .Select(claim => (Caller: claim.CallableId, claim.CallPrecondition!.MetadataClause?.Attribute,
+                response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId).Outcome))
+            .ToImmutableArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("error SP0051").And.Contain("[NonNull] on parameter 0 in Library"), build.Output);
+            Assert.That(outcomes.Where(static row => row.Caller.Contains("BadNull", StringComparison.Ordinal)).Select(static row => (row.Attribute, row.Outcome)),
+                Is.EqualTo(new[] { ((string?)"NonNull", WorkerClaimOutcome.Refuted) }));
+            Assert.That(outcomes.Where(static row => row.Caller.Contains("BadRange", StringComparison.Ordinal)).Select(static row => (row.Attribute, row.Outcome)),
+                Is.EqualTo(new[] { ((string?)"InRange(0, 9)", WorkerClaimOutcome.Refuted) }));
+            Assert.That(outcomes.Where(static row => row.Caller.Contains("Good", StringComparison.Ordinal)).Select(static row => row.Outcome),
+                Is.EqualTo(new[] { WorkerClaimOutcome.Proven, WorkerClaimOutcome.Proven }));
+            Assert.That(outcomes.Select(static row => row.Caller), Has.None.Contains("Dispatched"));
+            Assert.That(response.Manifest.UncheckedCallSites, Is.EqualTo(1));
+        }
+    }
+
     private static string CallPreconditionSource(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -3282,6 +3324,42 @@ public sealed class WorkerMsBuildIntegrationTests
                 "consumer-%TEMP%-" + Guid.NewGuid().ToString("N"));
         }
 
+        // The consumer references a plain SDK library project in Library/.
+        internal static ConsumerProject CreateWithLibrary(string source, string librarySource)
+        {
+            System.ArgumentNullException.ThrowIfNull(source);
+            System.ArgumentNullException.ThrowIfNull(librarySource);
+            var project = CreateCore(source, useSpaces: false, [], items: """
+                    <Compile Remove="Library/**" />
+                    <ProjectReference Include="Library/Library.csproj" />
+                """);
+            try
+            {
+                var library = Directory.CreateDirectory(Path.Combine(project._root, "Library")).FullName;
+                File.WriteAllText(Path.Combine(library, "Library.cs"), librarySource, new System.Text.UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(library, "Library.csproj"), $"""
+                    <Project Sdk="Microsoft.NET.Sdk">
+                      <PropertyGroup>
+                        <TargetFramework>net8.0</TargetFramework>
+                        <LangVersion>12.0</LangVersion>
+                        <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+                      </PropertyGroup>
+                      <ItemGroup>
+                        <Reference Include="SharpProof.Attributes">
+                          <HintPath>{s_projectTemplate.Value.AttributesAssemblyPath}</HintPath>
+                        </Reference>
+                      </ItemGroup>
+                    </Project>
+                    """, new System.Text.UTF8Encoding(false));
+                return project;
+            }
+            catch
+            {
+                project.Dispose();
+                throw;
+            }
+        }
+
         internal static ConsumerProject CreateWithLongPath(string source)
         {
             System.ArgumentNullException.ThrowIfNull(source);
@@ -3303,7 +3381,8 @@ public sealed class WorkerMsBuildIntegrationTests
             string source,
             bool useSpaces,
             ImmutableArray<(string Name, string Value)> properties,
-            string? explicitName = null)
+            string? explicitName = null,
+            string items = "")
         {
             if (properties.IsDefault)
             {
@@ -3330,7 +3409,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     new System.Text.UTF8Encoding(false));
                 File.WriteAllText(
                     Path.Combine(root, "Consumer.csproj"),
-                    CreateProjectXml(properties),
+                    CreateProjectXml(properties, items),
                     new System.Text.UTF8Encoding(false));
                 return new ConsumerProject(temporary);
             }
@@ -3740,7 +3819,7 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         private static string CreateProjectXml(
-            ImmutableArray<(string Name, string Value)> properties)
+            ImmutableArray<(string Name, string Value)> properties, string items = "")
         {
             if (properties.IsDefault)
             {
@@ -3790,6 +3869,7 @@ public sealed class WorkerMsBuildIntegrationTests
                       <HintPath>{template.AttributesAssemblyPath}</HintPath>
                       <Private>true</Private>
                     </Reference>
+                {items}
                   </ItemGroup>
                   <Import Project="{template.TargetsPath}" />
                   <Import Project="{template.VerifierTargetsPath}" />

@@ -18,7 +18,7 @@ Fix actual invalid calls and malformed declarations first. Use the [diagnostic e
 
 The standard package already runs the worker. If you deliberately chose advisory discovery, keep worker execution enabled and review selected claims, incomplete callable coverage, assumptions, trusted boundaries, vacuity, and reasons in every completed run. A Refuted result remains an error even under advisory policy; infrastructure failures remain failures.
 
-Adding `Requires` to a method also creates obligations for its callers. Each body that calls it directly must establish the clause, including bodies with no contract of their own, and a method that forwards its input needs the same `Requires` or a guard. Calls into another assembly are not checked, so keep runtime validation at public API boundaries. See [call preconditions](verification-results.md#call-preconditions).
+Adding `Requires` to a method also creates obligations for its callers. Each body that calls it directly must establish the clause, including bodies with no contract of their own, and a method that forwards its input needs the same `Requires` or a guard. At calls into another assembly only the callee's closed parameter attributes and companions in the calling project are checked; a library's `Contract.Requires` is not, so keep runtime validation at public API boundaries. See [call preconditions](verification-results.md#call-preconditions).
 
 Start with small pure functions and simple postconditions. Add only preconditions that represent the application's real domain. Understand an Unknown before raising resource limits; unsupported semantics cannot be fixed with time. See [Unknown reasons](unknown-reasons.md) and [verification evidence](verification-results.md).
 

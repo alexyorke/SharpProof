@@ -89,7 +89,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         { return _expressions.LowerScalarCall(invocation, model, block, depth); }
         if (_preserveSourceCall != null)
         { return PreserveSourceCall(invocation, block, depth); }
-        if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body)
+        // Claim lowering takes a metadata body it cannot expand as an opaque
+        // call, rather than giving up on the caller's whole body.
+        if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body &&
+            (!_expressions.AllowOpaqueCalls || TotalIlStack.TryValidate(body, _calls.Spend, out _)))
         { return InlineMetadataCall(invocation, body, block, depth); }
         return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
     }

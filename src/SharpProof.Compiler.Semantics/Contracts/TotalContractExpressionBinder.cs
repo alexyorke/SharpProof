@@ -137,8 +137,32 @@ internal sealed class TotalContractBinder
             _factory, _classifier.Api.Selections, sites, cancellationToken);
     }
 
+    // The Requires a companion in this compilation declares for a callee in
+    // another assembly. The callee's own closed attributes are not bound here:
+    // they come from its authenticated image through BindTotalMetadataRequires.
+    internal TotalContractBindingResult BindTotalCompanionRequires(TotalLoweringContext context,
+        CancellationToken cancellationToken)
+    {
+        context = RepositoryParameterGuard.NotNull(context, nameof(context));
+        if (context.Target.DeclaringSyntaxReferences.Length != 0)
+        { return new([], ContractBindingFailure.UnsupportedTarget, context.Origin); }
+        if (_classifier.Api == null)
+        { return new([], ContractBindingFailure.ContractApiUnavailable, context.Origin); }
+        // A companion type that declares no member of this name does not
+        // cover the callee, which then has no companion clause. A companion
+        // that is ambiguous or does not match is a failure, so the call stays
+        // unchecked.
+        var resolution = _classifier.ContractSources.Resolve(context.Target, null, cancellationToken);
+        if (!resolution.UsesCompanion)
+        {
+            return new([], resolution.Failure == ContractBindingFailure.MissingCompanion ? ContractBindingFailure.None : resolution.Failure,
+                context.Origin);
+        }
+        return BindTotalCore(context, null, requiresOnly: true, cancellationToken, includeAttributes: false);
+    }
+
     private TotalContractBindingResult BindTotalCore(TotalLoweringContext context, IOperation? implementationBody,
-        bool requiresOnly, CancellationToken cancellationToken)
+        bool requiresOnly, CancellationToken cancellationToken, bool includeAttributes = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -178,7 +202,7 @@ internal sealed class TotalContractBinder
             clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
             clauses.Add(clause);
         }
-        var attributeFailure = BindTotalAttributes(context, requiresOnly, AppendClause);
+        var attributeFailure = includeAttributes ? BindTotalAttributes(context, requiresOnly, AppendClause) : ContractBindingFailure.None;
         if (attributeFailure != ContractBindingFailure.None)
         { return Fail(attributeFailure); }
         var ordinal = 0;
