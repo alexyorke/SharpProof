@@ -611,7 +611,7 @@ public sealed class ProjectDoctorTests
         {
             Directory.CreateDirectory(DirectoryPath);
             File.WriteAllText(Path.Combine(DirectoryPath, "Consumer.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
-            Properties.Add("NETCoreSdkVersion", "10.0.403");
+            Properties.Add("NETCoreSdkVersion", "10.0.404");
             Properties.Add("SharpProofProfile", "advisory");
             Properties.Add("SharpProofFeatures", "all");
             Properties.Add("SharpProofVerify", "false");
