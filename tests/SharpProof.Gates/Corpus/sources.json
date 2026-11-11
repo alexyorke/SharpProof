@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "aalhour-c-sharp-algorithms",
+      "repository": "https://github.com/aalhour/C-Sharp-Algorithms",
+      "commit": "b82432474a916ac784cd1446eabcba615c333463",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "793edd619b9a288ea4f2e06557d4ffbbb2e322caf412d2eebce35d2154d94587"
+      },
+      "notices": [],
+      "roots": [
+        "Algorithms",
+        "DataStructures"
+      ],
+      "excludes": [],
+      "methodQuota": 200,
+      "compilation": {
+        "nullable": false,
+        "checkOverflow": false,
+        "globalUsings": [
+          "System",
+          "System.Collections.Generic",
+          "System.IO",
+          "System.Linq",
+          "System.Threading",
+          "System.Threading.Tasks"
+        ],
+        "preprocessorSymbols": []
+      }
+    },
+    {
+      "id": "morelinq",
+      "repository": "https://github.com/morelinq/MoreLINQ",
+      "commit": "d217ab1e8eac68247650c27e977b767dd66bcab0",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "COPYING.txt",
+        "sha256": "a1562a263cd1714767f2f68ad7200d8ac544ff635e5423adb7e99f74ec746543"
+      },
+      "notices": [],
+      "roots": [
+        "MoreLinq"
+      ],
+      "excludes": [
+        "MoreLinq/Extensions.g.cs",
+        "MoreLinq/Extensions.ToDataTable.g.cs"
+      ],
+      "methodQuota": 100,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "MORELINQ",
+          "DYNAMIC_CODE_FALLBACK",
+          "NET",
+          "NET9_0",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER"
+        ]
+      }
+    },
+    {
+      "id": "nodatime",
+      "repository": "https://github.com/nodatime/nodatime",
+      "commit": "6e024ddefed3ea21169f0eca5ab5c32312adb9cf",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "LICENSE.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      "notices": [
+        {
+          "path": "NOTICE.txt",
+          "sha256": "b20873f8469e39d5d09bfbafa9ceb101d555cf8de61f8c2a31394161d3b4c6dd"
+        }
+      ],
+      "roots": [
+        "src/NodaTime"
+      ],
+      "excludes": [],
+      "methodQuota": 100,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": true,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NET8_0",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER"
+        ]
+      }
+    },
+    {
+      "id": "humanizer",
+      "repository": "https://github.com/Humanizr/Humanizer",
+      "commit": "3ebc38de585fc641a04b0e78ed69468453b0f8a1",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "e24ec7f2eea5c5f4b3e2c08308109ba99b49b4b56ea7ff0e0a178f2bdd4bbce8"
+      },
+      "notices": [
+        {
+          "path": "src/Humanizer/Bytes/LICENSE",
+          "sha256": "448b44bf6e128ee1537ecdf57f556473bb53892c594be393f92bd7a993ef764a"
+        },
+        {
+          "path": "src/Humanizer/Inflections/LICENSE",
+          "sha256": "5592fb5b203b5ffe9fc1f9b66ce5418198b89911b5a3952e32fd487874a40932"
+        }
+      ],
+      "roots": [
+        "src/Humanizer"
+      ],
+      "excludes": [
+        "src/Humanizer/FluentDate/In.Months.cs",
+        "src/Humanizer/FluentDate/In.SomeTimeFrom.cs",
+        "src/Humanizer/FluentDate/InDate.Months.cs",
+        "src/Humanizer/FluentDate/InDate.SomeTimeFrom.cs",
+        "src/Humanizer/FluentDate/On.Days.cs",
+        "src/Humanizer/FluentDate/OnDate.Days.cs"
+      ],
+      "methodQuota": 100,
+      "compilation": {
+        "nullable": false,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NET6_0",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER"
+        ]
+      }
+    }
+  ]
+}

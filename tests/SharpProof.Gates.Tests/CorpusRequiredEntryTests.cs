@@ -18,11 +18,11 @@ public sealed class CorpusRequiredEntryTests
         using var temporary = new TempDirectory("SharpProof.Gates.Test-pr275-required-entry-");
         var corpus = Path.Combine(temporary.FullName, "tests/SharpProof.Gates", "Corpus");
         Directory.CreateDirectory(corpus);
-        foreach (var source in original.Sources)
+        foreach (var copied in original.Sources.SelectMany(static source => source.NoticeFiles.Select(static notice => notice.File).Prepend(source.LicenseFile)))
         {
-            var destination = Path.Combine(corpus, source.LicenseFile);
+            var destination = Path.Combine(corpus, copied);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            File.Copy(Path.Combine(repository, "tests/SharpProof.Gates", "Corpus", source.LicenseFile), destination);
+            File.Copy(Path.Combine(repository, "tests/SharpProof.Gates", "Corpus", copied), destination);
         }
         var manifestPath = Path.Combine(corpus, "oss-methods.json");
         File.WriteAllText(manifestPath, JsonSerializer.Serialize(original));

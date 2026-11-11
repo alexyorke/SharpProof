@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using SharpProof.Analyzer;
 
 namespace SharpProof.Gates.Corpus;
@@ -133,6 +134,79 @@ internal sealed record OpenSourceCorpusSource(
     public string LicenseSpdx { get; init; } = LicenseSpdx ?? throw new System.ArgumentNullException(nameof(LicenseSpdx));
     public string LicenseFile { get; init; } = LicenseFile ?? throw new System.ArgumentNullException(nameof(LicenseFile));
     public string LicenseSha256 { get; init; } = LicenseSha256 ?? throw new System.ArgumentNullException(nameof(LicenseSha256));
+
+    // Further upstream notices that travel with the license, such as an
+    // Apache NOTICE file or a vendored component's own license.
+    public ImmutableArray<OpenSourceCorpusNoticeFile> /* SPINT001: all values valid - raw corpus collections are validated by preflight */ NoticeFiles { get; init; } = [];
+
+    public OpenSourceCorpusCompilationOptions /* SPINT001: all values valid - raw corpus options are validated by preflight */ Compilation { get; init; } =
+        OpenSourceCorpusCompilationOptions.Default;
+}
+
+internal sealed record OpenSourceCorpusNoticeFile(string File, string Sha256)
+{
+    public string File { get; init; } = File ?? throw new System.ArgumentNullException(nameof(File));
+    public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
+}
+
+// How one source's pinned files compile as their own assembly against the
+// runtime's BCL. Mirrors the upstream project's settings that change meaning.
+internal sealed record OpenSourceCorpusCompilationOptions(
+    bool Nullable,
+    bool CheckOverflow,
+    ImmutableArray<string> /* SPINT001: all values valid - raw corpus collections are validated by preflight */ GlobalUsings,
+    ImmutableArray<string> /* SPINT001: all values valid - raw corpus collections are validated by preflight */ PreprocessorSymbols)
+{
+    internal static OpenSourceCorpusCompilationOptions Default { get; } = new(
+        false,
+        false,
+        ["System", "System.Collections.Generic", "System.IO", "System.Linq", "System.Threading", "System.Threading.Tasks"],
+        []);
+}
+
+// Importer input: one reviewed upstream source in Corpus/sources.json.
+internal sealed record OpenSourceCorpusSourceConfig(
+    string Id,
+    string Repository,
+    string Commit,
+    string LicenseSpdx,
+    OpenSourceCorpusUpstreamFile License,
+    ImmutableArray<OpenSourceCorpusUpstreamFile> /* SPINT001: all values valid - raw config collections are validated on load */ Notices,
+    ImmutableArray<string> /* SPINT001: all values valid - raw config collections are validated on load */ Roots,
+    ImmutableArray<string> /* SPINT001: all values valid - raw config collections are validated on load */ Excludes,
+    int MethodQuota,
+    OpenSourceCorpusCompilationOptions Compilation)
+{
+    public string Id { get; init; } = Id ?? throw new System.ArgumentNullException(nameof(Id));
+    public string Repository { get; init; } = Repository ?? throw new System.ArgumentNullException(nameof(Repository));
+    public string Commit { get; init; } = Commit ?? throw new System.ArgumentNullException(nameof(Commit));
+    public string LicenseSpdx { get; init; } = LicenseSpdx ?? throw new System.ArgumentNullException(nameof(LicenseSpdx));
+    public OpenSourceCorpusUpstreamFile License { get; init; } = License ?? throw new System.ArgumentNullException(nameof(License));
+    public OpenSourceCorpusCompilationOptions Compilation { get; init; } = Compilation ?? throw new System.ArgumentNullException(nameof(Compilation));
+}
+
+// An upstream file at the pinned commit and the SHA-256 of its reviewed,
+// LF-normalized text (with a final newline).
+internal sealed record OpenSourceCorpusUpstreamFile(string Path, string Sha256)
+{
+    public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+    public string Sha256 { get; init; } = Sha256 ?? throw new System.ArgumentNullException(nameof(Sha256));
+}
+
+internal sealed record OpenSourceCorpusSourcesDocument(
+    int SchemaVersion,
+    ImmutableArray<OpenSourceCorpusSourceConfig> /* SPINT001: all values valid - raw config collections are validated on load */ Sources);
+
+// Per-source coverage reported by the corpus gate.
+internal sealed record CorpusSourceCoverage(
+    string SourceId,
+    int Methods,
+    int Supported,
+    int Proven,
+    int Refuted,
+    int Unknown)
+{
+    public string SourceId { get; init; } = SourceId ?? throw new System.ArgumentNullException(nameof(SourceId));
 }
 
 internal sealed record OpenSourceCorpusFile(
@@ -147,22 +221,29 @@ internal sealed record OpenSourceCorpusFile(
     public string Content { get; init; } = Content;
 }
 
+// Property order keeps the checked-in manifest in reading order.
 internal sealed record OpenSourceCorpusMethod(
     string Id,
     string SourceId,
     string Path,
-    int StartLine,
-    int EndLine,
+    [property: JsonPropertyOrder(3)] int StartLine,
+    [property: JsonPropertyOrder(4)] int EndLine,
     string DeclarationSha256,
     string MethodName,
     string Mode,
-    CorpusVerdict ExpectedVerdict,
-    CorpusSupport Support)
+    [property: JsonPropertyOrder(8)] CorpusVerdict ExpectedVerdict,
+    [property: JsonPropertyOrder(9)] CorpusSupport Support)
 {
+    [JsonPropertyOrder(0)]
     public string Id { get; init; } = Id ?? throw new System.ArgumentNullException(nameof(Id));
+    [JsonPropertyOrder(1)]
     public string SourceId { get; init; } = SourceId ?? throw new System.ArgumentNullException(nameof(SourceId));
+    [JsonPropertyOrder(2)]
     public string Path { get; init; } = Path ?? throw new System.ArgumentNullException(nameof(Path));
+    [JsonPropertyOrder(5)]
     public string DeclarationSha256 { get; init; } = DeclarationSha256 ?? throw new System.ArgumentNullException(nameof(DeclarationSha256));
+    [JsonPropertyOrder(6)]
     public string MethodName { get; init; } = MethodName ?? throw new System.ArgumentNullException(nameof(MethodName));
+    [JsonPropertyOrder(7)]
     public string Mode { get; init; } = Mode ?? throw new System.ArgumentNullException(nameof(Mode));
 }

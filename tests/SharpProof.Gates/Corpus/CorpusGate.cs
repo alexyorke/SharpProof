@@ -43,6 +43,9 @@ internal sealed record CorpusGateResult(
     public ImmutableArray<CorpusUnknownReasonCount> UnknownReasons { get; init; } = UnknownReasons.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(UnknownReasons)) : UnknownReasons;
     public ImmutableArray<string> AllowedDegradations { get; init; } = AllowedDegradations.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(AllowedDegradations)) : AllowedDegradations;
     public ImmutableArray<string> Failures { get; init; } = Failures.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Failures)) : Failures;
+
+    // Supported methods and observed verdicts for each pinned source.
+    public ImmutableArray<CorpusSourceCoverage> OpenSourceCoverage { get; init; } = [];
 }
 
 internal sealed record ContractCallCensus(int PublicOwners, int PotentialCalls, int BoundRequires,
@@ -359,6 +362,7 @@ internal static class CorpusGate
             failures);
         var observationCount = observations.Length;
         failures.AddRange(ValidateWallTime(wallTime.Elapsed));
+        var openSourceCoverage = SummarizeSourceCoverage(openSourceDocument, observations);
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,
@@ -388,7 +392,36 @@ internal static class CorpusGate
             CorpusCatalog.Variants.Length,
             unknownReasons,
             allowedDegradations.ToImmutable(),
-            failures.ToImmutable());
+            failures.ToImmutable())
+        { OpenSourceCoverage = openSourceCoverage };
+    }
+
+    internal static ImmutableArray<CorpusSourceCoverage> SummarizeSourceCoverage(
+        OpenSourceCorpusDocument document,
+        ImmutableArray<CorpusObservation> observations)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        RepositoryParameterGuard.RequireInitialized(observations.IsDefault, nameof(observations), "Array must be initialized.");
+        var verdicts = observations.ToImmutableDictionary(
+            static observation => observation.CaseId,
+            static observation => observation.Verdict,
+            StringComparer.Ordinal);
+        return [.. document.Sources.Select(source =>
+        {
+            var methods = document.Methods
+                .Where(method => string.Equals(method.SourceId, source.Id, StringComparison.Ordinal))
+                .ToImmutableArray();
+            var observed = methods
+                .Select(method => verdicts.TryGetValue($"{method.Id}.baseline", out var verdict) ? verdict : CorpusVerdict.SilentUnknown)
+                .ToImmutableArray();
+            return new CorpusSourceCoverage(
+                source.Id,
+                methods.Length,
+                methods.Count(static method => method.Support == CorpusSupport.Supported),
+                observed.Count(static verdict => verdict == CorpusVerdict.Proven),
+                observed.Count(static verdict => verdict == CorpusVerdict.Refuted),
+                observed.Count(static verdict => verdict is CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown));
+        })];
     }
 
     internal static ImmutableArray<string> ValidateWallTime(TimeSpan elapsed)
@@ -833,9 +866,10 @@ internal static class CorpusGate
             return "none";
         }
 
+        // Open-source trees carry source-qualified relative paths
+        // (source-id/path), so same-named files in different sources differ.
         var lineSpan = location.GetMappedLineSpan();
-        var path = Path.GetFileName(lineSpan.Path)
-            .Replace('\\', '/');
+        var path = lineSpan.Path.Replace('\\', '/');
         var start = lineSpan.StartLinePosition;
         var end = lineSpan.EndLinePosition;
         return string.Create(
