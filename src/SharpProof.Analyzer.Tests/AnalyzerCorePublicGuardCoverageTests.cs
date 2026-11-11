@@ -22,7 +22,7 @@ public sealed class AnalyzerCorePublicGuardCoverageTests
     [Test]
     public void AdvisoryConstructorRejectsDefaultVariables()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var error = Assert.Throws<ArgumentException>((Action)(() =>
             _ = new CoreIrAdvisoryInterpreter(ConstantProgram(factory), default)));
         Assert.That(error!.ParamName, Is.EqualTo("variables"));
@@ -31,7 +31,7 @@ public sealed class AnalyzerCorePublicGuardCoverageTests
     [Test]
     public void AdvisoryConstructorAcceptsInitializedEmptyVariables()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var program = ConstantProgram(factory);
         var result = new CoreIrAdvisoryInterpreter(program, []).Run(
             ImmutableDictionary<IrVarId, IntervalValue>.Empty);

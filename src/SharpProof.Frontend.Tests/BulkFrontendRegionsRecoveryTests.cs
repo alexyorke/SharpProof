@@ -40,7 +40,7 @@ public sealed class BulkFrontendRegionsRecoveryTests
             Assert.That(region.Kind, Is.Not.EqualTo(ControlFlowRegionKind.Catch));
         }
         Assert.That(terminal.EnclosingRegion.Kind, Is.EqualTo(ControlFlowRegionKind.Try));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method)!);
         var lowering = RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.False);

@@ -152,7 +152,7 @@ public sealed class RegionFilterEdgeResolverTests
         var graph = ControlFlowGraph.Create(syntax, model, TestContext.CurrentContext.CancellationToken)!;
         var filter = Regions(graph.Root).Single(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Filter));
         var caught = filter.EnclosingRegion!.NestedRegions.Single(region => region is null ? throw new System.ArgumentNullException(nameof(region)) : (region.Kind == ControlFlowRegionKind.Catch));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

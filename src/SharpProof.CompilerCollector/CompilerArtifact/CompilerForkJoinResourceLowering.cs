@@ -28,7 +28,7 @@ internal static class CompilerForkJoinResourceLowering
             { return new(null, "ForkJoinEntryInitializationUnknown"); }
             var declaration = (MethodDeclarationSyntax)child.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken);
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
-            var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), child)
+            var context = new TotalLoweringContext(new IrFactory(), child)
             { CaptureResourceLoopEntries = true };
             var contracts = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || !contracts.Clauses.IsEmpty)

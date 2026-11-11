@@ -1,4 +1,3 @@
-mode: Total
 classification: Exact/None
 entry: b0
 parameter: 0 entry=v0:sbyte[width=8,signed=True] current=v1:sbyte[width=8,signed=True] old=v2:sbyte[width=8,signed=True]

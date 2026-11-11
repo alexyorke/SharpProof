@@ -1,4 +1,3 @@
-mode: Total
 classification: Exact/None
 entry: b0
 parameter: 0 entry=v0:uint[width=32,signed=False] current=v1:uint[width=32,signed=False] old=v2:uint[width=32,signed=False]

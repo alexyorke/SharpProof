@@ -450,7 +450,7 @@ internal sealed class TypedContractLoweringTests
                 }
             }
             """);
-        var binder = new TotalContractBinder(subject.Compilation, new IrFactory(IrExecutionSemantics.Total));
+        var binder = new TotalContractBinder(subject.Compilation, new IrFactory());
         Assert.Throws<ArgumentException>(new Action(() => binder.BindTotal(subject.Context)));
         AssertRejectedBodyRetained(subject);
         Assert.That(subject.Bind().Clauses, Has.Length.EqualTo(1));
@@ -561,7 +561,7 @@ internal sealed class TypedContractLoweringTests
             {
                 method = method.Construct(compilation.GetSpecialType(SpecialType.System_String));
             }
-            var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+            var context = new TotalLoweringContext(new IrFactory(), method);
             return new(compilation, context, ControlFlowGraph.Create(bodySyntax, model)!);
         }
 

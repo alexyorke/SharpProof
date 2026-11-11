@@ -36,7 +36,7 @@ public sealed class NativeSequenceLocalAdmissionTests
 
     private static async Task CheckLocalDefinition(string leaf, bool nested, bool havoc)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var element = leaf switch
         {
             "integer" => factory.IntegerType,

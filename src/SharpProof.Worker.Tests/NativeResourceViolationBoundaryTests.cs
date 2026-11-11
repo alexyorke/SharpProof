@@ -44,7 +44,7 @@ internal sealed partial class NativeResourceContractTests
                 inputs = inputs.SetItem(first, factory.CreateBooleanValue(false));
                 break;
             case "foreign-value":
-                inputs = inputs.SetItem(first, new IrFactory(IrExecutionSemantics.Total).CreateIntegerValue(0));
+                inputs = inputs.SetItem(first, new IrFactory().CreateIntegerValue(0));
                 break;
             case "null-value":
                 inputs = inputs.SetItem(first, null!);
@@ -129,7 +129,7 @@ internal sealed partial class NativeResourceContractTests
     public void ExactArrayByteCandidatesRequireANonnegativeExtentArrayShapeAndCompatibleLayout(
         bool array, int elements, bool incompatible, int? expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) :

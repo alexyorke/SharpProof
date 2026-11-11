@@ -12,7 +12,7 @@ public sealed class NativeFieldRefutationReplayTests
     [Test]
     public async Task FalseCurrentFieldPostconditionReplaysFromNativeEntryModel()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var boxType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "BoxRef");
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), boxType, "field:Value",
             factory.IntegerType, isStatic: false);

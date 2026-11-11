@@ -61,7 +61,7 @@ public sealed class VisualBasicRegionProgramTerminationApiTests
             Assert.That(edge.FinallyRegions, Has.Length.EqualTo(1));
             Assert.That(edge.FinallyRegions.Single().Kind, Is.EqualTo(ControlFlowRegionKind.Finally));
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

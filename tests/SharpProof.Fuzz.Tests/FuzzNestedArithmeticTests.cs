@@ -9,7 +9,7 @@ public sealed class FuzzNestedArithmeticTests
     [Test]
     public async Task NestedTotalDivisionRemainsInsideFiniteIntegerDomain()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.Variable(factory.CreateVariable("x", factory.IntegerType));
         var y = factory.Variable(factory.CreateVariable("y", factory.IntegerType));
         IrTerm nested = x;

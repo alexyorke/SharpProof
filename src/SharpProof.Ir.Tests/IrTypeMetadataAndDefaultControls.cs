@@ -7,11 +7,10 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 internal sealed class IrTypeMetadataAndDefaultControls
 {
-    [TestCase(IrExecutionSemantics.Legacy)]
-    [TestCase(IrExecutionSemantics.Total)]
-    public void FactoryTypeMetadataAndInterningRemainExact(IrExecutionSemantics semantics)
+    [Test]
+    public void FactoryTypeMetadataAndInterningRemainExact()
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var identity = factory.CreateIdentity();
         var reference = factory.GetOrCreateReferenceType(identity, "Widget");
         var sequence = factory.GetOrCreateSequenceType(factory.BooleanType);
@@ -41,7 +40,7 @@ internal sealed class IrTypeMetadataAndDefaultControls
             Assert.That(factory.GetOrCreateIntegerType(64, signed: false), Is.EqualTo(unsigned));
             var integer = factory.GetTypeInfo(factory.IntegerType);
             Assert.That(integer.Kind, Is.EqualTo(IrTypeKind.Integer));
-            Assert.That(integer.Width, Is.EqualTo(semantics == IrExecutionSemantics.Total ? 32 : 0));
+            Assert.That(integer.Width, Is.EqualTo(32));
             Assert.That(integer.Signed, Is.True);
         }
     }
@@ -49,7 +48,7 @@ internal sealed class IrTypeMetadataAndDefaultControls
     [Test]
     public void TotalEvaluationDefaultsPreserveBooleanIntegerAndNullableTypes()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var interpreter = new IrInterpreter(factory);
         var boxed = factory.CreateVariable("boxed", factory.ObjectType);
         var operand = interpreter.Evaluate(factory.Variable(boxed), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(boxed, factory.CreateReferenceValue(factory.ObjectType, new object())));

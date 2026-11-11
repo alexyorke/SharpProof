@@ -9,7 +9,7 @@ public sealed class AllocationStorageBoundaryTests
     [Test]
     public void AnArrayLengthRequiresStorageBeforeAnInstructionCanBeAppended()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
@@ -21,7 +21,7 @@ public sealed class AllocationStorageBoundaryTests
     [Test]
     public void ArrayStorageMustHaveTheActualAllocatedSequenceType()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
         var scalar = factory.CreateVariable("scalar", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -34,7 +34,7 @@ public sealed class AllocationStorageBoundaryTests
     [Test]
     public void ValidOwnedArrayStorageReplaysItsInitializedContents()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var sequence = factory.GetOrCreateSequenceType(factory.IntegerType);
         var array = factory.CreateVariable("array", sequence);
         var builder = new IrProgramBuilder(factory);

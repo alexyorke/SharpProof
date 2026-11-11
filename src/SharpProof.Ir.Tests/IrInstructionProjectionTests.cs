@@ -40,7 +40,7 @@ public sealed class IrInstructionProjectionTests
     [Test]
     public void SnapshotSelectorsFollowCastsAndShareRepeatedLeaves()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var elementType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Element");
         var type = factory.GetOrCreateSequenceType(elementType);
         var old = factory.CreateVariable("old", type);

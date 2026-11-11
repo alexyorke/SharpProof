@@ -11,8 +11,8 @@ public sealed class FuzzFactoryBoundaryTests
     [TestCase(2)]
     public void StructuralCandidatesDoNotRebuildTermsInADifferentFactory(int shape)
     {
-        var source = new IrFactory(IrExecutionSemantics.Total);
-        var destination = new IrFactory(IrExecutionSemantics.Total);
+        var source = new IrFactory();
+        var destination = new IrFactory();
         var x = source.Variable(source.CreateVariable("x", source.IntegerType));
         var y = source.Variable(source.CreateVariable("y", source.IntegerType));
         var sum = source.Binary(IrBinaryOperator.Add, x, y);

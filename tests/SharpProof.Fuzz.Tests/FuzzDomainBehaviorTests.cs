@@ -9,12 +9,11 @@ namespace SharpProof.Fuzz.Test;
 
 internal sealed class FuzzDomainBehaviorTests
 {
-    [TestCase(IrExecutionSemantics.Legacy, false)]
-    [TestCase(IrExecutionSemantics.Total, true)]
-    public void DefinednessRespectsFactoryDivisionSemantics(
-        IrExecutionSemantics semantics, bool expectedDefined)
+    [Test]
+    public void DivisionByZeroIsDefinedInTheTotalDomain()
     {
-        var factory = new IrFactory(semantics);
+        const bool expectedDefined = true;
+        var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
         var formula = factory.Binary(IrBinaryOperator.Equal,
             factory.Binary(IrBinaryOperator.Divide, factory.Integer(1),

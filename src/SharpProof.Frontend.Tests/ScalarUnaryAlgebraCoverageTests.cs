@@ -20,7 +20,7 @@ public sealed class ScalarUnaryAlgebraCoverageTests
         UnaryOperatorKind kind, int inputWidth, int targetWidth, long input,
         long expected, bool isChecked, bool overflow)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var inputType = factory.GetOrCreateIntegerType(inputWidth, true);
         var target = factory.GetOrCreateIntegerType(targetWidth, true);
         var variable = factory.CreateVariable("value", inputType);
@@ -49,7 +49,7 @@ public sealed class ScalarUnaryAlgebraCoverageTests
     [TestCase(false)]
     public void OwnedBooleanNotAlgebraPreservesBooleanResult(bool input)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var rule = CSharpOperationSemantics.ApplyUnaryScalar(factory,
             UnaryOperatorKind.Not, false, factory.Boolean(input), factory.BooleanType);
         Assert.That(rule.Classification.IsExact, Is.True);
@@ -63,7 +63,7 @@ public sealed class ScalarUnaryAlgebraCoverageTests
     public void OwnedRejectedUnaryDomainsReturnTheTypedScalarAbstention(
         UnaryOperatorKind kind, bool booleanOperand)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         IrTerm operand = booleanOperand ? factory.Boolean(true) : factory.Integer(type, 17L);
         var rule = CSharpOperationSemantics.ApplyUnaryScalar(factory, kind, false, operand,

@@ -19,7 +19,7 @@ public sealed class NativeModuleExceptionEvidenceTests
         System.ArgumentNullException.ThrowIfNull(allowed);
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(thrown);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var exit = builder.CreateBlock();

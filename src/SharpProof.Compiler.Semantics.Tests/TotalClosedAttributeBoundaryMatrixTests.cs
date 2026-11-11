@@ -23,7 +23,7 @@ public sealed class TotalClosedAttributeBoundaryMatrixTests
         ArgumentNullException.ThrowIfNull(typeName);
         var compilation = CreateCompilation(typeName, "NonNull");
         var target = GetTarget(compilation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var bound = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());

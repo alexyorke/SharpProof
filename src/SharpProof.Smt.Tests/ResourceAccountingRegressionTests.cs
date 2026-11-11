@@ -90,7 +90,7 @@ public sealed class ResourceAccountingRegressionTests
     public async Task NativeResourceAccountingChargesOnlyTheCurrentQuery()
     {
         const uint queryLimit = 1_000_000;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var operation = factory.CreateOperation("tracked");
         var expensive = CreateTrackedQuery(factory, operation, 256);
         var inexpensive = new VerificationQuery(
@@ -126,7 +126,7 @@ public sealed class ResourceAccountingRegressionTests
     public async Task RepeatedQueriesDoNotHitResourceLimitFromPriorQueries()
     {
         const uint queryLimit = 50_000;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var operation = factory.CreateOperation("tracked");
         var query = CreateTrackedQuery(factory, operation, 256);
         using var backend = new CallableSolverSession(factory,

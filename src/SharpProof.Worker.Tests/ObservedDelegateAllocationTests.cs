@@ -76,7 +76,7 @@ public sealed class ObservedDelegateAllocationTests
             .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
         var creation = model.GetOperation(targetSyntax)!.Descendants().OfType<IDelegateCreationOperation>()
             .First(CSharpOperationSemantics.IsExplicitDelegateCreation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!)
         { Compilation = compilation };
         var builder = new IrProgramBuilder(factory);

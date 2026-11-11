@@ -24,7 +24,7 @@ public sealed class NativeTotalCandidateCoreTests
     public async Task EveryReturnKindRetainsItsActualAdmissionAndAllUncheckedOrdinals(string kind, bool matched)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm returned = kind switch
         {
             "boolean" => factory.Boolean(true),
@@ -96,7 +96,7 @@ public sealed class NativeTotalCandidateCoreTests
     [TestCase(true)]
     public async Task RealContradictionAndExceptionalExitRetainTheirDistinctVacuity(bool exceptional)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("total-module-vacuity");
@@ -285,7 +285,7 @@ public sealed class NativeTotalCandidateCoreTests
 
     private static PassiveCallableCandidate BooleanCandidate(bool satisfied, int count = 1)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("total-module-postcondition");
@@ -300,7 +300,7 @@ public sealed class NativeTotalCandidateCoreTests
         var budgets = new WorkerBudgets();
         Assert.That(budgets.MaximumExpressionDepth, Is.EqualTo(WorkerBudgets.DefaultMaximumExpressionDepth));
         var expected = budgets.MaximumExpressionDepth + (beyond ? 1 : 0);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var builder = new IrProgramBuilder(factory);

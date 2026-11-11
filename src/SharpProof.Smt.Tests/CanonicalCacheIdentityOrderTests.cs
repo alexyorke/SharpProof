@@ -10,7 +10,7 @@ public sealed class CanonicalCacheIdentityOrderTests
     public async Task StringAndArrayCachesAreDistinctInEitherEncodingOrder(bool arrayFirst)
     {
         Assert.That(ReferenceEquals(string.Empty, Array.Empty<int>()), Is.False);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.Cast(factory.ObjectType, factory.String(string.Empty));
         var array = factory.Cast(factory.ObjectType, factory.EmptyArray(factory.GetOrCreateSequenceType(factory.IntegerType)));
         var predicate = factory.Binary(IrBinaryOperator.NotEqual, arrayFirst ? array : text, arrayFirst ? text : array);

@@ -28,7 +28,7 @@ public sealed class FuzzNumericCampaignRegressionTests
         var sources = new StringBuilder();
         foreach (var seed in Enumerable.Range(0, 256).Concat([int.MinValue, int.MaxValue]))
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var generated = new WellSortedIrGenerator(factory, seed).NextArithmeticOrBoolean(3);
             var formula = generated.Term.Type == factory.BooleanType
                 ? generated.Term

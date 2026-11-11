@@ -55,7 +55,7 @@ public sealed class CompilerSpecificationSignatureDomainWorkflowTests
             Assert.That(runtimeMethod.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType)),
                 Is.EqualTo(arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.GetType()))));
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var mapped = CompilerSpecificationScalarDomain.TryMapSignature(factory, method,
             out var parameters, out var resultType, out var integerType);
         using (Assert.EnterMultipleScope())

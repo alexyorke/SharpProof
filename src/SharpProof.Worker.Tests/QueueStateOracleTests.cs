@@ -54,7 +54,7 @@ public sealed class QueueStateOracleTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var model = compilation.GetSemanticModel(tree);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
@@ -130,7 +130,7 @@ public sealed class QueueStateOracleTests
         Assert.That(emitted.Success, Is.True, string.Join(";", emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
             static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);

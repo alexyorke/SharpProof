@@ -11,7 +11,7 @@ internal sealed class IrConstantInitializerControls
     [TestCase(IrTypeKind.Reference)]
     public void RegisteredConstantInitializersReturnTheirExactValue(IrTypeKind kind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm literal = kind switch
         {
             IrTypeKind.Boolean => factory.Boolean(true),

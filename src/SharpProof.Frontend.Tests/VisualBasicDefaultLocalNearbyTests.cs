@@ -42,7 +42,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
             var model = compilation.GetSemanticModel(tree);
             var graph = ControlFlowGraph.Create(tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single(), model)!;
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True, name);
             var lowered = RoslynProgramLowering.LowerCandidate(graph, context);
@@ -76,7 +76,7 @@ public sealed class VisualBasicDefaultLocalNearbyTests
             var model = compilation.GetSemanticModel(tree);
             var graph = ControlFlowGraph.Create(tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single(), model)!;
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var lowered = RoslynProgramLowering.LowerCandidate(graph, new TotalLoweringContext(factory, target));
             Assert.That(lowered.IsExact, Is.False);
             Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedMutation));

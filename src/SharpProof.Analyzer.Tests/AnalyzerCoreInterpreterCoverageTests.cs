@@ -20,7 +20,7 @@ internal sealed class AnalyzerCoreInterpreterCoverageTests
     [TestCase(IrBinaryOperator.GreaterThanOrEqual, 1, 2)]
     public void ComparisonIntervalsContainEveryConcreteResult(IrBinaryOperator operation, int left, int right)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.IntegerType);
         var second = factory.CreateVariable("second", factory.IntegerType);
         var output = factory.CreateVariable("output", factory.BooleanType);
@@ -58,7 +58,7 @@ internal sealed class AnalyzerCoreInterpreterCoverageTests
     [TestCase("first", "second")]
     public void StringEqualityNullnessContainsTheConcreteResult(string? left, string? right)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var first = factory.CreateVariable("first", factory.StringType);
         var second = factory.CreateVariable("second", factory.StringType);
         var output = factory.CreateVariable("output", factory.BooleanType);

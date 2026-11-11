@@ -75,7 +75,7 @@ internal sealed class DictionaryInitializationReplayTests
     private static (IrFactory Factory, IrHavocRequest Request) Request(string primitive, IrHavocOrigin origin, bool wrongType)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", wrongType ? factory.IntegerType : factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

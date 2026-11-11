@@ -36,7 +36,7 @@ public sealed class ContractIntrinsicInterceptionContextTests
     {
         var compilation = CreateCompilation(featureEnabled, companion);
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Identity").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binder = new TotalContractBinder(compilation, factory);
         var binding = binder.BindTotal(new TotalLoweringContext(factory, method));
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());

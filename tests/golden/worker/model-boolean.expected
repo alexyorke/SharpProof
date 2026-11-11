@@ -1,2 +1,2 @@
-model: Total False outcome=Refuted
-model: Total True outcome=Refuted
+model: False outcome=Refuted
+model: True outcome=Refuted

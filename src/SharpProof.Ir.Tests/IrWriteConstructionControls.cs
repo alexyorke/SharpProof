@@ -8,7 +8,7 @@ public sealed class IrWriteConstructionControls
     [Test]
     public void EffectWritePreservesItsEmptyStoreProjectionAndRegionDiagnostic()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var invalid = Assert.Throws<ArgumentException>((Action)(() =>
@@ -32,7 +32,7 @@ public sealed class IrWriteConstructionControls
     [Test]
     public void ElementStorePreservesExactOperandReferencesAndNullDiagnostic()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.Variable(factory.CreateVariable("array", factory.GetOrCreateSequenceType(factory.IntegerType)));
@@ -58,7 +58,7 @@ public sealed class IrWriteConstructionControls
     [Test]
     public void FieldStorePreservesExactOperandReferencesAndNullDiagnostic()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var receiver = factory.Variable(factory.CreateVariable("owner", factory.ObjectType));

@@ -18,7 +18,7 @@ public sealed class NativeResourceAllocationTests
 
     private static CompilerTotalCallablePreparation Owner(bool hasSize = false)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         builder.Return(block, factory.CreateOperation("return"));

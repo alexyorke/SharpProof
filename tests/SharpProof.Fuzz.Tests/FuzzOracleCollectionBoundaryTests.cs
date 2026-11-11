@@ -76,7 +76,7 @@ public sealed class FuzzOracleCollectionBoundaryTests
     {
         var frontend = FrontendDifferentialOracle.Compare(
             new SmallCSharpCaseGenerator(12345).Next(), cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var finite = await FiniteDomainSmtDifferentialOracle.CompareAsync(factory, factory.Boolean(true), cancellationToken: TestContext.CurrentContext.CancellationToken);
         var partial = await PartialTermSmtDifferentialOracle.CompareAsync(factory,
             PartialTermSmtCaseGenerator.Create(factory, 12345), cancellationToken: TestContext.CurrentContext.CancellationToken);

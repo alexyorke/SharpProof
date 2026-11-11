@@ -72,10 +72,10 @@ public sealed class ResourceExpressionOwnershipTests
     }
 
     [Test]
-    public void UnsupportedIntegerDomainsDoNotBorrowInt32Bounds()
+    public void UnsupportedDomainsDoNotBorrowInt32Bounds()
     {
         var factory = new IrFactory();
-        foreach (var type in new[] { factory.IntegerType, factory.BooleanType, factory.GetOrCreateIntegerType(32, false), factory.GetOrCreateIntegerType(16, true) })
+        foreach (var type in new[] { factory.BooleanType, factory.GetOrCreateIntegerType(32, false), factory.GetOrCreateIntegerType(16, true) })
         {
             var callable = Callable(factory, type);
             Action decode = () => Decode(Input(0, ResourceInputKind.NonNegativeScalar, int.MaxValue), callable);

@@ -111,7 +111,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
             Assert.That(read.Type!.SpecialType, Is.EqualTo(SpecialType.System_Int32));
             Assert.That(SymbolEqualityComparer.Default.Equals(read.Local.ContainingSymbol, method), Is.True);
             Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-            var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+            var context = new TotalLoweringContext(new IrFactory(), method);
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             var runtime = new AssemblyLoadContext(name, isCollectible: true);
             image.Position = 0;

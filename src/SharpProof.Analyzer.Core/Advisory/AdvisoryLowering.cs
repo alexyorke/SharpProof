@@ -58,7 +58,7 @@ internal static class AdvisoryLowering
         if (!TotalSourceCallSession.IsBodyDeclaration(declaration))
         { return (null, "UnsupportedCallable"); }
         var paths = documents.Paths;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
+        var context = new TotalLoweringContext(new IrFactory(), method,
             tree => paths.TryGetValue(tree, out var path) ? path : throw new InvalidOperationException("The syntax tree is not part of the compilation."));
         FrontendProgramLoweringResult? lowering;
         ImmutableArray<BoundTotalContractClause> clauses = [];

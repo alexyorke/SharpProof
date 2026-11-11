@@ -1600,7 +1600,7 @@ internal sealed class ContractBinderTests
             System.ArgumentNullException.ThrowIfNull(methodName);
             System.ArgumentNullException.ThrowIfNull(typeName);
             var method = GetMethod(typeName, methodName);
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             return new TotalContractBinder(Compilation, factory).BindTotal(new TotalLoweringContext(factory, method));
         }
 

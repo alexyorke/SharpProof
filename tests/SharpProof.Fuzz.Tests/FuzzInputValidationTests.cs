@@ -37,20 +37,17 @@ public sealed class FuzzInputValidationTests
     }
 
     [Test]
-    public void PartialTermGeneratorRequiresTotalFactory()
+    public void PartialTermGeneratorRequiresAFactory()
     {
         Assert.That(Throws<ArgumentNullException>(() =>
             PartialTermSmtCaseGenerator.Create(null!, 12345))!.ParamName,
             Is.EqualTo("factory"));
-        Assert.That(Throws<ArgumentException>(() =>
-            PartialTermSmtCaseGenerator.Create(new IrFactory(IrExecutionSemantics.Legacy),
-                12345))!.ParamName, Is.EqualTo("factory"));
     }
 
     [Test]
     public void PartialTermOracleRejectsInvalidPublicInputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var generated = PartialTermSmtCaseGenerator.Create(factory, 12345);
 
         Assert.That(ThrowsAsync<ArgumentNullException>(async () =>
@@ -78,7 +75,7 @@ public sealed class FuzzInputValidationTests
     [TestCase(2)]
     public void PartialTermOracleRejectsIncompleteOrMistypedPublicAssignments(int invalidKind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var generated = PartialTermSmtCaseGenerator.Create(factory, 12345);
         var scenario = generated.Scenarios[0];
         var variable = scenario.Keys.OrderBy(item => item.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(item)) : (item.Value)).First();
@@ -103,7 +100,7 @@ public sealed class FuzzInputValidationTests
     [Test]
     public void StructuralShrinkerRejectsMissingInputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var term = factory.Boolean(true);
         Func<IrTerm, CancellationToken, Task<bool>> preserve =
             static (_, _) => Task.FromResult(false);

@@ -78,7 +78,7 @@ public sealed class InstructionFactsCoverageTests
     [Test]
     public void AllocationReadsItsLengthBeforeInitialElements()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);

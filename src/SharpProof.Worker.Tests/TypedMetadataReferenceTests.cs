@@ -37,7 +37,7 @@ public sealed class TypedMetadataReferenceTests
             $"using SharpProof.Attributes; public static class Library {{ [return: Positive] public static int Target([{attribute}] {type} value) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var binder = new TotalContractBinder(subject.Compilation, factory);
         var binding = binder.BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -70,7 +70,7 @@ public sealed class TypedMetadataReferenceTests
             $"using SharpProof.Attributes; public static class Library {{ public static int Target([NonNull] {type} value) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var binding = new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.True, binding.Failure.ToString());
@@ -93,7 +93,7 @@ public sealed class TypedMetadataReferenceTests
             $"using SharpProof.Attributes; public static class Library {{ public static int Target({parameters}) => 1; }}",
             "public static class Subject { public static int Target(int value) => value; }", includeSharpProofReference: true);
         var method = subject.Compilation.GetTypeByMetadataName("Library")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, method);
         var binding = new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.EqualTo(success));
@@ -103,7 +103,7 @@ public sealed class TypedMetadataReferenceTests
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() =>
             new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(context, cancellation.Token)));
-        var foreignContext = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method);
+        var foreignContext = new TotalLoweringContext(new IrFactory(), method);
         Assert.Throws<ArgumentException>(new Action(() =>
             new TotalContractBinder(subject.Compilation, factory).BindTotalMetadataRequires(foreignContext, cancellationToken: TestContext.CurrentContext.CancellationToken)));
     }
@@ -331,7 +331,7 @@ public sealed class MetadataClosedAttributeEvidenceTests
         var method = compilation.GetTypeByMetadataName("MetadataTarget")!.GetMembers("Read").OfType<IMethodSymbol>().Single();
         if (mode == "duplicate")
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
             Assert.That(binding.Clauses, Is.Empty);
@@ -456,7 +456,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         var body = new CompilerTotalIlBodyProvider(compilation, null).Resolve(method, TestContext.CurrentContext.CancellationToken);
         Assert.That(body, Is.Not.Null);
         Assert.That(body!.ParameterAttributes, Has.Length.EqualTo(2));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.IsSuccess, Is.True);
         Assert.That(binding.Clauses, Has.Length.EqualTo(2));
@@ -487,7 +487,7 @@ public sealed class MetadataClosedAttributeEvidencePairingTests
         using var directory = new TempDirectory("sharpproof-evidence-pairing-");
         var (compilation, method, _) = CreateSubject(directory.FullName,
             "using SharpProof.Attributes; public static class Library { public static int Target([Positive, InRange(10L, 1L)] int value) => value; }");
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var binding = new TotalContractBinder(compilation, factory).BindTotalMetadataRequires(new(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(binding.Failure, Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
         Assert.That(binding.Clauses, Is.Empty);

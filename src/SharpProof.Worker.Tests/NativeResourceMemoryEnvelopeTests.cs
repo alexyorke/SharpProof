@@ -9,7 +9,7 @@ internal sealed partial class NativeResourceContractTests
     [Test]
     public void EnvelopeRejectsAReferenceReadBeforeItsAllocation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -26,7 +26,7 @@ internal sealed partial class NativeResourceContractTests
     [Test]
     public void EnvelopeAcceptsADominatingAllocationFromAnotherBlock()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var exit = builder.CreateBlock();
@@ -43,7 +43,7 @@ internal sealed partial class NativeResourceContractTests
     [Test]
     public void EnvelopeRejectsAnOversizedControlFlowGraph()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         for (var index = 0; index <= ResourceMemoryTrace.MaximumEvents / 4; index++)
         { builder.Return(builder.CreateBlock(), factory.CreateOperation()); }
@@ -59,7 +59,7 @@ internal sealed partial class NativeResourceContractTests
     public void MemoryEnvelopeRejectsExhaustedAnalysisBudgets(string budget)
     {
         ArgumentNullException.ThrowIfNull(budget);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var value = factory.CreateVariable("value", factory.IntegerType);
@@ -112,7 +112,7 @@ internal sealed partial class NativeResourceContractTests
     public void MemoryEnvelopeHavocPreservesOnlyScalarOwnership(string shape, bool admitted)
     {
         ArgumentNullException.ThrowIfNull(shape);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var array = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -316,7 +316,7 @@ internal sealed partial class NativeResourceContractTests
     public void CrossBlockOriginsRejectMissingOrRedefinedAllocations(string mode)
     {
         ArgumentNullException.ThrowIfNull(mode);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var allocated = builder.CreateBlock();

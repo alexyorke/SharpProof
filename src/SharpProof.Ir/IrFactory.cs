@@ -29,21 +29,14 @@ internal sealed class IrFactory
     private readonly long _scope;
     private int _identityCount;
 
-    public IrFactory() : this(IrExecutionSemantics.Legacy) { }
-
-    public IrFactory(IrExecutionSemantics semantics)
+    public IrFactory()
     {
-        Semantics = ArgumentNullGuard.RequireDefined(semantics, nameof(semantics));
         _scope = Interlocked.Increment(ref s_nextScope);
         BooleanType = CreateBuiltInType("bool", IrBooleanTypeShape.Instance);
-        IntegerType = semantics == IrExecutionSemantics.Total
-            ? GetOrCreateIntegerType(32, signed: true)
-            : CreateBuiltInType("int", IrIntegerTypeShape.Instance);
+        IntegerType = GetOrCreateIntegerType(32, signed: true);
         StringType = CreateBuiltInType("string", IrNullableTypeShape.String);
         ObjectType = CreateBuiltInType("object", IrNullableTypeShape.Reference);
     }
-
-    public IrExecutionSemantics Semantics { get; }
 
     public IrTypeId BooleanType
     {
@@ -199,7 +192,7 @@ internal sealed class IrFactory
     {
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closureFrameTypes.ContainsKey(type))
             { throw new ArgumentException("A certificate requires a Total nominal reference type.", nameof(type)); }
             _closedSealedReferenceTypes.Add(type);
@@ -223,7 +216,7 @@ internal sealed class IrFactory
         ResourceAllocationShape.Object(fields);
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference ||
                 !_closedClassReferenceBases.TryGetValue(type, out var parent) || parent.HasValue ||
                 _interfaceReferenceTypes.Contains(type) || _delegateReferenceTypes.Contains(type) ||
@@ -252,7 +245,7 @@ internal sealed class IrFactory
         ResourceAllocationShape.Object(fields);
         lock (_gate)
         {
-            if (fields.IsEmpty || Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (fields.IsEmpty || type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closedSealedReferenceTypes.Contains(type) || _implementedReferenceInterfaces.ContainsKey(type) ||
                 _interfaceReferenceTypes.Contains(type) || _closedClassReferenceBases.ContainsKey(type) || _delegateReferenceTypes.Contains(type))
             { throw new ArgumentException("A closure frame requires a Total nominal frame and nonempty storage fields.", nameof(type)); }
@@ -277,7 +270,7 @@ internal sealed class IrFactory
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference ||
                 _interfaceReferenceTypes.Contains(type) || _closedClassReferenceBases.ContainsKey(type) || _closureFrameTypes.ContainsKey(type))
             { throw new ArgumentException("A delegate certificate requires a Total nominal delegate type.", nameof(type)); }
@@ -299,7 +292,7 @@ internal sealed class IrFactory
     {
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _interfaceReferenceTypes.Contains(type) || _delegateReferenceTypes.Contains(type) || _closureFrameTypes.ContainsKey(type) ||
                 baseType.HasValue && (baseType == type || baseType == ObjectType ||
                     !_closedClassReferenceBases.ContainsKey(baseType.Value)))
@@ -323,7 +316,7 @@ internal sealed class IrFactory
     {
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType ||
+            if (type == ObjectType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closedClassReferenceBases.ContainsKey(type) || _delegateReferenceTypes.Contains(type) || _closureFrameTypes.ContainsKey(type))
             { throw new ArgumentException("An interface certificate requires a Total nominal interface.", nameof(type)); }
             _interfaceReferenceTypes.Add(type);
@@ -343,7 +336,7 @@ internal sealed class IrFactory
     {
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || type == ObjectType || type == interfaceType ||
+            if (type == ObjectType || type == interfaceType ||
                 GetTypeInfoCore(type, nameof(type)).Kind != IrTypeKind.Reference || _closureFrameTypes.ContainsKey(type) || !_interfaceReferenceTypes.Contains(interfaceType))
             { throw new ArgumentException("An implemented interface requires certified nominal views.", nameof(interfaceType)); }
             if (!_implementedReferenceInterfaces.TryGetValue(type, out var interfaces))
@@ -693,7 +686,7 @@ internal sealed class IrFactory
     {
         lock (_gate)
         {
-            if (Semantics != IrExecutionSemantics.Total || GetTypeInfo(type).Kind != IrTypeKind.Sequence)
+            if (GetTypeInfo(type).Kind != IrTypeKind.Sequence)
             { throw new ArgumentException("An empty array requires a Total sequence type.", nameof(type)); }
             return Intern(new StructuralKey(IrTermKind.EmptyArray, type.Value), type,
                 static (id, valueType) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : valueType.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(valueType)) : (new IrEmptyArrayTerm(id, valueType)));

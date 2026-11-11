@@ -25,8 +25,6 @@ internal sealed class NativeCallableBackend : ISmtBackend, IDisposable
         ArgumentNullGuard.NotNull(query, nameof(query));
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
-        if (query.Factory.Semantics != IrExecutionSemantics.Total)
-        { return Task.FromResult(BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding)); }
         if (!ReferenceEquals(query.Factory, _factory))
         {
             RetireSession();

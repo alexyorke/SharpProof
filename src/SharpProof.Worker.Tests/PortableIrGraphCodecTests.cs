@@ -15,7 +15,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void CompleteObjectStorageSurvivesPortableRoundTrip()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "StoredObject");
         factory.RegisterClosedClassReferenceType(type, null);
         factory.RegisterObjectStorageType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
@@ -34,7 +34,6 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(JsonSerializer.SerializeToUtf8Bytes(second, WorkerProtocolJson.Options), Is.EqualTo(bytes));
     }
 
-    [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
@@ -43,15 +42,13 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(6)]
     public void CompleteObjectStorageRejectsMalformedRows(int kind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "StoredObject");
         factory.RegisterClosedClassReferenceType(type, null);
         var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(factory.CreateVariable("object", type))], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
         var row = kind == 6 ? graph.Types[0] : graph.Types.Single(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Name == "StoredObject");
         var rowIndex = graph.Types.IndexOf(row);
         row = row with { ObjectStorageFields = kind == 1 ? [ResourceStorageKind.Unspecified] : [] };
-        if (kind == 0)
-        { graph = graph with { Semantics = IrExecutionSemantics.Legacy }; }
         if (kind == 2)
         { row = row with { ClosedClassBase = null }; }
         if (kind == 3)
@@ -67,7 +64,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void ClosureFrameStorageSurvivesPortableRoundTrip()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         factory.RegisterClosureFrameType(type, [ResourceStorageKind.Word32, ResourceStorageKind.Reference]);
         var target = factory.CreateVariable("frame", type);
@@ -87,7 +84,6 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(JsonSerializer.SerializeToUtf8Bytes(second.Graph, WorkerProtocolJson.Options), Is.EqualTo(bytes));
     }
 
-    [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
@@ -96,7 +92,7 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(6)]
     public void ClosureFrameStorageRejectsNonCanonicalRows(int kind)
     {
-        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         var target = factory.CreateVariable("frame", type);
         var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(target)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
@@ -118,7 +114,7 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void DelegateCertificatesRoundTripWithFreshAllocationTypes()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
         factory.RegisterDelegateReferenceType(type);
         var target = factory.CreateVariable("target", type);
@@ -137,14 +133,13 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(JsonSerializer.SerializeToUtf8Bytes(second.Graph, WorkerProtocolJson.Options), Is.EqualTo(bytes));
     }
 
-    [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
     [TestCase(3)]
     [TestCase(4)]
     public void DelegateCertificatesRejectNonCanonicalTypeRows(int kind)
     {
-        var factory = new IrFactory(kind == 0 ? IrExecutionSemantics.Legacy : IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Delegate");
         var target = factory.CreateVariable("target", type);
         var graph = PortableIrGraphCodec.Encode(factory, null, [factory.Variable(target)], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken).Graph;
@@ -227,7 +222,7 @@ public sealed class PortableIrGraphCodecTests
     {
         Assert.That((int)IrExceptionKind.Unknown, Is.EqualTo(6));
         Assert.That((int)IrExceptionKind.Explicit, Is.EqualTo(7));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var exceptional = builder.CreateBlock();
@@ -281,7 +276,7 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots, variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var totalFactory = new IrFactory(IrExecutionSemantics.Total);
+        var totalFactory = new IrFactory();
         var empty = totalFactory.EmptyArray(totalFactory.GetOrCreateSequenceType(totalFactory.IntegerType));
         var encodedEmpty = PortableIrGraphCodec.Encode(totalFactory, null, [empty], variables: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var decodedEmpty = PortableIrGraphCodec.Decode(encodedEmpty.Graph, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -605,7 +600,6 @@ public sealed class PortableIrGraphCodecTests
             WorkerProtocolJson.Options).ToImmutableArray();
         var hash = Convert.ToHexString(SHA256.HashData(bytes.AsSpan()));
 
-        Assert.That(encoded.Graph.Semantics, Is.EqualTo(IrExecutionSemantics.Legacy));
         Assert.That(encoded.Graph.Operations.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.SourceSpan)), Has.All.Null);
         Assert.That(encoded.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin)),
             Has.All.EqualTo(IrHavocOrigin.Approximation));
@@ -613,10 +607,9 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(
             hash,
             Is.EqualTo(
-                "3DAAF8FCCFCD144CF735A4ECEEA0B078B414CC404E203A04BB8D24A6FE49AE29"));
+                "72F8429926969F9FB2C389E7ED5AF80F96B02BA647D941488A68BC2C0B5C3F03"));
 
         var previous = JsonNode.Parse(bytes.AsSpan())!;
-        previous.AsObject().Remove("semantics");
         foreach (var operation in previous["operations"]!.AsArray())
         {
             operation!.AsObject().Remove("sourceSpan");
@@ -630,7 +623,7 @@ public sealed class PortableIrGraphCodecTests
         }
         var previousBytes = JsonSerializer.SerializeToUtf8Bytes(previous, WorkerProtocolJson.Options).ToImmutableArray();
         Assert.That(Convert.ToHexString(SHA256.HashData(previousBytes.AsSpan())),
-            Is.EqualTo("369E597B3404366C0029C4B06E0C21DFC18C951557107EC703AE574AC483F51F"));
+            Is.EqualTo("EFC4043E5A43CBE7CBA351B9D49FB9859ED215964463F768BFF56AA5F7073431"));
         TestContext.Progress.WriteLine($"Canonical wire: {bytes.Length} bytes; previous {previousBytes.Length}; " +
             $"{encoded.Graph.Types.Length} types; {encoded.Graph.Terms.Length} terms.");
 

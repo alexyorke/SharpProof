@@ -12,7 +12,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void ExhaustedMarkerReplayDoesNotPublishPartialStates()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, assignment) = Program(factory, boolean: true);
         var interpreter = new CoreIrAdvisoryInterpreter(program, [value]);
         var rejected = interpreter.Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
@@ -34,7 +34,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [TestCase(65536, -1)]
     public void InvalidWorkArgumentsAreRejectedBeforePublishingStates(int termWork, int syntheticEdges)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
@@ -44,7 +44,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void AnOversizedMarkerRequestIsRejectedBeforePublishingStates()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, assignment) = Program(factory, boolean: true);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty,
@@ -54,7 +54,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void DuplicateTrackedVariablesAreRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value, value])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty), "variable budget/ownership");
@@ -63,9 +63,9 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void ForeignFactoryVariableIsRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, _, _) = Program(factory);
-        var foreignFactory = new IrFactory(IrExecutionSemantics.Total);
+        var foreignFactory = new IrFactory();
         var foreign = foreignFactory.CreateVariable("foreign", foreignFactory.IntegerType);
         Rejected(new CoreIrAdvisoryInterpreter(program, [foreign])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty), "variable ownership");
@@ -74,7 +74,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void InitialFactForAnUntrackedVariableIsRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory);
         var outside = factory.CreateVariable("outside", factory.IntegerType);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value])
@@ -85,7 +85,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void AnInitialScalarOutsideItsTypeRangeIsRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(value, IntervalValue.Constant(long.MaxValue))),
@@ -95,7 +95,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void MarkerFromAnotherRealProgramIsRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory, boolean: true);
         var (_, _, foreignMarker) = Program(factory, boolean: true);
         Rejected(new CoreIrAdvisoryInterpreter(program, [value])
@@ -105,7 +105,7 @@ public sealed class AnalyzerCoreAdmissionCoverageTests
     [Test]
     public void AProgramTargetMissingFromTheTrackedSetRemainsAnExplicitGap()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var (program, value, _) = Program(factory);
         var result = new CoreIrAdvisoryInterpreter(program, [])
             .Run(ImmutableDictionary<IrVarId, IntervalValue>.Empty);

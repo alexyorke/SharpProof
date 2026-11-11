@@ -77,11 +77,10 @@ public sealed class TotalProgramAliasSourceReplayTests
             var actualValue = actualType.GetMethod("Target0", BindingFlags.Public | BindingFlags.Static)!
                 .Invoke(null, arguments.ToArray());
             Assert.That(actualValue, Is.EqualTo(expected));
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, declared);
             var lowering = RoslynProgramLowering.LowerCandidate(
                 ControlFlowGraph.Create(syntax, model)!, context, TestContext.CurrentContext.CancellationToken);
-            Assert.That(factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.Abstentions, Is.Empty);
             Assert.That(lowering.Program.Factory, Is.SameAs(factory));

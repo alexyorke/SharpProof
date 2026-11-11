@@ -22,7 +22,6 @@ internal static partial class PortableIrGraphCodec
             IsComplete(BinaryOperators),
             IsComplete(HavocKinds),
             IsComplete(PortableIrWireCatalog.HavocOrigins),
-            IsComplete(PortableIrWireCatalog.ExecutionSemantics),
             IsComplete(PortableIrWireCatalog.ExceptionKinds)
         ).All(static complete => complete);
 
@@ -383,7 +382,6 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             var graph = new PortableIrGraph
             {
-                Semantics = _factory.Semantics,
                 HasProgram = _program != null,
                 Types = _types.Rows,
                 Identities = _identities.Rows,
@@ -516,7 +514,7 @@ internal static partial class PortableIrGraphCodec
         PortableIrGraph _graph,
         CancellationToken _cancellationToken)
     {
-        private readonly IrFactory _factory = new((_graph ?? throw new System.ArgumentNullException(nameof(_graph))).Semantics);
+        private readonly IrFactory _factory = _graph is null ? throw new System.ArgumentNullException(nameof(_graph)) : new();
         private readonly ImmutableHashSet<IrMemberId>.Builder _distinctMembers = ImmutableHashSet.CreateBuilder<IrMemberId>();
         private readonly ImmutableHashSet<IrId>.Builder _distinctTerms = ImmutableHashSet.CreateBuilder<IrId>();
         private readonly ImmutableList<IrTypeId>.Builder _types = ImmutableList.CreateBuilder<IrTypeId>();
@@ -614,17 +612,17 @@ internal static partial class PortableIrGraphCodec
             _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
-            Require(!row.ClosedSealedReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference,
+            Require(!row.ClosedSealedReference || row.Kind == IrTypeKind.Reference,
                 "Only Total nominal reference types may carry closed sealed certificates.");
-            Require(!row.DelegateReference || _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+            Require(!row.DelegateReference || row.Kind == IrTypeKind.Reference &&
                 !row.InterfaceReference && row.ClosedClassBase == null,
                 "Only Total nominal delegates may carry delegate certificates.");
-            Require(row.ClosureFrameFields is null || !row.ClosureFrameFields.Value.IsDefault && _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+            Require(row.ClosureFrameFields is null || !row.ClosureFrameFields.Value.IsDefault && row.Kind == IrTypeKind.Reference &&
                 !row.InterfaceReference && !row.DelegateReference && !row.ClosedSealedReference && row.ClosedClassBase == null &&
                 row.ImplementedInterfaces is null && row.ClosureFrameFields.Value.Length is > 0 and <= ResourceAllocationShape.MaximumFields &&
                 row.ClosureFrameFields.Value.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
                 "Only Total nominal closure frames may carry valid storage fields.");
-            Require(row.ObjectStorageFields is null || !row.ObjectStorageFields.Value.IsDefault && _graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference &&
+            Require(row.ObjectStorageFields is null || !row.ObjectStorageFields.Value.IsDefault && row.Kind == IrTypeKind.Reference &&
                 !row.InterfaceReference && !row.DelegateReference && row.ClosureFrameFields is null &&
                 row.ClosedClassBase == -1 && row.ObjectStorageFields.Value.Length <= ResourceAllocationShape.MaximumFields &&
                 row.ObjectStorageFields.Value.All(static storage => storage != ResourceStorageKind.Unspecified && Enum.IsDefined(typeof(ResourceStorageKind), storage)),
@@ -650,13 +648,13 @@ internal static partial class PortableIrGraphCodec
             { _factory.RegisterDelegateReferenceType(_types[index]); }
             if (row.InterfaceReference)
             {
-                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !row.ClosedSealedReference && row.ClosedClassBase == null,
+                Require(row.Kind == IrTypeKind.Reference && !row.ClosedSealedReference && row.ClosedClassBase == null,
                     "Only Total nominal interfaces may carry interface certificates.");
                 _factory.RegisterInterfaceReferenceType(_types[index]);
             }
             if (row.ClosedClassBase.HasValue)
             {
-                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && row.ClosedClassBase >= -1,
+                Require(row.Kind == IrTypeKind.Reference && row.ClosedClassBase >= -1,
                     "Only Total nominal reference types may carry class certificates.");
                 var parent = row.ClosedClassBase == -1 ? (IrTypeId?)null : DecodeType(row.ClosedClassBase.Value, depth + 1);
                 Require(!parent.HasValue || _factory.TryGetClosedClassReferenceBase(parent.Value, out _),
@@ -667,7 +665,7 @@ internal static partial class PortableIrGraphCodec
             { _factory.RegisterObjectStorageType(_types[index], storage); }
             if (row.ImplementedInterfaces is { } implementedInterfaces)
             {
-                Require(_graph.Semantics == IrExecutionSemantics.Total && row.Kind == IrTypeKind.Reference && !implementedInterfaces.IsDefault && implementedInterfaces.Length is > 0 and <= 128,
+                Require(row.Kind == IrTypeKind.Reference && !implementedInterfaces.IsDefault && implementedInterfaces.Length is > 0 and <= 128,
                     "Implemented interface metadata requires a bounded nominal reference type.");
                 var previous = -1;
                 foreach (var implemented in implementedInterfaces)

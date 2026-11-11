@@ -9,9 +9,9 @@ public sealed class ArgumentNullGuardBoundaryTests
         var optionsError = Assert.Throws<ArgumentNullException>(
             (Action)(() =>
             {
-                _ = new CallableSolverSession(new IrFactory(IrExecutionSemantics.Total), null!);
+                _ = new CallableSolverSession(new IrFactory(), null!);
             }));
-        using var backend = new CallableSolverSession(new IrFactory(IrExecutionSemantics.Total), new IrSmtBackendOptions());
+        using var backend = new CallableSolverSession(new IrFactory(), new IrSmtBackendOptions());
         var queryError = Assert.Throws<ArgumentNullException>(
             (Action)(() =>
             {

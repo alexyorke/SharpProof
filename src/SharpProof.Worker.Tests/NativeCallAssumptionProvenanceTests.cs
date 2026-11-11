@@ -13,7 +13,7 @@ public sealed class NativeCallAssumptionProvenanceTests
     [TestCase(false)]
     public async Task ActualAcyclicAssumptionsRemainConditionalCallEvidence(bool assumed)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         PassiveParameterBinding Parameter(string name)
         {
             System.ArgumentNullException.ThrowIfNull(name);

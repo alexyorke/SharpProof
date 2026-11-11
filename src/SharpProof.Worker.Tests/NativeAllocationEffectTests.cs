@@ -663,8 +663,8 @@ internal sealed class NativeAllocationEffectTests
     public void AllocationEventsRequireAnOwnedReferenceTypeAndSite(string mutation)
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
+        var foreign = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var type = mutation == "scalar-type" ? factory.IntegerType : mutation == "foreign-type" ? foreign.ObjectType : factory.ObjectType;
@@ -742,8 +742,8 @@ internal sealed class NativeAllocationEffectTests
     [Test]
     public void AllocationTargetsRequireMatchingOwnedReferenceStorage()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
+        var foreign = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation("allocation");

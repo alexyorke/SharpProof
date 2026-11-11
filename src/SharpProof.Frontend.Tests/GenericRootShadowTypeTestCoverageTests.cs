@@ -35,7 +35,7 @@ public sealed class GenericRootShadowTypeTestCoverageTests
             var operation = (IIsTypeOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
             Assert.That(CSharpOperationSemantics.OpaqueTypeTestOperand(operation), Is.SameAs(operation.ValueOperand));
             Assert.That(CSharpOperationSemantics.OpaqueTypeTestMayAllocate(operation, compilation), Is.True);
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, method);
             var graph = ControlFlowGraph.Create(syntax, model)!;
             var shadow = RoslynProgramLowering.LowerShadowSourceBody(graph, context, static _ => true, default);

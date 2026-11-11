@@ -11,7 +11,7 @@ public sealed class OwnedIrStructuralCandidateTests
     [TestCaseSource(nameof(NestedShapes))]
     public void OwnedNestedCandidatesRemainDeterministicTypedAndReplayable(string shape, bool flagValue)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var number = factory.CreateVariable("number", factory.IntegerType);
         var index = factory.CreateVariable("index", factory.IntegerType);
@@ -85,7 +85,7 @@ public sealed class OwnedIrStructuralCandidateTests
     [Test]
     public void OriginalOwnedStringSelectionIsRejectedAsASequenceAccessInput()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var text = factory.CreateVariable("text", factory.StringType);
         var other = factory.CreateVariable("other", factory.StringType);

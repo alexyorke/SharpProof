@@ -23,7 +23,7 @@ public sealed class BulkCompilerChildGuardCoverageTests
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = (IIsTypeOperation)model.GetOperation(syntax.ExpressionBody!.Expression)!;
         Assert.That(CSharpOperationSemantics.OpaqueTypeTestOperand(operation), Is.SameAs(operation.ValueOperand));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");

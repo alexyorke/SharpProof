@@ -23,7 +23,7 @@ public sealed class IrCSharpDifferentialOracleTests
             var result = oracle.Compare(generated.Term, generated.Variables);
             Assert.That(
                 result.Status,
-                Is.EqualTo(DifferentialStatus.Agreement),
+                Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined),
                 $"case {index}: {result.Detail}; term " +
                 new IrPrinter(factory).Print(generated.Term));
         }
@@ -202,18 +202,11 @@ public sealed class IrCSharpDifferentialOracleTests
         {
             Assert.That(value.Status, Is.EqualTo(DifferentialStatus.Agreement));
             Assert.That(value.Interpreted.Value!.Integer, Is.EqualTo(17));
-            Assert.That(
-                outOfRange.Status,
-                Is.EqualTo(DifferentialStatus.Agreement));
-            Assert.That(
-                outOfRange.Interpreted.Exception!.Kind,
-                Is.EqualTo(IrExceptionKind.IndexOutOfRange));
-            Assert.That(
-                nullReceiver.Status,
-                Is.EqualTo(DifferentialStatus.Agreement));
-            Assert.That(
-                nullReceiver.Interpreted.Exception!.Kind,
-                Is.EqualTo(IrExceptionKind.NullReference));
+            // Total access reads the element default; C# faults.
+            Assert.That(outOfRange.Status, Is.EqualTo(DifferentialStatus.Undefined));
+            Assert.That(outOfRange.Interpreted.Value!.Integer, Is.Zero);
+            Assert.That(nullReceiver.Status, Is.EqualTo(DifferentialStatus.Undefined));
+            Assert.That(nullReceiver.Interpreted.Value!.Integer, Is.Zero);
         }
     }
 
@@ -267,8 +260,8 @@ public sealed class IrCSharpDifferentialOracleTests
         IrValue interpreted = factory.CreateSequenceValue(
             sequenceType,
             [factory.CreateIntegerValue(1), factory.CreateIntegerValue(1)]);
-        object actual = new long[] { 1, 1 };
-        var runtimeType = typeof(long[]);
+        object actual = new int[] { 1, 1 };
+        var runtimeType = typeof(int[]);
 
         for (var depth = 0; depth < sharedDepth; depth++)
         {
@@ -289,7 +282,7 @@ public sealed class IrCSharpDifferentialOracleTests
             System.Reflection.BindingFlags.Static)!;
         _ = valuesAgree.Invoke(
             null,
-            [factory.CreateIntegerValue(1), 1L]);
+            [factory.CreateIntegerValue(1), 1]);
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
 
         var agrees = (bool)valuesAgree.Invoke(null, [interpreted, actual])!;

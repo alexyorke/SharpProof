@@ -259,7 +259,7 @@ internal sealed class PassiveCallableVcTests
         var second = PassiveSourceSubject.Create(source);
         Assert.Throws<ArgumentException>(new Action(() => PassiveSourceSubject.Enroll(first.Context, second.Binding, first.Lowering)));
         Assert.Throws<ArgumentException>(new Action(() => PassiveSourceSubject.Enroll(first.Context, first.Binding, second.Lowering)));
-        var shared = new IrFactory(IrExecutionSemantics.Total);
+        var shared = new IrFactory();
         const string related = """
             using SharpProof.Attributes;
             public static class Subject {
@@ -357,7 +357,7 @@ internal sealed class PassiveCallableVcTests
     [TestCase(0, false)]
     public async Task ScalarIdentitySupportsEveryDeclaredType(int width, bool hasSign)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = width == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(width, hasSign);
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", type), factory.CreateVariable("current", type), factory.CreateVariable("old", type));
         var result = factory.CreateVariable("result", type);
@@ -449,7 +449,7 @@ internal sealed class PassiveCallableVcTests
     {
         const int parameterCount = 1000;
         const int writes = 2000;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameters = Enumerable.Range(0, parameterCount).Select(index => new PassiveParameterBinding(
             factory.CreateVariable("entry:" + index, factory.IntegerType), factory.CreateVariable("current:" + index, factory.IntegerType),
             factory.CreateVariable("old:" + index, factory.IntegerType))).ToImmutableArray();
@@ -788,7 +788,7 @@ internal sealed class PassiveCallableVcTests
     public void CallMarkersRequireFreshUnreadOwnedTargets(string mutation)
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation();
@@ -829,7 +829,7 @@ internal sealed class PassiveCallableVcTests
     [Test]
     public async Task BoundedCallQueriesCannotRecoverAnUnknownProof()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var site = factory.CreateOperation();
@@ -863,7 +863,7 @@ internal sealed class PassiveCallableVcTests
 
     internal static PassiveCallableCandidate StraightLineCandidate(int blockCount, int parameterCount)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameters = Enumerable.Range(0, parameterCount).Select(index => new PassiveParameterBinding(
             factory.CreateVariable("entry:" + index, factory.IntegerType), factory.CreateVariable("current:" + index, factory.IntegerType),
             factory.CreateVariable("old:" + index, factory.IntegerType))).ToImmutableArray();
@@ -915,7 +915,7 @@ internal sealed class PassiveCallableVcTests
 
     internal sealed class ScalarSubject
     {
-        internal IrFactory Factory { get; } = new(IrExecutionSemantics.Total);
+        internal IrFactory Factory { get; } = new();
         internal PassiveParameterBinding Parameter { get; }
         internal IrVarId Result { get; }
         internal OperationId Site { get; }

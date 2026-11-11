@@ -25,7 +25,7 @@ public sealed class HornStateArgumentTests
     private static (IrFactory Factory, IrVarId Counter, IrMemberId Relation,
         ImmutableDictionary<IrMemberId, ImmutableArray<IrTerm>> States, ImmutableArray<VerificationQuery> Clauses) CounterSystem()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var counter = factory.CreateVariable("counter", factory.IntegerType);
         var current = factory.Variable(counter);
         var relation = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,

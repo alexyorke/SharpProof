@@ -39,7 +39,7 @@ public sealed class BulkVisualBasicWholeStatementBoundaryTests
             var model = compilation.GetSemanticModel(tree);
             var graph = ControlFlowGraph.Create(tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single(), model)!;
             var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
             var lowered = RoslynProgramLowering.LowerCandidate(graph, context);

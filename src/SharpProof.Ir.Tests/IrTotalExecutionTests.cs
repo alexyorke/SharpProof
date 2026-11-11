@@ -13,7 +13,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(100, 4, IrProgramExecutionStatus.StepLimit, 0)]
     public void RepeatedStringReplayObservesOnlySuccessfulFreshStorage(int count, int steps, IrProgramExecutionStatus expected, int allocations)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("text", factory.StringType);
@@ -51,7 +51,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(3)]
     public void RepeatedStringAllocationRejectsInvalidFillPayload(int kind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("text", factory.StringType);
@@ -65,7 +65,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void AssignmentObservationsRetainApproximationStateAtEachCheckpoint()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var marker = factory.CreateVariable("marker", factory.BooleanType);
         var unknown = factory.CreateVariable("unknown", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
@@ -91,7 +91,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void FailedAssignmentDoesNotEmitAnObservationOrEraseAnEarlierCheckpoint()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var marker = factory.CreateVariable("marker", factory.BooleanType);
         var missing = factory.CreateVariable("missing", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
@@ -116,7 +116,7 @@ internal sealed class IrTotalExecutionTests
     public void EffectPrefixObservationsIncludeOperandApproximation(string kind, bool supplied)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var operand = factory.CreateVariable("operand", kind == "allocation" ? factory.IntegerType : factory.ObjectType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -169,47 +169,39 @@ internal sealed class IrTotalExecutionTests
     }
 
     [Test]
-    public void EmptyArrayTermsRequireTotalOwnedSequenceTypes()
+    public void EmptyArrayTermsRequireOwnedSequenceTypes()
     {
-        var total = new IrFactory(IrExecutionSemantics.Total);
+        var total = new IrFactory();
         var type = total.GetOrCreateSequenceType(total.IntegerType);
         var empty = total.EmptyArray(type);
         Assert.That(total.EmptyArray(type), Is.SameAs(empty));
         Assert.That(total.CreateEmptyArrayValue(type), Is.SameAs(total.CreateEmptyArrayValue(type)));
         Assert.That(new IrPrinter(total).Print(empty), Does.StartWith("empty("));
         Assert.Throws<ArgumentException>(new Action(() => total.EmptyArray(total.IntegerType)));
-        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var foreign = new IrFactory();
         Assert.Throws<ArgumentException>(new Action(() => total.EmptyArray(foreign.GetOrCreateSequenceType(foreign.IntegerType))));
-        var legacy = new IrFactory();
-        Assert.Throws<ArgumentException>(new Action(() => legacy.EmptyArray(legacy.GetOrCreateSequenceType(legacy.IntegerType))));
     }
 
     [TestCase(true)]
     [TestCase(false)]
-    public void TotalStringEqualityUsesConcreteIdentityWhileLegacyUsesContent(bool alias)
+    public void StringEqualityUsesConcreteIdentity(bool alias)
     {
         var first = new string('x', 3);
         var second = alias ? first : new string('x', 3);
-        foreach (var semantics in ImmutableArray.Create(IrExecutionSemantics.Legacy, IrExecutionSemantics.Total))
-        {
-            var factory = new IrFactory(semantics);
-            var x = factory.CreateVariable("x", factory.StringType);
-            var y = factory.CreateVariable("y", factory.StringType);
-            var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.Variable(y));
-            var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, factory.CreateStringValue(first)).SetItem(y, factory.CreateStringValue(second));
-            var evaluated = new IrInterpreter(factory).Evaluate(equal, values);
-            Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
-            Assert.That(evaluated.Value!.Boolean, Is.EqualTo(alias || semantics == IrExecutionSemantics.Legacy));
-        }
+        var factory = new IrFactory();
+        var x = factory.CreateVariable("x", factory.StringType);
+        var y = factory.CreateVariable("y", factory.StringType);
+        var equal = factory.Binary(IrBinaryOperator.Equal, factory.Variable(x), factory.Variable(y));
+        var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(x, factory.CreateStringValue(first)).SetItem(y, factory.CreateStringValue(second));
+        var evaluated = new IrInterpreter(factory).Evaluate(equal, values);
+        Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(evaluated.Value!.Boolean, Is.EqualTo(alias));
     }
 
     [Test]
-    public void TotalDefaultsUseInt32WhileParameterlessFactoryRetainsLegacy()
+    public void DefaultIntegerTypeIsInt32()
     {
-        var legacy = new IrFactory();
-        var total = new IrFactory(IrExecutionSemantics.Total);
-        Assert.That(typeof(IrFactory).GetConstructor(Type.EmptyTypes), Is.Not.Null);
-        Assert.That(legacy.GetTypeInfo(legacy.IntegerType).Width, Is.Zero);
+        var total = new IrFactory();
         Assert.That(total.IntegerType, Is.EqualTo(total.GetOrCreateIntegerType(32, true)));
         Assert.That(total.Length(total.Null(total.StringType)).Type, Is.EqualTo(total.IntegerType));
         Assert.That(new IrInterpreter(total).Evaluate(total.Length(total.Null(total.StringType))).Value!.Integer, Is.Zero);
@@ -223,7 +215,7 @@ internal sealed class IrTotalExecutionTests
     public void TotalArithmeticAndFoldingUseTheSameBitVectorCompletion(
         IrBinaryOperator operation, int left, int right, ulong expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         var y = factory.CreateVariable("y", factory.IntegerType);
         var term = factory.Binary(operation, factory.Variable(x), factory.Variable(y));
@@ -243,7 +235,7 @@ internal sealed class IrTotalExecutionTests
     public void ApproximationIsConsumedOnlyByAnActualRead(string scenario, bool expected)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         var y = factory.CreateVariable("y", factory.IntegerType);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
@@ -273,7 +265,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void ThrowPreservesTheOriginalOperationUntilExceptionalExit()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var cleanup = builder.CreateBlock();
@@ -302,7 +294,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void ThrowCycleIsRejectedByAcyclicOrdering()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Throw(entry, factory.CreateOperation(), IrExceptionKind.DivideByZero, entry);
@@ -311,28 +303,13 @@ internal sealed class IrTotalExecutionTests
         Assert.That(failure, Is.EqualTo(IrAcyclicOrderFailure.CyclicControlFlow));
     }
 
-    [Test]
-    public void LegacyExecutionRejectsModeledHavocBeforeInvokingItsProvider()
-    {
-        var factory = new IrFactory();
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock();
-        builder.Return(entry, factory.CreateOperation(), factory.Integer(1));
-        var invoked = false;
-        var options = new IrProgramReplayOptions(_ => { invoked = true; return factory.CreateIntegerValue(2); });
-        var exception = Assert.Throws<ArgumentException>((Action)(() =>
-            new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100, options)));
-        Assert.That(exception!.ParamName, Is.EqualTo("replayOptions"));
-        Assert.That(invoked, Is.False);
-    }
-
     [TestCase("replacement", IrProgramExecutionStatus.Exception)]
     [TestCase("handled", IrProgramExecutionStatus.Returned)]
     [TestCase("naked-exit", IrProgramExecutionStatus.Unsupported)]
     public void ExceptionalContinuationsAreDistinctFromNormalReturn(string scenario, IrProgramExecutionStatus expected)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var cleanup = builder.CreateBlock();
@@ -377,7 +354,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(IrHavocOrigin.Approximation, true)]
     public void HavocOccurrencesArePerVisitAndSharedAcrossVariables(IrHavocOrigin origin, bool approximate)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         var y = factory.CreateVariable("y", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
@@ -409,7 +386,7 @@ internal sealed class IrTotalExecutionTests
     public void UnsupportedHavocModelsFailClosed(string scenario)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
@@ -427,7 +404,7 @@ internal sealed class IrTotalExecutionTests
     public void CallOperandsUseTheSameActualReadObserver(string scenario, bool expected)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", scenario == "receiver" ? factory.ObjectType : factory.IntegerType);
         var unavailable = factory.CreateVariable("unavailable", factory.IntegerType);
         var resultVariable = factory.CreateVariable("result", factory.IntegerType);
@@ -457,7 +434,7 @@ internal sealed class IrTotalExecutionTests
     public void SkippedCallsStillEvaluateTheirOperands(string scenario, bool consumed, bool returned)
     {
         System.ArgumentNullException.ThrowIfNull(scenario);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var unknown = factory.CreateVariable("unknown", factory.IntegerType);
         var missing = factory.CreateVariable("missing", factory.IntegerType);
         ImmutableArray<IrTerm> arguments = scenario == "missing-first"
@@ -484,7 +461,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(true, true, true)]
     public void HostedCallArgumentsReadCurrentHeap(bool array, bool store, bool snapshot)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = array ? factory.GetOrCreateSequenceType(factory.IntegerType) : factory.ObjectType;
         var owner = factory.CreateVariable("owner", type);
         var alias = factory.CreateVariable("alternate", type);
@@ -522,7 +499,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(true, true)]
     public void SkippedInstanceCallsRespectReceiverReadOrder(bool missing, bool hosted)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var owner = factory.CreateVariable("owner", factory.ObjectType);
         var argument = factory.CreateVariable("argument", factory.IntegerType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType, false, [factory.IntegerType]);
@@ -553,7 +530,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(true, true)]
     public void HostedCallReceiverReadsCurrentHeap(bool store, bool snapshot)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var holder = factory.CreateVariable("holder", factory.ObjectType);
         var alias = factory.CreateVariable("alternate", factory.ObjectType);
         var replacement = factory.CreateVariable("replacement", factory.ObjectType);
@@ -580,11 +557,11 @@ internal sealed class IrTotalExecutionTests
     [TestCase(true)]
     public void SnapshotRolesRejectUnownedVariableIds(bool foreign)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Return(entry, factory.CreateOperation(), factory.Integer(0));
-        var other = new IrFactory(IrExecutionSemantics.Total);
+        var other = new IrFactory();
         var options = new IrProgramReplayOptions(_ => null)
         { SnapshotVariables = [foreign ? other.CreateVariable("old", other.IntegerType) : default] };
         Assert.Throws<ArgumentException>((Action)(() => new IrProgramInterpreter(factory).Execute(builder.Build(), null, 100, options)));
@@ -593,7 +570,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void TotalSequenceAndUnboxingFaultsUseTypedDefaults()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var elementType = factory.GetOrCreateIntegerType(64, false);
         var sequenceType = factory.GetOrCreateSequenceType(factory.CreateIdentity(), elementType, "values");
         var sequence = factory.CreateVariable("sequence", sequenceType);
@@ -625,7 +602,7 @@ internal sealed class IrTotalExecutionTests
     public void MemberLocationOperandsPreserveReadOrderBeforeMemoryFailure(bool store, string receiverKind, bool consumed)
     {
         System.ArgumentNullException.ThrowIfNull(receiverKind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var receiver = factory.CreateVariable("receiver", factory.ObjectType);
         var argument = factory.CreateVariable("argument", factory.IntegerType);
         var value = factory.CreateVariable("value", factory.IntegerType);
@@ -672,7 +649,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public void TotalUnboxingFaultsUseBooleanAndStringDefaults()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var boxed = factory.CreateVariable("boxed", factory.ObjectType);
         var values = ImmutableDictionary<IrVarId, IrValue>.Empty
             .Add(boxed, factory.CreateReferenceValue(factory.ObjectType, new object()));
@@ -691,7 +668,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(false, IrUnsupportedReason.MissingVariable)]
     public void ReadsAreObservedAfterSuccessfulLookupBeforeTypeValidation(bool present, IrUnsupportedReason reason)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.IntegerType);
         var valueBuilder = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         if (present)
@@ -710,7 +687,7 @@ internal sealed class IrTotalExecutionTests
     [Test]
     public async Task ConcurrentEvaluationsKeepSeparateLazyReadObservers()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var x = factory.CreateVariable("x", factory.IntegerType);
         var y = factory.CreateVariable("y", factory.IntegerType);
@@ -759,7 +736,7 @@ internal sealed class IrTotalExecutionTests
     public void QuantitativeArrayEventsRequireSuccessfulAllocation(int length, bool approximate, int steps,
         IrProgramExecutionStatus expected, int count)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
         var size = factory.CreateVariable("size", factory.IntegerType);
@@ -792,7 +769,7 @@ internal sealed class IrTotalExecutionTests
     [TestCase(true, true, true, 1)]
     public void SourceLoopEventsRequireAMarkedTrueEdge(bool marked, bool condition, bool approximation, int expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var exit = builder.CreateBlock();

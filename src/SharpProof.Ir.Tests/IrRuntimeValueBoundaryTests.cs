@@ -6,13 +6,11 @@ namespace SharpProof.Ir.Test;
 [TestFixture]
 internal sealed class IrRuntimeValueBoundaryTests
 {
-    [TestCase(IrExecutionSemantics.Legacy, false)]
-    [TestCase(IrExecutionSemantics.Legacy, true)]
-    [TestCase(IrExecutionSemantics.Total, false)]
-    [TestCase(IrExecutionSemantics.Total, true)]
-    public void EqualityValueOperationChecksActualTypesBeforeKinds(IrExecutionSemantics semantics, bool negate)
+    [TestCase(false)]
+    [TestCase(true)]
+    public void EqualityValueOperationChecksActualTypesBeforeKinds(bool negate)
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var interpreter = new IrInterpreter(factory);
         var left = factory.CreateBooleanValue(true);
         var equal = interpreter.EvaluateEquality(left, factory.CreateBooleanValue(true), negate);
@@ -31,11 +29,10 @@ internal sealed class IrRuntimeValueBoundaryTests
         }
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
-    [TestCase(IrExecutionSemantics.Total)]
-    public void CastValueOperationPreservesIdentityAndRejectsUnsupportedRelation(IrExecutionSemantics semantics)
+    [Test]
+    public void CastValueOperationPreservesIdentityAndRejectsUnsupportedRelation()
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var interpreter = new IrInterpreter(factory);
         var operand = interpreter.Evaluate(factory.Boolean(true), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
         var identity = interpreter.EvaluateCastValue(factory.BooleanType, operand);
@@ -52,11 +49,10 @@ internal sealed class IrRuntimeValueBoundaryTests
         }
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
-    [TestCase(IrExecutionSemantics.Total)]
-    public void CastValueOperationPreservesActualOperandFailure(IrExecutionSemantics semantics)
+    [Test]
+    public void CastValueOperationPreservesActualOperandFailure()
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("missing", factory.BooleanType);
         var interpreter = new IrInterpreter(factory);
         var operand = interpreter.Evaluate(factory.Variable(variable), global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty);
@@ -70,15 +66,14 @@ internal sealed class IrRuntimeValueBoundaryTests
         }
     }
 
-    [TestCase(IrExecutionSemantics.Legacy)]
-    [TestCase(IrExecutionSemantics.Total)]
-    public void CastValueOperationPreservesBoxedIntegerRules(IrExecutionSemantics semantics)
+    [Test]
+    public void CastValueOperationPreservesBoxedIntegerRules()
     {
-        var factory = new IrFactory(semantics);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("boxed", factory.ObjectType);
         var interpreter = new IrInterpreter(factory);
-        object validBox = semantics == IrExecutionSemantics.Total ? (object)17 : 17L;
-        object invalidBox = semantics == IrExecutionSemantics.Total ? (object)17L : 17;
+        object validBox = 17;
+        object invalidBox = 17L;
         IrEvaluationResult EvaluateBox(object box)
         {
             System.ArgumentNullException.ThrowIfNull(box);
@@ -94,18 +89,9 @@ internal sealed class IrRuntimeValueBoundaryTests
             Assert.That(valid.Status, Is.EqualTo(IrEvaluationStatus.Value));
             Assert.That(valid.Value!.Type, Is.EqualTo(factory.IntegerType));
             Assert.That(valid.Value.Integer, Is.EqualTo(17L));
-            if (semantics == IrExecutionSemantics.Total)
-            {
-                Assert.That(invalid.Status, Is.EqualTo(IrEvaluationStatus.Value));
-                Assert.That(invalid.Value!.Type, Is.EqualTo(factory.IntegerType));
-                Assert.That(invalid.Value.Integer, Is.Zero);
-            }
-            else
-            {
-                Assert.That(invalid.Status, Is.EqualTo(IrEvaluationStatus.Exception));
-                Assert.That(invalid.Exception!.Kind, Is.EqualTo(IrExceptionKind.InvalidCast));
-                Assert.That(invalid.Exception.Detail, Is.EqualTo("The concrete reference does not contain a boxed integer."));
-            }
+            Assert.That(invalid.Status, Is.EqualTo(IrEvaluationStatus.Value));
+            Assert.That(invalid.Value!.Type, Is.EqualTo(factory.IntegerType));
+            Assert.That(invalid.Value.Integer, Is.Zero);
         }
     }
 }

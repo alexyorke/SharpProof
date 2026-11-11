@@ -27,7 +27,7 @@ public sealed class NativeHornApplicationReconstructionTests
     public void RealNativeBooleanApplicationsHaveIndependentlyExpectedTruthValues(
         string operation, Z3_decl_kind expectedKind, int expectedArity, bool expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         var yes = owner.Own(context.MkTrue());
@@ -87,7 +87,7 @@ public sealed class NativeHornApplicationReconstructionTests
     public void RealNativeArithmeticApplicationsPreserveExpectedBitsAndTypes(
         string operation, Z3_decl_kind expectedKind, int expectedArity, int expectedWidth, ulong expectedBits)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         var two = owner.Own(context.MkInt(2));
@@ -146,7 +146,7 @@ public sealed class NativeHornApplicationReconstructionTests
     [TestCase("real")]
     public void ARealRejectedNativeChildKeepsItsActualParentRejected(string childKind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         Expr child = owner.Own<Expr>(childKind switch
@@ -172,7 +172,7 @@ public sealed class NativeHornApplicationReconstructionTests
     [Test]
     public void ARealUnsupportedNativeOperatorKeepsItsActualApplicationRejected()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var context = new Context();
         using var owner = new Z3ExpressionOwner();
         var yes = owner.Own(context.MkTrue());

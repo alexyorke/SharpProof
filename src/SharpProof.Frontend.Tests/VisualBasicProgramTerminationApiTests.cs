@@ -43,7 +43,7 @@ public sealed class VisualBasicProgramTerminationApiTests
             Assert.That(edge.Source.IsReachable, Is.True);
             Assert.That(edge.FinallyRegions, Is.Empty);
         }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

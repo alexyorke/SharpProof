@@ -201,7 +201,7 @@ public sealed class PassiveExceptionLoopTests
     public void RouterDoesNotRepairMissingImmutableStateOrPendingThrow(string kind)
     {
         System.ArgumentNullException.ThrowIfNull(kind);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.IntegerType),
             factory.CreateVariable("current", factory.IntegerType), factory.CreateVariable("old", factory.IntegerType));
         var unbound = factory.CreateVariable("unbound", factory.IntegerType);
@@ -280,7 +280,7 @@ public sealed class PassiveExceptionLoopTests
     [Test]
     public void RepeatedExternalRoutersStopBeforeUnboundedGraphGrowth()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var site = factory.CreateOperation("router-bound");
         var entries = Enumerable.Range(0, 1100).Select(_ => builder.CreateBlock()).ToImmutableArray();
@@ -303,7 +303,7 @@ public sealed class PassiveExceptionLoopTests
 
     internal static PassiveCallableCandidate MultipleEntryCandidate(bool insideEntry = false, bool unusedInput = false)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var result = factory.CreateVariable("result", factory.IntegerType);
         var site = factory.CreateOperation("multi-entry-original");
         var builder = new IrProgramBuilder(factory);

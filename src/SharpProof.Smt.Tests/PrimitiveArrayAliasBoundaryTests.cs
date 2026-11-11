@@ -15,7 +15,7 @@ public sealed class PrimitiveArrayAliasBoundaryTests
     [TestCase(64, true)]
     public async Task CompatibleArrayAliasWitnessReplays(int width, bool unsignedFirst)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var signedType = factory.GetOrCreateIntegerType(width, true);
         var unsignedType = factory.GetOrCreateIntegerType(width, false);
         var signed = factory.CreateVariable("signed", factory.GetOrCreateSequenceType(signedType));
@@ -42,7 +42,7 @@ public sealed class PrimitiveArrayAliasBoundaryTests
     [TestCase(64)]
     public async Task CompatibleArrayEntryViewsShareElementBits(int width)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var signedType = factory.GetOrCreateIntegerType(width, true);
         var unsignedType = factory.GetOrCreateIntegerType(width, false);
         var signed = factory.CreateVariable("signed", factory.GetOrCreateSequenceType(signedType));

@@ -96,7 +96,7 @@ internal sealed class IntegralConvertInitializationReplayTests
     [Test]
     public void FailedObservationRemainsApproximateInInterpreter()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("ready", factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();
@@ -128,7 +128,7 @@ internal sealed class IntegralConvertInitializationReplayTests
     private static (IrFactory Factory, IrHavocRequest Request) Request(string primitive, IrHavocOrigin origin, bool wrongType, string? description = null)
     {
         ArgumentNullException.ThrowIfNull(primitive);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", wrongType ? factory.IntegerType : factory.BooleanType);
         var builder = new IrProgramBuilder(factory);
         var block = builder.CreateBlock();

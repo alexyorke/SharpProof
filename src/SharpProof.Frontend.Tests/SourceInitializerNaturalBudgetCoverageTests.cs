@@ -40,7 +40,7 @@ public sealed class SourceInitializerNaturalBudgetCoverageTests
         {
             if (available is < 0 or > 256)
             { throw new ArgumentOutOfRangeException(nameof(available)); }
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, subject.Context.Target);
             var session = new TotalSourceCallSession(subject.Compilation, static _ => true, null,
                 TestContext.CurrentContext.CancellationToken);

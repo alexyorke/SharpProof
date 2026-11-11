@@ -10,7 +10,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void NonFieldMembersAreRejectedByBothTheBuilderAndMemoryExtraction(bool isStatic)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -41,7 +41,7 @@ public sealed class ResourceMemoryProgramTests
     public void ExtractionRejectsIncompleteOrUnsupportedTailsAfterOwnedAllocation(bool unsupported, string reason)
     {
         ArgumentNullException.ThrowIfNull(reason);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -56,7 +56,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void ExtractionEnforcesItsEventBudgetIndependentlyOfThePathCollector()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -68,35 +68,11 @@ public sealed class ResourceMemoryProgramTests
         Assert.That(check.UnknownReason, Is.EqualTo("MemoryProgramBudgetExceeded"));
     }
 
-    [Test]
-    public void MathematicalIntegerArraysNeverAcquireAPrimitiveByteWidth()
-    {
-        var factory = new IrFactory(IrExecutionSemantics.Legacy);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock();
-        var type = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var root = factory.CreateVariable("root", type);
-        Action allocate = () =>
-        {
-            _ = builder.Allocate(entry, factory.CreateOperation(), type, root, factory.Integer(1));
-        };
-        Assert.That(allocate, Throws.ArgumentException);
-        var seed = builder.Write(entry, factory.CreateOperation(), IrWriteRegion.Local);
-        var allocation = new IrAllocationInstruction(seed.Id, seed.Operation, type, root, factory.Integer(1));
-        var returned = builder.Return(entry, factory.CreateOperation(), factory.Variable(root));
-        var publicCheck = ResourceMemoryProgram.Evaluate(builder.Build(), Layout, TestContext.CurrentContext.CancellationToken);
-        Assert.That(publicCheck.Bounds, Is.Null);
-        Assert.That(publicCheck.UnknownReason, Is.EqualTo("MemoryProgramRequiresTotalSemantics"));
-        var extraction = ExtractMemory(factory, [allocation, returned]);
-        Assert.That(extraction.Bounds, Is.Null);
-        Assert.That(extraction.UnknownReason, Is.EqualTo("MemoryAllocationUnsupported"));
-    }
-
     [TestCase(false)]
     [TestCase(true)]
     public void ConstantArithmeticDoesNotBecomeABooleanGuardProof(bool multiply)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var left = factory.CreateVariable("left", factory.IntegerType);
         var right = factory.CreateVariable("right", factory.IntegerType);
         var condition = factory.Binary(multiply ? IrBinaryOperator.Multiply : IrBinaryOperator.Add,
@@ -127,7 +103,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void ForeignBlockInventoryReturnsUnknown(bool mismatchedProgramScope)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -150,7 +126,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void InvalidBlockInventoryReturnsUnknownWithoutThrowing(bool nullBlock)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var root = factory.CreateVariable("root", factory.ObjectType);
@@ -169,7 +145,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void MissingOwnedBlocksDiscardPreviouslyCountedStorage(bool missingEntry)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var exit = builder.CreateBlock();
@@ -191,7 +167,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void OwnedCopyChainsPreservePeakStorageThroughTheirLastRead()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -211,7 +187,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void UnownedCopyCannotSilentlyReplaceAnExistingOwnedRoot()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -235,7 +211,7 @@ public sealed class ResourceMemoryProgramTests
     {
         if (length < 2 || length > 17)
         { throw new ArgumentOutOfRangeException(nameof(length)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var current = factory.CreateVariable("input", factory.ObjectType);
@@ -260,7 +236,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void BorrowedInputCopiesNeedOwnershipOnlyWhenObserved(bool observed)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var input = factory.CreateVariable("input", factory.ObjectType);
@@ -295,7 +271,7 @@ public sealed class ResourceMemoryProgramTests
     {
         if (operation < 0 || operation > 5)
         { throw new ArgumentOutOfRangeException(nameof(operation)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -327,7 +303,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true, true)]
     public void StoredBooleanEqualityFactsControlTheReturnedGraph(bool different, bool taken)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -353,7 +329,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void OversizedControlFlowAndInstructionStreamsReturnNoPartialMemoryBounds(bool blocks)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         if (blocks)
@@ -394,7 +370,7 @@ public sealed class ResourceMemoryProgramTests
     {
         if (mutation < 0 || mutation > 16)
         { throw new ArgumentOutOfRangeException(nameof(mutation)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var frameType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Frame");
         if (mutation != 9)
         { factory.RegisterClosureFrameType(frameType, mutation is >= 10 and <= 12 ? [ResourceStorageKind.Reference, ResourceStorageKind.Reference] : [ResourceStorageKind.Reference]); }
@@ -470,7 +446,7 @@ public sealed class ResourceMemoryProgramTests
     {
         if (mutation < 0 || mutation > 7)
         { throw new ArgumentOutOfRangeException(nameof(mutation)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Callback");
         if (mutation != 6)
         { factory.RegisterDelegateReferenceType(type); }
@@ -522,7 +498,7 @@ public sealed class ResourceMemoryProgramTests
     {
         if (marker < 0 || marker > 2)
         { throw new ArgumentOutOfRangeException(nameof(marker)); }
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Callback");
         if (certified)
         { factory.RegisterDelegateReferenceType(type); }
@@ -556,7 +532,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void StaticDelegateAdmissionRequiresItsFactoryAndInstruction()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var allocation = builder.Allocate(entry, factory.CreateOperation(), factory.ObjectType);
@@ -568,7 +544,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true, 32)]
     public void UnsignedGuardConstantsDoNotPassThroughASignedIntermediary(bool maximum, int retained)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var integer = factory.GetOrCreateIntegerType(64, signed: false);
         var value = factory.CreateVariable("value", integer);
         var builder = new IrProgramBuilder(factory);
@@ -593,7 +569,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void TruncatingIntegerConversionsDoNotBecomeValuePreservingConstants()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var small = factory.GetOrCreateIntegerType(8, signed: false);
         var wide = factory.CreateVariable("wide", factory.IntegerType);
         var count = factory.CreateVariable("count", small);
@@ -616,7 +592,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(6, 40)]
     public void StringLifetimesPreserveAliasesAndSharedEmptyStorage(int length, int bytes)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var text = factory.CreateVariable("text", factory.StringType);
@@ -643,7 +619,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void StringContentEqualityCannotBeProvedFromDistinctAllocationIdentities()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -665,7 +641,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(1, 40, 48)]
     public void EmptyIdentitySharingAndFreshStringReferenceGuardsKeepReadRootsLive(int length, int retained, int auxiliary)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -703,7 +679,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(3, 40)]
     public void TypedArrayReturnDerivesRetainedStorageWithoutProducerSizes(int length, int bytes)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -718,7 +694,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true, 72)]
     public void LastUseRootsDistinguishDeadStorageFromLiveAliases(bool preserveAlias, int peak)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -737,7 +713,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void ReturnedAliasOwnsTheOriginalAllocationAcrossBlocks()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var exit = builder.CreateBlock();
@@ -760,7 +736,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(5)]
     public void UnsupportedEffectsAndUnownedReferencesReturnUnknown(int kind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(factory.IntegerType);
@@ -801,7 +777,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(5, int.MaxValue, int.MinValue, true)]
     public void OnlyProvenConstantGuardEdgesContributeStorage(int operation, int left, int right, bool taken)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -826,7 +802,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true, 40)]
     public void CopiedConstantsAndReassignmentsDetermineGuards(bool overwrite, int bytes)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -851,7 +827,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void HavocCannotReuseAnEarlierConstantGuard()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -869,7 +845,7 @@ public sealed class ResourceMemoryProgramTests
     [Test]
     public void InputDependentGuardDoesNotSelectASampledPath()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var yes = builder.CreateBlock();
@@ -887,7 +863,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(2)]
     public void IncompatibleLayoutCannotSupplyNumbers(int allocationKind)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = allocationKind == 1 ? factory.ObjectType : allocationKind == 2 ? factory.StringType :
@@ -907,7 +883,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(4)]
     public void MalformedStringAllocationsCannotPublishPartialStorage(int mutation)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("text", factory.StringType);
@@ -935,7 +911,7 @@ public sealed class ResourceMemoryProgramTests
     [TestCase(true)]
     public void OversizedAndReferenceElementArraysDoNotReceivePrimitiveStorageBounds(bool oversized)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var type = factory.GetOrCreateSequenceType(oversized ? factory.IntegerType : factory.ObjectType);

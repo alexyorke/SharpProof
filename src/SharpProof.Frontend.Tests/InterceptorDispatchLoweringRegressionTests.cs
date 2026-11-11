@@ -106,7 +106,7 @@ public sealed class InterceptorDispatchLoweringRegressionTests
             .OfType<MethodDeclarationSyntax>()
             .Single(static declaration => declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.Identifier.ValueText == "Target"));
         var graph = ControlFlowGraph.Create(method, model);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(method)!);
         var lowered = RoslynProgramLowering.LowerCandidate(graph!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
 

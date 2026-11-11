@@ -68,7 +68,7 @@ public sealed class RequiresOnlyTerminalSpecificationTests
             Assert.That(emission.IsElided(thrown[0].BranchValue!), Is.True);
         }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var fullContext = new TotalLoweringContext(factory, target);
         var binder = new TotalContractBinder(compilation, factory);
         var full = binder.BindTotal(fullContext);

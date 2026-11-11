@@ -100,7 +100,7 @@ public sealed class NativeExceptionEffectTests
     [TestCase(true, true)]
     public async Task SharedExitPreservesKindAndPathCorrelation(bool allowOverflow, bool allowDivision)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var parameter = new PassiveParameterBinding(factory.CreateVariable("entry", factory.BooleanType),
             factory.CreateVariable("current", factory.BooleanType), factory.CreateVariable("old", factory.BooleanType));

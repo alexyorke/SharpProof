@@ -92,7 +92,7 @@ public sealed class RequiresOnlyNestedInitializerContinuationTests
             Assert.That(additions.Any(addition => fall.Contains(addition.Block) && conditional.Contains(addition.Block)), Is.False);
         }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var fullContext = new TotalLoweringContext(factory, target);
         var binder = new TotalContractBinder(compilation, factory);
         var full = binder.BindTotal(fullContext);

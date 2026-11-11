@@ -9,7 +9,7 @@ public sealed class IrRemainingLifecycleTests
     [Test]
     public void DefaultCallOperandsRejectBeforeReceiverEvaluation()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var interpreter = new IrProgramInterpreter(factory);
         var values = new IrProgramInterpreter.ReplayValues(ImmutableHashSet<IrVarId>.Empty);
         var missing = factory.Variable(factory.CreateVariable("missing-receiver", factory.ObjectType));
@@ -124,7 +124,7 @@ public sealed class IrRemainingLifecycleTests
     [Test]
     public void StringCastToUnknownNominalTypeDoesNotInventRuntimeRelations()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Unrelated");
         var source = factory.String("text");
         var interpreter = new IrInterpreter(factory);
@@ -139,7 +139,7 @@ public sealed class IrRemainingLifecycleTests
     [Test]
     public void FieldSnapshotSelectionStopsWhenItsExistingWorkBudgetIsExhausted()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", factory.IntegerType, false);
         var value = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState().WithField(field, factory.CreateIntegerValue(3)));
         var heap = new IrHeap();

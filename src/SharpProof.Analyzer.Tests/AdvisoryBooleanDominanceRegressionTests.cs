@@ -33,7 +33,7 @@ public sealed class AdvisoryBooleanDominanceRegressionTests
     [Test]
     public void UnavailableRightOperandIsObservedBeforeDecisiveFalse()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var resultVariable = factory.CreateVariable("result", factory.BooleanType);
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,

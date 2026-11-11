@@ -83,10 +83,6 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         maximumSteps = ArgumentNullGuard.RequirePositive(
             maximumSteps, nameof(maximumSteps));
 
-        if (replayOptions != null && _factory.Semantics != IrExecutionSemantics.Total)
-        {
-            throw new ArgumentException("Modeled havoc requires total program semantics.", nameof(replayOptions));
-        }
         var snapshots = replayOptions?.SnapshotVariables ?? ImmutableHashSet<IrVarId>.Empty;
         foreach (var snapshot in snapshots)
         {
@@ -653,8 +649,7 @@ internal sealed partial class IrCallInstruction
         var cancellationToken = state.CancellationToken;
         var call = this;
         if (this is IrCallInstruction { Target: null } opaqueCall &&
-            state.CallHost == null && state.ReplayOptions != null &&
-            state.Interpreter._factory.Semantics == IrExecutionSemantics.Total)
+            state.CallHost == null && state.ReplayOptions != null)
         {
             // Results and exceptions have separate approximation
             // havocs. Operands still run, and a writer forgets current

@@ -20,7 +20,7 @@ public sealed class TotalClaimResultTests
     {
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(value);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var formatted = WorkerProjections.FormatTotalValue(factory.CreateStringValue(value));
         Assert.That(formatted.Kind, Is.EqualTo("String"));
         Assert.That(formatted.Value, Is.EqualTo(expected));

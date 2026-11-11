@@ -49,7 +49,7 @@ public sealed class StaticMutationInstanceApiRejectionCoverageTests
             Assert.That(field.Field.IsStatic, Is.True);
             Assert.That(field.Instance, Is.Null);
             Assert.That(SymbolEqualityComparer.Default.Equals(field.Field.ContainingAssembly, compilation.Assembly), Is.True);
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
             var graph = ControlFlowGraph.Create(syntax, model)!;
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

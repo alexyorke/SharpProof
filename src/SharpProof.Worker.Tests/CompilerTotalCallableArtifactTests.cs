@@ -238,7 +238,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase(true)]
     public void EmptyStructuralReturnsAreOnlyAllowedOutsideReachableNonvoidFlow(bool reachable)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var result = factory.CreateVariable("result", type);
         var builder = new IrProgramBuilder(factory);
@@ -271,7 +271,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase(true, true)]
     public void ShadowDecoderChecksExecutableEvidenceInEveryBlock(bool reachable, bool wrongReturn)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var operation = factory.CreateOperation("block-validation");
@@ -416,7 +416,7 @@ public sealed class CompilerTotalCallableArtifactTests
     public void CanonicalRootInputsRemainImmutableWithoutOwnClauses(string mutation, bool rejected)
     {
         System.ArgumentNullException.ThrowIfNull(mutation);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var entry = factory.CreateVariable("entry:0", type);
         var current = factory.CreateVariable("current:0", type);
@@ -726,7 +726,6 @@ public sealed class CompilerTotalCallableArtifactTests
         Assert.That(preparation.Total, Is.Null);
         var entry = preparation.TotalEntry!;
         Assert.That(entry, Is.Not.Null);
-        Assert.That(entry.Factory.Semantics, Is.EqualTo(IrExecutionSemantics.Total));
         Assert.That(entry.Clauses.Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind)), Is.All.EqualTo(CompilerContractKind.Requires));
         Assert.That(entry.Clauses.Single().AssumptionId, Is.EqualTo(preparation.Entry.Assumptions.Single().Id));
         var result = await TotalCallableVerifier.VerifyEntryAsync(preparation, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken);
@@ -741,7 +740,6 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase("count")]
     [TestCase("current")]
     [TestCase("result")]
-    [TestCase("mode")]
     [TestCase("span")]
     public void EntryPayloadRejectsForeignEvidence(string mutation)
     {
@@ -790,12 +788,6 @@ public sealed class CompilerTotalCallableArtifactTests
             case "result":
                 {
                     entry = entry with { Result = entry.Parameters[0].Entry };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
-                }
-                break;
-            case "mode":
-                {
-                    entry = entry with { Graph = entry.Graph with { Semantics = IrExecutionSemantics.Legacy } };
                     artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { TotalEntry = entry }) };
                 }
                 break;
@@ -1096,7 +1088,6 @@ public sealed class CompilerTotalCallableArtifactTests
         }
     }
 
-    [TestCase("mode")]
     [TestCase("roots")]
     [TestCase("alias")]
     [TestCase("result-alias")]
@@ -1119,12 +1110,6 @@ public sealed class CompilerTotalCallableArtifactTests
         var parameter = total.Parameters[0];
         switch (mutation)
         {
-            case "mode":
-                {
-                    total = total with { Graph = total.Graph with { Semantics = IrExecutionSemantics.Legacy } };
-                    artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = total }) };
-                }
-                break;
             case "roots":
                 {
                     total = total with { Graph = total.Graph with { Roots = [] } };

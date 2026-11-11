@@ -367,7 +367,7 @@ public sealed class ContractsCoverageBoundaryTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         var method = compilation.GetTypeByMetadataName("Library")!
             .GetMembers("Target").OfType<IMethodSymbol>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         return new TotalContractBinder(compilation, factory)
             .BindTotalMetadataRequires(new TotalLoweringContext(factory, method), cancellationToken: TestContext.CurrentContext.CancellationToken);
     }

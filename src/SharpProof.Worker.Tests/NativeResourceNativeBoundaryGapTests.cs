@@ -16,7 +16,7 @@ internal sealed partial class NativeResourceContractTests
     [Test]
     public void MemoryEnvelopeValidatesReconstructedAssignmentTypesAtItsComponentBoundary()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         var target = factory.CreateVariable("scalar", factory.IntegerType);

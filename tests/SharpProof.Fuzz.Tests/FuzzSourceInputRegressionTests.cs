@@ -77,7 +77,7 @@ public sealed class FuzzSourceInputRegressionTests
     [Test]
     public void MalformedStringAbstractionRequiresAnExplicitLengthOnlyCase()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var aliases = TotalProgramDifferentialOracle.CreateAliases();
         const string malformed = "a\ud800b";
         Assert.Throws<ArgumentException>((Action)(() => TotalProgramDifferentialOracle.Value(factory,

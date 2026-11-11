@@ -11,7 +11,7 @@ public sealed class DictionaryKeyedFieldWireTests
     [TestCase(long.MaxValue)]
     public void KeyedFieldStoresAndReadsSurvivePortableRoundTrip(long key)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var keyType = factory.GetOrCreateIntegerType(64, true);
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:values", factory.IntegerType, false, keyType);
         var receiver = factory.CreateVariable("dictionary", factory.ObjectType);

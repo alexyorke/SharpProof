@@ -106,7 +106,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         var fieldSyntax = syntaxRoot.DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
         var actualField = (IFieldSymbol)semanticModel.GetDeclaredSymbol(fieldSyntax)!;
         Assert.That(SymbolEqualityComparer.Default.Equals(actualField.Type, actualMethod.ReturnType), Is.True);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var lowering = new TotalLoweringContext(factory, actualMethod);
         Assert.That(lowering.Result, Is.Not.Null);
         // The maintained compiler mapper registers the method's actual return type.

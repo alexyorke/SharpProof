@@ -46,7 +46,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
     public void CanonicalPublicBaselineAndModulePreserveStateTruthAndProvenance(bool companion)
     {
         var compilation = Compile();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, companion ? "Target" : "Direct", "Run");
         var context = new TotalLoweringContext(factory, target);
         var publicResult = new TotalContractBinder(compilation, factory).BindTotal(context);
@@ -85,7 +85,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
     public void ActualDifferentWidthCompilerFramesRejectAsModuleArguments()
     {
         var compilation = Compile();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var byteTarget = Method(compilation, "ByteTarget", "Run");
         var intTarget = Method(compilation, "IntTarget", "Run");
         Assert.That(byteTarget.Parameters.Single().Type.SpecialType, Is.EqualTo(SpecialType.System_Byte));
@@ -113,7 +113,7 @@ public sealed class TotalContractInvocationMaterializationRepresentativeTests
     public void RawIntegerConditionRejectsWithoutEnrollingAnOrdinaryCall()
     {
         var compilation = Compile();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var target = Method(compilation, "Direct", "Raw");
         var context = new TotalLoweringContext(factory, target);
         var resolution = EffectiveContractSourceResolver.ForCompilation(compilation, TestContext.CurrentContext.CancellationToken).Resolve(target, implementationBody: null, cancellationToken: TestContext.CurrentContext.CancellationToken);

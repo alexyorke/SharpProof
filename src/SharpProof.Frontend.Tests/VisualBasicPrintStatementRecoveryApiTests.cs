@@ -58,7 +58,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(graph.OriginalOperation.Descendants().OfType<IFieldReferenceOperation>(), Is.Empty);
         Assert.That(graph.OriginalOperation.Descendants().OfType<IIncrementOrDecrementOperation>(), Is.Empty);
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
@@ -114,7 +114,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         Assert.That(graph.OriginalOperation.Descendants().OfType<IFieldReferenceOperation>(), Is.Empty);
         Assert.That(graph.OriginalOperation.Descendants().OfType<IIncrementOrDecrementOperation>(), Is.Empty);
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
@@ -167,7 +167,7 @@ public sealed class VisualBasicPrintStatementRecoveryApiTests
         var graph = ControlFlowGraph.Create(declaration, model)!;
         var target = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         Assert.That(graph.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(compilation));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

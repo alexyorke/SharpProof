@@ -56,7 +56,7 @@ internal static class CallableReplayValidator
                 initialBuffer[binding.Key] = GetRequiredValue(model, binding.Value);
             }
             var initial = initialBuffer.ToImmutable();
-            var replayOptions = factory.Semantics != IrExecutionSemantics.Total ? context.ReplayOptions : new IrProgramReplayOptions(request =>
+            var replayOptions = new IrProgramReplayOptions(request =>
                 request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
@@ -148,25 +148,22 @@ internal static class CallableReplayValidator
         var interpreter = new IrInterpreter(factory);
         // An Old read sees the objects as the callable entered.
         var snapshots = context.PreStateBindings.Keys.ToImmutableHashSet();
-        if (factory.Semantics == IrExecutionSemantics.Total)
+        if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)
         {
-            if (context.PostconditionGuard is not { } guard || guard.Type != factory.BooleanType)
-            {
-                return AbstentionReason.CounterexampleNotReplayable;
-            }
-            var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots, context.ReplayOptions?.ConcreteOpaqueValueProvider);
-            if (consumedApproximation || heap?.ConsumedApproximation == true)
-            {
-                return AbstentionReason.CounterexampleNotReplayable;
-            }
-            if (defined.Status != IrEvaluationStatus.Value || defined.Value is not { Kind: IrValueKind.Boolean })
-            {
-                return AbstentionReason.CounterexampleReplayFailed;
-            }
-            if (!defined.Value.Boolean)
-            {
-                return AbstentionReason.PostconditionMayBeUndefined;
-            }
+            return AbstentionReason.CounterexampleNotReplayable;
+        }
+        var defined = interpreter.Evaluate(guard, final, ObserveRead, heap, cancellationToken, snapshots, context.ReplayOptions?.ConcreteOpaqueValueProvider);
+        if (consumedApproximation || heap?.ConsumedApproximation == true)
+        {
+            return AbstentionReason.CounterexampleNotReplayable;
+        }
+        if (defined.Status != IrEvaluationStatus.Value || defined.Value is not { Kind: IrValueKind.Boolean })
+        {
+            return AbstentionReason.CounterexampleReplayFailed;
+        }
+        if (!defined.Value.Boolean)
+        {
+            return AbstentionReason.PostconditionMayBeUndefined;
         }
         var evaluated = interpreter.Evaluate(context.Postcondition, final, ObserveRead, heap, cancellationToken, snapshots, context.ReplayOptions?.ConcreteOpaqueValueProvider);
         if (consumedApproximation || heap?.ConsumedApproximation == true)

@@ -23,7 +23,7 @@ public sealed class BulkCollectorSpecificationConfigurationTests
             .OfType<IMethodSymbol>().Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Parameters.Length == 2 &&
                 candidate.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Int32))));
         var configuration = CompilerSpecificationPackProvider.ResolveConfiguration(["dotnet.scalar"]);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         Assert.That(CompilerSpecificationPackSelection.IsValid(configuration.SpecificationPackIds,
             configuration.SpecificationPackCatalogVersion, configuration.SpecificationPackCatalogSha256), Is.True);
         var provider = new CompilerSpecificationPackProvider(factory, configuration);

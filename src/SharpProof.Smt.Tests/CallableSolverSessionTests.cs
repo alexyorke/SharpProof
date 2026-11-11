@@ -14,7 +14,7 @@ public sealed class CallableSolverSessionTests
     [TestCase(64, false, ulong.MaxValue, 0UL)]
     public async Task ArithmeticWrapsAtTheDeclaredWidth(int width, bool isSigned, ulong input, ulong expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var x = factory.CreateVariable("x", type);
         var term = factory.Binary(IrBinaryOperator.Add, factory.Variable(x), factory.IntegerBits(type, 1));
@@ -30,7 +30,7 @@ public sealed class CallableSolverSessionTests
     [TestCase(false, false)]
     public async Task SignedAndUnsignedComparisonsUseTheirOwnOrdering(bool isSigned, bool less)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(8, isSigned);
         var x = factory.CreateVariable("x", type);
         var predicate = factory.Binary(IrBinaryOperator.LessThan, factory.Variable(x), factory.IntegerBits(type, 127));
@@ -48,7 +48,7 @@ public sealed class CallableSolverSessionTests
     public async Task CastsExtendBySourceSignednessAndTruncateBits(int sourceWidth, bool sourceSigned, ulong input,
         int targetWidth, bool targetSigned, ulong expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var source = factory.GetOrCreateIntegerType(sourceWidth, sourceSigned);
         var target = factory.GetOrCreateIntegerType(targetWidth, targetSigned);
         var x = factory.CreateVariable("x", source);
@@ -62,7 +62,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task InactiveBodyAssumptionsAndPreviousGoalsDoNotLeakIntoLaterQueries()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var positive = Assume(factory, factory.Variable(flag));
         var negative = Assume(factory, factory.Unary(IrUnaryOperator.Not, factory.Variable(flag)));
@@ -87,7 +87,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task CoreIndicesReferToCurrentAssumptionOrderAndDistinctEvidence()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var positive = Assume(factory, factory.Variable(flag));
         var otherPositive = Assume(factory, factory.Variable(flag));
@@ -109,7 +109,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task ModelProjectionExcludesPreviousVariablesAndCompletesExplicitUnusedInputs()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var old = factory.CreateVariable("old", factory.BooleanType);
         var current = factory.CreateVariable("current", factory.GetOrCreateIntegerType(64, false));
         var unusedBoolean = factory.CreateVariable("unused-boolean", factory.BooleanType);
@@ -125,7 +125,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task Unsigned64ModelReplaysBoundInputThroughTheActualOriginalCall()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, false);
         var input = factory.CreateVariable("input", type);
         var bodyInput = factory.CreateVariable("body-input", type);
@@ -164,10 +164,9 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task UnsupportedFactoriesAndDomainsFailClosed()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
-        Assert.Throws<ArgumentException>((Action)(() => new CallableSolverSession(new IrFactory(), new IrSmtBackendOptions())));
+        var factory = new IrFactory();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
-        var foreign = new IrFactory(IrExecutionSemantics.Total);
+        var foreign = new IrFactory();
         var result = await session.CheckAsync(Query(foreign, [], foreign.Boolean(false)), TestContext.CurrentContext.CancellationToken);
         Assert.That(result.FailureReason, Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
         var text = factory.CreateVariable("text", factory.StringType);
@@ -179,7 +178,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task UnsupportedOpaqueGoalsAndAssumptionsCannotContaminateLaterQueries()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var member = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType,
             "Unknown", factory.BooleanType, isStatic: true);
         var opaque = factory.PureOpaque(member, receiver: null);
@@ -224,7 +223,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task CachedTermsAreStillDepthValidatedBeforeAReusedCheck()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("deep", factory.BooleanType);
         IrTerm term = factory.Variable(variable);
         for (var index = 0; index < 255; index++)
@@ -243,7 +242,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task BooleanAndConditionalTermsKeepSelectedTypedValues()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var x = factory.CreateVariable("x", factory.IntegerType);
         var condition = factory.Binary(IrBinaryOperator.OrElse,
@@ -270,7 +269,7 @@ public sealed class CallableSolverSessionTests
     [TestCase(false, ulong.MaxValue)]
     public async Task TypedConditionalCounterexamplesKeepTheActualBooleanModelAndSelectedArm(bool selected, ulong expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(64, false);
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var value = factory.Conditional(factory.Variable(flag), factory.IntegerBits(type, 1), factory.IntegerBits(type, ulong.MaxValue));
@@ -288,7 +287,7 @@ public sealed class CallableSolverSessionTests
     [TestCase(3U)]
     public async Task ResourceLimitsChargeSetupAndRepeatedChecksUseTheirOwnToken(uint limit)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var query = Query(factory, [], factory.Boolean(false));
         using var limited = new CallableSolverSession(factory, new IrSmtBackendOptions(limit));
         var exhausted = await limited.CheckAsync(query, TestContext.CurrentContext.CancellationToken);
@@ -306,7 +305,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public void WarmEncoderStillChargesEveryExplicitModelVariableVisit()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variables = Enumerable.Range(0, 10).Select(index => factory.CreateVariable("v" + index, factory.BooleanType)).ToImmutableArray();
         var query = Query(factory, [], factory.Boolean(true), variables);
         using var context = new Context();
@@ -320,7 +319,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task QueuedCancellationCannotInterruptOrRetireAnotherActiveQuery()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         var runner = GetRunner(session);
         var gate = typeof(SmtNativeRunner).GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(runner)!;
@@ -345,7 +344,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task ActiveCancellationRetiresOnlyThatSessionAndDisposalDrainsQueuedChecks()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         using var cancellation = new CancellationTokenSource();
         var runner = GetRunner(session);
@@ -387,7 +386,7 @@ public sealed class CallableSolverSessionTests
     [Test]
     public async Task DisposalReleasesTheSolverAndAllCachedNativeExpressionsBeforeContextTeardown()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
         Assert.That((await session.CheckAsync(Query(factory,

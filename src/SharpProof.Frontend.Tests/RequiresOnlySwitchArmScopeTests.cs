@@ -55,7 +55,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
                 Is.EqualTo(SharpProof.Attributes.Contract.ConditionalSymbol));
         }
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, subject.Target);
         Assert.That(context.HasScalarSignature, Is.True);
         Assert.That(context.OwnsBody(subject.Graph.OriginalOperation), Is.True);
@@ -67,7 +67,7 @@ public sealed class RequiresOnlySwitchArmScopeTests
         Assert.That(context.IsExcludedSpecificationCall(ensuresCall), Is.True);
         Assert.That(context.IsSpecificationOperation(ensuresCall.Arguments.Single().Value), Is.True);
 
-        var completeFactory = new IrFactory(IrExecutionSemantics.Total);
+        var completeFactory = new IrFactory();
         var completeContext = new TotalLoweringContext(completeFactory, subject.Target);
         var completeBinding = new TotalContractBinder(subject.Compilation, completeFactory).BindTotal(completeContext);
         Assert.That(completeBinding.Failure, Is.EqualTo(hasSwitch

@@ -34,7 +34,7 @@ public sealed class NativeFieldGoalAdmissionTests
 
     private static async Task VerifyGoalAsync(string typeName, bool upcastStoreView, bool oldSnapshot)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var fieldType = typeName switch
         {
             "Boolean" => factory.BooleanType,

@@ -21,7 +21,7 @@ public sealed class CachedBuiltinQueryIsolationTests
             "uint-array" => Array.Empty<uint>(),
             _ => string.Empty
         }), Is.False);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm first = factory.EmptyArray(factory.GetOrCreateSequenceType(factory.IntegerType));
         IrTerm second = otherKind switch
         {

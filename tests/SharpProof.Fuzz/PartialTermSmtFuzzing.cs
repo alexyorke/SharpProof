@@ -46,10 +46,6 @@ internal static class PartialTermSmtCaseGenerator
             throw new ArgumentNullException(nameof(factory));
         }
 
-        if (factory.Semantics != IrExecutionSemantics.Total)
-        {
-            throw new ArgumentException("The guarded campaign requires Total IR semantics.", nameof(factory));
-        }
         var integerType = factory.GetOrCreateIntegerType(64, true);
         var guard = factory.CreateVariable(
             "partial-guard",

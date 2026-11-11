@@ -204,7 +204,7 @@ internal static class FuzzSourceCaseExecutor
 
         private static IrFactory CreateGeneratedFactory()
         {
-            return new IrFactory(IrExecutionSemantics.Total);
+            return new IrFactory();
         }
 
         private sealed class FiniteScope : IDisposable
@@ -347,7 +347,7 @@ internal static class FuzzSourceCaseExecutor
         private readonly SemanticModel _model;
         private readonly Type _runtime;
         private readonly ImmutableArray<MethodDeclarationSyntax> _methods;
-        internal IrFactory Factory { get; } = new(IrExecutionSemantics.Total);
+        internal IrFactory Factory { get; } = new();
 
         internal BooleanSourceScope(string members, CancellationToken cancellationToken)
         {

@@ -30,7 +30,7 @@ public sealed class NativeCanonicalStorageAdmissionTests
     {
         System.ArgumentNullException.ThrowIfNull(operation);
         System.ArgumentNullException.ThrowIfNull(storage);
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = operation switch
         {
             "allocate" => factory.ObjectType,

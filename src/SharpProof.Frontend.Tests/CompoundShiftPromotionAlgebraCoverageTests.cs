@@ -17,7 +17,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
     public void OwnedScalarPromotionPreservesWidthAndMaskedCount(
         int width, bool isSigned, long input, int count, long expected)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(width, isSigned);
         var valueVariable = factory.CreateVariable("value", type);
         var countVariable = factory.CreateVariable("count", factory.IntegerType);
@@ -37,7 +37,7 @@ public sealed class CompoundShiftPromotionAlgebraCoverageTests
     [TestCase(0, false)]
     public void OwnedScalarPromotionRejectsNonInt32SignedCount(int countWidth, bool isSigned)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var countType = countWidth == 0 ? factory.BooleanType : factory.GetOrCreateIntegerType(countWidth, isSigned);
         var valueVariable = factory.CreateVariable("value", factory.IntegerType);
         var countVariable = factory.CreateVariable("count", countType);

@@ -79,7 +79,7 @@ public sealed class MetadataInvocationBindingInvariantTests
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         var graph = ControlFlowGraph.Create(method, model)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
             CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);

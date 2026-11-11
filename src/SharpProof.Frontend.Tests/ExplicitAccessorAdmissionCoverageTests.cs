@@ -31,7 +31,7 @@ public sealed class ExplicitAccessorAdmissionCoverageTests
             var declaration = tree.GetRoot().DescendantNodes().OfType<AccessorDeclarationSyntax>().Single();
             var model = compilation.GetSemanticModel(tree);
             var target = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, target);
             var graph = ControlFlowGraph.Create(declaration, model)!;
             Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);

@@ -104,7 +104,7 @@ internal static class CompilerReachableSourceCollector
                     CSharpOperationSemantics.IsValueDomain(parameter.Type))) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
-                var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), method,
+                var context = new TotalLoweringContext(new IrFactory(), method,
                     tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (capturedTrees[ordinals[tree]].Path));
                 var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context,
                     cancellationToken: cancellationToken);
@@ -221,7 +221,7 @@ internal static class CompilerReachableSourceCollector
                 method.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (CSharpOperationSemantics.IsValueDomain(parameter.Type))) &&
                 (method.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(method.ReturnType)))
             {
-                var signatureFactory = new IrFactory(IrExecutionSemantics.Total);
+                var signatureFactory = new IrFactory();
                 var mapper = new RoslynTypeMapper(signatureFactory);
                 body = body with
                 {

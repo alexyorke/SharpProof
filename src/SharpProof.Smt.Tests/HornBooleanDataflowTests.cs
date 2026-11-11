@@ -9,7 +9,7 @@ public sealed class HornBooleanDataflowTests
     [Test]
     public async Task OneStepBooleanPhaseAgreesWithItsCounterInEveryReachableState()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var phase = factory.CreateVariable("done", factory.BooleanType);
         var counter = factory.CreateVariable("counter", factory.IntegerType);
         var done = factory.Variable(phase);

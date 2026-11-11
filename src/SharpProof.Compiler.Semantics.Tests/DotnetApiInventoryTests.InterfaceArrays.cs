@@ -102,7 +102,7 @@ public sealed partial class DotnetApiInventoryTests
         var compilation = CSharpCompilation.Create("InterfaceArraySkeleton", [tree], paths.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerShadowSourceBody(ControlFlowGraph.Create(syntax, model)!, context, static _ => true, TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.Classification.IsExact, Is.True);
@@ -135,7 +135,7 @@ public sealed partial class DotnetApiInventoryTests
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new global::System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new global::System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Check"));
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         // No callee preparation or opaque-call admission: each source helper
         // remains outside this lowering context and must retain its abstention.
@@ -171,7 +171,7 @@ public sealed partial class DotnetApiInventoryTests
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var graph = ControlFlowGraph.Create(syntax, model)!;
-        var context = new TotalLoweringContext(new IrFactory(IrExecutionSemantics.Total), model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
         context.TrackArrayReceivers(graph);
         var property = graph.Blocks.SelectMany(block => block is null ? throw new global::System.ArgumentNullException(nameof(block)) : (block.Operations.Concat(block.BranchValue == null ? [] : ImmutableArray.Create(block.BranchValue)))).SelectMany(operation => operation is null ? throw new global::System.ArgumentNullException(nameof(operation)) : (operation.DescendantsAndSelf())).OfType<Microsoft.CodeAnalysis.Operations.IPropertyReferenceOperation>().Single();
         Assert.That(context.ConcreteArray(property.Instance!) != null, Is.EqualTo(expected));
@@ -224,7 +224,7 @@ public sealed partial class DotnetApiInventoryTests
 
             var model = compilation.GetSemanticModel(tree);
             var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
             var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context);
             if (!lowered.IsExact)

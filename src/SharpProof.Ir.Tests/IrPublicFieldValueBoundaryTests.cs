@@ -9,7 +9,7 @@ public sealed class IrPublicFieldValueBoundaryTests
     [TestCase(false)]
     public void EntryFieldReadsRejectValuesOfADifferentDeclaredType(bool booleanField)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var fieldType = booleanField ? factory.BooleanType : factory.IntegerType;
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", fieldType, false);
         var owner = factory.CreateVariable("owner", factory.ObjectType);
@@ -31,7 +31,7 @@ public sealed class IrPublicFieldValueBoundaryTests
     [TestCase(false)]
     public void ProgramFieldReadsRejectMismatchedEntryValuesInTheCurrentHeap(bool booleanField)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var fieldType = booleanField ? factory.BooleanType : factory.IntegerType;
         var field = factory.GetOrCreateMember(factory.CreateIdentity(), factory.ObjectType, "field:Value", fieldType, false);
         var owner = factory.CreateVariable("owner", factory.ObjectType);

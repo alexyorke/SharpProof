@@ -36,7 +36,7 @@ public sealed class IrTypedIntegerDifferentialTests
             {
                 var values = global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValueFromBits(type, pair.Left)).SetItem(right, factory.CreateIntegerValueFromBits(type, pair.Right));
                 var result = oracle.Compare(term, values);
-                Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement),
+                Assert.That(result.Status, Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined),
                     $"{width}/{isSigned} {operation} ({pair.Left},{pair.Right}): {result.Detail}");
                 var folded = factory.Binary(operation, factory.IntegerBits(type, pair.Left),
                     factory.IntegerBits(type, pair.Right));
@@ -48,7 +48,7 @@ public sealed class IrTypedIntegerDifferentialTests
         {
             var result = oracle.Compare(negation,
                 global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(left, factory.CreateIntegerValueFromBits(type, bits)));
-            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement), result.Detail);
+            Assert.That(result.Status, Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined), result.Detail);
         }
     }
 
@@ -68,7 +68,7 @@ public sealed class IrTypedIntegerDifferentialTests
                 {
                     var target = factory.GetOrCreateIntegerType(width, isSigned);
                     var result = oracle.Compare(factory.Cast(target, factory.Variable(variable)), values);
-                    Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement),
+                    Assert.That(result.Status, Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined),
                         $"cast to {width}/{isSigned}: {result.Detail}");
                     AssertSameResult(new IrInterpreter(factory).Evaluate(
                         factory.Cast(target, factory.IntegerBits(source, bits))), result.Interpreted);
@@ -94,7 +94,7 @@ public sealed class IrTypedIntegerDifferentialTests
             {
                 var result = oracle.Compare(factory.Binary(operation,
                     factory.Variable(left), factory.Variable(right)), values);
-                Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement),
+                Assert.That(result.Status, Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined),
                     $"signed {width} minimum {operation} -1: {result.Detail}");
             }
         }
@@ -103,7 +103,7 @@ public sealed class IrTypedIntegerDifferentialTests
         var wrap = oracle.Compare(factory.Binary(IrBinaryOperator.Add,
                 factory.Variable(input), factory.Integer(unsigned, 1UL)),
             global::System.Collections.Immutable.ImmutableDictionary<IrVarId, IrValue>.Empty.SetItem(input, factory.CreateIntegerValue(unsigned, ulong.MaxValue)));
-        Assert.That(wrap.Status, Is.EqualTo(DifferentialStatus.Agreement), wrap.Detail);
+        Assert.That(wrap.Status, Is.AnyOf(DifferentialStatus.Agreement, DifferentialStatus.Undefined), wrap.Detail);
     }
 
     private static void AssertSameResult(IrEvaluationResult folded, IrEvaluationResult evaluated)

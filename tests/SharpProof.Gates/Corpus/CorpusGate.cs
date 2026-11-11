@@ -85,7 +85,7 @@ internal static class CorpusGate
         var boundRequires = 0;
         foreach (var call in calls)
         {
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var context = new TotalLoweringContext(factory, call.Target);
             var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context);
             if (!binding.IsSuccess)
@@ -118,7 +118,7 @@ internal static class CorpusGate
                 if (call.OriginKind != PotentialRequiresCallOrigin.Operation || call.Target.DeclaringSyntaxReferences.Length != 1)
                 { failures.Add("UnsupportedClauseOwner:" + owner.CallableId); continue; }
                 var callDocument = documents[call.Syntax.SyntaxTree];
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var context = new TotalLoweringContext(factory, call.Target);
                 var binding = new TotalContractBinder(compilation, factory).BindTotalRequires(context, cancellationToken);
                 if (!binding.IsSuccess)

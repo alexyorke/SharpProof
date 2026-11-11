@@ -99,7 +99,7 @@ internal sealed class TotalProgramSourceReplay
                 }
                 catch (TargetInvocationException exception) when (exception.InnerException != null)
                 { expectedException = exception.InnerException; }
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var declared = model.GetDeclaredSymbol(method, cancellationToken) as IMethodSymbol
                     ?? throw new InvalidOperationException("Generated Total method has no declared method symbol.");
                 var context = new TotalLoweringContext(factory, declared);

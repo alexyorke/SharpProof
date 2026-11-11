@@ -209,7 +209,7 @@ public sealed class TotalProgramSourceReplayTests
                 values.Add(runtime.GetMethod(name, BindingFlags.Public | BindingFlags.Static)!
                     .Invoke(null, [7L]));
                 var method = methods[name];
-                var factory = new IrFactory(IrExecutionSemantics.Total);
+                var factory = new IrFactory();
                 var declared = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
                 var loweringContext = new TotalLoweringContext(factory, declared);
                 var lowering = RoslynProgramLowering.LowerCandidate(

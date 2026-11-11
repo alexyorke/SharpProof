@@ -22,7 +22,7 @@ public sealed class NativeSynchronizationProjectionTests
     {
         System.ArgumentNullException.ThrowIfNull(shape);
         Install();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         var site = factory.CreateOperation("original-lock");
@@ -142,7 +142,7 @@ public sealed class NativeSynchronizationProjectionTests
     public async Task ExpressionDepthPreflightRejectsDeepRequires()
     {
         Install();
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateIntegerType(32, true);
         var input = factory.CreateVariable("entry:0", type);
         var current = factory.CreateVariable("current:0", type);

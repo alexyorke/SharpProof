@@ -142,7 +142,7 @@ public sealed class SourceNativeIntegerConditionalEmissionApiTests
         Assert.DoesNotThrow((Action)(() => elided = policy.IsElided(invocation)));
         Assert.That(elided, Is.EqualTo(!enabled));
         var graph = ControlFlowGraph.Create(targetSyntax, model)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, (IMethodSymbol)model.GetDeclaredSymbol(targetSyntax)!);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);

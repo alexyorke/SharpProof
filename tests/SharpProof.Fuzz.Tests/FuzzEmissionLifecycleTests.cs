@@ -209,7 +209,7 @@ public sealed class FuzzEmissionLifecycleTests
                 TestContext.CurrentContext.CancellationToken);
             Assert.That(operation, Is.Not.Null);
             Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
-            var factory = new IrFactory(IrExecutionSemantics.Total);
+            var factory = new IrFactory();
             var lowering = FrontendTotalLowering.Lower(factory, operation);
             Assert.That(lowering.IsExact, Is.True);
             var binding = lowering.Variables.Single();
@@ -308,7 +308,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(operation, Is.Not.Null);
         Assert.That(operation!.Syntax.SyntaxTree, Is.SameAs(tree));
         Assert.That(operation.ConstantValue.HasValue, Is.False);
-        var lowering = FrontendTotalLowering.Lower(new IrFactory(IrExecutionSemantics.Total), operation);
+        var lowering = FrontendTotalLowering.Lower(new IrFactory(), operation);
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Term, Is.TypeOf<IrOpaqueTerm>());
         var results = FrontendDifferentialOracle.CompareBatch([positive, negative], cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -448,7 +448,7 @@ public sealed class FuzzEmissionLifecycleTests
         Assert.That(sourceOperators.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.IsKind(SyntaxKind.LogicalNotExpression))), Is.True);
         Assert.That(model.GetOperation(guardSyntax.ExpressionBody.Expression), Is.Not.Null);
 
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var variable = factory.CreateVariable("value", factory.BooleanType);
         var formula = factory.Variable(variable);
         var guardVariable = factory.CreateVariable("guard", factory.BooleanType);

@@ -13,8 +13,6 @@ internal static class ResourceMemoryProgram
         program = ArgumentNullGuard.NotNull(program, nameof(program));
         layout = ArgumentNullGuard.NotNull(layout, nameof(layout));
         cancellation.ThrowIfCancellationRequested();
-        if (program.Factory.Semantics != IrExecutionSemantics.Total)
-        { return Unknown("MemoryProgramRequiresTotalSemantics"); }
         if (program.Blocks.Length > ResourceMemoryTrace.MaximumEvents / 4)
         { return Unknown("MemoryProgramBudgetExceeded"); }
         if (program.Entry.Scope != program.Scope)

@@ -9,7 +9,7 @@ public sealed class HornUnknownDataflowTests
     [Test]
     public async Task RepeatedMaskedInputEstablishesTheSameBoundedCounterState()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var counter = factory.CreateVariable("counter", factory.IntegerType);
         var input = factory.CreateVariable("input", factory.IntegerType);
         var current = factory.Variable(counter);

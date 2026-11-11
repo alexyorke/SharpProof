@@ -68,7 +68,7 @@ public sealed class MetadataZeroArgumentCallDepthApiTests
         var declaration = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var target = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
         var graph = ControlFlowGraph.Create(declaration, model)!;
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, target);
         Assert.That(context.OwnsBody(graph.OriginalOperation), Is.True);
         Assert.That(context.HasScalarSignature, Is.True);

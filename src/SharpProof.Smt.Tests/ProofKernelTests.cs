@@ -58,7 +58,7 @@ internal sealed class ProofKernelTests
     [TestCase(true)]
     public async Task TotalNominalReferenceWitnessesMustReplayTheRequestedIdentityPredicate(bool isNull)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
         var variable = factory.CreateVariable("node", type);
         var predicate = factory.Binary(isNull ? IrBinaryOperator.NotEqual : IrBinaryOperator.Equal,
@@ -75,10 +75,10 @@ internal sealed class ProofKernelTests
     [TestCase(true)]
     public async Task MatchingNominalReferenceNamesDoNotAuthorizeForeignTypesOrFactories(bool foreignFactory)
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var type = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Node<T>");
         var variable = factory.CreateVariable("node", type);
-        var other = foreignFactory ? new IrFactory(IrExecutionSemantics.Total) : factory;
+        var other = foreignFactory ? new IrFactory() : factory;
         var otherType = other.GetOrCreateReferenceType(other.CreateIdentity(), "Node<T>");
         var query = new VerificationQuery(factory, [], new Goal(factory, factory.Boolean(false),
             ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
@@ -159,7 +159,9 @@ internal sealed class ProofKernelTests
                 ]))))
             .VerifyAsync(new VerificationQuery(factory, [], goal, [text]), TestContext.CurrentContext.CancellationToken);
 
-        ImmutableArray<ProofOutcome> outcomes = [missing, wrongType, unsupported];
+        // Total replay evaluates string models, so that counterexample replays.
+        Assert.That(unsupported, Is.TypeOf<RefutedOutcome>());
+        ImmutableArray<ProofOutcome> outcomes = [missing, wrongType];
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
         Assert.That(
             outcomes.Cast<UnknownOutcome>()
@@ -252,10 +254,11 @@ internal sealed class ProofKernelTests
     {
         var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var boxType = factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Box");
+        var read = factory.GetOrCreateMember(factory.CreateIdentity(), boxType, "Read", factory.IntegerType, isStatic: false);
+        // A read through a null receiver faults even in Total IR.
         var predicate = factory.Binary(IrBinaryOperator.Equal,
-            factory.Binary(IrBinaryOperator.Divide,
-                factory.Integer(0), factory.Variable(divisor)),
-            factory.Integer(0));
+            factory.PureOpaque(read, factory.Null(boxType)), factory.Variable(divisor));
         var query = new VerificationQuery(factory, [],
             new Goal(factory, predicate, diagnosticKind, new SourceLocationId(0)),
             [divisor]);

@@ -61,7 +61,7 @@ public sealed class FuzzBoundaryCoverageTests
     [Test]
     public async Task FiniteDomainRejectsUnsupportedVariableAndInvalidFormula()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var text = factory.CreateVariable("text", factory.StringType);
         var formula = factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(text), factory.String("a"));
@@ -89,7 +89,7 @@ public sealed class FuzzBoundaryCoverageTests
     [Test]
     public void FiniteDomainRecognizesDefinedAssignments()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var x = factory.CreateVariable("x", factory.IntegerType);
         var defined = factory.Binary(IrBinaryOperator.Equal,
             factory.Variable(x), factory.Integer(1));
@@ -104,7 +104,7 @@ public sealed class FuzzBoundaryCoverageTests
     [Test]
     public async Task FiniteDomainAbstainsWhenRealFormulaExceedsAssignmentLimit()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         IrTerm formula = factory.Boolean(true);
         for (var index = 0; index < 17; index++)
         {

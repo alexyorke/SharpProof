@@ -12,7 +12,7 @@ public sealed class AnalyzerCoreDomainCoverageTests
     [Test]
     public void UnreachableProgramStateIsAnIdentityForWidening()
     {
-        var factory = new IrFactory(IrExecutionSemantics.Total);
+        var factory = new IrFactory();
         var flag = factory.CreateVariable("flag", factory.BooleanType);
         var value = factory.CreateVariable("value", factory.IntegerType);
         var text = factory.CreateVariable("text", factory.StringType);
