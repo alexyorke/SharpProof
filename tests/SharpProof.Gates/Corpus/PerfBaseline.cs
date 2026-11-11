@@ -37,19 +37,29 @@ internal static class PerfBaseline
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
         var document = OpenSourceCorpusCatalog.Load(repositoryRoot);
-        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, cancellationToken, purity: true);
-        WorkerVerifyResponse? observed = null;
-        _ = await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken,
-            new WorkerBudgets { MaxParallelism = 1 }, response => observed = response).ConfigureAwait(false);
-        var response = observed ?? throw new InvalidDataException("The corpus produced no worker response.");
-        var costs = response.Summary.Costs?.Callables ?? [];
+        var costs = ImmutableArray.CreateBuilder<WorkerCallableCost>();
+        var projectElapsed = 0L;
+        // Each corpus source compiles as its own assembly; verify them in a fixed order.
+        foreach (var (compilation, _) in OpenSourceCorpusRunner.PrepareExceptionProbes(document, cancellationToken, purity: true))
+        {
+            WorkerVerifyResponse? observed = null;
+            _ = await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken,
+                new WorkerBudgets { MaxParallelism = 1 }, response => observed = response).ConfigureAwait(false);
+            if (observed == null)
+            {
+                // A source with no verification targets produces no worker run.
+                continue;
+            }
+            costs.AddRange(observed.Summary.Costs?.Callables ?? []);
+            projectElapsed += observed.Summary.ElapsedMilliseconds;
+        }
         return new PerfBaselineReport
         {
-            Callables = costs.Length,
+            Callables = costs.Count,
             TotalRlimit = costs.Sum(static cost => cost.ConsumedRlimit),
             TotalElapsedMilliseconds = costs.Sum(static cost => cost.ElapsedMilliseconds),
-            ProjectElapsedMilliseconds = response.Summary.ElapsedMilliseconds,
-            CallableCosts = costs
+            ProjectElapsedMilliseconds = projectElapsed,
+            CallableCosts = costs.ToImmutable()
         };
     }
 
