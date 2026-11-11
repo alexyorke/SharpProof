@@ -6,12 +6,9 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
-- Ship the portable analyzer as one assembly and drop the separate logging
-  assembly: `SharpProof.Analyzer.Core.dll` is now part of `SharpProof.Analyzer.dll`,
-  and `SharpProof.Logging.dll` is now part of the worker. Neither file is in the
-  verifier package any more. A source-tree consumer that referenced
-  `src/SharpProof.Analyzer.Core` or loaded either DLL by path should use
-  `SharpProof.Analyzer` alone.
+- Drop the separate logging assembly: `SharpProof.Logging.dll` is now part of
+  the worker and is no longer in the verifier package. Nothing loads it by path
+  outside the worker.
 - Point templates, `init` and the consumer workflow at nuget.org instead of the
   private GitHub feed and its credentials; the workflow still accepts that feed with
   `package-read-token`. The package version moves to `1.0.0-preview.2`. It is not
