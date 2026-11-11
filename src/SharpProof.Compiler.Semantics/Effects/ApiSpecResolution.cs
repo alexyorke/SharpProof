@@ -314,16 +314,8 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
         var identity = assembly.Identity;
-        var token = HashEncoding.ToLowerHex(identity.PublicKeyToken);
-        bool IdentityMatches(ApiSpecAssemblyIdentity approved)
-        {
-            approved = RepositoryParameterGuard.NotNull(approved, nameof(approved));
-            return string.Equals(approved.Name, identity.Name, StringComparison.Ordinal) &&
-            string.Equals(approved.PublicKeyToken, token, StringComparison.OrdinalIgnoreCase);
-        }
-
         var identityMatches = target.ApprovedAssemblies
-            .Where(IdentityMatches)
+            .Where(approved => approved is null ? throw new System.ArgumentNullException(nameof(approved)) : ApiSpecAssemblyMatching.Matches(approved, identity))
             .ToImmutableArray();
         if (identityMatches.Length == 0)
         {

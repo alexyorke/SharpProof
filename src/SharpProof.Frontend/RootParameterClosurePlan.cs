@@ -177,14 +177,8 @@ internal sealed class RootParameterClosurePlan
         foreach (var capture in orderedCaptures)
         {
             var type = capture is IParameterSymbol parameter ? parameter.Type : ((ILocalSymbol)capture).Type;
-            var storage = type.IsReferenceType ? ResourceStorageKind.Reference : type.SpecialType switch
-            {
-                SpecialType.System_Boolean or SpecialType.System_Byte or SpecialType.System_SByte => ResourceStorageKind.Byte,
-                SpecialType.System_Int16 or SpecialType.System_UInt16 or SpecialType.System_Char => ResourceStorageKind.Word16,
-                SpecialType.System_Int32 or SpecialType.System_UInt32 => ResourceStorageKind.Word32,
-                SpecialType.System_Int64 or SpecialType.System_UInt64 => ResourceStorageKind.Word64,
-                _ => ResourceStorageKind.Unspecified
-            };
+            var storage = type.IsReferenceType ? ResourceStorageKind.Reference
+                : ResourceStorageKinds.Primitive(type.SpecialType, includeFloatingPoint: false);
             if (storage == ResourceStorageKind.Unspecified)
             { return null; }
             fields.Add(storage);

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 
 namespace SharpProof.Specs;
@@ -25,7 +24,7 @@ internal static class ResourceCatalogIdentity
     internal static string Sha256Upper(string value)
     {
         value = ArgumentNullGuard.NotNull(value, nameof(value));
-        using var hash = SHA256.Create();
-        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-", string.Empty);
+        // Catalog identities are persisted in upper case.
+        return HashEncoding.ComputeSha256Hex([.. Encoding.UTF8.GetBytes(value)]).ToUpperInvariant();
     }
 }

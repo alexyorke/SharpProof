@@ -172,7 +172,7 @@ internal static class NativeEffectClaims
         {
             { ExceptionWitness: { Kind: IrExceptionKind.Explicit } } => ("explicit-throw",
                 ExplicitThrowSites.TypeName(ExplicitThrowSites.Types(factory, site.Value).FirstOrDefault() ?? "System.Exception"), WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
-            { ExceptionWitness: { } exception } => ("implicit-throw", ExplicitThrowSites.TypeName(exception.Kind),
+            { ExceptionWitness: { } exception } => ("implicit-throw", IrExceptionKindFacts.MetadataName(exception.Kind),
                 WorkerEffectSet.Throws, WorkerEffectCapabilitySet.None),
             { AllocationWitness: { } allocation } => (IsArray(program, allocation) ? "managed-array-allocation" : "managed-allocation",
                 Describe(factory, allocation), WorkerEffectSet.Allocates, WorkerEffectCapabilitySet.None),

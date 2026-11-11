@@ -197,7 +197,7 @@ internal sealed partial class NativeSpecifiedCallTests
             var result = await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
             Assert.That(result.Outcome is ProvenOutcome, Is.EqualTo(expected), result.Reason.ToString());
         }
-        Assert.That(ExplicitThrowSites.TypeName(SharpProof.Ir.IrExceptionKind.ArgumentOutOfRange), Is.EqualTo("System.ArgumentOutOfRangeException"));
+        Assert.That(SharpProof.Ir.IrExceptionKindFacts.MetadataName(SharpProof.Ir.IrExceptionKind.ArgumentOutOfRange), Is.EqualTo("System.ArgumentOutOfRangeException"));
     }
 
     [Test]
