@@ -10,7 +10,7 @@
   "worker": {
     "protocolVersion": 46,
     "manifestSchemaVersion": 7,
-    "compilerArtifactSchemaVersion": 57,
+    "compilerArtifactSchemaVersion": 58,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,

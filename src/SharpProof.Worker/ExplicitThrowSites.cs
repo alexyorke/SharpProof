@@ -30,21 +30,6 @@ internal static class ExplicitThrowSites
         return separator < 0 ? identity : identity[(separator + 2)..];
     }
 
-    internal static string TypeName(IrExceptionKind kind)
-    {
-        return kind switch
-        {
-            IrExceptionKind.NullReference => "System.NullReferenceException",
-            IrExceptionKind.DivideByZero => "System.DivideByZeroException",
-            IrExceptionKind.Overflow => "System.OverflowException",
-            IrExceptionKind.IndexOutOfRange => "System.IndexOutOfRangeException",
-            IrExceptionKind.ArgumentOutOfRange => "System.ArgumentOutOfRangeException",
-            IrExceptionKind.InvalidCast => "System.InvalidCastException",
-            IrExceptionKind.Argument => "System.ArgumentException",
-            _ => "System.Exception"
-        };
-    }
-
     private static string Describe(IrFactory factory, OperationId site)
     { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

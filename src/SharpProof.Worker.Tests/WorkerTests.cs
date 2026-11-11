@@ -5525,6 +5525,27 @@ internal sealed partial class WorkerTests
                     WorkerProtocolVersions.Current,
                     System.Globalization.CultureInfo.InvariantCulture)));
             Assert.That(
+                worker.GetProperty("manifestSchemaVersion").GetInt32(),
+                Is.EqualTo(WorkerManifestVersions.Current));
+            Assert.That(
+                worker.GetProperty("compilerArtifactSchemaVersion").GetInt32(),
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
+            Assert.That(
+                worker.GetProperty("maximumCompilerReferenceModuleBytes").GetInt32(),
+                Is.EqualTo(CompilerReferenceLimits.MaximumModuleBytes));
+            Assert.That(
+                worker.GetProperty("maximumCompilerReferenceClosureBytes").GetInt32(),
+                Is.EqualTo(CompilerReferenceLimits.MaximumClosureBytes));
+            Assert.That(
+                worker.GetProperty("maximumCompilerReferenceModules").GetInt32(),
+                Is.EqualTo(CompilerReferenceLimits.MaximumModuleCount));
+            Assert.That(
+                worker.GetProperty("relationalSummarySchemaVersion").GetInt32(),
+                Is.EqualTo(CompilerRelationalSummaryVersions.Current));
+            Assert.That(
+                worker.GetProperty("specificationPackSchemaVersion").GetInt32(),
+                Is.EqualTo(CompilerSpecificationPackVersions.Current));
+            Assert.That(
                 worker.GetProperty("maximumParallelism").GetInt32(),
                 Is.EqualTo(WorkerBudgets.MaximumParallelism));
             Assert.That(

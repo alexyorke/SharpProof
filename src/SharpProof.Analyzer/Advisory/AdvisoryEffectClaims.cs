@@ -165,7 +165,7 @@ internal static class AdvisoryEffectClaims
             var listed = allowed.Select(CompilerExceptionTypeIdentity.Encode).ToImmutableHashSet(StringComparer.Ordinal);
             return site.ThrownTypes.Any(listed.Contains);
         }
-        var runtime = compilation.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(site.Exception));
+        var runtime = compilation.GetTypeByMetadataName(IrExceptionKindFacts.MetadataName(site.Exception));
         return runtime != null && allowed.Any(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (EffectTypeFacts.IsDerivedFrom(runtime, type)));
     }
 
@@ -174,6 +174,6 @@ internal static class AdvisoryEffectClaims
         site = RepositoryParameterGuard.NotNull(site, nameof(site));
         return site.Exception == IrExceptionKind.Explicit
             ? "an explicit exception"
-            : CSharpOperationSemantics.ExceptionMetadataName(site.Exception);
+            : IrExceptionKindFacts.MetadataName(site.Exception);
     }
 }

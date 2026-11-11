@@ -38,7 +38,7 @@ internal sealed partial class WorkerTests
             Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
                 instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation)), Is.True);
             Assert.That(total.ExceptionConstraints.Single().AllowedKinds, Does.Contain(kind));
-            Assert.That(ExplicitThrowSites.TypeName(kind), Is.EqualTo("System.InvalidCastException"));
+            Assert.That(IrExceptionKindFacts.MetadataName(kind), Is.EqualTo("System.InvalidCastException"));
         }
 
         using var project = TestProject.Create(source);

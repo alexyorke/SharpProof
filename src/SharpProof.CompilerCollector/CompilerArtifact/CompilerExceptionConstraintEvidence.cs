@@ -19,7 +19,7 @@ internal static class CompilerExceptionConstraintEvidence
             var allowed = ImmutableArray.CreateBuilder<IrExceptionKind>();
             foreach (var kind in ExceptionKinds)
             {
-                var runtime = core.GetTypeByMetadataName(CSharpOperationSemantics.ExceptionMetadataName(kind));
+                var runtime = core.GetTypeByMetadataName(IrExceptionKindFacts.MetadataName(kind));
                 if (runtime == null)
                 { return []; }
                 if (listsTypes &&

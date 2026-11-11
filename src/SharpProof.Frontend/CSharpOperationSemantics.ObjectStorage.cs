@@ -40,14 +40,8 @@ internal static partial class CSharpOperationSemantics
             { continue; }
             if (field.IsFixedSizeBuffer || fields.Count == ResourceAllocationShape.MaximumFields)
             { return null; }
-            var storage = field.Type.IsReferenceType ? ResourceStorageKind.Reference : field.Type.SpecialType switch
-            {
-                SpecialType.System_Boolean or SpecialType.System_Byte or SpecialType.System_SByte => ResourceStorageKind.Byte,
-                SpecialType.System_Char or SpecialType.System_Int16 or SpecialType.System_UInt16 => ResourceStorageKind.Word16,
-                SpecialType.System_Int32 or SpecialType.System_UInt32 => ResourceStorageKind.Word32,
-                SpecialType.System_Int64 or SpecialType.System_UInt64 => ResourceStorageKind.Word64,
-                _ => ResourceStorageKind.Unspecified
-            };
+            var storage = field.Type.IsReferenceType ? ResourceStorageKind.Reference
+                : ResourceStorageKinds.Primitive(field.Type.SpecialType, includeFloatingPoint: false);
             if (storage == ResourceStorageKind.Unspecified)
             { return null; }
             fields.Add(storage);

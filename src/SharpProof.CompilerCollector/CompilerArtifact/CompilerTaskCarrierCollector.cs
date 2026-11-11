@@ -833,14 +833,9 @@ internal sealed class CompilerTaskCarrierCollector
             cancellation.ThrowIfCancellationRequested();
             if (field.IsStatic)
             { continue; }
-            var storage = field.Type.SpecialType switch
-            {
-                SpecialType.System_Boolean or SpecialType.System_Byte or SpecialType.System_SByte => ResourceStorageKind.Byte,
-                SpecialType.System_Char or SpecialType.System_Int16 or SpecialType.System_UInt16 => ResourceStorageKind.Word16,
-                SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Single => ResourceStorageKind.Word32,
-                SpecialType.System_Int64 or SpecialType.System_UInt64 or SpecialType.System_Double => ResourceStorageKind.Word64,
-                _ => field.Type.IsReferenceType ? ResourceStorageKind.Reference : ResourceStorageKind.Unspecified
-            };
+            var storage = ResourceStorageKinds.Primitive(field.Type.SpecialType, includeFloatingPoint: true);
+            if (storage == ResourceStorageKind.Unspecified && field.Type.IsReferenceType)
+            { storage = ResourceStorageKind.Reference; }
             if (storage != ResourceStorageKind.Unspecified)
             { fields.Add(storage); }
             else if (field.Type is INamedTypeSymbol named && named.ContainingAssembly.Identity.ToString() == framework &&
