@@ -18,7 +18,8 @@ Use the canonical Linux amd64 container for repository execution. Host commands 
 | Clean package graph | `tooling pack -Configuration Release` | Exact-commit product packages; `tooling pack-tool` packs the optional developer packages |
 | Retained and rotating fuzz | `tooling fuzz-nightly -Configuration Release` | Bounded clean-source campaign with validated per-run results |
 | Verification performance | `tooling perf-baseline` | Verifies the pinned corpus on one solver lane and writes per-callable solver work and time to `artifacts/perf` |
-| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline and bounded fuzz; CI uploads all evidence |
+| Self-verification cost | `tooling perf-self` | Verifies every tracked `src/` project with SharpProof applied, writes each worker result to `artifacts/perf/self/<project>.json` and per-project totals to `artifacts/perf/self-summary.md`; advisory |
+| Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline, bounded fuzz and, last, self-verification cost; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 
 The dispatcher [Invoke-SharpProofContainer.ps1](../eng/scripts/Invoke-SharpProofContainer.ps1) owns accepted commands and parameters. [contract.json](../eng/acceptance/contract.json) owns test parallelism and wall-time budgets. A successful selected test or feedback profile establishes only its selected scope.
@@ -59,6 +60,7 @@ PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes,
 - `worker-a1`, `worker-a4`, `worker-b`, `projects-a`, `projects-b`, `gates-corpus-a`, `gates-corpus-b`, `gates-shards`: `coverage -CoveragePart Semantic -TaskGroup <group>`. The lane-to-group mapping is in `ci.sh`; WorkerA is split further into WorkerA1 and WorkerA4. Each lane builds only its task group's closure, without analyzers.
 - `package-0`..`package-5`: `coverage -CoveragePart Package -PackagePartitionCount 6 -PackagePartition <n>`. Each test filter, largest first, goes to the partition with the fewest cases of its class: a case renamed with `TestName=` is placed on its own, and a method's other parameter cases stay together.
 - `self-apply`: SharpProof's own analyzer over `src/`, then the package-backed samples. It skips the .NET and code-style analyzers that `build` already enforces.
+- `perf-self` (in `nightly`): the same `src/` builds with `SharpProofVerify=true`. It packs the verifier from the bootstrap build and imports it into each build, so the worker runs on SharpProof's own code with the response cache off. Build exit codes go to `artifacts/perf/self-builds.json`. Refuted claims, timeouts and cost changes never fail it, because the input changes with every commit; it fails only when the tooling itself fails or no project publishes a result.
 - `repository`: lint, `docs`, `layout`, the tooling and consumer-baseline regression suites, and a Grype scan of the tooling image.
 - `evidence`: the API inventory and catalog evidence tests, and `coverage -CoveragePart Isolated`.
 

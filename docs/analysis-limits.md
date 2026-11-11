@@ -34,6 +34,13 @@ The comparison is advisory until the reference sets `enforced`; then an increase
 `maximumIncreasePercent` fails nightly. Update the reference deliberately, like the
 corpus ratchets, when a change is expected to alter solver work.
 
+`tooling perf-self`, also nightly, measures the same costs on SharpProof's own `src/`
+projects with the default budgets above and the cache off. It writes per-project
+totals and the ten costliest callables to `artifacts/perf/self-summary.md`, which CI
+adds to the step summary. It has no reference and never fails on outcomes, timeouts or
+cost: the input changes with every commit, so read it as a trend and as a pointer to
+the callables worth simplifying.
+
 The nightly fuzz runner rebuild uses the 600-second solution-build allowance in
 [contract.json](../eng/acceptance/contract.json), rather than the worker's
 300000-millisecond (300-second) per-project default above. Retained runner invocations
