@@ -11,7 +11,7 @@ internal static class TestMetadataReferences
 
     internal static ImmutableArray<MetadataReference> SortedPlatform { get; } =
         [.. Platform.OrderBy(
-            static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display ?? string.Empty),
+            static reference => reference.Display ?? string.Empty,
             StringComparer.Ordinal)];
 
     internal static ImmutableArray<MetadataReference> SortedDistinctPlatform { get; } =
@@ -22,10 +22,10 @@ internal static class TestMetadataReferences
         WithAdditionalPaths([typeof(Contract).Assembly.Location], sort: false);
 
     internal static ImmutableArray<MetadataReference> WithoutSharpProof { get; } =
-        [.. Platform.Where(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (!string.Equals(
+        [.. Platform.Where(static reference => !string.Equals(
             Path.GetFileNameWithoutExtension(reference.Display),
             "SharpProof.Attributes",
-            StringComparison.OrdinalIgnoreCase)))];
+            StringComparison.OrdinalIgnoreCase))];
 
     internal static ImmutableArray<MetadataReference> CoreLibraryOnly { get; } =
         [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)];
@@ -37,7 +37,7 @@ internal static class TestMetadataReferences
         System.ArgumentNullException.ThrowIfNull(fileNames);
         var names = fileNames.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         IEnumerable<string> paths = Platform
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display))
+            .Select(static reference => reference.Display)
             .Where(path => path != null &&
                 names.Contains(Path.GetFileName(path)!))
             .Select(static path => path!);
@@ -45,11 +45,11 @@ internal static class TestMetadataReferences
             .Distinct(StringComparer.OrdinalIgnoreCase);
         if (sort)
         {
-            paths = paths.OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.Ordinal);
+            paths = paths.OrderBy(static path => path, StringComparer.Ordinal);
         }
 
         return [.. paths.Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : ((MetadataReference)MetadataReference.CreateFromFile(path)))];
+            (MetadataReference)MetadataReference.CreateFromFile(path))];
     }
 #endif
 
@@ -59,16 +59,16 @@ internal static class TestMetadataReferences
     {
         System.ArgumentNullException.ThrowIfNull(additionalPaths);
         IEnumerable<string> paths = Platform
-            .Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display!))
+            .Select(static reference => reference.Display!)
             .Concat(additionalPaths)
             .Distinct(StringComparer.OrdinalIgnoreCase);
         if (sort)
         {
-            paths = paths.OrderBy(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (path), StringComparer.OrdinalIgnoreCase);
+            paths = paths.OrderBy(static path => path, StringComparer.OrdinalIgnoreCase);
         }
 
         return [.. paths.Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : ((MetadataReference)MetadataReference.CreateFromFile(path)))];
+            (MetadataReference)MetadataReference.CreateFromFile(path))];
     }
 
     private static ImmutableArray<MetadataReference> CreatePlatformReferences()
@@ -79,7 +79,7 @@ internal static class TestMetadataReferences
                 "Trusted platform assemblies are unavailable.");
         return [.. trustedPlatformAssemblies
             .Split(Path.PathSeparator)
-            .Select(static path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path)))];
+            .Select(static path => MetadataReference.CreateFromFile(path))];
     }
 
 }

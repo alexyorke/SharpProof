@@ -59,15 +59,15 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         var candidate = implicitConsumer.GetTypeByMetadataName(ContractApiMetadata.Contract);
         Assert.That(candidate, Is.Not.Null, "The actual SDK must expose its implicitly resolved declaration.");
         Assert.That(candidate!.TypeKind, Is.Not.EqualTo(TypeKind.Error));
-        Assert.That(candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource)), Is.False);
-        Assert.That(candidate.Locations.Any(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
+        Assert.That(candidate.Locations.Any(static location => location.IsInSource), Is.False);
+        Assert.That(candidate.Locations.Any(static location => location.IsInMetadata), Is.True);
         Assert.That(candidate.ContainingAssembly.Identity, Is.EqualTo(attributesOwner.Identity));
         Assert.That(SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
             implicitConsumer.GetAssemblyOrModuleSymbol(attributesReference)), Is.True);
-        Assert.That(implicitConsumer.References.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (ReferenceEquals(reference, attributesReference))), Is.False);
+        Assert.That(implicitConsumer.References.Any(reference => ReferenceEquals(reference, attributesReference)), Is.False);
         Assert.That(implicitConsumer.References.Any(reference =>
-            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
-                implicitConsumer.GetAssemblyOrModuleSymbol(reference)))), Is.False);
+            SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly,
+                implicitConsumer.GetAssemblyOrModuleSymbol(reference))), Is.False);
         var requested = missing.Requests.Where(request => request.Identity.Equals(attributesOwner.Identity)).ToImmutableArray();
         Assert.That(requested, Is.Not.Empty);
         foreach (var request in requested)
@@ -92,7 +92,7 @@ public sealed class AuthenticImplicitContractReferenceApiTests
         Assert.That(explicitCandidate, Is.Not.Null);
         Assert.That(SymbolEqualityComparer.Default.Equals(explicitCandidate!.ContainingAssembly,
             explicitConsumer.GetAssemblyOrModuleSymbol(attributesReference)), Is.True);
-        Assert.That(explicitConsumer.References.Any(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (ReferenceEquals(reference, attributesReference))), Is.True);
+        Assert.That(explicitConsumer.References.Any(reference => ReferenceEquals(reference, attributesReference)), Is.True);
         var accepted = ContractApiIdentityResolver.ForCompilation(explicitConsumer);
         Assert.That(accepted.Contract, Is.SameAs(explicitCandidate));
         Assert.That(accepted.Result, Is.Not.Null);
@@ -124,8 +124,8 @@ public sealed class AuthenticImplicitContractReferenceApiTests
     private static void RequireNoErrors(CSharpCompilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors, Is.Empty, string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
     }
 
     private static void RequireEmit(CSharpCompilation compilation)

@@ -30,8 +30,8 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
 {
     private static readonly ImmutableDictionary<ushort, OpCode> s_opCodes = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .ToImmutableDictionary(opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
 
     private static readonly ImmutableArray<Case> s_cases =
@@ -97,13 +97,13 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         });
         Assert.That(string.Equals(sourceHash, subject.SourceHash, StringComparison.OrdinalIgnoreCase), Is.True);
         Assert.That(parseOptions.PreprocessorSymbolNames, Is.Empty);
-        Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilerDiagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var bytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
         await File.WriteAllBytesAsync(Path.Combine(evidence, "Subject.dll"), bytes.AsMemory());
 
         var syntax = (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == subject.Method));
+            .Single(method => method.Identifier.ValueText == subject.Method);
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var operation = model.GetOperation(syntax)!;
@@ -127,16 +127,16 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             AttributeType = attribute.AttributeClass!.ToDisplayString(),
             AttributeAssembly = attribute.AttributeClass.ContainingAssembly.Identity.ToString(),
             CanonicalAttributeBinding = SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, canonicalAttribute),
-            ParameterReferences = parameters.Select(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (new
+            ParameterReferences = parameters.Select(reference => new
             {
                 reference.Parameter.Name,
                 Owner = reference.Parameter.ContainingSymbol.ToDisplayString(),
                 OwnerKind = ((IMethodSymbol)reference.Parameter.ContainingSymbol).MethodKind.ToString(),
                 OwnedByTarget = SymbolEqualityComparer.Default.Equals(reference.Parameter.ContainingSymbol, target),
                 Span = new { reference.Syntax.Span.Start, reference.Syntax.Span.Length }
-            })).ToImmutableArray(),
-            StorageOperations = operations.Where(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item is ISimpleAssignmentOperation or ICompoundAssignmentOperation or
-                IIncrementOrDecrementOperation)).Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Kind.ToString())).ToImmutableArray()
+            }).ToImmutableArray(),
+            StorageOperations = operations.Where(item => item is ISimpleAssignmentOperation or ICompoundAssignmentOperation or
+                IIncrementOrDecrementOperation).Select(item => item.Kind.ToString()).ToImmutableArray()
         });
         using (Assert.EnterMultipleScope())
         {
@@ -213,7 +213,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             FreshRequestedPath = manifestPath,
             OutputExists = outputExists,
             Diagnostics = collectorDiagnostics.Select(DiagnosticObservation).ToImmutableArray(),
-            InfrastructureFailures = collectorDiagnostics.Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0049"))
+            InfrastructureFailures = collectorDiagnostics.Where(diagnostic => diagnostic.Id == "SP0049")
                 .Select(DiagnosticObservation).ToImmutableArray(),
             DownstreamStarted = outputExists
         });
@@ -233,15 +233,15 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
         var artifactBytes = Encoding.UTF8.GetBytes(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken)).ToImmutableArray();
         await File.WriteAllBytesAsync(Path.Combine(evidence, "worker-compiler-artifact.json"), artifactBytes.AsMemory());
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-request.json"), WorkerProtocolJson.SerializeRequest(project.Request));
-        var preparation = project.Snapshot.Callables.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Entry.CallableId == callableId));
+        var preparation = project.Snapshot.Callables.Single(item => item.Entry.CallableId == callableId);
         var native = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, project.Request.Budgets, cancellationToken: TestContext.CurrentContext.CancellationToken);
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         await File.WriteAllTextAsync(Path.Combine(evidence, "worker-response.json"), WorkerProtocolJson.SerializeResponse(response));
         var validation = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(project.Request),
             Program.ComputeExpectedInputHash(project.Request, artifactBytes), artifact.Manifest, project.Request, Program.ExpectedVersions());
-        var nativeWrites = preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (write.Operation == native.WriteWitness)).ToImmutableArray() ?? [];
+        var nativeWrites = preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.Operation == native.WriteWitness).ToImmutableArray() ?? [];
         await Save(evidence, "native-observations.json", new
         {
             subject.Name,
@@ -261,7 +261,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             native.QueryCompleted,
             native.HasFeasibleEntryWitness,
             NativeWriteWitness = native.WriteWitness?.ToString(),
-            NativeWriteInstructions = nativeWrites.Select(write => write is null ? throw new System.ArgumentNullException(nameof(write)) : (new
+            NativeWriteInstructions = nativeWrites.Select(write => new
             {
                 Operation = write.Operation.ToString(),
                 Region = write.Region.ToString(),
@@ -270,20 +270,20 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Receiver = write.Target?.ToString(),
                 Field = write.Field?.ToString(),
                 Value = write.Value?.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             NativeEntryModel = native.EntryModel.Select(pair => new { Variable = pair.Key.ToString(), Value = pair.Value.ToString() }).ToImmutableArray(),
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             RunStatus = response.RunStatus.ToString(),
             FailureReason = response.FailureReason.ToString(),
             response.Errors,
-            CallableResults = response.CallableResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
+            CallableResults = response.CallableResults.Select(item => new
             {
                 item.CallableId,
                 Coverage = item.Coverage.ToString(),
                 Reason = item.Reason.ToString()
-            })).ToImmutableArray(),
-            Claims = response.ClaimResults.Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (new
+            }).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(item => new
             {
                 item.ClaimId,
                 Outcome = item.Outcome.ToString(),
@@ -291,7 +291,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 Certainty = item.EffectCertainty.ToString(),
                 Vacuity = item.Vacuity.ToString(),
                 item.EffectWitness
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             ExpectedOutcome = subject.Outcome.ToString()
         });
         using (Assert.EnterMultipleScope())
@@ -438,7 +438,7 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
                 field?.FieldType.FullName, field?.DeclaringType == type,
                 method.MetadataToken, execute.Method.MetadataToken, execute.Method.Module.ModuleVersionId,
                 ReferenceEquals(execute.Target, instance), execute.Target?.GetType() == type,
-                method.CustomAttributes.Count(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeType == typeof(EnforcePureAttribute))),
+                method.CustomAttributes.Count(attribute => attribute.AttributeType == typeof(EnforcePureAttribute)),
                 constructor.GetParameters().Length, method.GetParameters().Length,
                 DecodeIl(constructor, bytes), DecodeIl(method, bytes), readIl);
         }
@@ -468,34 +468,34 @@ public sealed class CapturedPrimaryConstructorStorageAuditTests
             Assert.That(observation.InstanceFieldCount, Is.EqualTo(caseIndex == 4 ? 0 : 1));
             if (caseIndex == 4)
             {
-                Assert.That(observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.FieldToken != null)), Is.Empty);
+                Assert.That(observation.Target.Instructions.Where(instruction => instruction.FieldToken != null), Is.Empty);
             }
             else
             {
                 Assert.That(observation.FieldType, Is.EqualTo(typeof(int).FullName));
                 Assert.That(observation.FieldSignature, Is.EqualTo("0608"));
                 Assert.That(observation.FieldOwnerMatches, Is.True);
-                var reads = (caseIndex == 3 ? observation.Target : observation.Peek!).Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "ldfld"));
+                var reads = (caseIndex == 3 ? observation.Target : observation.Peek!).Instructions.Where(instruction => instruction.OpCode == "ldfld");
                 Assert.That(reads.Single().FieldToken, Is.EqualTo(observation.FieldToken));
                 if (caseIndex < 4)
                 {
-                    var stores = observation.Constructor.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "stfld"));
+                    var stores = observation.Constructor.Instructions.Where(instruction => instruction.OpCode == "stfld");
                     Assert.That(stores.Single().FieldToken, Is.EqualTo(observation.FieldToken));
                 }
                 if (caseIndex == 3)
                 {
                     Assert.That(observation.Returned, Is.EqualTo(1));
-                    Assert.That(observation.Target.Instructions.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "stfld")), Is.Empty);
+                    Assert.That(observation.Target.Instructions.Where(instruction => instruction.OpCode == "stfld"), Is.Empty);
                 }
                 else
                 {
-                    var store = observation.Target.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "stfld"));
+                    var store = observation.Target.Instructions.Single(instruction => instruction.OpCode == "stfld");
                     Assert.That(store.FieldToken, Is.EqualTo(observation.FieldToken));
                     Assert.That(store.FieldMvid, Is.EqualTo(observation.PeMvid));
                     if (caseIndex is 1 or 2)
                     {
-                        var read = observation.Target.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "ldfld"));
-                        var add = observation.Target.Instructions.Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.OpCode == "add"));
+                        var read = observation.Target.Instructions.Single(instruction => instruction.OpCode == "ldfld");
+                        var add = observation.Target.Instructions.Single(instruction => instruction.OpCode == "add");
                         Assert.That(read.FieldToken, Is.EqualTo(store.FieldToken));
                         Assert.That(read.Offset, Is.LessThan(add.Offset));
                         Assert.That(add.Offset, Is.LessThan(store.Offset));

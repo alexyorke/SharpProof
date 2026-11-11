@@ -31,8 +31,7 @@ internal sealed class NativeCallableBackend : ISmtBackend, IDisposable
             var factory = query.Factory;
             _session = new CallableSolverSession(factory, _options)
             {
-                ConcreteOpaqueValueProvider = term => term is null ? throw new ArgumentNullException(nameof(term)) :
-                    PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, PassiveCallableVcPlan.ReadDefaultComparer)
+                ConcreteOpaqueValueProvider = term => PassiveCallableVcPlan.ObserveDefaultComparerValue(factory, term, PassiveCallableVcPlan.ReadDefaultComparer)
             };
             _factory = factory;
         }

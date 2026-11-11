@@ -24,7 +24,7 @@ public sealed class AdmissionCompilerCollectorCoverageTests
             }
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(
-            candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Method.MetadataName == "get_Value");
+            candidate => candidate.Method.MetadataName == "get_Value");
 
         var preparation = new CompilerCallableLowerer(compilation).Prepare(
             target, TestContext.CurrentContext.CancellationToken);
@@ -76,8 +76,7 @@ public sealed class AdmissionCompilerCollectorCoverageTests
         var compilation = CSharpCompilation.Create(nameof(AdmissionCompilerCollectorCoverageTests),
             [CSharpSyntaxTree.ParseText("public static class Subject { public static void Child(int n); }")],
             TestMetadataReferences.WithSharpProof, TestCompilation.CreateOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Select(diagnostic => diagnostic is null
-            ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id), Does.Contain("CS0501"));
+        Assert.That(compilation.GetDiagnostics().Select(diagnostic => diagnostic.Id), Does.Contain("CS0501"));
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Child").OfType<IMethodSymbol>().Single();
         var continuationRan = false;
 
@@ -164,7 +163,7 @@ public sealed class AdmissionCompilerCollectorCoverageTests
             }
             """);
         var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single(
-            candidate => candidate is null ? throw new ArgumentNullException(nameof(candidate)) : candidate.Method.Name == "Target");
+            candidate => candidate.Method.Name == "Target");
         var attach = typeof(CompilerManifestArtifactProducer).GetMethod(
             "AttachEffectEvidence", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.That(attach, Is.Not.Null);
@@ -174,8 +173,7 @@ public sealed class AdmissionCompilerCollectorCoverageTests
 
         Assert.That(artifact.ResourceProgram, Is.Null);
         Assert.That(artifact.ResourceUnknownReason, Is.EqualTo("CompilationOrBodyUnavailable"));
-        Assert.That(artifact.EffectClaims, Is.EqualTo(target.EffectClaims.Select(claim => claim is null
-            ? throw new ArgumentNullException(nameof(claim)) : claim.Evidence)));
+        Assert.That(artifact.EffectClaims, Is.EqualTo(target.EffectClaims.Select(claim => claim.Evidence)));
         Assert.That(artifact.EffectClaims, Has.Length.EqualTo(1));
         Assert.That(artifact.CallableId, Is.EqualTo(target.Entry.CallableId));
     }

@@ -53,7 +53,7 @@ internal sealed partial class NativeSpecifiedCallTests
         var request = project.CreateRequest(cacheEnabled: false, targetFramework: "net9.0");
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message)), Is.Empty);
+        Assert.That(response.Errors.Select(error => error.Code + ": " + error.Message), Is.Empty);
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), response.ClaimResults.Single().ToString());
     }
 

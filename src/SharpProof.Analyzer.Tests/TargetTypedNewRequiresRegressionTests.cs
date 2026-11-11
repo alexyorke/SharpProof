@@ -26,7 +26,7 @@ public sealed class TargetTypedNewRequiresRegressionTests
             "private static int Read(Box box) => box.Value; " +
             "public static int Caller(int input) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo([message]));
     }
 }

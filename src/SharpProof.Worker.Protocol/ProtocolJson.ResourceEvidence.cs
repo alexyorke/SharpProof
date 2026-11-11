@@ -228,7 +228,7 @@ internal static partial class WorkerProtocolJson
         { return false; }
         var used = new HashSet<string>(result.Assumptions.Where(static assumption => assumption is not null && assumption.Used &&
                 assumption.Kind == WorkerAssumptionKind.TrustedBoundary && assumption.Id.StartsWith("resource-metadata-", StringComparison.Ordinal))
-            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id)
+            .Select(static assumption => assumption.Id)
             , StringComparer.Ordinal);
         if (metadata.Length != used.Count || result.Outcome == WorkerClaimOutcome.Unknown && metadata.Length != 0)
         { return false; }

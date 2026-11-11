@@ -71,8 +71,7 @@ internal sealed class NativeTaskRuntimeZeroPremiseTests
         Assert.That(compilerBytes, Is.GreaterThan(BigInteger.Zero));
         var declarations = projection.RuntimePremises!.Inventory!.Declarations;
         Assert.That(declarations.Quantities, Has.Length.EqualTo(11));
-        var expectedIds = declarations.Quantities.Select(declaration => declaration is null ? throw new ArgumentNullException(nameof(declaration)) :
-            ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration)).ToHashSet(StringComparer.Ordinal);
+        var expectedIds = declarations.Quantities.Select(declaration => ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declaration)).ToHashSet(StringComparer.Ordinal);
         expectedIds.Add(ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations));
         Assert.That(expectedIds, Has.Count.EqualTo(12));
         Assert.That(target.Entry.Assumptions.Where(static assumption => assumption is not null && assumption.Kind == WorkerAssumptionKind.UserAssume)
@@ -105,7 +104,7 @@ internal sealed class NativeTaskRuntimeZeroPremiseTests
         }
         var usedIds = result.Assumptions.Where(static assumption => assumption is not null &&
                 assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used)
-            .Select(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id).ToArray();
+            .Select(static assumption => assumption.Id).ToArray();
         Assert.That(usedIds, Has.Length.EqualTo(12));
         Assert.That(usedIds, Is.EquivalentTo(expectedIds));
     }

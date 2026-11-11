@@ -48,8 +48,7 @@ internal sealed partial class NativeResourceContractTests
         var source = NativeForkJoinSourceCostVerifier.Check(target.ForkJoinProjection!, target.TotalEntry!, TestContext.CurrentContext.CancellationToken);
         Assert.That(source.HasSourceCosts, Is.True, source.UnknownReason);
         Assert.That(source.Upper!.LoopEntries.ToDisplayString(), Is.EqualTo("(max(0, n) + 3)"));
-        Assert.That(target.Compilation.ResourceMetadataReferences, Has.Some.Matches<CompilerReferenceSnapshot>(reference => reference is null ? throw new ArgumentNullException(nameof(reference)) :
-            reference.Identity == target.ForkJoinProjection!.FrameworkAssemblyIdentity));
+        Assert.That(target.Compilation.ResourceMetadataReferences, Has.Some.Matches<CompilerReferenceSnapshot>(reference => reference.Identity == target.ForkJoinProjection!.FrameworkAssemblyIdentity));
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.Null);
@@ -117,10 +116,8 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(sourceCosts.HasSourceCosts, Is.True, sourceCosts.UnknownReason);
         var results = await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(),
             TestContext.CurrentContext.CancellationToken);
-        var loop = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
-            result.ResourceBound?.Metric == WorkerResourceMetric.LoopBodyEntries);
-        var storage = results.Single(static result => result is null ? throw new ArgumentNullException(nameof(result)) :
-            result.ResourceBound?.Metric == WorkerResourceMetric.PeakAuxiliaryBytes);
+        var loop = results.Single(static result => result.ResourceBound?.Metric == WorkerResourceMetric.LoopBodyEntries);
+        var storage = results.Single(static result => result.ResourceBound?.Metric == WorkerResourceMetric.PeakAuxiliaryBytes);
         Assert.That(loop.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), loop.ResourceBound?.UnknownReason);
         Assert.That(storage.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }

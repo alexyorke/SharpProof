@@ -41,11 +41,11 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
                 NullableContextOptions.Enable));
         var model = compilation.GetSemanticModel(tree);
         var methods = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Identifier.ValueText == "Read")).ToImmutableArray();
-        var definitionSyntax = methods.Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body == null));
-        var implementationSyntax = methods.Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Body != null));
+            .Where(syntax => syntax.Identifier.ValueText == "Read").ToImmutableArray();
+        var definitionSyntax = methods.Single(syntax => syntax.Body == null);
+        var implementationSyntax = methods.Single(syntax => syntax.Body != null);
         var errors = compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         if (mismatched)
         {
             Assert.That(errors, Has.Length.EqualTo(1));
@@ -64,7 +64,7 @@ public sealed class PartialReferenceReturnEditingRecoveryTests
         Assert.That(definition.PartialImplementationPart, Is.SameAs(implementation));
         Assert.That(implementation.PartialDefinitionPart, Is.SameAs(definition));
         var call = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression.ToString() == "Target.Read"));
+            .Single(syntax => syntax.Expression.ToString() == "Target.Read");
         var callOperation = model.GetOperation(call);
         Assert.That(callOperation, Is.InstanceOf<IInvocationOperation>());
         var target = ((IInvocationOperation)callOperation!).TargetMethod;

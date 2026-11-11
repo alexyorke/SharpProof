@@ -38,7 +38,7 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
                 ModuleMetadata.CreateFromImage(firstImage), ModuleMetadata.CreateFromImage(secondImage));
             var reference = metadata.GetReference(filePath: manifestPath);
             var subject = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []).AddReferences(reference);
-            Assert.That(subject.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(subject.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
             Assert.That(subject.GetAssemblyOrModuleSymbol(reference), Is.InstanceOf<IAssemblySymbol>());
             var maximumModule = Math.Max(((long)manifestImage.Length), Math.Max(((long)firstImage.Length), ((long)secondImage.Length)));
             var closureBytes = ((long)manifestImage.Length) + ((long)firstImage.Length) + ((long)secondImage.Length);
@@ -50,11 +50,11 @@ public sealed class CompilerLinkedModuleCountWorkflowTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(captured.Kind, Is.EqualTo("Assembly"));
-                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Name)),
+                Assert.That(captured.Modules.Select(module => module.Name),
                     Is.EqualTo(ExpectedModuleNames));
-                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.SizeBytes)),
+                Assert.That(captured.Modules.Select(module => module.SizeBytes),
                     Is.EqualTo(ImmutableArray.Create(((long)manifestImage.Length), ((long)firstImage.Length), ((long)secondImage.Length))));
-                Assert.That(captured.Modules.Select(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module.Path)),
+                Assert.That(captured.Modules.Select(module => module.Path),
                     Is.EqualTo(ImmutableArray.Create(manifestPath, firstPath, secondPath).Select(Path.GetFullPath)));
             }
         }

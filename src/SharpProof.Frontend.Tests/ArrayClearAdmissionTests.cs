@@ -18,7 +18,7 @@ public sealed class ArrayClearAdmissionTests
             : "public static class Probe { public static void Target(int[] data) { System.GC.KeepAlive(data); } }";
         var tree = CSharpSyntaxTree.ParseText(source);
         var compilation = CSharpCompilation.Create("ClearOwnership", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         Assert.That(CSharpOperationSemantics.IsArrayClear(invocation.TargetMethod), Is.False);
@@ -38,7 +38,7 @@ public sealed class ArrayClearAdmissionTests
         ArgumentNullException.ThrowIfNull(value);
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static void Target(" + parameters + ") { System.Array.Clear(" + value + ", 0, 1); } }");
         var compilation = CSharpCompilation.Create("ClearAdmission", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
         var invocation = (IInvocationOperation)compilation.GetSemanticModel(tree).GetOperation(syntax)!;
         var operand = CSharpOperationSemantics.TypedArrayClearReceiver(invocation);

@@ -117,7 +117,7 @@ internal sealed partial class NativeResourceContractTests
                 ? WorkerResourceModels.AllocationCostModel : WorkerResourceModels.LifetimeCostModel));
             Assert.That(result.ResourceBound.MetadataAssumptions, Has.Length.EqualTo(1));
         }
-        Assert.That(results.Select(static result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ResourceBound!.InferredUpperBound),
+        Assert.That(results.Select(static result => result.ResourceBound!.InferredUpperBound),
             Is.EquivalentTo(LifetimeExpectedBounds));
     }
 

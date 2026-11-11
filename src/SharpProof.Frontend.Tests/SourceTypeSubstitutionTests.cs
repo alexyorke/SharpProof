@@ -19,8 +19,7 @@ public sealed class SourceTypeSubstitutionTests
             "public System.Collections.Generic.List<(int, string)>" + suffix + " Value; public Box<int>.Inner<string> Owner; }");
         var compilation = CSharpCompilation.Create("SourceSubstitution", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) :
-            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var target = (IMethodSymbol)model.GetDeclaredSymbol(tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
         var context = new TotalLoweringContext(new IrFactory(), target) { Compilation = compilation };
@@ -39,9 +38,7 @@ public sealed class SourceTypeSubstitutionTests
         var tree = CSharpSyntaxTree.ParseText("#nullable enable\npublic class Box<T> { public void Target() { } public System.Collections.Generic.Dictionary<T, string?> Value = null!; }");
         var compilation = CSharpCompilation.Create("NullableConstructedSubstitution", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null
-            ? throw new System.ArgumentNullException(nameof(diagnostic))
-            : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var target = (IMethodSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(
             tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single())!;
         var context = new TotalLoweringContext(new IrFactory(), target) { Compilation = compilation };

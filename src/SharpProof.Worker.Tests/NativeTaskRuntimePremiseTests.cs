@@ -110,11 +110,8 @@ internal sealed class NativeTaskRuntimePremiseTests
             Assert.That(quantity.Scope, Is.EqualTo(QuantityScopes[index]));
             Assert.That(quantity.AssumptionId, Is.EqualTo(ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declarations.Quantities[index])));
         }
-        Assert.That(result.Assumptions.Count(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(12));
-        Assert.That(target.Entry.Assumptions.Where(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            assumption.Kind == WorkerAssumptionKind.UserAssume).All(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            !assumption.Used), Is.True, "Compiler declarations do not mark assumptions used before verification.");
+        Assert.That(result.Assumptions.Count(static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(12));
+        Assert.That(target.Entry.Assumptions.Where(static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).All(static assumption => !assumption.Used), Is.True, "Compiler declarations do not mark assumptions used before verification.");
     }
 
     [TestCase(false)]
@@ -131,8 +128,7 @@ internal sealed class NativeTaskRuntimePremiseTests
         Assert.That(result.ResourceBound!.RuntimePremises!.DeploymentManifestSha256, Is.EqualTo(DeploymentHash));
         Assert.That(result.ResourceBound.InferredUpperBound,
             Is.EqualTo(ManualSum(target.ForkJoinProjection!).ToString(CultureInfo.InvariantCulture)));
-        Assert.That(result.Assumptions.Count(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-            assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(12));
+        Assert.That(result.Assumptions.Count(static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume && assumption.Used), Is.EqualTo(12));
     }
 
     [TestCase("malformed", false)]
@@ -207,16 +203,14 @@ internal sealed class NativeTaskRuntimePremiseTests
         var target = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All, cancellation).Build().Targets.Values.Single();
         var lowerer = new CompilerCallableLowerer(compilation);
         Assert.That(lowerer.Prepare(target, cancellation).ForkJoinProjection, Is.Not.Null);
-        var quantities = target.Entry.Assumptions.Where(static assumption => assumption is null
-            ? throw new ArgumentNullException(nameof(assumption)) : assumption.Kind == WorkerAssumptionKind.UserAssume).ToImmutableArray();
+        var quantities = target.Entry.Assumptions.Where(static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume).ToImmutableArray();
         Assert.That(quantities, Has.Length.EqualTo(12));
         var later = quantities[quantities.Length - 1];
         var changed = mutation switch
         {
             "foreign-user-assumption" => target.Entry.Assumptions.Add(new() { Id = "foreign-user-assumption", Kind = WorkerAssumptionKind.UserAssume }),
             "partial-set" => target.Entry.Assumptions.Remove(later),
-            "all-missing" => target.Entry.Assumptions.Where(static assumption => assumption is null
-                ? throw new ArgumentNullException(nameof(assumption)) : assumption.Kind != WorkerAssumptionKind.UserAssume).ToImmutableArray(),
+            "all-missing" => target.Entry.Assumptions.Where(static assumption => assumption.Kind != WorkerAssumptionKind.UserAssume).ToImmutableArray(),
             "duplicate-id" => target.Entry.Assumptions.Add(later),
             "used" => target.Entry.Assumptions.Replace(later, later with { Used = true }),
             "wrong-kind" => target.Entry.Assumptions.Replace(later, later with { Kind = WorkerAssumptionKind.TrustedBoundary }),
@@ -256,8 +250,8 @@ internal sealed class NativeTaskRuntimePremiseTests
         var declarations = inventory.Declarations;
         var deploymentId = ResourceTaskRuntimePremiseIdentity.DeploymentAssumptionId(declarations);
         var quantityId = ResourceTaskRuntimePremiseIdentity.QuantityAssumptionId(declarations, declarations.Quantities[10]);
-        var deployment = target.Entry.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == deploymentId);
-        var quantity = target.Entry.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == quantityId);
+        var deployment = target.Entry.Assumptions.Single(assumption => assumption.Id == deploymentId);
+        var quantity = target.Entry.Assumptions.Single(assumption => assumption.Id == quantityId);
         var changed = inventory;
         var entry = target.Entry;
         var compilation = target.Compilation;
@@ -522,7 +516,7 @@ internal sealed class NativeTaskRuntimePremiseTests
         Assert.That(result.ResourceBound.MetadataAssumptions, Is.Empty);
         Assert.That(result.ResourceBound.Asymptotic, Is.Null);
         Assert.That(result.ProofCore, Is.Empty);
-        Assert.That(result.Assumptions.Any(static assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Used), Is.False);
+        Assert.That(result.Assumptions.Any(static assumption => assumption.Used), Is.False);
     }
 
     private static void AssertMalformedResponse(string json, string mutation)

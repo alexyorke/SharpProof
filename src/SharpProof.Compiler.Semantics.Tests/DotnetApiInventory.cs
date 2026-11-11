@@ -26,13 +26,13 @@ internal static class DotnetApiInventory
     {
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         // Contract ghost APIs belong to SharpProof.Attributes, outside this pack.
-        var failures = resolved.Failures.Where(failure => failure is null ? throw new global::System.ArgumentNullException(nameof(failure)) : (!failure.WitnessIdentifier.StartsWith("contract.", StringComparison.Ordinal))).ToImmutableArray();
+        var failures = resolved.Failures.Where(failure => !failure.WitnessIdentifier.StartsWith("contract.", StringComparison.Ordinal)).ToImmutableArray();
         if (failures.Length != 0)
         {
-            throw new InvalidOperationException("Framework catalog resolution failed: " + string.Join(", ", failures.Select(failure => failure is null ? throw new global::System.ArgumentNullException(nameof(failure)) : (failure.ToString()))));
+            throw new InvalidOperationException("Framework catalog resolution failed: " + string.Join(", ", failures.Select(failure => failure.ToString())));
         }
 
-        return compilation.References.Select(compilation.GetAssemblyOrModuleSymbol).OfType<IAssemblySymbol>().SelectMany(assembly => assembly is null ? throw new global::System.ArgumentNullException(nameof(assembly)) : (Members(assembly.GlobalNamespace))).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (Describe(symbol, resolved))).OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key), StringComparer.Ordinal).ToImmutableArray();
+        return compilation.References.Select(compilation.GetAssemblyOrModuleSymbol).OfType<IAssemblySymbol>().SelectMany(assembly => Members(assembly.GlobalNamespace)).Select(symbol => Describe(symbol, resolved)).OrderBy(row => row.Key, StringComparer.Ordinal).ToImmutableArray();
     }
 
     internal static IEnumerable<ISymbol> Members(INamespaceOrTypeSymbol owner)

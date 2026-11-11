@@ -42,10 +42,10 @@ public sealed class NativeEffectEvidenceRegressionTests
                 if (result.Outcome == WorkerClaimOutcome.Proven)
                 { previousBackendConsumption = budgets.MethodRlimit; }
             }, budget);
-        var exception = target.EffectClaims.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.DoesNotThrow);
-        var allocation = target.EffectClaims.Single(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim.ContractKind == WorkerEffectContractKind.ZeroAllocations);
-        Assert.That(results.Single(result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId == exception.ClaimId).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-        Assert.That(results.Single(result => result is null ? throw new ArgumentNullException(nameof(result)) : result.ClaimId == allocation.ClaimId).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
+        var exception = target.EffectClaims.Single(claim => claim.ContractKind == WorkerEffectContractKind.DoesNotThrow);
+        var allocation = target.EffectClaims.Single(claim => claim.ContractKind == WorkerEffectContractKind.ZeroAllocations);
+        Assert.That(results.Single(result => result.ClaimId == exception.ClaimId).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(results.Single(result => result.ClaimId == allocation.ClaimId).Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
     }
 
     [TestCase("DoesNotThrow", "Assume")]
@@ -60,9 +60,9 @@ public sealed class NativeEffectEvidenceRegressionTests
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible,
             new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
-        var declared = target.Total!.Clauses.Single(contract => contract is null ? throw new ArgumentNullException(nameof(contract)) : contract.Kind ==
+        var declared = target.Total!.Clauses.Single(contract => contract.Kind ==
             (clause == "Assume" ? CompilerContractKind.Assume : CompilerContractKind.Requires));
-        Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) : assumption.Id == declared.AssumptionId).Used, Is.True);
+        Assert.That(result.Assumptions.Single(assumption => assumption.Id == declared.AssumptionId).Used, Is.True);
     }
 
     private static CompilerCallablePreparation Prepare(string method)
@@ -73,6 +73,6 @@ public sealed class NativeEffectEvidenceRegressionTests
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact,
             cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations,
             cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new ArgumentNullException(nameof(preparation)) : preparation.EffectClaims.Length != 0);
+        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 }

@@ -38,7 +38,7 @@ public sealed class QueueStateDomainBoundaryTests
             (expression == "data.Count" ? "var value = " + expression : expression) + "; } }");
         var compilation = CSharpCompilation.Create("QueueBodyBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);
@@ -53,7 +53,7 @@ public sealed class QueueStateDomainBoundaryTests
         var lowered = new RoslynTotalExpressionLowerer(context, builder, exceptional).LowerBodyValue(operation, entry, depth);
         Assert.That(lowered.Classification.IsExact, Is.False);
         builder.Return(lowered.Continuation, site);
-        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+        Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.IsStore), Is.Empty);
     }
 }

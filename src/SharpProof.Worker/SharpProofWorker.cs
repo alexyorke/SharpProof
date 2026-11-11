@@ -216,7 +216,7 @@ internal sealed class SharpProofWorker : IDisposable
             {
                 return FailedAfterManifest(WorkerRunFailureReason.CompilationFailure,
                     snapshot.CompilerManifest.CompilerDiagnostics.Select(static item =>
-                        item is null ? throw new System.ArgumentNullException(nameof(item)) : (new WorkerProtocolError { Code = item.Code, Message = item.Message })));
+                        new WorkerProtocolError { Code = item.Code, Message = item.Message }));
             }
 
             var targets = snapshot.Callables;
@@ -279,7 +279,7 @@ internal sealed class SharpProofWorker : IDisposable
             }
             ThrowIfProjectInterrupted();
             var orderedTargets = targets.OrderBy(
-                static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId), StringComparer.Ordinal).ToImmutableArray();
+                static target => target.Entry.CallableId, StringComparer.Ordinal).ToImmutableArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
                 CountSolverTargets(orderedTargets),
@@ -583,7 +583,7 @@ internal sealed class SharpProofWorker : IDisposable
             {
                 var backend = backendFactory() ??
                     throw new InvalidOperationException("The backend factory returned null.");
-                if (created.Any(lane => lane is null ? throw new System.ArgumentNullException(nameof(lane)) : (ReferenceEquals(lane.Backend, backend))))
+                if (created.Any(lane => ReferenceEquals(lane.Backend, backend)))
                 {
                     throw new InvalidOperationException("The backend factory returned the same backend for multiple lanes.");
                 }
@@ -655,8 +655,8 @@ internal sealed class SharpProofWorker : IDisposable
     {
 
         RepositoryParameterGuard.RequireInitialized(targets.IsDefault, nameof(targets), "Array must be initialized.");
-        var malformed = targets.Select(target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (Unknown(target, WorkerClaimReason.InfrastructureFailure,
-            WorkerCallableCoverageReason.MissingClaimResult))).ToImmutableArray();
+        var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
+            WorkerCallableCoverageReason.MissingClaimResult)).ToImmutableArray();
         return ProjectResults(malformed);
     }
 
@@ -713,8 +713,8 @@ internal sealed class SharpProofWorker : IDisposable
                     var replacement = _backendFactory() ??
                         throw new InvalidOperationException("The backend factory returned null.");
                     if (ReferenceEquals(replacement, prior) ||
-                        lanes.Any(lane => lane is null ? throw new System.ArgumentNullException(nameof(lane)) : (!ReferenceEquals(lane, this) &&
-                            ReferenceEquals(lane.Backend, replacement))))
+                        lanes.Any(lane => !ReferenceEquals(lane, this) &&
+                            ReferenceEquals(lane.Backend, replacement)))
                     {
                         return LaneRenewalResult.BackendUnavailable;
                     }

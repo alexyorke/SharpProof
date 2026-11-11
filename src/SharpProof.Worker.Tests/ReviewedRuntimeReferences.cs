@@ -15,7 +15,7 @@ internal static class ReviewedRuntimeReferences
     private static readonly Lazy<ImmutableArray<MetadataReference>> s_net8 = new(static () =>
         [.. Directory.GetFiles(PackDirectory, "*.dll")
             .Append(typeof(ResourceUpperBoundAttribute).Assembly.Location)
-            .Select(static path => path is null ? throw new ArgumentNullException(nameof(path)) : (MetadataReference)MetadataReference.CreateFromFile(path))]);
+            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))]);
 
     internal static ImmutableArray<MetadataReference> Net8 => s_net8.Value;
 }

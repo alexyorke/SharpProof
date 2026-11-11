@@ -28,7 +28,7 @@ internal static class OverridePreconditionDiagnostics
         }
 
         var inherited = GetInheritedMethods(method)
-            .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (GetRequires(candidate, session)))
+            .Select(candidate => GetRequires(candidate, session))
             .All(candidate => candidate != null && HaveSameRequires(
                 local,
                 candidate));
@@ -73,9 +73,9 @@ internal static class OverridePreconditionDiagnostics
     {
         contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         return [.. contracts.Clauses
-            .Where(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires))
-            .Select(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ComparisonKey))
-            .OrderBy(static key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (key), StringComparer.Ordinal)];
+            .Where(static clause => clause.Kind == BoundContractKind.Requires)
+            .Select(static clause => clause.ComparisonKey)
+            .OrderBy(static key => key, StringComparer.Ordinal)];
     }
 
     private static bool HasDispatchContract(IMethodSymbol method)

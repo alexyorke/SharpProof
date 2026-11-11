@@ -29,8 +29,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _context.Target.ContainingAssembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || invocation.Arguments.Length != method.Parameters.Length ||
-            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
-                !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType))
         { return null; }
         var ordinals = ImmutableHashSet.CreateBuilder<int>();
@@ -76,7 +76,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         var member = _context.Factory.GetOrCreateMemberSnapshot(
             CompilerIdentityBridge.InternSymbol(_context.Factory, method), _context.Type(method.ContainingType),
             "shadow-call:" + CompilerIdentityBridge.CreateSymbolDisplay(method), resultType, true,
-            method.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (_context.Type(parameter.Type))).ToImmutableArray());
+            method.Parameters.Select(parameter => _context.Type(parameter.Type)).ToImmutableArray());
         var call = _builder.CallSnapshot(block, _context.Site(invocation), target, member, null, arguments.ToImmutable());
         _preservedSourceCalls.AddUnique(call, method.OriginalDefinition);
         return new(value, block, FrontendSubsetClassification.Exact);
@@ -295,8 +295,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         else
         {
             if (candidate.Property is not { } symbol || candidate.Operation is not IPropertyInitializerOperation initializer ||
-                type.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(field => field is null ? throw new ArgumentNullException(nameof(field)) :
-                    SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, symbol)) is not { } backing)
+                type.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, symbol)) is not { } backing)
             { return false; }
             value = (backing, initializer.Value);
         }
@@ -471,7 +470,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (!_calls.Spend(program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
         { throw new RegionIncompleteException(); }
         var continuation = _builder.CreateBlock("call:continued");
-        var blocks = ImmutableDictionaryCapture.Create(program.Blocks, source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (source.Id), source => source is null ? throw new System.ArgumentNullException(nameof(source)) : (_builder.CreateBlock("call:body")));
+        var blocks = ImmutableDictionaryCapture.Create(program.Blocks, source => source.Id, source => _builder.CreateBlock("call:body"));
         foreach (var parameter in callee.Parameters)
         { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
         _builder.Goto(block, site, blocks[program.Entry]);
@@ -564,8 +563,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (callee.SourceCallPreconditions.IsEmpty)
         { return; }
-        var replacements = ImmutableDictionaryCapture.Create(callee.Parameters, parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Entry),
-            parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (arguments[parameter.Parameter.Ordinal]));
+        var replacements = ImmutableDictionaryCapture.Create(callee.Parameters, parameter => parameter.Entry,
+            parameter => arguments[parameter.Parameter.Ordinal]);
         for (var ordinal = 0; ordinal < callee.SourceCallPreconditions.Length; ordinal++)
         {
             SpendRegion();

@@ -73,7 +73,7 @@ internal static class TotalContractInvocationMaterialization
                     ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
                     : null)
         };
-        var allowedBuilder = context.Inputs.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState))).ToImmutableHashSet().ToBuilder();
+        var allowedBuilder = context.Inputs.SelectMany(binding => ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)).ToImmutableHashSet().ToBuilder();
         if (context.Result is { } resultVariable)
         { allowedBuilder.Add(resultVariable); }
         var allowed = allowedBuilder.ToImmutable();

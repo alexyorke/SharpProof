@@ -59,9 +59,9 @@ public sealed class AdvisoryInstructionDeltaTests
         var decoded = PortableIrGraphCodec.Decode(body.Graph!, externalVariableIndices: null, cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(decoded.Program, Is.Not.Null);
         var markers = decoded.Instructions.OfType<IrHavocInstruction>().Where(instruction =>
-            instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Origin == IrHavocOrigin.Approximation &&
+            instruction.Origin == IrHavocOrigin.Approximation &&
             instruction.HavocKind == IrHavocKind.Variables &&
-            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect)).ToImmutableArray();
+            IrOpaqueCallSite.Effects(decoded.Factory, instruction.Operation) == (IrOpaqueCallEffects)effect).ToImmutableArray();
         Assert.That(markers, Is.Not.Empty, "The unchanged compiler producer must supply the declared marker.");
         foreach (var marker in markers)
         {
@@ -183,7 +183,7 @@ public sealed class AdvisoryInstructionDeltaTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(program.Factory, Is.SameAs(factory));
-            Assert.That(program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)), Does.Contain(instruction));
+            Assert.That(program.Blocks.SelectMany(block => block.Instructions), Does.Contain(instruction));
         }
         return (factory, instruction);
     }

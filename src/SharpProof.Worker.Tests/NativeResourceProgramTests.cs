@@ -321,7 +321,7 @@ public sealed class NativeResourceProgramTests
         var compilation = TestCompilation.Create("ResourceProgram", [("Subject.cs", source)]);
         TestCompilation.AssertNoErrors(compilation);
         var tree = compilation.SyntaxTrees.Single();
-        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
         var analysis = ResourceBoundsAnalysis.Analyze((IMethodSymbol)model.GetDeclaredSymbol(method)!, model.GetOperation(method.Body!), TestContext.CurrentContext.CancellationToken);
         Assert.That(analysis.Proven, Is.True, analysis.UnknownReason);

@@ -82,12 +82,12 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             .Select(ResolvePath)
             .ToImmutableArray();
         var compilerOutputPaths = CompilerOutputPaths
-            .Where(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (!string.IsNullOrWhiteSpace(item.ItemSpec)))
-            .Select(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (ResolvePath(item.ItemSpec)))
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .Select(item => ResolvePath(item.ItemSpec))
             .ToImmutableArray();
         var compilerInputPaths = CompilerInputPaths
-            .Where(static item => item is null ? throw new ArgumentNullException(nameof(item)) : !string.IsNullOrWhiteSpace(item.ItemSpec))
-            .SelectMany(item => item is null ? throw new ArgumentNullException(nameof(item)) : ResolveCompilerInputPaths(item.ItemSpec))
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .SelectMany(item => ResolveCompilerInputPaths(item.ItemSpec))
             .Distinct(PublicationPaths.Comparer).ToImmutableArray();
         var workerFile = string.IsNullOrWhiteSpace(WorkerPath) ? null : ResolvePath(WorkerPath);
         var workerDirectory = workerFile != null && File.Exists(workerFile)
@@ -120,7 +120,7 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
             Log.LogError("{0}", exception.Message);
         }
         if (cachePath != null &&
-            (writtenPaths.Any(path => path is null ? throw new System.ArgumentNullException(nameof(path)) : (PublicationPaths.IsWithin(path, cachePath, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cachePath, path, PublicationPaths.Comparison))) ||
+            (writtenPaths.Any(path => PublicationPaths.IsWithin(path, cachePath, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cachePath, path, PublicationPaths.Comparison)) ||
              workerDirectory != null && PublicationPaths.IsWithin(cachePath, workerDirectory, PublicationPaths.Comparison)))
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");

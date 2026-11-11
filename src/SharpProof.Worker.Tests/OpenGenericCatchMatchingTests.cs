@@ -212,9 +212,8 @@ public sealed class OpenGenericCatchMatchingTests
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
-        var claim = response.Manifest.Claims.Single(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) :
-            (claim.Kind == WorkerClaimKind.Postcondition && claim.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
-        var result = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId));
+        var claim = response.Manifest.Claims.Single(claim => claim.Kind == WorkerClaimKind.Postcondition && claim.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
+        var result = response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId);
         Assert.That(result.Outcome, expected, result.Reason.ToString());
     }
 
@@ -223,11 +222,9 @@ public sealed class OpenGenericCatchMatchingTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source);
-        var program = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) :
-            (callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal))).Total!.Program;
-        return program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Count(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) :
-                (havoc.Origin == IrHavocOrigin.Approximation && ExplicitThrowSites.IsExact(program.Factory, havoc.Operation)));
+        var program = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)).Total!.Program;
+        return program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Count(havoc => havoc.Origin == IrHavocOrigin.Approximation && ExplicitThrowSites.IsExact(program.Factory, havoc.Operation));
     }
 
     private static CompilerCallablePreparation Prepare(string source)
@@ -235,7 +232,7 @@ public sealed class OpenGenericCatchMatchingTests
         System.ArgumentNullException.ThrowIfNull(source);
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(source);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal)));
+        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("Subject.Target", StringComparison.Ordinal));
     }
 
     // Contract.Result<T>() throws outside the rewriter, so the CLR runs the body alone.

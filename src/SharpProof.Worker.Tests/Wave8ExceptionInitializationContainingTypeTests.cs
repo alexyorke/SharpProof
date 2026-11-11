@@ -80,7 +80,7 @@ internal sealed class Wave8ExceptionInitializationContainingTypeTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.EffectClaims.Length != 0));
+        return preparations.Single(item => item.EffectClaims.Length != 0);
     }
 
     private static async Task<WorkerClaimOutcome> Publish(CompilerManifestArtifact artifact)

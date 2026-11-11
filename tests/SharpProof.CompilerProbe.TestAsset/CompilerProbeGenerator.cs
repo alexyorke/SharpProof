@@ -15,10 +15,10 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
                 CompilerProbeContract.GlobalValueOptionKey)));
         var inputs = context.AdditionalTextsProvider
             .Where(static file =>
-                file is null ? throw new System.ArgumentNullException(nameof(file)) : (string.Equals(
+                string.Equals(
                     Path.GetFileName(file.Path),
                     CompilerProbeContract.AdditionalFileName,
-                    StringComparison.OrdinalIgnoreCase)))
+                    StringComparison.OrdinalIgnoreCase))
             .Collect()
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select(static (pair, cancellationToken) =>

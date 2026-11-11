@@ -22,11 +22,9 @@ internal sealed class NativeTaskCarrierAdmissionGapTests
         var tree = initial.SyntaxTrees.Single();
         var compilation = initial.ReplaceSyntaxTree(tree,
             CSharpSyntaxTree.ParseText(source, (CSharpParseOptions)tree.Options, tree.FilePath));
-        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "CS0103"), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(static diagnostic => diagnostic.Id == "CS0103"), Is.True);
         var (artifact, target) = RoundTrip(compilation);
-        Assert.That(artifact.CompilerDiagnostics.Any(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Code == "compiler.CS0103"), Is.True);
+        Assert.That(artifact.CompilerDiagnostics.Any(static diagnostic => diagnostic.Code == "compiler.CS0103"), Is.True);
         Assert.That(artifact.Callables.Single().ResourceUnknownReason, Is.EqualTo("CompilationOrBodyUnavailable"));
         Assert.That(target.FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         Assert.That(target.ResourceUnknownReason, Is.EqualTo("CompilationOrBodyUnavailable"));
@@ -83,16 +81,13 @@ internal sealed class NativeTaskCarrierAdmissionGapTests
         var cancellation = TestContext.CurrentContext.CancellationToken;
         using var emitted = new MemoryStream();
         var emission = compilation.Emit(emitted, cancellationToken: cancellation);
-        var errors = emission.Diagnostics.Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        var errors = emission.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
         if (shadow)
         {
             Assert.That(emission.Success, Is.False);
-            Assert.That(errors.Any(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) :
-                diagnostic.Id == "CS0656" && diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)
+            Assert.That(errors.Any(static diagnostic => diagnostic.Id == "CS0656" && diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)
                     .Contains("AsyncTaskMethodBuilder.SetException", StringComparison.Ordinal)), Is.True,
-                string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic is null ?
-                    throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.ToString())));
+                string.Join(Environment.NewLine, errors.Select(static diagnostic => diagnostic.ToString())));
         }
         else
         {

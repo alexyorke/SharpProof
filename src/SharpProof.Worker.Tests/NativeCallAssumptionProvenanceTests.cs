@@ -73,7 +73,7 @@ public sealed class NativeCallAssumptionProvenanceTests
         Assert.That(proof.Outcome, assumed ? Is.TypeOf<ProvenOutcome>() : Is.TypeOf<RefutedOutcome>());
         Assert.That(proof.Reason, Is.EqualTo(WorkerClaimReason.None));
         Assert.That(proof.BodyAssumptions, Is.EqualTo(assumed ? ImmutableArray.Create(firstSite, secondSite) : []));
-        Assert.That(proof.Core.Any(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label.StartsWith("assume:", StringComparison.Ordinal))), Is.EqualTo(assumed));
+        Assert.That(proof.Core.Any(label => label.StartsWith("assume:", StringComparison.Ordinal)), Is.EqualTo(assumed));
         Assert.That(proof.CallPreconditionWitness, assumed ? Is.Null : Is.EqualTo(site));
         if (!assumed)
         {

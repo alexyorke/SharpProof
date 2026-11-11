@@ -105,7 +105,6 @@ public sealed class ResourceExpressionCodecTests
         Assert.That(result.Proven, Is.True, result.UnknownReason);
         var payload = ResourceExpressionCodec.Encode(result.Bounds!.Elements.Expression, TestContext.CurrentContext.CancellationToken);
         var expression = ResourceExpressionCodec.Decode(payload, TestContext.CurrentContext.CancellationToken);
-        Assert.That(expression.Evaluate(input => input is null ? throw new ArgumentNullException(nameof(input)) :
-            input.Ordinal == 0 ? 3 : throw new InvalidOperationException("Input is not owned by this fixture."), TestContext.CurrentContext.CancellationToken), Is.EqualTo(new BigInteger(6)));
+        Assert.That(expression.Evaluate(input => input.Ordinal == 0 ? 3 : throw new InvalidOperationException("Input is not owned by this fixture."), TestContext.CurrentContext.CancellationToken), Is.EqualTo(new BigInteger(6)));
     }
 }

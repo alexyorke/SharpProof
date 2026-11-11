@@ -610,7 +610,7 @@ internal sealed class CompilerCallableLowererTests
                 verification.Callable.Reason,
                 Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
             Assert.That(
-                verification.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Reason)),
+                verification.Claims.Select(static claim => claim.Reason),
                 Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
         }
     }
@@ -624,7 +624,7 @@ internal sealed class CompilerCallableLowererTests
         var (compilation, target, factory) = CreateTarget(source, methodName);
         return new CompilerCallableLowerer(compilation).Prepare(target, cancellationToken: TestContext.CurrentContext.CancellationToken) with
         {
-            EffectClaims = [.. target.EffectClaims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Evidence))]
+            EffectClaims = [.. target.EffectClaims.Select(static claim => claim.Evidence)]
         };
     }
 
@@ -644,7 +644,7 @@ internal sealed class CompilerCallableLowererTests
             projectBoundary,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(backend.ConsumedResourceCount == 0,
-            Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.Precondition))));
+            Is.EqualTo(!preparation.Entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.Precondition)));
         return verification;
     }
 
@@ -662,7 +662,7 @@ internal sealed class CompilerCallableLowererTests
             [("Subject.cs", source)]);
         var discovery = new ClaimManifestBuilder(compilation).Build();
         var target = discovery.Targets.Values.Single(candidate =>
-            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Method.MetadataName == methodName));
+            candidate.Method.MetadataName == methodName);
         return (compilation, target, new IrFactory());
     }
 

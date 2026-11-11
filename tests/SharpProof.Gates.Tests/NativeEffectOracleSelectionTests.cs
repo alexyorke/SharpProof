@@ -21,8 +21,8 @@ public sealed class NativeEffectOracleSelectionTests
         Assert.That(report.UniverseMethodCount, Is.EqualTo(document.Methods.Length));
         Assert.That(report.CheckedMethodCount, Is.EqualTo(maximumMethods));
         Assert.That(report.Exhaustive, Is.EqualTo(exhaustive));
-        Assert.That(report.Rows.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.MethodId)),
-            Is.EqualTo(document.Methods.Take(maximumMethods).Select(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Id))));
+        Assert.That(report.Rows.Select(row => row.MethodId),
+            Is.EqualTo(document.Methods.Take(maximumMethods).Select(method => method.Id)));
         Assert.That(report.RuntimeContradictions, Is.Zero);
         Assert.That(report.Passed, Is.True);
     }
@@ -57,7 +57,7 @@ public sealed class NativeEffectOracleSelectionTests
         ArgumentNullException.ThrowIfNull(methodId);
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
-        document = document with { Methods = [.. document.Methods.Where(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Id == methodId)] };
+        document = document with { Methods = [.. document.Methods.Where(method => method.Id == methodId)] };
         Assert.That(document.Methods, Has.Length.EqualTo(1));
         var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(document, TestContext.CurrentContext.CancellationToken, purity: true);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
@@ -66,7 +66,7 @@ public sealed class NativeEffectOracleSelectionTests
         CompilerManifestArtifactJson.DeserializePrepared(
             CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken),
             out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        var preparation = preparations.Single(preparation => preparation is null ? throw new ArgumentNullException(nameof(preparation)) : preparation.EffectClaims.Length != 0);
+        var preparation = preparations.Single(preparation => preparation.EffectClaims.Length != 0);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out _, out var failure, TestContext.CurrentContext.CancellationToken), Is.True,
             "construction=" + failure + "; blocks=" + candidate.Program.Blocks.Length);

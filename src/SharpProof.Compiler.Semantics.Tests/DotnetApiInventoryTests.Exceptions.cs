@@ -34,7 +34,7 @@ public sealed partial class DotnetApiInventoryTests
                 static _ => true, null, TestContext.CurrentContext.CancellationToken, opaqueCalls: true);
             if (!lowered.IsExact)
             { return false; }
-            if (resourceOnly && lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).OfType<IrLockInstruction>().Count() != 1)
+            if (resourceOnly && lowered.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrLockInstruction>().Count() != 1)
             { return false; }
             // Select a normal constructor path only for this differential probe.
             // This approximation is not native replay authority or a proof premise.

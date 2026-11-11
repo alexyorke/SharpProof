@@ -156,7 +156,7 @@ public sealed class TypedRegionProgramLoweringTests
         using var subject = TypedProgramSubject.Create("int Target(int x) { " + string.Concat(Enumerable.Repeat("x = 0;", 5000)) + "return x; }");
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.False);
-        Assert.That(lowered.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length)), Is.EqualTo(1));
+        Assert.That(lowered.Program.Blocks.Sum(block => block.Instructions.Length), Is.EqualTo(1));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(new Action(() => RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context, cancellation.Token)));
@@ -183,7 +183,7 @@ public sealed class TypedRegionProgramLoweringTests
         Assert.That(unnamed, Is.True);
         var lowered = subject.Lower();
         Assert.That(lowered.IsExact, Is.True);
-        var instructions = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
+        var instructions = lowered.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         Assert.That(instructions.OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         Assert.That(instructions.OfType<IrLockInstruction>().Count(), Is.EqualTo(2));
     }

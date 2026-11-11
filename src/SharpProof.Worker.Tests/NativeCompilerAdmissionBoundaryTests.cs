@@ -83,7 +83,7 @@ public sealed class NativeCompilerAdmissionBoundaryTests
         Assert.That(total.IsBodyAbstraction, Is.False);
         Assert.That(total.EffectsCompleteAtEntry, Is.True);
         Assert.That(preparation.EffectClaims, Has.Length.EqualTo(3));
-        Assert.That(preparation.EffectClaims.All(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (total.ValidEffectClaimIds.Contains(claim.ClaimId))), Is.True);
+        Assert.That(preparation.EffectClaims.All(claim => total.ValidEffectClaimIds.Contains(claim.ClaimId)), Is.True);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null);
         Assert.That(candidate!.Requires, Has.Length.EqualTo(1));

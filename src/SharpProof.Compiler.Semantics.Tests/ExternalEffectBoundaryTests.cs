@@ -32,7 +32,7 @@ internal sealed class ExternalEffectBoundaryTests
             Assert.That(summary.Capabilities.Kinds, Is.EqualTo(EffectCapabilityKind.IO |
                 EffectCapabilityKind.Synchronization | EffectCapabilityKind.Randomness |
                 EffectCapabilityKind.NativeInterop | EffectCapabilityKind.Reflection));
-            Assert.That(summary.Throws.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())),
+            Assert.That(summary.Throws.Types.Select(type => type.ToDisplayString()),
                 Is.EqualTo(s_exceptionNames));
             Assert.That(summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
         }
@@ -141,7 +141,7 @@ internal sealed class ExternalEffectBoundaryTests
                 EffectCapabilityKind.Synchronization | EffectCapabilityKind.NativeInterop |
                 EffectCapabilityKind.Reflection | EffectCapabilityKind.Randomness));
             Assert.That(summary.Allocation, Is.EqualTo(EffectAllocationKind.Managed));
-            Assert.That(summary.Throws.Types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString())), Is.EqualTo(s_exceptionNames));
+            Assert.That(summary.Throws.Types.Select(type => type.ToDisplayString()), Is.EqualTo(s_exceptionNames));
             Assert.That(summary.Termination, Is.EqualTo(EffectTermination.Terminates));
             Assert.That(summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
         }

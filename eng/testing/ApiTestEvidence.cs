@@ -63,11 +63,11 @@ internal static class ApiTestEvidence
         global::System.ArgumentNullException.ThrowIfNull(root);
         global::System.ArgumentNullException.ThrowIfNull(name);
         global::System.ArgumentNullException.ThrowIfNull(evidence);
-        var rows = evidence.OrderBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Api), StringComparer.Ordinal).ThenBy(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Facet), StringComparer.Ordinal).ToImmutableArray();
+        var rows = evidence.OrderBy(row => row.Api, StringComparer.Ordinal).ThenBy(row => row.Facet, StringComparer.Ordinal).ToImmutableArray();
         var directory = Path.Combine(root, "artifacts", "api-coverage");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, name + ".json"), JsonSerializer.Serialize(rows, JsonOptions) + "\n");
-        var report = new StringBuilder("# API facet test evidence: ").Append(name).Append("\n\n").Append(CultureInfo.InvariantCulture, $"Required: {rows.Length}; passed: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "passed"))}; missing: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "missing"))}; failed: {rows.Count(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Status == "failed"))}.\n\n").Append("Each passing row executed its declared-behavior check and rejected a deliberately wrong claim on the named inputs. This is bounded test evidence, not a proof for all inputs.\n\n").Append("| API | Facet | Test method | Edge inputs | Status | Detail |\n| --- | --- | --- | --- | --- | --- |\n");
+        var report = new StringBuilder("# API facet test evidence: ").Append(name).Append("\n\n").Append(CultureInfo.InvariantCulture, $"Required: {rows.Length}; passed: {rows.Count(row => row.Status == "passed")}; missing: {rows.Count(row => row.Status == "missing")}; failed: {rows.Count(row => row.Status == "failed")}.\n\n").Append("Each passing row executed its declared-behavior check and rejected a deliberately wrong claim on the named inputs. This is bounded test evidence, not a proof for all inputs.\n\n").Append("| API | Facet | Test method | Edge inputs | Status | Detail |\n| --- | --- | --- | --- | --- | --- |\n");
         foreach (var row in rows)
         {
             report.Append("| ").Append(Escape(row.Api)).Append(" | ").Append(Escape(row.Facet)).Append(" | ").Append(Escape(row.Test)).Append(" | ").Append(Escape(row.EdgeInputs)).Append(" | ").Append(row.Status).Append(" | ").Append(Escape(row.Detail)).Append(" |\n");

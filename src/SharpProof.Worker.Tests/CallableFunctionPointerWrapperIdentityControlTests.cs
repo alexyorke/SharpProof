@@ -66,13 +66,13 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
             Assert.That(methods, Has.Length.EqualTo(2));
             Assert.That(methods.Select(SemanticClaimIdentity.CreateCallableId), Is.Unique);
             Assert.That(discovery.Manifest.Callables, Has.Length.EqualTo(2));
-            Assert.That(discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)), Is.Unique);
+            Assert.That(discovery.Manifest.Callables.Select(static entry => entry.CallableId), Is.Unique);
             Assert.That(discovery.Manifest.Claims, Has.Length.EqualTo(2));
-            Assert.That(discovery.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)), Is.Unique);
+            Assert.That(discovery.Manifest.Claims.Select(static entry => entry.ClaimId), Is.Unique);
             Assert.That(WorkerProtocolJson.ValidateManifest(discovery.Manifest).IsValid, Is.True);
         }
         var expectedTotalIds = wrapperKind is 3 or 4
-            ? discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)).ToImmutableHashSet(StringComparer.Ordinal)
+            ? discovery.Manifest.Callables.Select(static entry => entry.CallableId).ToImmutableHashSet(StringComparer.Ordinal)
             : null;
         AssertUnsupportedArtifactRoundTrip(compilation, discovery, expectedTotalIds);
     }
@@ -147,12 +147,12 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
             $"Box<{pointer}[]>.Inner"];
         var genericParameters = generic ? "<T>" : string.Empty;
         var constraints = generic ? "where T : unmanaged" : string.Empty;
-        var declarations = string.Join(Environment.NewLine, types.Select(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : ($$"""
+        var declarations = string.Join(Environment.NewLine, types.Select(type => $$"""
             public static int Target{{genericParameters}}({{type}} pointer) {{constraints}} {
                 Contract.Ensures(Contract.Result<int>() == 1);
                 return 1;
             }
-            """)));
+            """));
         var compilation = TestCompilation.Create("CallablePointerWrapperShapeControls", [("Subject.cs", $$"""
             using SharpProof.Attributes;
             public sealed class Box<TItem> { public sealed class Inner { } }
@@ -165,14 +165,14 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(discovery.Manifest.Callables, Has.Length.EqualTo(types.Length));
-            Assert.That(discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)), Is.Unique);
+            Assert.That(discovery.Manifest.Callables.Select(static entry => entry.CallableId), Is.Unique);
             Assert.That(discovery.Manifest.Claims, Has.Length.EqualTo(types.Length));
-            Assert.That(discovery.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)), Is.Unique);
+            Assert.That(discovery.Manifest.Claims.Select(static entry => entry.ClaimId), Is.Unique);
             Assert.That(WorkerProtocolJson.ValidateManifest(discovery.Manifest).IsValid, Is.True);
         }
         var expectedTotalIds = discovery.Targets.Values
-            .Where(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Method.Parameters[0].Type is INamedTypeSymbol))
-            .Select(static target => target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Entry.CallableId)).ToImmutableHashSet(StringComparer.Ordinal);
+            .Where(static target => target.Method.Parameters[0].Type is INamedTypeSymbol)
+            .Select(static target => target.Entry.CallableId).ToImmutableHashSet(StringComparer.Ordinal);
         Assert.That(expectedTotalIds, Has.Count.EqualTo(3));
         AssertUnsupportedArtifactRoundTrip(compilation, discovery, expectedTotalIds);
     }
@@ -193,14 +193,14 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
         }
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(decoded.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId)),
-                Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))));
-            Assert.That(decoded.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId)),
-                Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.ClaimId))));
-            Assert.That(prepared.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.Entry.CallableId)),
-                Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.CallableId))));
+            Assert.That(decoded.Manifest.Callables.Select(static entry => entry.CallableId),
+                Is.EqualTo(discovery.Manifest.Callables.Select(static entry => entry.CallableId)));
+            Assert.That(decoded.Manifest.Claims.Select(static entry => entry.ClaimId),
+                Is.EqualTo(discovery.Manifest.Claims.Select(static entry => entry.ClaimId)));
+            Assert.That(prepared.Select(static entry => entry.Entry.CallableId),
+                Is.EqualTo(decoded.Manifest.Callables.Select(static entry => entry.CallableId)));
             Assert.That(prepared.All(static entry =>
-                entry is null ? throw new System.ArgumentNullException(nameof(entry)) : (entry.FailureReason == WorkerClaimReason.UnsupportedCallable)), Is.True);
+                entry.FailureReason == WorkerClaimReason.UnsupportedCallable), Is.True);
         }
         foreach (var entry in prepared)
         {
@@ -210,7 +210,7 @@ public sealed class CallableFunctionPointerWrapperIdentityControlTests
         foreach (var entry in decoded.Manifest.Callables)
         {
             Assert.That(entry.ClaimIds, Is.EqualTo(decoded.Manifest.Claims
-                .Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == entry.CallableId)).Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+                .Where(claim => claim.CallableId == entry.CallableId).Select(static claim => claim.ClaimId)));
         }
     }
 }

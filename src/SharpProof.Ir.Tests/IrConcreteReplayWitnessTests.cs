@@ -59,7 +59,7 @@ internal sealed class IrConcreteReplayWitnessTests
         builder.Havoc(entry, knownSite, IrHavocKind.Variables, IrHavocOrigin.Approximation, confirmed);
         builder.Return(entry, factory.CreateOperation(), factory.Variable(confirmed));
         var options = new IrProgramReplayOptions(_ => factory.CreateBooleanValue(true))
-        { ConcreteHavocValueProvider = request => request is null ? throw new ArgumentNullException(nameof(request)) : request.Site == knownSite ? factory.CreateBooleanValue(false) : null };
+        { ConcreteHavocValueProvider = request => request.Site == knownSite ? factory.CreateBooleanValue(false) : null };
         var replay = new IrProgramInterpreter(factory).Execute(builder.Build(), null, 64, options);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.True);

@@ -368,6 +368,6 @@ internal sealed partial class NativeResourceContractTests
         var result = (await NativeEffectClaims.VerifyAsync(target, CallableEntryFeasibility.Feasible, new WorkerBudgets(), TestContext.CurrentContext.CancellationToken)).Single();
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.ResourceBound?.UnknownReason);
         Assert.That(result.ResourceBound!.InferredUpperBound, Is.EqualTo("0"));
-        Assert.That(result.ProofCore.Any(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.StartsWith("resource-memory-envelope:", StringComparison.Ordinal)), Is.False);
+        Assert.That(result.ProofCore.Any(static item => item.StartsWith("resource-memory-envelope:", StringComparison.Ordinal)), Is.False);
     }
 }

@@ -116,8 +116,7 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("1"));
-        var receiver = result.Model.Single(static value => value is null ? throw new ArgumentNullException(nameof(value)) :
-            value.Variable == "this");
+        var receiver = result.Model.Single(static value => value.Variable == "this");
         Assert.That(receiver.Kind, Is.Not.EqualTo("null"));
         Assert.That(receiver.Value, Is.Not.EqualTo("null"));
     }
@@ -274,12 +273,10 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ResourceBound!.ObservedLowerBound, Is.EqualTo("7"));
         Assert.That(result.ResourceBound.EvaluatedUpperBound, Is.EqualTo("6"));
         Assert.That(result.EffectWitness!.Location!.Line, Is.Positive);
-        Assert.That(result.Model.Single(static value => value is null ? throw new ArgumentNullException(nameof(value)) :
-            value.Variable == "parameter:0").Value, Is.EqualTo("7"));
+        Assert.That(result.Model.Single(static value => value.Variable == "parameter:0").Value, Is.EqualTo("7"));
         if (distinct)
         {
-            Assert.That(result.Model.Single(static value => value is null ? throw new ArgumentNullException(nameof(value)) :
-                value.Variable == "parameter:1").Value, Is.EqualTo("9"));
+            Assert.That(result.Model.Single(static value => value.Variable == "parameter:1").Value, Is.EqualTo("9"));
         }
     }
 

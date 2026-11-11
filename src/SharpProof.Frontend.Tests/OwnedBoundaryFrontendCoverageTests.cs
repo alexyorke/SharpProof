@@ -74,9 +74,8 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         builder.Return(entry, subject.Factory.CreateOperation(), subject.Factory.Integer(7));
         var program = builder.Build();
         Assert.That(program.Blocks.SelectMany(static block =>
-            block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(static write => write is null
-                ? throw new ArgumentNullException(nameof(write)) : write.IsStore && write.Region == IrWriteRegion.Field), Is.Empty);
+            block.Instructions)
+            .OfType<IrWriteInstruction>().Where(static write => write.IsStore && write.Region == IrWriteRegion.Field), Is.Empty);
         var replay = new IrProgramInterpreter(subject.Factory).Execute(program);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(7));
@@ -99,7 +98,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         Assert.That(result.Classification.Abstention, Is.Not.EqualTo(FrontendAbstention.None));
         builder.Return(result.Continuation, subject.Factory.CreateOperation(), result.Value);
         Assert.That(builder.Build().Blocks.SelectMany(static block =>
-            block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
+            block.Instructions)
             .OfType<IrAllocationInstruction>(), Is.Empty);
     }
 
@@ -115,8 +114,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         var lowering = new RoslynTotalProgramLowerer(subject.Context, TestContext.CurrentContext.CancellationToken, session)
             .Lower(subject.Graph);
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new ArgumentNullException(nameof(block)) :
-            IrSourceLoopEntry.IsGuard(subject.Factory, block.Terminator.Operation)), Is.EqualTo(2));
+        Assert.That(lowering.Program.Blocks.Count(block => IrSourceLoopEntry.IsGuard(subject.Factory, block.Terminator.Operation)), Is.EqualTo(2));
         var replay = subject.Execute(lowering, [2, 3]);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);
@@ -297,7 +295,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
         var model = compilation.GetSemanticModel(tree);
         var fieldSyntax = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>().Single();
         var propertySyntax = tree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>()
-            .Single(static property => property is null ? throw new ArgumentNullException(nameof(property)) : property.Identifier.ValueText == "Value");
+            .Single(static property => property.Identifier.ValueText == "Value");
         var field = (IFieldInitializerOperation)model.GetOperation(fieldSyntax.Initializer!)!;
         var property = (IPropertyInitializerOperation)model.GetOperation(propertySyntax.Initializer!)!;
         var symbol = (IPropertySymbol)model.GetDeclaredSymbol(propertySyntax)!;
@@ -349,8 +347,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
     public void RootCaptureInventoryRejectsOversizedCompilerFramesBeforePublishingAPlan(int count, bool admitted)
     {
         var names = Enumerable.Range(0, count).Select(static ordinal => "p" + ordinal).ToArray();
-        var parameters = string.Join(",", names.Select(static name => name is null
-            ? throw new ArgumentNullException(nameof(name)) : "int " + name));
+        var parameters = string.Join(",", names.Select(static name => "int " + name));
         var compilation = Compile("public static class Subject { public static System.Action Target(" + parameters +
             ") => () => System.GC.KeepAlive(new int[] {" + string.Join(",", names) + "}); }");
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
@@ -429,7 +426,7 @@ public sealed class OwnedBoundaryFrontendCoverageTests
             [CSharpSyntaxTree.ParseText(source, path: "owned-boundary.cs")], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error);
+            diagnostic.Severity == DiagnosticSeverity.Error);
         if (allowErrors)
         { Assert.That(errors, Is.Not.Empty); }
         else

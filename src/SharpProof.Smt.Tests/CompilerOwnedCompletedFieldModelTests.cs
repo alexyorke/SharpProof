@@ -95,7 +95,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         var compilation = CSharpCompilation.Create("CompilerOwnedCompletedField", [tree],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var emittedAssembly = new MemoryStream();
         var emitted = compilation.Emit(emittedAssembly);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -135,11 +135,11 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         Assert.That(graph, Is.Not.Null);
         var lowered = RoslynProgramLowering.LowerCandidate(graph!, lowering);
         Assert.That(lowered.IsExact, Is.True);
-        var assignments = lowered.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        var assignments = lowered.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAssignInstruction>().ToImmutableArray();
-        var actualRead = assignments.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Value))
-            .OfType<IrOpaqueTerm>().Single(term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (factory.GetString(factory.GetMemberInfo(term.Member).Name)
-                .StartsWith("field:", StringComparison.Ordinal)));
+        var actualRead = assignments.Select(instruction => instruction.Value)
+            .OfType<IrOpaqueTerm>().Single(term => factory.GetString(factory.GetMemberInfo(term.Member).Name)
+                .StartsWith("field:", StringComparison.Ordinal));
         Assert.That(actualRead.Type, Is.EqualTo(declaredType));
         Assert.That(factory.GetMemberInfo(actualRead.Member).ReturnType, Is.EqualTo(declaredType));
         Assert.That(actualRead.Receiver, Is.TypeOf<IrCastTerm>());
@@ -153,7 +153,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         while (cursor != lowering.Parameters.Single().Entry)
         {
             Assert.That(visited.Add(cursor), Is.True, "Compiler receiver copy chain must terminate at the source input.");
-            var copies = assignments.Where(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == cursor)).ToImmutableArray();
+            var copies = assignments.Where(instruction => instruction.Target == cursor).ToImmutableArray();
             Assert.That(copies.Length, Is.EqualTo(1));
             Assert.That(copies[0].Value, Is.TypeOf<IrVariableTerm>());
             cursor = ((IrVariableTerm)copies[0].Value).Variable;
@@ -174,7 +174,7 @@ public sealed class CompilerOwnedCompletedFieldModelTests
         System.ArgumentNullException.ThrowIfNull(factory);
         System.ArgumentNullException.ThrowIfNull(inspect);
         var query = new VerificationQuery(factory,
-            predicates.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))),
+            predicates.Select(predicate => new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         using var context = new Context();
         using var solver = context.MkSolver();

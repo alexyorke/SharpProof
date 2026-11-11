@@ -86,7 +86,7 @@ internal sealed class NativeOpaqueCallTests
         var preparation = project.Snapshot.Callables.Single();
         Assert.That(preparation.Total, Is.Not.Null, preparation.FailureReason.ToString());
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var call = candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrCallInstruction>().Single();
+        var call = candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrCallInstruction>().Single();
         var description = candidate.Factory.GetString(candidate.Factory.GetOperationInfo(call.Operation).Description!.Value);
         Assert.That(description, Does.StartWith("opaque-call:"));
         var effects = int.Parse(description.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture);
@@ -218,7 +218,7 @@ internal sealed class NativeOpaqueCallTests
             """ + (guarded ? "try { " + body + " } catch (System.Exception) { return false; }" : body) + " } }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = await NativeExceptionEffectVerifier.VerifyAsync(
-            preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0)), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+            preparations.Single(preparation => preparation.EffectClaims.Length != 0), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         if (outcome != null)
         { Assert.That(result.Outcome, Is.TypeOf(outcome), result.Reason.ToString()); }
         else
@@ -251,6 +251,6 @@ internal sealed class NativeOpaqueCallTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
+        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 }

@@ -20,7 +20,7 @@ public sealed class BulkSourceApiDomainCoverageTests
         const string source = "public static class Subject { public static void Target() => Helper(); [System.Diagnostics.Conditional(null)] private static void Helper() { } }";
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12), "conditional-null.cs");
         var compilation = CSharpCompilation.Create("ConditionalNull", [tree], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)), Is.EqualTo(ConditionalNullErrors));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).Select(diagnostic => diagnostic.Id), Is.EqualTo(ConditionalNullErrors));
         using var image = new System.IO.MemoryStream();
         Assert.That(compilation.Emit(image).Success, Is.False);
         var invocation = tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();

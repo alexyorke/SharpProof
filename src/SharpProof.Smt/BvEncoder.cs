@@ -119,12 +119,12 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
     {
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         relation = RepositoryParameterGuard.NotNull(relation, nameof(relation));
-        var arguments = relation.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (Encode(argument, meter))).ToImmutableArray();
+        var arguments = relation.Arguments.Select(argument => Encode(argument, meter)).ToImmutableArray();
         var relations = _relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         if (!relations.TryGetValue(relation.Member, out var declaration))
         {
             declaration = context.MkFuncDecl("invariant" + relation.Member.Value.ToString(CultureInfo.InvariantCulture),
-                [.. arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Sort))], context.BoolSort);
+                [.. arguments.Select(argument => argument.Sort)], context.BoolSort);
             relations.Add(relation.Member, declaration);
             _relationDeclarations.Add(new(relation.Member, declaration));
         }

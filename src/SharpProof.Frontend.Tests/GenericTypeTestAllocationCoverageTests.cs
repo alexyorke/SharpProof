@@ -18,7 +18,7 @@ public sealed class GenericTypeTestAllocationCoverageTests
         var compilation = CSharpCompilation.Create("GenericTypeTestAllocationControl", [tree],
             TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var operation = compilation.GetSemanticModel(tree).GetOperation(method.ExpressionBody!.Expression)!;
         Assert.That(CSharpOperationSemantics.OpaqueTypeTestOperand(operation), Is.Not.Null);

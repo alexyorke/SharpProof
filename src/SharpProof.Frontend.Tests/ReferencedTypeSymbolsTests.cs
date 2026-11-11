@@ -149,7 +149,7 @@ public sealed class ReferencedTypeSymbolsTests
 
         var identities = ReferencedTypeSymbols.GetAll(compilation, TestContext.CurrentContext.CancellationToken)
             .Select(static type =>
-                type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ContainingAssembly.Name + ":" + type.ToDisplayString()))
+                type.ContainingAssembly.Name + ":" + type.ToDisplayString())
             .ToImmutableArray();
 
         Assert.That(
@@ -173,7 +173,7 @@ public sealed class ReferencedTypeSymbolsTests
         var types = ReferencedTypeSymbols.GetAllCached(
                 compilation,
                 contractFor!.ContainingAssembly, TestContext.CurrentContext.CancellationToken)
-            .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
+            .Select(static type => type.ToDisplayString())
             .ToImmutableArray();
 
         Assert.That(types, Does.Contain("Consumer.Marker"));

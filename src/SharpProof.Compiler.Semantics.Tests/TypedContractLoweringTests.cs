@@ -261,8 +261,8 @@ internal sealed class TypedContractLoweringTests
             }
             """);
         var clauses = subject.Bind().Clauses;
-        var requires = clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
-        var ensures = clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures));
+        var requires = clauses.Single(clause => clause.Kind == BoundContractKind.Requires);
+        var ensures = clauses.Single(clause => clause.Kind == BoundContractKind.Ensures);
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, string.Join(';', lowering.Abstentions.Select(item => item.Reason)));
         var binding = subject.Context.Parameters.Single();
@@ -369,7 +369,7 @@ internal sealed class TypedContractLoweringTests
             }
             """);
         var other = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Other"));
+            .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Other");
         var model = subject.Compilation.GetSemanticModel(other.SyntaxTree);
         var graph = ControlFlowGraph.Create(other, model)!;
         Assert.That(RoslynProgramLowering.LowerCandidate(graph, subject.Context).IsExact, Is.False);
@@ -514,16 +514,16 @@ internal sealed class TypedContractLoweringTests
     {
         System.ArgumentNullException.ThrowIfNull(subject);
         var method = subject.Compilation.SyntaxTrees.Single().GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var invocation = method.DescendantNodes().OfType<InvocationExpressionSyntax>().First();
         var mutation = method.DescendantNodes().OfType<AssignmentExpressionSyntax>().Single();
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.False);
         Assert.That(lowering.Abstentions.Select(item => ((item.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(item)) : (subject.Factory.GetOperationInfo(item.Operation).SourceSpan?.Start))),
             Does.Contain(invocation.SpanStart), "The earlier specification call must remain when the complete binding fails.");
-        Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>()
-                .Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Target == subject.Context.Parameters[0].Current &&
-                    subject.Factory.GetOperationInfo(instruction.Operation).SourceSpan?.Start == mutation.SpanStart)),
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>()
+                .Any(instruction => instruction.Target == subject.Context.Parameters[0].Current &&
+                    subject.Factory.GetOperationInfo(instruction.Operation).SourceSpan?.Start == mutation.SpanStart),
             Is.True, "Rejecting contracts must preserve the original body mutation.");
     }
 
@@ -551,9 +551,9 @@ internal sealed class TypedContractLoweringTests
             var compilation = TestCompilation.Create("TypedContracts", source, includeSharpProofReference: includeSharpProofReference);
             TestCompilation.AssertNoErrors(compilation);
             var methods = compilation.SyntaxTrees.Single().GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target" &&
-                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" })).ToImmutableArray();
-            var bodySyntax = methods.Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Body != null || method.ExpressionBody != null));
+                .Where(method => method.Identifier.ValueText == "Target" &&
+                    method.Parent is TypeDeclarationSyntax { Identifier.ValueText: "Subject" }).ToImmutableArray();
+            var bodySyntax = methods.Single(method => method.Body != null || method.ExpressionBody != null);
             var contextSyntax = implementationContext ? bodySyntax : methods[0];
             var model = compilation.GetSemanticModel(bodySyntax.SyntaxTree);
             var method = (IMethodSymbol)model.GetDeclaredSymbol(contextSyntax)!;
@@ -586,8 +586,8 @@ internal sealed class TypedContractLoweringTests
             { throw new ArgumentNullException(nameof(inputs)); }
             return ImmutableDictionaryCapture.Create(
                 Context.Parameters,
-                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, inputs[binding.Parameter.Ordinal])));
+                binding => binding.Entry,
+                binding => Value(binding.Entry, inputs[binding.Parameter.Ordinal]));
         }
 
         internal ImmutableDictionary<IrVarId, IrValue> Values(ImmutableArray<int> inputs)
@@ -595,8 +595,8 @@ internal sealed class TypedContractLoweringTests
             if (inputs.IsDefault)
             { throw new ArgumentNullException(nameof(inputs)); }
             return ImmutableDictionaryCapture.Create(
-                Context.Parameters.SelectMany(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)
-                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal])))))),
+                Context.Parameters.SelectMany(binding => ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)
+                    .Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (KeyValuePair.Create(variable, Value(variable, inputs[binding.Parameter.Ordinal]))))),
                 pair => pair.Key,
                 pair => pair.Value);
         }

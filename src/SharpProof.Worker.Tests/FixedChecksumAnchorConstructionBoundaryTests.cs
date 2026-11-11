@@ -642,9 +642,9 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
             observation["imageSha256"] = Hash(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
             await File.WriteAllBytesAsync(Path.Combine(output, "compiler-image.dll"), image.GetBuffer().AsMemory(0, checked((int)image.Length)));
             // The runtime image has the same source; only the shipped Conditional symbol is absent.
-            var runtimeTrees = compilation.SyntaxTrees.Select(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (CSharpSyntaxTree.ParseText(tree.GetText(),
+            var runtimeTrees = compilation.SyntaxTrees.Select(tree => CSharpSyntaxTree.ParseText(tree.GetText(),
                 ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols(
-                    ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath)));
+                    ((CSharpParseOptions)tree.Options).PreprocessorSymbolNames.Where(symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol != Contract.ConditionalSymbol))), tree.FilePath));
             var runtimeCompilation = compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(runtimeTrees);
             TestCompilation.AssertNoErrors(runtimeCompilation);
             using var runtimeImage = new MemoryStream();
@@ -731,17 +731,17 @@ public sealed class FixedChecksumAnchorConstructionBoundaryTests
                 observation["irControlCount"] = irControlCount;
             }
             observation["originalBlocks"] = candidate.Program.Blocks.Length;
-            observation["originalInstructions"] = candidate.Program.Blocks.Sum(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions.Length));
+            observation["originalInstructions"] = candidate.Program.Blocks.Sum(block => block.Instructions.Length);
             var loops = PassiveLoopCutter.Loops(candidate, TestContext.CurrentContext.CancellationToken);
             var printer = new IrPrinter(candidate.Factory);
-            observation["loops"] = loops.Select(loop => loop is null ? throw new System.ArgumentNullException(nameof(loop)) : (new
+            observation["loops"] = loops.Select(loop => new
             {
                 header = loop.Header.Value,
                 blocks = loop.Blocks.Select(block => block.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(block)) : (block.Value)).Order().ToImmutableArray(),
                 writes = loop.Writes.Select(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray(),
                 tracked = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Tracked.Select(printer.Print).ToImmutableArray(),
                 anchors = LoopInvariantCandidates.State(candidate, loop, TestContext.CurrentContext.CancellationToken).Anchors.Select(printer.Print).ToImmutableArray()
-            })).ToImmutableArray();
+            }).ToImmutableArray();
             var generated = LoopInvariantCandidates.Generate(candidate, loops, TestContext.CurrentContext.CancellationToken);
             observation["generated"] = generated.Select((invariant, ordinal) => invariant is null ? throw new System.ArgumentNullException(nameof(invariant)) : (new
             {

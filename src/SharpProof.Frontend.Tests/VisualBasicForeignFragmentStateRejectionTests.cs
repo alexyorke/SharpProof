@@ -96,7 +96,7 @@ public sealed class VisualBasicForeignFragmentStateRejectionTests
             var compilation = VisualBasicCompilation.Create(name, [tree], TestMetadataReferences.Platform,
                 new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                     optionStrict: OptionStrict.On, optimizationLevel: OptimizationLevel.Release));
-            Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
             using var image = new MemoryStream();
             Assert.That(compilation.Emit(image).Success, Is.True);
             var model = compilation.GetSemanticModel(tree);

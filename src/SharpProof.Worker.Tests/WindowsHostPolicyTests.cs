@@ -122,7 +122,7 @@ public sealed class WindowsHostPolicyTests
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => true)));
         var visited = ImmutableArray.CreateBuilder<string>();
         Assert.DoesNotThrow((Action)(() => PublicationLease.ValidateWindowsMember(path,
-            root => root is null ? throw new System.ArgumentNullException(nameof(root)) : (root == @"C:\"), member =>
+            root => (root == @"C:\"), member =>
             {
                 System.ArgumentNullException.ThrowIfNull(member);
                 visited.Add(member);

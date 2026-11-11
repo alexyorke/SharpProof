@@ -29,7 +29,7 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         ArgumentNullException.ThrowIfNull(expected);
         cancellationToken.ThrowIfCancellationRequested();
         if (!method.IsStatic || method.Arity != 0 || preparation.Parameters.Length != method.Parameters.Length ||
-            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)))
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
         { return "UnsupportedInvocationShape"; }
         for (var owner = method.ContainingType; owner != null; owner = owner.ContainingType)
         {

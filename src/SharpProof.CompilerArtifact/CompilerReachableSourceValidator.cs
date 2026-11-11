@@ -74,11 +74,11 @@ internal static class CompilerReachableSourceValidator
         }
         var bodies = bodyBuilder.ToImmutable();
         var graphs = graphBuilder.ToImmutable();
-        Require(artifact.Bodies.Select(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal)).Distinct().Count() == documents.Count);
+        Require(artifact.Bodies.Select(body => body.SourceTreeOrdinal).Distinct().Count() == documents.Count);
         foreach (var document in artifact.Documents)
         {
-            Require(document.MaximumBodyEnd == artifact.Bodies.Where(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceTreeOrdinal == document.SourceTreeOrdinal))
-                .Max(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.Start + body.Length)));
+            Require(document.MaximumBodyEnd == artifact.Bodies.Where(body => body.SourceTreeOrdinal == document.SourceTreeOrdinal)
+                .Max(body => body.Start + body.Length));
         }
         foreach (var body in artifact.Bodies)
         {
@@ -115,10 +115,10 @@ internal static class CompilerReachableSourceValidator
                     }
                 }
                 Require(body.Callees.ToImmutableHashSet(StringComparer.Ordinal).SetEquals(
-                    body.SourceCalls.Select(call => call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.CalleeBodyId))));
+                    body.SourceCalls.Select(call => call.CalleeBodyId)));
             }
         }
-        var callableIds = manifest.Manifest.Callables.Select(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId)).ToImmutableHashSet(StringComparer.Ordinal);
+        var callableIds = manifest.Manifest.Callables.Select(callable => callable.CallableId).ToImmutableHashSet(StringComparer.Ordinal);
         var rootIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var pending = ImmutableStack<string>.Empty;
         foreach (var root in artifact.Roots!)

@@ -151,7 +151,7 @@ public sealed class NativeMetadataShadowRequiresTests
         TestCompilation.AssertNoErrors(compilation);
         var batch = Prepare(compilation, Capture(compilation), true);
         Assert.That(batch.Callers, Is.Empty);
-        Assert.That(batch.Gaps.Any(gap => gap is null ? throw new System.ArgumentNullException(nameof(gap)) : (gap.Reason == "UnsupportedBody")), Is.True);
+        Assert.That(batch.Gaps.Any(gap => gap.Reason == "UnsupportedBody"), Is.True);
     }
 
     [Test]
@@ -219,7 +219,7 @@ public sealed class NativeMetadataShadowRequiresTests
         var value = type == "string" ? input == null ? factory.CreateNullValue(factory.StringType) : factory.CreateStringValue(input) :
             factory.CreateIntegerValue(factory.GetVariableInfo(entry).Type, long.Parse(input!, CultureInfo.InvariantCulture));
         var observations = ImmutableArray.CreateBuilder<bool>();
-        var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
+        var markers = body.CallPreconditions.Select(row => row.Instruction).ToImmutableHashSet();
         var options = new IrProgramReplayOptions(static _ => null)
         {
             AssignmentObserver = (instruction, assigned, _) =>

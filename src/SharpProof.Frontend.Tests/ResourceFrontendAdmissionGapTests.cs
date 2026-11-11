@@ -37,9 +37,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         ArgumentNullException.ThrowIfNull(member);
         var compilation = Compile("public sealed class Payload { public int Value; " + member + " }");
         var type = compilation.GetTypeByMetadataName("Payload")!;
-        Assert.That(type.GetMembers().Any(static candidate => candidate is null
-            ? throw new ArgumentNullException(nameof(candidate))
-            : candidate is IEventSymbol or IMethodSymbol { MethodKind: MethodKind.Destructor }), Is.True);
+        Assert.That(type.GetMembers().Any(static candidate => candidate is IEventSymbol or IMethodSymbol { MethodKind: MethodKind.Destructor }), Is.True);
         Assert.That(CSharpOperationSemantics.CompleteObjectStorage(type, TestContext.CurrentContext.CancellationToken), Is.Null);
         var control = Compile("public sealed class Payload { public int Value; }").GetTypeByMetadataName("Payload")!;
         Assert.That(CSharpOperationSemantics.CompleteObjectStorage(control, TestContext.CurrentContext.CancellationToken)!.Value,
@@ -67,8 +65,7 @@ public sealed class ResourceFrontendAdmissionGapTests
     {
         var count = ResourceAllocationShape.MaximumFields + delta;
         var names = Enumerable.Range(0, count).Select(static index => "p" + index.ToString(CultureInfo.InvariantCulture)).ToArray();
-        var parameters = string.Join(",", names.Select(static name => name is null
-            ? throw new ArgumentNullException(nameof(name)) : "int " + name));
+        var parameters = string.Join(",", names.Select(static name => "int " + name));
         var middle = count / 2;
         var source = "using System; public static class Subject { public static Func<Action> Target(" + parameters +
             ") => () => { GC.KeepAlive(new int[]{" + string.Join(",", names.Take(middle)) +
@@ -83,8 +80,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         Assert.That(outer.Succeeded && inner.Succeeded, Is.True);
         Assert.That(outer.CapturedInside, Has.Length.EqualTo(count));
         Assert.That(inner.CapturedInside.Length, Is.LessThanOrEqualTo(ResourceAllocationShape.MaximumFields));
-        Assert.That(inner.CapturedInside.All(capture => capture is null ? throw new ArgumentNullException(nameof(capture))
-            : outer.CapturedInside.Contains(capture, SymbolEqualityComparer.Default)), Is.True);
+        Assert.That(inner.CapturedInside.All(capture => outer.CapturedInside.Contains(capture, SymbolEqualityComparer.Default)), Is.True);
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Target").OfType<IMethodSymbol>().Single();
         var plan = RootParameterClosurePlan.TryCreate(method, compilation, TestContext.CurrentContext.CancellationToken);
         Assert.That(plan != null, Is.EqualTo(admitted));
@@ -176,9 +172,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         Assert.That(subject.Invoke([]), Is.EqualTo(7));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var model = subject.Compilation.GetSemanticModel(tree);
-        var declaration = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().Single(static field => field is null
-            ? throw new ArgumentNullException(nameof(field)) : field.Declaration.Variables.Any(static variable => variable is null
-                ? throw new ArgumentNullException(nameof(variable)) : variable.Identifier.ValueText == "Child"));
+        var declaration = tree.GetRoot().DescendantNodes().OfType<FieldDeclarationSyntax>().Single(static field => field.Declaration.Variables.Any(static variable => variable.Identifier.ValueText == "Child"));
         var initializer = (IFieldInitializerOperation)model.GetOperation(declaration.Declaration.Variables.Single().Initializer!)!;
         var creation = (IObjectCreationOperation)initializer.Value;
         Assert.That(creation.Initializer!.Initializers.Single(), Is.InstanceOf<ISimpleAssignmentOperation>());
@@ -238,9 +232,8 @@ public sealed class ResourceFrontendAdmissionGapTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var compilation = CSharpCompilation.Create("PartialPropertyInitializerAdmission", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null
-            ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id).ToArray();
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(static diagnostic => diagnostic.Id).ToArray();
         if (duplicateInitializer)
         {
             Assert.That(errors, Has.Length.EqualTo(1));
@@ -300,9 +293,8 @@ public sealed class ResourceFrontendAdmissionGapTests
         var lowered = RoslynProgramLowering.LowerCandidate(subject.Graph, context, static _ => true,
             TestContext.CurrentContext.CancellationToken);
         Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
-        var guards = lowered.Program.Blocks.Select(static block => block is null
-            ? throw new ArgumentNullException(nameof(block)) : block.Terminator).OfType<IrBranchInstruction>()
-            .Where(branch => branch is null ? throw new ArgumentNullException(nameof(branch)) : IrSourceLoopEntry.IsGuard(subject.Factory, branch.Operation)).ToArray();
+        var guards = lowered.Program.Blocks.Select(static block => block.Terminator).OfType<IrBranchInstruction>()
+            .Where(branch => IrSourceLoopEntry.IsGuard(subject.Factory, branch.Operation)).ToArray();
         Assert.That(guards, Has.Length.EqualTo(2), "The body if must not become another source loop guard.");
         var observed = 0;
         var options = new IrProgramReplayOptions(static _ => null)
@@ -329,8 +321,7 @@ public sealed class ResourceFrontendAdmissionGapTests
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12));
         var compilation = CSharpCompilation.Create("ResourceFrontendAdmission", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null
-            ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         return compilation;
     }
 }

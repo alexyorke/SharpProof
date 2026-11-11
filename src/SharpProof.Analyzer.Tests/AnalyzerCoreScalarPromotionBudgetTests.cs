@@ -26,7 +26,7 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
     [TestCase(1400)]
     public async Task DefaultContractsModeRecordsBoundedCalleeOutcomes(int valueCopies)
     {
-        var testCase = s_cases.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.ValueCopies == valueCopies));
+        var testCase = s_cases.Single(candidate => candidate.ValueCopies == valueCopies);
         var observation = InspectCompiler(testCase);
         AssertCompilerGate(observation);
         var factory = new RecordingSessionFactory();
@@ -56,13 +56,13 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         var sourceHash = Convert.ToHexString(SHA256.HashData(sourceBytes.AsSpan()));
         var compilation = AnalyzerTestHost.CreateCompilation(source, ["SP0027"], filePath: path);
         var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
-            .Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(static diagnostic => diagnostic.ToString())
             .ToImmutableArray();
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Identifier.ValueText == "Need"));
+            .Single(candidate => candidate.Identifier.ValueText == "Need");
         var symbol = (IMethodSymbol)model.GetDeclaredSymbol(method)!;
         var operation = model.GetOperation(method);
         var syntaxNodes = method.DescendantNodesAndSelf().Count();
@@ -71,8 +71,8 @@ public sealed class AnalyzerCoreScalarPromotionBudgetTests
         var typeMembers = symbol.ContainingType.GetMembers();
         var typeInitializationMemberCharges = typeMembers.Length;
         var typeInitializationReferenceCharges = typeMembers
-            .Where(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.IsStatic && member is not IFieldSymbol { IsConst: true }))
-            .Sum(static member => member is null ? throw new System.ArgumentNullException(nameof(member)) : (member.DeclaringSyntaxReferences.Length));
+            .Where(static member => member.IsStatic && member is not IFieldSymbol { IsConst: true })
+            .Sum(static member => member.DeclaringSyntaxReferences.Length);
         var typeInitializationCost = typeInitializationMemberCharges + typeInitializationReferenceCharges;
         var sourceBudgetSpentBeforePrepare = symbol.Parameters.Length + 1 +
             method.DescendantNodesAndSelf().Count() + typeInitializationCost +

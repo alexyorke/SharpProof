@@ -49,7 +49,7 @@ internal sealed partial class ResourceBoundsAnalysis
             return new(new Cost(worst.LoopIterations, worst.Arrays, worst.Elements,
                 ResourceProgram.WithDistribution(distribution, noCost.Program, yesCost.Program)), null)
             {
-                Assumptions = [.. whenFalse.Assumptions.Concat(whenTrue.Assumptions).Distinct(StringComparer.Ordinal).OrderBy(static value => value is null ? throw new ArgumentNullException(nameof(value)) : value, StringComparer.Ordinal)]
+                Assumptions = [.. whenFalse.Assumptions.Concat(whenTrue.Assumptions).Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal)]
             };
         }
         catch (ResourceExpressionLimitException)

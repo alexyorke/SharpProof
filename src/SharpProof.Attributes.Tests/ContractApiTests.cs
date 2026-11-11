@@ -228,16 +228,16 @@ internal sealed class ContractApiTests
             (typeof(ObsoleteAttribute).Assembly, "System"),
             (typeof(System.Diagnostics.ConditionalAttribute).Assembly, "System.Diagnostics"))
             .SelectMany(static pair => pair.Item1.GetExportedTypes()
-                .Where(type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Namespace == pair.Item2 && typeof(Attribute).IsAssignableFrom(type)))
-                .Select(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Name)))
+                .Where(type => type.Namespace == pair.Item2 && typeof(Attribute).IsAssignableFrom(type))
+                .Select(static type => type.Name))
             .ToImmutableHashSet(StringComparer.Ordinal);
 
         Assert.That(imported, Does.Contain("NotNullAttribute"));
         Assert.That(
             typeof(Contract).Assembly.GetExportedTypes()
-                .Where(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (typeof(Attribute).IsAssignableFrom(type)))
-                .Select(static type => type is null ? throw new ArgumentNullException(nameof(type)) : (type.Name)),
-            Has.None.Matches<string>(name => name is null ? throw new ArgumentNullException(nameof(name)) : imported.Contains(name)));
+                .Where(static type => typeof(Attribute).IsAssignableFrom(type))
+                .Select(static type => type.Name),
+            Has.None.Matches<string>(name => imported.Contains(name)));
     }
 
     [Test]
@@ -259,14 +259,14 @@ internal sealed class ContractApiTests
     {
         Assert.That(
             typeof(EffectContractAttribute).GetConstructors()
-                .SelectMany(static constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.GetParameters())),
+                .SelectMany(static constructor => constructor.GetParameters()),
             Has.None.Property(nameof(System.Reflection.ParameterInfo.ParameterType))
                 .EqualTo(typeof(string)));
         Assert.That(
             typeof(EffectContractAttribute).GetProperties()
-                .Where(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.DeclaringType ==
-                    typeof(EffectContractAttribute)))
-                .Select(static property => property is null ? throw new System.ArgumentNullException(nameof(property)) : (property.PropertyType)),
+                .Where(static property => property.DeclaringType ==
+                    typeof(EffectContractAttribute))
+                .Select(static property => property.PropertyType),
             Has.None.EqualTo(typeof(string)));
         Assert.That(
             typeof(EffectContractAttribute).GetCustomAttributes(

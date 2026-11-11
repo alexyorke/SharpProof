@@ -98,14 +98,14 @@ internal sealed class PassiveCallableCandidate
         CallPreconditions = callPreconditions.IsDefault ? [] : callPreconditions;
         if (CallPreconditions.IsEmpty)
         {
-            if (program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Any(marker =>
-                marker is null ? throw new System.ArgumentNullException(nameof(marker)) : (IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)))))
+            if (program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Any(marker =>
+                IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name))))
             { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
             return;
         }
         var instructionOrder = ImmutableArray.CreateBuilder<IrInstruction>();
-        var instructions = ImmutableDictionaryCapture.Create(program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)),
-            instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : instruction.Id,
+        var instructions = ImmutableDictionaryCapture.Create(program.Blocks.SelectMany(block => block.Instructions),
+            instruction => instruction.Id,
             instruction =>
             {
                 System.ArgumentNullException.ThrowIfNull(instruction);
@@ -116,7 +116,7 @@ internal sealed class PassiveCallableCandidate
         var markers = ImmutableHashSet.CreateBuilder<IrInstructionId>();
         var markerTargets = ImmutableHashSet.CreateBuilder<IrVarId>();
         var writers = ImmutableDictionaryCapture.Create(instructionRows.SelectMany(IrInstructionFacts.WrittenVariables)
-            .GroupBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable)), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Count()));
+            .GroupBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable)), group => group.Key, group => group.Count());
         var reads = IrTraversal.CollectVariables(instructionRows.SelectMany(IrInstructionFacts.ReadTerms)
             .Concat(requires.Concat(ensures).SelectMany(clause => ((clause.Value is null || clause.Safe is null || clause.Operation.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(clause)) : (ImmutableArray.Create(clause.Value, clause.Safe))))));
         foreach (var clause in CallPreconditions)
@@ -130,8 +130,8 @@ internal sealed class PassiveCallableCandidate
             { throw new ArgumentException("Call preconditions must own distinct guarded assignments in the original body.", nameof(callPreconditions)); }
         }
         if (instructionRows.OfType<IrAssignInstruction>().Any(marker =>
-            marker is null ? throw new System.ArgumentNullException(nameof(marker)) : (IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
-            !markers.Contains(marker.Id))))
+            IrCallPreconditionMarker.IsReservedName(program.Factory.GetString(program.Factory.GetVariableInfo(marker.Target).Name)) &&
+            !markers.Contains(marker.Id)))
         { throw new ArgumentException("Reserved call-precondition markers require owned obligation rows.", nameof(callPreconditions)); }
     }
 

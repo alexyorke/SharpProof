@@ -61,8 +61,8 @@ public sealed class DictionaryDomainBoundaryTests
         if (depth != 0)
         { Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.ExpressionDepthLimit)); }
         builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
-        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+        Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.IsStore), Is.Empty);
     }
 
     [TestCase("var alias = data;", true)]
@@ -124,14 +124,14 @@ public sealed class DictionaryDomainBoundaryTests
             " { var data = new System.Collections.Generic.Dictionary<" + key + ", " + value + ">(); } }");
         var compilation = CSharpCompilation.Create("DictionaryValueDomains", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var creation = tree.GetRoot().DescendantNodes().OfType<ObjectCreationExpressionSyntax>().Single();
         var constructor = (IMethodSymbol)compilation.GetSemanticModel(tree).GetSymbolInfo(creation).Symbol!;
         var type = constructor.ContainingType;
         var count = type.GetMembers("Count").OfType<IPropertySymbol>().Single();
         var contains = type.GetMembers("ContainsKey").OfType<IMethodSymbol>().Single();
         var add = type.GetMembers("Add").OfType<IMethodSymbol>().Single();
-        var indexer = type.GetMembers().OfType<IPropertySymbol>().Single(property => property is null ? throw new ArgumentNullException(nameof(property)) : property.IsIndexer);
+        var indexer = type.GetMembers().OfType<IPropertySymbol>().Single(property => property.IsIndexer);
         Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(constructor), Is.True);
         Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(count.GetMethod!), Is.True);
         Assert.That(CSharpOperationSemantics.IsDefaultDictionaryStateMember(contains), Is.EqualTo(emptyState));
@@ -196,8 +196,8 @@ public sealed class DictionaryDomainBoundaryTests
         Assert.That(lowered.Classification.IsExact, Is.False);
         Assert.That(lowered.Classification.Abstention, Is.EqualTo(FrontendAbstention.ExpressionDepthLimit));
         builder.Return(lowered.Continuation, site, context.Factory.Integer(0));
-        Assert.That(builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrWriteInstruction>().Where(write => write is null ? throw new ArgumentNullException(nameof(write)) : write.IsStore), Is.Empty);
+        Assert.That(builder.Build().Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Where(write => write.IsStore), Is.Empty);
     }
     [TestCase("List", true)]
     [TestCase("Queue", true)]
@@ -217,9 +217,9 @@ public sealed class DictionaryDomainBoundaryTests
             operation, operation.Property.GetMethod!, [], entry, null, default);
         Assert.That(lowered.Classification.IsExact, Is.True);
         builder.Return(lowered.Continuation, context.Site(operation), lowered.Value);
-        var masks = builder.Build().Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrAssignInstruction>().Select(assignment => assignment is null ? throw new ArgumentNullException(nameof(assignment)) : assignment.Value)
-            .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd).ToImmutableArray();
+        var masks = builder.Build().Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrAssignInstruction>().Select(assignment => assignment.Value)
+            .OfType<IrBinaryTerm>().Where(term => term.Operator == IrBinaryOperator.BitwiseAnd).ToImmutableArray();
         Assert.That(masks.Length, Is.EqualTo(nonnegative ? 1 : 0));
         if (nonnegative)
         { Assert.That(new IrInterpreter(context.Factory).Evaluate(masks.Single().Right).Value!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(int.MaxValue))); }
@@ -231,7 +231,7 @@ public sealed class DictionaryDomainBoundaryTests
         var tree = CSharpSyntaxTree.ParseText("public static class Probe { public static int Target(" + parameters + ") { " + body + " } }");
         var compilation = CSharpCompilation.Create("DictionaryDomainBoundary", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var context = new TotalLoweringContext(new IrFactory(), model.GetDeclaredSymbol(syntax)!);

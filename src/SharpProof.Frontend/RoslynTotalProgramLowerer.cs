@@ -78,19 +78,19 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         _context.TrackManagedValueReceivers(graph);
         var freshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
-                .All(static receiver => receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
-                    CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent)));
+                .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent));
         // Roslyn captures a local or parameter that a branching right-hand
         // side assigns; every capture of that id names the same variable.
-        foreach (var captures in graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>().GroupBy(capture => capture is null ? throw new System.ArgumentNullException(nameof(capture)) : (capture.Id)))
+        foreach (var captures in graph.Blocks.SelectMany(block => block.Operations).OfType<IFlowCaptureOperation>().GroupBy(capture => capture.Id))
         {
-            var symbols = captures.Select(capture => capture is null ? throw new System.ArgumentNullException(nameof(capture)) : (capture.Value switch
+            var symbols = captures.Select(capture => capture.Value switch
             {
                 IParameterReferenceOperation parameter when parameter.Parameter.RefKind == RefKind.None && _context.OwnsParameter(parameter.Parameter) =>
                     (ISymbol)parameter.Parameter,
                 ILocalReferenceOperation { Local.RefKind: RefKind.None } local => local.Local,
                 _ => null
-            })).Distinct(SymbolEqualityComparer.Default).ToImmutableArray();
+            }).Distinct(SymbolEqualityComparer.Default).ToImmutableArray();
             if (symbols.Length == 1 && symbols[0] is { } symbol)
             { _context.RecordStorageCapture(captures.Key, symbol); }
         }
@@ -104,7 +104,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { _frame = createFrame(entry); }
         if (_context.HasScalarSignature && _context.OwnsBody(graph.OriginalOperation) &&
             (HasUnsupportedRegion(graph.Root) || graph.Blocks.Any(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow))))
+                block.FallThroughSuccessor?.Semantics is ControlFlowBranchSemantics.Throw or ControlFlowBranchSemantics.Rethrow)))
         { _regionStructural = structural; LowerRegions(graph, entry, structural, freshReceiver); return; }
         if (!_context.HasScalarSignature || !_context.OwnsBody(graph.OriginalOperation) ||
             HasUnsupportedRegion(graph.Root) || !TrySelect(graph.Blocks[0], out var selected))
@@ -236,7 +236,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
                 // Nonvoid C# fallthrough is rejected by the compiler. A
                 // constant loop can still expose its impossible exit in CFG;
                 // keep that structural return typed, behind its false edge.
-                IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor is null ? throw new System.ArgumentNullException(nameof(predecessor)) : (predecessor.Semantics == ControlFlowBranchSemantics.Regular))
+                IrTerm? filler = _context.Result is { } exitResult && source.Predecessors.Any(predecessor => predecessor.Semantics == ControlFlowBranchSemantics.Regular)
                     ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(exitResult).Type)
                     : null;
                 Return(block, site, filler);

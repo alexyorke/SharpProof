@@ -48,7 +48,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
         var model = compilation.GetSemanticModel(tree);
         var expectedType = valueType == "double" ? SpecialType.System_Double : SpecialType.System_Single;
         var calls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" })).ToImmutableArray();
+            .Where(syntax => syntax.Expression is IdentifierNameSyntax { Identifier.ValueText: "Tap" }).ToImmutableArray();
         Assert.That(calls, Has.Length.EqualTo(4));
         foreach (var syntax in calls)
         {
@@ -57,18 +57,18 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             Assert.That(call.TargetMethod.DeclaringSyntaxReferences, Has.Length.EqualTo(1));
             Assert.That(call.TargetMethod.IsStatic, Is.True);
             Assert.That(call.TargetMethod.ReturnType.SpecialType, Is.EqualTo(expectedType));
-            Assert.That(call.TargetMethod.Parameters.Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType)),
+            Assert.That(call.TargetMethod.Parameters.Select(parameter => parameter.Type.SpecialType),
                 Is.EqualTo(ImmutableArray.Create(expectedType, SpecialType.System_Int32)));
-            Assert.That(call.Arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.ArgumentKind)),
+            Assert.That(call.Arguments.Select(argument => argument.ArgumentKind),
                 Is.EqualTo(ExplicitArgumentKinds));
         }
         var comparisons = root.DescendantNodes().OfType<BinaryExpressionSyntax>()
-            .Select(syntax => syntax is null ? throw new System.ArgumentNullException(nameof(syntax)) : (model.GetOperation(syntax))).OfType<IBinaryOperation>()
-            .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.LeftOperand.Type?.SpecialType == expectedType &&
-                operation.RightOperand.Type?.SpecialType == expectedType)).ToImmutableArray();
-        Assert.That(comparisons.Select(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorKind)),
+            .Select(syntax => model.GetOperation(syntax)).OfType<IBinaryOperation>()
+            .Where(operation => operation.LeftOperand.Type?.SpecialType == expectedType &&
+                operation.RightOperand.Type?.SpecialType == expectedType).ToImmutableArray();
+        Assert.That(comparisons.Select(operation => operation.OperatorKind),
             Is.EquivalentTo(FloatingComparisonKinds));
-        Assert.That(comparisons.All(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.OperatorMethod == null && !operation.IsLifted)), Is.True);
+        Assert.That(comparisons.All(operation => operation.OperatorMethod == null && !operation.IsLifted), Is.True);
 
         var repository = Environment.GetEnvironmentVariable("SHARPPROOF_REPO_ROOT") ??
             throw new AssertionException("Canonical container repository root is missing.");
@@ -115,7 +115,7 @@ public sealed class FloatingEqualityEvaluationOrderAuditTests
             discovery, WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         var callableId = artifact.Manifest.Claims.Single().CallableId;
-        var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == callableId));
+        var captured = artifact.Callables.Single(callable => callable.CallableId == callableId);
         Assert.That(captured.Total, Is.Not.Null, "Expected retained compiler-captured Total for the floating-parameter method.");
         Assert.That(captured.Total!.IsBodyAbstraction, Is.False);
         using var project = new ShadowTestProject(artifact, cacheEnabled: false);

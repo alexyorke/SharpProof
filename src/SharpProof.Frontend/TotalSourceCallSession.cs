@@ -65,7 +65,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var method = invocation.TargetMethod;
         if (invocation.Instance != null || !method.IsStatic || method.Parameters.Length > 128 ||
             invocation.Arguments.Length != method.Parameters.Length ||
-            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)))
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None))
         { return null; }
         var ordinals = ImmutableHashSet.CreateBuilder<int>();
         foreach (var argument in invocation.Arguments)
@@ -146,10 +146,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!IsEmptyParamsArray(argument) || !Spend() || argument.Value.Type is not IArrayTypeSymbol array)
         { return null; }
         var emptyMethods = _compilation.GetSpecialType(SpecialType.System_Array).GetMembers("Empty")
-            .OfType<IMethodSymbol>().Where(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
+            .OfType<IMethodSymbol>().Where(method => method.IsStatic && method.DeclaredAccessibility == Accessibility.Public &&
                 method.Arity == 1 && method.Parameters.IsEmpty &&
                 method.ReturnType is IArrayTypeSymbol { IsSZArray: true } returned &&
-                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0]))).ToImmutableArray();
+                SymbolEqualityComparer.Default.Equals(returned.ElementType, method.TypeParameters[0])).ToImmutableArray();
         if (emptyMethods.Length != 1 || !Spend(emptyMethods.Length))
         { return null; }
         var empty = emptyMethods[0].Construct(array.ElementType);
@@ -207,7 +207,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         ITypeSymbol? KnownSourceValue(ITypeSymbol? type)
         {
             collectionElementSpecialization ??= method.OriginalDefinition.Parameters.Any(parameter =>
-                parameter is null ? throw new ArgumentNullException(nameof(parameter)) : TotalLoweringContext.IsListReceiverType(parameter.Type) ||
+                TotalLoweringContext.IsListReceiverType(parameter.Type) ||
                     TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
                     TotalLoweringContext.IsHashSetReceiverType(parameter.Type) || TotalLoweringContext.IsQueueReceiverType(parameter.Type));
             return collectionElementSpecialization.Value ? caller.KnownValueType(type) : caller.KnownScalarType(type);
@@ -236,9 +236,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                      (declared is not ITypeParameterSymbol || KnownSourceValue(parameter.Type) == null));
             }).Any() ||
             !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !valueReturnSpecialization ||
-            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
-                !CSharpOperationSemantics.IsValueDomain(parameter.Type))) ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
             method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
@@ -290,8 +290,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         else
         {
-            foreach (var node in declaration.DescendantNodesAndSelf(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (ReferenceEquals(node, declaration) ||
-                node is not (LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax))))
+            foreach (var node in declaration.DescendantNodesAndSelf(node => ReferenceEquals(node, declaration) ||
+                node is not (LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax)))
             {
                 if (!Spend())
                 { return false; }
@@ -382,11 +382,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 }
             }
             if (parameter.Type is IArrayTypeSymbol { IsSZArray: true } || declarationOperations.Length != 0 &&
-                !declarationOperations.OfType<IParameterReferenceOperation>().Any(use => use is null ? throw new System.ArgumentNullException(nameof(use)) : (
+                !declarationOperations.OfType<IParameterReferenceOperation>().Any(use =>
                     SymbolEqualityComparer.Default.Equals(use.Parameter, parameter) &&
                     (use.Parent is IAssignmentOperation assignment && assignment.Target == use ||
                      use.Parent is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
-                     IsCapturedParameterUse(use)))))
+                     IsCapturedParameterUse(use))))
             {
                 if (caller.ConcreteArray(argument.Value) is { } array)
                 { frame.SpecializeArrayParameter(parameter, array); }
@@ -452,8 +452,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 case LocalFunctionStatementSyntax local:
                     if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method, cancellationToken))
                     { return null; }
-                    var owner = local.Ancestors().FirstOrDefault(node => node is null ? throw new System.ArgumentNullException(nameof(node)) : (node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
-                        IsBodyDeclaration(node)));
+                    var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
+                        IsBodyDeclaration(node));
                     var ownerSymbol = owner == null ? null : model.GetDeclaredSymbol(owner, cancellationToken) as IMethodSymbol ??
                         (owner.Parent?.Parent is BasePropertyDeclarationSyntax property
                             ? (model.GetDeclaredSymbol(property, cancellationToken) as IPropertySymbol)?.GetMethod : null);
@@ -481,7 +481,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             visited = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
             visited.Add(method);
         }
-        return body.Descendants().Any(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation switch
+        return body.Descendants().Any(operation => operation switch
         {
             ILocalReferenceOperation local => !SymbolEqualityComparer.Default.Equals(local.Local.ContainingSymbol, method),
             IParameterReferenceOperation parameter => !SymbolEqualityComparer.Default.Equals(parameter.Parameter.ContainingSymbol, method),
@@ -489,7 +489,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             IInvocationOperation invocation => LocalFunctionCaptures(body, invocation.TargetMethod, visited, cancellationToken),
             IMethodReferenceOperation reference => LocalFunctionCaptures(body, reference.Method, visited, cancellationToken),
             _ => false
-        }));
+        });
     }
 
     private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, ImmutableHashSet<IMethodSymbol>.Builder visited,

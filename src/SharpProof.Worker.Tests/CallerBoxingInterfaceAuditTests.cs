@@ -27,10 +27,10 @@ public sealed class CallerBoxingInterfaceAuditTests
     private static readonly ImmutableArray<byte> IdentityBody = [0x02, 0x2A];
     private static readonly ImmutableDictionary<ushort, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
-        .Where(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (field.FieldType == typeof(OpCode)))
-        .Select(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : ((OpCode)field.GetValue(null)!))
+        .Where(field => field.FieldType == typeof(OpCode))
+        .Select(field => (OpCode)field.GetValue(null)!)
         .GroupBy(code /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)code.Value))
-        .ToImmutableDictionary(group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key), group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.First()));
+        .ToImmutableDictionary(group => group.Key, group => group.First());
     private static volatile IComparable? _escaped;
 
     private const string BoundarySource = """
@@ -99,7 +99,7 @@ public sealed class CallerBoxingInterfaceAuditTests
         foreach (var methodName in TargetNames)
         {
             var syntax = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-                .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == methodName));
+                .Single(method => method.Identifier.ValueText == methodName);
             var invocation = (IInvocationOperation)model.GetOperation(
                 syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single())!;
             Assert.That(invocation.TargetMethod.IsStatic, Is.True);
@@ -138,10 +138,10 @@ public sealed class CallerBoxingInterfaceAuditTests
                 Assert.That(nullable.TypeArguments.Single().SpecialType, Is.EqualTo(SpecialType.System_Double));
             }
             var attributes = invocation.TargetMethod.GetAttributes();
-            Assert.That(attributes.Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
-                "SharpProof.Attributes.SharpProofTrustedAttribute")), Is.True);
-            var effect = attributes.Single(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() ==
-                "SharpProof.Attributes.EffectContractAttribute"));
+            Assert.That(attributes.Any(attribute => attribute.AttributeClass?.ToDisplayString() ==
+                "SharpProof.Attributes.SharpProofTrustedAttribute"), Is.True);
+            var effect = attributes.Single(attribute => attribute.AttributeClass?.ToDisplayString() ==
+                "SharpProof.Attributes.EffectContractAttribute");
             Assert.That(effect.ConstructorArguments.Single().Value, Is.EqualTo(0L));
             Assert.That(effect.NamedArguments.Single(pair => pair.Key == "Complete").Value.Value, Is.EqualTo(true));
             Assert.That(effect.NamedArguments.Single(pair => pair.Key == "PreconditionFree").Value.Value, Is.EqualTo(true));
@@ -262,17 +262,17 @@ public sealed class CallerBoxingInterfaceAuditTests
         foreach (var methodName in TargetNames)
         {
             var declaration = artifact.Manifest.Claims.Single(claim =>
-                claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId.Contains("Subject." + methodName, StringComparison.Ordinal)));
-            var claim = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == declaration.ClaimId));
-            var captured = artifact.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId == declaration.CallableId));
-            var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == declaration.CallableId));
-            var group = observations.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Method == methodName)).ToImmutableArray();
+                claim.CallableId.Contains("Subject." + methodName, StringComparison.Ordinal));
+            var claim = response.ClaimResults.Single(result => result.ClaimId == declaration.ClaimId);
+            var captured = artifact.Callables.Single(callable => callable.CallableId == declaration.CallableId);
+            var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == declaration.CallableId);
+            var group = observations.Where(row => row.Method == methodName).ToImmutableArray();
             Assert.That(group, Has.Length.EqualTo(methodName == "TargetDouble" ? MeasurementRounds : 2 * MeasurementRounds));
-            var positive = group.Any(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes > 0));
-            var zero = group.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.SubjectBytes == 0));
+            var positive = group.Any(row => row.SubjectBytes > 0);
+            var zero = group.All(row => row.SubjectBytes == 0);
             nativeObservationBuilder.Add(new(methodName, declaration.CallableId, claim.ClaimId,
                 claim.Outcome, claim.Reason, claim.Vacuity, captured.Total != null, captured.Total?.IsBodyAbstraction,
-                preparation.Total?.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>().Count(),
+                preparation.Total?.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>().Count(),
                 positive, zero, zero && claim.Outcome == WorkerClaimOutcome.Refuted));
         }
         var nativeObservations = nativeObservationBuilder.ToImmutable();
@@ -283,11 +283,11 @@ public sealed class CallerBoxingInterfaceAuditTests
         TestContext.WriteLine($"interface-boxing claims={nativeObservations.Length}; inputs=3; evidence={evidence}");
         Assert.Multiple((Action)(() =>
         {
-            Assert.That(identityControls.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Bytes == 0 && row.SameReference)), Is.True,
+            Assert.That(identityControls.All(row => row.Bytes == 0 && row.SameReference), Is.True,
                 "The exact identity boundary must preserve preboxed/null references without allocating.");
-            Assert.That(observations.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.BeforeControlBytes == 0 && row.AfterControlBytes == 0)), Is.True,
+            Assert.That(observations.All(row => row.BeforeControlBytes == 0 && row.AfterControlBytes == 0), Is.True,
                 "Matching typed preboxed/null controls must calibrate to zero bytes.");
-            Assert.That(observations.All(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.BeforeSameReference && row.AfterSameReference && row.SubjectPayloadMatches)), Is.True);
+            Assert.That(observations.All(row => row.BeforeSameReference && row.AfterSameReference && row.SubjectPayloadMatches), Is.True);
             foreach (var probe in probes)
             {
                 Assert.That(probe.FirstNull, Is.EqualTo(probe.ExpectedNull), probe.Input);
@@ -295,7 +295,7 @@ public sealed class CallerBoxingInterfaceAuditTests
                 Assert.That(probe.SameProbeReference, Is.EqualTo(probe.ExpectedNull), probe.Input);
                 Assert.That(probe.FirstPayloadMatches && probe.SecondPayloadMatches, Is.True, probe.Input);
             }
-            foreach (var native in nativeObservations.Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.AnyPositiveBytes)))
+            foreach (var native in nativeObservations.Where(row => row.AnyPositiveBytes))
             {
                 Assert.That(native.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven),
                     "Positive warmed caller allocation for any input cannot receive a valid allocation-free proof. " +

@@ -375,8 +375,8 @@ internal sealed class IrTotalExecutionTests
         Assert.That(result.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(result.ReturnValue!.Integer, Is.EqualTo(1));
         ImmutableArray<int> expectedOccurrences = [0, 0, 1, 1];
-        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Occurrence)), Is.EqualTo(expectedOccurrences));
-        Assert.That(requests.ToImmutable().Select(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Instruction)), Has.All.EqualTo(havoc.Id));
+        Assert.That(requests.ToImmutable().Select(request => request.Occurrence), Is.EqualTo(expectedOccurrences));
+        Assert.That(requests.ToImmutable().Select(request => request.Instruction), Has.All.EqualTo(havoc.Id));
         Assert.That(result.ConsumedApproximation, Is.EqualTo(approximate));
     }
 
@@ -441,7 +441,7 @@ internal sealed class IrTotalExecutionTests
             ? [factory.Variable(missing), factory.Variable(unknown)]
             : [scenario == "unused" ? factory.Integer(4) : factory.Variable(unknown)];
         var member = factory.GetOrCreateMemberSnapshot(factory.CreateIdentity(), factory.ObjectType, "Call", factory.IntegerType,
-            true, arguments.Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Type)).ToImmutableArray());
+            true, arguments.Select(argument => argument.Type).ToImmutableArray());
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock();
         builder.Havoc(entry, factory.CreateOperation(), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
@@ -700,7 +700,7 @@ internal sealed class IrTotalExecutionTests
             Task.Run(() => Evaluate(true, whenTrue)),
             Task.Run(() => Evaluate(false, whenFalse)));
         var results = (await Task.WhenAll(tasks)).ToImmutableArray();
-        Assert.That(results.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Status)), Is.All.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(results.Select(result => result.Status), Is.All.EqualTo(IrEvaluationStatus.Value));
         Assert.That(results[0].Value!.Integer, Is.EqualTo(11));
         Assert.That(results[1].Value!.Integer, Is.EqualTo(22));
         Assert.That(whenTrue.ToImmutable(), Is.EqualTo(ImmutableArray.Create(flag, x)));

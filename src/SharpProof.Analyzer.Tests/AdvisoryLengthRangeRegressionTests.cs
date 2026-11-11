@@ -29,7 +29,7 @@ public sealed class AdvisoryLengthRangeRegressionTests
             "private static int Need(int value) { Contract.Requires(value > 0); return value; } " +
             "public static int Caller(int input, int[]? items, string? text) { " + body + " } }",
             "contracts", ["SP0027"]);
-        Assert.That(diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id + ": " + diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id + ": " + diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             message == null ? Is.Empty : Is.EqualTo(["SP0027: " + message]));
     }
 }

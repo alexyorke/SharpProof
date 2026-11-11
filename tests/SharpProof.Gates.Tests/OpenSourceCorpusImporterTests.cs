@@ -67,13 +67,13 @@ public sealed class OpenSourceCorpusImporterTests
         {
             Assert.That(files, Has.Length.EqualTo(26));
             Assert.That(candidates, Has.Length.EqualTo(207));
-            Assert.That(candidates.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.DeclarationSha256))
+            Assert.That(candidates.Select(static candidate => candidate.DeclarationSha256)
                 .Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(207));
-            Assert.That(candidates.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.MethodName))
+            Assert.That(candidates.Select(static candidate => candidate.MethodName)
                     .Intersect(["Abstract", "External", "Unsafe", "Conditional", "Leak"]),
                 Is.Empty);
             Assert.That(selected, Has.Length.EqualTo(200));
-            Assert.That(selected.Select(static candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Path))
+            Assert.That(selected.Select(static candidate => candidate.Path)
                 .Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(26));
             Assert.That(selected[0].Path, Is.EqualTo("Algorithms/F00.cs"));
             Assert.That(selected[25].Path, Is.EqualTo("DataStructures/F25.cs"));

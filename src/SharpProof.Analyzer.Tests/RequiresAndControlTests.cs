@@ -493,8 +493,8 @@ public sealed class RequiresAndControlTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                CultureInfo.InvariantCulture))),
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                CultureInfo.InvariantCulture)),
             Has.All.Contains("get_Reachable"));
     }
 
@@ -1050,7 +1050,7 @@ public sealed class RequiresAndControlTests
         AnalyzerTestHost.AssertIds(diagnostics, ["SP0027", "SP0027"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("Positive"));
     }
 
@@ -1126,13 +1126,13 @@ public sealed class RequiresAndControlTests
         Assert.That(diagnostics, Has.Length.EqualTo(2));
         var messages = diagnostics
             .Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
             .ToImmutableArray();
         Assert.That(
             messages.All(static message =>
-                message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                message.Contains(
                     "nullable or reference-capable",
-                    StringComparison.Ordinal))),
+                    StringComparison.Ordinal)),
             Is.True);
     }
 
@@ -1173,7 +1173,7 @@ public sealed class RequiresAndControlTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
         Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
         Assert.That(messages[1], Does.Contain("Contract.Old").And.Contain("<placement>"));
         Assert.That(messages[2], Does.Contain("Contract.Old").And.Contain("<nesting>"));
@@ -1231,7 +1231,7 @@ public sealed class RequiresAndControlTests
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("<placement>"));
     }
 
@@ -1309,11 +1309,11 @@ public sealed class RequiresAndControlTests
         AnalyzerTestHost.AssertIds(diagnostics, ["SP0024", "SP0024"]);
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.Some.Contain("Contract.Ensures"));
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.Some.Contain("Contract.Assume"));
     }
 
@@ -1340,7 +1340,7 @@ public sealed class RequiresAndControlTests
 
         Assert.That(
             diagnostics.Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.None.Contain("'Outer'"));
     }
 
@@ -1389,7 +1389,7 @@ public sealed class RequiresAndControlTests
             ["SP0047"]);
 
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(messages, Has.Length.EqualTo(2));
@@ -1453,15 +1453,15 @@ public sealed class RequiresAndControlTests
             ["SP0024", "SP0047"]);
 
         var invalid = diagnostics
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024"))
+            .Where(static diagnostic => diagnostic.Id == "SP0024")
             .ToImmutableArray();
         Assert.That(invalid, Has.Length.EqualTo(3));
         Assert.That(
             invalid.Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("override or interface implementation"));
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Not.Contain("SP0047"));
     }
 
@@ -1511,7 +1511,7 @@ public sealed class RequiresAndControlTests
             ["SP0024"]);
 
         Assert.That(
-            diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")),
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
             Is.EqualTo(1));
     }
 
@@ -1537,7 +1537,7 @@ public sealed class RequiresAndControlTests
             ["SP0002", "SP0024"]);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(["SP0002", "SP0024", "SP0024"]));
     }
 }

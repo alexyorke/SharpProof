@@ -36,17 +36,17 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         var check = Check(target);
         Assert.That(check.UnknownReason, Is.Null);
         Assert.That(check.RequiredCompilerModel, Is.EqualTo("owned-emitted-primitive-fault-sites-v1"));
-        var expected = inventory.Bodies.SelectMany(body => body is null ? throw new ArgumentNullException(nameof(body)) : DecodeIndependently(body.Code)
-            .Where(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : ExpectedFaults(instruction.OpCode) != CompilerTaskPrimitiveFaultKind.None)
-            .Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : (body.MethodToken, instruction.Offset, instruction.OpCode, ExpectedFaults(instruction.OpCode))))
+        var expected = inventory.Bodies.SelectMany(body => DecodeIndependently(body.Code)
+            .Where(static instruction => ExpectedFaults(instruction.OpCode) != CompilerTaskPrimitiveFaultKind.None)
+            .Select(instruction => (body.MethodToken, instruction.Offset, instruction.OpCode, ExpectedFaults(instruction.OpCode))))
             .ToArray();
         var sites = check.Sites!.Value;
-        Assert.That(sites.Select(static site => site is null ? throw new ArgumentNullException(nameof(site)) : (site.MethodToken, site.IlOffset, site.OpCode, site.Faults)),
+        Assert.That(sites.Select(static site => (site.MethodToken, site.IlOffset, site.OpCode, site.Faults)),
             Is.EqualTo(expected));
-        Assert.That(sites.Count(static site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Faults == CompilerTaskPrimitiveFaultKind.NewArray), Is.EqualTo(1));
-        Assert.That(sites.Any(static site => site is null ? throw new ArgumentNullException(nameof(site)) : site.Faults == CompilerTaskPrimitiveFaultKind.Overflow), Is.True);
+        Assert.That(sites.Count(static site => site.Faults == CompilerTaskPrimitiveFaultKind.NewArray), Is.EqualTo(1));
+        Assert.That(sites.Any(static site => site.Faults == CompilerTaskPrimitiveFaultKind.Overflow), Is.True);
         var bodyCode = DecodeIndependently(inventory.Bodies.Single().Code);
-        Assert.That(bodyCode.Any(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.TargetOffset >= 0 && instruction.TargetOffset < instruction.Offset),
+        Assert.That(bodyCode.Any(static instruction => instruction.TargetOffset >= 0 && instruction.TargetOffset < instruction.Offset),
             Is.True, "The fixture must retain a loop; static site count is not an execution count.");
         var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(projection, target.TotalEntry!, Layout(),
             TestContext.CurrentContext.CancellationToken);
@@ -80,11 +80,11 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         var target = Prepare(optimization, false, "int quotient=n/(n-1);", "var values=new int[1];");
         var inventory = Inventory(target);
         Assert.That(inventory.Bodies, Has.Length.EqualTo(2));
-        Assert.That(inventory.Bodies.Select(static body => body is null ? throw new ArgumentNullException(nameof(body)) : body.MethodToken), Is.Ordered.Ascending);
+        Assert.That(inventory.Bodies.Select(static body => body.MethodToken), Is.Ordered.Ascending);
         var check = Check(target);
         Assert.That(check.UnknownReason, Is.Null);
-        Assert.That(check.Sites!.Value.Select(static site => site is null ? throw new ArgumentNullException(nameof(site)) : site.MethodToken).Distinct(),
-            Is.EquivalentTo(inventory.Bodies.Select(static body => body is null ? throw new ArgumentNullException(nameof(body)) : body.MethodToken)));
+        Assert.That(check.Sites!.Value.Select(static site => site.MethodToken).Distinct(),
+            Is.EquivalentTo(inventory.Bodies.Select(static body => body.MethodToken)));
         foreach (var body in inventory.Bodies)
         {
             Assert.That(body.CodeSha256, Is.EqualTo(WorkerProtocolJson.ComputeSha256(body.Code)));
@@ -214,12 +214,12 @@ internal sealed class NativeTaskEmittedFaultSiteTests
                 changed = inventory with { Bodies = bodies.SetItem(1, later with { Code = default }) };
                 break;
             case "later-truncated-newarr":
-                var allocation = DecodeIndependently(later.Code).Single(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode == 0x8d);
+                var allocation = DecodeIndependently(later.Code).Single(static instruction => instruction.OpCode == 0x8d);
                 changed = inventory with { Bodies = bodies.SetItem(1, WithCode(later, later.Code.Take(allocation.Offset + 1).ToImmutableArray())) };
                 break;
             case "later-call":
                 var callCode = later.Code.ToArray();
-                var original = DecodeIndependently(later.Code).Single(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode == 0x8d);
+                var original = DecodeIndependently(later.Code).Single(static instruction => instruction.OpCode == 0x8d);
                 callCode[original.Offset] = 0x28;
                 changed = inventory with { Bodies = bodies.SetItem(1, WithCode(later, [.. callCode])) };
                 break;
@@ -301,12 +301,12 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         var scan = CompilerTaskPrimitiveIlScanner.Scan(code, TestContext.CurrentContext.CancellationToken);
         Assert.That(scan.UnknownReason, Is.Null);
         var instructions = scan.Instructions!.Value;
-        Assert.That(instructions.Select(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : (instruction.Offset, instruction.OpCode, instruction.NextOffset)),
-            Is.EqualTo(independent.Select(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : (instruction.Offset, instruction.OpCode, instruction.NextOffset))));
+        Assert.That(instructions.Select(static instruction => (instruction.Offset, instruction.OpCode, instruction.NextOffset)),
+            Is.EqualTo(independent.Select(static instruction => (instruction.Offset, instruction.OpCode, instruction.NextOffset))));
         foreach (var instruction in instructions)
         { Assert.That(instruction.Faults, Is.EqualTo(ExpectedFaults(instruction.OpCode)), "IL offset " + instruction.Offset); }
         foreach (var opcode in new[] { 0xd6, 0x5b, 0x5c, 0x5d, 0x5e, 0x8d, 0x8e, 0x94, 0x9e })
-        { Assert.That(independent.Any(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode == opcode), Is.True, "Missing emitted opcode " + opcode); }
+        { Assert.That(independent.Any(instruction => instruction.OpCode == opcode), Is.True, "Missing emitted opcode " + opcode); }
     }
 
     [Test]
@@ -320,10 +320,8 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         var code = CompileProbe(OptimizationLevel.Debug,
             "public static int Probe(int n){" + declarations + "local256=n;return local256;}");
         var independent = DecodeIndependently(code);
-        var expected = independent.Where(static instruction => instruction is null ?
-            throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode is 0xfe0c or 0xfe0e)
-            .Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
-                (instruction.Offset, instruction.OpCode, instruction.NextOffset,
+        var expected = independent.Where(static instruction => instruction.OpCode is 0xfe0c or 0xfe0e)
+            .Select(instruction => (instruction.Offset, instruction.OpCode, instruction.NextOffset,
                     Operand: (int)BinaryPrimitives.ReadUInt16LittleEndian(code.AsSpan(instruction.Offset + 2, 2)))).ToArray();
         Assert.That(expected.Any(static instruction => instruction.OpCode == 0xfe0c && instruction.Operand == lastLocal), Is.True,
             "The emitted fixture must load local slot 256 with the full ldloc encoding.");
@@ -333,10 +331,8 @@ internal sealed class NativeTaskEmittedFaultSiteTests
             "Each full local instruction must consume its two-byte opcode and two-byte operand.");
         var scan = CompilerTaskPrimitiveIlScanner.Scan(code, TestContext.CurrentContext.CancellationToken);
         Assert.That(scan.UnknownReason, Is.Null);
-        Assert.That(scan.Instructions!.Value.Where(static instruction => instruction is null ?
-            throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode is 0xfe0c or 0xfe0e)
-            .Select(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
-                (instruction.Offset, instruction.OpCode, instruction.NextOffset, instruction.Operand)), Is.EqualTo(expected));
+        Assert.That(scan.Instructions!.Value.Where(static instruction => instruction.OpCode is 0xfe0c or 0xfe0e)
+            .Select(static instruction => (instruction.Offset, instruction.OpCode, instruction.NextOffset, instruction.Operand)), Is.EqualTo(expected));
     }
 
     [TestCase("public static int Probe(int n)=>System.Math.Abs(n);", "TaskEmittedFaultBodyCallUnsupported")]
@@ -361,18 +357,18 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         var code = CompileProbe(OptimizationLevel.Debug,
             "public static int Probe(int n){int value=0;for(int i=0;i<n;i++){var owned=new int[2];value+=owned.Length;}return value>0?value:0;}");
         var independent = DecodeIndependently(code);
-        var allocation = independent.Single(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode == 0x8d);
+        var allocation = independent.Single(static instruction => instruction.OpCode == 0x8d);
         var bytes = code.ToArray();
         if (mutation == "two-byte-opcode")
         {
-            var instruction = independent.First(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.OpCode > 0xff);
+            var instruction = independent.First(static instruction => instruction.OpCode > 0xff);
             bytes = bytes.Take(instruction.Offset + 1).ToArray();
         }
         else if (mutation == "operand")
         { bytes = bytes.Take(allocation.Offset + 2).ToArray(); }
         else
         {
-            var branch = independent.First(static instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.TargetOffset >= 0);
+            var branch = independent.First(static instruction => instruction.TargetOffset >= 0);
             var displacement = allocation.Offset + 1 - branch.NextOffset;
             if (branch.NextOffset - branch.Offset == 2)
             {
@@ -578,8 +574,8 @@ internal sealed class NativeTaskEmittedFaultSiteTests
         if (code.IsDefault)
         { throw new ArgumentNullException(nameof(code)); }
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.FieldType == typeof(OpCode))
-            .Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : (OpCode)field.GetValue(null)!)
+            .Where(static field => field.FieldType == typeof(OpCode))
+            .Select(static field => (OpCode)field.GetValue(null)!)
             .ToDictionary(static opcode /* SPINT001: all values valid - all opcode values, including default nop, can be inspected */ => unchecked((ushort)opcode.Value));
         var instructions = ImmutableArray.CreateBuilder<IndependentInstruction>();
         var offset = 0;

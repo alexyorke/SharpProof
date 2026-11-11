@@ -15,7 +15,7 @@ public sealed class FrontendPublicLoweringBoundaryTests
     {
         using var subject = TypedProgramSubject.Create("int Target(int left, int right) => left + right;");
         Assert.That(subject.Context.EntryVariables,
-            Is.EqualTo(subject.Context.Inputs.Select(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry))));
+            Is.EqualTo(subject.Context.Inputs.Select(binding => binding.Entry)));
         Assert.That(subject.Context.EntryVariables, Has.Length.EqualTo(2));
     }
 

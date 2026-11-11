@@ -101,13 +101,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 "The generated consumer project has no root.");
 
         Assert.That(
-            elements.Select(static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName)),
+            elements.Select(static element => element.Name.LocalName),
             Is.EqualTo(s_manualConsumerElementOrder));
         Assert.That(
             elements.Where(static element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName == "Import"))
-                .Select(static import => import is null ? throw new System.ArgumentNullException(nameof(import)) : (Path.GetFileName(
-                    import.Attribute("Project")?.Value))),
+                    element.Name.LocalName == "Import")
+                .Select(static import => Path.GetFileName(
+                    import.Attribute("Project")?.Value)),
             Is.EqualTo(s_manualConsumerImportOrder));
     }
 
@@ -488,9 +488,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 enabled.ClaimResults.Single().ProofCore.Any(
-                    static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.StartsWith(
+                    static item => item.StartsWith(
                         "spec-pack:dotnet.scalar@1:",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.False);
         }
     }
@@ -1106,8 +1106,8 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.ClaimResults, Has.Length.EqualTo(2));
             var outcomesByKind = response.Manifest.Claims.Join(
                 response.ClaimResults,
-                static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
-                static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId),
+                static claim => claim.ClaimId,
+                static result => result.ClaimId,
                 static (claim, result) => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : result is null ? throw new System.ArgumentNullException(nameof(result)) : (new
                 {
                     claim.Kind,
@@ -1116,17 +1116,17 @@ public sealed class WorkerMsBuildIntegrationTests
                 })).ToImmutableArray();
             Assert.That(
                 outcomesByKind.Single(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Kind == WorkerClaimKind.Postcondition)).Outcome,
+                    result.Kind == WorkerClaimKind.Postcondition).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 string.Join(", ", outcomesByKind.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ($"{result.Kind}={result.Outcome}/{result.Reason}"))) +
+                    $"{result.Kind}={result.Outcome}/{result.Reason}")) +
                 Environment.NewLine + build.Output);
             Assert.That(
-                response.ClaimResults.Count(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Outcome == WorkerClaimOutcome.Refuted)),
+                response.ClaimResults.Count(static claim => claim.Outcome == WorkerClaimOutcome.Refuted),
                 Is.GreaterThanOrEqualTo(1));
             Assert.That(
                 outcomesByKind.Single(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Kind == WorkerClaimKind.Effect)).Outcome,
+                    result.Kind == WorkerClaimKind.Effect).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted));
         }
     }
@@ -1439,7 +1439,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.MalformedResult));
             Assert.That(
-                response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+                response.Errors.Select(static error => error.Code),
                 Does.Contain("worker.malformed_result"));
         }
     }
@@ -1482,7 +1482,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(
-                response.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code)),
+                response.Errors.Select(static error => error.Code),
                 Does.Contain("launcher.infrastructure"));
         }
     }
@@ -1825,7 +1825,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 "--cache-enabled", "false", "--publish-request", project.RequestPath,
                 "--publish-result", scenario == "invalid-input" ? project.RequestPath : project.ResultPath,
                 "--publish-compiler-manifest", stableManifest)
-                .Select(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (new Microsoft.Build.Utilities.TaskItem(argument))).ToArray()
+                .Select(argument => new Microsoft.Build.Utilities.TaskItem(argument)).ToArray()
         };
         bool completed;
         if (scenario == "canceled")
@@ -1856,11 +1856,11 @@ public sealed class WorkerMsBuildIntegrationTests
             "invalid-input" => 2,
             "publication-failure" => 3,
             _ => -1
-        }), string.Join('\n', engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message))));
+        }), string.Join('\n', engine.Messages.Select(message => message.Message)));
         Assert.That(successMessages, Is.EqualTo(scenario == "success" ? 1 : 0));
         if (scenario is "success" or "publication-failure")
         {
-            Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)), Has.Some.Contains("SharpProof staged evidence:"));
+            Assert.That(engine.Messages.Select(message => message.Message), Has.Some.Contains("SharpProof staged evidence:"));
         }
         if (scenario == "success")
         {
@@ -1881,13 +1881,13 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 Assert.That(File.Exists(privateRequest), Is.False);
                 Assert.That(File.Exists(privateResult), Is.False);
-                Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
+                Assert.That(engine.Messages.Select(message => message.Message),
                     Has.Some.Contains("SharpProof launcher input is invalid: ArgumentException"));
             }
             else if (scenario == "publication-failure")
             {
                 Assert.That(File.Exists(privateResult), Is.True);
-                Assert.That(engine.Messages.Select(message => message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Message)),
+                Assert.That(engine.Messages.Select(message => message.Message),
                     Has.Some.Contains("SharpProof worker result could not be published."));
             }
         }
@@ -2158,11 +2158,11 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
             Assert.That(callable.Assumptions,
                 Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
-                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)));
+                    assumption.Kind == WorkerAssumptionKind.UserAssume));
             Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(claim.Assumptions,
                 Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
-                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind == WorkerAssumptionKind.UserAssume)));
+                    assumption.Kind == WorkerAssumptionKind.UserAssume));
         }
     }
 
@@ -2372,13 +2372,13 @@ public sealed class WorkerMsBuildIntegrationTests
         var properties = verifierDefaults
             .Descendants()
             .Where(static element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Parent?.Name.LocalName == "PropertyGroup"))
+                element.Parent?.Name.LocalName == "PropertyGroup")
             .GroupBy(
-                static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Name.LocalName),
+                static element => element.Name.LocalName,
                 StringComparer.Ordinal)
             .ToImmutableDictionary(
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Key),
-                static group => group is null ? throw new System.ArgumentNullException(nameof(group)) : (group.Last().Value),
+                static group => group.Key,
+                static group => group.Last().Value,
                 StringComparer.Ordinal);
         var compilerVisible = CompilerVisibleProperties(portableProps)
             .Concat(CompilerVisibleProperties(verifierProps));
@@ -2469,28 +2469,28 @@ public sealed class WorkerMsBuildIntegrationTests
         var initialize = targets
             .Descendants("Target")
             .Single(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
-                "_SharpProofInitializeVerify"));
+                target.Attribute("Name")?.Value ==
+                "_SharpProofInitializeVerify");
         var resolvePaths = targets
             .Descendants("Target")
             .Single(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
-                "_SharpProofResolveVerificationPaths"));
+                target.Attribute("Name")?.Value ==
+                "_SharpProofResolveVerificationPaths");
         var verifyCore = targets
             .Descendants("Target")
             .Single(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
-                "_SharpProofVerifyCore"));
+                target.Attribute("Name")?.Value ==
+                "_SharpProofVerifyCore");
         var reset = targets
             .Descendants("Target")
             .Single(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
-                "SharpProofResetPublishedVerification"));
+                target.Attribute("Name")?.Value ==
+                "SharpProofResetPublishedVerification");
         var cleanup = targets
             .Descendants("Target")
             .Single(static target =>
-                target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value ==
-                "_SharpProofCleanupInvocation"));
+                target.Attribute("Name")?.Value ==
+                "_SharpProofCleanupInvocation");
         var invocation = verifyCore
             .Descendants("SharpProof.BuildTasks.RunVerifier")
             .Single();
@@ -2500,33 +2500,33 @@ public sealed class WorkerMsBuildIntegrationTests
         var cleanupCall = verifyCore
             .Elements("CallTarget")
             .Single(static call =>
-                call is null ? throw new System.ArgumentNullException(nameof(call)) : (call.Attribute("Targets")?.Value ==
-                "_SharpProofCleanupInvocation"));
+                call.Attribute("Targets")?.Value ==
+                "_SharpProofCleanupInvocation");
         var cleanupOnError = verifyCore
             .Elements("OnError")
             .Single(static onError =>
-                onError is null ? throw new System.ArgumentNullException(nameof(onError)) : (onError.Attribute("ExecuteTargets")?.Value ==
-                "_SharpProofCleanupInvocation"));
+                onError.Attribute("ExecuteTargets")?.Value ==
+                "_SharpProofCleanupInvocation");
         var cleanupElements = cleanup.Elements().ToImmutableArray();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToImmutableArray();
         var verifyCoreElements = verifyCore.Elements().ToImmutableArray();
         var runnerTasks = targets.Descendants("UsingTask")
-            .Where(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("TaskName")?.Value ==
-                "SharpProof.BuildTasks.RunVerifier"))
+            .Where(static task => task.Attribute("TaskName")?.Value ==
+                "SharpProof.BuildTasks.RunVerifier")
             .ToImmutableArray();
-        var coreRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Condition")?.Value ==
-            "'$(MSBuildRuntimeType)' == 'Core'"));
-        var fullRunnerTask = runnerTasks.Single(static task => task is null ? throw new System.ArgumentNullException(nameof(task)) : (task.Attribute("Runtime")?.Value ==
-            "NET"));
+        var coreRunnerTask = runnerTasks.Single(static task => task.Attribute("Condition")?.Value ==
+            "'$(MSBuildRuntimeType)' == 'Core'");
+        var fullRunnerTask = runnerTasks.Single(static task => task.Attribute("Runtime")?.Value ==
+            "NET");
         var verifierExitError = verifyCore.Descendants("Error")
-            .Single(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.StartsWith(
+            .Single(static error => error.Attribute("Text")?.Value.StartsWith(
                 "SharpProof verifier failed with exit code",
-                StringComparison.Ordinal) == true));
+                StringComparison.Ordinal) == true);
         var arguments = string.Join(
             " ",
             verifyCore.Descendants("_SharpProofVerifierArgument")
-                .Select(static argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Attribute("Include")?.Value)));
+                .Select(static argument => argument.Attribute("Include")?.Value));
         var targetXml = targets.ToString(SaveOptions.DisableFormatting);
 
         using (Assert.EnterMultipleScope())
@@ -2540,7 +2540,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 portableTargets.Descendants("Target")
                     .Select(static target =>
-                        target is null ? throw new System.ArgumentNullException(nameof(target)) : (target.Attribute("Name")?.Value)),
+                        target.Attribute("Name")?.Value),
                 Has.None.EqualTo("_SharpProofVerifyCore"));
             Assert.That(
                 initialize.Attribute("BeforeTargets")?.Value
@@ -2584,10 +2584,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo("$(_SharpProofDotNetHost)"));
             Assert.That(
                 invocation.Elements("Output").Any(static output =>
-                    output is null ? throw new System.ArgumentNullException(nameof(output)) : (output.Attribute("TaskParameter")?.Value ==
+                    output.Attribute("TaskParameter")?.Value ==
                         "HasStructuredError" &&
                     output.Attribute("PropertyName")?.Value ==
-                        "_SharpProofVerifierHasStructuredError")),
+                        "_SharpProofVerifierHasStructuredError"),
                 Is.True);
             Assert.That(
                 cleanup.Attribute("Condition")?.Value,
@@ -2597,19 +2597,19 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo("$(_SharpProofCleanupInvocationDirectoryFullPath)"));
             Assert.That(
                 cleanupSafetyErrors.Count(static error =>
-                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.Contains(
+                    error.Attribute("Text")?.Value.Contains(
                         "exact safe identifier",
-                        StringComparison.Ordinal) == true)),
+                        StringComparison.Ordinal) == true),
                 Is.EqualTo(1));
             Assert.That(
                 cleanupSafetyErrors.Count(static error =>
-                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Attribute("Text")?.Value.Contains(
+                    error.Attribute("Text")?.Value.Contains(
                         "resolve canonically",
-                        StringComparison.Ordinal) == true)),
+                        StringComparison.Ordinal) == true),
                 Is.EqualTo(1));
             Assert.That(
                 cleanupSafetyErrors.Select(error =>
-                    error is null ? throw new System.ArgumentNullException(nameof(error)) : (cleanupElements.IndexOf(error))),
+                    cleanupElements.IndexOf(error)),
                 Is.All.LessThan(cleanupElements.IndexOf(cleanupRemove)),
                 "Cleanup validation must run before RemoveDir.");
             Assert.That(
@@ -2800,7 +2800,7 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
             Assert.That(build.Output, Does.Contain(expected), build.Output);
-            Assert.That(response.Manifest.Claims.Select(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind)),
+            Assert.That(response.Manifest.Claims.Select(static claim => claim.Kind),
                 Has.Member(WorkerClaimKind.CallPrecondition));
         }
     }
@@ -2816,7 +2816,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var build = await project.BuildAsync(verify: null, [("SharpProofProfile", "strict")]);
         Assert.That(build.ExitCode, Is.Zero, build.Output);
         var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
-        Assert.That(response.ClaimResults.Select(static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+        Assert.That(response.ClaimResults.Select(static result => result.Outcome),
             Is.All.EqualTo(WorkerClaimOutcome.Proven));
     }
 
@@ -3049,8 +3049,8 @@ public sealed class WorkerMsBuildIntegrationTests
         System.ArgumentNullException.ThrowIfNull(document);
         return document.Descendants("CompilerVisibleProperty")
             .SelectMany(static property =>
-                property is null ? throw new System.ArgumentNullException(nameof(property)) : ((property.Attribute("Include")?.Value ?? string.Empty)
-                    .Split(';', StringSplitOptions.RemoveEmptyEntries)));
+                (property.Attribute("Include")?.Value ?? string.Empty)
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private sealed record CompilerManifestArtifact(

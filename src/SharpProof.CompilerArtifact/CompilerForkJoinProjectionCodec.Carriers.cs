@@ -179,7 +179,7 @@ internal static partial class CompilerForkJoinProjectionCodec
             methods.Add(token);
         }
         Require(unique.SetEquals(activations!.Forwarders.Select(static forwarder =>
-            forwarder is null ? throw new ArgumentNullException(nameof(forwarder)) : forwarder.ChildMethodToken)), "Source bodies do not cover the forwarded targets.");
+            forwarder.ChildMethodToken)), "Source bodies do not cover the forwarded targets.");
         return new(new(owner, module, methods.MoveToImmutable()), null);
     }
 

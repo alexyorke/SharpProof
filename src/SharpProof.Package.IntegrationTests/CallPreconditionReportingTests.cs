@@ -117,7 +117,7 @@ internal sealed class CallPreconditionReportingTests
     {
         var (exitCode, _, error) = Report(CreateResponse(WorkerClaimOutcome.Refuted), policy);
         var line = error.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
-            .Single(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : (line.StartsWith(VerifierDiagnosticTransport.Prefix, StringComparison.Ordinal)));
+            .Single(static line => line.StartsWith(VerifierDiagnosticTransport.Prefix, StringComparison.Ordinal));
         using var diagnostic = JsonDocument.Parse(line[VerifierDiagnosticTransport.Prefix.Length..]);
         var root = diagnostic.RootElement;
         using (Assert.EnterMultipleScope())
@@ -165,8 +165,8 @@ internal sealed class CallPreconditionReportingTests
     {
         System.ArgumentNullException.ThrowIfNull(error);
         return error.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
-            .Where(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : line.StartsWith(VerifierDiagnosticTransport.Prefix, StringComparison.Ordinal))
-            .Select(static line => line is null ? throw new System.ArgumentNullException(nameof(line)) : JsonDocument.Parse(line[VerifierDiagnosticTransport.Prefix.Length..]).RootElement.Clone());
+            .Where(static line => line.StartsWith(VerifierDiagnosticTransport.Prefix, StringComparison.Ordinal))
+            .Select(static line => JsonDocument.Parse(line[VerifierDiagnosticTransport.Prefix.Length..]).RootElement.Clone());
     }
 
     private static List<string?> Property(IEnumerable<JsonElement> elements, string name)

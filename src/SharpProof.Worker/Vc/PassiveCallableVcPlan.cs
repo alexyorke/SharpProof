@@ -279,9 +279,9 @@ internal sealed class PassiveCallableVcPlan
         Action<IrLockInstruction, bool>? lockPrefixObserver = null)
     {
         System.ArgumentNullException.ThrowIfNull(inputs);
-        return ReplayWithOptions(inputs, initial => initial is null ? throw new System.ArgumentNullException(nameof(initial)) : (ReplayOptions(
+        return ReplayWithOptions(inputs, initial => ReplayOptions(
             allocationObserver, writeObserver, lockObserver, initial,
-            allocationPrefixObserver, writePrefixObserver, lockPrefixObserver)), cancellationToken);
+            allocationPrefixObserver, writePrefixObserver, lockPrefixObserver), cancellationToken);
     }
 
     internal IrProgramExecutionResult ReplayResources(ImmutableDictionary<IrVarId, IrValue> inputs,
@@ -358,14 +358,14 @@ internal sealed class PassiveCallableVcPlan
         Action<IrBranchInstruction, bool>? sourceLoopEntryObserver = null,
         Action<IrInstruction, IrValue?, bool>? completedInstructionObserver = null)
     {
-        return new(request => request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin == IrHavocOrigin.Input
+        return new(request => request.Origin == IrHavocOrigin.Input
             ? initial != null && initial.TryGetValue(request.Variable, out var input) ? input : null
             : request.Origin == IrHavocOrigin.SpecResult ? null
             : Factory.GetVariableInfo(request.Variable).Type == Factory.BooleanType
             ? Factory.CreateBooleanValue(false)
             : Factory.GetTypeInfo(Factory.GetVariableInfo(request.Variable).Type).Kind == IrTypeKind.Integer
                 ? Factory.CreateIntegerValue(Factory.GetVariableInfo(request.Variable).Type, 0L)
-                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type)))
+                : Factory.CreateNullValue(Factory.GetVariableInfo(request.Variable).Type))
         {
             ConcreteHavocValueProvider = ReplayFrameworkValue,
             ConcreteOpaqueValueProvider = ObserveFrameworkOpaqueValue,
@@ -744,16 +744,16 @@ internal sealed class PassiveCallableVcPlan
     internal ImmutableArray<string> CoreLabels(ProvenOutcome outcome)
     {
         ArgumentNullGuard.NotNull(outcome, nameof(outcome));
-        if (outcome.Core.Any(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (!_labels.ContainsKey(justification))))
+        if (outcome.Core.Any(justification => !_labels.ContainsKey(justification)))
         { throw new ArgumentException("The core contains a foreign justification.", nameof(outcome)); }
-        return [.. outcome.Core.Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (_labels[justification])).Distinct(StringComparer.Ordinal).OrderBy(label => label is null ? throw new System.ArgumentNullException(nameof(label)) : (label), StringComparer.Ordinal)];
+        return [.. outcome.Core.Select(justification => _labels[justification]).Distinct(StringComparer.Ordinal).OrderBy(label => label, StringComparer.Ordinal)];
     }
 
     internal ImmutableArray<OperationId> UsedBodyAssumptions(ProvenOutcome outcome)
     {
         System.ArgumentNullException.ThrowIfNull(outcome);
         CoreLabels(outcome);
-        return [.. outcome.Core.Where(_assumes.ContainsKey).Select(justification => justification is null ? throw new System.ArgumentNullException(nameof(justification)) : (_assumes[justification])).Distinct()];
+        return [.. outcome.Core.Where(_assumes.ContainsKey).Select(justification => _assumes[justification]).Distinct()];
     }
 
     internal ImmutableDictionary<IrVarId, IrValue> ProjectModel(RefutedOutcome outcome)

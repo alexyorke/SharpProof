@@ -38,7 +38,7 @@ public sealed class DictionaryOldHeapBindingTests
         var ownerType = factory.GetVariableInfo(parameter.Entry).Type;
         var execution = new IrProgramInterpreter(factory).Execute(lowering.Program,
             ImmutableDictionary<IrVarId, IrValue>.Empty.Add(parameter.Entry, factory.CreateReferenceValue(ownerType, initial)),
-            10000, new IrProgramReplayOptions(request => request is null ? throw new ArgumentNullException(nameof(request)) : factory.CreateBooleanValue(false))
+            10000, new IrProgramReplayOptions(request => factory.CreateBooleanValue(false))
             { SnapshotVariables = [parameter.PreState] }, TestContext.CurrentContext.CancellationToken);
         Assert.That(execution.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         // Choosing the normal initializer path is still approximation evidence.

@@ -40,7 +40,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
 
         var tree = CSharpSyntaxTree.ParseText(errorSource, (CSharpParseOptions)valid.SyntaxTrees.Single().Options, "accessor-error.cs");
         var compilation = valid.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
-        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8813" && diagnostic.Severity == DiagnosticSeverity.Error)), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS8813" && diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
         using var invalidImage = new MemoryStream();
         Assert.That(compilation.Emit(invalidImage).Success, Is.False);
         var accessor = tree.GetRoot().DescendantNodes().OfType<AccessorDeclarationSyntax>().Single();
@@ -63,7 +63,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
 
         var artifact = Capture(compilation);
-        Assert.That(artifact.CompilerDiagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS8813")), Is.True);
+        Assert.That(artifact.CompilerDiagnostics.Any(diagnostic => diagnostic.Code == "compiler.CS8813"), Is.True);
         var claim = artifact.Manifest.Claims.Single();
         Assert.That(claim.EffectContractKind, Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
         var callable = artifact.Callables.Single();
@@ -109,12 +109,12 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         Assert.That(Capture(valid).Callables.Single().Total!.ExceptionConstraints, Has.Length.EqualTo(1));
         var tree = CSharpSyntaxTree.ParseText(errorSource, (CSharpParseOptions)valid.SyntaxTrees.Single().Options, shape + ".cs");
         var compilation = valid.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
-        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "CS8813" && diagnostic.Severity == DiagnosticSeverity.Error)), Is.True);
+        Assert.That(compilation.GetDiagnostics().Any(diagnostic => diagnostic.Id == "CS8813" && diagnostic.Severity == DiagnosticSeverity.Error), Is.True);
         using var invalidImage = new MemoryStream();
         Assert.That(compilation.Emit(invalidImage).Success, Is.False);
         var method = compilation.GetTypeByMetadataName("Subject")!.GetMembers().OfType<IMethodSymbol>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.GetAttributes().Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString() ==
-                "System.Runtime.CompilerServices.ModuleInitializerAttribute"))));
+            .Single(candidate => candidate.GetAttributes().Any(attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.ToDisplayString() ==
+                "System.Runtime.CompilerServices.ModuleInitializerAttribute")));
         Assert.That(method.MethodKind, Is.EqualTo(expectedKind));
         var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
         Assert.That(syntax.SyntaxTree, Is.SameAs(tree));
@@ -127,7 +127,7 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
         var artifact = Capture(compilation);
-        Assert.That(artifact.CompilerDiagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code == "compiler.CS8813")), Is.True);
+        Assert.That(artifact.CompilerDiagnostics.Any(diagnostic => diagnostic.Code == "compiler.CS8813"), Is.True);
         Assert.That(artifact.Callables.Single().FailureReason, Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         Assert.That(artifact.Callables.Single().Total, Is.Null);
         Assert.That(artifact.ReachableSource, Is.Null);
@@ -148,11 +148,11 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
             Assert.That(method.DeclaringSyntaxReferences, Is.Empty);
             Assert.That(method.GetAttributes().Single().AttributeClass!.ToDisplayString(), Is.EqualTo("System.Runtime.CompilerServices.ModuleInitializerAttribute"));
         }
-        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
+        var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
         using var image = new MemoryStream();
         var emission = compilation.Emit(image);
         Assert.That(emission.Success, Is.EqualTo(errors.Length == 0));
-        TestContext.Progress.WriteLine("FieldLikeEvent: EmitSuccess=" + emission.Success + "; errors=" + string.Join(",", errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id))));
+        TestContext.Progress.WriteLine("FieldLikeEvent: EmitSuccess=" + emission.Success + "; errors=" + string.Join(",", errors.Select(diagnostic => diagnostic.Id)));
         if (emission.Success)
         {
             image.Position = 0;
@@ -170,8 +170,8 @@ public sealed class CompilerModuleInitializerApiBoundaryTests
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.ExceptionConstraints, Is.Empty);
         var artifact = Capture(compilation);
-        Assert.That(artifact.CompilerDiagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Code)),
-            Is.EquivalentTo(errors.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ("compiler." + diagnostic.Id))));
+        Assert.That(artifact.CompilerDiagnostics.Select(diagnostic => diagnostic.Code),
+            Is.EquivalentTo(errors.Select(diagnostic => "compiler." + diagnostic.Id)));
         if (errors.Length == 0)
         {
             Assert.That(artifact.Callables.Single().Total, Is.Not.Null);

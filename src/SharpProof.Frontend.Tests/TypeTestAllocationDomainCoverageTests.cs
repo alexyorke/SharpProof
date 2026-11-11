@@ -35,7 +35,7 @@ public sealed class TypeTestAllocationDomainCoverageTests
         Assert.That(subject.Invoke([null!]), Is.False);
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Helper"));
+            .Single(method => method.Identifier.ValueText == "Helper");
         var operation = (IIsTypeOperation)subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         Assert.That(operation.ValueOperand.Type, Is.InstanceOf<ITypeParameterSymbol>());
         Assert.That(operation.ValueOperand.Type!.IsReferenceType, Is.True);

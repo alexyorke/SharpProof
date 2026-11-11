@@ -142,7 +142,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
                 return CSharpPreprocessorSymbols.GetDefined(tree, cancellation.Token);
             });
         return conditionalSymbols.All(symbol =>
-            symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (!definedSymbols.Contains(symbol)));
+            !definedSymbols.Contains(symbol));
     }
 
     internal IInvocationOperation? OwningInvocation(IOperation operation)
@@ -209,7 +209,7 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
                         { Name: "System", ContainingNamespace.IsGlobalNamespace: true } ||
                         attribute.AttributeConstructor == null ||
                         attribute.ApplicationSyntaxReference?.GetSyntax() is not AttributeSyntax syntax ||
-                        syntax.ArgumentList?.Arguments.Count(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.NameEquals == null)) != 1 ||
+                        syntax.ArgumentList?.Arguments.Count(argument => argument.NameEquals == null) != 1 ||
                         attribute.ConstructorArguments.IsDefaultOrEmpty)
                     { continue; }
                     // Source early decoding counts supplied arguments, even when
@@ -267,9 +267,9 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
         return method.PartialDefinitionPart == null &&
             method.PartialImplementationPart == null &&
             method.DeclaringSyntaxReferences.Any(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.GetSyntax() is MethodDeclarationSyntax declaration &&
+                reference.GetSyntax() is MethodDeclarationSyntax declaration &&
                 declaration.Modifiers.Any(SyntaxKind.PartialKeyword) &&
                 declaration.Body == null &&
-                declaration.ExpressionBody == null));
+                declaration.ExpressionBody == null);
     }
 }

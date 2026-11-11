@@ -40,9 +40,9 @@ public sealed class OrdinaryLongBranchAllocationWorkflowTests
                 Assert.That(method.IsStatic, Is.True);
                 Assert.That(body.InitLocals, Is.True);
                 Assert.That(body.LocalVariables, Has.Count.EqualTo(301));
-                Assert.That(body.LocalVariables.Count(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalType == typeof(int))), Is.EqualTo(300));
-                Assert.That(body.LocalVariables.Count(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalType == typeof(bool))), Is.EqualTo(1));
-                Assert.That(body.LocalVariables.Any(static local => local is null ? throw new System.ArgumentNullException(nameof(local)) : (local.LocalIndex >= 256)), Is.True);
+                Assert.That(body.LocalVariables.Count(static local => local.LocalType == typeof(int)), Is.EqualTo(300));
+                Assert.That(body.LocalVariables.Count(static local => local.LocalType == typeof(bool)), Is.EqualTo(1));
+                Assert.That(body.LocalVariables.Any(static local => local.LocalIndex >= 256), Is.True);
                 Assert.That(bytes.Length, Is.GreaterThan(sbyte.MaxValue).And.LessThan(65536));
                 Assert.That(method.Invoke(null, arguments.ToArray()), Is.EqualTo(expectedResult));
                 Assert.That(AllocationIlOracle.HasPotentialAllocation(method), Is.False);

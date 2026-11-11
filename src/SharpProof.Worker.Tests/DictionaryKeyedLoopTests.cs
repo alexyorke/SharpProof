@@ -35,9 +35,8 @@ public sealed class DictionaryKeyedLoopTests
         var candidate = new PassiveCallableCandidate("keyed-loop", builder.Build(), [subject.Parameter, owner], subject.Result, [],
             [new(factory.Boolean(true), factory.Boolean(true), subject.Site)]);
         Assert.That(PassiveLoopCutter.TryCreate(candidate, out var proof, out var search, out var reason, TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
-        Assert.That(proof!.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new ArgumentNullException(nameof(havoc)) :
-                havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
+        Assert.That(proof!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrHavocInstruction>().Any(havoc => havoc.Operation == headerSite && havoc.HavocKind is IrHavocKind.Memory or IrHavocKind.VariablesAndMemory), Is.True);
         var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         inputBuilder[subject.Parameter.Entry] = factory.CreateIntegerValue(3);
         inputBuilder[owner.Entry] = factory.CreateReferenceValue(factory.ObjectType, new IrObjectState());

@@ -86,7 +86,7 @@ internal static partial class CSharpOperationSemantics
             // An instance store never runs type initialization; a compiler-
             // generated static constructor only runs static field initializers.
             (field.ContainingType.StaticConstructors.Length == 0 ||
-                !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor is null ? throw new System.ArgumentNullException(nameof(constructor)) : (constructor.IsImplicitlyDeclared)));
+                !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
     }
 
     // An instance field read runs no code; its only fault is a null receiver.
@@ -127,7 +127,7 @@ internal static partial class CSharpOperationSemantics
             setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
         { return null; }
         return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
-            .FirstOrDefault(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)));
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
     }
 
     internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
@@ -137,7 +137,7 @@ internal static partial class CSharpOperationSemantics
             !property.IsStatic && !property.ContainingType.IsReferenceType)
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
-            .FirstOrDefault(field => field is null ? throw new System.ArgumentNullException(nameof(field)) : (SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property)));
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
         if (backing != null)
         { return IsSupportedFieldRead(backing) ? backing : null; }
         if (getter.DeclaringSyntaxReferences.Length != 1)

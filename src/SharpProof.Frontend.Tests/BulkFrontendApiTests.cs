@@ -86,9 +86,9 @@ public sealed class BulkFrontendApiTests
         Assert.That(lowered.Classification.IsExact, Is.True, lowered.Classification.Abstention.ToString());
 
         var receiver = subject.Factory.Variable(
-            subject.Context.Parameters.Single(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 0)).Current);
+            subject.Context.Parameters.Single(binding => binding.Parameter.Ordinal == 0).Current);
         var index = subject.Factory.Variable(
-            subject.Context.Parameters.Single(binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Parameter.Ordinal == 1)).Current);
+            subject.Context.Parameters.Single(binding => binding.Parameter.Ordinal == 1).Current);
         var guard = CSharpOperationSemantics.ElementGuard(
             subject.Factory,
             receiver,
@@ -109,7 +109,7 @@ public sealed class BulkFrontendApiTests
         var method = TargetMethod(subject);
         var access = method.DescendantNodes()
             .OfType<ElementAccessExpressionSyntax>()
-            .Single(static element => element is null ? throw new System.ArgumentNullException(nameof(element)) : (element.Expression is ParenthesizedExpressionSyntax));
+            .Single(static element => element.Expression is ParenthesizedExpressionSyntax);
         var receiver = access.Expression;
 
         Assert.That(
@@ -234,7 +234,7 @@ public sealed class BulkFrontendApiTests
             "namespace CachedApi { internal sealed class Outer { internal sealed class Nested { } } }");
 
         var typeNames = ReferencedTypeSymbols.GetAllCached(subject.Compilation, TestContext.CurrentContext.CancellationToken)
-            .Select(static type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ToDisplayString()))
+            .Select(static type => type.ToDisplayString())
             .ToImmutableArray();
         Assert.That(typeNames, Does.Contain("CachedApi.Outer"));
         Assert.That(typeNames, Does.Contain("CachedApi.Outer.Nested"));
@@ -331,7 +331,7 @@ public sealed class BulkFrontendApiTests
         return tree.GetRoot()
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Single(static method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(static method => method.Identifier.ValueText == "Target");
     }
 
     private static IOperation TargetExpression(TypedProgramSubject subject)

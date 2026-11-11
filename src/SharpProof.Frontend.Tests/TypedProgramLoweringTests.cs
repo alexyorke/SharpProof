@@ -251,7 +251,7 @@ public sealed class TypedProgramLoweringTests
             "public static Flag operator &(Flag x, Flag y) => x; }");
         var tree = subject.Compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var operation = subject.Compilation.GetSemanticModel(tree).GetOperation(syntax.ExpressionBody!.Expression)!;
         var builder = new IrProgramBuilder(subject.Factory);
         var lowered = new RoslynTotalExpressionLowerer(subject.Context, builder)
@@ -358,8 +358,8 @@ internal sealed class TypedProgramSubject : IDisposable
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: preprocessorSymbols), "typed.cs");
         var compilation = CSharpCompilation.Create("TypedSubject", [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
         var context = new TotalLoweringContext(new IrFactory(), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
         using var stream = new MemoryStream();
@@ -412,7 +412,7 @@ internal sealed class TypedProgramSubject : IDisposable
         { throw new System.ArgumentNullException(nameof(arguments)); }
         System.ArgumentNullException.ThrowIfNull(lowering);
         return new IrProgramInterpreter(Factory).Execute(lowering.Program,
-            ImmutableDictionaryCapture.Create(Context.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry), binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (Value(binding.Entry, arguments[binding.Parameter.Ordinal]))));
+            ImmutableDictionaryCapture.Create(Context.Parameters, binding => binding.Entry, binding => Value(binding.Entry, arguments[binding.Parameter.Ordinal])));
     }
     internal IrValue Value(IrVarId variable, object value)
     {

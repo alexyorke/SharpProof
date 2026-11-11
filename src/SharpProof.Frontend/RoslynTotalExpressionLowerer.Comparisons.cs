@@ -42,8 +42,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod) || _context.IsConstrainedIntegerComparable(invocation);
         if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
-        var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == 0)).Value, state, depth + 1);
-        var right = LowerClause(invocation.Arguments.Single(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter!.Ordinal == (primitive ? 0 : 1))).Value, state, depth + 1);
+        var left = LowerClause(primitive ? invocation.Instance! : invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == 0).Value, state, depth + 1);
+        var right = LowerClause(invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == (primitive ? 0 : 1)).Value, state, depth + 1);
         var classification = First([left.Classification, right.Classification]);
         var safe = And(left.SafeCondition, right.SafeCondition);
         if (!primitive && !_context.IsDefaultIntegerComparer(invocation.Instance!))

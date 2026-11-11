@@ -279,9 +279,9 @@ public sealed class FrontendExpressionCoverageTests
 
         var parents = parentsBuilder.ToImmutable();
         var candidates = parents.SelectMany(parent =>
-            parent is null ? throw new System.ArgumentNullException(nameof(parent)) : (CSharpStructuralShrinker.GetCandidates(parent)
+            CSharpStructuralShrinker.GetCandidates(parent)
                 .Where(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.NodeCount < parent.NodeCount))
-                .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((Parent: parent, Candidate: candidate)))))
+                .Select(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : ((Parent: parent, Candidate: candidate))))
             .ToImmutableArray();
         Assert.That(candidates, Is.Not.Empty);
         Assert.That(candidates.Select(item => item.Parent.Kind).Distinct().Count(), Is.EqualTo(parents.Length));

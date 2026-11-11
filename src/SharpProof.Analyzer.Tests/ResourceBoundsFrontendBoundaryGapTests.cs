@@ -27,8 +27,7 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
         var dependency = AnalyzerTestHost.CreateCompilation(helperSource, [], filePath: "ResourceDependency.cs")
             .WithAssemblyName("ResourceBoundaryDependency");
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(dependency.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(dependency.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var reference = dependency.ToMetadataReference();
         Assert.That(reference.Compilation, Is.SameAs(dependency));
         var compilation = AnalyzerTestHost.CreateCompilation(callerSource + (referenced ? "" : "\n" + helperSource), [],
@@ -68,16 +67,14 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
             ") { if(n<=0)return; var before=new int[2]; Root(n-1" + (variadic ? ",__arglist(1)" : "") + "); } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot(cancellation);
         var model = compilation.GetSemanticModel(tree);
         var declaration = syntax.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var method = (IMethodSymbol)model.GetDeclaredSymbol(declaration, cancellation)!;
         Assert.That(method.IsVararg, Is.EqualTo(variadic));
-        var invocation = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single(static candidate => candidate is null ?
-            throw new ArgumentNullException(nameof(candidate)) : candidate.Expression is IdentifierNameSyntax { Identifier.ValueText: "Root" });
+        var invocation = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>().Single(static candidate => candidate.Expression is IdentifierNameSyntax { Identifier.ValueText: "Root" });
         var operation = model.GetOperation(invocation, cancellation);
         Assert.That(operation, Is.InstanceOf<IInvocationOperation>());
         var tail = (IInvocationOperation)operation!;
@@ -85,8 +82,7 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
         Assert.That(tail.Arguments.Length, Is.EqualTo(variadic ? 2 : 1));
         if (variadic)
         {
-            var extra = tail.Arguments.Single(static argument => argument is null ?
-                throw new ArgumentNullException(nameof(argument)) : argument.Parameter is null);
+            var extra = tail.Arguments.Single(static argument => argument.Parameter is null);
             Assert.That(extra.Value.Kind, Is.EqualTo(OperationKind.None));
         }
         else
@@ -113,8 +109,7 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
             "public static class C { public static void Root() { var before=new int[2]; var item=new Cell(); } }";
         var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var field = tree.GetRoot(cancellation).DescendantNodes().OfType<FieldDeclarationSyntax>().Single();
@@ -146,8 +141,7 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
         var compilation = AnalyzerTestHost.CreateCompilation("public static class C { public static System.Func<int> Root(" +
             parameters + ") => () => p0; }", []);
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var declaration = tree.GetRoot(cancellation).DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
@@ -298,11 +292,10 @@ public sealed class ResourceBoundsFrontendBoundaryGapTests
     {
         ArgumentNullException.ThrowIfNull(compilation);
         var cancellation = TestContext.CurrentContext.CancellationToken;
-        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic is null ?
-            throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
+        Assert.That(compilation.GetDiagnostics(cancellation).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot(cancellation).DescendantNodes().OfType<MethodDeclarationSyntax>().Single(static method =>
-            method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Root");
+            method.Identifier.ValueText == "Root");
         var model = compilation.GetSemanticModel(tree);
         var body = declaration.Body is { } block ? model.GetOperation(block, cancellation) :
             declaration.ExpressionBody is { } arrow ? model.GetOperation(arrow.Expression, cancellation) : null;

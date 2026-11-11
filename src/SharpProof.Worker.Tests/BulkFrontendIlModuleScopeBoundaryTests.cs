@@ -132,12 +132,12 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             Assert.That(SymbolEqualityComparer.Default.Equals(
                 metadataMethod.Parameters[0].GetAttributes().Single().AttributeClass, positive), Is.True);
             Assert.That(metadataMethod.Parameters.Skip(1).All(parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Boolean && parameter.GetAttributes().IsEmpty)), Is.True);
+                parameter.Type.SpecialType == SpecialType.System_Boolean && parameter.GetAttributes().IsEmpty), Is.True);
 
             var references = CompilerCompilationCapture.CaptureReferences(compilation.References,
                 CompilerCompilationCapture.ReferenceCaptureLimits.Default, TestContext.CurrentContext.CancellationToken);
-            var captured = references.SelectMany(reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Modules)).Single(reference =>
-                reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath)));
+            var captured = references.SelectMany(reference => reference.Modules).Single(reference =>
+                Path.GetFullPath(reference.Path) == Path.GetFullPath(imagePath));
             Assert.That(captured.SizeBytes, Is.EqualTo((long)image.Length));
             Assert.That(captured.Sha256, Is.EqualTo(Convert.ToHexStringLower(SHA256.HashData(image.AsSpan()))));
             Assert.That(captured.Mvid, Is.EqualTo(runtimeAssembly.ManifestModule.ModuleVersionId.ToString("D")));
@@ -151,7 +151,7 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             Assert.That(decodedBody.ImageSha256, Is.EqualTo(captured.Sha256));
             Assert.That(decodedBody.ModuleMvid, Is.EqualTo(captured.Mvid));
             Assert.That(decodedBody.Module, Is.EqualTo(captured.Name));
-            Assert.That(decodedBody.Instructions.Select(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Code)).ToImmutableArray(), Is.EqualTo(ExpectedCodes));
+            Assert.That(decodedBody.Instructions.Select(instruction => instruction.Code).ToImmutableArray(), Is.EqualTo(ExpectedCodes));
             Assert.That(decodedBody.Instructions[0].Operand, Is.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes, Has.Length.EqualTo(1));
             Assert.That(decodedBody.ParameterAttributes.Single().Kind, Is.EqualTo("Positive"));
@@ -214,7 +214,7 @@ public sealed class BulkFrontendIlModuleScopeBoundaryTests
             foreach (var input in Inputs)
             {
                 var observationBuilder = ImmutableArray.CreateBuilder<bool>();
-                var markers = body.CallPreconditions.Select(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Instruction)).ToImmutableHashSet();
+                var markers = body.CallPreconditions.Select(row => row.Instruction).ToImmutableHashSet();
                 var options = new IrProgramReplayOptions(static _ => null)
                 {
                     AssignmentObserver = (instruction, assigned, _) =>

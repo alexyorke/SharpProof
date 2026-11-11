@@ -34,7 +34,7 @@ internal static class EffectClaimDeclarations
             established: throws.IsEmpty);
         Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
             new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
-            !throws.IncludesUnknown && throws.Types.All(type => type is null ? throw new ArgumentNullException(nameof(type)) : exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(
+            !throws.IncludesUnknown && throws.Types.All(type => exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(
                 type ?? throw new ArgumentNullException(nameof(type)), allowed ?? throw new ArgumentNullException(nameof(allowed))))));
         Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
             new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),

@@ -24,7 +24,7 @@ internal static class CompilerExceptionConstraintEvidence
                 { return []; }
                 if (listsTypes &&
                     CompilerExceptionTypeIdentity.EncodeHierarchy(runtime).Any(identity =>
-                        identity is null ? throw new System.ArgumentNullException(nameof(identity)) : (evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal))))
+                        evidence.Constraint.AllowedExceptionTypes.Contains(identity, StringComparer.Ordinal)))
                 { allowed.Add(kind); }
             }
             constraints.Add(new(evidence.ClaimId, allowed.ToImmutable()));

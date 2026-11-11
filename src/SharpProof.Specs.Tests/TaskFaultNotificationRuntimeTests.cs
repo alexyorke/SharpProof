@@ -129,12 +129,12 @@ internal sealed class TaskFaultNotificationRuntimeTests
         var exception = typeof(Exception).GetFields(instance);
         string[] expected = ["_exceptionMethod", "_message", "_data", "_innerException", "_helpURL", "_stackTrace", "_watsonBuckets",
             "_stackTraceString", "_remoteStackTraceString", "_dynamicMethods", "_source", "_ipForWatsonBuckets", "_xptrs", "_xcode", "_HResult"];
-        Assert.That(exception.Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.Name).Order(StringComparer.Ordinal),
+        Assert.That(exception.Select(static field => field.Name).Order(StringComparer.Ordinal),
             Is.EqualTo(expected.Order(StringComparer.Ordinal)));
         Assert.That(exception.Select(Storage).Order(), Is.EqualTo(ResourceTaskFaultNotificationCatalog.ExceptionFields.Order()));
         var aggregate = typeof(AggregateException).GetFields(instance);
         string[] aggregateNames = ["_innerExceptions", "_rocView"];
-        Assert.That(aggregate.Select(static field => field is null ? throw new ArgumentNullException(nameof(field)) : field.Name).Order(StringComparer.Ordinal),
+        Assert.That(aggregate.Select(static field => field.Name).Order(StringComparer.Ordinal),
             Is.EqualTo(aggregateNames.Order(StringComparer.Ordinal)));
         Assert.That(exception.Concat(aggregate).Select(Storage).Order(), Is.EqualTo(ResourceTaskFaultNotificationCatalog.AggregateFields.Order()));
         Assert.That(typeof(AggregateException).BaseType, Is.EqualTo(typeof(Exception)));

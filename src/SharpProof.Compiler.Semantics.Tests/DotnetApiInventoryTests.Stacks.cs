@@ -29,10 +29,10 @@ public sealed partial class DotnetApiInventoryTests
             (incoming ? "int Target(System.Collections.Generic.Stack<int> data)" : opaque ? "T Target<T>(T first, T second)" : "int Target()") +
             " { " + body + " } static T Read<T>(System.Collections.Generic.Stack<T> data) => data.Pop(); }");
         var compilation = references.AddSyntaxTrees(tree);
-        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Severity == DiagnosticSeverity.Error))
+        if (compilation.GetDiagnostics().Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         { return false; }
         var model = compilation.GetSemanticModel(tree);
-        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method is null ? throw new ArgumentNullException(nameof(method)) : method.Identifier.ValueText == "Target");
+        var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var factory = new IrFactory();
         var context = new TotalLoweringContext(factory, model.GetDeclaredSymbol(syntax)!);
         var lowered = RoslynProgramLowering.LowerCandidate(ControlFlowGraph.Create(syntax, model)!, context,
@@ -42,10 +42,10 @@ public sealed partial class DotnetApiInventoryTests
         var inputBuilder = ImmutableDictionary.CreateBuilder<ScopedIrId<IrVariableTag>, IrValue>();
         if (incoming)
         {
-            var count = lowered.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-                .OfType<IrAssignInstruction>().Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) : instruction.Value)
-                .OfType<IrBinaryTerm>().Where(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Operator == IrBinaryOperator.BitwiseAnd)
-                .Select(term => term is null ? throw new ArgumentNullException(nameof(term)) : term.Left).OfType<IrOpaqueTerm>().First();
+            var count = lowered.Program.Blocks.SelectMany(block => block.Instructions)
+                .OfType<IrAssignInstruction>().Select(instruction => instruction.Value)
+                .OfType<IrBinaryTerm>().Where(term => term.Operator == IrBinaryOperator.BitwiseAnd)
+                .Select(term => term.Left).OfType<IrOpaqueTerm>().First();
             var parameter = context.Parameters.Single().Entry;
             inputBuilder[parameter] = factory.CreateReferenceValue(factory.GetVariableInfo(parameter).Type,
                 new IrObjectState().WithField(count.Member, factory.CreateIntegerValue(1)));

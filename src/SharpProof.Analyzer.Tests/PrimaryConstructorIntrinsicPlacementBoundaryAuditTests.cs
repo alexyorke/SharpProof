@@ -70,8 +70,8 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var intrinsicCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
-                method.Name is "Result" or "Old")).ToImmutableArray();
+            .Where(invocation => model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
+                method.Name is "Result" or "Old").ToImmutableArray();
         Assert.That(intrinsicCalls, Has.Length.EqualTo(2));
         foreach (var invocation in intrinsicCalls)
         {
@@ -171,8 +171,8 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
         var root = await tree.GetRootAsync();
         var model = compilation.GetSemanticModel(tree);
         var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (model.GetSymbolInfo(candidate).Symbol is IMethodSymbol method &&
-                method.Name == intrinsicName));
+            .Single(candidate => model.GetSymbolInfo(candidate).Symbol is IMethodSymbol method &&
+                method.Name == intrinsicName);
         var target = (IMethodSymbol)model.GetSymbolInfo(invocation).Symbol!;
         Assert.That(SymbolEqualityComparer.Default.Equals(target.ContainingType,
             compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract")), Is.True);
@@ -216,9 +216,9 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode);
         var observed = string.Join("\n", diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture))));
-        Assert.That(diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            $"{diagnostic.Id}@{diagnostic.Location.SourceSpan}:" +
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+        Assert.That(diagnostics.Select(diagnostic => diagnostic.Id),
             Is.EqualTo(ExpectedDiagnosticIds),
             $"Emit succeeded; CLR={runtimeFailure};mode={mode};owner={owner};" +
             $"span={invocation.Span};argumentSyntaxOperation={argumentSyntaxKind};" +
@@ -237,6 +237,6 @@ public sealed class PrimaryConstructorIntrinsicPlacementBoundaryAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
     }
 }

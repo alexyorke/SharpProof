@@ -103,8 +103,8 @@ internal sealed class NativeAllocationEffectTests
         Assert.That(native.AllocationWitness.HasValue, Is.EqualTo(!proven));
         if (!proven)
         {
-            Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-                .OfType<IrAllocationInstruction>().Any(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Operation == native.AllocationWitness)), Is.True);
+            Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+                .OfType<IrAllocationInstruction>().Any(allocation => allocation.Operation == native.AllocationWitness), Is.True);
         }
         var input = (int)native.EntryModel.Values.Single().IntegerNumericValue;
         Assert.That(AllocatedBytes(source, input), proven ? Is.Zero : Is.GreaterThan(0));
@@ -169,8 +169,8 @@ internal sealed class NativeAllocationEffectTests
     {
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations] public static int Target(int x) => string.Concat(\"\", x == 0 ? \"a\" : \"b\").Length; }");
-        foreach (var allocation in artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .Where(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate)))
+        foreach (var allocation in artifact.Callables.Single().Total!.Graph.Blocks.SelectMany(block => block.Instructions)
+            .Where(row => row.Kind == IrInstructionKind.Allocate))
         {
             var total = artifact.Callables.Single().Total!;
             {
@@ -239,7 +239,7 @@ internal sealed class NativeAllocationEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations] public static int Target(int x) { int[] values = new int[x]; return values.Length; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
-        var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
         switch (mutation)
         {
             case "missing-length":
@@ -262,7 +262,7 @@ internal sealed class NativeAllocationEffectTests
                 break;
             case "wrong-length-type":
                 {
-                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (graph.Types[term.Type].Kind == IrTypeKind.Boolean)) });
+                    (allocation, graph) = graph.ChangeRow(allocation, allocation with { C = PortableGraphChanges.FindIndex(graph.Terms, term => graph.Types[term.Type].Kind == IrTypeKind.Boolean) });
                     { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
                 }
                 break;
@@ -280,13 +280,13 @@ internal sealed class NativeAllocationEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations] public static int Target(int x) { int[] values = new int[] { 1, -2 }; return values[0]; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
-        var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
         (allocation, graph) = graph.ChangeRow(allocation, allocation with
         {
             Items = (mutation == "count" ? ImmutableArray.Create(allocation.Items[0])
                     : ImmutableArray.Create(
-                        PortableGraphChanges.FindIndex(graph.Terms, term => term is null ? throw new System.ArgumentNullException(nameof(term)) : (mutation == "type"
-                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable)),
+                        PortableGraphChanges.FindIndex(graph.Terms, term => mutation == "type"
+                ? graph.Types[term.Type].Kind == IrTypeKind.Boolean : term.Kind == IrTermKind.Variable),
                         allocation.Items[1]))
         });
         { artifact = artifact with { Callables = artifact.Callables.ReplaceReference(artifact.Callables.Single(), artifact.Callables.Single() with { Total = artifact.Callables.Single().Total! with { Graph = graph } }) }; }
@@ -367,7 +367,7 @@ internal sealed class NativeAllocationEffectTests
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         if (requireNonnull)
         { Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<RefutedOutcome>()); }
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
             .OfType<IrAllocationInstruction>().Single().Target, Is.Not.Null);
         using var image = new MemoryStream();
         Assert.That(TestCompilation.Create("InstanceDelegateRuntime", source).Emit(image).Success, Is.True);
@@ -434,7 +434,7 @@ internal sealed class NativeAllocationEffectTests
             "public static class C { [ZeroAllocations] public static bool Target(Receiver receiver, bool flag) { " +
             "System.Action action = new System.Action(receiver.Sink); return flag; } }");
         var total = artifact.Callables.Single().Total!;
-        var row = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction.Kind == IrInstructionKind.Havoc));
+        var row = total.Graph.Blocks.SelectMany(block => block.Instructions).Single(instruction => instruction.Kind == IrInstructionKind.Havoc);
         switch (mutation)
         {
             case "input-origin":
@@ -534,7 +534,7 @@ internal sealed class NativeAllocationEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations] public static int Target(int x) { new object(); return x; } }");
         var total = artifact.Callables.Single().Total!;
-        var allocation = total.Graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
+        var allocation = total.Graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
         switch (mutation)
         {
             case "foreign-claim":
@@ -599,7 +599,7 @@ internal sealed class NativeAllocationEffectTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact("using SharpProof.Attributes; public static class C { " +
             "[ZeroAllocations] public static object Target(int x) { return (object)x; } }");
         var graph = artifact.Callables.Single().Total!.Graph;
-        var allocation = graph.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).Single(row => row is null ? throw new System.ArgumentNullException(nameof(row)) : (row.Kind == IrInstructionKind.Allocate));
+        var allocation = graph.Blocks.SelectMany(block => block.Instructions).Single(row => row.Kind == IrInstructionKind.Allocate);
         if (mutation == "invalid-index")
         {
             (allocation, graph) = graph.ChangeRow(allocation, allocation with { B = int.MaxValue });
@@ -709,8 +709,8 @@ internal sealed class NativeAllocationEffectTests
             Is.True, failure.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
-        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAllocationInstruction>()
-            .All(allocation => allocation is null ? throw new System.ArgumentNullException(nameof(allocation)) : (allocation.Target != null)), Is.True);
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>()
+            .All(allocation => allocation.Target != null), Is.True);
         using var image = new MemoryStream();
         var runtimeSource = source.Replace("Contract.Ensures(Contract.Result<bool>()); ", "", StringComparison.Ordinal);
         Assert.That(TestCompilation.Create("AllocationIdentityRuntime", runtimeSource).Emit(image).Success, Is.True);

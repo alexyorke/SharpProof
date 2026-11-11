@@ -32,13 +32,13 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
         var compilation = CSharpCompilation.Create("BothConstructorCapture_" + partial + "_" + enabled,
             [tree], TestMetadataReferences.Platform,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
         var model = compilation.GetSemanticModel(tree);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText == "Target"));
+            .Single(method => method.Identifier.ValueText == "Target");
         var target = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         var graph = ControlFlowGraph.Create(syntax, model)!;
         var factory = new IrFactory();
@@ -75,7 +75,7 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
             Assert.That(owner.Syntax.Span, Is.EqualTo(ownerSyntax.Span));
             var outer = (ConditionalExpressionSyntax)ownerSyntax.ArgumentList.Arguments.Single().Expression;
             var terminal = graph.Blocks.Where(block =>
-                block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)).ToImmutableArray();
+                block.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw).ToImmutableArray();
             Assert.That(terminal.Length, Is.GreaterThanOrEqualTo(2));
             foreach (var block in terminal)
             {
@@ -84,8 +84,8 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                 Assert.That(emission.IsElided(block.BranchValue!), Is.EqualTo(!enabled));
             }
 
-            var dispatch = graph.Blocks.Single(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.ConditionKind != ControlFlowConditionKind.None &&
-                block.BranchValue?.Syntax.SyntaxTree == tree && block.BranchValue.Syntax.Span == outer.Condition.Span));
+            var dispatch = graph.Blocks.Single(block => block.ConditionKind != ControlFlowConditionKind.None &&
+                block.BranchValue?.Syntax.SyntaxTree == tree && block.BranchValue.Syntax.Span == outer.Condition.Span);
             foreach (var trueArm in ImmutableArray.Create(false, true))
             {
                 var takeConditional = trueArm == (dispatch.ConditionKind == ControlFlowConditionKind.WhenTrue);
@@ -111,8 +111,8 @@ public sealed class BulkFrontendCallsBothConstructorCaptureRegressionTests
                     }
                 }
                 var arm = trueArm ? outer.WhenTrue : outer.WhenFalse;
-                var captures = visited.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Operations)).OfType<IFlowCaptureOperation>()
-                    .Where(operation => operation is null ? throw new System.ArgumentNullException(nameof(operation)) : (operation.Syntax.SyntaxTree == tree && arm.Span.Contains(operation.Syntax.Span))).ToImmutableArray();
+                var captures = visited.SelectMany(block => block.Operations).OfType<IFlowCaptureOperation>()
+                    .Where(operation => operation.Syntax.SyntaxTree == tree && arm.Span.Contains(operation.Syntax.Span)).ToImmutableArray();
                 Assert.That(captures, Is.Not.Empty, "Each fixed constructor argument must produce compiler scan operations.");
                 foreach (var capture in captures)
                 {

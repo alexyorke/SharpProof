@@ -65,8 +65,8 @@ public sealed class FrontendFailurePropagationTests
         Assert.That(subject.Invoke([]), Is.EqualTo(99));
         var lowering = subject.Lower();
         Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
-        Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
-            .OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
+        Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
         var replay = subject.Execute(lowering, []);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Unsupported));
         Assert.That(replay.ReturnValue, Is.Null);

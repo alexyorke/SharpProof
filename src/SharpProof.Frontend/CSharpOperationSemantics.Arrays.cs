@@ -15,7 +15,7 @@ internal static partial class CSharpOperationSemantics
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         if (!IsArrayClear(invocation.TargetMethod))
         { return null; }
-        var receiver = invocation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
+        var receiver = invocation.Arguments.Single(argument => argument.Parameter!.Ordinal == 0).Value;
         while (receiver is IConversionOperation { OperatorMethod: null } conversion &&
             (conversion.Conversion.IsIdentity || conversion.Conversion is { IsReference: true, IsImplicit: true }))
         { receiver = conversion.Operand; }
@@ -86,8 +86,8 @@ internal static partial class CSharpOperationSemantics
         access = RepositoryParameterGuard.NotNull(access, nameof(access));
         return access.ArrayReference.Type is IArrayTypeSymbol array && array.Rank == access.Indices.Length &&
             IsValueDomain(array.ElementType) && access.Indices.All(index =>
-                index is null ? throw new System.ArgumentNullException(nameof(index)) : (index.Type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int16 or SpecialType.System_SByte or
-                    SpecialType.System_Byte or SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_UInt32));
+                index.Type?.SpecialType is SpecialType.System_Int32 or SpecialType.System_Int16 or SpecialType.System_SByte or
+                    SpecialType.System_Byte or SpecialType.System_UInt16 or SpecialType.System_Char or SpecialType.System_UInt32);
     }
 
     internal static bool ArrayStoreNeedsCompatibility(ITypeSymbol element)
@@ -100,7 +100,7 @@ internal static partial class CSharpOperationSemantics
         { return false; }
         for (INamedTypeSymbol? current = named; current != null; current = current.ContainingType)
         {
-            if (current.OriginalDefinition.TypeParameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Variance != VarianceKind.None)))
+            if (current.OriginalDefinition.TypeParameters.Any(parameter => parameter.Variance != VarianceKind.None))
             { return true; }
         }
         return false;
@@ -229,8 +229,8 @@ internal static partial class CSharpOperationSemantics
                 constructor.DeclaringSyntaxReferences[0].SyntaxTree == model.SyntaxTree &&
                 model.GetOperation(constructor.DeclaringSyntaxReferences[0].GetSyntax()) is { } body &&
                 body.Descendants().OfType<IInstanceReferenceOperation>().All(static receiver =>
-                    receiver is null ? throw new System.ArgumentNullException(nameof(receiver)) : (receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
-                    IsObjectConstructorCall(receiver.Parent))),
+                    receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    IsObjectConstructorCall(receiver.Parent)),
             _ => false
         };
     }

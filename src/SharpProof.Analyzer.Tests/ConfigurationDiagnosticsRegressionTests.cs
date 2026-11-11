@@ -98,18 +98,18 @@ public sealed class ConfigurationDiagnosticsRegressionTests
         {
             AnalyzerTestHost.AssertIds(diagnostics, ["SP0025", "SP0025"]);
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                    CultureInfo.InvariantCulture))),
+                diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
                 Has.Some.Contain("sharpproof_profile"));
             Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                    CultureInfo.InvariantCulture))),
+                diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
                 Has.Some.Contain("sharpproof_features"));
             Assert.That(
                 diagnostics.Single(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains(
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains(
                         "sharpproof_features",
-                        StringComparison.Ordinal)))
+                        StringComparison.Ordinal))
                     .Location.SourceTree,
                 Is.SameAs(compilation.SyntaxTrees.Single()));
         }

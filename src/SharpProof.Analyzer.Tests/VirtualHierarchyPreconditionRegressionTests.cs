@@ -22,8 +22,8 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
                 public
             """ + (useBase ? " override " : " ") + "void Run([Positive] int value) {} }",
             "contracts", []);
-        Assert.That(diagnostics.Count(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(expected));
-        Assert.That(diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")), Is.False);
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(expected));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
     }
 
     [TestCase("v99999999999999999999", "v99999999999999999999", 0)]
@@ -39,7 +39,7 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
             "public class Derived : Base { public override void Run(string renamed) { " +
             "Contract.Requires(renamed != \"" + local + "\"); } }",
             "contracts", []);
-        Assert.That(diagnostics.Any(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "AD0001")), Is.False);
-        Assert.That(diagnostics.Count(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")), Is.EqualTo(expected));
+        Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == "AD0001"), Is.False);
+        Assert.That(diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"), Is.EqualTo(expected));
     }
 }

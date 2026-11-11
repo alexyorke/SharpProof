@@ -28,7 +28,7 @@ public sealed class ClosedClassMetadataTests
         var json = CompilerManifestArtifactJson.SerializeProducerValidated(artifact, TestContext.CurrentContext.CancellationToken);
         CompilerManifestArtifactJson.DeserializePrepared(json, out var preparations, TestContext.CurrentContext.CancellationToken);
         var encoded = CompilerTotalCallableArtifactCodec.Encode(preparations.Single().Total)!;
-        Assert.That(encoded.Graph.Types.Select(row => row is null ? throw new ArgumentNullException(nameof(row)) : row.ClosedClassBase), Is.EqualTo(types.Select(row => row is null ? throw new ArgumentNullException(nameof(row)) : row.ClosedClassBase)));
+        Assert.That(encoded.Graph.Types.Select(row => row.ClosedClassBase), Is.EqualTo(types.Select(row => row.ClosedClassBase)));
     }
 
     [TestCase("cycle")]
@@ -111,7 +111,7 @@ public sealed class ClosedClassMetadataTests
             var callable = callables[index];
             if (callable.Total is { } total)
             {
-                callables[index] = callable with { Total = total with { Graph = total.Graph with { Types = total.Graph.Types.Select(type => type is null ? throw new ArgumentNullException(nameof(type)) : type with { ClosedClassBase = null }).ToImmutableArray() } } };
+                callables[index] = callable with { Total = total with { Graph = total.Graph with { Types = total.Graph.Types.Select(type => type with { ClosedClassBase = null }).ToImmutableArray() } } };
             }
         }
         artifact = artifact with { Callables = callables.ToImmutable() };

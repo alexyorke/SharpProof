@@ -295,11 +295,11 @@ internal static class Program
         validatedResponse = response;
         WriteErrors(response.Errors, "SharpProof ");
         var hasProjectTimeoutCoverage = response.CallableResults.Any(
-            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete &&
-                result.Reason == WorkerCallableCoverageReason.ProjectTimeout));
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.ProjectTimeout);
         var hasMethodTimeoutCoverage = response.CallableResults.Any(
-            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete &&
-                result.Reason == WorkerCallableCoverageReason.MethodTimeout));
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete &&
+                result.Reason == WorkerCallableCoverageReason.MethodTimeout);
         var projectTimedOut = hasProjectTimeoutCoverage ||
             response.CallableResults.Length == 0 &&
                 response.RunStatus == WorkerRunStatus.TimedOut &&
@@ -332,10 +332,10 @@ internal static class Program
             refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
         }
         var incompleteCount = response.CallableResults.Count(
-            static result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Coverage == WorkerCallableCoverage.Incomplete));
+            static result => result.Coverage == WorkerCallableCoverage.Incomplete);
         var callablesById = ImmutableDictionaryCapture.Create(
             response.Manifest.Callables,
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable.CallableId,
             static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
             StringComparer.Ordinal);
         foreach (var result in response.CallableResults)
@@ -403,7 +403,7 @@ internal static class Program
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
                     ", ", result.Model.Select(value =>
-                        value is null ? throw new System.ArgumentNullException(nameof(value)) : (LauncherPresentation.VariableName(result, value.Variable) + " = " + value.Value))) + "."
+                        LauncherPresentation.VariableName(result, value.Variable) + " = " + value.Value)) + "."
                 : string.Empty);
 
         // Keep this diagnostic on stderr so RunVerifier consumes it through
@@ -435,7 +435,7 @@ internal static class Program
         System.ArgumentNullException.ThrowIfNull(response);
         var callablesById = ImmutableDictionaryCapture.Create(
             response.Manifest.Callables,
-            static callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : callable.CallableId,
+            static callable => callable.CallableId,
             static callable => callable ?? throw new System.ArgumentNullException(nameof(callable)),
             StringComparer.Ordinal);
         var reported = false;
@@ -443,8 +443,8 @@ internal static class Program
         {
             var assumptions = result.Assumptions
                 .Where(static assumption =>
-                    assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Kind is WorkerAssumptionKind.UserAssume or
-                        WorkerAssumptionKind.TrustedBoundary))
+                    assumption.Kind is WorkerAssumptionKind.UserAssume or
+                        WorkerAssumptionKind.TrustedBoundary)
                 .ToImmutableArray();
             if (assumptions.Length == 0)
             {
@@ -719,12 +719,12 @@ internal sealed partial class LauncherArguments
                 return false;
             }
         }
-        if (s_required.Any(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (!values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))))
+        if (s_required.Any(key => !values.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value)))
         {
             return false;
         }
 
-        var publicationCount = s_publication.Count(key => key is null ? throw new System.ArgumentNullException(nameof(key)) : (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)));
+        var publicationCount = s_publication.Count(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
         if (publicationCount is not (0 or 3) ||
             values.TryGetValue("publish-sarif", out var sarif) &&
             (string.IsNullOrWhiteSpace(sarif) || publicationCount != 3))
@@ -784,7 +784,7 @@ internal sealed partial class LauncherArguments
             PublishSarifPath
         ];
         var paths = candidates.OfType<string>().Select(static path =>
-            path is null ? throw new System.ArgumentNullException(nameof(path)) : PublicationLease.CanonicalMember(path)).ToImmutableArray();
+            PublicationLease.CanonicalMember(path)).ToImmutableArray();
         if (paths.Distinct(PublicationPaths.Comparer).Count() != paths.Length)
         {
             throw new ArgumentException(
@@ -794,8 +794,7 @@ internal sealed partial class LauncherArguments
         {
             var cache = Path.GetDirectoryName(PublicationLease.CanonicalMember(
                 Path.Combine(cacheDirectory, ".sharpproof-cache-identity")))!;
-            if (paths.Skip(1).Any(path => path is null ? throw new ArgumentNullException(nameof(path)) :
-                PublicationPaths.IsWithin(path, cache, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cache, path, PublicationPaths.Comparison)))
+            if (paths.Skip(1).Any(path => PublicationPaths.IsWithin(path, cache, PublicationPaths.Comparison) || PublicationPaths.IsWithin(cache, path, PublicationPaths.Comparison)))
             {
                 throw new ArgumentException("SharpProof cache paths must not contain input or output paths.");
             }

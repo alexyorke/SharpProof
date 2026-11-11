@@ -25,7 +25,7 @@ internal sealed class TrustedBoundaryPolicy
     {
         return Policies.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            static value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (new TrustedBoundaryPolicy(value)));
+            static value => new TrustedBoundaryPolicy(value));
     }
 
     internal bool AuthorizesDeclaredContracts(
@@ -39,12 +39,12 @@ internal sealed class TrustedBoundaryPolicy
         }
 
         return CompilerMethodScopes.Enumerate(method)
-            .SelectMany(static symbol => symbol is null ? throw new System.ArgumentNullException(nameof(symbol)) : (symbol.GetAttributes()))
+            .SelectMany(static symbol => symbol.GetAttributes())
             .Any(attribute =>
-                attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (IsTrusted(attribute) &&
+                IsTrusted(attribute) &&
                 attribute.ConstructorArguments.Length == 1 &&
                 attribute.ConstructorArguments[0].Value is string reason &&
-                !string.IsNullOrWhiteSpace(reason)));
+                !string.IsNullOrWhiteSpace(reason));
     }
 
     private bool IsTrusted(

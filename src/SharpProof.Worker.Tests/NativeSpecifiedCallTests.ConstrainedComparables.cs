@@ -16,9 +16,8 @@ internal sealed partial class NativeSpecifiedCallTests
             : "[ZeroAllocations] public static int Target() { return Compare(new int[] { 17, 23 }, new int[] { 23 }); } static int Compare<T>(T[] data, T[] other) where T : System.IComparable<T> => data[0].CompareTo((data = other)[0]);";
         var preparation = Prepare(method);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        var messages = candidate.Program.Blocks.SelectMany(block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions)
-            .OfType<IrHavocInstruction>().Select(instruction => instruction is null ? throw new ArgumentNullException(nameof(instruction)) :
-                candidate.Factory.GetString(candidate.Factory.GetOperationInfo(instruction.Operation).Description!.Value)).ToImmutableArray();
+        var messages = candidate.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrHavocInstruction>().Select(instruction => candidate.Factory.GetString(candidate.Factory.GetOperationInfo(instruction.Operation).Description!.Value)).ToImmutableArray();
         Assert.That(messages, Is.Empty);
     }
 

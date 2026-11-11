@@ -129,7 +129,7 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         Directory.CreateDirectory(evidenceDirectory);
         await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "producer-source.cs"), source);
         var references = scenario == "source-nested-attribute"
-            ? TestMetadataReferences.Platform.Select(static reference => reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.WithAliases(BclAliases))).ToImmutableArray()
+            ? TestMetadataReferences.Platform.Select(static reference => reference.WithAliases(BclAliases)).ToImmutableArray()
             : TestMetadataReferences.Platform;
         var producer = CreateCompilation("LayoutAdmission_" + scenario.Replace('-', '_'), source, references);
         using var image = new MemoryStream();
@@ -138,9 +138,9 @@ public sealed class ExplicitLayoutFieldAdmissionTests
         {
             SourceSha256 = Hash(Encoding.UTF8.GetBytes(source)),
             Optimization = producer.Options.OptimizationLevel.ToString(),
-            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray(),
+            CompilationDiagnostics = producer.GetDiagnostics().Select(static diagnostic => diagnostic.ToString()).ToImmutableArray(),
             emission.Success,
-            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
+            EmitDiagnostics = emission.Diagnostics.Select(static diagnostic => diagnostic.ToString()).ToImmutableArray()
         });
         AssertNoErrors(producer);
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
@@ -293,8 +293,8 @@ public sealed class ExplicitLayoutFieldAdmissionTests
     private static void AssertNoErrors(Compilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+        var errors = compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToImmutableArray();
+        Assert.That(errors, Is.Empty, string.Join("\n", errors.Select(static diagnostic => diagnostic.ToString())));
     }
 
     private static async Task VerifySourceBinding(

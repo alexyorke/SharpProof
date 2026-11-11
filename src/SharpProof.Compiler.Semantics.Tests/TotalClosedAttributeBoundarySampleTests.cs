@@ -48,9 +48,9 @@ public sealed class TotalClosedAttributeBoundarySampleTests
         var bound = new TotalContractBinder(compilation, factory).BindTotal(context);
         Assert.That(bound.IsSuccess, Is.True, bound.Failure.ToString());
         Assert.That(bound.Clauses, Has.Length.EqualTo(2));
-        Assert.That(bound.Clauses.All(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Evidence == BoundContractEvidence.ClosedAttribute)), Is.True);
-        var requires = bound.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Requires));
-        var ensures = bound.Clauses.Single(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == BoundContractKind.Ensures));
+        Assert.That(bound.Clauses.All(clause => clause.Evidence == BoundContractEvidence.ClosedAttribute), Is.True);
+        var requires = bound.Clauses.Single(clause => clause.Kind == BoundContractKind.Requires);
+        var ensures = bound.Clauses.Single(clause => clause.Kind == BoundContractKind.Ensures);
         var entry = context.Parameters[0].Entry;
         var result = context.Result!.Value;
         var inputType = factory.GetVariableInfo(entry).Type;

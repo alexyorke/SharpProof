@@ -59,7 +59,7 @@ public sealed class ResourceAsymptoticDiagnosticsTests
         var compilation = AnalyzerTestHost.CreateCompilation("public static class C { public static void Target(int n) { for(int i=0;i<n;i++) {} } }", []);
         compilation = compilation.WithOptions(compilation.Options.WithSyntaxTreeOptionsProvider(new ResourceSeverityOptions(severity, global)));
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(compilation, mode: null);
-        Assert.That(diagnostics.Count(static diagnostic => diagnostic is null ? throw new ArgumentNullException(nameof(diagnostic)) : diagnostic.Id == "SP0060"),
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SP0060"),
             Is.EqualTo(enabled ? 1 : 0));
     }
 

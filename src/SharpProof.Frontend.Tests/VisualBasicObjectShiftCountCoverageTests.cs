@@ -45,7 +45,7 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         var compilation = VisualBasicCompilation.Create("ObjectShiftCount", [tree], TestMetadataReferences.Platform,
             new VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optionStrict: OptionStrict.Off,
                 optimizationLevel: OptimizationLevel.Release));
-        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -111,8 +111,8 @@ public sealed class VisualBasicObjectShiftCountCoverageTests
         var controlLowering = RoslynProgramLowering.LowerCandidate(controlGraph, controlContext);
         Assert.That(controlLowering.IsExact, Is.True, controlLowering.Classification.Abstention.ToString());
         Assert.That(controlLowering.ConstructionLimitExceeded, Is.False);
-        var environment = ImmutableDictionaryCapture.Create(controlContext.Parameters, binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-            binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (controlFactory.CreateIntegerValue(controlFactory.GetVariableInfo(binding.Entry).Type, binding.Parameter.Ordinal == 0 ? 6 : 1)));
+        var environment = ImmutableDictionaryCapture.Create(controlContext.Parameters, binding => binding.Entry,
+            binding => controlFactory.CreateIntegerValue(controlFactory.GetVariableInfo(binding.Entry).Type, binding.Parameter.Ordinal == 0 ? 6 : 1));
         var replay = new IrProgramInterpreter(controlFactory).Execute(controlLowering.Program, environment);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ConsumedApproximation, Is.False);

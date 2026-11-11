@@ -30,9 +30,9 @@ internal static class CorpusObservationComparison
         System.ArgumentNullException.ThrowIfNull(expected);
         System.ArgumentNullException.ThrowIfNull(observations);
         return [.. observations
-            .Where(observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (!Matches(expected[observation.CaseId], observation)))
-            .OrderBy(static observation => observation is null ? throw new System.ArgumentNullException(nameof(observation)) : (observation.CaseId), StringComparer.Ordinal)
+            .Where(observation => !Matches(expected[observation.CaseId], observation))
+            .OrderBy(static observation => observation.CaseId, StringComparer.Ordinal)
             .Select(static observation =>
-                observation is null ? throw new System.ArgumentNullException(nameof(observation)) : ($"Concurrent replay changed {observation.CaseId}."))];
+                $"Concurrent replay changed {observation.CaseId}.")];
     }
 }

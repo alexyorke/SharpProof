@@ -12,7 +12,7 @@ public sealed class InvalidOperationExceptionConstructorSpecTests
     {
         ArgumentNullException.ThrowIfNull(witness);
         var template = ApiSpecTable.Default.Templates.Single(
-            row => row is null ? throw new System.ArgumentNullException(nameof(row)) : row.Target.WitnessIdentifier == witness);
+            row => row.Target.WitnessIdentifier == witness);
 
         using (Assert.EnterMultipleScope())
         {

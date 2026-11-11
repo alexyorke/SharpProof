@@ -57,12 +57,12 @@ internal static class CallableReplayValidator
             }
             var initial = initialBuffer.ToImmutable();
             var replayOptions = new IrProgramReplayOptions(request =>
-                request is null ? throw new System.ArgumentNullException(nameof(request)) : (request.Origin switch
+                request.Origin switch
                 {
                     IrHavocOrigin.Input => initial.TryGetValue(request.Variable, out var entry) ? entry : null,
                     IrHavocOrigin.Approximation => context.ReplayOptions?.HavocValueProvider(request),
                     _ => null
-                }))
+                })
             {
                 SnapshotVariables = context.PreStateBindings.Keys.ToImmutableHashSet(),
                 ConcreteHavocValueProvider = context.ReplayOptions?.ConcreteHavocValueProvider,

@@ -99,8 +99,8 @@ public sealed class PartialDeclarationValidationControlTests
             return;
         }
         AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
-        var expectedTree = compilation.SyntaxTrees.Single(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.FilePath.Contains(
-            attributeOnDefinition ? "Definition" : "Implementation", StringComparison.Ordinal)));
+        var expectedTree = compilation.SyntaxTrees.Single(tree => tree.FilePath.Contains(
+            attributeOnDefinition ? "Definition" : "Implementation", StringComparison.Ordinal));
         Assert.That(diagnostics.Single().Location.SourceTree, Is.SameAs(expectedTree));
     }
 

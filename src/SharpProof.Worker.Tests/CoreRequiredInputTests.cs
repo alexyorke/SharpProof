@@ -115,11 +115,11 @@ public sealed class CoreRequiredInputTests
         var lowering = TotalBodyLowering.Lower(
             fixture.Compilation, fixture.Graph, context, TestContext.CurrentContext.CancellationToken);
         var variables = context.Parameters
-            .SelectMany(static parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
+            .SelectMany(static parameter => ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState))
             .Concat(lowering.Program.Blocks
-                .SelectMany(static block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+                .SelectMany(static block => block.Instructions)
                 .OfType<IrAssignInstruction>()
-                .Select(static assignment => assignment is null ? throw new System.ArgumentNullException(nameof(assignment)) : (assignment.Target)))
+                .Select(static assignment => assignment.Target))
             .Append(context.Result!.Value)
             .Distinct()
             .ToImmutableArray();

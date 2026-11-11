@@ -37,8 +37,8 @@ public sealed class CompilerMetadataResolutionTests
         var compilation = AnalyzerTestHost.CreateCompilation("internal class Subject { }", []);
         var reference = compilation.References
             .OfType<PortableExecutableReference>()
-            .First(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.FilePath != null &&
-                compilation.GetAssemblyOrModuleSymbol(candidate) is IAssemblySymbol));
+            .First(candidate => candidate.FilePath != null &&
+                compilation.GetAssemblyOrModuleSymbol(candidate) is IAssemblySymbol);
         var assembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(reference)!;
         var module = ((AssemblyMetadata)reference.GetMetadata()).GetModules()[0];
         var moduleName = CompilerCompilationCapture.ReadModuleName(

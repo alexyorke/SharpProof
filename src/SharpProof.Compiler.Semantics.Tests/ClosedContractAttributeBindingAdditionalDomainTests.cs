@@ -156,7 +156,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         var api = ContractApiSymbols.TryCreate(compilation)!;
         var parameter = GetMethod(compilation, "Read").Parameters.Single();
         var attributes = parameter.GetAttributes();
-        Assert.That(attributes.Select(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass!.Name)),
+        Assert.That(attributes.Select(static attribute => attribute.AttributeClass!.Name),
             Is.EqualTo(MarkerNames));
 
         var factory = new IrFactory();
@@ -207,10 +207,10 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         ArgumentNullException.ThrowIfNull(parameterName);
         var (consumer, method) = CreateMetadataConsumer();
         var api = ContractApiSymbols.TryCreate(consumer)!;
-        var parameter = method.Parameters.Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Name == parameterName));
+        var parameter = method.Parameters.Single(candidate => candidate.Name == parameterName);
         var attributes = parameter.GetAttributes();
         Assert.That(attributes, Is.Not.Empty);
-        Assert.That(attributes.All(static attribute => attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.ApplicationSyntaxReference is null)), Is.True);
+        Assert.That(attributes.All(static attribute => attribute.ApplicationSyntaxReference is null), Is.True);
 
         var factory = new IrFactory();
         var type = parameterName == "text" ? factory.StringType : factory.IntegerType;
@@ -266,7 +266,7 @@ internal sealed class ClosedContractAttributeBindingAdditionalDomainTests
         using var image = new MemoryStream();
         var emit = library.Emit(image);
         Assert.That(emit.Success, Is.True, string.Join(System.Environment.NewLine,
-            emit.Diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))));
+            emit.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
 
         var consumer = TestCompilation.Create("ClosedAttributeMetadataConsumer", "public static class Consumer {}")
             .AddReferences(MetadataReference.CreateFromImage(ImmutableArray.Create(image.GetBuffer(), 0, checked((int)image.Length))));

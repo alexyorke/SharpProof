@@ -164,7 +164,7 @@ public sealed class NativeCompletedModelInvariantTests
         System.ArgumentNullException.ThrowIfNull(factory);
         System.ArgumentNullException.ThrowIfNull(inspect);
         var query = new VerificationQuery(factory,
-            predicates.Select(predicate => predicate is null ? throw new System.ArgumentNullException(nameof(predicate)) : (new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation())))),
+            predicates.Select(predicate => new Assumption(factory, predicate, new LoweredJustification(factory.CreateOperation()))),
             new Goal(factory, factory.Boolean(false), ProofDiagnosticKind.Postcondition, new SourceLocationId(0)), [variable]);
         using var context = new Context();
         using var solver = context.MkSolver();

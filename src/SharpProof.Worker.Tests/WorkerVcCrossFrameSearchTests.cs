@@ -107,7 +107,7 @@ public sealed class WorkerVcCrossFrameSearchTests
     public async Task ReplacementSearchAbstractionAndBoundedReplayRetainSeparateAuthority()
     {
         using var project = new ShadowTestProject(ReplacementSource);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var session = new CallableSolverSession(candidate.Factory, new IrSmtBackendOptions(WorkerBudgets.DefaultQueryRlimit));
@@ -129,7 +129,7 @@ public sealed class WorkerVcCrossFrameSearchTests
     {
         System.ArgumentNullException.ThrowIfNull(source);
         using var project = new ShadowTestProject(source, cacheEnabled: true);
-        var target = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal)));
+        var target = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId.Contains("Target", StringComparison.Ordinal));
         Assert.That(target.Total, Is.Not.Null);
         var candidate = PassiveCallableArtifactAdapter.Enroll(target)!;
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -161,14 +161,14 @@ public sealed class WorkerVcCrossFrameSearchTests
             { Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit)); }
             Assert.That(response.Errors, Is.Empty);
             var ordinals = ImmutableDictionaryCapture.Create(
-                response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition)),
-                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId),
-                claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal),
+                response.Manifest.Claims.Where(claim => claim.CallableId == target.Entry.CallableId && claim.Kind == WorkerClaimKind.Postcondition),
+                claim => claim.ClaimId,
+                claim => claim.Ordinal,
                 StringComparer.Ordinal);
-            var posts = response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals.ContainsKey(result.ClaimId))).OrderBy(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ordinals[result.ClaimId])).ToImmutableArray();
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome)),
+            var posts = response.ClaimResults.Where(result => ordinals.ContainsKey(result.ClaimId)).OrderBy(result => ordinals[result.ClaimId]).ToImmutableArray();
+            Assert.That(posts.Select(result => result.Outcome),
                 Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimOutcome.Unknown : WorkerClaimOutcome.Proven, WorkerClaimOutcome.Refuted)));
-            Assert.That(posts.Select(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Reason)),
+            Assert.That(posts.Select(result => result.Reason),
                 Is.EqualTo(ImmutableArray.Create(incomplete ? WorkerClaimReason.SolverIncomplete : WorkerClaimReason.None, WorkerClaimReason.None)));
             Assert.That(posts[1].Model, Is.Not.Empty);
         }

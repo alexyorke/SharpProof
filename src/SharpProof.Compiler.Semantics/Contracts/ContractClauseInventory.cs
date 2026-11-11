@@ -23,7 +23,8 @@ internal sealed partial class ContractClauseInventory
     internal bool HasValidClause =>
         _hasValidClause >= 0
             ? _hasValidClause != 0
-            : Clauses.Any(static clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.IsValid));
+            // The deferred validation failure: a null entry is reported here.
+            : Clauses.Any(static clause => clause is null ? throw new ArgumentNullException(nameof(clause)) : clause.IsValid);
 
     private static int ComputeHasValidClause(
         ImmutableArray<ContractClauseOccurrence> clauses /* SPINT001: all values valid - default arrays and null entries defer the original validation failure until the property is read */)
@@ -48,7 +49,7 @@ internal sealed partial class ContractClauseInventory
 
     public bool HasPlacementErrors =>
         Clauses.Any(static clause =>
-            clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Placement is not (
+            clause.Placement is not (
                 ContractClausePlacement.ValidPrologue or
-                ContractClausePlacement.NestedCallable)));
+                ContractClausePlacement.NestedCallable));
 }

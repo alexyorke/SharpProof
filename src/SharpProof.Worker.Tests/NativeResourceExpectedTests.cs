@@ -43,12 +43,10 @@ internal sealed partial class NativeResourceContractTests
         Assert.That(result.ProofCore, Does.Contain("resource-input-model:" + WorkerResourceModels.Expected));
         var dependencies = result.ResourceBound!.MetadataAssumptions;
         Assert.That(dependencies, Has.Length.EqualTo(2));
-        Assert.That(dependencies.Select(static dependency => dependency is null ? throw new ArgumentNullException(nameof(dependency)) :
-            dependency.WitnessIdentifier), Is.EquivalentTo(BooleanCaseMetadataWitnesses));
+        Assert.That(dependencies.Select(static dependency => dependency.WitnessIdentifier), Is.EquivalentTo(BooleanCaseMetadataWitnesses));
         foreach (var dependency in dependencies)
         {
-            Assert.That(result.Assumptions.Single(assumption => assumption is null ? throw new ArgumentNullException(nameof(assumption)) :
-                assumption.Id == dependency.AssumptionId).Used, Is.True);
+            Assert.That(result.Assumptions.Single(assumption => assumption.Id == dependency.AssumptionId).Used, Is.True);
         }
     }
 

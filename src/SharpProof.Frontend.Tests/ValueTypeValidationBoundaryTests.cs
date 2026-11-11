@@ -51,7 +51,7 @@ public sealed class ValueTypeValidationBoundaryTests
     public void ErrorSourceConstantRejects()
     {
         var compilation = CompileCSharp("public class Subject { public Missing Value; }");
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)),
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
             Is.EqualTo(CSharpError));
         var error = compilation.GetTypeByMetadataName("Subject")!.GetMembers("Value").OfType<IFieldSymbol>().Single().Type;
         Assert.That(error.TypeKind, Is.EqualTo(TypeKind.Error));
@@ -76,7 +76,7 @@ public sealed class ValueTypeValidationBoundaryTests
     public void InvalidLocalStorageRejects()
     {
         var compilation = CompileVisualBasic("Module Subject\n Sub F()\n Dim broken As Missing\n End Sub\nEnd Module");
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)).Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Id)),
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Id),
             Is.EqualTo(VisualBasicError));
         var local = Local(compilation, "broken");
         Assert.That(local.Type.TypeKind, Is.EqualTo(TypeKind.Error));
@@ -91,8 +91,8 @@ public sealed class ValueTypeValidationBoundaryTests
     public void ProgramLoweringRetainsTypeRefusalForBoundErrorLocalStorage()
     {
         var compilation = CompileVisualBasic("Module Subject\n Sub F()\n Dim broken As Missing\n System.GC.KeepAlive(broken)\n End Sub\nEnd Module");
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : d.Id), Is.EqualTo(VisualBasicError));
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error)
+            .Select(d => d.Id), Is.EqualTo(VisualBasicError));
         var tree = compilation.SyntaxTrees.Single();
         var model = compilation.GetSemanticModel(tree);
         var method = tree.GetRoot().DescendantNodes().OfType<MethodBlockSyntax>().Single();
@@ -179,7 +179,7 @@ public sealed class ValueTypeValidationBoundaryTests
     private static void AssertNoErrors(Compilation compilation)
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
-        Assert.That(compilation.GetDiagnostics().Where(d => d is null ? throw new System.ArgumentNullException(nameof(d)) : (d.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error), Is.Empty);
     }
 
     private static ILocalSymbol Local(VisualBasicCompilation compilation, string name)
@@ -188,7 +188,7 @@ public sealed class ValueTypeValidationBoundaryTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         var tree = compilation.SyntaxTrees.Single();
         var syntax = tree.GetRoot().DescendantNodes().OfType<ModifiedIdentifierSyntax>()
-            .Single(identifier => identifier is null ? throw new System.ArgumentNullException(nameof(identifier)) : (identifier.Identifier.ValueText == name));
+            .Single(identifier => identifier.Identifier.ValueText == name);
         return (ILocalSymbol)compilation.GetSemanticModel(tree).GetDeclaredSymbol(syntax)!;
     }
 }

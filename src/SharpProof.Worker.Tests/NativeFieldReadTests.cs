@@ -106,6 +106,6 @@ internal sealed class NativeFieldReadTests
     {
         System.ArgumentNullException.ThrowIfNull(artifact);
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.EffectClaims.Length != 0));
+        return preparations.Single(preparation => preparation.EffectClaims.Length != 0);
     }
 }

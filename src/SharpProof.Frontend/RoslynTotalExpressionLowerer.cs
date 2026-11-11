@@ -203,7 +203,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             CSharpOperationSemantics.IsSupportedConstantArrayCollection(collection))
         {
             var initial = collection.Elements.Select(element =>
-                element is null ? throw new System.ArgumentNullException(nameof(element)) : (CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value))).ToImmutableArray();
+                CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
             var allocatedType = _context.Type(collection.Type);
             var allocatedTarget = _context.Temporary(allocatedType);
             _builder!.Allocate(block, _context.Site(collection), allocatedType, allocatedTarget, _factory.Integer(initial.Length), initial);
@@ -223,7 +223,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var target = _context.Temporary(type);
             var initialValues = arrayCreation.Initializer == null ? ImmutableArray<IrTerm>.Empty
                 : arrayCreation.Initializer.ElementValues.Select(element =>
-                    element is null ? throw new System.ArgumentNullException(nameof(element)) : (CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value))).ToImmutableArray();
+                    CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
             var length = arrayCreation.Initializer == null ? dimension.Value : _factory.Integer(initialValues.Length);
             _builder!.Allocate(block, _context.Site(operation), type, target, length, initialValues);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
@@ -284,7 +284,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             CSharpOperationSemantics.IsRepeatedCharacterStringCreation(stringCreation))
         {
             var arguments = new IrTerm[2];
-            foreach (var argument in stringCreation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+            foreach (var argument in stringCreation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
             {
                 var lowered = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!lowered.Classification.IsExact)
@@ -299,14 +299,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 [new(IrExceptionKind.ArgumentOutOfRange, _factory.Binary(IrBinaryOperator.LessThan, arguments[1], _factory.Integer(0)))],
                 FrontendSubsetClassification.Exact);
             block = ApplyRule(operation, rule, block).Continuation;
-            var count = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 1).Value;
+            var count = stringCreation.Arguments.Single(argument => argument.Parameter!.Ordinal == 1).Value;
             if (count.ConstantValue is not { HasValue: true, Value: <= MaximumStringLength })
             {
                 block = MayFault(operation, _factory.Binary(IrBinaryOperator.GreaterThan, arguments[1],
                     _factory.Integer(MaximumStringLength)), "string:beyond-maximum-length", block);
             }
             var target = _context.Temporary(_factory.StringType);
-            var character = stringCreation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter!.Ordinal == 0).Value;
+            var character = stringCreation.Arguments.Single(argument => argument.Parameter!.Ordinal == 0).Value;
             var fill = _factory.Integer(_context.Type(character.Type), (char)character.ConstantValue.Value!);
             _builder!.Allocate(block, _context.Site(operation), _factory.StringType, target, arguments[1], [fill]);
             return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
@@ -325,7 +325,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         {
             var argumentValues = ImmutableArray.CreateBuilder<IrTerm>(exceptionCreation.Arguments.Length);
             argumentValues.Count = exceptionCreation.Arguments.Length;
-            foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
+            foreach (var argument in exceptionCreation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
             {
                 var lowered = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!lowered.Classification.IsExact)
@@ -951,9 +951,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
             instance != null && !CSharpOperationSemantics.IsValueDomain(instance.Type) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
-            method.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
-            arguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter == null ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))) ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            arguments.Any(argument => argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
             assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
         { return null; }
         IrTerm? receiver = null;
@@ -967,7 +967,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         var values = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned != null ? 1 : 0));
         values.Count = arguments.Length + (assigned != null ? 1 : 0);
-        foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
+        foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -1002,7 +1002,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return _factory.GetOrCreateMemberSnapshot(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
             "opaque-call:" + display, resultType ?? _context.Type(method.ReturnType), true,
-            [.. arguments.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Type))]);
+            [.. arguments.Select(value => value.Type)]);
     }
 
     // The call itself is only an effect site; its result and whether it
@@ -1062,7 +1062,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // Arguments have already been evaluated and pinned. A compiler-known
         // nonnull message cannot take the resource path; omit that unreachable
         // effect site so syntactic advisory summaries retain the same boundary.
-        var message = operation.Arguments.Single(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Parameter?.Ordinal == ordinal).Value;
+        var message = operation.Arguments.Single(argument => argument.Parameter?.Ordinal == ordinal).Value;
         if (message.ConstantValue is { HasValue: true, Value: string })
         { return block; }
         var runtime = _builder!.CreateBlock("exception:resource-message");
@@ -1122,13 +1122,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             creation.Initializer != null || creation.Type is not { IsReferenceType: true } type ||
             !CSharpOperationSemantics.IsValueDomain(type) || _factory.GetTypeInfo(_context.Type(type)).Kind != IrTypeKind.Reference ||
             IsSharpProofApi(constructor.ContainingNamespace) ||
-            constructor.Parameters.Any(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.RefKind != RefKind.None)) ||
-            creation.Arguments.Any(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Parameter == null ||
-                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue))))
+            constructor.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            creation.Arguments.Any(argument => argument.Parameter == null ||
+                argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
         { return null; }
         var values = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
         values.Count = creation.Arguments.Length;
-        foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : (argument.Syntax.SpanStart)))
+        foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -1374,9 +1374,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (_context.KnownScalarType(field.Type) != null && _context.SpecializeSourceType(field.ContainingType) is INamedTypeSymbol owner &&
             !SymbolEqualityComparer.Default.Equals(owner, field.ContainingType))
         {
-            return owner.GetMembers(field.Name).OfType<IFieldSymbol>().Single(candidate => candidate is null
-                ? throw new ArgumentNullException(nameof(candidate))
-                : SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, field.OriginalDefinition));
+            return owner.GetMembers(field.Name).OfType<IFieldSymbol>().Single(candidate => SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, field.OriginalDefinition));
         }
         return field;
     }
@@ -1569,12 +1567,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
 
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        var classification = First([.. children.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Classification))]);
+        var classification = First([.. children.Select(value => value.Classification)]);
         if (!classification.IsExact)
         {
             return Failed(operation, classification.Abstention);
         }
-        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Value))]);
+        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
         if (!rule.Classification.IsExact)
         {
             return Failed(operation, rule.Classification.Abstention);

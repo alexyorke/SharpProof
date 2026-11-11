@@ -75,7 +75,7 @@ internal sealed class WorkerVcHeapTests
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = SharpProofWorker.Create(request.Budgets);
         s_response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        Assert.That(s_response.Errors, Is.Empty, string.Join("; ", s_response.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
+        Assert.That(s_response.Errors, Is.Empty, string.Join("; ", s_response.Errors.Select(error => error.Code + ": " + error.Message)));
     }
 
     [TestCase("StoreThenRead", WorkerClaimOutcome.Proven)]
@@ -105,7 +105,7 @@ internal sealed class WorkerVcHeapTests
         System.ArgumentNullException.ThrowIfNull(method);
         var response = s_response!;
         var callable = response.Manifest.Callables.Single(callable =>
-            callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal)));
-        return response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (callable.ClaimIds.Contains(result.ClaimId)));
+            callable.CallableId.Contains("." + method + "(", StringComparison.Ordinal));
+        return response.ClaimResults.Single(result => callable.ClaimIds.Contains(result.ClaimId));
     }
 }

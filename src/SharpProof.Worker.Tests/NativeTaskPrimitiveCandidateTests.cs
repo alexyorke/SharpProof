@@ -23,8 +23,7 @@ internal sealed class NativeTaskPrimitiveCandidateTests
         var layout = new ResourceRuntimeLayoutContext("CoreCLR", "8.0.32", "x64", 8);
         var emitted = NativeTaskEmittedFaultSiteVerifier.Check(projection, target.TotalEntry!, layout, cancellation);
         Assert.That(emitted.UnknownReason, Is.Null);
-        var read = emitted.Sites!.Value.Single(static site => site is null ?
-            throw new ArgumentNullException(nameof(site)) : site.OpCode == 0x94);
+        var read = emitted.Sites!.Value.Single(static site => site.OpCode == 0x94);
         Assert.That(read.Faults, Is.EqualTo(CompilerTaskPrimitiveFaultKind.NullReference | CompilerTaskPrimitiveFaultKind.RangeCheck),
             "The unused read must remain in emitted IL because it can fault.");
         var routes = NativeTaskPrimitiveHelperRouteVerifier.Check(projection, target.TotalEntry!, layout, cancellation);

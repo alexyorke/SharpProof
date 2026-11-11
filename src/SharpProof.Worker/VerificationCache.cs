@@ -148,8 +148,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             response,
             expectedInputHash,
             expectedManifest).IsValid &&
-        response.ClaimResults.All(claim => claim is null ? throw new ArgumentNullException(nameof(claim)) :
-            claim.EffectWitness is not { Kind: "synchronization-lock", Detail: { } detail } ||
+        response.ClaimResults.All(claim => claim.EffectWitness is not { Kind: "synchronization-lock", Detail: { } detail } ||
                 !detail.StartsWith(IrOpaqueCallSite.ExceptionResourceLockPrefix, StringComparison.Ordinal));
     }
 
@@ -159,10 +158,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         var entries = new DirectoryInfo(_directory)
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
             .Where(static file => file is not null && IsCacheFileName(file.Name))
-            .OrderBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.LastWriteTimeUtc))
-            .ThenBy(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Name), StringComparer.Ordinal)
+            .OrderBy(static file => file.LastWriteTimeUtc)
+            .ThenBy(static file => file.Name, StringComparer.Ordinal)
             .ToImmutableArray();
-        var total = entries.Sum(static file => file is null ? throw new System.ArgumentNullException(nameof(file)) : (file.Length));
+        var total = entries.Sum(static file => file.Length);
         foreach (var file in entries)
         {
             if (total <= _maximumBytes)

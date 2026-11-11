@@ -126,7 +126,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
             response, WorkerProtocolJson.ComputeRequestHash(request), expectedInputHash,
             manifest, request, response.Summary.Versions);
         Assert.That(validation.IsValid, Is.True,
-            string.Join("\n", validation.Errors.Select(static error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code + ": " + error.Message))));
+            string.Join("\n", validation.Errors.Select(static error => error.Code + ": " + error.Message)));
         Assert.That(manifest.Callables, Has.Length.EqualTo(1));
         Assert.That(manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
@@ -171,7 +171,7 @@ public sealed class NaNPublicBuildWorkflowAuditTests
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown),
                 "NaN disproves value == copy; opaque double operators must abstain.");
             Assert.That(result.Reason, Is.Not.EqualTo(WorkerClaimReason.None));
-            Assert.That(response.ClaimResults.Any(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.Outcome == WorkerClaimOutcome.Proven)), Is.False);
+            Assert.That(response.ClaimResults.Any(static item => item.Outcome == WorkerClaimOutcome.Proven), Is.False);
             Assert.That(response.CallableResults.Single().Coverage, Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(build.ExitCode, Is.EqualTo(1), "Strict public build must reject an incomplete proof.");
             Assert.That(build.CombinedOutput, Does.Contain("SharpProof Unknown " + callable.CallableId));

@@ -110,7 +110,7 @@ internal sealed class VerificationQuery
 
         ModelVariables = [.. IrTraversal.CollectVariables(
                 Assumptions
-                    .Select(static assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Predicate))
+                    .Select(static assumption => assumption.Predicate)
                     .Append(goal.Predicate))
             .Concat(modelVariables)
             .Distinct()

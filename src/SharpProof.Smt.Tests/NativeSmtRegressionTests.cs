@@ -617,12 +617,12 @@ public sealed class NativeSmtRegressionTests
                 success.Status,
                 Is.EqualTo(BackendCheckStatus.Unsatisfiable));
             Assert.That(success.UnsatCore, Is.EqualTo(ImmutableArray.Create(1, 2)));
-            Assert.That(successful.All(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsDisposed)), Is.True);
+            Assert.That(successful.All(static item => item.IsDisposed), Is.True);
             Assert.That(failure.Status, Is.EqualTo(BackendCheckStatus.Unknown));
             Assert.That(
                 failure.FailureReason,
                 Is.EqualTo(BackendFailureReason.MalformedResult));
-            Assert.That(malformed.All(static item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.IsDisposed)), Is.True);
+            Assert.That(malformed.All(static item => item.IsDisposed), Is.True);
         }
     }
 
@@ -664,7 +664,7 @@ public sealed class NativeSmtRegressionTests
         {
             Assert.That(owner.OwnedCount, Is.Zero);
             Assert.That(expressions.All(static expression =>
-                expression is null ? throw new System.ArgumentNullException(nameof(expression)) : (NativeObject(expression) == IntPtr.Zero)), Is.True);
+                NativeObject(expression) == IntPtr.Zero), Is.True);
             Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
         }
     }

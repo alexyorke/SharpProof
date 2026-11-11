@@ -39,9 +39,9 @@ public sealed class NativeTypeParameterTests
         System.ArgumentNullException.ThrowIfNull(type);
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static " + type + " Target() => default(" + type + ");");
         Assert.That(preparation.Total, Is.Not.Null);
-        var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).ToImmutableArray();
-        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
-        Assert.That(instructions.Any(instruction => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : (instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction)), Is.False);
+        var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
+        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(instructions.Any(instruction => instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction), Is.False);
         Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
@@ -152,7 +152,7 @@ public sealed class NativeTypeParameterTests
         var artifact = CompilerTotalCallableArtifactTests.CreateArtifact(
             "using SharpProof.Attributes; public static class C { " + method + " }");
         CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var preparations, cancellationToken: TestContext.CurrentContext.CancellationToken);
-        return preparations.Single(preparation => preparation is null ? throw new System.ArgumentNullException(nameof(preparation)) : (preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal)));
+        return preparations.Single(preparation => preparation.Entry.CallableId.Contains("C.Target", StringComparison.Ordinal));
     }
 
     [TestCase("", false)]
@@ -170,8 +170,8 @@ public sealed class NativeTypeParameterTests
         var preparation = Prepare(method);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
         Assert.That(candidate, Is.Not.Null, preparation.FailureReason.ToString());
-        Assert.That(candidate!.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
+        Assert.That(candidate!.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         var result = await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -201,8 +201,8 @@ public sealed class NativeTypeParameterTests
         var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static T[] Target<T>() " + constraint +
             " { Contract.Ensures(Contract.Result<T[]>() == null); return default(T[]); }");
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.False);
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
@@ -220,8 +220,8 @@ public sealed class NativeTypeParameterTests
         Assert.That(preparation.Total, Is.Not.Null);
         Assert.That(preparation.Total!.IsBodyAbstraction, Is.False);
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
-        Assert.That(candidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrHavocInstruction>()
-            .Any(havoc => havoc is null ? throw new System.ArgumentNullException(nameof(havoc)) : (havoc.Origin == IrHavocOrigin.Approximation)), Is.True);
+        Assert.That(candidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrHavocInstruction>()
+            .Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
         Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
         using var solver = new PassiveCallableSolver(plan!);
         Assert.That((await solver.VerifyEnsuresAsync(0, cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());

@@ -57,7 +57,7 @@ public sealed class SynchronizedMethodPurityAuditTests
             SourceSha256 = sourceHash,
             Optimization = compilation.Options.OptimizationLevel.ToString(),
             emission.Success,
-            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString())).ToImmutableArray()
+            Diagnostics = emission.Diagnostics.Select(diagnostic => diagnostic.ToString()).ToImmutableArray()
         });
         Assert.That(emission.Success, Is.True, string.Join("\n", emission.Diagnostics));
         var imageBytes = ImmutableArray.Create<byte>(image.GetBuffer().AsSpan(0, checked((int)image.Length)));
@@ -78,7 +78,7 @@ public sealed class SynchronizedMethodPurityAuditTests
                 (flags & MethodImplAttributes.Synchronized) != 0,
                 method.IsStatic,
                 method.ReturnType == typeof(int),
-                method.GetParameters().Select(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.ParameterType.FullName)).ToImmutableArray(),
+                method.GetParameters().Select(parameter => parameter.ParameterType.FullName).ToImmutableArray(),
                 subject.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Length,
                 subject.TypeInitializer != null,
                 s_inputValues.Select(execute).ToImmutableArray(),
@@ -152,20 +152,20 @@ public sealed class SynchronizedMethodPurityAuditTests
             ProtocolValid = validation.IsValid,
             ProtocolErrors = validation.Errors,
             response.Errors,
-            ManifestClaims = artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            ManifestClaims = artifact.Manifest.Claims.Select(claim => new
             {
                 claim.ClaimId,
                 Kind = claim.Kind.ToString(),
                 ContractKind = claim.EffectContractKind.ToString()
-            })).ToImmutableArray(),
-            Claims = response.ClaimResults.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (new
+            }).ToImmutableArray(),
+            Claims = response.ClaimResults.Select(claim => new
             {
                 claim.ClaimId,
                 Outcome = claim.Outcome.ToString(),
                 Reason = claim.Reason.ToString(),
                 EffectCertainty = claim.EffectCertainty.ToString(),
                 Vacuity = claim.Vacuity.ToString()
-            })).ToImmutableArray(),
+            }).ToImmutableArray(),
             FrozenExpectation = synchronized ? "The synchronized source method cannot be Proven EnforcePure."
                 : "The NoInlining-only control remains Proven EnforcePure with complete native may-effect evidence."
         });

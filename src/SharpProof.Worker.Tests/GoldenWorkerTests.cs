@@ -50,8 +50,8 @@ public sealed class GoldenWorkerTests
             : scenario == "vc-shadow" ? await NativeVc(fixture.Source)
             : scenario == "vc-shadow-reference" ? await NativeVc(fixture.Source)
             : scenario == "typed-il-call-requires" ? await TypedIlCallRequires(fixture.Source)
-            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (NativeVc(artifact)))
-            : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => artifact is null ? throw new System.ArgumentNullException(nameof(artifact)) : (TotalArtifact(artifact)))
+            : scenario == "typed-il-shadow" ? await TypedIlGolden(fixture.Source, artifact => NativeVc(artifact))
+            : scenario == "typed-il-artifact" ? await TypedIlGolden(fixture.Source, artifact => TotalArtifact(artifact))
             : scenario == "vc-loop-prologue-reentry" ? VcLoopPrologueReentry(fixture.Source)
             : scenario == "vc-exception-multi-entry" ? await VcExceptionMultiEntry()
             : scenario == "vc-assume-placement" ? VcAssumePlacement(fixture.Source)
@@ -191,9 +191,9 @@ public sealed class GoldenWorkerTests
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         var output = new StringBuilder();
         output.AppendLine("run: " + response.RunStatus);
-        foreach (var claim in response.Manifest.Claims.Where(static claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.CallPrecondition)))
+        foreach (var claim in response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.CallPrecondition))
         {
-            var result = response.ClaimResults.Single(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId == claim.ClaimId));
+            var result = response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId);
             output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal.ToString(CultureInfo.InvariantCulture));
             output.AppendLine(FormattableString.Invariant($"  call: {claim.Location.Line}:{claim.Location.Column}"));
             output.AppendLine("  callee: " + WorkerCallPreconditionTarget.StableCallee(claim.CallPrecondition!.Callee));
@@ -221,7 +221,7 @@ public sealed class GoldenWorkerTests
         var callables = project.Snapshot.Callables.Select(preparation =>
         {
             System.ArgumentNullException.ThrowIfNull(preparation);
-            var reason = WorkerResultAssembler.ProjectCallableReasons(preparation.Entry.ClaimIds.Select(id => id is null ? throw new System.ArgumentNullException(nameof(id)) : (claims[id]))).Reason;
+            var reason = WorkerResultAssembler.ProjectCallableReasons(preparation.Entry.ClaimIds.Select(id => claims[id])).Reason;
             return new WorkerCallableResult
             {
                 CallableId = preparation.Entry.CallableId,
@@ -235,13 +235,13 @@ public sealed class GoldenWorkerTests
             runStatus, failureReason, callables, claims.Values, project.Request.Budgets, WorkerCacheStatus.Disabled, 0);
         var json = WorkerProtocolJson.SerializeResponse(response);
         var validation = WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest);
-        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(validation.IsValid, Is.True, string.Join(", ", validation.Errors.Select(error => error.Code)));
         var output = new StringBuilder();
         output.AppendLine("candidate-authority: Total IR (legacy worker routing retained)");
         output.AppendLine("run: " + response.RunStatus);
         output.AppendLine("wire-valid: True");
         output.AppendLine("serialized: " + (json.Length > 0));
-        foreach (var claim in response.Manifest.Claims.OrderBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal).ThenBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal)))
+        foreach (var claim in response.Manifest.Claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal))
         {
             var result = claims[claim.ClaimId];
             output.AppendLine("claim: " + claim.CallableId + "#" + claim.Ordinal);
@@ -294,8 +294,8 @@ public sealed class GoldenWorkerTests
         {
             var pendingCandidate = PassiveExceptionLoopTests.ChangingPendingExceptionCandidate(explicitThrows);
             var pendingExecution = new IrProgramInterpreter(pendingCandidate.Factory).Execute(pendingCandidate.Program);
-            var sites = pendingCandidate.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrThrowInstruction>()
-                .Select(thrown => thrown is null ? throw new System.ArgumentNullException(nameof(thrown)) : (thrown.Operation)).ToImmutableArray();
+            var sites = pendingCandidate.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrThrowInstruction>()
+                .Select(thrown => thrown.Operation).ToImmutableArray();
             var prefix = explicitThrows ? "explicit-pending" : "builtin-pending";
             output.AppendLine(prefix + "-original-kind: " + pendingExecution.Exception!.Kind);
             Assert.That(PassiveCallableVcBuilder.TryBuild(pendingCandidate, out var pendingPlan, out reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -536,12 +536,12 @@ public sealed class GoldenWorkerTests
                     Is.EqualTo(JsonSerializer.Serialize(original, WorkerProtocolJson.SharedOptions)));
             }
             original = response.ClaimResults;
-            var claims = response.Manifest.Claims.Where(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Kind == WorkerClaimKind.Postcondition)).ToImmutableArray();
-            var ids = claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId)).ToImmutableHashSet(StringComparer.Ordinal);
+            var claims = response.Manifest.Claims.Where(claim => claim.Kind == WorkerClaimKind.Postcondition).ToImmutableArray();
+            var ids = claims.Select(claim => claim.ClaimId).ToImmutableHashSet(StringComparer.Ordinal);
             var results = ImmutableDictionaryCapture.Create(
-                response.ClaimResults.Where(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (ids.Contains(result.ClaimId))),
-                result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.ClaimId),
-                static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+                response.ClaimResults.Where(result => ids.Contains(result.ClaimId)),
+                result => result.ClaimId,
+                static item => item,
                 StringComparer.Ordinal);
             Assert.That(results.Keys, Is.EquivalentTo(ids));
             output.AppendLine("run: " + run);
@@ -549,18 +549,18 @@ public sealed class GoldenWorkerTests
             output.AppendLine("request-bindings: True");
             output.AppendLine("cache: " + response.Summary.CacheStatus);
             output.AppendLine("postconditions: " + claims.Length);
-            output.AppendLine("enrolled: " + checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Enrolled)));
-            output.AppendLine("checked: " + checks.Values.Count(check => check is null ? throw new System.ArgumentNullException(nameof(check)) : (check.Checked)));
-            output.AppendLine("unknown: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Unknown)));
-            output.AppendLine("proven: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Proven)));
-            output.AppendLine("refuted: " + results.Values.Count(result => result is null ? throw new System.ArgumentNullException(nameof(result)) : (result.Outcome == WorkerClaimOutcome.Refuted)));
+            output.AppendLine("enrolled: " + checks.Values.Count(check => check.Enrolled));
+            output.AppendLine("checked: " + checks.Values.Count(check => check.Checked));
+            output.AppendLine("unknown: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Unknown));
+            output.AppendLine("proven: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Proven));
+            output.AppendLine("refuted: " + results.Values.Count(result => result.Outcome == WorkerClaimOutcome.Refuted));
             // Artifact claim hashes can include temporary metadata document paths.
             // Callable identity and source ordinal give every fixture stable ordering.
-            var ordered = claims.OrderBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.CallableId), StringComparer.Ordinal).ThenBy(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.Ordinal));
+            var ordered = claims.OrderBy(claim => claim.CallableId, StringComparer.Ordinal).ThenBy(claim => claim.Ordinal);
             foreach (var claim in ordered)
             {
                 var result = results[claim.ClaimId];
-                var preparation = project.Snapshot.Callables.Single(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Entry.CallableId == claim.CallableId));
+                var preparation = project.Snapshot.Callables.Single(callable => callable.Entry.CallableId == claim.CallableId);
                 checks.TryGetValue(claim.ClaimId, out var check);
                 if (check != null)
                 {
@@ -575,8 +575,8 @@ public sealed class GoldenWorkerTests
                 output.AppendLine("  reason: " + result.Reason);
                 output.AppendLine("  vacuity: " + result.Vacuity);
                 output.AppendLine("  feasibility: " + (check?.Feasibility ?? PassiveCallableFeasibilityKind.Unknown));
-                output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption is null ? throw new System.ArgumentNullException(nameof(assumption)) : (assumption.Used &&
-                    assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification)));
+                output.AppendLine("  conditional: " + result.Assumptions.Any(assumption => assumption.Used &&
+                    assumption.Kind is WorkerAssumptionKind.UserAssume or WorkerAssumptionKind.TrustedBoundary or WorkerAssumptionKind.ApiSpecification));
             }
         }
         return output.ToString();
@@ -591,30 +591,30 @@ public sealed class GoldenWorkerTests
         var output = new StringBuilder();
         output.AppendLine(CultureInfo.InvariantCulture, $"collection-complete: {reachable.CollectionComplete}");
         output.AppendLine(CultureInfo.InvariantCulture, $"bodies: {reachable.Bodies.Length}");
-        output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (!body.CallsComplete))}");
-        output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.SourceCalls.Length))}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"incomplete-calls: {reachable.Bodies.Count(body => !body.CallsComplete)}");
+        output.AppendLine(CultureInfo.InvariantCulture, $"preserved-calls: {reachable.Bodies.Sum(body => body.SourceCalls.Length)}");
         if (source.Contains("// golden-total-call-preconditions: true", StringComparison.Ordinal))
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
-            var encodedCount = artifact.Callables.Sum(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length ?? 0));
-            var decodedCount = prepared.Sum(callable => callable is null ? throw new System.ArgumentNullException(nameof(callable)) : (callable.Total?.CallPreconditions.Length ?? 0));
+            var encodedCount = artifact.Callables.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
+            var decodedCount = prepared.Sum(callable => callable.Total?.CallPreconditions.Length ?? 0);
             Assert.That(encodedCount, Is.EqualTo(2));
             Assert.That(decodedCount, Is.EqualTo(encodedCount));
             output.AppendLine(CultureInfo.InvariantCulture, $"total-call-preconditions: encoded={encodedCount} decoded={decodedCount}");
         }
         if (source.Contains("// golden-mutation: void-call-return", StringComparison.Ordinal))
         {
-            var graph = reachable.Bodies.Single(body => body is null ? throw new System.ArgumentNullException(nameof(body)) : (body.IsCallSkeleton)).Graph!;
+            var graph = reachable.Bodies.Single(body => body.IsCallSkeleton).Graph!;
             // Keep the first void member unchanged so canonical graph closure
             // cannot mask the second member's invalid return signature.
-            var member = graph.Members.Single(value => value is null ? throw new System.ArgumentNullException(nameof(value)) : (value.Name.Contains("Helper", StringComparison.Ordinal)));
+            var member = graph.Members.Single(value => value.Name.Contains("Helper", StringComparison.Ordinal));
             (member, graph) = graph.ChangeRow(member, member with
             {
                 ReturnType = PortableGraphChanges.FindIndex(graph.Types,
-                            type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed))
+                            type => type.Kind == IrTypeKind.Integer && type.Width == 32 && type.Signed)
             });
             {
-                reachable = reachable with { Bodies = reachable.Bodies.ReplaceReference(reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton), reachable.Bodies.Single(body => body is null ? throw new ArgumentNullException(nameof(body)) : body.IsCallSkeleton) with { Graph = graph }) };
+                reachable = reachable with { Bodies = reachable.Bodies.ReplaceReference(reachable.Bodies.Single(body => body.IsCallSkeleton), reachable.Bodies.Single(body => body.IsCallSkeleton) with { Graph = graph }) };
                 artifact = artifact with { ReachableSource = reachable };
             }
             Assert.That(member.ReturnType, Is.GreaterThanOrEqualTo(0));
@@ -627,7 +627,7 @@ public sealed class GoldenWorkerTests
         {
             CompilerManifestArtifactJson.DeserializePrepared(CompilerManifestArtifactJson.SerializeProducerValidated(artifact, cancellationToken: TestContext.CurrentContext.CancellationToken), out var prepared, cancellationToken: TestContext.CurrentContext.CancellationToken);
             var count = 0;
-            foreach (var owner in prepared.Where(owner => owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.Total?.CallPreconditions.Length > 0)))
+            foreach (var owner in prepared.Where(owner => owner.Total?.CallPreconditions.Length > 0))
             {
                 var candidate = PassiveCallableArtifactAdapter.Enroll(owner)!;
                 Assert.That(PassiveCallableVcBuilder.TryBuild(candidate, out var plan, out var reason, cancellationToken: TestContext.CurrentContext.CancellationToken), Is.True, reason.ToString());
@@ -723,14 +723,14 @@ public sealed class GoldenWorkerTests
         var output = new StringBuilder(await TotalArtifact(artifact));
         using var project = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedSource);
         var total = project.Snapshot.Callables.Single().Total!;
-        output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair is null ? throw new System.ArgumentNullException(nameof(pair)) : (pair.Left + ":" + pair.Right))));
+        output.AppendLine("disjoint-entry-pairs: " + string.Join(",", total.DisjointInputs.Select(pair => pair.Left + ":" + pair.Right)));
         using var worker = SharpProofWorker.Create(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.Errors, Is.Empty);
         output.AppendLine("distinct-sealed-identity: " + response.ClaimResults.Single().Outcome);
         using var fields = new ShadowTestProject(NativeAliasingBoundaryTests.DistinctSealedFieldSource);
         var fieldArtifact = CompilerTotalCallableArtifactCodec.Encode(fields.Snapshot.Callables.Single().Total)!;
-        output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type is null ? throw new System.ArgumentNullException(nameof(type)) : (type.ClosedSealedReference)));
+        output.AppendLine("closed-sealed-field-types: " + fieldArtifact.Graph.Types.Count(type => type.ClosedSealedReference));
         using var fieldWorker = SharpProofWorker.Create(fields.Request.Budgets);
         var fieldResponse = await fieldWorker.VerifyAsync(fields.Request, fields.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(fieldResponse.Errors, Is.Empty);
@@ -758,7 +758,7 @@ public sealed class GoldenWorkerTests
         output.AppendLine("integer-width: " + type.Width);
         output.AppendLine("unsigned: " + !type.Signed);
         output.AppendLine("roots-interleaved: " + row.Total!.Clauses.Select((clause, ordinal) => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ValueRoot == ordinal * 2 && clause.SafeRoot == ordinal * 2 + 1)).All(value => value));
-        output.AppendLine("same-claim-ids: " + total.Clauses.Where(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.Kind == CompilerContractKind.Ensures)).Select(clause => clause is null ? throw new System.ArgumentNullException(nameof(clause)) : (clause.ClaimId)).SequenceEqual(artifact.Manifest.Claims.Select(claim => claim is null ? throw new System.ArgumentNullException(nameof(claim)) : (claim.ClaimId))));
+        output.AppendLine("same-claim-ids: " + total.Clauses.Where(clause => clause.Kind == CompilerContractKind.Ensures).Select(clause => clause.ClaimId).SequenceEqual(artifact.Manifest.Claims.Select(claim => claim.ClaimId)));
         output.AppendLine("full-ulong-wrap: " + proven.Outcome!.GetType().Name);
         return output.ToString();
     }
@@ -1071,7 +1071,7 @@ public sealed class GoldenWorkerTests
                 mixed = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(mixed))!;
                 var bound = WorkerProtocolJson.ValidateForRequest(mixed, WorkerProtocolJson.ComputeRequestHash(request),
                     input.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
-                Assert.That(bound.IsValid, Is.True, string.Join(';', bound.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+                Assert.That(bound.IsValid, Is.True, string.Join(';', bound.Errors.Select(error => error.Code)));
                 mixedOutput.AppendLine("record-order: " + (reverseRecords ? "timeout-first" : "fatal-first"));
                 mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"run: {mixed.RunStatus}/{mixed.FailureReason}");
                 mixedOutput.AppendLine(CultureInfo.InvariantCulture, $"request-bound: {bound.IsValid}");
@@ -1170,7 +1170,7 @@ public sealed class GoldenWorkerTests
         var snapshot = WorkerInputSnapshot.Load(request, WorkerCacheIdentity.Current, TestContext.CurrentContext.CancellationToken);
         var binding = WorkerProtocolJson.ValidateForRequest(response, WorkerProtocolJson.ComputeRequestHash(request),
             snapshot.InputHash, artifact.Manifest, request, Program.ExpectedVersions());
-        Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code))));
+        Assert.That(binding.IsValid, Is.True, string.Join(';', binding.Errors.Select(error => error.Code)));
         Assert.That(response.RunStatus, Is.EqualTo(scenario is "identity" or "publication" or "publication-private-binding" ? WorkerRunStatus.Complete
             : scenario == "empty-canceled" ? WorkerRunStatus.Canceled : WorkerRunStatus.TimedOut));
         var output = new StringBuilder();
@@ -1196,10 +1196,10 @@ public sealed class GoldenWorkerTests
         }
         foreach (var claim in response.ClaimResults)
         {
-            var declaration = artifact.Manifest.Claims.Single(item => item is null ? throw new System.ArgumentNullException(nameof(item)) : (item.ClaimId == claim.ClaimId));
+            var declaration = artifact.Manifest.Claims.Single(item => item.ClaimId == claim.ClaimId);
             output.AppendLine(CultureInfo.InvariantCulture, $"claim: {declaration.Kind}[{declaration.Ordinal}] {claim.Outcome}/{claim.Reason} vacuity={claim.Vacuity}");
         }
-        foreach (var error in response.Errors.OrderBy(error => error is null ? throw new System.ArgumentNullException(nameof(error)) : (error.Code), StringComparer.Ordinal))
+        foreach (var error in response.Errors.OrderBy(error => error.Code, StringComparer.Ordinal))
         {
             output.AppendLine("error: " + error.Code);
             if (scenario == "promotion")

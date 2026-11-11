@@ -18,7 +18,7 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
                 [EnforcePure] public static int Identity(int value) => value;
             }
             """, "OrdinaryRepeatedAnalysis", includeExternalEffectsFixture: false);
-        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+        Assert.That(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var factory = new RecordingFactory(compilation);
         var first = await AnalyzerGateHost.AnalyzeAsync(compilation, new SharpProofAnalyzer(factory),
             "effects", concurrentAnalysis: false, cancellationToken: TestContext.CurrentContext.CancellationToken);
@@ -55,8 +55,8 @@ public sealed class OrdinaryRepeatedAnalyzerWorkflowTests
             // their unchanged source declarations through the original compiler model.
             var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
             var canonical = (IMethodSymbol)_guarded_compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration)!;
-            var location = method.Locations.Single(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
-            var canonicalLocation = canonical.Locations.Single(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
+            var location = method.Locations.Single(static location => location.IsInSource);
+            var canonicalLocation = canonical.Locations.Single(static location => location.IsInSource);
             Assert.That(canonicalLocation.SourceTree, Is.SameAs(location.SourceTree));
             Assert.That(canonicalLocation.SourceSpan, Is.EqualTo(location.SourceSpan));
             Assert.That(canonical.GetDocumentationCommentId(), Is.EqualTo(method.GetDocumentationCommentId()));

@@ -141,7 +141,7 @@ internal static class FinalCompilationCollector
             packs.Add(pack);
         }
 
-        return [.. packs.ToImmutable().OrderBy(static pack => pack is null ? throw new ArgumentNullException(nameof(pack)) : pack, StringComparer.Ordinal)];
+        return [.. packs.ToImmutable().OrderBy(static pack => pack, StringComparer.Ordinal)];
     }
 
     private static string Get(AnalyzerConfigOptions options, string key)

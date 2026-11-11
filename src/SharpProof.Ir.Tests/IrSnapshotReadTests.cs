@@ -75,7 +75,7 @@ public sealed class IrSnapshotReadTests
         { owner = factory.PureOpaque(field, owner); }
         var memo = ImmutableDictionary<IrId, IrTerm>.Empty;
         var work = 3200;
-        var selection = IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
+        var selection = IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard,
             () => --work >= 0, memo, default);
         memo = selection.Memo;
         Assert.That(selection.Success, Is.False);
@@ -83,7 +83,7 @@ public sealed class IrSnapshotReadTests
         Assert.That(memo.Count, Is.GreaterThan(0));
         Assert.That(memo.ContainsKey(owner.Id), Is.False);
         work = 7000;
-        selection = IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard),
+        selection = IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old), static guard => guard,
             () => --work >= 0, memo, default);
         memo = selection.Memo;
         Assert.That(selection.Success, Is.True);
@@ -92,7 +92,7 @@ public sealed class IrSnapshotReadTests
         canceled.Cancel();
         var spent = false;
         Assert.Throws<OperationCanceledException>((Action)(() => IrSnapshotReads.TrySelector(factory, owner, variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable == old),
-            static guard => guard is null ? throw new System.ArgumentNullException(nameof(guard)) : (guard), () => { spent = true; return true; }, memo, canceled.Token)));
+            static guard => guard, () => { spent = true; return true; }, memo, canceled.Token)));
         Assert.That(spent, Is.False);
     }
 }

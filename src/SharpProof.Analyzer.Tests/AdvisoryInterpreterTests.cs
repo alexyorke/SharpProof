@@ -477,9 +477,9 @@ public sealed class CoreIrAdvisorySourceAdmissionTests
         var graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(syntax, model)!;
         var lowering = SharpProof.Frontend.RoslynProgramLowering.LowerCandidate(graph, context);
         Assert.That(lowering.IsExact, Is.True);
-        Assert.That(lowering.Program.Blocks.Count(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Terminator is IrExceptionalExitInstruction)), Is.EqualTo(1));
-        var variables = context.Parameters.SelectMany(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState)))
-            .Concat(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions)).OfType<IrAssignInstruction>().Select(assign => assign is null ? throw new System.ArgumentNullException(nameof(assign)) : (assign.Target)))
+        Assert.That(lowering.Program.Blocks.Count(block => block.Terminator is IrExceptionalExitInstruction), Is.EqualTo(1));
+        var variables = context.Parameters.SelectMany(parameter => ImmutableArray.Create(parameter.Entry, parameter.Current, parameter.PreState))
+            .Concat(lowering.Program.Blocks.SelectMany(block => block.Instructions).OfType<IrAssignInstruction>().Select(assign => assign.Target))
             .Append(context.Result!.Value).Distinct().ToImmutableArray();
         var result = new CoreIrAdvisoryInterpreter(lowering.Program, variables).Run(
             ImmutableDictionary<IrVarId, IntervalValue>.Empty.Add(context.Parameters[0].Entry, IntervalValue.Range(-2, 2)));

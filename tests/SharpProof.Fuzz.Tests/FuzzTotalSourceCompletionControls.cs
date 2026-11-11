@@ -37,8 +37,8 @@ public sealed class FuzzTotalSourceCompletionControls
         Assert.That(emission.Emit.Success, Is.True, string.Join(Environment.NewLine, emission.Emit.Diagnostics));
         var methods = ImmutableDictionaryCapture.Create(
             (await tree.GetRootAsync()).DescendantNodes().OfType<MethodDeclarationSyntax>(),
-            method => method is null ? throw new System.ArgumentNullException(nameof(method)) : (method.Identifier.ValueText),
-            static item => item is null ? throw new ArgumentNullException(nameof(item)) : item,
+            method => method.Identifier.ValueText,
+            static item => item,
             StringComparer.Ordinal);
         var model = compilation.GetSemanticModel(tree);
         var factory = new IrFactory();

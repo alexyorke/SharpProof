@@ -309,9 +309,9 @@ public sealed class FinalCompilationProbeTests
         {
             Assert.That(
                 secondResponse.ClaimResults.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ((result.ClaimId, result.Outcome, result.Reason))),
+                    (result.ClaimId, result.Outcome, result.Reason)),
                 Is.EqualTo(firstResponse.ClaimResults.Select(static result =>
-                    result is null ? throw new System.ArgumentNullException(nameof(result)) : ((result.ClaimId, result.Outcome, result.Reason)))));
+                    (result.ClaimId, result.Outcome, result.Reason))));
             Assert.That(
                 secondResponse.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
@@ -404,12 +404,12 @@ public sealed class FinalCompilationProbeTests
             get;
         }
         internal ImmutableArray<string> SyntaxTreePaths =>
-            [.. _syntaxTreeRows.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path))];
+            [.. _syntaxTreeRows.Select(static tree => tree.Path)];
         internal ImmutableArray<string> FrameworkReferences =>
             [.. PortableReferences.Where(static reference =>
-                    reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (!reference.Contains(
+                    !reference.Contains(
                         "SharpProof.Attributes.dll",
-                        StringComparison.OrdinalIgnoreCase)))];
+                        StringComparison.OrdinalIgnoreCase))];
 
         internal static async Task<ProbeArtifact> ReadAsync(string path)
         {
@@ -457,7 +457,7 @@ public sealed class FinalCompilationProbeTests
             return new ProbeArtifact(
                 targetFramework!,
                 root.GetProperty("options").GetRawText(),
-                [.. syntaxTreeRows.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Raw))],
+                [.. syntaxTreeRows.Select(static tree => tree.Raw)],
                 syntaxTreeRows,
                 GetCanonicalRawRows(
                     root,
@@ -470,9 +470,9 @@ public sealed class FinalCompilationProbeTests
         {
             System.ArgumentNullException.ThrowIfNull(pathSuffix);
             var matches = _syntaxTreeRows
-                .Where(tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path.EndsWith(
+                .Where(tree => tree.Path.EndsWith(
                     pathSuffix,
-                    StringComparison.OrdinalIgnoreCase)))
+                    StringComparison.OrdinalIgnoreCase))
                 .ToImmutableArray();
             Assert.That(
                 matches,
@@ -498,14 +498,14 @@ public sealed class FinalCompilationProbeTests
                     tree.GetRawText()))))
                 .ToImmutableArray();
             Assert.That(
-                trees.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree.Path, tree.Ordinal))),
+                trees.Select(static tree => (tree.Path, tree.Ordinal)),
                 Is.EqualTo(trees
-                    .OrderBy(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Path), StringComparer.Ordinal)
-                    .ThenBy(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Ordinal))
-                    .Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((tree.Path, tree.Ordinal)))),
+                    .OrderBy(static tree => tree.Path, StringComparer.Ordinal)
+                    .ThenBy(static tree => tree.Ordinal)
+                    .Select(static tree => (tree.Path, tree.Ordinal))),
                 path + ": syntaxTrees");
             Assert.That(
-                trees.Select(static tree => tree is null ? throw new System.ArgumentNullException(nameof(tree)) : (tree.Raw))
+                trees.Select(static tree => tree.Raw)
                     .Distinct(StringComparer.Ordinal)
                     .Count(),
                 Is.EqualTo(trees.Length),

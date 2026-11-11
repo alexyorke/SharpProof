@@ -21,7 +21,7 @@ internal sealed partial class NativeResourceContractTests
         if (!result.Verified)
         {
             var printer = new IrPrinter(preparation.Total.Program.Factory);
-            foreach (var instruction in preparation.Total.Program.Blocks.SelectMany(static block => block is null ? throw new ArgumentNullException(nameof(block)) : block.Instructions).Take(64))
+            foreach (var instruction in preparation.Total.Program.Blocks.SelectMany(static block => block.Instructions).Take(64))
             {
                 var detail = instruction switch
                 {

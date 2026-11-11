@@ -38,7 +38,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         await replay.CompareBatchAsync([new(member, arguments, false)], 0, cancellationToken: TestContext.CurrentContext.CancellationToken);
         var result = replay.Result;
         Assert.That(result.Failures, Is.Empty,
-            string.Join("\n", result.Failures.Select(failure => failure is null ? throw new System.ArgumentNullException(nameof(failure)) : (failure.Detail))) +
+            string.Join("\n", result.Failures.Select(failure => failure.Detail)) +
             $"\nActual replay counters: agreements={result.Agreements}, " +
             $"native proofs={result.NativeProofs}, native refutations={result.NativeRefutations}.");
         Assert.That(result.Cases, Is.EqualTo(1));
@@ -67,7 +67,7 @@ public sealed class TotalProgramAliasSourceReplayTests
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
         var declared = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
         Assert.That(declared.Parameters, Has.Length.EqualTo(arguments.Length));
-        Assert.That(declared.Parameters.All(parameter => parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.Type.SpecialType == SpecialType.System_Object)), Is.True);
+        Assert.That(declared.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Object), Is.True);
         Assert.That(declared.ReturnType.SpecialType, Is.EqualTo(SpecialType.System_Boolean));
         var runtime = new AssemblyLoadContext("TotalObjectAliasControl", isCollectible: true);
         try
@@ -84,15 +84,15 @@ public sealed class TotalProgramAliasSourceReplayTests
             Assert.That(lowering.IsExact, Is.True, lowering.Classification.Abstention.ToString());
             Assert.That(lowering.Abstentions, Is.Empty);
             Assert.That(lowering.Program.Factory, Is.SameAs(factory));
-            Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
                 .OfType<IrCallInstruction>(), Is.Empty);
-            Assert.That(lowering.Program.Blocks.SelectMany(block => block is null ? throw new System.ArgumentNullException(nameof(block)) : (block.Instructions))
+            Assert.That(lowering.Program.Blocks.SelectMany(block => block.Instructions)
                 .OfType<IrHavocInstruction>(), Is.Empty);
             var entries = ImmutableDictionaryCapture.Create(
                 context.Parameters,
-                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (binding.Entry),
-                binding => binding is null ? throw new System.ArgumentNullException(nameof(binding)) : (factory.CreateReferenceValue(factory.GetVariableInfo(binding.Entry).Type,
-                    arguments[binding.Parameter.Ordinal]!)));
+                binding => binding.Entry,
+                binding => factory.CreateReferenceValue(factory.GetVariableInfo(binding.Entry).Type,
+                    arguments[binding.Parameter.Ordinal]!));
             var interpreted = new IrProgramInterpreter(factory).Execute(lowering.Program, entries);
             Assert.That(interpreted.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(interpreted.ConsumedApproximation, Is.False);

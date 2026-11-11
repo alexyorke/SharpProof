@@ -115,7 +115,7 @@ internal static class ContractForValidationEngine
                          .DescendantNodes()
                          .OfType<TypeDeclarationSyntax>()
                          .Where(static declaration =>
-                             declaration is null ? throw new System.ArgumentNullException(nameof(declaration)) : (declaration.AttributeLists.Count != 0)))
+                             declaration.AttributeLists.Count != 0))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (model.GetDeclaredSymbol(
@@ -140,12 +140,12 @@ internal static class ContractForValidationEngine
         diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return [.. diagnostics
             .OrderBy(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceTree?.FilePath),
+                diagnostic.Location.SourceTree?.FilePath,
                 StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Location.SourceSpan.Start))
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id), StringComparer.Ordinal)
-            .ThenBy(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture)),
+            .ThenBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
+            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)
+            .ThenBy(static diagnostic => diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
                 StringComparer.Ordinal)];
     }
 
@@ -163,11 +163,11 @@ internal static class ContractForValidationEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (discovered.Any(candidate =>
-                    candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (!SymbolEqualityComparer.Default.Equals(
+                    !SymbolEqualityComparer.Default.Equals(
                         candidate.Type, source.Companion) &&
                     ContractForSymbolMatcher.TargetsOverlap(
                         candidate.ContractTarget,
-                        (source.Target, source.IsOpenTarget)))))
+                        (source.Target, source.IsOpenTarget))))
             {
                 overlapping.Add(source);
             }

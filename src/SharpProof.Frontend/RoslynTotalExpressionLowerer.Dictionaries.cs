@@ -103,7 +103,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
             var constructor = creation.Constructor!;
             var constructorValuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
             constructorValuesBuilder.Count = creation.Arguments.Length;
-            foreach (var argument in creation.Arguments.OrderBy(argument => argument is null ? throw new ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+            foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
             {
                 var value = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!value.Classification.IsExact)
@@ -156,7 +156,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         block = receiver.Continuation;
         var valueBuffer = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned == null ? 0 : 1));
         valueBuffer.Count = valueBuffer.Capacity;
-        foreach (var argument in arguments.OrderBy(argument => argument is null ? throw new System.ArgumentNullException(nameof(argument)) : argument.Syntax.SpanStart))
+        foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
             var value = LowerBodyValue(argument.Value, block, depth + 1);
             if (!value.Classification.IsExact)

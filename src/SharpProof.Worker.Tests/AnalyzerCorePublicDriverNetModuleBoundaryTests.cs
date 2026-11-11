@@ -33,9 +33,9 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
             [moduleTree], TestMetadataReferences.WithoutSharpProof.Add(globalReference),
             new CSharpCompilationOptions(OutputKind.NetModule));
         Assert.That(moduleCompilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var sourceAttribute = moduleCompilation.Assembly.GetAttributes().Single(static attribute =>
-            attribute is null ? throw new System.ArgumentNullException(nameof(attribute)) : (attribute.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.SharpProofTrustedAttribute"));
+            attribute.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.SharpProofTrustedAttribute");
         Assert.That(sourceAttribute.ApplicationSyntaxReference!.SyntaxTree, Is.SameAs(moduleTree));
         Assert.That(SymbolEqualityComparer.Default.Equals(sourceAttribute.AttributeClass!.ContainingAssembly,
             moduleCompilation.GetAssemblyOrModuleSymbol(globalReference)), Is.True);
@@ -59,7 +59,7 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
             [tree], TestMetadataReferences.WithoutSharpProof.Add(attributesReference).Add(moduleReference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.That(compilation.GetDiagnostics().Where(static diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         using var image = new MemoryStream();
         var emitted = compilation.Emit(image);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));
@@ -70,9 +70,9 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
         Assert.That(SymbolEqualityComparer.Default.Equals(module.ContainingAssembly, compilation.Assembly), Is.True);
         Assert.That(compilation.Assembly.Modules.Count(), Is.EqualTo(2));
         Assert.That(module.Locations, Is.Not.Empty);
-        Assert.That(module.Locations.All(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInMetadata)), Is.True);
+        Assert.That(module.Locations.All(static location => location.IsInMetadata), Is.True);
         var attribute = compilation.Assembly.GetAttributes().Single(static candidate =>
-            candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.SharpProofTrustedAttribute"));
+            candidate.AttributeClass?.ToDisplayString() == "SharpProof.Attributes.SharpProofTrustedAttribute");
         Assert.That(attribute.ApplicationSyntaxReference, Is.Null);
         Assert.That(attribute.ConstructorArguments.Single().Value, Is.EqualTo("Reviewed ordinary module boundary."));
         var attributesAssembly = (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(attributesReference)!;
@@ -86,7 +86,7 @@ public sealed class AnalyzerCorePublicDriverNetModuleBoundaryTests
         {
             Assert.That(SymbolEqualityComparer.Default.Equals(canonical, attribute.AttributeClass), Is.True);
         }
-        var sourceLocation = compilation.Assembly.Locations.Single(static location => location is null ? throw new System.ArgumentNullException(nameof(location)) : (location.IsInSource));
+        var sourceLocation = compilation.Assembly.Locations.Single(static location => location.IsInSource);
         Assert.That(sourceLocation.SourceTree, Is.SameAs(tree));
         Assert.That(compilation.GetSemanticModel(tree).Compilation, Is.SameAs(compilation));
 

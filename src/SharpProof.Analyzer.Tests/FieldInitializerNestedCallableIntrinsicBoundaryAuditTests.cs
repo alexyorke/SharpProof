@@ -106,9 +106,9 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(owners.Count(static owner =>
-                owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.MethodKind == MethodKind.AnonymousFunction)), Is.EqualTo(2));
+                owner.MethodKind == MethodKind.AnonymousFunction), Is.EqualTo(2));
             Assert.That(owners.Count(static owner =>
-                owner is null ? throw new System.ArgumentNullException(nameof(owner)) : (owner.MethodKind == MethodKind.LocalFunction)), Is.EqualTo(2));
+                owner.MethodKind == MethodKind.LocalFunction), Is.EqualTo(2));
             Assert.That(owners.Distinct<IMethodSymbol>(
                 SymbolEqualityComparer.Default).Count(), Is.EqualTo(2));
         }
@@ -217,9 +217,9 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         var api = compilation.GetTypeByMetadataName("SharpProof.Attributes.Contract");
         Assert.That(api, Is.Not.Null);
         return root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(invocation => invocation is null ? throw new System.ArgumentNullException(nameof(invocation)) : (model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
+            .Where(invocation => model.GetSymbolInfo(invocation).Symbol is IMethodSymbol method &&
                 (method.Name == "Result" || method.Name == "Old") &&
-                SymbolEqualityComparer.Default.Equals(method.ContainingType, api)))
+                SymbolEqualityComparer.Default.Equals(method.ContainingType, api))
             .ToImmutableArray();
     }
 
@@ -229,13 +229,13 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
         System.ArgumentNullException.ThrowIfNull(invocation);
         System.ArgumentNullException.ThrowIfNull(model);
         var fieldDeclaration = invocation.Ancestors().OfType<VariableDeclaratorSyntax>()
-            .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Parent?.Parent is FieldDeclarationSyntax));
+            .Single(variable => variable.Parent?.Parent is FieldDeclarationSyntax);
         var initializer = model.GetOperation(fieldDeclaration.Initializer!) as
             IFieldInitializerOperation;
         Assert.That(initializer, Is.Not.Null);
         return initializer!.DescendantsAndSelf().OfType<IInvocationOperation>()
-            .Single(candidate => candidate is null ? throw new System.ArgumentNullException(nameof(candidate)) : (candidate.Syntax.SyntaxTree == invocation.SyntaxTree &&
-                candidate.Syntax.Span == invocation.Span));
+            .Single(candidate => candidate.Syntax.SyntaxTree == invocation.SyntaxTree &&
+                candidate.Syntax.Span == invocation.Span);
     }
 
     private static IMethodSymbol AssertIntrinsicCallableAndFieldOwner(
@@ -258,7 +258,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
             _ => null
         };
         var fieldDeclaration = invocation.Ancestors().OfType<VariableDeclaratorSyntax>()
-            .Single(variable => variable is null ? throw new System.ArgumentNullException(nameof(variable)) : (variable.Parent?.Parent is FieldDeclarationSyntax));
+            .Single(variable => variable.Parent?.Parent is FieldDeclarationSyntax);
         var field = model.GetDeclaredSymbol(fieldDeclaration) as IFieldSymbol;
         IOperation operationRoot = operation;
         while (operationRoot.Parent != null)
@@ -360,7 +360,7 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(compilation);
         Assert.That(compilation.GetDiagnostics().Where(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error)), Is.Empty);
+            diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         Assert.That(((CSharpParseOptions)compilation.SyntaxTrees.Single().Options)
             .PreprocessorSymbolNames, Does.Not.Contain("SHARPPROOF_CONTRACTS"));
     }
@@ -369,8 +369,8 @@ public sealed class FieldInitializerNestedCallableIntrinsicBoundaryAuditTests
     {
         System.ArgumentNullException.ThrowIfNull(diagnostics);
         return string.Join("\n", diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : ($"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
+            $"{diagnostic.Id}|{diagnostic.Severity}|{diagnostic.Location.SourceTree?.FilePath}|" +
             $"{diagnostic.Location.SourceSpan}|" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)));
     }
 }

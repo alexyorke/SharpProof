@@ -305,7 +305,7 @@ public sealed class AnalyzerModeAndEffectTests
             features: features);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(expected));
     }
 
@@ -361,7 +361,7 @@ public sealed class AnalyzerModeAndEffectTests
             additionalReferences: [external]);
 
         Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id)),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(
                 ["SP0002", "SP0016", "SP0045", "SP0046", "SP0046"]));
     }
@@ -653,17 +653,17 @@ public sealed class AnalyzerModeAndEffectTests
             .ToImmutableArray();
 
         var runs = (await Task.WhenAll(factories.Select(factory =>
-            factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (AnalyzerTestHost.AnalyzeAsync(
+            AnalyzerTestHost.AnalyzeAsync(
                 source,
                 "effects",
                 ["SP0002"],
-                new SharpProofAnalyzer(factory)))))).ToImmutableArray();
+                new SharpProofAnalyzer(factory))))).ToImmutableArray();
 
         Assert.That(
             runs.Select(static diagnostics => diagnostics.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(diagnostics)) : (diagnostics.Length)),
             Is.EqualTo(Enumerable.Repeat(1, 4)));
         Assert.That(
-            factories.Select(factory => factory is null ? throw new System.ArgumentNullException(nameof(factory)) : (factory.OutcomeCounts["Write"])),
+            factories.Select(factory => factory.OutcomeCounts["Write"]),
             Is.EqualTo(Enumerable.Repeat(1, 4)));
     }
 
@@ -887,32 +887,32 @@ public sealed class AnalyzerModeAndEffectTests
 
         AnalyzerTestHost.AssertIds(diagnostics, ["SP0047", "SP0047", "SP0047"]);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "'SelectedByClause'",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "'SelectedByAttribute'",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "'SelectedAsyncByClause'",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
                 messages.Any(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "'Unannotated'",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.False);
         }
     }
@@ -968,20 +968,20 @@ public sealed class AnalyzerModeAndEffectTests
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 4);
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))).ToImmutableArray();
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "BodylessEffectContractNotEnforced",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(3));
             Assert.That(
                 messages.Count(static message =>
-                    message is null ? throw new System.ArgumentNullException(nameof(message)) : (message.Contains(
+                    message.Contains(
                         "MissingOperationRoot",
-                        StringComparison.Ordinal))),
+                        StringComparison.Ordinal)),
                 Is.EqualTo(1));
         }
     }
@@ -1118,7 +1118,7 @@ public sealed class AnalyzerModeAndEffectTests
             AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 2);
             Assert.That(
                 diagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 Has.All.Contains("Advisory:"));
             Assert.That(factory.OutcomeCounts["add_Changed"], Is.EqualTo(1));
             Assert.That(factory.OutcomeCounts["remove_Changed"], Is.EqualTo(1));
@@ -1207,17 +1207,17 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0024", "SP0046", "SP0047"]);
 
         Assert.That(
-            diagnostics.Count(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024")),
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
             Is.EqualTo(2));
         Assert.That(
-            diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0024"))
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SP0024")
                 .Select(diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.All.Contain("[EffectContract]"));
         var incomplete = diagnostics
-            .Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0047"))
+            .Where(static diagnostic => diagnostic.Id == "SP0047")
             .Select(diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)))
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
             .ToImmutableArray();
         Assert.That(
             incomplete,
@@ -1229,9 +1229,9 @@ public sealed class AnalyzerModeAndEffectTests
         Assert.That(incomplete, Has.Some.Contain("'Invalid'"));
         Assert.That(incomplete, Has.Some.Contain("'Conflicting'"));
         Assert.That(
-            diagnostics.Where(static diagnostic => diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Id == "SP0046"))
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SP0046")
                 .Select(diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
             Has.Some.Contain("'Contradictory'"));
     }
 
@@ -1355,7 +1355,7 @@ public sealed class AnalyzerModeAndEffectTests
             [],
             features: "effects");
         var messages = diagnostics.Select(diagnostic =>
-            diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture)));
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1400,27 +1400,27 @@ public sealed class AnalyzerModeAndEffectTests
         // because a complete body summary does not satisfy its declared
         // effect contract.
         var informational = descriptors.Where(static descriptor =>
-            descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id is not
-                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050" or "SP0052")));
+            descriptor.Id is not
+                ("SP0024" or "SP0025" or "SP0027" or "SP0049" or "SP0050" or "SP0052"));
 
         Assert.That(
-            informational.Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.DefaultSeverity)),
+            informational.Select(static descriptor => descriptor.DefaultSeverity),
             Is.All.EqualTo(DiagnosticSeverity.Info));
         Assert.That(
-            descriptors.Where(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id != "SP0060")
-                .Select(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.IsEnabledByDefault)),
+            descriptors.Where(static descriptor => descriptor.Id != "SP0060")
+                .Select(static descriptor => descriptor.IsEnabledByDefault),
             Is.All.True);
-        Assert.That(descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : descriptor.Id == "SP0060").IsEnabledByDefault, Is.False);
+        Assert.That(descriptors.Single(static descriptor => descriptor.Id == "SP0060").IsEnabledByDefault, Is.False);
         Assert.That(
-            descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id == "SP0027"))
+            descriptors.Single(static descriptor => descriptor.Id == "SP0027")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Warning));
         Assert.That(
-            descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id == "SP0052"))
+            descriptors.Single(static descriptor => descriptor.Id == "SP0052")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Warning));
         Assert.That(
-            descriptors.Single(static descriptor => descriptor is null ? throw new System.ArgumentNullException(nameof(descriptor)) : (descriptor.Id == "SP0049"))
+            descriptors.Single(static descriptor => descriptor.Id == "SP0049")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
     }

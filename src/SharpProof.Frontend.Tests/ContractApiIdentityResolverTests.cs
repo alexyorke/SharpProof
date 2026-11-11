@@ -19,10 +19,10 @@ public sealed class ContractApiIdentityResolverTests
         {
             var resolver = ContractApiIdentityResolver.ForCompilation(compilation);
             return (Resolver: resolver, Symbols: names.Select(name =>
-                name is null ? throw new ArgumentNullException(nameof(name)) : resolver.ResolveAttribute(name)).ToImmutableArray());
+                resolver.ResolveAttribute(name)).ToImmutableArray());
         }, TestContext.CurrentContext.CancellationToken)))).ToImmutableArray();
         var owner = ContractApiIdentityResolver.ForCompilation(compilation);
-        var expected = names.Select(name => name is null ? throw new ArgumentNullException(nameof(name)) : owner.ResolveAttribute(name)).ToImmutableArray();
+        var expected = names.Select(name => owner.ResolveAttribute(name)).ToImmutableArray();
         foreach (var result in results)
         {
             Assert.That(result.Resolver, Is.SameAs(owner));
@@ -139,7 +139,7 @@ public sealed class ContractApiIdentityResolverTests
             .Single();
         var attributes = method.GetAttributes()
             .Concat(method.Parameters.SelectMany(static parameter =>
-                parameter is null ? throw new System.ArgumentNullException(nameof(parameter)) : (parameter.GetAttributes())))
+                parameter.GetAttributes()))
             .Concat(method.GetReturnTypeAttributes())
             .ToImmutableArray();
 
@@ -327,7 +327,7 @@ public sealed class ContractApiIdentityResolverTests
             string.Join(
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                    diagnostic.ToString())));
         return ImmutableArray.Create<byte>(stream.GetBuffer().AsSpan(0, checked((int)stream.Length)));
     }
 
@@ -336,7 +336,7 @@ public sealed class ContractApiIdentityResolverTests
         System.ArgumentNullException.ThrowIfNull(compilation);
         var errors = compilation.GetDiagnostics()
             .Where(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.Severity == DiagnosticSeverity.Error))
+                diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
         Assert.That(
             errors,
@@ -344,6 +344,6 @@ public sealed class ContractApiIdentityResolverTests
             string.Join(
                 Environment.NewLine,
                 errors.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                    diagnostic.ToString())));
     }
 }

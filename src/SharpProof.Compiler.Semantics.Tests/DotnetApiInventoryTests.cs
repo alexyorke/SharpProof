@@ -14,13 +14,13 @@ public sealed partial class DotnetApiInventoryTests
         Assert.That(Directory.Exists(pack), Is.True, "Pinned reference pack is missing; do not fall back to runtime assemblies.");
         var files = Directory.GetFiles(pack, "*.dll").Order(StringComparer.Ordinal).ToImmutableArray();
         Assert.That(files, Is.Not.Empty);
-        var compilation = CSharpCompilation.Create("DotnetApiInventory", references: files.Select(path => path is null ? throw new global::System.ArgumentNullException(nameof(path)) : (MetadataReference.CreateFromFile(path))), options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var compilation = CSharpCompilation.Create("DotnetApiInventory", references: files.Select(path => MetadataReference.CreateFromFile(path)), options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var rows = DotnetApiInventory.Collect(compilation);
-        Assert.That(rows.Select(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Key)).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(rows.Length));
+        Assert.That(rows.Select(row => row.Key).Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(rows.Length));
         WriteIntrinsicTestEvidence(root, compilation, rows);
-        Assert.That(rows.Single(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Id == "M:System.String.Equals(System.String,System.String)")).Evidence, Does.Contain("intrinsic=string-static-equality"));
-        Assert.That(rows.Single(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Id == "M:System.String.Equals(System.String)")).Evidence, Does.Contain("intrinsic=string-instance-equality"));
-        Assert.That(rows.Single(row => row is null ? throw new global::System.ArgumentNullException(nameof(row)) : (row.Id == "M:System.String.Equals(System.String,System.String,System.StringComparison)")).Evidence, Is.Empty, "An intrinsic match must not grant support to other overloads.");
+        Assert.That(rows.Single(row => row.Id == "M:System.String.Equals(System.String,System.String)").Evidence, Does.Contain("intrinsic=string-static-equality"));
+        Assert.That(rows.Single(row => row.Id == "M:System.String.Equals(System.String)").Evidence, Does.Contain("intrinsic=string-instance-equality"));
+        Assert.That(rows.Single(row => row.Id == "M:System.String.Equals(System.String,System.String,System.StringComparison)").Evidence, Is.Empty, "An intrinsic match must not grant support to other overloads.");
     }
 
     [Test]
@@ -40,7 +40,7 @@ public sealed partial class DotnetApiInventoryTests
             }
             internal class HiddenOuter { public class Nested { } }
             """)], references: [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
-        var declarations = DotnetApiInventory.Members(compilation.Assembly.GlobalNamespace).Select(symbol => symbol is null ? throw new global::System.ArgumentNullException(nameof(symbol)) : (symbol.GetDocumentationCommentId())).ToImmutableArray();
+        var declarations = DotnetApiInventory.Members(compilation.Assembly.GlobalNamespace).Select(symbol => symbol.GetDocumentationCommentId()).ToImmutableArray();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(declarations, Does.Contain("M:Outer.Overload(System.Int32)"));
@@ -48,7 +48,7 @@ public sealed partial class DotnetApiInventoryTests
             Assert.That(declarations, Does.Contain("T:Outer.Visible"));
             Assert.That(declarations, Does.Contain("M:Outer.#ctor"));
             Assert.That(declarations, Does.Contain("P:Outer.Value"));
-            Assert.That(declarations.Any(id => id is null ? throw new global::System.ArgumentNullException(nameof(id)) : (id!.Contains("Hidden", StringComparison.Ordinal) || id.Contains("Internal", StringComparison.Ordinal) || id.Contains("PrivateProtected", StringComparison.Ordinal) || id.Contains("get_", StringComparison.Ordinal) || id.Contains("set_", StringComparison.Ordinal))), Is.False);
+            Assert.That(declarations.Any(id => id!.Contains("Hidden", StringComparison.Ordinal) || id.Contains("Internal", StringComparison.Ordinal) || id.Contains("PrivateProtected", StringComparison.Ordinal) || id.Contains("get_", StringComparison.Ordinal) || id.Contains("set_", StringComparison.Ordinal)), Is.False);
         }
     }
 }

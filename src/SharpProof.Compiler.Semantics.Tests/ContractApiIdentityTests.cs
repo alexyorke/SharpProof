@@ -14,11 +14,11 @@ public sealed class ContractApiIdentityTests
         preprocessorSymbols: [Contract.ConditionalSymbol]);
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
         [.. TestMetadataReferences.Platform.Where(static reference =>
-            reference is null ? throw new System.ArgumentNullException(nameof(reference)) : (reference.Display is not { } display ||
+            reference.Display is not { } display ||
             !string.Equals(
                 Path.GetFileNameWithoutExtension(display),
                 "SharpProof.Attributes",
-                StringComparison.OrdinalIgnoreCase)))];
+                StringComparison.OrdinalIgnoreCase))];
 
     [Test]
     public void MatchingPackageReferenceIsAdmitted()
@@ -160,7 +160,7 @@ public sealed class ContractApiIdentityTests
             string.Join(
                 Environment.NewLine,
                 result.Diagnostics.Select(static diagnostic =>
-                    diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.ToString()))));
+                    diagnostic.ToString())));
         return MetadataReference.CreateFromImage(ImmutableArray.Create(stream.GetBuffer(), 0, checked((int)stream.Length)));
     }
 

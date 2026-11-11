@@ -22,9 +22,9 @@ public sealed class ResourceBoundRuntimeOracleTests
         var second = Enumerable.Range(0, 40).Select(static ordinal => ResourceBoundProgramGenerator.Generate(12345, ordinal)).ToImmutableArray();
         var other = Enumerable.Range(0, 40).Select(static ordinal => ResourceBoundProgramGenerator.Generate(54321, ordinal)).ToImmutableArray();
         Assert.That(second, Is.EqualTo(first));
-        Assert.That(other.Select(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Member),
-            Is.Not.EqualTo(first.Select(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Member)));
-        Assert.That(first.Select(static item => item is null ? throw new ArgumentNullException(nameof(item)) : item.Shape).Distinct().Count(),
+        Assert.That(other.Select(static item => item.Member),
+            Is.Not.EqualTo(first.Select(static item => item.Member)));
+        Assert.That(first.Select(static item => item.Shape).Distinct().Count(),
             Is.EqualTo(ResourceBoundCase.ShapeCount));
     }
 
@@ -55,7 +55,7 @@ public sealed class ResourceBoundRuntimeOracleTests
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(metric);
-        var result = ResourceBoundRuntimeOracle.Check([Case(body)], 1, claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : lowered switch
+        var result = ResourceBoundRuntimeOracle.Check([Case(body)], 1, claim => lowered switch
         {
             "Entries" => claim with { Entries = ResourceExpression.Zero },
             "Arrays" => claim with { Arrays = ResourceExpression.Zero },
@@ -63,7 +63,7 @@ public sealed class ResourceBoundRuntimeOracleTests
         }, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Proven, Is.EqualTo(1));
         Assert.That(result.Violating, Is.EqualTo(1));
-        Assert.That(result.Failures.Select(static failure => failure is null ? throw new ArgumentNullException(nameof(failure)) : failure.Oracle),
+        Assert.That(result.Failures.Select(static failure => failure.Oracle),
             Is.EquivalentTo(ImmutableArray.Create("resource-bound-sp0060", "resource-bound-native")));
         Assert.That(result.Failures, Has.All.Property(nameof(FuzzFailure.Detail)).Contains(metric + " "));
     }
@@ -73,7 +73,7 @@ public sealed class ResourceBoundRuntimeOracleTests
     public void AnAllocationNoCountMarksFailsOnMeasuredBytes()
     {
         var result = ResourceBoundRuntimeOracle.Check([Case("int k = new string('x', 64).Length; while (k > 0) { k--; }")], 1,
-            static claim => claim is null ? throw new ArgumentNullException(nameof(claim)) : claim, TestContext.CurrentContext.CancellationToken);
+            static claim => claim, TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Proven, Is.EqualTo(1));
         Assert.That(result.Failures, Has.All.Property(nameof(FuzzFailure.Detail)).Contains("AllocatedBytes"));
         Assert.That(result.Failures, Has.Count.EqualTo(2));
