@@ -31,7 +31,29 @@ internal static class WorkerResultAssembler
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 Budgets = CloneBudgets(budgets),
                 Versions = versions,
-                ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds)
+                ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds),
+                // A cache hit replays results; nothing was verified, so nothing was measured.
+                Costs = cacheStatus == WorkerCacheStatus.Hit ? null : response.Summary.Costs
+            }
+        };
+    }
+
+    internal static WorkerVerifyResponse WithCosts(WorkerVerifyResponse response, IEnumerable<WorkerCallableCost> costs)
+    {
+        ArgumentNullGuard.NotNull(response, nameof(response));
+        ArgumentNullGuard.NotNull(costs, nameof(costs));
+        if (response.Summary is null)
+        {
+            throw new System.IO.InvalidDataException("The worker response summary is missing.");
+        }
+        return response with
+        {
+            Summary = response.Summary with
+            {
+                Costs = new WorkerCostReport
+                {
+                    Callables = [.. costs.OrderBy(static cost => cost.CallableId, StringComparer.Ordinal)]
+                }
             }
         };
     }

@@ -611,8 +611,8 @@ internal sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("47"));
-            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(70));
+            Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("48"));
+            Assert.That(WorkerCacheVersions.Current, Is.EqualTo(71));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(8));
             Assert.That(WorkerResourceModels.Program, Is.EqualTo(SharpProof.Ir.ResourceProgram.ModelVersion));
             Assert.That(WorkerResourceModels.Expression, Is.EqualTo(SharpProof.Ir.ResourceExpression.ModelVersion));
@@ -727,7 +727,7 @@ internal sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.SchemaVersion,
                 Is.EqualTo(CompilerManifestArtifactVersions.Current));
-            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("47"));
+            Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("48"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
             Assert.That(
@@ -2167,6 +2167,57 @@ internal sealed class ProtocolJsonTests
             .ToImmutableArray();
 
         Assert.That(elapsedErrors.Length == 0, Is.EqualTo(expectedValid));
+    }
+
+    [TestCase("valid", true)]
+    [TestCase("absent", true)]
+    [TestCase("empty", true)]
+    [TestCase("default", false)]
+    [TestCase("blank-id", false)]
+    [TestCase("duplicate-id", false)]
+    [TestCase("negative-rlimit", false)]
+    [TestCase("negative-time", false)]
+    public void SummaryCostsRejectMalformedEntries(string shape, bool expectedValid)
+    {
+        var cost = new WorkerCallableCost { CallableId = "M:C.A", ConsumedRlimit = 10, ElapsedMilliseconds = 2 };
+        WorkerCostReport? costs = shape switch
+        {
+            "valid" => new WorkerCostReport { Callables = [cost, cost with { CallableId = "M:C.B" }] },
+            "absent" => null,
+            "empty" => new WorkerCostReport(),
+            "default" => new WorkerCostReport { Callables = default },
+            "blank-id" => new WorkerCostReport { Callables = [cost with { CallableId = " " }] },
+            "duplicate-id" => new WorkerCostReport { Callables = [cost, cost] },
+            "negative-rlimit" => new WorkerCostReport { Callables = [cost with { ConsumedRlimit = -1 }] },
+            "negative-time" => new WorkerCostReport { Callables = [cost with { ElapsedMilliseconds = -1 }] },
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var response = CreateResponse(CreateManifest());
+        response = response with { Summary = response.Summary with { Costs = costs } };
+
+        var validation = WorkerProtocolJson.Validate(response);
+
+        Assert.That(validation.Errors.Any(static error => error.Code == "summary.costs"), Is.EqualTo(!expectedValid));
+    }
+
+    [Test]
+    public void SummaryCostsRoundTripAndStayOffTheWireWhenAbsent()
+    {
+        var response = CreateResponse(CreateManifest());
+        Assert.That(WorkerProtocolJson.SerializeResponse(response), Does.Not.Contain("\"costs\""));
+
+        var measured = WorkerResultAssembler.WithCosts(response,
+        [
+            new WorkerCallableCost { CallableId = "M:C.B", ConsumedRlimit = 7, ElapsedMilliseconds = 1 },
+            new WorkerCallableCost { CallableId = "M:C.A", ConsumedRlimit = 3, ElapsedMilliseconds = 0 }
+        ]);
+        var roundTrip = WorkerProtocolJson.DeserializeResponse(WorkerProtocolJson.SerializeResponse(measured))!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(roundTrip.Summary.Costs!.Callables.Select(static cost => cost.CallableId), Is.EqualTo(ImmutableArray.Create("M:C.A", "M:C.B")));
+            Assert.That(roundTrip.Summary.Costs.Callables.Sum(static cost => cost.ConsumedRlimit), Is.EqualTo(10));
+        }
     }
 
     [TestCase(WorkerRunStatus.Complete)]

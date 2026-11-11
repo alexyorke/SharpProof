@@ -320,6 +320,7 @@ internal sealed class SharpProofWorker : IDisposable
                     }
                 }
             }
+            var costs = new WorkerCallableCost?[orderedTargets.Length];
             var scheduler = new VerificationTargetScheduler(orderedTargets.Length);
             var verificationOrder = VerificationOrder(orderedTargets);
             async Task RunLane(VerificationLane lane)
@@ -334,12 +335,20 @@ internal sealed class SharpProofWorker : IDisposable
                     }
 
                     ThrowIfProjectInterrupted();
+                    var consumedResources = 0L;
+                    var clock = System.Diagnostics.Stopwatch.StartNew();
                     var result = await VerifyNativeTargetAsync(lane.Backend, orderedTargets[index], request.Budgets,
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
-                        projectBoundary, cancellationToken).ConfigureAwait(false);
+                        projectBoundary, cancellationToken, consumed => consumedResources = consumed).ConfigureAwait(false);
                     lock (results)
                     {
                         results[index] = result;
+                        costs[index] = new WorkerCallableCost
+                        {
+                            CallableId = orderedTargets[index].Entry.CallableId,
+                            ConsumedRlimit = consumedResources,
+                            ElapsedMilliseconds = clock.ElapsedMilliseconds
+                        };
                     }
                     if (result.Callable.Reason ==
                             WorkerCallableCoverageReason.MethodTimeout &&
@@ -403,6 +412,10 @@ internal sealed class SharpProofWorker : IDisposable
             ThrowIfProjectInterrupted();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
+            lock (results)
+            {
+                response = WorkerResultAssembler.WithCosts(response, costs.OfType<WorkerCallableCost>());
+            }
             var completion = CompleteResponse(response, snapshot, request.Budgets,
                 requestHash, started, projectBoundary);
             response = completion.Response;

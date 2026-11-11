@@ -97,6 +97,12 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Resource bounds
 
+- Report measured solver work (Z3 resource units) and time per verified callable in
+  the worker result's `summary.costs`, absent on cache hits (protocol 48, cache 71).
+  A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
+  lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
+  solver work with an advisory reference in `eng/acceptance/perf-baseline.json`.
+
 - Stop reporting false `Proven` resource bounds. A local written anywhere in an
   enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
   start or array dimension can no longer allocate without being charged. Both

@@ -22,7 +22,7 @@ internal sealed record NativeCorpusVerdict(SyntaxNode? Declaration, IMethodSymbo
 internal static class NativeCorpusVerifier
 {
     internal static async Task<ImmutableArray<NativeCorpusVerdict>> VerifyAsync(CSharpCompilation compilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, WorkerBudgets? budgets = null, Action<WorkerVerifyResponse>? observeResponse = null)
     {
         ArgumentNullException.ThrowIfNull(compilation);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.All).Build();
@@ -40,12 +40,13 @@ internal static class NativeCorpusVerifier
             {
                 CompilerManifest = new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) },
                 Cache = new WorkerCacheOptions { Enabled = false, Directory = Path.Combine(directory.FullName, "cache") },
-                Budgets = new WorkerBudgets()
+                Budgets = budgets ?? new WorkerBudgets()
             };
             ContainerNativeLibrary.InstallZ3ResolverRequired(typeof(Microsoft.Z3.Context).Assembly);
             using var worker = SharpProofWorker.Create(request.Budgets);
             var response = await worker.VerifyAsync(request, cancellationToken).ConfigureAwait(false);
             EnsureComplete(response, request.Budgets, request.CompilerManifest.Sha256);
+            observeResponse?.Invoke(response);
             var results = ImmutableDictionaryCapture.Create(response.ClaimResults, static result => result.ClaimId, static result => result, StringComparer.Ordinal);
             var claimsByCallable = response.Manifest.Claims.ToLookup(static claim => claim.CallableId, StringComparer.Ordinal);
             return [.. discovery.Targets.Values.Concat(discovery.ContractCallers)

@@ -279,7 +279,14 @@ run_lane() {
       fi
       return "$status"
       ;;
-    nightly) tooling nightly ;;
+    nightly)
+      local nightly_status=0
+      tooling nightly || nightly_status=$?
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        cat artifacts/perf/summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+      fi
+      return "$nightly_status"
+      ;;
     fuzz-[0-9]*) fuzz_shard "${1#fuzz-}" ;;
     release-packages) release_packages ;;
     image) pull_or_build_image ;;

@@ -24,6 +24,7 @@ After validating a worker response, the build prints a readable summary: run/fai
 | Claim | `ClaimResults`: `Outcome`, `Reason` | Proven, Refuted, or Unknown for one selected postcondition, effect contract or call precondition |
 | Evidence | `Vacuity`, `ProofCore`, `Model`, `EffectCertainty`, `EffectWitness`, `Assumptions` | Conditions, dependencies, counterexample inputs, and source sites needed to interpret that outcome |
 | Execution | `Summary`: `Versions`, `Budgets`, `ElapsedMilliseconds`, `CacheStatus`, `CacheHit` | The worker/specification identity, configured limits, timing, and reuse status |
+| Cost | `Summary.Costs.Callables`: `CallableId`, `ConsumedRlimit`, `ElapsedMilliseconds` | Measured solver work and time for each callable verified in this run; absent on a cache hit. Diagnostic only, never part of an outcome |
 
 The table uses C# protocol member names; JSON properties use camel case (`runStatus`, `claimResults`, `summary.cacheStatus`) and enum values use names such as `Complete` and `Proven`. See the [protocol model](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) and [serializer configuration](../src/SharpProof.Worker.Protocol/ProtocolJsonSupport.cs). JSON is a versioned protocol, not a hand-written receipt format. IDs connect manifest entries and results. Missing, duplicate, foreign, or inconsistent results fail validation; counting successful diagnostics is not an accountability check.
 

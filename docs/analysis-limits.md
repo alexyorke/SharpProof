@@ -24,6 +24,16 @@ See [configuration](configuration.md) for activation, policy, cache-directory an
 
 Resource units are solver accounting, not elapsed milliseconds. Container CPU/memory quotas are separate outer limits.
 
+The worker reports the resource units and time each callable actually used in
+`summary.costs`. `tooling perf-baseline`, part of the nightly profile, verifies the
+pinned corpus on a single solver lane and compares total solver work with the
+reviewed reference in [perf-baseline.json](../eng/acceptance/perf-baseline.json).
+For a fixed solver build and input that total is deterministic, so it is the
+comparable figure; wall time depends on the runner and is reported only for context.
+The comparison is advisory until the reference sets `enforced`; then an increase above
+`maximumIncreasePercent` fails nightly. Update the reference deliberately, like the
+corpus ratchets, when a change is expected to alter solver work.
+
 The nightly fuzz runner rebuild uses the 600-second solution-build allowance in
 [contract.json](../eng/acceptance/contract.json), rather than the worker's
 300000-millisecond (300-second) per-project default above. Retained runner invocations
