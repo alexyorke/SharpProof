@@ -5,8 +5,11 @@ analyzer is an MSBuild project dependency and is not included in shipped
 SharpProof analyzer packages. Run builds through the canonical Linux container.
 
 The rule covers methods, constructors (including primary constructors), operators,
-local functions, anonymous methods, and lambdas. It ignores `out` parameters,
-unread underscore inputs in anonymous callables, declarations without bodies, and generated code. A used underscore parameter is still checked.
+and local functions in production assemblies. Lambdas and anonymous methods are
+exempt because their inputs come from the callable that creates them, and test
+assemblies (`*.Test`) are exempt because the test runner or the test itself
+supplies every input. It ignores `out` parameters, declarations without bodies,
+and generated code. An underscore parameter is checked like any other.
 
 Reference inputs require visible null validation unless their nullable annotation
 admits null and no explicit null or range input constraint overrides it. A nullability suppression used as a dereference receiver still requires a runtime guard. A guard
@@ -15,7 +18,7 @@ validation helper (`ThrowIf*`, `Validate*`, `Ensure*`, `Check*`, `Require*`, or
 `NotNull`) receiving the parameter. Null-testing predicates also count. Validation through an unchanged local alias is recognized; reassigned aliases do not count.
 
 For value inputs, explicit validation includes returned predicates, default-array
-normalization, nullable `HasValue` checks, and NUnit assertions in test assemblies.
+normalization, and nullable `HasValue` checks.
 Inputs whose entire domain is valid do not need artificial rejection: Boolean
 values, cancellation tokens, tuples, key-value pairs, GUIDs, and safe numeric or
 enum pass-through inputs without parameter attributes are exempt. Stated parameter constraints still require validation, including identity methods. Numeric indexes, array sizes, divisors,
@@ -33,8 +36,7 @@ parameter after formatting:
 string /* SPINT001: all values valid - raw content is validated during preflight */ content
 ```
 
-The reason must be nonempty. An inferred lambda parameter can put the comment
-immediately after its name. The rule checks every repository C# parameter without a baseline;
+The reason must be nonempty. The rule checks every covered parameter without a baseline;
 each finding must be fixed, documented as accepting the full domain, or shown to
 be existing validation that the analyzer should recognize. The rule verifies
 visible validation, not that a condition rejects every possible invalid input.
