@@ -333,6 +333,22 @@ public sealed class ExportedCallPreconditionTests
     // A readable export whose stamp does not match is never checked, and its
     // callees' calls are counted. One that cannot be read, or names another
     // assembly, says nothing about this reference.
+    // A rejected export leaves the whole call unchecked, even when the
+    // callee's closed attributes alone could be checked.
+    [Test]
+    public void RejectedExportKeepsAttributeChecksOffTheCall()
+    {
+        using var directory = new TempDirectory("sharpproof-exported-call-");
+        using var previous = new TempDirectory("sharpproof-exported-call-");
+        var stale = Build(previous).Export;
+        var artifact = Artifact(Consumer("public static int Caller() { return Remote.Pick(1, 12); }"), Build(directory) with { Export = stale });
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Targets(artifact), Is.Empty);
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
+        }
+    }
+
     [TestCase("sha256", 1)]
     [TestCase("mvid", 1)]
     [TestCase("assembly", 0)]

@@ -302,8 +302,10 @@ internal sealed class CompilerContractExports
     {
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         clauses = [];
+        // A callee of a rejected export has clauses that cannot be checked, so
+        // none of its call's clauses is: the call stays unchecked and counted.
         if (!TryFind(frame.Target, out var accepted, out var callable))
-        { return true; }
+        { return !IsRejected(frame.Target); }
         if (!callable.Complete || callable.Requires is not { } requires)
         { return false; }
         var key = (accepted.Snapshot.AssemblyIdentity, callable.DocumentationId);
