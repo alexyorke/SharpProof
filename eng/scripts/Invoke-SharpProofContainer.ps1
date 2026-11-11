@@ -548,8 +548,8 @@ switch ($Command) {
                 Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
                     $ordinal, $sourceProjects.Length,
                     [IO.Path]::GetRelativePath($repositoryRoot, $project))
-                Invoke-SharpProofRequiredDotnet ([string[]]@(
-                        New-SelfApplicationBuildArgument -Project $project))
+                $arguments = New-SelfApplicationBuildArgument -Project $project
+                Invoke-SharpProofRequiredDotnet ([string[]]@($arguments))
             }
 
         }
