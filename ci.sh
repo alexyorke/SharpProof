@@ -25,6 +25,9 @@ lanes=(
   self-apply repository evidence
 )
 
+# Extra `-f` Compose files for one compose_run call; lint() sets it locally.
+compose_files=()
+
 docker_host_path() {
   if command -v cygpath > /dev/null 2>&1; then
     cygpath -m "$1"
@@ -50,7 +53,7 @@ compose_run() {
     mounts=(--volume "$(docker_host_path "$common"):/git-common:ro"
     --volume "$(docker_host_path "$pointer"):/workspace/SharpProof/.git:ro")
   fi
-  docker compose run --rm "${mounts[@]}" "$@" || status=$?
+  docker compose "${compose_files[@]}" run --rm "${mounts[@]}" "$@" || status=$?
   if [[ -n "$pointer" ]]; then rm -f -- "$pointer"; fi
   return "$status"
 }
@@ -123,8 +126,10 @@ pull_or_build_image() {
 }
 
 # Lint runs on the prepared tooling image; `docker compose build lint` would
-# rebuild tooling through its service:tooling context.
+# rebuild tooling through its service:tooling context. `compose run lint` would
+# too, so the run uses an override that drops the lint service's build.
 lint() {
+  local compose_files=(-f compose.yaml -f eng/ci/compose.prebuilt-lint.yaml)
   docker buildx build --platform linux/amd64 --file eng/lint/Dockerfile --load \
     --tag "${project}-lint:local" --build-context "canonical_tooling=docker-image://$image" \
     --progress plain . &&

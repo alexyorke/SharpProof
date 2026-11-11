@@ -150,7 +150,12 @@ class ToolingTests(unittest.TestCase):
         self.evidence()
         result = self.ci("build", "repository", "evidence", "fuzz-0")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        calls = [call for call in self.calls() if call["args"][:2] == ["compose", "run"]]
+        calls = [call for call in self.calls() if call["args"][:1] == ["compose"] and "run" in call["args"]]
+        # The lint run reuses the lint image built from the pulled tooling image.
+        lint_runs = [call["args"] for call in calls if call["args"][-1] == "lint"]
+        self.assertTrue(lint_runs)
+        for args in lint_runs:
+            self.assertEqual(["compose", "-f", "compose.yaml", "-f", "eng/ci/compose.prebuilt-lint.yaml", "run"], args[:6])
         commands = [call["args"][call["args"].index("tooling") + 1:]
                     if "tooling" in call["args"] else [call["args"][-1]] for call in calls]
         self.assertEqual({"security", "format-check", "lint", "docs", "layout", "test", "coverage"},
