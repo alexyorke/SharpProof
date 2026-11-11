@@ -289,7 +289,7 @@ public sealed class SetupInitializerTests
         await fixture.WriteAsync("project.assets.json", JsonSerializer.Serialize(new { libraries }));
         var properties = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["NETCoreSdkVersion"] = "10.0.403",
+            ["NETCoreSdkVersion"] = "10.0.404",
             ["SharpProofProfile"] = "strict",
             ["SharpProofFeatures"] = "all",
             ["SharpProofVerify"] = "true",

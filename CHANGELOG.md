@@ -23,6 +23,12 @@ Entries describe repository changes, not package publication. Confirm available 
 - Move repository toolchain and verifier tasks/worker to .NET 10; full verification now requires SDK 10.0.100+ with the .NET 10 runtime. Portable analyzer minimum remains SDK 9.0.300+/Roslyn 4.14; application targets are independent.
 - Move to SDK 10.0.403 (.NET 10.0.14, a security release) and re-audit the
   pinned CoreLib facts; patch `libbrotli1` in the tooling image.
+- Move to SDK 10.0.404 (.NET 10.0.15), the 9.0.321 minimum-SDK fixture and the
+  final .NET 8.0.34 test runtime: the November 2026 servicing fixes
+  the high-severity ASP.NET Core advisory and others the image scan reports. Between
+  10.0.14 and 10.0.15 CoreLib changes only floating-point formatting and the VM
+  changes do not touch the audited resource-lock path or fault kinds, so the
+  CoreLib pins move to the 10.0.15 module; 8.0.34 changes no CoreLib source.
 - Run the `net8.0` test projects on .NET 8.0.33, the final .NET 8 release, and drop
   the scanner exception for the 8.0.32 Brotli advisory (GHSA-p3jp-9v83-76w9). 8.0.33
   changed no CoreLib or CoreCLR source, so the resource-bound facts reviewed

@@ -1742,9 +1742,9 @@ public sealed class BuildTaskTests
     {
         ArgumentNullException.ThrowIfNull(root);
         var muxer = Path.Combine(root, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
-        var appHost = Path.Combine(root, "sdk", "10.0.403", OperatingSystem.IsWindows() ? "MSBuild.exe" : "MSBuild");
+        var appHost = Path.Combine(root, "sdk", "10.0.404", OperatingSystem.IsWindows() ? "MSBuild.exe" : "MSBuild");
         var coreLibrary = Path.Combine(root, "shared", "Microsoft.NETCore.App", "10.0.12", "System.Private.CoreLib.dll");
-        var entryAssembly = Path.Combine(root, "sdk", "10.0.403", "MSBuild.dll");
+        var entryAssembly = Path.Combine(root, "sdk", "10.0.404", "MSBuild.dll");
         Directory.CreateDirectory(Path.Combine(root, "host", "fxr"));
         foreach (var file in ImmutableArray.Create<string>(muxer, appHost, coreLibrary, entryAssembly))
         {

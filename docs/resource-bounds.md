@@ -10,9 +10,9 @@ dotnet_diagnostic.SP0060.severity = suggestion
 Bounds that depend on runtime layout, reviewed metadata costs or task premises are
 conditional on CoreCLR 8.0.32 and `net8.0` consumers. Microsoft's
 [support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core)
-lists .NET 8 support ending on 2026-11-10. The final .NET 8 release, 8.0.33,
-changed no CoreLib or CoreCLR source from 8.0.32, so these facts also describe
-8.0.33; they have not been re-audited for any later runtime. The pinned research
+lists .NET 8 support ending on 2026-11-10. The 8.0.33 and final 8.0.34
+releases changed no CoreLib source and no layout, allocation or exception code
+from 8.0.32, so these facts also describe them; there is no later .NET 8 runtime. The pinned research
 runtime is not a claim of current servicing.
 
 Use SharpProof's advisory or strict profile. The off profile disables this feature.

@@ -1988,7 +1988,7 @@ public sealed class NativeTaskCarrierStorageTests
     [Test]
     public void ReviewedCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
     {
-        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33/System.Private.CoreLib.dll");
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34/System.Private.CoreLib.dll");
         using var image = new PEReader(stream);
         var reader = image.GetMetadataReader();
         var task = RuntimeType(reader, "System.Threading.Tasks", "Task");
@@ -2144,7 +2144,7 @@ public sealed class NativeTaskCarrierStorageTests
     [Test]
     public void FaultCarrierFieldsMatchPinnedRuntimeImplementationMetadata()
     {
-        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33/System.Private.CoreLib.dll");
+        using var stream = File.OpenRead("/usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34/System.Private.CoreLib.dll");
         using var image = new PEReader(stream);
         var reader = image.GetMetadataReader();
         var task = RuntimeType(reader, "System.Threading.Tasks", "Task");
