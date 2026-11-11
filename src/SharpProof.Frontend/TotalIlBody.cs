@@ -26,6 +26,19 @@ internal sealed class TotalIlBody(IMethodSymbol method, string imageSha256, stri
     internal bool InitializeLocals { get; } = initializeLocals;
     internal int MaximumStack { get; } = maximumStack;
     internal ImmutableArray<TotalIlInstruction> Instructions { get; } = (instructions.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(instructions)) : instructions);
+    internal TotalMetadataImage Image => new(Method, ImageSha256, Module, ModuleMvid, ParameterAttributes);
+}
+
+// The hashed reference image a metadata callee's closed parameter attributes
+// were read from. It carries no body: a reference assembly qualifies.
+internal sealed class TotalMetadataImage(IMethodSymbol method, string imageSha256, string module, string moduleMvid,
+    ImmutableArray<TotalIlClosedAttribute> parameterAttributes)
+{
+    internal IMethodSymbol Method { get; } = (method ?? throw new System.ArgumentNullException(nameof(method)));
+    internal string ImageSha256 { get; } = (imageSha256 ?? throw new System.ArgumentNullException(nameof(imageSha256)));
+    internal string Module { get; } = (module ?? throw new System.ArgumentNullException(nameof(module)));
+    internal string ModuleMvid { get; } = (moduleMvid ?? throw new System.ArgumentNullException(nameof(moduleMvid)));
+    internal ImmutableArray<TotalIlClosedAttribute> ParameterAttributes { get; } = (parameterAttributes.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(parameterAttributes)) : parameterAttributes);
 }
 
 internal delegate TotalIlBody? ResolveTotalIlBody(IMethodSymbol method, CancellationToken cancellationToken);
@@ -59,12 +72,12 @@ internal sealed class TotalIlClosedAttribute(int methodToken, int parameterOrdin
 }
 
 internal sealed class TotalMetadataPrecondition(IrTerm value, IrTerm safe, OperationId clauseSite,
-    TotalIlBody body, TotalIlClosedAttribute evidence, string evidenceDigest)
+    TotalMetadataImage image, TotalIlClosedAttribute evidence, string evidenceDigest)
 {
     internal IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
     internal IrTerm Safe { get; } = (safe ?? throw new System.ArgumentNullException(nameof(safe)));
     internal OperationId ClauseSite { get; } = (clauseSite.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauseSite)) : clauseSite);
-    internal TotalIlBody Body { get; } = (body ?? throw new System.ArgumentNullException(nameof(body)));
+    internal TotalMetadataImage Image { get; } = (image ?? throw new System.ArgumentNullException(nameof(image)));
     internal TotalIlClosedAttribute Evidence { get; } = (evidence ?? throw new System.ArgumentNullException(nameof(evidence)));
     internal string EvidenceDigest { get; } = (evidenceDigest ?? throw new System.ArgumentNullException(nameof(evidenceDigest)));
 }

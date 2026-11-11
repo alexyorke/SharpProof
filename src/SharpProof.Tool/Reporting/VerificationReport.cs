@@ -93,7 +93,7 @@ internal static class VerificationReport
             }
             if (claim.CallPrecondition is { } call)
             {
-                writer.WriteLine($"  Call to {WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} at {call.ClauseLocation.Path}({call.ClauseLocation.Line},{call.ClauseLocation.Column})");
+                writer.WriteLine($"  Call to {WorkerCallPreconditionTarget.StableCallee(call.Callee)}, clause {call.ClauseOrdinal} {call.DescribeClause(static location => $"{location.Path}({location.Line},{location.Column})")}");
             }
             if (claim.Kind == WorkerClaimKind.Effect)
             {

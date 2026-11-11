@@ -22,7 +22,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
     Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
     bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
-    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false)
+    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false,
+    Func<TotalLoweringContext, bool>? prepareMetadataCallee = null)
 {
     private readonly Compilation _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly ImmutableHashSet<IMethodSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -38,12 +39,48 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null,
     bool opaqueCalls = false, Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null,
-    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false)
+    bool approximateElementReads = false, bool pinElementReads = false, bool captureResourceLoopEntries = false,
+    Func<TotalLoweringContext, bool>? prepareMetadataCallee = null)
     {
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         ArgumentNullGuard.NotNull(prepareCallee, nameof(prepareCallee));
         return new(compilation, prepareCallee, resolveIl, cancellationToken, resolveScalarModel, prepareMetadata,
-            opaqueCalls, opaqueEffects, approximateElementReads, pinElementReads, captureResourceLoopEntries);
+            opaqueCalls, opaqueEffects, approximateElementReads, pinElementReads, captureResourceLoopEntries, prepareMetadataCallee);
+    }
+
+    // A contract-only frame for a nonvirtual callee in another assembly: its
+    // closed parameter attributes, read from the hashed reference image, and
+    // the clauses of a companion this compilation declares for it. Null when
+    // the callee has none, or when any of them cannot be bound; then no clause
+    // of the call is checked, and the call stays in the unchecked count.
+    internal TotalLoweringContext? PrepareMetadataCallee(TotalLoweringContext caller, IMethodSymbol method)
+    {
+        caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        if (prepareMetadataCallee == null || !Spend(method.Parameters.Length + 1) ||
+            method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor) ||
+            method.IsVirtual || method.IsOverride || method.IsAbstract || method.ContainingType.TypeKind == TypeKind.Interface ||
+            method.IsAsync || method.IsExtern || method.IsVararg || method.ReducedFrom != null ||
+            !method.DeclaringSyntaxReferences.IsEmpty ||
+            SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
+            method.IsGenericMethod || IsInGenericType(method.ContainingType) ||
+            method.Parameters.Length > 128 ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || parameter.IsParams ||
+                !CSharpOperationSemantics.IsValueDomain(parameter.Type)))
+        { return null; }
+        var frame = caller.CreateFrame(method);
+        return prepareMetadataCallee(frame) &&
+            !(frame.SourceCallPreconditions.IsEmpty && frame.MetadataCallPreconditions.IsEmpty) ? frame : null;
+
+        static bool IsInGenericType(INamedTypeSymbol? type)
+        {
+            for (; type != null; type = type.ContainingType)
+            {
+                if (type.IsGenericType)
+                { return true; }
+            }
+            return false;
+        }
     }
 
     internal bool MetadataRequiresEnabled => prepareMetadata != null;

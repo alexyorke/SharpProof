@@ -48,6 +48,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // An API specification narrows what an opaque call may do.
     internal Func<IMethodSymbol, IrOpaqueCallEffects?>? OpaqueEffects { get; init; }
 
+    // A nondispatched callee in another assembly: the contract-only frame of
+    // its checked clauses, and the recorder of those clauses at one call.
+    internal Func<IMethodSymbol, TotalLoweringContext?>? MetadataCallee { get; init; }
+    internal Action<IOperation, TotalLoweringContext, ImmutableArray<IrTerm>, IrBlockId>? MetadataPreconditions { get; init; }
+
     // `this` (or `base`) of a reference-type instance member is never null.
     internal bool IsImplicitThis(IOperation? instance)
     {
@@ -965,6 +970,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
+        var preconditions = dispatched ? null : MetadataCallee?.Invoke(method);
         var values = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned != null ? 1 : 0));
         values.Count = arguments.Length + (assigned != null ? 1 : 0);
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
@@ -972,7 +978,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
-            values[arguments.IndexOf(argument)] = lowered.Value;
+            values[arguments.IndexOf(argument)] = preconditions == null ? lowered.Value : Pin(argument.Value, lowered.Value, lowered.Continuation);
             block = lowered.Continuation;
         }
         if (assigned != null)
@@ -980,15 +986,56 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var lowered = LowerBodyValue(assigned, block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
-            values[values.Count - 1] = lowered.Value;
+            values[values.Count - 1] = preconditions == null ? lowered.Value : Pin(assigned, lowered.Value, lowered.Continuation);
             block = lowered.Continuation;
         }
         if (receiver != null && _context.SpecializeSourceType(instance!.Type) is { } receiverType &&
             (receiverType.IsReferenceType || receiverType is ITypeParameterSymbol { IsValueType: false }))
         { block = CheckReceiver(operation, receiver, block); }
+        // The callee checks its clauses on entry, after the receiver check.
+        if (preconditions != null &&
+            ByParameter(method, arguments, values.ToImmutable(), assigned != null) is { } byParameter)
+        { MetadataPreconditions!(operation, preconditions, byParameter, block); }
         // A dispatched call may run an override the specification does not describe.
         return EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
+    }
+
+    // A value held where it was evaluated, so a later argument cannot change
+    // what a precondition reads. A null literal cannot change.
+    private IrTerm Pin(IOperation source, IrTerm value, IrBlockId block)
+    {
+        source = RepositoryParameterGuard.NotNull(source, nameof(source));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (value is IrNullTerm)
+        { return value; }
+        var pinned = _context.Temporary(value.Type);
+        _builder!.Assign(block, _context.Site(source), pinned, value);
+        return _factory.Variable(pinned);
+    }
+
+    // Call values indexed by the callee's parameter ordinals, a setter's value
+    // last; null unless each parameter has exactly one.
+    private static ImmutableArray<IrTerm>? ByParameter(IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments,
+        ImmutableArray<IrTerm> values, bool assigned)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
+        if (arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length || values.Length != method.Parameters.Length)
+        { return null; }
+        var result = new IrTerm?[method.Parameters.Length];
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            if (arguments[index].Parameter is not { Ordinal: var ordinal } || ordinal < 0 || ordinal >= result.Length ||
+                assigned && ordinal == result.Length - 1 || result[ordinal] != null)
+            { return null; }
+            result[ordinal] = values[index];
+        }
+        if (assigned)
+        { result[result.Length - 1] = values[values.Length - 1]; }
+        return result.All(static value => value != null) ? [.. result.Select(static value => value!)] : null;
     }
 
     // Every opaque effect call uses the same compiler-owned member signature.
@@ -1126,6 +1173,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             creation.Arguments.Any(argument => argument.Parameter == null ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)))
         { return null; }
+        var preconditions = MetadataCallee?.Invoke(constructor);
         var values = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
         values.Count = creation.Arguments.Length;
         foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
@@ -1133,9 +1181,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(creation, lowered.Continuation, lowered.Classification.Abstention); }
-            values[creation.Arguments.IndexOf(argument)] = lowered.Value;
+            values[creation.Arguments.IndexOf(argument)] = preconditions == null ? lowered.Value : Pin(argument.Value, lowered.Value, lowered.Continuation);
             block = lowered.Continuation;
         }
+        // The constructor checks its clauses on entry, before it can run.
+        if (preconditions != null &&
+            ByParameter(constructor, creation.Arguments, values.ToImmutable(), assigned: false) is { } byParameter)
+        { MetadataPreconditions!(creation, preconditions, byParameter, block); }
         // A rejected implicit source constructor may initialize its type before
         // any instance exists. Its unknown completion precedes allocation.
         var valueSnapshot = values.ToImmutable();

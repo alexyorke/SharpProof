@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 58;
+    internal const int Current = 59;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -125,6 +125,9 @@ internal sealed record CompilerTotalCallPrecondition(IrInstructionId Instruction
     public IrTerm Value { get; init; } = Value ?? throw new ArgumentNullException(nameof(Value));
     public IrTerm Safe { get; init; } = Safe ?? throw new ArgumentNullException(nameof(Safe));
     internal ImmutableArray<CompilerShadowCallHop> Ancestry { get; init; } = [];
+    // A companion clause the calling project declared for a callee in another
+    // assembly. It is reported, not serialized: the claim carries it.
+    internal bool CallerDeclared { get; init; }
     // The call-precondition claim that checks this row. A row without one
     // belongs to a callee verified on its own.
     internal string? ClaimId { get; init; }

@@ -127,6 +127,10 @@ internal sealed class CommandPresentation
             {
                 details.Add(new("callee", WorkerCallPreconditionTarget.StableCallee(call.Callee)));
                 details.Add(new("calleeClause", call.ClauseOrdinal.ToString(CultureInfo.InvariantCulture)));
+                if (call.MetadataClause is { } metadata)
+                { details.Add(new("calleeAttribute", metadata.Describe())); }
+                if (call.CallerDeclared)
+                { details.Add(new("callerDeclared", "true")); }
             }
             details.Add(new("vacuity", result.Vacuity.ToString()));
             details.Add(new("effectCertainty", result.EffectCertainty.ToString()));

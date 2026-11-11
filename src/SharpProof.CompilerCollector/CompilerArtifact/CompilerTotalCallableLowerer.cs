@@ -114,7 +114,7 @@ internal static class CompilerTotalCallableLowerer
         {
             graph = TotalSourceCallSession.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
             lowering = graph == null ? null : LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority,
-                cancellationToken, opaqueCalls: true);
+                cancellationToken, opaqueCalls: true, metadataCallees: true);
         }
         if (lowering == null)
         { return null; }
@@ -328,23 +328,29 @@ internal static class CompilerTotalCallableLowerer
             .Select(pair => new CompilerTotalCallPrecondition(pair.Key.Id, pair.Value.CalleeIdentity,
                 pair.Value.ClauseOrdinal, pair.Value.ClauseSite, pair.Value.Value, pair.Value.Safe,
                 MetadataOrigin(pair.Value.MetadataClause))
-            { Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))] })];
+            {
+                Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))],
+                CallerDeclared = pair.Value.CallerDeclared
+            })];
     }
 
     private static FrontendProgramLoweringResult LowerBody(CSharpCompilation compilation,
         ControlFlowGraph graph, TotalLoweringContext context, ImmutableArray<CompilerReferenceSnapshot>? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
-        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false)
+        Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false,
+        bool metadataCallees = false)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
         graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         var specificationPacks = new CompilerSpecificationPackProvider(context.Factory, specificationPackAuthority);
+        var images = new CompilerTotalIlBodyProvider(compilation, capturedReferences);
         return TotalBodyLowering.Lower(compilation, graph, context, cancellationToken,
-            new CompilerTotalIlBodyProvider(compilation, capturedReferences).Resolve, specificationPacks.ResolveTotal,
+            images.Resolve, specificationPacks.ResolveTotal,
             initializationFree, enableMetadataRequires ? (frame, body) => body is null ? throw new System.ArgumentNullException(nameof(body)) : frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (PrepareMetadataRequires(compilation, frame, body, cancellationToken)) : null,
-            opaqueCalls);
+            opaqueCalls, prepareMetadataCallee: metadataCallees
+                ? frame => PrepareMetadataCallee(compilation, images, RepositoryParameterGuard.NotNull(frame, nameof(frame)), cancellationToken) : null);
     }
 
     private static Func<INamedTypeSymbol, bool> CreateShadowInitializationPredicate(
@@ -655,10 +661,10 @@ internal static class CompilerTotalCallableLowerer
 
     private static CompilerMetadataClauseOrigin? MetadataOrigin(TotalMetadataPrecondition? clause)
     {
-        return clause == null ? null : MetadataOrigin(clause.Body, clause.Evidence);
+        return clause == null ? null : MetadataOrigin(clause.Image, clause.Evidence);
     }
 
-    private static CompilerMetadataClauseOrigin MetadataOrigin(TotalIlBody body, TotalIlClosedAttribute evidence)
+    private static CompilerMetadataClauseOrigin MetadataOrigin(TotalMetadataImage body, TotalIlClosedAttribute evidence)
     {
         body = RepositoryParameterGuard.NotNull(body, nameof(body));
         evidence = RepositoryParameterGuard.NotNull(evidence, nameof(evidence));
@@ -674,19 +680,61 @@ internal static class CompilerTotalCallableLowerer
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         var binding = new TotalContractBinder(compilation, frame.Factory).BindTotalMetadataRequires(frame, cancellationToken);
-        _ = CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
-            body.ParameterAttributes, cancellationToken, out var paired);
+        if (!CompilerTotalIlBodyProvider.TryPairMetadataRequires(binding.Clauses,
+            body.ParameterAttributes, cancellationToken, out var paired))
+        { return false; }
         var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>();
         for (var ordinal = 0; ordinal < binding.Clauses.Length; ordinal++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(MetadataOrigin(body, paired[ordinal]), out var digest))
+            if (!CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(MetadataOrigin(body.Image, paired[ordinal]), out var digest))
             { return false; }
             var bound = binding.Clauses[ordinal];
             clauses.Add(new(bound.Value, bound.SafeCondition, frame.Factory.CreateOperation("metadata Requires"),
-                body, paired[ordinal], digest));
+                body.Image, paired[ordinal], digest));
         }
         frame.MetadataCallPreconditions = clauses.ToImmutable();
+        return true;
+    }
+
+    // The checked clauses of a callee in another assembly: the Requires of a
+    // companion this compilation declares for it, and its closed parameter
+    // attributes paired with the rows of its authenticated reference image.
+    // Either all of them are recorded at a call or none is, so a call is never
+    // counted as checked while one of its clauses is not.
+    private static bool PrepareMetadataCallee(CSharpCompilation compilation, CompilerTotalIlBodyProvider images,
+        TotalLoweringContext frame, CancellationToken cancellationToken)
+    {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        images = RepositoryParameterGuard.NotNull(images, nameof(images));
+        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
+        cancellationToken.ThrowIfCancellationRequested();
+        var binder = new TotalContractBinder(compilation, frame.Factory);
+        var companion = binder.BindTotalCompanionRequires(frame, cancellationToken);
+        if (!companion.IsSuccess)
+        { return false; }
+        var attributes = binder.BindTotalMetadataRequires(frame, cancellationToken);
+        if (!attributes.IsSuccess)
+        { return false; }
+        var clauses = ImmutableArray.CreateBuilder<TotalMetadataPrecondition>(attributes.Clauses.Length);
+        if (!attributes.Clauses.IsEmpty)
+        {
+            if (images.ResolveParameterAttributes(frame.Target, cancellationToken) is not { } image ||
+                !CompilerTotalIlBodyProvider.TryPairMetadataRequires(attributes.Clauses, image.ParameterAttributes, cancellationToken, out var paired))
+            { return false; }
+            for (var ordinal = 0; ordinal < attributes.Clauses.Length; ordinal++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!CompilerTotalCallableArtifactCodec.TryGetMetadataEvidenceDigest(MetadataOrigin(image, paired[ordinal]), out var digest))
+                { return false; }
+                var bound = attributes.Clauses[ordinal];
+                clauses.Add(new(bound.Value, bound.SafeCondition, frame.Factory.CreateOperation("metadata Requires"),
+                    image, paired[ordinal], digest));
+            }
+        }
+        frame.SourceCallPreconditions = [.. companion.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires)
+            .Select(static clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
+        frame.MetadataCallPreconditions = clauses.MoveToImmutable();
         return true;
     }
 }

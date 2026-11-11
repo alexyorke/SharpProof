@@ -119,6 +119,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             AllowOpaqueCalls = _preserveSourceCall == null && _calls?.OpaqueCalls == true,
             ShadowCallSkeleton = _preserveSourceCall != null,
             OpaqueEffects = _calls?.OpaqueEffects,
+            MetadataCallee = _preserveSourceCall == null ? PrepareMetadataCallee : null,
+            MetadataPreconditions = RecordMetadataCallPreconditions,
             ApproximateElementReads = _calls?.ApproximateElementReads == true,
             PinElementReads = _calls?.PinElementReads == true,
             DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,

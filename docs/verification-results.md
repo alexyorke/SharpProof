@@ -39,7 +39,7 @@ See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md)
 
 ## Call preconditions
 
-Each clause of a modeled call's `Requires` is one `CallPrecondition` claim owned by the caller. The claim's `Location` is the call. Its `CallPrecondition` field names the callee, the clause ordinal and the clause location. The ID does not depend on the line, so moving a call keeps its claim. [Semantics](../SEMANTICS.md#calls-and-loops) defines which calls are modeled.
+Each clause of a modeled call's `Requires` is one `CallPrecondition` claim owned by the caller. The claim's `Location` is the call. Its `CallPrecondition` field names the callee, the clause ordinal and the clause location. A closed attribute read from another assembly's metadata has no source location: its `MetadataClause` names the assembly, the member, the parameter and the attribute instead. `CallerDeclared` marks a clause the calling project declared for another assembly's callee in a companion. Messages and SARIF carry both. The ID does not depend on the line, so moving a call keeps its claim. [Semantics](../SEMANTICS.md#calls-and-loops) defines which calls are modeled.
 
 A body that declares nothing is selected automatically, with reason `DiscoveredCallPrecondition`, when it makes a modeled call. A project with no `Requires` selects nothing this way. Every other body remains unselected, and the report's "Unselected methods are not proved" applies to it.
 
