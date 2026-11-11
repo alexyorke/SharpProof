@@ -251,11 +251,14 @@
   <!-- Each project reference built in this build may publish a contract
        export. It reaches the compiler collector as an additional file with
        dedicated metadata; the collector accepts it only when its stamp names
-       the reference image this compilation resolved. -->
+       the reference image this compilation resolved. It follows reference
+       resolution and never forces it: an invocation that does not resolve
+       references passes no export. -->
   <Target Name="_SharpProofResolveContractExports"
-          DependsOnTargets="_SharpProofSetVerifyActive;ResolveProjectReferences"
+          DependsOnTargets="_SharpProofSetVerifyActive"
+          AfterTargets="ResolveProjectReferences"
           BeforeTargets="_SharpProofInitializeVerify;GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile;CoreCompile"
-          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
     <ItemGroup>
       <_SharpProofContractExport Remove="@(_SharpProofContractExport)" />
     </ItemGroup>

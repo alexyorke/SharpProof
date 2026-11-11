@@ -1276,8 +1276,9 @@ public sealed class PackageLayoutSmokeTests
         var targets = XDocument.Parse(ReadArchiveText(archive, "build/SharpProof.Verifier.targets"));
         var root = targets.Root ?? throw new InvalidDataException("The verifier targets have no project root.");
         var registrations = root.Elements("UsingTask").ToImmutableArray();
-        Assert.That(registrations, Has.Length.EqualTo(8));
-        foreach (var taskName in ImmutableArray.Create("InvalidatePublishedResult", "RunVerifier", "ValidatePublishedVerificationResult", "ResetPublishedVerification"))
+        Assert.That(registrations, Has.Length.EqualTo(10));
+        foreach (var taskName in ImmutableArray.Create("InvalidatePublishedResult", "RunVerifier", "ValidatePublishedVerificationResult", "ResetPublishedVerification",
+            "StampContractsExport"))
         {
             var coreRegistrations = 0;
             var fullRegistrations = 0;
