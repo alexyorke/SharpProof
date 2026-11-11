@@ -168,7 +168,7 @@ public sealed class ResourceRuntimeLayoutTests
     [Test]
     public void CanonicalRuntimeAllocationsIndependentlyFitReviewedIntervals()
     {
-        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 33)));
+        Assert.That(Environment.Version, Is.EqualTo(new Version(8, 0, 34)));
         Assert.That(RuntimeInformation.ProcessArchitecture, Is.EqualTo(Architecture.X64));
         Assert.That(Type.GetType("Mono.Runtime"), Is.Null);
         CheckMeasured(ResourceAllocationShape.Array(ResourceStorageKind.Byte, ResourceExpression.Literal(9)), static () => new byte[9]);

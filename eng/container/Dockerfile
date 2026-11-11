@@ -1,6 +1,6 @@
-ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e
-ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.320-bookworm-slim@sha256:07ed28d9e7279248fcea27334880f6c415b42c631c39b8bc5b3caf13ec6fdaa2
-ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.427-bookworm-slim@sha256:341aa6e8bbaceb1194732328ca27c15bfa9c531687db83a66af3c0c1833f5534
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb
+ARG DOTNET_MINIMUM_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:9.0.321-bookworm-slim@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84
+ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0.428-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5
 # MCR's 7.5 aliases still contain 7.5.0, so install the verified serviced
 # release on the SDK base this build already pulls instead of pulling a
 # PowerShell image only to replace its payload.
@@ -59,16 +59,16 @@ RUN test "${TARGETOS}" = "linux" && test "${TARGETARCH}" = "amd64"
 COPY --from=powershell /opt/microsoft/powershell/7 /opt/microsoft/powershell/7
 # The minimum-framework SDK carries the pinned test runtime, byte for byte the
 # same files as the matching runtime image.
-COPY --from=minimum-framework /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.33
-COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.320 /usr/share/dotnet/sdk/9.0.320
+COPY --from=minimum-framework /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34 /usr/share/dotnet/shared/Microsoft.NETCore.App/8.0.34
+COPY --from=minimum-sdk /usr/share/dotnet/sdk/9.0.321 /usr/share/dotnet/sdk/9.0.321
 # Retain the runtime and targeting packs needed by the minimum portable compiler host.
 COPY --from=minimum-sdk /usr/share/dotnet/shared /usr/share/dotnet/shared
 COPY --from=minimum-sdk /usr/share/dotnet/packs /usr/share/dotnet/packs
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.33 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.33
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.33 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.33
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.34 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.34
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.34 /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref/8.0.34
 # Keep the reviewed API inventory pack alongside the minimum-SDK packs.
 COPY --from=api-inventory /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18 /usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/9.0.18
-COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.33 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.33
+COPY --from=minimum-framework /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.34 /usr/share/dotnet/packs/Microsoft.NETCore.App.Host.linux-x64/8.0.34
 # Use only the explicitly pinned PowerShell copy, not the SDK image's unused tool store.
 RUN rm -rf /usr/share/powershell
 COPY eng/container/toolchain.json /opt/sharpproof/toolchain.json
@@ -79,7 +79,11 @@ COPY eng/container/Install-ScriptTools.ps1 /opt/sharpproof/Install-ScriptTools.p
 # Moving archive mirrors remove superseded packages, so the immutable Ubuntu
 # snapshot comes first. The live archives serve the same reviewed bytes while
 # the snapshot service is unavailable; the archive checksum is verified either way.
-RUN pwsh -NoLogo -NoProfile -Command '$packages = @(@("x/xz-utils", "xz-utils_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb", "18ef3c30308990626cfbda8b6336ef6ef5a412d1991bdad0cdaa226fd2041ffe"), @("b/brotli", "libbrotli1_1.1.0-2ubuntu0.1_amd64.deb", "70b188a86d81f30d7510aab30e25d638ed5037dded6691af1533952b71ac61de"), @("a/apt", "libapt-pkg6.0t64_2.8.4ubuntu0.1_amd64.deb", "a50f3e68a793f90b05f44a4b5f2f59f3ec7687e39b5d8bbd1da44c84671fa3d6"), @("a/apt", "apt_2.8.4ubuntu0.1_amd64.deb", "ad2ea7f107f250ba88b0bfdba31812a341e3247589647aa2b03b9dc4e8abf8ed"), @("p/pcre2", "libpcre2-8-0_10.42-4ubuntu2.2_amd64.deb", "f41da7cb7e979d6b037ea92650c72ec8ec532ec3c93aa8d5b997207de56695ea")); New-Item -ItemType Directory -Path /tmp/packages | Out-Null; foreach ($package in $packages) { $pool, $file, $sha256 = $package; $path = "/tmp/packages/$file"; $sources = @("https://snapshot.ubuntu.com/ubuntu/20261030T000000Z/pool/main/$pool/$file", "http://archive.ubuntu.com/ubuntu/pool/main/$pool/$file", "http://security.ubuntu.com/ubuntu/pool/main/$pool/$file"); $verified = $false; foreach ($source in $sources) { try { Invoke-WebRequest -Uri $source -OutFile $path -MaximumRetryCount 2 -RetryIntervalSec 5; if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ieq $sha256) { $verified = $true; break }; Write-Warning "Checksum mismatch from ${source}" } catch { Write-Warning "Download failed from ${source}: $_" } }; if (-not $verified) { throw "No source served the reviewed package $file." } }'     && dpkg --install /tmp/packages/*.deb && rm -rf /tmp/packages
+# Bounded timeouts let a hung source fall through to the next one, and a source
+# that never answered is skipped for the remaining packages. When no source
+# serves a package, every source is tried again after a pause, so a brief DNS
+# or network outage does not fail the build.
+RUN pwsh -NoLogo -NoProfile -Command '$packages = @(@("x/xz-utils", "xz-utils_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb", "18ef3c30308990626cfbda8b6336ef6ef5a412d1991bdad0cdaa226fd2041ffe"), @("b/brotli", "libbrotli1_1.1.0-2ubuntu0.1_amd64.deb", "70b188a86d81f30d7510aab30e25d638ed5037dded6691af1533952b71ac61de"), @("a/apt", "libapt-pkg6.0t64_2.8.4ubuntu0.1_amd64.deb", "a50f3e68a793f90b05f44a4b5f2f59f3ec7687e39b5d8bbd1da44c84671fa3d6"), @("a/apt", "apt_2.8.4ubuntu0.1_amd64.deb", "ad2ea7f107f250ba88b0bfdba31812a341e3247589647aa2b03b9dc4e8abf8ed"), @("p/pcre2", "libpcre2-8-0_10.42-4ubuntu2.2_amd64.deb", "f41da7cb7e979d6b037ea92650c72ec8ec532ec3c93aa8d5b997207de56695ea")); New-Item -ItemType Directory -Path /tmp/packages | Out-Null; $unreachable = @{}; foreach ($package in $packages) { $pool, $file, $sha256 = $package; $path = "/tmp/packages/$file"; $sources = @("https://snapshot.ubuntu.com/ubuntu/20261030T000000Z/pool/main/$pool/$file", "http://archive.ubuntu.com/ubuntu/pool/main/$pool/$file", "http://security.ubuntu.com/ubuntu/pool/main/$pool/$file"); $verified = $false; for ($attempt = 1; -not $verified -and $attempt -le 4; $attempt++) { if ($attempt -gt 1) { $unreachable.Clear(); Start-Sleep -Seconds 30 }; foreach ($source in $sources) { $sourceHost = ([uri]$source).Host; if ($unreachable.ContainsKey($sourceHost)) { continue }; try { Invoke-WebRequest -Uri $source -OutFile $path -MaximumRetryCount 2 -RetryIntervalSec 5 -ConnectionTimeoutSeconds 30 -OperationTimeoutSeconds 120; if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ieq $sha256) { $verified = $true; break }; Write-Warning "Checksum mismatch from ${source}" } catch { Write-Warning "Download failed from ${source}: $_"; if ($null -eq $_.Exception.Response) { $unreachable[$sourceHost] = $true } } } }; if (-not $verified) { throw "No source served the reviewed package $file." } }'     && dpkg --install /tmp/packages/*.deb && rm -rf /tmp/packages
 RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Install-ScriptTools.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json
 
