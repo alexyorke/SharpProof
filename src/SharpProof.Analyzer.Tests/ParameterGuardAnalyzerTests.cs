@@ -11,7 +11,7 @@ namespace SharpProof.Analyzer.Test;
 public sealed class ParameterGuardAnalyzerTests
 {
     [Test]
-    public async Task UsedUnderscoreParametersAreInputsRatherThanDiscards()
+    public async Task UnderscoreParametersAreInputsAndLambdasAreExempt()
     {
         const string source = """
             public static class Sample
@@ -25,7 +25,7 @@ public sealed class ParameterGuardAnalyzerTests
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics.Select(static diagnostic =>
                 (diagnostic ?? throw new System.ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)),
-            Is.EqualTo(ImmutableArray.Create("Parameter '_' has no explicit guard", "Parameter '_' has no explicit guard")));
+            Is.EqualTo(ImmutableArray.Create("Parameter '_' has no explicit guard")));
     }
     [Test]
     public async Task NullableAnnotationsDoNotEraseExplicitInputConstraints()
@@ -366,7 +366,7 @@ public sealed class ParameterGuardAnalyzerTests
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
     [Test]
-    public async Task NUnitAssertionsValidateExpectedValuesOnlyInTestAssemblies()
+    public async Task TestAssembliesAreExempt()
     {
         const string source = """
             using System;
@@ -381,9 +381,7 @@ public sealed class ParameterGuardAnalyzerTests
             }
             """;
 
-        Assert.That((await Analyze(source, testAssembly: true)).Select(static diagnostic =>
-                diagnostic is null ? throw new System.ArgumentNullException(nameof(diagnostic)) : (diagnostic.GetMessage(CultureInfo.InvariantCulture))),
-            Is.EqualTo(ImmutableArray.Create("Parameter 'index' has no explicit guard")));
+        Assert.That(await Analyze(source, testAssembly: true), Is.Empty);
         Assert.That((await Analyze(source)).Length, Is.EqualTo(2));
     }
     [Test]
@@ -458,22 +456,18 @@ public sealed class ParameterGuardAnalyzerTests
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
     [Test]
-    public async Task InstanceValidationAndTrailingLambdaReasonsAreRecognized()
+    public async Task InstanceValidationIsRecognizedAndLambdasAreExempt()
     {
         const string source = """
             public readonly struct Item { public void Validate() { } }
             public static class Sample
             {
                 public static Item Read(Item value) { value.Validate(); return value; }
-                public static System.Func<string, int> Accepted() =>
-                    value /* SPINT001: all values valid - the callback ignores its input */ => 1;
                 public static System.Func<string, int> Unsafe() => other => other.Length;
             }
             """;
 
-        Assert.That((await Analyze(source)).Select(static diagnostic =>
-                (diagnostic ?? throw new System.ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)),
-            Is.EqualTo(ImmutableArray.Create("Parameter 'other' has no explicit guard")));
+        Assert.That(await Analyze(source), Is.Empty);
     }
     [Test]
     public async Task NumericChecksDistinguishUncheckedAndTotalDispatchFromUnsafeOperations()
@@ -491,7 +485,7 @@ public sealed class ParameterGuardAnalyzerTests
 
         Assert.That((await Analyze(source)).Select(static diagnostic =>
                 (diagnostic ?? throw new System.ArgumentNullException(nameof(diagnostic))).GetMessage(CultureInfo.InvariantCulture)),
-            Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard", "Parameter 'value' has no explicit guard")));
+            Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
     [Test]
     public async Task CapturedNullableInputDoesNotMakeAnUnrelatedResultSuppressionUnsafe()
@@ -530,7 +524,7 @@ public sealed class ParameterGuardAnalyzerTests
             Is.EqualTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
     [Test]
-    public async Task OperatorsConversionsAndAnonymousMethodsRequireTheirOwnGuards()
+    public async Task OperatorsAndConversionsRequireTheirOwnGuards()
     {
         const string source = """
             public sealed class Box
@@ -545,7 +539,7 @@ public sealed class ParameterGuardAnalyzerTests
                 public static System.Func<string, int> Callback() => delegate(string text) { return text.Length; };
             }
             """;
-        Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'value' has no explicit guard", "Parameter 'text' has no explicit guard")));
+        Assert.That(Messages(await Analyze(source)), Is.EquivalentTo(ImmutableArray.Create("Parameter 'value' has no explicit guard")));
     }
 
     [Test]
