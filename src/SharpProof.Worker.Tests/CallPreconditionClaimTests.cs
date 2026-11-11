@@ -78,7 +78,7 @@ public sealed class CallPreconditionClaimTests
             Assert.That(claim.Location.Line, Is.EqualTo(4));
             Assert.That(claim.CallPrecondition!.Callee, Does.Contain("Subject.F"));
             Assert.That(claim.CallPrecondition.ClauseOrdinal, Is.Zero);
-            Assert.That(source.Substring(claim.CallPrecondition.ClauseLocation.Start, claim.CallPrecondition.ClauseLocation.Length), Does.Contain("x > 0"));
+            Assert.That(source.Substring(claim.CallPrecondition.ClauseLocation!.Start, claim.CallPrecondition.ClauseLocation.Length), Does.Contain("x > 0"));
             Assert.That(caller.SelectionReasons, Is.EqualTo(new[] { WorkerSelectionReason.DiscoveredCallPrecondition }));
             Assert.That(caller.SelectedFeatures, Is.EqualTo(new[] { WorkerSelectedFeature.Contracts }));
         }
@@ -526,7 +526,7 @@ public sealed class CallPreconditionClaimTests
     }
 
     [Test]
-    public void ClosedAttributeInAnotherAssemblyIsCountedAsUnchecked()
+    public void ClosedAttributeInAnotherAssemblyIsChecked()
     {
         using var directory = new TempDirectory("sharpproof-call-library-");
         var library = Library(directory, """
@@ -536,8 +536,8 @@ public sealed class CallPreconditionClaimTests
         var (_, artifact) = Census("public static class Consumer { public static int Caller() => Remote.M(0); }", library);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
-            Assert.That(artifact.Manifest.Claims, Is.Empty);
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.Zero);
+            Assert.That(artifact.Manifest.Claims.Single().CallPrecondition!.MetadataClause!.Attribute, Is.EqualTo("Positive"));
         }
     }
 
@@ -558,7 +558,7 @@ public sealed class CallPreconditionClaimTests
     }
 
     [Test]
-    public void CompanionForAnotherAssemblyIsCountedButNotChecked()
+    public void CompanionForAnotherAssemblyIsChecked()
     {
         using var directory = new TempDirectory("sharpproof-call-library-");
         var library = Library(directory, "public static class Remote { public static int M(int n) => n; }");
@@ -572,8 +572,8 @@ public sealed class CallPreconditionClaimTests
             """, library);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(artifact.Manifest.UncheckedCallSites, Is.EqualTo(1));
-            Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind), Has.None.EqualTo(WorkerClaimKind.CallPrecondition));
+            Assert.That(artifact.Manifest.UncheckedCallSites, Is.Zero);
+            Assert.That(artifact.Manifest.Claims.Single(static claim => claim.Kind == WorkerClaimKind.CallPrecondition).CallPrecondition!.CallerDeclared, Is.True);
         }
     }
 

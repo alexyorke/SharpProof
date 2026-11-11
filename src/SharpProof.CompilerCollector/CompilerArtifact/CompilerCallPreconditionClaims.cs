@@ -151,7 +151,9 @@ internal static class CompilerCallPreconditionClaims
                 {
                     Callee = row.CalleeIdentity,
                     ClauseOrdinal = row.ClauseOrdinal,
-                    ClauseLocation = Project(documents, factory.GetOperationInfo(row.ClauseSite).SourceSpan!)
+                    ClauseLocation = row.MetadataClause == null ? Project(documents, factory.GetOperationInfo(row.ClauseSite).SourceSpan!) : null,
+                    MetadataClause = row.MetadataClause is { } origin ? MetadataClause(row.CalleeIdentity, origin) : null,
+                    CallerDeclared = row.CallerDeclared
                 },
                 Location = Project(documents, factory.GetOperationInfo(markers[row.Instruction].Operation).SourceSpan!)
             });
@@ -166,8 +168,24 @@ internal static class CompilerCallPreconditionClaims
     {
         row = RepositoryParameterGuard.NotNull(row, nameof(row));
         verified = RepositoryParameterGuard.NotNull(verified, nameof(verified));
-        return row.MetadataClause == null && !row.Ancestry.Take(row.Ancestry.Length - 1)
+        return !row.Ancestry.Take(row.Ancestry.Length - 1)
             .Any(hop => verified.Contains(hop.CalleeIdentity));
+    }
+
+    // A closed attribute from another assembly's metadata has no source span.
+    // The claim names it by assembly, member, parameter and attribute.
+    internal static WorkerMetadataClauseLocation MetadataClause(string calleeIdentity, CompilerMetadataClauseOrigin origin)
+    {
+        calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity));
+        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
+        return new WorkerMetadataClauseLocation
+        {
+            Assembly = origin.AssemblyIdentity,
+            Member = WorkerCallPreconditionTarget.StableCallee(calleeIdentity),
+            Parameter = origin.ParameterOrdinal,
+            Attribute = origin.Kind == "InRange"
+                ? FormattableString.Invariant($"InRange({origin.Minimum}, {origin.Maximum})") : origin.Kind
+        };
     }
 
     private static WorkerSourceLocation Project(ImmutableDictionary<string, SyntaxTree> documents, IrSourceSpan span)

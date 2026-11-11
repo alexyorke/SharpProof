@@ -45,6 +45,21 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Check preconditions at calls into other assemblies. A call that is not dispatched
+  and not generic now checks the callee's closed parameter attributes (`[NonNull]`,
+  `[Positive]`, `[InRange]`), read from the referenced image whose hash the compiler
+  artifact records, so reference assemblies work too. It also checks the `Requires`
+  of a `[ContractFor]` companion the calling project declares for the callee; those
+  claims are marked as declared by the calling project. A metadata clause has no
+  source span, so its claim names the assembly, member, parameter and attribute.
+  Calls that cannot be checked stay in the unchecked count, and nothing is assumed
+  after the call. A library's `Contract.Requires` is compiled out of its binary and
+  remains unchecked. This can fail existing builds: a caller that passes a value the
+  library's attributes reject is now refuted. A metadata body the verifier cannot
+  expand is now an opaque call instead of making its caller's body abstract, and a
+  library method that a companion targets but does not cover is no longer selected
+  (it produced an invalid manifest). Protocol 47, manifest 8, cache 70 and compiler
+  artifact 59.
 - Remove the Legacy IR execution mode. Every IR factory now uses the Total
   semantics the verifier already required: 32-bit default integers, defined
   division and access results with faults as separate guarded terms. Compiler
@@ -78,7 +93,7 @@ Entries describe repository changes, not package publication. Confirm available 
 ### Resource bounds
 
 - Report measured solver work (Z3 resource units) and time per verified callable in
-  the worker result's `summary.costs`, absent on cache hits (protocol 47, cache 70).
+  the worker result's `summary.costs`, absent on cache hits (protocol 48, cache 71).
   A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
   lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
   solver work with an advisory reference in `eng/acceptance/perf-baseline.json`.

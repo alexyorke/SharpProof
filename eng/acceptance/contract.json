@@ -8,9 +8,9 @@
     "buildCpuPercent": 75
   },
   "worker": {
-    "protocolVersion": 47,
-    "manifestSchemaVersion": 7,
-    "compilerArtifactSchemaVersion": 58,
+    "protocolVersion": 48,
+    "manifestSchemaVersion": 8,
+    "compilerArtifactSchemaVersion": 59,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -26,7 +26,7 @@
     "forcedTerminationMilliseconds": 1000
   },
   "cache": {
-    "schemaVersion": 70,
+    "schemaVersion": 71,
     "enabledByDefault": true,
     "maximumMiB": 512
   },

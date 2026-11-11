@@ -100,14 +100,14 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static CompilerTotalCallablePreparation? Decode(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
     {
 
         if (artifact is null)
         { return null; }
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         ArgumentNullGuard.NotNull(entry, nameof(entry));
-        var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken);
+        var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken, metadataReferences);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
         {
             ExceptionConstraints = decoded.ExceptionConstraints,
@@ -452,9 +452,15 @@ internal static class CompilerTotalCallableArtifactCodec
             if (row.ClaimId != null)
             {
                 var span = factory.GetOperationInfo(marker.Operation).SourceSpan!;
-                Require(row.MetadataClause == null && boundClaims.Add(row.ClaimId) && callClaims.TryGetValue(row.ClaimId, out var claim) &&
+                Require(boundClaims.Add(row.ClaimId) && callClaims.TryGetValue(row.ClaimId, out var claim) &&
                     claim.CallPrecondition is { } target && target.Callee == row.CalleeIdentity && target.ClauseOrdinal == row.ClauseOrdinal &&
-                    claim.Location.Start == span.Start && claim.Location.Length == span.Length,
+                    claim.Location.Start == span.Start && claim.Location.Length == span.Length &&
+                    (row.MetadataClause is { } origin
+                        ? target.ClauseLocation == null && target.MetadataClause is { } metadata && metadata.Assembly == origin.AssemblyIdentity &&
+                            metadata.Parameter == origin.ParameterOrdinal
+                        : target.ClauseLocation is { } clause && target.MetadataClause == null &&
+                            factory.GetOperationInfo(clauseSite).SourceSpan is { } clauseSpan &&
+                            clause.Start == clauseSpan.Start && clause.Length == clauseSpan.Length),
                     "A Total call precondition does not equal its manifest claim.");
             }
             calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause) { ClaimId = row.ClaimId });

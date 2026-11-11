@@ -89,7 +89,8 @@ internal static class RoslynProgramLowering
         Func<IMethodSymbol, TotalScalarCallModel?>? resolveScalarModel = null,
         Func<TotalLoweringContext, TotalIlBody, bool>? prepareMetadata = null, bool opaqueCalls = false,
         Func<IMethodSymbol, IrOpaqueCallEffects?>? opaqueEffects = null, bool approximateElementReads = false,
-        bool pinElementReads = false, bool stopAtFirstAbstention = false)
+        bool pinElementReads = false, bool stopAtFirstAbstention = false,
+        Func<TotalLoweringContext, bool>? prepareMetadataCallee = null)
     {
         ArgumentNullGuard.NotNull(graph, nameof(graph));
         ArgumentNullGuard.NotNull(context, nameof(context));
@@ -99,7 +100,7 @@ internal static class RoslynProgramLowering
         var calls = TotalSourceCallSession.CreatePrepared(compilation, prepareCallee, resolveIl,
             cancellationToken, resolveScalarModel, prepareMetadata, opaqueCalls: opaqueCalls,
             opaqueEffects: opaqueEffects, approximateElementReads: approximateElementReads, pinElementReads: pinElementReads,
-            captureResourceLoopEntries: context.CaptureResourceLoopEntries);
+            captureResourceLoopEntries: context.CaptureResourceLoopEntries, prepareMetadataCallee: prepareMetadataCallee);
         return new RoslynTotalProgramLowerer(context, cancellationToken, calls) { StopAtFirstAbstention = stopAtFirstAbstention }.Lower(graph);
     }
 }

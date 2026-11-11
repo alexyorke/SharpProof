@@ -329,6 +329,14 @@ internal sealed partial class ClaimManifestBuilder(
         var target = seed.Method;
 
         var resolution = _contractSources.Resolve(target, implementationBody: null, cancellationToken);
+        // A method of another assembly is discovered only because a companion
+        // targets its type. One the companion declares no member for has no
+        // source location and nothing to verify here.
+        if (!SymbolEqualityComparer.Default.Equals(target.ContainingAssembly, _compilation.Assembly) &&
+            resolution.Failure is ContractBindingFailure.None or ContractBindingFailure.MissingCompanion && !resolution.UsesCompanion)
+        {
+            return null;
+        }
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;

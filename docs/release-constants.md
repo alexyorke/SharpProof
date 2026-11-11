@@ -6,10 +6,10 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 | --- | --- | --- |
 | Package version | `1.0.0-preview.2` | [eng/Versions.props](../eng/Versions.props) |
 | Assembly version | `1.0.0.0` | [eng/Versions.props](../eng/Versions.props) |
-| Worker protocol | `46` | [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) |
-| Worker manifest schema | `7` | Same protocol model |
-| Response cache schema | `69` | Same protocol model |
-| Compiler artifact schema | `57` | [CompilerArtifactModel.cs](../src/SharpProof.CompilerArtifact/CompilerArtifactModel.cs) |
+| Worker protocol | `47` | [ProtocolModel.cs](../src/SharpProof.Worker.Protocol/ProtocolModel.cs) |
+| Worker manifest schema | `8` | Same protocol model |
+| Response cache schema | `70` | Same protocol model |
+| Compiler artifact schema | `59` | [CompilerArtifactModel.cs](../src/SharpProof.CompilerArtifact/CompilerArtifactModel.cs) |
 | Relational summary schema | `2` | Same compiler artifact model |
 | Specification pack schema | `1` | Same compiler artifact model |
 | Specification pack catalog version | `2` | Same compiler artifact model |
