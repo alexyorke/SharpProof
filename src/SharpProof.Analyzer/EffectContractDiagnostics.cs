@@ -132,10 +132,22 @@ internal static class EffectContractDiagnostics
             abstained = true;
             return evaluations;
         }
-        return [.. evaluations.Select(evaluation =>
+        ImmutableArray<EffectClaimEvaluation> reported = [.. evaluations.Select(evaluation =>
             evaluation.Outcome != EffectEvaluationOutcome.Proven &&
             AdvisoryEffectClaims.FindViolation(evaluation.Kind, evaluation.Constraint, analysis.Sites, compilation) is { } violation
                 ? Report(evaluation, SiteText(violation.Site.Location), violation.Detail) : evaluation)];
+        // The worker proves these claims only over a complete effect summary
+        // at entry. Without a violating site to report, name the
+        // initialization that keeps the summary incomplete rather than
+        // leave the claim silently Unknown.
+        if (reported.Any(static evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven && evaluation.Diagnostic == null &&
+                RequiresCompleteEntryEffects(evaluation.Kind)) &&
+            EntryEffectGap(compilation, method, analysis, cancellationToken) is { } entryGap)
+        {
+            reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule, location,
+                method.Name, "Advisory:EntryInitialization:" + entryGap));
+        }
+        return reported;
 
         EffectClaimEvaluation Report(EffectClaimEvaluation evaluation, string subject, string detail)
         {
@@ -158,6 +170,25 @@ internal static class EffectContractDiagnostics
             };
             return evaluation with { Diagnostic = diagnostic.Rule, DiagnosticLocation = location, DiagnosticArguments = diagnostic.Arguments };
         }
+    }
+
+    // Resource bounds name their entry-initialization gap through SP0060.
+    private static bool RequiresCompleteEntryEffects(EffectEvaluationContractKind kind)
+    {
+        return kind is EffectEvaluationContractKind.EnforcePure or EffectEvaluationContractKind.ZeroAllocations or
+            EffectEvaluationContractKind.AllowedCapabilities or EffectEvaluationContractKind.EffectContract;
+    }
+
+    // The collector's entry-completeness condition, in its order: callee
+    // initialization the body reaches, then the declaring type, then the
+    // module.
+    private static string? EntryEffectGap(CSharpCompilation compilation, IMethodSymbol method, AdvisoryEffectAnalysis analysis,
+        CancellationToken cancellationToken)
+    {
+        if (!analysis.SourceInitializationEffectsComplete)
+        { return "CalleeTypeInitializer"; }
+        var gap = EntryInitialization.FindEffectGap(compilation, method.ContainingType, cancellationToken);
+        return gap == EntryInitializationGap.None ? null : gap.ToString();
     }
 
     private static string SiteText(Location location)

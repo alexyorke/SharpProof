@@ -367,12 +367,12 @@ internal static class CompilerTotalCallableLowerer
             { return false; }
             if (!types.TryGetValue(type, out var typeSafe))
             {
-                typeSafe = HasNoTypeEntryInitialization(compilation, type, cancellationToken);
+                typeSafe = EntryInitialization.HasNoEffectTypeInitialization(compilation, type, cancellationToken);
                 types.AddUnique(type, typeSafe);
             }
             if (!typeSafe)
             { return false; }
-            moduleSafe ??= HasNoModuleEntryInitialization(compilation, cancellationToken);
+            moduleSafe ??= EntryInitialization.ModuleInitializers(compilation, cancellationToken).IsEmpty;
             cancellationToken.ThrowIfCancellationRequested();
             return moduleSafe.Value;
         };
@@ -383,70 +383,7 @@ internal static class CompilerTotalCallableLowerer
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        return HasNoTypeEntryInitialization(compilation, type, cancellationToken) &&
-            HasNoModuleEntryInitialization(compilation, cancellationToken);
-    }
-
-    // A compiler-generated static constructor that only stores scalar
-    // constants into readonly statics has no effect a body could observe.
-    private static bool HasNoTypeEntryInitialization(CSharpCompilation compilation, INamedTypeSymbol type, CancellationToken cancellationToken)
-    {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        var remaining = CompilerArtifactLimits.MaximumInstructions;
-        for (var current = type; current != null; current = current.ContainingType)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (--remaining < 0 || current.StaticConstructors.Any(constructor => !constructor.IsImplicitlyDeclared))
-            { return false; }
-            foreach (var member in current.GetMembers().Where(member => member.IsStatic && member is IFieldSymbol { IsConst: false } or IPropertySymbol))
-            {
-                foreach (var reference in member.DeclaringSyntaxReferences)
-                {
-                    if (--remaining < 0)
-                    { return false; }
-                    var syntax = reference.GetSyntax(cancellationToken);
-                    var value = syntax switch
-                    {
-                        VariableDeclaratorSyntax variable => variable.Initializer?.Value,
-                        PropertyDeclarationSyntax property => property.Initializer?.Value,
-                        _ => null
-                    };
-                    if (value != null && (member is IFieldSymbol { IsReadOnly: false } or IPropertySymbol { SetMethod: not null } ||
-                        !SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree)
-                            .GetConstantValue(value, cancellationToken).HasValue ||
-                        !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : ((IPropertySymbol)member).Type)))
-                    { return false; }
-                }
-            }
-        }
-        return true;
-    }
-
-    private static bool HasNoModuleEntryInitialization(CSharpCompilation compilation, CancellationToken cancellationToken)
-    {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
-        pending = pending.Push(compilation.Assembly.GlobalNamespace);
-        var remaining = CompilerArtifactLimits.MaximumInstructions;
-        while (!pending.IsEmpty)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var pendingOwner = pending.Peek();
-            pending = pending.Pop();
-            foreach (var member in pendingOwner.GetMembers())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (--remaining < 0)
-                { return false; }
-                if (member is INamespaceOrTypeSymbol nested)
-                { pending = pending.Push(nested); }
-                if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
-                        attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                        CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"])))
-                { return false; }
-            }
-        }
-        return true;
+        return EntryInitialization.FindEffectGap(compilation, type, cancellationToken) == EntryInitializationGap.None;
     }
 
     // Exception proof admission is separate from entry purity: a constant
@@ -530,24 +467,10 @@ internal static class CompilerTotalCallableLowerer
 
         private bool NoFaultModule()
         {
-            var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
-            pending = pending.Push(compilation.Assembly.GlobalNamespace);
-            while (!pending.IsEmpty)
+            foreach (var method in EntryInitialization.ModuleInitializers(compilation, cancellationToken))
             {
-                var pendingOwner = pending.Peek();
-                pending = pending.Pop();
-                foreach (var member in pendingOwner.GetMembers())
-                {
-                    if (!Spend())
-                    { return false; }
-                    if (member is INamespaceOrTypeSymbol nested)
-                    { pending = pending.Push(nested); }
-                    if (member is IMethodSymbol method && method.GetAttributes().Any(attribute =>
-                            attribute.AttributeClass is { Name: "ModuleInitializerAttribute", ContainingNamespace: { } ns } &&
-                            CompilerMetadataResolution.HasNamespace(ns, ["System", "Runtime", "CompilerServices"])) &&
-                        (!NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType)))
-                    { return false; }
-                }
+                if (!Spend() || !NoFaultType(method.ContainingType) || !NoFaultBody(method, method.ContainingType))
+                { return false; }
             }
             return true;
         }

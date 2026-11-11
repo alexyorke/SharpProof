@@ -79,7 +79,7 @@ A `[DoesNotThrow]` or `[AllowedExceptions]` contract could not be established. A
 
 ## SP0047
 
-A selected callable is outside the portable analyzer's admitted subset or analysis is incomplete. Unannotated unsupported methods can remain quiet; silence must not be counted as proof. Worker callable coverage is a separate accountability record. When a callable's only gaps are call-precondition claims that ran out of time, SP0047 is a warning even under `require-proven`, and those calls count as unchecked.
+A selected callable is outside the portable analyzer's admitted subset or analysis is incomplete. Unannotated unsupported methods can remain quiet; silence must not be counted as proof. Worker callable coverage is a separate accountability record. A reason of `Advisory:EntryInitialization:TypeInitializer` means the body has no site that could violate a purity, allocation, capability or effect-contract claim, but the declaring type or an enclosing type has a static constructor or a static initializer other than a scalar constant stored in a readonly field. The runtime may run that initializer on entry, so the worker has no complete effect summary. Moving the method to a type without such initializers, or making the initializers constants, removes the gap. `ModuleInitializer` names a `[ModuleInitializer]` in the assembly, and `CalleeTypeInitializer` names a type initializer that the body reaches and that writes mutable static state. When a callable's only gaps are call-precondition claims that ran out of time, SP0047 is a warning even under `require-proven`, and those calls count as unchecked.
 
 ## SP0049
 

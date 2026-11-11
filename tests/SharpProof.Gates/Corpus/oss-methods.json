@@ -6675,7 +6675,7 @@
       "declarationSha256": "aca906e85c7e925cbf837d98cc68a36f52f76153340d412828b94abeeeb0345c",
       "methodName": "IdFn",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -7419,7 +7419,7 @@
       "declarationSha256": "f807ac3228c85413fde9601c1659ab82e6c8bf817a66839905a219c597b42923",
       "methodName": "ToString",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -7491,7 +7491,7 @@
       "declarationSha256": "f0132ff479210e44b44002657af11985efbf781e4bb6a48703bbcde803c5cc46",
       "methodName": "IsLeapYear",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -7539,8 +7539,8 @@
       "declarationSha256": "b25fcdef6e008c43a086e96223441b9ab93092e1e38e9c700be36e83f10e05b7",
       "methodName": "IsLeapYear",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0316",
@@ -7563,8 +7563,8 @@
       "declarationSha256": "db2bbcb89329b4888a51280e5576762e411290a1264676bbcc27030957b42a21",
       "methodName": "GetMonthsInYear",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0318",
@@ -7647,7 +7647,7 @@
       "declarationSha256": "8c71fd48c7a4360a25135d1fb855f50c2be721c2984d15adc35ca3b2219ebc51",
       "methodName": "DayOfMonth",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
@@ -8475,8 +8475,8 @@
       "declarationSha256": "9db6afea89818aff0c221a31af45eacc0a8afffdeb5b5c616a0401b5d7fe85b3",
       "methodName": "Match",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0394",
@@ -9507,7 +9507,7 @@
       "declarationSha256": "63617faaadd28c932d37f8f9c225606397372a6aa42eeb7bb13f57e619380739",
       "methodName": "IsAndSplitNeeded",
       "mode": "effects",
-      "expectedVerdict": "SilentUnknown",
+      "expectedVerdict": "Unknown",
       "support": "IntentionallyUnsupported"
     },
     {
