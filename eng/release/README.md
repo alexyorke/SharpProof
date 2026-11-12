@@ -9,8 +9,14 @@
    reasons, selection, assumptions, proof outcomes, and evidence formats even if
    application APIs are unchanged.
 3. Tag a `master` commit whose `ci.yml` run succeeded.
-4. The package job runs `tooling pack` and `tooling pack-tool` in the canonical Linux
-   amd64 container, then runs the package tests against that exact feed.
+4. The package job builds the consumer image (`./ci.sh consumer-image`): the
+   Dockerfile's `consumer` stage on top of the exact tooling image the job packs
+   with. A tagged canonical run pushes it to `ghcr.io/alexyorke/sharpproof-preview`
+   and pins its registry digest; GHCR creates a new package as private, so make
+   it public before announcing the release. The job then runs `tooling pack` and
+   `tooling pack-tool` in the canonical Linux amd64 container (`SharpProof.Templates`
+   pins the consumer image by that digest) and runs the package tests against that
+   exact feed. The uploaded artifact includes `consumer-image/reference.txt`.
 5. Native smoke jobs on `windows-latest` and `macos-latest` download those archives
    and require one Proven postcondition and its Refuted broken counterpart. These
    jobs use the runner's architecture and Core MSBuild; they do not qualify every
@@ -25,7 +31,9 @@
    release failure after the NuGet push does not roll back published packages.
 
 Manual dispatch on a branch exercises packaging and native smoke tests without
-publishing. Dispatch against a `v*` tag still satisfies the workflow's tag-gated
+publishing. Its consumer image stays on the runner, and the templates pin the
+local image ID instead of a registry digest, so a dispatch's packages are never
+release artifacts. `./ci.sh release-packages` runs the same dry run locally. Dispatch against a `v*` tag still satisfies the workflow's tag-gated
 publication conditions. A passing workflow definition or source version is not
 evidence that the corresponding packages have reached NuGet.org.
 

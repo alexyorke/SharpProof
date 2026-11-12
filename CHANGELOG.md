@@ -6,6 +6,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Build the consumer image in the release workflow. `SharpProof.Templates` pins
+  the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
+  and the release could not pack the templates. The package job now builds the
+  Dockerfile's `consumer` stage on the exact tooling image it packs with, pushes
+  it to `ghcr.io/alexyorke/sharpproof-preview` on tagged releases only, and passes
+  its digest to packing. A dispatch or a local `./ci.sh release-packages` keeps the
+  image local and publishes nothing.
 - Drop the separate logging assembly: `SharpProof.Logging.dll` is now part of
   the worker and is no longer in the verifier package. Nothing loads it by path
   outside the worker.
