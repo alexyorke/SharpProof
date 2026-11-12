@@ -6,18 +6,18 @@ namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerProtocolVersions
 {
-    public const string Current = "48";
+    public const string Current = "49";
     public const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 }
 
 internal static class WorkerCacheVersions
 {
-    public const int Current = 71;
+    public const int Current = 72;
 }
 
 internal static class WorkerManifestVersions
 {
-    public const int Current = 8;
+    public const int Current = 9;
 }
 
 internal static class WorkerLauncherDefaults
@@ -356,7 +356,9 @@ internal sealed record WorkerSourceLocation
 
 // The callee clause a call-precondition claim checks. The claim's own location
 // is the call. A clause in source has a ClauseLocation; a closed attribute read
-// from another assembly's metadata has a MetadataClause instead.
+// from another assembly's metadata has a MetadataClause instead. A clause
+// another project of the same build exported has a ClauseLocation in that
+// project and names it in ExportedBy.
 internal sealed record WorkerCallPreconditionTarget
 {
     [JsonRequired]
@@ -371,6 +373,10 @@ internal sealed record WorkerCallPreconditionTarget
     // in another assembly; the callee's own binary does not carry it.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool CallerDeclared { get; init; }
+    // The simple name of the referenced project whose contract export
+    // supplied this clause; its ClauseLocation is in that project's source.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExportedBy { get; init; }
 
     // Where the clause is declared, for a message.
     internal string DescribeClause(Func<WorkerSourceLocation, string> source)
@@ -378,7 +384,8 @@ internal sealed record WorkerCallPreconditionTarget
         source = RepositoryParameterGuard.NotNull(source, nameof(source));
         var declared = ClauseLocation is { } location ? "at " + source(location)
             : MetadataClause is { } metadata ? metadata.Describe() : string.Empty;
-        return CallerDeclared ? declared + ", declared by the calling project" : declared;
+        return CallerDeclared ? declared + ", declared by the calling project"
+            : ExportedBy is { } exporter ? declared + ", exported by " + exporter : declared;
     }
 
     // The callee without its assembly identity, which carries a version.
@@ -1101,6 +1108,8 @@ internal static class WorkerProtocolMetadata
         if (kind != WorkerClaimKind.CallPrecondition)
         { return target is null; }
         return target is not null && !string.IsNullOrWhiteSpace(target.Callee) && target.ClauseOrdinal >= 0 &&
+            (target.ExportedBy is null || !string.IsNullOrWhiteSpace(target.ExportedBy) && target.ExportedBy.Length <= 1024 &&
+                !target.CallerDeclared && target.ClauseLocation is not null) &&
             (target.ClauseLocation is { } location
                 ? target.MetadataClause is null && IsSourceLocationValid(location)
                 : target.MetadataClause is { } metadata && !target.CallerDeclared && IsMetadataClauseValid(metadata));

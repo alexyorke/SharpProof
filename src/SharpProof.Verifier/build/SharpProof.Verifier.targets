@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="_SharpProofCompilerCaptureNonce;_SharpProofCompilerCaptureRequestPath;TargetsTriggeredByCompilation;_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath;_SharpProofToolsDirectory">
+<Project TreatAsLocalProperty="_SharpProofContractsExportCompleted;_SharpProofCompilerCaptureNonce;_SharpProofCompilerCaptureRequestPath;TargetsTriggeredByCompilation;_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath;_SharpProofToolsDirectory">
   <Import Project="$(MSBuildThisFileDirectory)SharpProof.targets" Condition="'$(_SharpProofPortableTargetsImported)' != 'true' AND Exists('$(MSBuildThisFileDirectory)SharpProof.targets')" />
   <!-- NuGet imports package props before NETCoreSdkVersion is initialized by the SDK. -->
   <PropertyGroup>
@@ -18,6 +18,9 @@
     <_SharpProofWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofWorkerProtocolPath>
     <_SharpProofWorkerProtocolPath Condition="'$(_SharpProofTestWorkerProtocolPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestWorkerProtocolPath)'))</_SharpProofWorkerProtocolPath>
     <_SharpProofBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofBuildTasksPath>
+    <!-- Every compilation restamps this project's contract export or removes
+         it, so an export never outlives the sources it describes. -->
+    <TargetsTriggeredByCompilation>$(TargetsTriggeredByCompilation);_SharpProofStampContractsExport</TargetsTriggeredByCompilation>
   </PropertyGroup>
   <Target Name="_SharpProofSetVerifyActive"
           BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile;CoreCompile">
@@ -38,6 +41,9 @@
   <UsingTask TaskName="SharpProof.BuildTasks.ResetPublishedVerification"
              AssemblyFile="$(_SharpProofBuildTasksPath)"
              Condition="'$(MSBuildRuntimeType)' == 'Core'" />
+  <UsingTask TaskName="SharpProof.BuildTasks.StampContractsExport"
+             AssemblyFile="$(_SharpProofBuildTasksPath)"
+             Condition="'$(MSBuildRuntimeType)' == 'Core'" />
   <!-- Full MSBuild delegates modern .NET tasks to the SDK's separate task host. -->
   <UsingTask TaskName="SharpProof.BuildTasks.InvalidatePublishedResult"
              AssemblyFile="$(_SharpProofBuildTasksPath)" Runtime="NET" TaskFactory="TaskHostFactory"
@@ -49,6 +55,9 @@
              AssemblyFile="$(_SharpProofBuildTasksPath)" Runtime="NET" TaskFactory="TaskHostFactory"
              Condition="'$(MSBuildRuntimeType)' == 'Full' AND '$(UsingMicrosoftNETSdk)' == 'true' AND $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
   <UsingTask TaskName="SharpProof.BuildTasks.ResetPublishedVerification"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" Runtime="NET" TaskFactory="TaskHostFactory"
+             Condition="'$(MSBuildRuntimeType)' == 'Full' AND '$(UsingMicrosoftNETSdk)' == 'true' AND $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
+  <UsingTask TaskName="SharpProof.BuildTasks.StampContractsExport"
              AssemblyFile="$(_SharpProofBuildTasksPath)" Runtime="NET" TaskFactory="TaskHostFactory"
              Condition="'$(MSBuildRuntimeType)' == 'Full' AND '$(UsingMicrosoftNETSdk)' == 'true' AND $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '18.0'))" />
 
@@ -124,6 +133,9 @@
       <_SharpProofCompilerManifestPath Condition="'$(_SharpProofCompilerManifestPath)' == ''">$(_SharpProofCompilerManifestStagingPath)</_SharpProofCompilerManifestPath>
       <_SharpProofCompilerCaptureNonce>$([System.Guid]::NewGuid().ToString('N'))</_SharpProofCompilerCaptureNonce>
       <_SharpProofCompilerCaptureRequestPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-capture.request'))</_SharpProofCompilerCaptureRequestPath>
+      <!-- The collector writes this project's contract export here; the
+           stamp step publishes it as contracts-export.json. -->
+      <_SharpProofContractsExportPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'contracts-export.unstamped.json'))</_SharpProofContractsExportPath>
       <TargetsTriggeredByCompilation>$(TargetsTriggeredByCompilation);_SharpProofValidateCompilerCapture</TargetsTriggeredByCompilation>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
@@ -131,6 +143,8 @@
       <!-- A rejected capture is removed, so the next build must recollect even
            when the preceding compiler emitted an otherwise current assembly. -->
       <CustomAdditionalCompileOutputs Include="$(_SharpProofCompilerManifestPath)" />
+      <CustomAdditionalCompileOutputs Include="$(_SharpProofContractsExportPath)" />
+      <CustomAdditionalCompileOutputs Include="$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'contracts-export.json'))" />
       <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
       <_SharpProofCompilerOwnedOutput Include="$(_SharpProofCompilerCaptureRequestPath)" />
       <_SharpProofCompilerOwnedOutput Include="$(_SharpProofCompilerCaptureRequestPath).completed" />
@@ -190,6 +204,76 @@
     <Error Code="SP0049"
            Condition="'@(_SharpProofCompletedCapture)' != '$(_SharpProofCompilerCaptureNonce)' OR !Exists('$(_SharpProofCompilerManifestPath)')"
            Text="SharpProof did not receive a fresh final compiler manifest for this compilation. Ensure the SharpProof compiler collector runs when verification is enabled." />
+  </Target>
+
+  <!-- Stamps the collector's contract export with the reference and
+       implementation images this compilation produced. Without a completed
+       capture of this very compilation the previous export is removed. -->
+  <Target Name="_SharpProofStampContractsExport"
+          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_SharpProofContractsExportDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofContractsExportDirectory>
+      <_SharpProofContractsExportCompleted>false</_SharpProofContractsExportCompleted>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SharpProofContractsExportCapture Remove="@(_SharpProofContractsExportCapture)" />
+    </ItemGroup>
+    <ReadLinesFromFile File="$(_SharpProofCompilerCaptureRequestPath).completed"
+                       Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofCompilerCaptureRequestPath)' != '' AND Exists('$(_SharpProofCompilerCaptureRequestPath).completed')">
+      <Output TaskParameter="Lines" ItemName="_SharpProofContractsExportCapture" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_SharpProofContractsExportCompleted Condition="'$(_SharpProofCompilerCaptureNonce)' != '' AND '@(_SharpProofContractsExportCapture)' == '$(_SharpProofCompilerCaptureNonce)'">true</_SharpProofContractsExportCompleted>
+    </PropertyGroup>
+    <SharpProof.BuildTasks.StampContractsExport
+        UnstampedPath="$([System.IO.Path]::Combine('$(_SharpProofContractsExportDirectory)', 'contracts-export.unstamped.json'))"
+        OutputPath="$([System.IO.Path]::Combine('$(_SharpProofContractsExportDirectory)', 'contracts-export.json'))"
+        ImplementationAssembly="@(IntermediateAssembly->'%(FullPath)')"
+        ReferenceAssembly="@(IntermediateRefAssembly->'%(FullPath)')"
+        CaptureCompleted="$(_SharpProofContractsExportCompleted)"
+        ProjectDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- A referencing project asks for this project's stamped contract export
+       with the same global properties it resolved the reference with. -->
+  <Target Name="SharpProofGetContractsExport"
+          Returns="@(_SharpProofContractsExportOutput)">
+    <PropertyGroup>
+      <_SharpProofContractsExportOutputPath>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof', 'contracts-export.json'))))</_SharpProofContractsExportOutputPath>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SharpProofContractsExportOutput Remove="@(_SharpProofContractsExportOutput)" />
+      <_SharpProofContractsExportOutput Include="$(_SharpProofContractsExportOutputPath)"
+                                        Condition="Exists('$(_SharpProofContractsExportOutputPath)')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Each project reference built in this build may publish a contract
+       export. It reaches the compiler collector as an additional file with
+       dedicated metadata; the collector accepts it only when its stamp names
+       the reference image this compilation resolved. It follows reference
+       resolution and never forces it: an invocation that does not resolve
+       references passes no export. -->
+  <Target Name="_SharpProofResolveContractExports"
+          DependsOnTargets="_SharpProofSetVerifyActive"
+          AfterTargets="ResolveProjectReferences"
+          BeforeTargets="_SharpProofInitializeVerify;GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile;CoreCompile"
+          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <ItemGroup>
+      <_SharpProofContractExport Remove="@(_SharpProofContractExport)" />
+    </ItemGroup>
+    <MSBuild Projects="@(_MSBuildProjectReferenceExistent)"
+             Targets="SharpProofGetContractsExport"
+             BuildInParallel="$(BuildInParallel)"
+             SkipNonexistentTargets="true"
+             Properties="%(_MSBuildProjectReferenceExistent.SetConfiguration); %(_MSBuildProjectReferenceExistent.SetPlatform); %(_MSBuildProjectReferenceExistent.SetTargetFramework)"
+             RemoveProperties="%(_MSBuildProjectReferenceExistent.GlobalPropertiesToRemove)$(_GlobalPropertiesToRemoveFromProjectReferences)"
+             Condition="'$(_SharpProofVerifyActive)' == 'true' AND '%(_MSBuildProjectReferenceExistent.ReferenceOutputAssembly)' != 'false'">
+      <Output TaskParameter="TargetOutputs" ItemName="_SharpProofContractExport" />
+    </MSBuild>
+    <ItemGroup Condition="'$(_SharpProofVerifyActive)' == 'true'">
+      <AdditionalFiles Include="@(_SharpProofContractExport)" SharpProofContractsExport="true" />
+    </ItemGroup>
   </Target>
 
   <Target Name="_SharpProofCleanupInvocation"
@@ -316,6 +400,7 @@
       <_SharpProofCleanManifestFile>$(_SharpProofEffectiveCompilerManifestFile)</_SharpProofCleanManifestFile>
       <_SharpProofCleanSarifFile>$(_SharpProofEffectiveSarifFile)</_SharpProofCleanSarifFile>
     </PropertyGroup>
+    <Delete Files="$(_SharpProofCleanVerifyDirectory)/contracts-export.json;$(_SharpProofCleanVerifyDirectory)/contracts-export.unstamped.json" />
     <SharpProof.BuildTasks.ResetPublishedVerification
         RequestPath="$(_SharpProofCleanRequestFile)"
         ResultPath="$(_SharpProofCleanResultFile)"

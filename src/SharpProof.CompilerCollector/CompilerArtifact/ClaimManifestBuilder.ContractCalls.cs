@@ -63,7 +63,7 @@ internal sealed partial class ClaimManifestBuilder
         var callees = selected.Values
             .Where(static target => target.Entry.Assumptions.Any(static assumption => assumption.Kind == WorkerAssumptionKind.Precondition))
             .Select(static target => target.Method);
-        foreach (var callee in callees.Concat(MetadataPreconditionCallees()))
+        foreach (var callee in callees.Concat(MetadataPreconditionCallees()).Concat(ContractExports.Callees(_compilation, cancellationToken)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (callee.MethodKind == MethodKind.Constructor)
@@ -169,11 +169,20 @@ internal sealed partial class ClaimManifestBuilder
             method = RepositoryParameterGuard.NotNull(method, nameof(method));
             if (!known.TryGetValue(method, out var result))
             {
-                result = _effectSession.HasPotentialCallPreconditions(method);
+                result = HasPotentialCallPreconditions(method);
                 known.Add(method, result);
             }
             return result;
         }
+    }
+
+    // A callee whose preconditions the compiler can see, or whose project
+    // exported Requires for it. A call to an exported callee that attaches no
+    // claim (dispatched, incomplete or not importable) is counted unchecked.
+    private bool HasPotentialCallPreconditions(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return _effectSession.HasPotentialCallPreconditions(method) || ContractExports.Covers(method);
     }
 
     // Matches the site a call-precondition claim records, which for a setter

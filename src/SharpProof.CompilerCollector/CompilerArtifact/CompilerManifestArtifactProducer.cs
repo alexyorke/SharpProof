@@ -10,8 +10,10 @@ internal static class CompilerManifestArtifactProducer
         int maximumExpressionDepth, CancellationToken cancellationToken,
         ImmutableArray<AdditionalText> additionalFiles = default,
         ImmutableArray<string> specificationPacks = default,
-        long callerSelectionBytes = CompilerManifestArtifactFile.CallerSelectionBytes)
+        long callerSelectionBytes = CompilerManifestArtifactFile.CallerSelectionBytes,
+        CompilerContractExports? contractExports = null)
     {
+        contractExports ??= CompilerContractExports.Empty;
 
 
         if (additionalFiles.IsDefault)
@@ -31,7 +33,9 @@ internal static class CompilerManifestArtifactProducer
         {
             SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
             SpecificationPackCatalogVersion = specificationPackAuthority.SpecificationPackCatalogVersion,
-            SpecificationPackCatalogSha256 = specificationPackAuthority.SpecificationPackCatalogSha256
+            SpecificationPackCatalogSha256 = specificationPackAuthority.SpecificationPackCatalogSha256,
+            // The worker accepts an exported row only for an export recorded here.
+            ContractExports = contractExports.Snapshots.IsEmpty ? default : contractExports.Snapshots
         };
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error &&
@@ -64,7 +68,8 @@ internal static class CompilerManifestArtifactProducer
                     compilation,
                     specificationPackAuthority,
                     snapshot.SyntaxTrees,
-                    snapshot.References);
+                    snapshot.References,
+                    contractExports);
                 return new CompilerCallPreconditionClaims.LoweredCallable(item, lowerer.Prepare(item, cancellationToken));
             })];
             if (features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All)

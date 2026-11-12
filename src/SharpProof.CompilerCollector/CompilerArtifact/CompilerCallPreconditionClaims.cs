@@ -151,9 +151,12 @@ internal static class CompilerCallPreconditionClaims
                 {
                     Callee = row.CalleeIdentity,
                     ClauseOrdinal = row.ClauseOrdinal,
-                    ClauseLocation = row.MetadataClause == null ? Project(documents, factory.GetOperationInfo(row.ClauseSite).SourceSpan!) : null,
+                    // An exported clause is declared in the exporting project.
+                    ClauseLocation = row.ExportedClause is { } exported ? exported.Location
+                        : row.MetadataClause == null ? Project(documents, factory.GetOperationInfo(row.ClauseSite).SourceSpan!) : null,
                     MetadataClause = row.MetadataClause is { } origin ? MetadataClause(row.CalleeIdentity, origin) : null,
-                    CallerDeclared = row.CallerDeclared
+                    CallerDeclared = row.CallerDeclared,
+                    ExportedBy = row.ExportedClause?.AssemblyName
                 },
                 Location = Project(documents, factory.GetOperationInfo(markers[row.Instruction].Operation).SourceSpan!)
             });

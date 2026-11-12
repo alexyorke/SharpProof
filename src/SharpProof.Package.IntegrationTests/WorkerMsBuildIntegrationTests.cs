@@ -2862,6 +2862,144 @@ public sealed class WorkerMsBuildIntegrationTests
         }
     }
 
+    private const string ExportingLibrarySource = """
+        using SharpProof.Attributes;
+        public static class Remote {
+            public static int Take(int n) {
+                Contract.Requires(n > 0);
+                return n;
+            }
+        }
+        public sealed class Counter {
+            private int _limit = 10;
+            public int Below(int n) {
+                Contract.Requires(n < _limit);
+                return n;
+            }
+        }
+        public class Shape {
+            public virtual int Area(int side) {
+                Contract.Requires(side > 0);
+                return side * side;
+            }
+        }
+        """;
+
+    private const string ExportingConsumerSource = """
+        public static class Consumer {
+            public static int Bad() { return Remote.Take(0); }
+            public static int Good() { return Remote.Take(5); }
+            public static int Dispatched(Shape shape) { return shape.Area(0); }
+            public static int State(Counter counter) { return counter.Below(3); }
+        }
+        """;
+
+    private static ImmutableArray<(string Caller, string? ExportedBy, WorkerClaimOutcome Outcome)> ExportedOutcomes(WorkerVerifyResponse response)
+    {
+        System.ArgumentNullException.ThrowIfNull(response);
+        return [.. response.Manifest.Claims.Where(static claim => claim.Kind == WorkerClaimKind.CallPrecondition)
+            .Select(claim => (claim.CallableId, claim.CallPrecondition!.ExportedBy,
+                response.ClaimResults.Single(result => result.ClaimId == claim.ClaimId).Outcome))];
+    }
+
+    // A referenced project in the same build exports the Requires of its
+    // callables. The consumer checks them at its calls, cites the library's
+    // clause, and counts every call it cannot check.
+    [Test]
+    public async Task StrictBuildChecksExportedRequiresOfAReferencedProject()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateWithVerifiedLibrary(ExportingConsumerSource, ExportingLibrarySource);
+        var build = await project.BuildAsync(verify: null, []);
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        var outcomes = ExportedOutcomes(response);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(build.Output, Does.Contain("error SP0051").And.Contain("Library.cs(4,").And.Contain("exported by Library"), build.Output);
+            Assert.That(outcomes.Where(static row => row.Caller.Contains("Bad", StringComparison.Ordinal)).Select(static row => (row.ExportedBy, row.Outcome)),
+                Is.EqualTo(new[] { ((string?)"Library", WorkerClaimOutcome.Refuted) }));
+            Assert.That(outcomes.Where(static row => row.Caller.Contains("Good", StringComparison.Ordinal)).Select(static row => (row.ExportedBy, row.Outcome)),
+                Is.EqualTo(new[] { ((string?)"Library", WorkerClaimOutcome.Proven) }));
+            // Dispatch and a clause that reads a field are excluded, and counted.
+            Assert.That(outcomes.Select(static row => row.Caller), Has.None.Contains("Dispatched").And.None.Contains("State"));
+            Assert.That(response.Manifest.UncheckedCallSites, Is.EqualTo(2));
+            Assert.That(File.Exists(project.LibraryContractsExportPath("net8.0")), Is.True);
+        }
+    }
+
+    // An export the build did not regenerate for the library it now
+    // references, or one whose stamp was altered, is never checked: its
+    // callees' calls are counted unchecked instead.
+    [Test]
+    public async Task StaleOrForgedExportLeavesCallsUnchecked()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateWithVerifiedLibrary(ExportingConsumerSource, ExportingLibrarySource);
+        _ = await project.BuildAsync(verify: null, []);
+        var exportPath = project.LibraryContractsExportPath("net8.0");
+        var original = await File.ReadAllTextAsync(exportPath);
+        Assert.That(ExportedOutcomes(WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!)
+            .Select(static row => row.ExportedBy), Has.Member("Library"));
+
+        // A new public member changes the reference image the consumer binds.
+        project.WriteLibrarySource(ExportingLibrarySource.Replace("public static class Remote {",
+            "public static class Remote { public static int Added() => 1;", StringComparison.Ordinal));
+        _ = await project.BuildAsync(verify: null, []);
+        Assert.That(await File.ReadAllTextAsync(exportPath), Is.Not.EqualTo(original));
+        await File.WriteAllTextAsync(exportPath, original, new System.Text.UTF8Encoding(false));
+        var stale = await project.BuildAsync(verify: null, []);
+        var staleResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(stale.ExitCode, Is.Zero, stale.Output);
+            Assert.That(ExportedOutcomes(staleResponse), Is.Empty);
+            Assert.That(staleResponse.Manifest.UncheckedCallSites, Is.EqualTo(4));
+        }
+
+        // Restamp the current export with image hashes nothing produced. The
+        // consumer binds the reference image, so every stamped image changes.
+        project.WriteLibrarySource(ExportingLibrarySource);
+        _ = await project.BuildAsync(verify: null, []);
+        var current = await File.ReadAllTextAsync(exportPath);
+        var stamps = System.Text.RegularExpressions.Regex.Matches(current, "\"sha256\":\"[0-9a-f]{64}\"");
+        Assert.That(stamps, Has.Count.EqualTo(2), current);
+        await File.WriteAllTextAsync(exportPath, System.Text.RegularExpressions.Regex.Replace(current, "\"sha256\":\"[0-9a-f]{64}\"",
+            "\"sha256\":\"" + new string('0', 64) + "\""), new System.Text.UTF8Encoding(false));
+        var forged = await project.BuildAsync(verify: null, []);
+        var forgedResponse = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(forged.ExitCode, Is.Zero, forged.Output);
+            Assert.That(ExportedOutcomes(forgedResponse), Is.Empty);
+            Assert.That(forgedResponse.Manifest.UncheckedCallSites, Is.EqualTo(4));
+        }
+    }
+
+    // A multi-targeting library exports per target framework; the consumer
+    // reads the export of the framework it references.
+    [Test]
+    public async Task MultiTargetLibraryExportsPerFramework()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateWithVerifiedLibrary(ExportingConsumerSource, ExportingLibrarySource,
+            libraryFrameworks: "net8.0;net10.0");
+        var library = await project.BuildLibraryAsync();
+        Assert.That(library.ExitCode, Is.Zero, library.Output);
+        var build = await project.BuildAsync(verify: null, []);
+        var response = WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(project.ResultPath))!;
+        var manifest = await File.ReadAllTextAsync(project.CompilerManifestPath);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(File.Exists(project.LibraryContractsExportPath("net8.0")), Is.True);
+            Assert.That(File.Exists(project.LibraryContractsExportPath("net10.0")), Is.True);
+            Assert.That(manifest, Does.Contain("Library/obj/Release/net8.0/SharpProof/contracts-export.json"));
+            Assert.That(ExportedOutcomes(response).Select(static row => row.Outcome),
+                Is.EquivalentTo(new[] { WorkerClaimOutcome.Refuted, WorkerClaimOutcome.Proven }));
+        }
+    }
+
     private static string CallPreconditionSource(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -3358,6 +3496,57 @@ public sealed class WorkerMsBuildIntegrationTests
                 project.Dispose();
                 throw;
             }
+        }
+
+        // The consumer references a verified library project in Library/,
+        // which exports the Requires of its callables. The consumer verifies
+        // with require-proven; the library only verifies, advisory.
+        internal static ConsumerProject CreateWithVerifiedLibrary(string source, string librarySource,
+            string libraryFrameworks = "net8.0")
+        {
+            System.ArgumentNullException.ThrowIfNull(source);
+            System.ArgumentNullException.ThrowIfNull(librarySource);
+            System.ArgumentNullException.ThrowIfNull(libraryFrameworks);
+            var project = CreateCore(source, useSpaces: false,
+                [("SharpProofVerify", "true"), ("SharpProofVerifyPolicy", "require-proven")], items: """
+                    <Compile Remove="Library/**" />
+                    <ProjectReference Include="Library/Library.csproj" />
+                """);
+            try
+            {
+                var library = Directory.CreateDirectory(Path.Combine(project._root, "Library")).FullName;
+                project.WriteLibrarySource(librarySource);
+                ImmutableArray<(string Name, string Value)> properties = libraryFrameworks.Contains(';', StringComparison.Ordinal)
+                    ? [("SharpProofVerify", "true"), ("TargetFrameworks", libraryFrameworks)]
+                    : [("SharpProofVerify", "true"), ("TargetFramework", libraryFrameworks)];
+                File.WriteAllText(Path.Combine(library, "Library.csproj"), CreateProjectXml(properties),
+                    new System.Text.UTF8Encoding(false));
+                return project;
+            }
+            catch
+            {
+                project.Dispose();
+                throw;
+            }
+        }
+
+        internal void WriteLibrarySource(string source)
+        {
+            System.ArgumentNullException.ThrowIfNull(source);
+            File.WriteAllText(Path.Combine(_root, "Library", "Library.cs"), source, new System.Text.UTF8Encoding(false));
+        }
+
+        // Builds every target framework of the library on its own.
+        internal Task<BuildResult> BuildLibraryAsync()
+        {
+            return RunDotNetAsync(["build", Path.Combine(_root, "Library", "Library.csproj"), "-c", "Release", "--nologo",
+                "/m:1", "/nodeReuse:false"]);
+        }
+
+        internal string LibraryContractsExportPath(string framework)
+        {
+            System.ArgumentNullException.ThrowIfNull(framework);
+            return Path.Combine(_root, "Library", "obj", "Release", framework, "SharpProof", "contracts-export.json");
         }
 
         internal static ConsumerProject CreateWithLongPath(string source)

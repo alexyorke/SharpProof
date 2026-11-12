@@ -8,6 +8,8 @@ internal static class FinalCompilationCollector
         TargetFrameworkOption = "build_property._SharpProofCompilationTargetFramework",
         CaptureRequestOption = "build_property._SharpProofCompilerCaptureRequestPath",
         ProjectDirectoryOption = "build_property._SharpProofProjectDirectory",
+        ContractsExportOption = "build_property._SharpProofContractsExportPath",
+        ContractsExportMetadata = "build_metadata.AdditionalFiles.SharpProofContractsExport",
         SpecificationPacksOption =
             "build_property.SharpProofSpecificationPacks",
         MaximumExpressionDepthOption =
@@ -53,6 +55,16 @@ internal static class FinalCompilationCollector
             var serialized = Create(context, options, configuration);
             context.CancellationToken.ThrowIfCancellationRequested();
             AtomicFile.WriteUtf8(path, serialized);
+            // This project's own export is written before the capture is
+            // marked complete: the stamp step trusts only a completed capture.
+            var exportPath = Get(options, ContractsExportOption);
+            if (!string.IsNullOrWhiteSpace(exportPath) && context.Compilation is CSharpCompilation exporting)
+            {
+                var export = CompilerContractsExportProducer.Create(exporting, Get(options, TargetFrameworkOption),
+                    context.CancellationToken);
+                context.CancellationToken.ThrowIfCancellationRequested();
+                AtomicFile.WriteUtf8(exportPath, CompilerContractsExportJson.Serialize(export));
+            }
             if (invocation != null)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
@@ -90,8 +102,18 @@ internal static class FinalCompilationCollector
         var targetFramework = Get(options, TargetFrameworkOption);
         var features = configuration.Features == SharpProofFeatures.Effects ? WorkerFeatureSet.Effects :
             configuration.Features == SharpProofFeatures.Contracts ? WorkerFeatureSet.Contracts : WorkerFeatureSet.All;
-        var discovery = new ClaimManifestBuilder(
-            compilation, features, context.CancellationToken).Build();
+        // Exports of referenced projects arrive as additional files that the
+        // MSBuild targets mark with dedicated item metadata.
+        ImmutableArray<AdditionalText> exportFiles = [.. context.Options.AdditionalFiles.Where(file =>
+            context.Options.AnalyzerConfigOptionsProvider.GetOptions(file).TryGetValue(ContractsExportMetadata, out var marked) &&
+            string.Equals(marked, "true", StringComparison.OrdinalIgnoreCase))];
+        var exports = CompilerContractExports.Load(compilation, exportFiles, Get(options, ProjectDirectoryOption),
+            context.CancellationToken);
+        var builder = new ClaimManifestBuilder(compilation, features, context.CancellationToken)
+        {
+            ContractExports = exports
+        };
+        var discovery = builder.Build();
         if (!int.TryParse(
                 Get(options, MaximumExpressionDepthOption),
                 System.Globalization.NumberStyles.None,
@@ -108,7 +130,8 @@ internal static class FinalCompilationCollector
             targetFramework, features, discovery, maximumExpressionDepth,
             context.CancellationToken,
             context.Options.AdditionalFiles,
-            ParseSpecificationPacks(Get(options, SpecificationPacksOption)));
+            ParseSpecificationPacks(Get(options, SpecificationPacksOption)),
+            contractExports: exports);
         return CompilerManifestArtifactJson.SerializeProducerValidated(artifact, context.CancellationToken);
     }
 

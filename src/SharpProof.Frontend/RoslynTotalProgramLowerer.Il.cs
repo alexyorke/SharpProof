@@ -343,8 +343,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // The clauses of a call into another assembly, checked before the callee
     // runs: first those of a companion the calling project declares, then the
-    // callee's closed parameter attributes. Each is an obligation of this
-    // caller, never an assumption after the call. `arguments` is indexed by
+    // callee's closed parameter attributes, then the Requires its own project
+    // exported. Each is an obligation of this caller, never an assumption
+    // after the call. `arguments` is indexed by
     // parameter ordinal and holds values pinned where they were evaluated.
     private void RecordMetadataCallPreconditions(IOperation call, TotalLoweringContext frame, ImmutableArray<IrTerm> arguments,
         IrBlockId block)
@@ -394,6 +395,15 @@ internal sealed partial class RoslynTotalProgramLowerer
             { throw new RegionIncompleteException(); }
             Record(name, new(identity, ordinal, clause.ClauseSite, IrSubstitution.Substitute(factory, clause.Value, replacements),
                 IrSubstitution.Substitute(factory, clause.Safe, replacements), clause, ancestry));
+            ordinal++;
+        }
+        foreach (var clause in frame.ExportedCallPreconditions)
+        {
+            SpendRegion();
+            if (!_calls!.Spend() || !IrCallPreconditionMarker.TryCreateMetadataName(identity, ordinal, callSpan, clause.EvidenceDigest, out var name))
+            { throw new RegionIncompleteException(); }
+            Record(name, new(identity, ordinal, clause.ClauseSite, IrSubstitution.Substitute(factory, clause.Value, replacements),
+                IrSubstitution.Substitute(factory, clause.Safe, replacements), ancestry: ancestry, exportedClause: clause));
             ordinal++;
         }
 
