@@ -50,6 +50,26 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Prove effect claims in assemblies with more than 4,096 symbols. The check that
+  entry initialization has no effects walked at most 4,096 symbols looking for a
+  `[ModuleInitializer]` and treated a longer walk as finding one. So every purity,
+  allocation, capability and effect-contract claim in a larger assembly stayed
+  Unknown, and so did exception claims, whose module check shared the bound. The
+  search now visits every method member, accessors and operators included, once
+  per compilation, with no symbol bound. Two NodaTime
+  corpus methods, `JulianYearMonthDayCalculator.IsLeapYear` and
+  `RegularYearMonthDayCalculator.GetMonthsInYear`, are now Proven. A third,
+  `ValueCursor.Match`, is now Refuted: it advances the cursor.
+- Name the entry initialization that leaves an effect claim Unknown. When the
+  analyzer finds no site that could violate a purity, allocation, capability or
+  effect-contract claim, but the worker cannot prove it because the type or module
+  initializer is not known to be effect-free, SP0047 now reports
+  `Advisory:EntryInitialization:TypeInitializer`, `ModuleInitializer` or
+  `CalleeTypeInitializer`. Previously the claim was Unknown with no diagnostic. The
+  corpus no longer has silent Unknowns: five trivially pure methods from MoreLINQ,
+  NodaTime and Humanizer, in types with constructed static fields, now carry this
+  reason. Type initializers are still treated as entry effects, so these methods
+  remain Unknown.
 - Check the `Contract.Requires` of project references built in the same build. A
   verified project now writes a contract export per target framework
   (`obj/.../SharpProof/contracts-export.json`) with the clauses of its public and

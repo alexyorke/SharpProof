@@ -17,8 +17,9 @@ internal sealed class NativeEffectOracleGateTests
 {
     // The receipt hashes the complete manifest, including review metadata.
     // The reviewed OSS0015 correction (Corpus/README.md) reclassifies one method; all pinned source and declaration hashes
-    // remain unchanged. The universe spans every pinned source's methods (500 since the multi-source corpus).
-    private const string ReviewedUniverseSha256 = "4431116D1F730EA2F86FE9959F3B779AF7F9FEAE9F0303074B6077FF2FF2541F";
+    // remain unchanged. The universe spans every pinned source's methods (500 since the multi-source corpus). The
+    // exact module-initializer search re-reviewed eight expected verdicts and three support labels (Corpus/README.md).
+    private const string ReviewedUniverseSha256 = "76886864DD821F6C86DF286E5AD754071C87373538D55CFA7AA223D2984A8C2D";
 
     [Test]
     public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()

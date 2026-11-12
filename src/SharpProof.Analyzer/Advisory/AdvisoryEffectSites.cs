@@ -27,6 +27,10 @@ internal sealed record AdvisoryEffectSite(AdvisoryEffectSiteKind Kind, Location 
 
 internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite> Sites, string? Gap)
 {
+    // False when a callee's type initialization writes mutable static state
+    // the body does not model; the worker then has no complete effect
+    // summary at entry.
+    internal bool SourceInitializationEffectsComplete { get; init; } = true;
     public ImmutableArray<AdvisoryEffectSite> Sites { get; init; } = Sites.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Sites)) : Sites;
 }
 
@@ -49,7 +53,8 @@ internal static class AdvisoryEffectSites
         var (body, gap) = AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken);
         if (body == null)
         { return Gap(gap ?? throw new System.InvalidOperationException("Lowering returned no body and no gap reason.")); }
-        return Analyze(body.Program, body.Locate, method.Locations.FirstOrDefault() ?? Location.None, cancellationToken);
+        return Analyze(body.Program, body.Locate, method.Locations.FirstOrDefault() ?? Location.None, cancellationToken) with
+        { SourceInitializationEffectsComplete = body.Lowering.SourceInitializationEffectsComplete };
     }
 
     internal static AdvisoryEffectAnalysis Analyze(IrProgram program, Func<OperationId, Location?> locate,
