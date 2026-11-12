@@ -238,8 +238,10 @@ fuzz_shard() {
 consumer_image() {
   local repository="${SHARPPROOF_CONSUMER_REPOSITORY:-ghcr.io/alexyorke/sharpproof-preview}"
   local version digest output=(--load)
-  version="$(pwsh -NoLogo -NoProfile -Command \
-    'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
+  # The host needs only Docker: PowerShell runs in the tooling image.
+  version="$(docker run --rm --platform linux/amd64 --entrypoint pwsh -e SHARPPROOF_CI_PACKAGE_VERSION \
+    --volume "$(docker_host_path "$PWD"):/repo:ro" --workdir /repo "$image" -NoLogo -NoProfile -Command \
+    'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')" || return
   mkdir -p artifacts/consumer-image
   if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" == 1 ]]; then
     output=(--push --metadata-file artifacts/consumer-image/metadata.json)
