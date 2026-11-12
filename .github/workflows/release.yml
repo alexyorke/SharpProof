@@ -22,6 +22,9 @@ jobs:
     name: Pack and test packages
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,7 +40,17 @@ jobs:
 
       - uses: ./.github/actions/setup-tooling
 
+      # Only a tagged canonical release pushes the consumer image that the
+      # templates pin; a dispatch keeps it local and publishes nothing.
+      - name: Log in to GHCR to publish the consumer image
+        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+        env:
+          TOKEN: ${{ github.token }}
+        run: docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin <<< "$TOKEN"
+
       - name: ./ci.sh release-packages
+        env:
+          SHARPPROOF_CONSUMER_PUSH: ${{ startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof' && '1' || '' }}
         run: ./ci.sh release-packages
 
       - name: Upload packages
@@ -48,6 +61,7 @@ jobs:
             artifacts/container-packages/*.nupkg
             artifacts/container-packages/*.snupkg
             artifacts/tool-packages/*.nupkg
+            artifacts/consumer-image/reference.txt
           if-no-files-found: error
 
   # Every other job runs on Linux; these load the Windows and macOS payloads.
