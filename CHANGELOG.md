@@ -6,6 +6,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Build the consumer image in the release workflow. `SharpProof.Templates` pins
+  the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
+  and the release could not pack the templates. The package job now builds the
+  Dockerfile's `consumer` stage on the exact tooling image it packs with, pushes
+  it to `ghcr.io/alexyorke/sharpproof-preview` on tagged releases only, and passes
+  its digest to packing. A dispatch or a local `./ci.sh release-packages` keeps the
+  image local and publishes nothing.
 - Drop the separate logging assembly: `SharpProof.Logging.dll` is now part of
   the worker and is no longer in the verifier package. Nothing loads it by path
   outside the worker.
@@ -155,7 +162,8 @@ Entries describe repository changes, not package publication. Confirm available 
   the worker result's `summary.costs`, absent on cache hits (protocol 48, cache 71).
   A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
   lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
-  solver work with an advisory reference in `eng/acceptance/perf-baseline.json`.
+  solver work with the reference in `eng/acceptance/perf-baseline.json`. Nightly
+  fails when total solver work rises more than 25% above it.
 - Add an advisory nightly `perf-self` step that verifies SharpProof's own `src/`
   projects and summarizes per-project solver work, time and the costliest callables
   in `artifacts/perf/self-summary.md`. It never fails on outcomes or cost.
