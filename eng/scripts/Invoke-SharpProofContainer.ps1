@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'perf-baseline', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'perf-baseline', 'perf-self', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -338,6 +338,153 @@ function Invoke-ProductPack {
     }
 }
 
+function Get-SelfApplicationSourceProject {
+    $trackedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            & git -C $repositoryRoot ls-files -- '*.csproj' |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object {
+                    Join-Path $repositoryRoot $_
+                } |
+                Sort-Object
+        ))
+    if ($LASTEXITCODE -ne 0 -or $trackedProjects.Length -eq 0) {
+        throw "$Command requires a Git-backed repository with tracked project files."
+    }
+
+    $sourceProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
+            $trackedProjects |
+                Where-Object {
+                    $relative = [IO.Path]::GetRelativePath(
+                        $repositoryRoot, $_).Replace('\', '/')
+                    $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
+                    -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
+                }
+        ))
+    if ($sourceProjects.Length -eq 0) {
+        throw "$Command found no source-tree projects to analyze."
+    }
+    return , $sourceProjects
+}
+
+function Invoke-SelfApplicationBootstrapBuild {
+    # Build the complete source tree once with the self lane disabled so
+    # every analyzer and generator output is available as a stable input.
+    # Analyzer diagnostics are not needed here: the build lane already
+    # enforces them, and the per-project builds add SharpProof's.
+    Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
+    Invoke-SharpProofRequiredDotnet @(
+        'build', 'SharpProof.slnx', '--configuration', $Configuration,
+        '--no-restore', '--nologo',
+        '-p:RunAnalyzersDuringBuild=false',
+        '-p:SharpProofSelfApplication=false',
+        '-p:SharpProofProfile=off',
+        '-p:SharpProofVerify=false',
+        '-p:GeneratePackageOnBuild=false')
+}
+
+function New-SelfApplicationBuildArgument(
+    [string]$Project,
+    [string[]]$AdditionalArguments = @()) {
+    $arguments = [Collections.Immutable.ImmutableArray]::CreateBuilder[string]()
+    $arguments.AddRange([string[]]@(
+            'build', $Project, '--configuration', $Configuration,
+            '--no-restore', '--no-dependencies', '--nologo',
+            '-p:EnableNETAnalyzers=false',
+            '-p:EnforceCodeStyleInBuild=false',
+            '-p:SharpProofSelfApplication=true',
+            '-p:SharpProofProfile=advisory',
+            '-p:SharpProofFeatures=all',
+            '-p:GeneratePackageOnBuild=false'))
+    if ($AdditionalArguments.Count -eq 0) {
+        $arguments.Add('-p:SharpProofVerify=false')
+    }
+    else {
+        $arguments.AddRange($AdditionalArguments)
+    }
+    return , $arguments.ToImmutable()
+}
+
+function Get-PerfOwnedDirectory([string]$RelativePath) {
+    $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
+    $path = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $RelativePath))
+    if (-not $path.StartsWith(
+            $artifactsRoot + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::Ordinal)) {
+        throw "Refusing to clean perf output outside artifacts: $path"
+    }
+    if ([IO.Directory]::Exists($path)) {
+        [IO.Directory]::Delete($path, $true)
+    }
+    [void][IO.Directory]::CreateDirectory($path)
+    return $path
+}
+
+# Packs the verifier from the bootstrap build and extracts it, so the
+# self-application builds can import it as a manual consumer would.
+function New-SelfApplicationVerifier {
+    $workRoot = Get-PerfOwnedDirectory 'artifacts/tmp/perf-self'
+    $feed = Join-Path $workRoot 'feed'
+    $verifier = Join-Path $workRoot 'verifier'
+    # Keep command output out of this function's return value.
+    & (Join-Path $PSScriptRoot 'Export-SharpProofEmbeddedSymbols.ps1') `
+        -RepositoryRoot $repositoryRoot -Configuration $Configuration | Out-Host
+    Invoke-SharpProofRequiredDotnet @(
+        'pack', 'src/SharpProof.Verifier/SharpProof.Verifier.csproj',
+        '--configuration', $Configuration, '--output', $feed,
+        '--no-build', '--no-restore', '--nologo',
+        '-p:GeneratePackageOnBuild=false') | Out-Host
+    $packages = @(Get-ChildItem -LiteralPath $feed -Filter 'SharpProof.Verifier.*.nupkg' -File)
+    if ($packages.Count -ne 1) {
+        throw "Expected one packed SharpProof.Verifier package in $feed; found $($packages.Count)."
+    }
+    [IO.Compression.ZipFile]::ExtractToDirectory($packages[0].FullName, $verifier)
+    return $verifier
+}
+
+function Invoke-PerfSelf {
+    $sourceProjects = Get-SelfApplicationSourceProject
+    Invoke-SelfApplicationBootstrapBuild
+    $verifier = New-SelfApplicationVerifier
+    $resultRoot = Get-PerfOwnedDirectory 'artifacts/perf/self'
+    $builds = [Collections.Immutable.ImmutableArray]::CreateBuilder[object]()
+    $ordinal = 0
+    foreach ($project in $sourceProjects) {
+        $ordinal++
+        $relative = [IO.Path]::GetRelativePath($repositoryRoot, $project).Replace('\', '/')
+        $name = [IO.Path]::GetFileNameWithoutExtension($project)
+        Write-Host ("Measuring SharpProof on itself ({0}/{1}): {2}" -f
+            $ordinal, $sourceProjects.Length, $relative)
+        $arguments = New-SelfApplicationBuildArgument -Project $project -AdditionalArguments @(
+            '-p:SharpProofVerify=true',
+            '-p:SharpProofVerifyCacheEnabled=false',
+            '-p:UseSharedCompilation=false',
+            "-p:_SharpProofSelfVerifierDirectory=$verifier",
+            "-p:SharpProofVerifyResultFile=$(Join-Path $resultRoot "$name.json")")
+        $started = [Diagnostics.Stopwatch]::StartNew()
+        # Verification outcomes can fail a build; the perf lane only records
+        # that, because its input changes with every commit.
+        [string[]]$nativeArguments = @($arguments)
+        & dotnet @nativeArguments
+        $exitCode = $LASTEXITCODE
+        $global:LASTEXITCODE = 0
+        $builds.Add(([ordered]@{
+                    project                  = $relative
+                    name                     = $name
+                    exitCode                 = $exitCode
+                    buildElapsedMilliseconds = $started.ElapsedMilliseconds
+                }).AsReadOnly())
+    }
+    $buildsPath = Join-Path $repositoryRoot 'artifacts/perf/self-builds.json'
+    ConvertTo-Json -InputObject @($builds.ToImmutable()) -Depth 3 |
+        Set-Content -LiteralPath $buildsPath -Encoding utf8NoBOM
+    $gateProject = 'tests/SharpProof.Gates/SharpProof.Gates.csproj'
+    Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')
+    Invoke-SharpProofRequiredDotnet @(
+        'run', '--project', $gateProject,
+        '--configuration', $Configuration,
+        '--no-restore', '--', 'perf-self')
+}
+
 switch ($Command) {
     'lint' {
         & (Join-Path $PSScriptRoot 'Invoke-SharpProofLint.ps1')
@@ -369,6 +516,10 @@ switch ($Command) {
         Invoke-PipelineCommand 'corpus' 'Release'
         Invoke-PipelineCommand 'perf-baseline' 'Release'
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
+        # Last: its bootstrap build would leave the fuzz runner's outputs
+        # up to date (the fuzz receipt rejects them as stale), and its
+        # self-applied rebuilds rewrite shared bin outputs.
+        Invoke-PipelineCommand 'perf-self' 'Release'
     }
     'security' {
         Invoke-DependencyAudit
@@ -392,61 +543,16 @@ switch ($Command) {
     }
     'self-apply' {
         if ($SelfApplicationPhase -ne 'Samples') {
-            $trackedProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                    & git -C $repositoryRoot ls-files -- '*.csproj' |
-                        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                        ForEach-Object {
-                            Join-Path $repositoryRoot $_
-                        } |
-                        Sort-Object
-                ))
-            if ($LASTEXITCODE -ne 0 -or $trackedProjects.Length -eq 0) {
-                throw 'self-apply requires a Git-backed repository with tracked project files.'
-            }
-
-            $sourceProjects = [Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
-                    $trackedProjects |
-                        Where-Object {
-                            $relative = [IO.Path]::GetRelativePath(
-                                $repositoryRoot, $_).Replace('\', '/')
-                            $relative.StartsWith('src/', [StringComparison]::Ordinal) -and
-                            -not $relative.StartsWith('src/samples/', [StringComparison]::Ordinal)
-                        }
-                ))
-            if ($sourceProjects.Length -eq 0) {
-                throw 'self-apply found no source-tree projects to analyze.'
-            }
-
-            # Build the complete source tree once with the self lane disabled so
-            # every analyzer and generator output is available as a stable input.
-            # Analyzer diagnostics are not needed here: the build lane already
-            # enforces them, and the per-project builds below add SharpProof's.
-            Invoke-SharpProofRequiredDotnet @('restore', 'SharpProof.slnx', '--locked-mode')
-            Invoke-SharpProofRequiredDotnet @(
-                'build', 'SharpProof.slnx', '--configuration', $Configuration,
-                '--no-restore', '--nologo',
-                '-p:RunAnalyzersDuringBuild=false',
-                '-p:SharpProofSelfApplication=false',
-                '-p:SharpProofProfile=off',
-                '-p:SharpProofVerify=false',
-                '-p:GeneratePackageOnBuild=false')
-
+            $sourceProjects = Get-SelfApplicationSourceProject
+            Invoke-SelfApplicationBootstrapBuild
             $ordinal = 0
             foreach ($project in $sourceProjects) {
                 $ordinal++
                 Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
                     $ordinal, $sourceProjects.Length,
                     [IO.Path]::GetRelativePath($repositoryRoot, $project))
-                Invoke-SharpProofRequiredDotnet @(
-                    'build', $project, '--configuration', $Configuration,
-                    '--no-restore', '--no-dependencies', '--nologo',
-                    '-p:EnableNETAnalyzers=false',
-                    '-p:EnforceCodeStyleInBuild=false',
-                    '-p:SharpProofSelfApplication=true',
-                    '-p:SharpProofProfile=advisory',
-                    '-p:SharpProofFeatures=all',
-                    '-p:SharpProofVerify=false',
-                    '-p:GeneratePackageOnBuild=false')
+                $arguments = New-SelfApplicationBuildArgument -Project $project
+                Invoke-SharpProofRequiredDotnet ([string[]]@($arguments))
             }
 
         }
@@ -458,6 +564,10 @@ switch ($Command) {
                 'SharpProof self-application sample validation failed.' `
             ([ordered]@{ Configuration = $Configuration }).AsReadOnly()
         }
+    }
+    'perf-self' {
+        # Advisory: only a failure of the tooling itself fails this command.
+        Invoke-PerfSelf
     }
     'check' {
         & (Join-Path $repositoryRoot 'eng/scripts/Invoke-SharpProofDevCheck.ps1') `

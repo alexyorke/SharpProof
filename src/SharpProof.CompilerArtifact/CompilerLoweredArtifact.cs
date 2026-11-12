@@ -120,8 +120,10 @@ internal static partial class CompilerLoweredArtifact
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
 
-        // A metadata clause must name a module whose hash this compilation recorded.
-        var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken, compilation.References);
+        // A metadata clause must name a module whose hash this compilation
+        // recorded; an exported clause must also name an export it recorded.
+        var total = CompilerTotalCallableArtifactCodec.Decode(artifact.Total, entry, claims, cancellationToken, compilation.References,
+            compilation.ContractExports.IsDefault ? [] : compilation.ContractExports);
         if (total == null && claims.Any(static claim => claim.Kind == WorkerClaimKind.CallPrecondition))
         { throw new InvalidDataException("A call-precondition claim has no Total program."); }
         var resource = DecodeResource(artifact, entry, claims, total, cancellationToken);

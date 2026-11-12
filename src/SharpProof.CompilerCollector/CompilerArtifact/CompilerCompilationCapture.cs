@@ -589,7 +589,7 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
         };
     }
 
-    private static SourceText GetStableAdditionalText(
+    internal static SourceText GetStableAdditionalText(
         AdditionalText file,
         CancellationToken cancellationToken)
     {

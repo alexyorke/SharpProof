@@ -50,6 +50,40 @@ internal static class CompilerTotalCallableArtifactCodec
         return artifact with { HasReceiver = preparation.HasReceiver };
     }
 
+    // The Requires another project exports: canonical parameters and Requires
+    // clauses only, with no receiver, assumption or claim binding.
+    internal static CompilerTotalCallableArtifact EncodeExport(IrFactory factory, ImmutableArray<CompilerTotalParameter> parameters,
+        ImmutableArray<CompilerTotalClause> clauses, CancellationToken cancellationToken)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
+        RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
+        if (clauses.Any(static clause => clause.Kind != CompilerContractKind.Requires || clause.ClaimId != null || clause.AssumptionId != null))
+        { throw new ArgumentException("An export carries only unbound Requires clauses.", nameof(clauses)); }
+        return EncodeCore(factory, null, parameters, null, clauses, false, default, cancellationToken);
+    }
+
+    internal sealed record DecodedExport(IrFactory Factory, ImmutableArray<CompilerTotalParameter> Parameters,
+        ImmutableArray<CompilerTotalClause> Clauses)
+    {
+        public IrFactory Factory { get; init; } = Factory ?? throw new ArgumentNullException(nameof(Factory));
+        public ImmutableArray<CompilerTotalParameter> Parameters { get; init; } = Parameters.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Parameters)) : Parameters;
+        public ImmutableArray<CompilerTotalClause> Clauses { get; init; } = Clauses.IsDefault ? throw new ArgumentException("Array must be initialized.", nameof(Clauses)) : Clauses;
+    }
+
+    // Validates an exported payload as strictly as a manifest entry: closed
+    // predicates over entry parameters, and no opaque reads at all.
+    internal static DecodedExport DecodeExport(CompilerTotalCallableArtifact artifact, CancellationToken cancellationToken)
+    {
+        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
+        Require(!artifact.HasReceiver && artifact.Graph is { Terms.IsDefault: false } graph &&
+            graph.Terms.All(static term => term != null && term.Kind != IrTermKind.Opaque) &&
+            !artifact.Clauses.IsDefault && artifact.Clauses.All(static clause => clause != null && clause.Kind == CompilerContractKind.Requires),
+            "An exported payload must read only its parameters.");
+        var decoded = DecodeCore(artifact, [], [], entryOnly: true, cancellationToken, exported: true)!;
+        return new(decoded.Factory, decoded.Parameters, decoded.Clauses);
+    }
+
     private static CompilerTotalCallableArtifact EncodeCore(IrFactory factory, IrProgram? program,
         ImmutableArray<CompilerTotalParameter> parameters, IrVarId? result, ImmutableArray<CompilerTotalClause> clauses,
         bool isBodyAbstraction, ImmutableArray<CompilerTotalCallPrecondition> callPreconditions,
@@ -92,7 +126,8 @@ internal static class CompilerTotalCallableArtifactCodec
             CallPreconditions = [.. calls.Select((call, ordinal) => call is null ? throw new System.ArgumentNullException(nameof(call)) : (new CompilerTotalCallPreconditionArtifact
             {
                 InstructionIndex = encoded.InstructionIndices[call.Instruction], CalleeIdentity = call.CalleeIdentity,
-                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite], MetadataClause = call.MetadataClause, ClaimId = call.ClaimId,
+                ClauseOrdinal = call.ClauseOrdinal, ClauseSite = encoded.OperationIndices[call.ClauseSite], MetadataClause = call.MetadataClause,
+                ExportedClause = call.ExportedClause, ClaimId = call.ClaimId,
                 ValueRoot = clauses.Length * 2 + ordinal * 2, SafeRoot = clauses.Length * 2 + ordinal * 2 + 1
             }))]
         };
@@ -100,14 +135,15 @@ internal static class CompilerTotalCallableArtifactCodec
 
     internal static CompilerTotalCallablePreparation? Decode(CompilerTotalCallableArtifact? artifact,
         WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims,
-        CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
+        CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null,
+        ImmutableArray<CompilerContractExportSnapshot>? contractExports = null)
     {
 
         if (artifact is null)
         { return null; }
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         ArgumentNullGuard.NotNull(entry, nameof(entry));
-        var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken, metadataReferences);
+        var decoded = DecodeCore(artifact, entry.Assumptions, claims, entryOnly: false, cancellationToken, metadataReferences, contractExports);
         return decoded == null ? null : new(entry.CallableId, decoded.Program!, decoded.Parameters, decoded.Result, decoded.Clauses, artifact!.IsBodyAbstraction)
         {
             ExceptionConstraints = decoded.ExceptionConstraints,
@@ -170,8 +206,10 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static DecodedTotal? DecodeCore(CompilerTotalCallableArtifact? artifact,
         ImmutableArray<WorkerAssumptionEvidence> assumptions, ImmutableArray<WorkerClaimManifestEntry> claims,
-        bool entryOnly, CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null)
+        bool entryOnly, CancellationToken cancellationToken, ImmutableArray<CompilerReferenceSnapshot>? metadataReferences = null,
+        ImmutableArray<CompilerContractExportSnapshot>? contractExports = null, bool exported = false)
     {
+        Require(!exported || entryOnly, "An exported payload is an entry payload.");
         artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
         RepositoryParameterGuard.RequireInitialized(assumptions.IsDefault, nameof(assumptions), "Array must be initialized.");
         Require(!claims.IsDefault && claims.All(claim => claim != null), "The Total callable claim list contains a missing row.");
@@ -349,7 +387,8 @@ internal static class CompilerTotalCallableArtifactCodec
             }
             else if (row.Kind == CompilerContractKind.Requires)
             {
-                Require(assumptionOrdinal < preconditions.Length && row.AssumptionId == preconditions[assumptionOrdinal++].Id &&
+                Require(exported ? row.AssumptionId == null && row.ClaimId == null :
+                    assumptionOrdinal < preconditions.Length && row.AssumptionId == preconditions[assumptionOrdinal++].Id &&
                     row.ClaimId == null, "The Total assumption binding does not equal the manifest.");
             }
             else
@@ -372,13 +411,15 @@ internal static class CompilerTotalCallableArtifactCodec
             artifact.ValidEffectClaimIds.All(id => !string.IsNullOrWhiteSpace(id) &&
                 effectOwners.Contains(id)),
             "Validated effect claims must be canonical and owned by this callable.");
-        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities.ToImmutable(), claims, metadataReferences, cancellationToken);
+        var callPreconditions = DecodeCallPreconditions(artifact, decoded, identities.ToImmutable(), claims, metadataReferences,
+            contractExports, cancellationToken);
         return new(factory, decoded.Program, parameters.ToImmutable(), result, clauses.ToImmutable(), exceptionConstraints, callPreconditions, disjointInputs.ToImmutable());
     }
 
     private static ImmutableArray<CompilerTotalCallPrecondition> DecodeCallPreconditions(CompilerTotalCallableArtifact artifact,
         DecodedPortableIrGraph decoded, ImmutableHashSet<IrVarId> canonicalRoles, ImmutableArray<WorkerClaimManifestEntry> claims,
-        ImmutableArray<CompilerReferenceSnapshot>? metadataReferences, CancellationToken cancellationToken)
+        ImmutableArray<CompilerReferenceSnapshot>? metadataReferences, ImmutableArray<CompilerContractExportSnapshot>? contractExports,
+        CancellationToken cancellationToken)
     {
         var callClaims = ImmutableDictionaryCapture.Create(claims.Where(claim => claim.Kind == WorkerClaimKind.CallPrecondition),
             claim => claim.ClaimId, claim => claim ?? throw new ArgumentNullException(nameof(claim)), StringComparer.Ordinal);
@@ -434,12 +475,19 @@ internal static class CompilerTotalCallableArtifactCodec
                 !canonicalRoles.Contains(marker.Target) && !reads.Contains(marker.Target) && writers[marker.Target] == 1 &&
                 marker.Value.Id == factory.Binary(IrBinaryOperator.AndAlso, safe, value).Id &&
                 factory.GetOperationInfo(marker.Operation).SourceSpan is { Length: > 0 } &&
-                (row.MetadataClause == null ? factory.GetOperationInfo(clauseSite).SourceSpan is { Length: > 0 } :
+                (row.MetadataClause == null || row.ExportedClause == null) &&
+                (row.ExportedClause != null
+                    ? factory.GetOperationInfo(clauseSite).SourceSpan == null && CompilerContractsExportJson.IsValidOrigin(row.ExportedClause) &&
+                        CompilerContractsExportJson.OwnsOrigin(row.ExportedClause, contractExports, metadataReferences)
+                    : row.MetadataClause == null ? factory.GetOperationInfo(clauseSite).SourceSpan is { Length: > 0 } :
                     factory.GetOperationInfo(clauseSite).SourceSpan == null && ValidMetadataOrigin(row.MetadataClause) &&
                     OwnsMetadataOrigin(row.MetadataClause, metadataReferences)),
                 "A Total call precondition must own a fresh, unread boolean assignment of its guarded predicate.");
             string name;
-            var named = row.MetadataClause == null
+            var named = row.ExportedClause != null
+                ? TryCreateExportedMarkerName(row.CalleeIdentity, row.ClauseOrdinal,
+                    factory.GetOperationInfo(marker.Operation).SourceSpan, row.ExportedClause, out name)
+                : row.MetadataClause == null
                 ? IrCallPreconditionMarker.TryCreateName(row.CalleeIdentity, row.ClauseOrdinal,
                     factory.GetOperationInfo(marker.Operation).SourceSpan,
                     factory.GetOperationInfo(clauseSite).SourceSpan, out name)
@@ -455,14 +503,19 @@ internal static class CompilerTotalCallableArtifactCodec
                 Require(boundClaims.Add(row.ClaimId) && callClaims.TryGetValue(row.ClaimId, out var claim) &&
                     claim.CallPrecondition is { } target && target.Callee == row.CalleeIdentity && target.ClauseOrdinal == row.ClauseOrdinal &&
                     claim.Location.Start == span.Start && claim.Location.Length == span.Length &&
+                    (row.ExportedClause is { } exported
+                        ? target.MetadataClause == null && !target.CallerDeclared && target.ExportedBy == exported.AssemblyName &&
+                            target.ClauseLocation == exported.Location
+                        : target.ExportedBy == null &&
                     (row.MetadataClause is { } origin
                         ? target.ClauseLocation == null && target.MetadataClause == origin.ClaimTarget(row.CalleeIdentity)
                         : target.ClauseLocation is { } clause && target.MetadataClause == null &&
                             factory.GetOperationInfo(clauseSite).SourceSpan is { } clauseSpan &&
-                            clause.Start == clauseSpan.Start && clause.Length == clauseSpan.Length),
+                            clause.Start == clauseSpan.Start && clause.Length == clauseSpan.Length)),
                     "A Total call precondition does not equal its manifest claim.");
             }
-            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause) { ClaimId = row.ClaimId });
+            calls.Add(new(marker.Id, row.CalleeIdentity, row.ClauseOrdinal, clauseSite, value, safe, row.MetadataClause)
+            { ClaimId = row.ClaimId, ExportedClause = row.ExportedClause });
         }
         Require(boundClaims.Count == callClaims.Count, "A call-precondition claim has no obligation row.");
         Require(targets.SetEquals(decoded.Variables.Where(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (IrCallPreconditionMarker.IsReservedName(
@@ -475,6 +528,16 @@ internal static class CompilerTotalCallableArtifactCodec
     internal static bool TryCreateSourceMarkerName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, IrSourceSpan? clauseSite, out string name)
     { calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity)); return IrCallPreconditionMarker.TryCreateName(calleeIdentity, clauseOrdinal, callSite, clauseSite, out name); }
+
+    internal static bool TryCreateExportedMarkerName(string calleeIdentity, int clauseOrdinal,
+        IrSourceSpan? callSite, CompilerExportedClauseOrigin origin, out string name)
+    {
+        calleeIdentity = RepositoryParameterGuard.NotNull(calleeIdentity, nameof(calleeIdentity));
+        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
+        name = string.Empty;
+        return CompilerContractsExportJson.TryGetOriginDigest(origin, out var digest) &&
+            IrCallPreconditionMarker.TryCreateMetadataName(calleeIdentity, clauseOrdinal, callSite, digest, out name);
+    }
 
     internal static bool TryCreateMetadataMarkerName(string calleeIdentity, int clauseOrdinal,
         IrSourceSpan? callSite, CompilerMetadataClauseOrigin origin, out string name)

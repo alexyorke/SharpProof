@@ -30,6 +30,18 @@ internal readonly struct TotalSourcePrecondition(IrTerm value, IrTerm safe, Oper
     internal OperationId ClauseSite { get; } = (clauseSite.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauseSite)) : clauseSite);
 }
 
+// A Requires clause another project of the same build exported for a callee
+// in its assembly. The clause site has no span in this compilation; the
+// origin, owned by the compiler artifact, names the export and the clause.
+internal sealed class TotalExportedPrecondition(IrTerm value, IrTerm safe, OperationId clauseSite, object origin, string evidenceDigest)
+{
+    internal IrTerm Value { get; } = (value ?? throw new System.ArgumentNullException(nameof(value)));
+    internal IrTerm Safe { get; } = (safe ?? throw new System.ArgumentNullException(nameof(safe)));
+    internal OperationId ClauseSite { get; } = (clauseSite.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauseSite)) : clauseSite);
+    internal object Origin { get; } = (origin ?? throw new System.ArgumentNullException(nameof(origin)));
+    internal string EvidenceDigest { get; } = (evidenceDigest ?? throw new System.ArgumentNullException(nameof(evidenceDigest)));
+}
+
 internal sealed class TotalShadowCallHop(string callerIdentity, string calleeIdentity, IrSourceSpan site)
 {
     internal string CallerIdentity { get; } = (callerIdentity ?? throw new System.ArgumentNullException(nameof(callerIdentity)));
@@ -40,9 +52,10 @@ internal sealed class TotalShadowCallHop(string callerIdentity, string calleeIde
 // A caller-declared row checks a clause the calling project declared for a
 // callee in another assembly, through a companion.
 internal readonly struct TotalCallPrecondition(string calleeIdentity, int clauseOrdinal, OperationId clauseSite, IrTerm value, IrTerm safe, TotalMetadataPrecondition? metadataClause = null, ImmutableArray<TotalShadowCallHop> ancestry = default,
-    bool callerDeclared = false)
+    bool callerDeclared = false, TotalExportedPrecondition? exportedClause = null)
 {
     internal bool CallerDeclared { get; } = callerDeclared;
+    internal TotalExportedPrecondition? ExportedClause { get; } = exportedClause;
     internal string CalleeIdentity { get; } = (calleeIdentity ?? throw new System.ArgumentNullException(nameof(calleeIdentity)));
     internal int ClauseOrdinal { get; } = clauseOrdinal;
     internal OperationId ClauseSite { get; } = (clauseSite.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(clauseSite)) : clauseSite);
@@ -170,6 +183,7 @@ internal sealed partial class TotalLoweringContext
             : [.. Parameters.Select(parameter => parameter.Input), Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
+    internal ImmutableArray<TotalExportedPrecondition> ExportedCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; private set; }
     // The program's initialization reads Entry, so concrete replay must bind
     // these identities themselves before executing the first instruction.

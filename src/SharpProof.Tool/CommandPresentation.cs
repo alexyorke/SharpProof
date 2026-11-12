@@ -131,6 +131,8 @@ internal sealed class CommandPresentation
                 { details.Add(new("calleeAttribute", metadata.Describe())); }
                 if (call.CallerDeclared)
                 { details.Add(new("callerDeclared", "true")); }
+                if (call.ExportedBy is { } exporter)
+                { details.Add(new("exportedBy", exporter)); }
             }
             details.Add(new("vacuity", result.Vacuity.ToString()));
             details.Add(new("effectCertainty", result.EffectCertainty.ToString()));

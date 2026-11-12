@@ -49,10 +49,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     }
 
     // A contract-only frame for a nonvirtual callee in another assembly: its
-    // closed parameter attributes, read from the hashed reference image, and
-    // the clauses of a companion this compilation declares for it. Null when
-    // the callee has none, or when any of them cannot be bound; then no clause
-    // of the call is checked, and the call stays in the unchecked count.
+    // closed parameter attributes, read from the hashed reference image, the
+    // clauses of a companion this compilation declares for it, and the
+    // Requires its own project exported. Null when the callee has none, or
+    // when any of them cannot be bound; then no clause of the call is checked,
+    // and the call stays in the unchecked count.
     internal TotalLoweringContext? PrepareMetadataCallee(TotalLoweringContext caller, IMethodSymbol method)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
@@ -70,7 +71,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { return null; }
         var frame = caller.CreateFrame(method);
         return prepareMetadataCallee(frame) &&
-            !(frame.SourceCallPreconditions.IsEmpty && frame.MetadataCallPreconditions.IsEmpty) ? frame : null;
+            !(frame.SourceCallPreconditions.IsEmpty && frame.MetadataCallPreconditions.IsEmpty &&
+                frame.ExportedCallPreconditions.IsEmpty) ? frame : null;
 
         static bool IsInGenericType(INamedTypeSymbol? type)
         {

@@ -52,7 +52,8 @@ internal static class CompilerTotalCallableLowerer
     internal static CompilerTotalCallablePreparation? Prepare(CSharpCompilation compilation,
         ManifestCallableTarget target, ImmutableArray<CompilerSyntaxTreeSnapshot> capturedTrees,
         ImmutableArray<CompilerReferenceSnapshot>? capturedReferences, CompilerSpecificationPackConfiguration specificationPackAuthority,
-        CancellationToken cancellationToken, Action<WorkerDiagnosticContext>? reportDiagnostic = null)
+        CancellationToken cancellationToken, Action<WorkerDiagnosticContext>? reportDiagnostic = null,
+        CompilerContractExports? contractExports = null)
     {
         specificationPackAuthority = RepositoryParameterGuard.NotNull(specificationPackAuthority, nameof(specificationPackAuthority));
         cancellationToken.ThrowIfCancellationRequested();
@@ -114,7 +115,7 @@ internal static class CompilerTotalCallableLowerer
         {
             graph = TotalSourceCallSession.CreateGraph(declaration, target.Method, target.SemanticModel, cancellationToken);
             lowering = graph == null ? null : LowerBody(compilation, graph, context, capturedReferences, specificationPackAuthority,
-                cancellationToken, opaqueCalls: true, metadataCallees: true);
+                cancellationToken, opaqueCalls: true, metadataCallees: true, contractExports: contractExports);
         }
         if (lowering == null)
         { return null; }
@@ -330,7 +331,10 @@ internal static class CompilerTotalCallableLowerer
                 MetadataOrigin(pair.Value.MetadataClause))
             {
                 Ancestry = [.. pair.Value.Ancestry.Select(hop => new CompilerShadowCallHop(hop.CallerIdentity, hop.CalleeIdentity, hop.Site))],
-                CallerDeclared = pair.Value.CallerDeclared
+                CallerDeclared = pair.Value.CallerDeclared,
+                ExportedClause = pair.Value.ExportedClause is { } exported
+                    ? exported.Origin as CompilerExportedClauseOrigin ?? throw new InvalidOperationException("An exported row has no export origin.")
+                    : null
             })];
     }
 
@@ -338,7 +342,7 @@ internal static class CompilerTotalCallableLowerer
         ControlFlowGraph graph, TotalLoweringContext context, ImmutableArray<CompilerReferenceSnapshot>? capturedReferences,
         CompilerSpecificationPackConfiguration specificationPackAuthority, CancellationToken cancellationToken,
         Func<INamedTypeSymbol, bool>? initializationFree = null, bool enableMetadataRequires = false, bool opaqueCalls = false,
-        bool metadataCallees = false)
+        bool metadataCallees = false, CompilerContractExports? contractExports = null)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         context = RepositoryParameterGuard.NotNull(context, nameof(context));
@@ -350,7 +354,8 @@ internal static class CompilerTotalCallableLowerer
             images.Resolve, specificationPacks.ResolveTotal,
             initializationFree, enableMetadataRequires ? (frame, body) => body is null ? throw new System.ArgumentNullException(nameof(body)) : frame is null ? throw new System.ArgumentNullException(nameof(frame)) : (PrepareMetadataRequires(compilation, frame, body, cancellationToken)) : null,
             opaqueCalls, prepareMetadataCallee: metadataCallees
-                ? frame => PrepareMetadataCallee(compilation, images, RepositoryParameterGuard.NotNull(frame, nameof(frame)), cancellationToken) : null);
+                ? frame => PrepareMetadataCallee(compilation, images, RepositoryParameterGuard.NotNull(frame, nameof(frame)),
+                    contractExports ?? CompilerContractExports.Empty, cancellationToken) : null);
     }
 
     private static Func<INamedTypeSymbol, bool> CreateShadowInitializationPredicate(
@@ -621,17 +626,21 @@ internal static class CompilerTotalCallableLowerer
     }
 
     // The checked clauses of a callee in another assembly: the Requires of a
-    // companion this compilation declares for it, and its closed parameter
-    // attributes paired with the rows of its authenticated reference image.
+    // companion this compilation declares for it, its closed parameter
+    // attributes paired with the rows of its authenticated reference image,
+    // and the Requires its project exported for the exact image bound here.
     // Either all of them are recorded at a call or none is, so a call is never
     // counted as checked while one of its clauses is not.
     private static bool PrepareMetadataCallee(CSharpCompilation compilation, CompilerTotalIlBodyProvider images,
-        TotalLoweringContext frame, CancellationToken cancellationToken)
+        TotalLoweringContext frame, CompilerContractExports contractExports, CancellationToken cancellationToken)
     {
         compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         images = RepositoryParameterGuard.NotNull(images, nameof(images));
         frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
+        contractExports = RepositoryParameterGuard.NotNull(contractExports, nameof(contractExports));
         cancellationToken.ThrowIfCancellationRequested();
+        if (!contractExports.TryPrepare(frame, cancellationToken, out var exported))
+        { return false; }
         var binder = new TotalContractBinder(compilation, frame.Factory);
         var companion = binder.BindTotalCompanionRequires(frame, cancellationToken);
         if (!companion.IsSuccess)
@@ -658,6 +667,7 @@ internal static class CompilerTotalCallableLowerer
         frame.SourceCallPreconditions = [.. companion.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires)
             .Select(static clause => new TotalSourcePrecondition(clause.Value, clause.SafeCondition, clause.SourceOperation))];
         frame.MetadataCallPreconditions = clauses.MoveToImmutable();
+        frame.ExportedCallPreconditions = exported;
         return true;
     }
 }
