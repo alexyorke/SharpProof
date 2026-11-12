@@ -1,7 +1,7 @@
 {
   "input": "oss-corpus",
-  "note": "Total Z3 solver work (rlimit units) for one lane over the pinned corpus. Deterministic for a fixed solver build and input; update it deliberately when verification changes.",
+  "note": "Total Z3 solver work (rlimit units) for one lane over the pinned corpus. Deterministic for a fixed solver build and input; update it deliberately when verification changes. Enforced after CI on GitHub runners measured the same total as local runs.",
   "totalRlimit": 101187253,
   "maximumIncreasePercent": 25,
-  "enforced": false
+  "enforced": true
 }
