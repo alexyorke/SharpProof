@@ -216,7 +216,7 @@ internal sealed class SharpProofWorker : IDisposable
             {
                 return FailedAfterManifest(WorkerRunFailureReason.CompilationFailure,
                     snapshot.CompilerManifest.CompilerDiagnostics.Select(static item =>
-                        new WorkerProtocolError { Code = item.Code, Message = item.Message }));
+                        new WorkerProtocolError { Code = item.Code, Message = CompilerDiagnosticMessage(item) }));
             }
 
             var targets = snapshot.Callables;
@@ -528,6 +528,21 @@ internal sealed class SharpProofWorker : IDisposable
             WorkerResultAssembler.EmptyManifest(), WorkerRunStatus.Failed, reason,
             [], [], budgets, WorkerCacheStatus.Disabled, Elapsed(started), errors,
             requestHash, Versions());
+    }
+
+    // Names the error's source site, so a failed run points at what to fix.
+    internal static string CompilerDiagnosticMessage(CompilerDiagnosticArtifact diagnostic)
+    {
+        System.ArgumentNullException.ThrowIfNull(diagnostic);
+        return diagnostic.IsSource && diagnostic.Location.Path.Length != 0
+            ? string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{0}({1},{2}): {3}",
+                diagnostic.Location.Path,
+                diagnostic.Location.Line,
+                diagnostic.Location.Column,
+                diagnostic.Message)
+            : diagnostic.Message;
     }
 
     private static WorkerVersionSummary Versions()

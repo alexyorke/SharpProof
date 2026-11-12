@@ -160,11 +160,15 @@ internal static class CompilerManifestArtifactJson
 
     private static void EnsureWithinByteLimit(string json)
     {
-        if (Encoding.UTF8.GetByteCount(json) >
-            CompilerManifestArtifactFile.MaximumBytes)
+        var length = Encoding.UTF8.GetByteCount(json);
+        if (length > CompilerManifestArtifactFile.MaximumBytes)
         {
-            throw new JsonException(
-                "The compiler manifest exceeds the worker input byte limit.");
+            throw new JsonException(string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "The compiler manifest is {0} bytes, which exceeds the {1} byte limit " +
+                "(see docs/analysis-limits.md). Split the project to verify it.",
+                length,
+                CompilerManifestArtifactFile.MaximumBytes));
         }
     }
 
@@ -407,9 +411,11 @@ internal static class CompilerManifestArtifactJson
 
 internal static class CompilerManifestArtifactFile
 {
-    // Compiler manifests contain lowered evidence for every annotated method,
-    // so they need a larger bounded envelope than ordinary worker JSON files.
-    internal const int MaximumBytes = 32 * 1024 * 1024;
+    // Compiler manifests contain a line map for every source line and lowered
+    // evidence for every annotated method, so they need a larger bounded
+    // envelope than ordinary worker JSON files. The build task that validates
+    // a publication shares this bound through the protocol assembly.
+    internal const int MaximumBytes = WorkerProtocolJson.MaximumCompilerManifestBytes;
 
     // Callers selected only for their calls stop being added past this size,
     // which leaves headroom under MaximumBytes for everything else.
@@ -492,7 +498,7 @@ internal static class CompilerManifestArtifactFile
         if (fileLength > maximumBytes)
         {
             throw new InvalidDataException(
-                "The compiler manifest exceeds the byte limit.");
+                WorkerProtocolJson.ExceedsLimitMessage("compiler manifest", file.FullName, fileLength, maximumBytes));
         }
 
         var stream = new FileStream(

@@ -38,8 +38,7 @@ internal static class CompilerManifestArtifactProducer
             ContractExports = contractExports.Snapshots.IsEmpty ? default : contractExports.Snapshots
         };
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
-            .Where(static item => item.Severity == DiagnosticSeverity.Error &&
-                !item.IsSuppressed)
+            .Where(IsRealizedCompilerError)
             .Select(item => CreateDiagnostic(item, compilation, snapshot));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
@@ -195,6 +194,21 @@ internal static class CompilerManifestArtifactProducer
             artifact.ResourceProgram is null && artifact.ResourceUnknownReason is null)
         { artifact = artifact with { ResourceUnknownReason = "CompilationOrBodyUnavailable" }; }
         return artifact;
+    }
+
+    // The compiler reports unused using directives (CS8019) and extern aliases
+    // (CS8020) after binding, at their default Hidden severity and outside the
+    // options filter: /warnaserror and analyzer config never make them fail a
+    // command-line build, which still emits the assembly. GetDiagnostics does
+    // filter them, so an unused using under WarningsAsErrors=CS8019 comes back
+    // as an error here. It does not change the program, so it is not a realized
+    // compilation error. Every other error, promoted warnings included, is.
+    internal static bool IsRealizedCompilerError(Diagnostic diagnostic)
+    {
+        diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
+        return diagnostic.Severity == DiagnosticSeverity.Error &&
+            !diagnostic.IsSuppressed &&
+            diagnostic.Id is not ("CS8019" or "CS8020");
     }
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(

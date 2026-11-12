@@ -250,7 +250,7 @@ public sealed class BuildTaskTests
         var boundRequest = new WorkerVerifyRequest
         {
             CompilerManifest = new WorkerFileReference
-            { Path = inputManifest, Sha256 = WorkerProtocolJson.ComputeFileSha256(inputManifest) }
+            { Path = inputManifest, Sha256 = WorkerProtocolJson.ComputeCompilerManifestSha256(inputManifest) }
         };
         var declarations = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(declarations);
@@ -634,13 +634,17 @@ public sealed class BuildTaskTests
             _ => throw new InvalidOperationException(
                 "Unknown oversized protocol member.")
         };
+        // Compiler manifests have their own, larger bound.
+        var limit = oversizedMember == "manifest"
+            ? WorkerProtocolJson.MaximumCompilerManifestBytes
+            : WorkerProtocolJson.MaximumJsonBytes;
         using (var stream = new FileStream(
                    oversizedPath,
                    FileMode.OpenOrCreate,
                    FileAccess.Write,
                    FileShare.None))
         {
-            stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            stream.SetLength(limit + 1L);
         }
 
         var engine = new RecordingBuildEngine();
@@ -658,8 +662,68 @@ public sealed class BuildTaskTests
         Assert.That(task.Execute(), Is.False);
         Assert.That(
             engine.Errors.Single().Message,
-            Does.Contain(
-                $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
+            Does.Contain($"'{oversizedPath}' is {limit + 1L} bytes, which exceeds the {limit} byte limit"));
+    }
+
+    // Regression: perf-self on SharpProof.Worker.Tests wrote a valid compiler
+    // manifest above 16 MiB (one line map entry per source line), and the
+    // publication validator rejected it with the protocol JSON bound.
+    [Test]
+    [Platform("Linux")]
+    public void PublishedResultValidatorAcceptsCompilerManifestsAboveTheProtocolJsonBound()
+    {
+        using var directory = new TempDirectory("sharpproof-result-large-manifest-");
+        var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+        var requestPath = Path.Combine(directory.FullName, "request.json");
+        var resultPath = Path.Combine(directory.FullName, "result.json");
+        var manifestBytes = new byte[WorkerProtocolJson.MaximumJsonBytes + 1];
+        manifestBytes.AsSpan().Fill((byte)' ');
+        manifestBytes[0] = (byte)'{';
+        manifestBytes[^1] = (byte)'}';
+        File.WriteAllBytes(manifest, manifestBytes);
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = manifest,
+                Sha256 = WorkerProtocolJson.ComputeSha256([.. manifestBytes])
+            }
+        };
+        var responseManifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(responseManifest);
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = new('a', 64),
+            Manifest = responseManifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "build-task-test",
+                    ApiSpecVersion = "build-task-test"
+                },
+                Budgets = request.Budgets
+            }
+        };
+        File.WriteAllText(requestPath, WorkerProtocolJson.SerializeRequest(request));
+        File.WriteAllText(resultPath, WorkerProtocolJson.SerializeResponse(response));
+        var engine = new RecordingBuildEngine();
+        var task = new ValidatePublishedVerificationResult
+        {
+            BuildEngine = engine,
+            RequestPath = requestPath,
+            ResultPath = resultPath,
+            ManifestPath = manifest
+        };
+
+        Assert.That(task.Execute(), Is.True, string.Join(Environment.NewLine, engine.Errors.Select(static error => error.Message)));
+        Assert.That(
+            WorkerProtocolJson.ComputeCompilerManifestSha256(manifest),
+            Is.EqualTo(request.CompilerManifest.Sha256));
     }
 
     [Test]
