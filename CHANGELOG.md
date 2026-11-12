@@ -75,6 +75,25 @@ Entries describe repository changes, not package publication. Confirm available 
   In the OSS corpus, MoreLINQ `IdFn` and NodaTime `Era.ToString` and
   `DateAdjusters.DayOfMonth` are now Proven. MoreLINQ `Aggregate` is now
   Refuted: it invokes caller-supplied delegates. Compiler artifact 61.
+- Stop failing verification of a library with an unused `using` under
+  `WarningsAsErrors=CS8019`. The C# compiler reports unused using directives and
+  extern aliases (CS8019, CS8020) at Hidden severity without applying the
+  options, so such a build still succeeds, but the collector's
+  `Compilation.GetDiagnostics()` call promoted them to errors and the run ended
+  `Failed (CompilationFailure)` listing only CS8019. CS8019 is only computed with
+  XML documentation enabled, so this hit `SharpProof.Attributes` in the nightly
+  self-verification. Those two diagnostics no longer count as compilation errors;
+  every other error, promoted warnings included, still does. A
+  `CompilationFailure` now prefixes each error with its `path(line,column)`.
+- Publish results for projects whose compiler manifest is larger than 16 MiB.
+  The manifest may be up to 32 MiB, but the build task that validates a
+  publication hashed it under the 16 MiB bound for requests and results, so
+  verifying a large project (`SharpProof.Worker.Tests` in the nightly
+  self-verification) failed with `SharpProof verifier launch failed: The JSON
+  file exceeds the 16777216 byte limit.` after the worker had finished. Every
+  manifest reader now shares one 32 MiB bound, documented in
+  `docs/analysis-limits.md`, the validator streams the hash, and size errors
+  name the file, its size and the limit.
 - Prove effect claims in assemblies with more than 4,096 symbols. The check that
   entry initialization has no effects walked at most 4,096 symbols looking for a
   `[ModuleInitializer]` and treated a longer walk as finding one. So every purity,
