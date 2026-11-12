@@ -17,10 +17,18 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>$(SharpProofPublisher)</Authors>
     <Description>Optional SharpProof companion suggestions, editor fixes, and scaffolding.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>$(SharpProofProjectUrl)</RepositoryUrl>
+    <PackageProjectUrl>$(SharpProofProjectUrl)</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageIconFullPath>$(MSBuildThisFileDirectory)../../eng/branding/icon.png</PackageIconFullPath>
+    <PackageTags>SharpProof;formal-verification;contracts;code-fixes;roslyn;analyzers</PackageTags>
+    <Copyright>Copyright (c) $(SharpProofPublisher)</Copyright>
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeEditorSuggestionsInPackage</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
     <None Include="buildTransitive/SharpProof.CodeFixes.props" Pack="true" PackagePath="buildTransitive" />
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />

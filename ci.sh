@@ -261,8 +261,14 @@ consumer_image() {
     return 1
   fi
   SHARPPROOF_CONSUMER_IMAGE="$repository@$digest"
-  echo "$SHARPPROOF_CONSUMER_IMAGE" > artifacts/consumer-image/reference.txt
-  echo "Consumer image: $SHARPPROOF_CONSUMER_IMAGE"
+  local note=""
+  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" != 1 ]]; then
+    # A local image ID is not a registry digest: nothing can pull this
+    # reference, so templates packed from it are not release artifacts.
+    note=" (dry run: local image ID, not pushed and not pullable)"
+  fi
+  echo "$SHARPPROOF_CONSUMER_IMAGE$note" > artifacts/consumer-image/reference.txt
+  echo "Consumer image: $SHARPPROOF_CONSUMER_IMAGE$note"
 }
 
 release_packages() {
