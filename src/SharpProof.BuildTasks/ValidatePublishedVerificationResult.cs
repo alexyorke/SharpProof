@@ -106,7 +106,7 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                 "the published result does not satisfy the worker protocol");
         }
 
-        var manifestHash = WorkerProtocolJson.ComputeFileSha256(
+        var manifestHash = WorkerProtocolJson.ComputeCompilerManifestSha256(
             manifestPath);
         if (!string.Equals(
                 ResolvePath(request.CompilerManifest.Path),

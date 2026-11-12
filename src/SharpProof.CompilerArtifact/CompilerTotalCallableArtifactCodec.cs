@@ -26,6 +26,7 @@ internal static class CompilerTotalCallableArtifactCodec
         return artifact with
         {
             EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry,
+            EntryConstructsFreshValues = preparation.EntryConstructsFreshValues,
             HasReceiver = preparation.HasReceiver,
             DisjointInputs = preparation.DisjointInputs.IsEmpty ? null : preparation.DisjointInputs,
             ValidEffectClaimIds = preparation.ValidEffectClaimIds,
@@ -149,6 +150,7 @@ internal static class CompilerTotalCallableArtifactCodec
             ExceptionConstraints = decoded.ExceptionConstraints,
             CallPreconditions = decoded.CallPreconditions,
             EffectsCompleteAtEntry = artifact!.EffectsCompleteAtEntry,
+            EntryConstructsFreshValues = artifact.EntryConstructsFreshValues,
             HasReceiver = artifact.HasReceiver,
             DisjointInputs = decoded.DisjointInputs,
             ValidEffectClaimIds = [.. artifact.ValidEffectClaimIds]
@@ -181,7 +183,7 @@ internal static class CompilerTotalCallableArtifactCodec
         ArgumentNullGuard.NotNull(artifact, nameof(artifact));
         Require(!string.IsNullOrWhiteSpace(ownerId) && ownerId.Length <= CompilerArtifactLimits.MaximumInstructions,
             "A shadow body has an invalid owner label.");
-        Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry && !artifact.HasReceiver &&
+        Require(!artifact.IsBodyAbstraction && !artifact.EffectsCompleteAtEntry && !artifact.EntryConstructsFreshValues && !artifact.HasReceiver &&
             !artifact.Clauses.IsDefault && artifact.Clauses.IsEmpty &&
             !artifact.ValidEffectClaimIds.IsDefault && artifact.ValidEffectClaimIds.IsEmpty &&
             !artifact.ExceptionConstraints.IsDefault && artifact.ExceptionConstraints.IsEmpty &&
@@ -214,7 +216,10 @@ internal static class CompilerTotalCallableArtifactCodec
         RepositoryParameterGuard.RequireInitialized(assumptions.IsDefault, nameof(assumptions), "Array must be initialized.");
         Require(!claims.IsDefault && claims.All(claim => claim != null), "The Total callable claim list contains a missing row.");
         Require(!entryOnly || !artifact.IsBodyAbstraction, "An entry payload cannot carry a body abstraction.");
-        Require(!entryOnly || !artifact.EffectsCompleteAtEntry, "An entry payload cannot claim complete effect initialization.");
+        Require(!entryOnly || !artifact.EffectsCompleteAtEntry && !artifact.EntryConstructsFreshValues,
+            "An entry payload cannot claim complete effect initialization.");
+        Require(!artifact.EffectsCompleteAtEntry || !artifact.EntryConstructsFreshValues,
+            "Entry initialization is either effect-free or constructs fresh values.");
         Require(!artifact.HasReceiver || !artifact.IsBodyAbstraction, "A body abstraction has no receiver.");
         Require(artifact.DisjointInputs is not { } disjoint || !disjoint.IsDefault && disjoint.Length <= CompilerArtifactLimits.MaximumInstructions &&
             (!(entryOnly || artifact.IsBodyAbstraction) || disjoint.Length == 0),

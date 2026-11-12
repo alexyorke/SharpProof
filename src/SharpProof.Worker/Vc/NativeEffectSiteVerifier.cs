@@ -34,7 +34,8 @@ internal static class NativeEffectSiteVerifier
             preparation.Total == null || !preparation.Total.ValidEffectClaimIds.Contains(claimId))
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         CompilerEffectClaimArtifactCodec.Validate(claims[0]);
-        if (!preparation.Total.EffectsCompleteAtEntry)
+        // Constructing fresh values uses no capability.
+        if (!preparation.Total.EffectsCompleteAtEntry && !preparation.Total.EntryConstructsFreshValues)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken, resourceBudget)
@@ -264,7 +265,10 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         if (!preparation.Total.ValidEffectClaimIds.Contains(claims[0].ClaimId))
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
-        if (preparation.Total?.EffectsCompleteAtEntry != true)
+        // Purity ignores allocation, so it also accepts initialization that
+        // constructs fresh values; an allocation claim does not.
+        if (!preparation.Total.EffectsCompleteAtEntry &&
+            !(contract == WorkerEffectContractKind.EnforcePure && preparation.Total.EntryConstructsFreshValues))
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
         var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||

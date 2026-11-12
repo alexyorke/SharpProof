@@ -172,6 +172,12 @@ internal static class CompilerTotalCallableLowerer
         {
             cancellationToken.ThrowIfCancellationRequested();
         }
+        // Initialization a source callee reaches is admitted only when it
+        // stores constants; the declaring type's may also construct fresh
+        // values, which only allocation-insensitive claims accept.
+        var entryInitialization = lowering.SourceInitializationEffectsComplete
+            ? EntryInitialization.ClassifyEntry(compilation, target.Method.ContainingType, cancellationToken)
+            : InitializationEffect.Effectful;
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
@@ -188,8 +194,8 @@ internal static class CompilerTotalCallableLowerer
         {
             HasReceiver = inputs.Length != context.Parameters.Length,
             DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
-            EffectsCompleteAtEntry = lowering.SourceInitializationEffectsComplete &&
-                HasNoEffectEntryInitialization(compilation, target.Method.ContainingType, cancellationToken),
+            EffectsCompleteAtEntry = entryInitialization == InitializationEffect.None,
+            EntryConstructsFreshValues = entryInitialization == InitializationEffect.FreshValues,
             ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                 .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),

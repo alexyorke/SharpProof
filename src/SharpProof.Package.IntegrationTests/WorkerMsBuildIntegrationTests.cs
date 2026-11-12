@@ -674,6 +674,41 @@ public sealed class WorkerMsBuildIntegrationTests
         }
     }
 
+    // Regression: self-verifying SharpProof.Attributes, a netstandard2.0
+    // library with XML docs and WarningsAsErrors=CS8019, ended
+    // Failed (CompilationFailure) naming only CS8019. The compiler never fails
+    // a build on an unused using, so verification must not either.
+    [Test]
+    public async Task NetStandardLibraryWithUnusedUsingUnderWarningsAsErrorsVerifies()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            "using System.Text;" + Environment.NewLine + IdentitySource,
+            [
+                ("TargetFramework", "netstandard2.0"),
+                ("GenerateDocumentationFile", "true"),
+                ("NoWarn", "$(NoWarn);CS1591"),
+                ("TreatWarningsAsErrors", "true"),
+                ("WarningsAsErrors", "$(WarningsAsErrors);CS8019")
+            ]);
+
+        var build = await BuildOkAsync(project.BuildAsync(verify: true, []));
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.VerifyOutputPath("netstandard2.0", "request.json")))!;
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.VerifyOutputPath("netstandard2.0", "result.json")))!;
+        await AssertPublicationBindingAsync(request, response);
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(request.CompilerManifest.Path));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.Output, Does.Not.Contain("CompilationFailure"));
+            Assert.That(manifest.RootElement.GetProperty("compilerDiagnostics").GetArrayLength(), Is.Zero);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
     [Test]
     public async Task WhitespaceCacheDirectoryUsesFrameworkScopedDefault()
     {
