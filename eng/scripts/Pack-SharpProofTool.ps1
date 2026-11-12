@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = '',
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release'
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    # The templates pin the consumer image by digest; ci.sh consumer-image builds it.
+    [string]$ConsumerImage = $env:SHARPPROOF_CONSUMER_IMAGE
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -14,7 +16,7 @@ $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 foreach ($project in @('Tool', 'CodeFixes', 'Templates')) {
     & dotnet pack (Join-Path $repository "src/SharpProof.$project/SharpProof.$project.csproj") `
         --configuration $Configuration --output $OutputDirectory -p:ContinuousIntegrationBuild=true `
-        -p:SharpProofPackTool=true -p:SharpProofDeveloperPackages=true
+        -p:SharpProofPackTool=true -p:SharpProofDeveloperPackages=true "-p:SharpProofConsumerImage=$ConsumerImage"
     if ($LASTEXITCODE -ne 0) { throw "Optional SharpProof.$project packing failed." }
 }
 Write-Host "Optional developer package feed: $OutputDirectory"

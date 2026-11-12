@@ -231,9 +231,43 @@ fuzz_shard() {
 
 # Pack the product and developer packages, then run the package tests
 # against that packed feed (task workspaces copy nupkgs/, not artifacts/).
+# The consumer image is the consumer stage on top of the exact tooling image
+# this run packs with. SHARPPROOF_CONSUMER_PUSH=1 (tagged releases only)
+# pushes it and pins the registry digest; otherwise it stays local and the
+# pin is the local image ID, enough for a dry run that publishes nothing.
+consumer_image() {
+  local repository="${SHARPPROOF_CONSUMER_REPOSITORY:-ghcr.io/alexyorke/sharpproof-preview}"
+  local version digest output=(--load)
+  version="$(pwsh -NoLogo -NoProfile -Command \
+    'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')"
+  mkdir -p artifacts/consumer-image
+  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" == 1 ]]; then
+    output=(--push --metadata-file artifacts/consumer-image/metadata.json)
+  fi
+  docker buildx build --platform linux/amd64 --file eng/container/Dockerfile --target consumer \
+    --build-context "toolchain=docker-image://$image" \
+    --build-arg "SHARPPROOF_PACKAGE_VERSION=$version" \
+    --tag "$repository:$version" "${output[@]}" --progress plain . || return
+  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" == 1 ]]; then
+    digest="$(jq -r '."containerimage.digest"' artifacts/consumer-image/metadata.json)"
+  else
+    docker run --rm --platform linux/amd64 "$repository:$version" --info > /dev/null || return
+    digest="$(docker image inspect --format '{{.Id}}' "$repository:$version")"
+  fi
+  if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+    echo "The consumer image build reported no digest." >&2
+    return 1
+  fi
+  SHARPPROOF_CONSUMER_IMAGE="$repository@$digest"
+  echo "$SHARPPROOF_CONSUMER_IMAGE" > artifacts/consumer-image/reference.txt
+  echo "Consumer image: $SHARPPROOF_CONSUMER_IMAGE"
+}
+
 release_packages() {
+  if [[ -z "${SHARPPROOF_CONSUMER_IMAGE:-}" ]]; then consumer_image || return; fi
   tooling pack -Configuration Release
-  tooling pack-tool -Configuration Release
+  compose_run -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA \
+    -e "SHARPPROOF_CONSUMER_IMAGE=$SHARPPROOF_CONSUMER_IMAGE" tooling pack-tool -Configuration Release
   rm -rf nupkgs && mkdir -p nupkgs
   cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/
   tooling package-tests -Configuration Release -PackageSource nupkgs \
@@ -290,11 +324,12 @@ run_lane() {
       ;;
     fuzz-[0-9]*) fuzz_shard "${1#fuzz-}" ;;
     release-packages) release_packages ;;
+    consumer-image) consumer_image ;;
     image) pull_or_build_image ;;
     image-key) image_key ;;
     coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge ;;
     *)
-      echo "Unknown lane '$1'. Lanes: ${lanes[*]} coverage nightly fuzz-<n> release-packages image image-key" >&2
+      echo "Unknown lane '$1'. Lanes: ${lanes[*]} coverage nightly fuzz-<n> release-packages consumer-image image image-key" >&2
       return 2
       ;;
   esac
