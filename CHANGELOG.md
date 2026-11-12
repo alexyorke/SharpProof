@@ -6,6 +6,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Harden the release workflow before its first run. The GitHub release notes are
+  now the changelog section for the tagged version, with repository links made
+  absolute, instead of a generated list of every merged pull request; a tag
+  without that section is rejected. The package job fails at once when the
+  `NUGET_USER` variable is missing, before it pushes the consumer image. The
+  package artifact no longer carries the attempt number, so "Re-run failed jobs"
+  reuses the packages the first attempt built.
 - Build the consumer image in the release workflow. `SharpProof.Templates` pins
   the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
   and the release could not pack the templates. The package job now builds the
