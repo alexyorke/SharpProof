@@ -738,11 +738,20 @@ public sealed class ApiSpecTests
         System.ArgumentNullException.ThrowIfNull(targetFramework);
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(
             CreateTargetFrameworkCompilation(targetFramework));
+        // DateOnly and TimeOnly first ship in .NET 6; on older surfaces their
+        // rows stay unresolved, so those members stay unmodeled there.
+        ImmutableArray<string> absent = targetFramework == "net8.0"
+            ? []
+            : ApiSpecTable.Default.Templates
+                .Where(static template => template.Target.ContainingTypeMetadataName is "System.DateOnly" or "System.TimeOnly")
+                .Select(static template => template.Target.WitnessIdentifier)
+                .ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                resolved.Failures,
+                resolved.Failures.Where(failure => !absent.Contains(failure.WitnessIdentifier) ||
+                    failure.Kind != ApiSpecResolutionFailureKind.MissingContainingType),
                 Is.Empty,
                 targetFramework + Environment.NewLine +
                 string.Join(
@@ -750,8 +759,12 @@ public sealed class ApiSpecTests
                     resolved.Failures.Select(static failure =>
                         failure.WitnessIdentifier + ": " + failure.Detail)));
             Assert.That(
+                resolved.Failures.Select(static failure => failure.WitnessIdentifier),
+                Is.EquivalentTo(absent),
+                targetFramework);
+            Assert.That(
                 resolved.Specs.Length,
-                Is.EqualTo(ApiSpecTable.Default.Templates.Length),
+                Is.EqualTo(ApiSpecTable.Default.Templates.Length - absent.Length),
                 targetFramework);
         }
     }
@@ -1150,7 +1163,7 @@ public sealed class ApiSpecTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(templates.Length, Is.EqualTo(31));
+            Assert.That(templates.Length, Is.EqualTo(87));
             Assert.That(
                 templates.Select(static row => row.Target.WitnessIdentifier),
                 Is.Unique.And.All.Not.Empty);

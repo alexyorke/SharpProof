@@ -38,6 +38,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         witnesses.Add("contract.old", CreateContractOldWitness());
         witnesses.Add("contract.requires", CreateContractRequiresWitness());
         witnesses.Add("contract.result", CreateContractResultWitness());
+        AddCalendarWitnesses(witnesses);
         return witnesses.ToImmutable();
     }
 }

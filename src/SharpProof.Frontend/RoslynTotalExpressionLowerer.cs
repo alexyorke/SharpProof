@@ -642,6 +642,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IImplicitIndexerReferenceOperation stringLast &&
             CSharpOperationSemantics.IsLastStringIndex(stringLast))
         { return LastStringIndex(stringLast, block, depth); }
+        if (depth < 256 && operation is IBinaryOperation { OperatorMethod: { } operatorMethod, IsLifted: false } userOperator &&
+            MetadataOperatorCall(userOperator, operatorMethod, block, depth) is { } operatorCall)
+        { return operatorCall; }
         var rejected = Reject(operation, depth);
         if (rejected != FrontendAbstention.None)
         {
@@ -999,6 +1002,43 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // A dispatched call may run an override the specification does not describe.
         return EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
+    }
+
+    // A user-defined binary operator declared in another assembly is a call
+    // to its static operator method: both operands are evaluated left to
+    // right, then the method runs with them as its two by-value arguments
+    // (C# 12.4.4). Its effects are those of any other metadata call, bounded
+    // by an API specification when one exists. A source operator, a lifted
+    // operator, a short-circuiting `&&` or `||` over user-defined `true` and
+    // `false`, and a static abstract (generic math) operator stay closed.
+    private TotalBodyValue? MetadataOperatorCall(IBinaryOperation operation, IMethodSymbol method, IrBlockId block, int depth)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (!AllowOpaqueCalls || operation.IsLifted ||
+            operation.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr ||
+            method.MethodKind != MethodKind.UserDefinedOperator || !method.IsStatic || method.IsAbstract || method.IsVirtual ||
+            !method.DeclaringSyntaxReferences.IsEmpty || IsSharpProofApi(method.ContainingNamespace) ||
+            method.ReturnsByRef || method.ReturnsByRefReadonly || method.Parameters.Length != 2 ||
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None || !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
+            !CSharpOperationSemantics.IsValueDomain(method.ReturnType))
+        { return null; }
+        var preconditions = MetadataCallee?.Invoke(method);
+        var values = ImmutableArray.CreateBuilder<IrTerm>(2);
+        foreach (var operand in (ImmutableArray<IOperation>)[operation.LeftOperand, operation.RightOperand])
+        {
+            var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(operand), block, depth + 1);
+            if (!lowered.Classification.IsExact)
+            { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
+            values.Add(preconditions == null ? lowered.Value : Pin(operand, lowered.Value, lowered.Continuation));
+            block = lowered.Continuation;
+        }
+        // The operator checks its clauses on entry, after both operands.
+        if (preconditions != null)
+        { MetadataPreconditions!(operation, preconditions, values.ToImmutable(), block); }
+        return EmitOpaqueCall(operation, method, values.ToImmutable(), block, null,
+            OpaqueEffects?.Invoke(method) ?? IrOpaqueCallEffects.All);
     }
 
     // A value held where it was evaluated, so a later argument cannot change

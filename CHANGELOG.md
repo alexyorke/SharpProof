@@ -57,6 +57,19 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Model calendar and clock values. A non-lifted user-defined binary operator
+  declared in another assembly, such as `DateTime > DateTime`, now lowers as a
+  call to its static operator method after both operands are evaluated; before,
+  every user-defined operator kept the body Unknown. The default API table
+  (version 12) specifies 56 members as pure, non-throwing and non-allocating:
+  the calendar and time-of-day getters of `DateTime`, `DateOnly`, `TimeOnly` and
+  `TimeSpan`, `DateTimeOffset.UtcDateTime` and `UtcTicks`, and the six comparison
+  operators of `DateTime`, `DateOnly`, `TimeOnly` and `TimeSpan`. Validating
+  constructors, arithmetic that can overflow, `Now`/`UtcNow`, `DateTimeOffset`
+  operators and formatting stay unmodeled. Source, lifted, short-circuiting and
+  static abstract operators still abstain. No corpus verdict changes: each of the
+  21 Humanizer methods this unblocks stops at a later reason, as
+  [the coverage triage](tests/SharpProof.Gates/Corpus/coverage-gaps.md) records.
 - Prove purity and capability claims in types whose static initializers only
   construct fresh values. Such an initializer stores constants, one-dimensional
   arrays of constant length, boxed values, lambdas, static method groups,
