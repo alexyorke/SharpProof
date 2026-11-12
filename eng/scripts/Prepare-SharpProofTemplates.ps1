@@ -35,8 +35,14 @@ if ($ConsumerImage -cnotmatch '^ghcr\.io/alexyorke/sharpproof(?:-preview)?@sha25
 }
 $sdk = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'global.json') -Raw | ConvertFrom-Json).sdk.version
 $nuspec = [Xml.XmlDocument]::new()
-$nuspec.LoadXml('<package><metadata><id>SharpProof.Templates</id><version/><authors>Alex Yorke</authors><description>SharpProof portable and canonical-container starter projects.</description><license type="expression">MIT</license><readme>README.md</readme><packageTypes><packageType name="Template"/></packageTypes><repository type="git" url="https://github.com/alexyorke/SharpProof" commit=""/></metadata><files/></package>')
+$nuspec.LoadXml('<package><metadata><id>SharpProof.Templates</id><version/><authors>Alex Yorke</authors><description/><license type="expression">MIT</license><readme>README.md</readme><icon>icon.png</icon><projectUrl/><copyright>Copyright (c) Alex Yorke</copyright><tags>SharpProof formal-verification contracts dotnet-new templates</tags><packageTypes><packageType name="Template"/></packageTypes><repository type="git" url="https://github.com/alexyorke/SharpProof" commit=""/></metadata><files/></package>')
 $nuspec.package.metadata.version = $PackageVersion
+# The project file owns the description; this nuspec replaces the SDK's.
+$project = [xml](Get-Content -LiteralPath (Join-Path $repositoryRoot 'src/SharpProof.Templates/SharpProof.Templates.csproj') -Raw)
+$description = [string]$project.SelectSingleNode('/Project/PropertyGroup/Description').InnerText
+if ([string]::IsNullOrWhiteSpace($description)) { throw 'SharpProof.Templates.csproj must declare a Description.' }
+$nuspec.package.metadata.description = $description
+$nuspec.package.metadata.projectUrl = [string](Get-SharpProofExpectedRepositoryUrl)
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -cnotmatch '^[a-f0-9]{40}$') { throw 'Template packaging requires a Git source identity.' }
 $nuspec.package.metadata.repository.SetAttribute('commit', $commit)
@@ -47,7 +53,10 @@ function Add-PackageFile([string]$Source, [string]$Target) {
     $entry.SetAttribute('target', $Target)
     [void]$nuspec.SelectSingleNode('/package/files').AppendChild($entry)
 }
-Add-PackageFile (Join-Path $repositoryRoot 'README.md') ''
+# The package has its own readme: the repository README's relative links do
+# not resolve on nuget.org.
+Add-PackageFile (Join-Path $repositoryRoot 'src/SharpProof.Templates/README.md') ''
+Add-PackageFile (Join-Path $repositoryRoot 'eng/branding/icon.png') ''
 foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Force | Sort-Object FullName) {
     $relative = [IO.Path]::GetRelativePath($sourceRoot, $file.FullName)
     $target = Join-Path $destinationRoot $relative

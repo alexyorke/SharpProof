@@ -13,6 +13,13 @@ Entries describe repository changes, not package publication. Confirm available 
   `NUGET_USER` variable is missing, before it pushes the consumer image. The
   package artifact no longer carries the attempt number, so "Re-run failed jobs"
   reuses the packages the first attempt built.
+- Complete the package metadata. `SharpProof.CodeFixes` gains a readme, icon,
+  tags and project URL. `SharpProof.Templates` gains an icon, project URL,
+  copyright and tags, takes its description from its project file, and ships
+  its own readme instead of the repository README, whose relative links do not
+  resolve on nuget.org. The `SharpProof` description lists what the package
+  checks. A dry run's `consumer-image/reference.txt` now says its image
+  reference is a local ID that cannot be pulled.
 - Build the consumer image in the release workflow. `SharpProof.Templates` pins
   the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
   and the release could not pack the templates. The package job now builds the
