@@ -3,8 +3,8 @@
 This is a hand-maintained reference to [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs). The C# declarations are the runtime authority.
 
 - Table identity: `SharpProof.ApiSpec.Default`
-- Table version: `11`
-- Declarations: 31
+- Table version: `12`
+- Declarations: 87
 
 ## Matching and evidence
 
@@ -20,12 +20,41 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 
 | Catalog ID | Exact member target |
 | --- | --- |
-| `bcl.dictionary.count` | <code>P:System.Collections.Generic.Dictionary&#96;2.Count</code> |
-| `bcl.list.count` | <code>P:System.Collections.Generic.List&#96;1.Count</code> |
-| `bcl.list.item.int32` | <code>M:System.Collections.Generic.List&#96;1.get_Item(System.Int32)</code> |
-| `bcl.queue.count` | <code>P:System.Collections.Generic.Queue&#96;1.Count</code> |
-| `bcl.stack.count` | <code>P:System.Collections.Generic.Stack&#96;1.Count</code> |
 | `bcl.array.empty` | <code>M:System.Array.Empty&#96;&#96;1</code> |
+| `bcl.date-only.day` | <code>P:System.DateOnly.Day</code> |
+| `bcl.date-only.day-number` | <code>P:System.DateOnly.DayNumber</code> |
+| `bcl.date-only.day-of-week` | <code>P:System.DateOnly.DayOfWeek</code> |
+| `bcl.date-only.day-of-year` | <code>P:System.DateOnly.DayOfYear</code> |
+| `bcl.date-only.month` | <code>P:System.DateOnly.Month</code> |
+| `bcl.date-only.op-equality` | <code>M:System.DateOnly.op_Equality(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.op-greater-than` | <code>M:System.DateOnly.op_GreaterThan(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.op-greater-than-or-equal` | <code>M:System.DateOnly.op_GreaterThanOrEqual(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.op-inequality` | <code>M:System.DateOnly.op_Inequality(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.op-less-than` | <code>M:System.DateOnly.op_LessThan(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.op-less-than-or-equal` | <code>M:System.DateOnly.op_LessThanOrEqual(System.DateOnly,System.DateOnly)</code> |
+| `bcl.date-only.year` | <code>P:System.DateOnly.Year</code> |
+| `bcl.date-time-offset.utc-date-time` | <code>P:System.DateTimeOffset.UtcDateTime</code> |
+| `bcl.date-time-offset.utc-ticks` | <code>P:System.DateTimeOffset.UtcTicks</code> |
+| `bcl.date-time.date` | <code>P:System.DateTime.Date</code> |
+| `bcl.date-time.day` | <code>P:System.DateTime.Day</code> |
+| `bcl.date-time.day-of-week` | <code>P:System.DateTime.DayOfWeek</code> |
+| `bcl.date-time.day-of-year` | <code>P:System.DateTime.DayOfYear</code> |
+| `bcl.date-time.hour` | <code>P:System.DateTime.Hour</code> |
+| `bcl.date-time.kind` | <code>P:System.DateTime.Kind</code> |
+| `bcl.date-time.millisecond` | <code>P:System.DateTime.Millisecond</code> |
+| `bcl.date-time.minute` | <code>P:System.DateTime.Minute</code> |
+| `bcl.date-time.month` | <code>P:System.DateTime.Month</code> |
+| `bcl.date-time.op-equality` | <code>M:System.DateTime.op_Equality(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.op-greater-than` | <code>M:System.DateTime.op_GreaterThan(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.op-greater-than-or-equal` | <code>M:System.DateTime.op_GreaterThanOrEqual(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.op-inequality` | <code>M:System.DateTime.op_Inequality(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.op-less-than` | <code>M:System.DateTime.op_LessThan(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.op-less-than-or-equal` | <code>M:System.DateTime.op_LessThanOrEqual(System.DateTime,System.DateTime)</code> |
+| `bcl.date-time.second` | <code>P:System.DateTime.Second</code> |
+| `bcl.date-time.ticks` | <code>P:System.DateTime.Ticks</code> |
+| `bcl.date-time.time-of-day` | <code>P:System.DateTime.TimeOfDay</code> |
+| `bcl.date-time.year` | <code>P:System.DateTime.Year</code> |
+| `bcl.dictionary.count` | <code>P:System.Collections.Generic.Dictionary&#96;2.Count</code> |
 | `bcl.enumerable.empty` | <code>M:System.Linq.Enumerable.Empty&#96;&#96;1</code> |
 | `bcl.exception.ctor` | <code>M:System.Exception.#ctor</code> |
 | `bcl.exception.ctor.string` | <code>M:System.Exception.#ctor(System.String)</code> |
@@ -34,6 +63,8 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.key-value-pair.key` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Key</code> |
 | `bcl.key-value-pair.value` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Value</code> |
 | `bcl.list.add` | <code>M:System.Collections.Generic.List&#96;1.Add(&#96;0)</code> |
+| `bcl.list.count` | <code>P:System.Collections.Generic.List&#96;1.Count</code> |
+| `bcl.list.item.int32` | <code>M:System.Collections.Generic.List&#96;1.get_Item(System.Int32)</code> |
 | `bcl.math.abs.int32` | <code>M:System.Math.Abs(System.Int32)</code> |
 | `bcl.math.max.int32-int32` | <code>M:System.Math.Max(System.Int32,System.Int32)</code> |
 | `bcl.math.min.int32-int32` | <code>M:System.Math.Min(System.Int32,System.Int32)</code> |
@@ -42,10 +73,35 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.nullable.has-value` | <code>P:System.Nullable&#96;1.HasValue</code> |
 | `bcl.nullable.value` | <code>P:System.Nullable&#96;1.Value</code> |
 | `bcl.object.ctor` | <code>M:System.Object.#ctor</code> |
+| `bcl.queue.count` | <code>P:System.Collections.Generic.Queue&#96;1.Count</code> |
+| `bcl.stack.count` | <code>P:System.Collections.Generic.Stack&#96;1.Count</code> |
 | `bcl.string.concat.string-string` | <code>M:System.String.Concat(System.String,System.String)</code> |
 | `bcl.string.is-null-or-empty` | <code>M:System.String.IsNullOrEmpty(System.String)</code> |
 | `bcl.string.item.int32` | <code>M:System.String.get_Chars(System.Int32)</code> |
 | `bcl.string.length` | <code>P:System.String.Length</code> |
+| `bcl.time-only.hour` | <code>P:System.TimeOnly.Hour</code> |
+| `bcl.time-only.millisecond` | <code>P:System.TimeOnly.Millisecond</code> |
+| `bcl.time-only.minute` | <code>P:System.TimeOnly.Minute</code> |
+| `bcl.time-only.op-equality` | <code>M:System.TimeOnly.op_Equality(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.op-greater-than` | <code>M:System.TimeOnly.op_GreaterThan(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.op-greater-than-or-equal` | <code>M:System.TimeOnly.op_GreaterThanOrEqual(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.op-inequality` | <code>M:System.TimeOnly.op_Inequality(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.op-less-than` | <code>M:System.TimeOnly.op_LessThan(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.op-less-than-or-equal` | <code>M:System.TimeOnly.op_LessThanOrEqual(System.TimeOnly,System.TimeOnly)</code> |
+| `bcl.time-only.second` | <code>P:System.TimeOnly.Second</code> |
+| `bcl.time-only.ticks` | <code>P:System.TimeOnly.Ticks</code> |
+| `bcl.time-span.days` | <code>P:System.TimeSpan.Days</code> |
+| `bcl.time-span.hours` | <code>P:System.TimeSpan.Hours</code> |
+| `bcl.time-span.milliseconds` | <code>P:System.TimeSpan.Milliseconds</code> |
+| `bcl.time-span.minutes` | <code>P:System.TimeSpan.Minutes</code> |
+| `bcl.time-span.op-equality` | <code>M:System.TimeSpan.op_Equality(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.op-greater-than` | <code>M:System.TimeSpan.op_GreaterThan(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.op-greater-than-or-equal` | <code>M:System.TimeSpan.op_GreaterThanOrEqual(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.op-inequality` | <code>M:System.TimeSpan.op_Inequality(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.op-less-than` | <code>M:System.TimeSpan.op_LessThan(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.op-less-than-or-equal` | <code>M:System.TimeSpan.op_LessThanOrEqual(System.TimeSpan,System.TimeSpan)</code> |
+| `bcl.time-span.seconds` | <code>P:System.TimeSpan.Seconds</code> |
+| `bcl.time-span.ticks` | <code>P:System.TimeSpan.Ticks</code> |
 | `contract.assume` | <code>M:SharpProof.Attributes.Contract.Assume(System.Boolean)</code> |
 | `contract.ensures` | <code>M:SharpProof.Attributes.Contract.Ensures(System.Boolean)</code> |
 | `contract.old` | <code>M:SharpProof.Attributes.Contract.Old&#96;&#96;1(&#96;&#96;0)</code> |
@@ -53,6 +109,16 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `contract.result` | <code>M:SharpProof.Attributes.Contract.Result&#96;&#96;1</code> |
 
 The KeyValuePair getters copy immutable fields with evidence for purity, no allocations, no exceptions and termination. Their result relationships and constructors remain unmodeled. Receiver evaluation and surrounding effects retain their own obligations.
+
+## Calendar and clock values
+
+The `bcl.date-time.*`, `bcl.date-only.*`, `bcl.time-only.*`, `bcl.time-span.*` and `bcl.date-time-offset.*` rows cover the calendar and time-of-day getters and the six comparison operators of `DateTime`, `DateOnly`, `TimeOnly` and `TimeSpan`, plus `DateTimeOffset.UtcDateTime` and `UtcTicks`.
+
+- **Facets.** Each row reads only the value it is given, allocates nothing, does not throw and terminates. A getter projects a component of the stored ticks; for `DateTimeOffset`, it reads the UTC instant. An operator compares the stored ticks, or for `DateOnly` the day number.
+- **Evidence.** The rows list no exception and consult no culture, time zone or clock. Runtime witnesses check each row: it allocates nothing on boundary values, and it returns the same results under a culture that records every calendar, format, comparison and text read.
+- **Operators.** An operator row applies because the frontend lowers a non-lifted user-defined binary operator declared in another assembly as a call to its operator method.
+- **Older frameworks.** `DateOnly` and `TimeOnly` first ship in .NET 6, so on .NET Framework and .NET Standard reference surfaces their rows stay unresolved and those members stay unmodeled.
+- **Not covered.** Constructors, `Now`/`UtcNow`/`Today`, date arithmetic that can overflow, `DateTimeOffset` operators and formatting have no row. They remain conservative.
 
 ## Optional relational specification packs
 

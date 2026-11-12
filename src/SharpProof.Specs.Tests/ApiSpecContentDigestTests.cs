@@ -15,9 +15,9 @@ public sealed class ApiSpecContentDigestTests
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("11"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("12"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "e51f8d0c55a9d624c595147ce3523d813cd0608f76b0401a3697efe2716a33e3"));
+                "89077ec8ad379951c77e8ae65a76439899e410843cd8f538aaafc60fa0d43a89"));
         }
     }
 

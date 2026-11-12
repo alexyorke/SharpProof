@@ -33,7 +33,7 @@ Closed parameter/return attributes have their own type admission rules. For exam
 
 ## Arithmetic, operators, and conversions
 
-These rows describe built-in operators after Roslyn resolves conversions. A separately checked user-defined operator body does not make every invocation of an overloaded operator exact.
+These rows describe built-in operators after Roslyn resolves conversions. A separately checked user-defined operator body does not make every invocation of an overloaded operator exact. A non-lifted user-defined binary operator declared in another assembly, such as `DateTime > DateTime`, lowers as a call to its static operator method after both operands are evaluated: its effects are those of any metadata call, bounded by the [API specification catalog](api-spec-catalog.md#calendar-and-clock-values) when a row exists. Source, lifted, short-circuiting and static abstract (generic math) operators stay closed; see [calendar value tests](../src/SharpProof.Worker.Tests/CalendarValueSpecificationTests.cs).
 
 | ID | Feature | Modeled behavior and boundary | Concrete evidence |
 | --- | --- | --- | --- |

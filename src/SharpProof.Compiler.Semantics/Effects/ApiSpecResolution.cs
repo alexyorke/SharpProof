@@ -288,7 +288,7 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         if (target.MemberKind == SpecTargetMemberKind.Method)
         {
             return symbol is IMethodSymbol method &&
-                (method.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet) &&
+                (method.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.UserDefinedOperator) &&
                 method.IsStatic == target.IsStatic &&
                 string.Equals(method.Name, target.MemberName, StringComparison.Ordinal) &&
                 method.Arity == target.GenericArity &&

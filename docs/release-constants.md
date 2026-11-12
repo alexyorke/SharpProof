@@ -16,7 +16,7 @@ Use the owning files below when changing compatibility or packaging. Do not copy
 | Fork/join projection codec | `13` | [CompilerForkJoinProjectionCodec.cs](../src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.cs) |
 | Resource program model | `8` | [ResourceProgram.cs](../src/SharpProof.Ir/ResourceProgram.cs) |
 | Resource expression model | `1` | [ResourceExpression.cs](../src/SharpProof.Ir/ResourceExpression.cs) |
-| Default API table version | `11` | [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs) |
+| Default API table version | `12` | [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs) |
 | Canonical container platform | `linux/amd64` | [toolchain.json](../eng/container/toolchain.json) and [compose.yaml](../compose.yaml) |
 
 ## Coordinated changes

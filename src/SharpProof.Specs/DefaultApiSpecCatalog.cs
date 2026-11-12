@@ -291,7 +291,7 @@ internal sealed class ApiSpecTemplate
 internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "11";
+    public const string DefaultTableVersion = "12";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -333,6 +333,7 @@ internal sealed partial class ApiSpecTable
             CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.queue.count", "System.Collections.Generic.Queue`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.stack.count", "System.Collections.Generic.Stack`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            .. CalendarValueDeclarations(assemblySetFramework, evidenceDocumented, evidenceObserved),
             new ApiSpecDeclaration(
                 new ApiSpecTarget("bcl.list.item.int32", "M:System.Collections.Generic.List`1.get_Item(System.Int32)",
                     "System.Collections.Generic.List`1", SpecTargetMemberKind.Method, "get_Item",
@@ -760,6 +761,104 @@ internal sealed partial class ApiSpecTable
                 new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
                 new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
                 new SpecNullnessFacet(SpecNullness.Unknown, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
+    }
+
+    // Calendar and clock values. Each getter projects a component of the
+    // stored ticks (or, for DateTimeOffset, the UTC instant), and each
+    // comparison operator compares the stored ticks (DateOnly: the day
+    // number). The .NET documentation lists no exception for any of them, and
+    // none consults the culture, the time zone or the clock. Constructors that
+    // validate their arguments, Now/UtcNow/Today, arithmetic that can
+    // overflow, and formatting stay unspecified.
+    private static ImmutableArray<ApiSpecDeclaration> CalendarValueDeclarations(
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
+        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        ImmutableArray<(string Type, string Member, IrTypeKind Result)> getters = [
+            ("DateTime", "Ticks", IrTypeKind.Integer), ("DateTime", "Year", IrTypeKind.Integer),
+            ("DateTime", "Month", IrTypeKind.Integer), ("DateTime", "Day", IrTypeKind.Integer),
+            ("DateTime", "DayOfYear", IrTypeKind.Integer), ("DateTime", "Hour", IrTypeKind.Integer),
+            ("DateTime", "Minute", IrTypeKind.Integer), ("DateTime", "Second", IrTypeKind.Integer),
+            ("DateTime", "Millisecond", IrTypeKind.Integer), ("DateTime", "Kind", IrTypeKind.Reference),
+            ("DateTime", "DayOfWeek", IrTypeKind.Reference), ("DateTime", "Date", IrTypeKind.Reference),
+            ("DateTime", "TimeOfDay", IrTypeKind.Reference),
+            ("DateOnly", "Year", IrTypeKind.Integer), ("DateOnly", "Month", IrTypeKind.Integer),
+            ("DateOnly", "Day", IrTypeKind.Integer), ("DateOnly", "DayOfYear", IrTypeKind.Integer),
+            ("DateOnly", "DayNumber", IrTypeKind.Integer), ("DateOnly", "DayOfWeek", IrTypeKind.Reference),
+            ("TimeOnly", "Ticks", IrTypeKind.Integer), ("TimeOnly", "Hour", IrTypeKind.Integer),
+            ("TimeOnly", "Minute", IrTypeKind.Integer), ("TimeOnly", "Second", IrTypeKind.Integer),
+            ("TimeOnly", "Millisecond", IrTypeKind.Integer),
+            ("TimeSpan", "Ticks", IrTypeKind.Integer), ("TimeSpan", "Days", IrTypeKind.Integer),
+            ("TimeSpan", "Hours", IrTypeKind.Integer), ("TimeSpan", "Minutes", IrTypeKind.Integer),
+            ("TimeSpan", "Seconds", IrTypeKind.Integer), ("TimeSpan", "Milliseconds", IrTypeKind.Integer),
+            ("DateTimeOffset", "UtcDateTime", IrTypeKind.Reference), ("DateTimeOffset", "UtcTicks", IrTypeKind.Integer),
+        ];
+        ImmutableArray<string> comparisonTypes = ["DateTime", "DateOnly", "TimeOnly", "TimeSpan"];
+        ImmutableArray<string> comparisonOperators = ["op_Equality", "op_Inequality", "op_LessThan", "op_LessThanOrEqual", "op_GreaterThan", "op_GreaterThanOrEqual"];
+        var declarations = ImmutableArray.CreateBuilder<ApiSpecDeclaration>(getters.Length + comparisonTypes.Length * comparisonOperators.Length);
+        foreach (var (type, member, result) in getters)
+        {
+            declarations.Add(CalendarValueDeclaration(
+                new ApiSpecTarget(CalendarWitness(type, member), "P:System." + type + "." + member, "System." + type,
+                    SpecTargetMemberKind.PropertyGet, member, false, 0, IrTypeKind.Reference, [], result, assemblies),
+                documented, observed));
+        }
+        foreach (var type in comparisonTypes)
+        {
+            foreach (var name in comparisonOperators)
+            {
+                declarations.Add(CalendarValueDeclaration(
+                    new ApiSpecTarget(CalendarWitness(type, name), "M:System." + type + "." + name + "(System." + type + ",System." + type + ")",
+                        "System." + type, SpecTargetMemberKind.Method, name, true, 0, null,
+                        [IrTypeKind.Reference, IrTypeKind.Reference], IrTypeKind.Boolean, assemblies),
+                    documented, observed));
+            }
+        }
+        return declarations.MoveToImmutable();
+    }
+
+    // DateTime.DayOfYear becomes bcl.date-time.day-of-year and
+    // DateTime.op_GreaterThan becomes bcl.date-time.op-greater-than.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Specification witness identifiers are lowercase by convention.")]
+    internal static string CalendarWitness(string type, string member)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        member = RepositoryParameterGuard.NotNull(member, nameof(member));
+        return "bcl." + Kebab(type) + "." + Kebab(member);
+    }
+
+    private static string Kebab(string name)
+    {
+        name = RepositoryParameterGuard.NotNull(name, nameof(name));
+        var text = new System.Text.StringBuilder(name.Length + 8);
+        foreach (var character in name.StartsWith("op_", StringComparison.Ordinal) ? "Op" + name.Substring(3) : name)
+        {
+            if (char.IsUpper(character) && text.Length != 0)
+            { text.Append('-'); }
+            text.Append(char.ToLowerInvariant(character));
+        }
+        return text.ToString();
+    }
+
+    private static ApiSpecDeclaration CalendarValueDeclaration(ApiSpecTarget target, SpecEvidence documented, SpecEvidence observed)
+    {
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
+        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
+        return new ApiSpecDeclaration(target,
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.None, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.NotApplicable, documented),
                 new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
                 new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
             []);
