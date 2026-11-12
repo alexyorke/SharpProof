@@ -22,6 +22,11 @@ internal static partial class WorkerProtocolJson
     }
     internal const string CompilerDiagnosticCodePrefix = "compiler.";
     internal const int MaximumJsonBytes = 16 * 1024 * 1024;
+    // A compiler manifest records a source line map entry for every line of
+    // every syntax tree, plus lowered evidence for every selected method, so
+    // it has a larger bounded envelope than requests, results and caches.
+    // Every reader and hasher of a manifest uses this one bound.
+    internal const int MaximumCompilerManifestBytes = 32 * 1024 * 1024;
     internal const int MaximumJsonDepth = 32;
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private static readonly StringComparer s_ordinal = StringComparer.Ordinal;
@@ -55,20 +60,21 @@ internal static partial class WorkerProtocolJson
         return reader.ReadToEnd();
     }
 
-    internal static string ComputeFileSha256(string path)
+    // Hashes a compiler manifest under the manifest bound, streaming it
+    // instead of buffering a copy of up to 32 MiB.
+    internal static string ComputeCompilerManifestSha256(string path)
     {
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
-        using var bounded = OpenBoundedJsonFile(
+        using var bounded = OpenBoundedFile(
             path,
-            $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
-        using var buffer = new MemoryStream();
-        bounded.CopyTo(buffer);
+            MaximumCompilerManifestBytes,
+            "The compiler manifest must be a nonempty regular file.",
+            "compiler manifest");
+        var hash = ProtocolHashEncoding.ComputeSha256Hex(bounded);
         // The exact-length stream rejects another byte itself. Keep the final
-        // probe after CopyTo so a change at the completed read boundary fails.
+        // probe after hashing so a change at the completed read boundary fails.
         _ = bounded.ReadByte();
-
-        buffer.Position = 0;
-        return ProtocolHashEncoding.ComputeSha256Hex(buffer);
+        return hash;
     }
 
     internal static async Task<string> ReadUtf8FileAsync(
@@ -120,21 +126,38 @@ internal static partial class WorkerProtocolJson
     {
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return new StreamReader(
-            OpenBoundedJsonFile(
+            OpenBoundedFile(
                 path,
-                "The JSON file must be a nonempty regular file."),
+                MaximumJsonBytes,
+                "The JSON file must be a nonempty regular file.",
+                "JSON file"),
             s_strictUtf8,
             detectEncodingFromByteOrderMarks: false);
     }
 
-    private static BoundedReadStream OpenBoundedJsonFile(
+    // Names the oversized file and its size: a bare limit message does not
+    // say which of a run's files hit the cap.
+    internal static string ExceedsLimitMessage(string kind, string path, long length, long maximumBytes)
+    {
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
+        path = RepositoryParameterGuard.NotNull(path, nameof(path));
+        return string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "The {0} '{1}' is {2} bytes, which exceeds the {3} byte limit.",
+            kind, path, length, maximumBytes);
+    }
+
+    private static BoundedReadStream OpenBoundedFile(
         string path,
-        string emptyFileMessage)
+        int maximumBytes,
+        string emptyFileMessage,
+        string kind)
     {
         // Inspect the directory entry before FileStream opens it. On Unix,
         // opening a FIFO for reading waits for a writer, so a zero-length
         // non-file must fail before the potentially blocking open.
         emptyFileMessage = RepositoryParameterGuard.NotNull(emptyFileMessage, nameof(emptyFileMessage));
+        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
         path = RepositoryParameterGuard.NotNull(path, nameof(path));
         var fileLength = new FileInfo(path).Length;
         if (fileLength <= 0)
@@ -142,10 +165,10 @@ internal static partial class WorkerProtocolJson
             throw new InvalidDataException(
                 emptyFileMessage);
         }
-        if (fileLength > MaximumJsonBytes)
+        if (fileLength > maximumBytes)
         {
             throw new InvalidDataException(
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+                ExceedsLimitMessage(kind, path, fileLength, maximumBytes));
         }
 
         FileStream? stream = new FileStream(

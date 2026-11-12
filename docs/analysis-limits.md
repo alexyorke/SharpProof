@@ -55,6 +55,8 @@ Budget validation requires positive query/method rlimits, with query no larger t
 
 [ProtocolJson.cs](../src/SharpProof.Worker.Protocol/ProtocolJson.cs) caps JSON input at 16 MiB with maximum JSON depth 32 and validates UTF-8 and shape. This per-file cap differs from aggregate cache eviction. Oversized or malformed cache envelopes become misses; invalid requests or responses fail closed.
 
+The compiler manifest (`compiler-manifest.json`) has its own 32 MiB cap (`MaximumCompilerManifestBytes` in the same file). It records a line map entry for every source line of every syntax tree plus lowered evidence for every selected method, so a large project's manifest can pass 16 MiB even when it selects nothing; SharpProof's own `SharpProof.Worker.Tests` (about 114,000 lines) does. The collector, worker, launcher, evidence tool and publication validator all apply this one bound. Callers selected only for their calls stop being added at 24 MiB. A project whose manifest still exceeds 32 MiB fails with SP0049, naming the manifest size and the limit; split the project to verify it. Verification is never skipped.
+
 ## Fixed construction bounds
 
 The typed frontend's `MaximumRegionSteps` is 4096, enforced for region traversal, CFG/instruction work, and related construction. The passive VC builder also limits steps to 4096 and bounds construction work. These are internal bounds, not user-configurable proof budgets.

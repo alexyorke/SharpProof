@@ -1171,6 +1171,51 @@ public sealed class FinalCompilationCollectorTests
             Is.Not.EqualTo(CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason));
     }
 
+    // Regression: self-verifying SharpProof.Attributes (GenerateDocumentationFile,
+    // WarningsAsErrors=CS8019) failed with CompilationFailure naming only
+    // CS8019. The command-line compiler reports unused imports at Hidden
+    // severity without applying the options, so that build emits; only
+    // Compilation.GetDiagnostics promotes them.
+    [Test]
+    public async Task UnusedImportsPromotedByOptionsDoNotInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var seed = CreateCompilation();
+        var parse = ((CSharpParseOptions)seed.SyntaxTrees.Single().Options)
+            .WithDocumentationMode(DocumentationMode.Diagnose);
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            using System.Text;
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                [DoesNotThrow]
+                internal static int Method() => 1;
+            }
+            """,
+            parse,
+            "unused-using.cs",
+            Encoding.UTF8);
+        var compilation = seed.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
+        compilation = compilation.WithOptions(compilation.Options
+            .WithGeneralDiagnosticOption(ReportDiagnostic.Error)
+            .WithSpecificDiagnosticOptions(
+                compilation.Options.SpecificDiagnosticOptions.SetItem("CS8019", ReportDiagnostic.Error)));
+        Assert.That(
+            compilation.GetDiagnostics().Where(static item => item.Severity == DiagnosticSeverity.Error).Select(static item => item.Id),
+            Is.EqualTo(ImmutableArray.Create("CS8019")),
+            "The fixture must reproduce an unused import promoted to an error by the options.");
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("unused-import-promoted"),
+            allowCompilationErrors: true);
+
+        Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        Assert.That(
+            artifact.Callables.Single().FailureReason,
+            Is.Not.EqualTo(CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason));
+    }
+
     [TestCase("?", "first.cs")]
     [TestCase("class C {\n    void M() {\n        Missing();\n    }\n}", "ordinary.cs")]
     [TestCase("#line 100 \"mapped.cs\"\nclass C { void M() { Missing(); } }", "physical.cs")]

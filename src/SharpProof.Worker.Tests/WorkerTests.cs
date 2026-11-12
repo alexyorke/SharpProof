@@ -1369,6 +1369,11 @@ internal sealed partial class WorkerTests
             Assert.That(factoryCalls, Is.Zero);
             Assert.That(CacheFiles(project), Is.Empty);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+            // The failure names each error's source site, not just its text.
+            var diagnostic = authoritative.CompilerDiagnostics.First(static item => item.IsSource);
+            Assert.That(response.Errors, Has.Some.Matches<WorkerProtocolError>(error =>
+                error.Code == diagnostic.Code &&
+                error.Message == $"{diagnostic.Location.Path}({diagnostic.Location.Line},{diagnostic.Location.Column}): {diagnostic.Message}"));
         }
     }
 
