@@ -137,7 +137,8 @@ Entries describe repository changes, not package publication. Confirm available 
   the worker result's `summary.costs`, absent on cache hits (protocol 48, cache 71).
   A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
   lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
-  solver work with an advisory reference in `eng/acceptance/perf-baseline.json`.
+  solver work with the reference in `eng/acceptance/perf-baseline.json`. Nightly
+  fails when total solver work rises more than 25% above it.
 - Add an advisory nightly `perf-self` step that verifies SharpProof's own `src/`
   projects and summarizes per-project solver work, time and the costliest callables
   in `artifacts/perf/self-summary.md`. It never fails on outcomes or cost.
