@@ -6183,8 +6183,8 @@
       "declarationSha256": "cc2abc4c4faf416746a4fc0bc846d69a7fe3054d16c8c30a88e09b6fbb2e3801",
       "methodName": "Aggregate",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0203",
@@ -6675,8 +6675,8 @@
       "declarationSha256": "aca906e85c7e925cbf837d98cc68a36f52f76153340d412828b94abeeeb0345c",
       "methodName": "IdFn",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0244",
@@ -7419,8 +7419,8 @@
       "declarationSha256": "f807ac3228c85413fde9601c1659ab82e6c8bf817a66839905a219c597b42923",
       "methodName": "ToString",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0306",
@@ -7647,8 +7647,8 @@
       "declarationSha256": "8c71fd48c7a4360a25135d1fb855f50c2be721c2984d15adc35ca3b2219ebc51",
       "methodName": "DayOfMonth",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0325",

@@ -22,10 +22,13 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
     // drops entry completeness or the exception constraint.
     [TestCase("module", 4093, 1, true)]
     [TestCase("module", 4095, 1, true)]
-    [TestCase("empty-body", 1, 1, false)]
+    // A static constructor with only empty statements stores nothing, so
+    // its entry is effect-free until its statements exhaust the budget.
+    // Constants cost no classification work.
+    [TestCase("empty-body", 1, 1, true)]
     [TestCase("empty-body", 4096, 0, false)]
-    [TestCase("constructor-reference", 1, 1, false)]
-    [TestCase("constructor-reference", 4094, 0, false)]
+    [TestCase("constructor-reference", 1, 1, true)]
+    [TestCase("constructor-reference", 4094, 0, true)]
     [TestCase("value-work", 1, 1, false)]
     [TestCase("value-work", 1363, 0, false)]
     [TestCase("type-work", 1, 1, false)]

@@ -140,9 +140,11 @@ internal static class EffectContractDiagnostics
         // at entry. Without a violating site to report, name the
         // initialization that keeps the summary incomplete rather than
         // leave the claim silently Unknown.
-        if (reported.Any(static evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven && evaluation.Diagnostic == null &&
-                RequiresCompleteEntryEffects(evaluation.Kind)) &&
-            EntryEffectGap(compilation, method, analysis, cancellationToken) is { } entryGap)
+        var unexplained = reported.Where(static evaluation => evaluation.Outcome != EffectEvaluationOutcome.Proven &&
+            evaluation.Diagnostic == null && RequiresCompleteEntryEffects(evaluation.Kind)).ToImmutableArray();
+        if (!unexplained.IsEmpty &&
+            EntryEffectGap(compilation, method, analysis, unexplained.All(static evaluation => IgnoresAllocation(evaluation.Kind)),
+                cancellationToken) is { } entryGap)
         {
             reportDiagnostic(Diagnostic.Create(GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule, location,
                 method.Name, "Advisory:EntryInitialization:" + entryGap));
@@ -179,15 +181,22 @@ internal static class EffectContractDiagnostics
             EffectEvaluationContractKind.AllowedCapabilities or EffectEvaluationContractKind.EffectContract;
     }
 
+    // The worker accepts entry initialization that constructs fresh values
+    // for these claims only.
+    private static bool IgnoresAllocation(EffectEvaluationContractKind kind)
+    {
+        return kind is EffectEvaluationContractKind.EnforcePure or EffectEvaluationContractKind.AllowedCapabilities;
+    }
+
     // The collector's entry-completeness condition, in its order: callee
     // initialization the body reaches, then the declaring type, then the
     // module.
     private static string? EntryEffectGap(CSharpCompilation compilation, IMethodSymbol method, AdvisoryEffectAnalysis analysis,
-        CancellationToken cancellationToken)
+        bool admitFreshValues, CancellationToken cancellationToken)
     {
         if (!analysis.SourceInitializationEffectsComplete)
         { return "CalleeTypeInitializer"; }
-        var gap = EntryInitialization.FindEffectGap(compilation, method.ContainingType, cancellationToken);
+        var gap = EntryInitialization.FindEffectGap(compilation, method.ContainingType, cancellationToken, admitFreshValues);
         return gap == EntryInitializationGap.None ? null : gap.ToString();
     }
 
