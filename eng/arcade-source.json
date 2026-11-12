@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/dotnet/arcade",
-  "commit": "1141c9df487f40450bc0ab7444f8941b863528dd",
-  "sdkVersion": "9.0.0-beta.26523.9",
+  "commit": "8018080f69d112044bcd7e0589a45e59e209bf30",
+  "sdkVersion": "9.0.0-beta.26553.12",
   "commonFiles": [
     {
       "path": "eng/common/BuildConfiguration/build-configuration.json",
@@ -77,8 +77,8 @@
     },
     {
       "path": "eng/common/core-templates/job/onelocbuild.yml",
-      "gitBlob": "ea590495fb0d5e130e4c6ff51f7b20c89598fb58",
-      "sha256": "f60d282e7af22850c5e7aa267b0dec6c86373e9735271b0febde26f2d02f86c6",
+      "gitBlob": "98eb4d5071d2f940ba9d985285d5aae623f045c7",
+      "sha256": "75db55c959de781c62735d65307d507fb854f21854160cff5d633e1a7e9a617a",
       "mode": "100644"
     },
     {
