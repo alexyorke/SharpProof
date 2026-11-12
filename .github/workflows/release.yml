@@ -61,8 +61,14 @@ jobs:
             sed -E "s#\]\(([^)\#:]+)(\#[^)]*)?\)#](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/\1\2)#g" \
             > artifacts/release-notes/notes.md
           if ! grep -q '[^[:space:]]' artifacts/release-notes/notes.md; then
-            echo "::error::CHANGELOG.md has no '## ${heading}' section. Cut the version heading before tagging."
-            exit 1
+            # Unreleased is empty once the version heading is cut, and the
+            # dry run of that commit must still reach packaging.
+            if [[ "$heading" == Unreleased ]]; then
+              echo "No unreleased changes." > artifacts/release-notes/notes.md
+            else
+              echo "::error::CHANGELOG.md has no '## ${heading}' section. Cut the version heading before tagging."
+              exit 1
+            fi
           fi
 
       - uses: ./.github/actions/setup-tooling
