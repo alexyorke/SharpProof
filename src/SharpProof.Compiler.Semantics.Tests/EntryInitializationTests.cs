@@ -98,6 +98,13 @@ public sealed class EntryInitializationTests
     [TestCase("public static class Other { public static readonly int[] Data = Make(); private static int[] Make() => null; } " +
         "public static class Subject { private static readonly int[] Copy = Other.Data; }")]
     [TestCase("public static class Subject { private static readonly string Empty = string.Empty; }")]
+    // A read of mutable or per-thread state is an ambient read, whatever its
+    // type's initializer.
+    [TestCase("public static class Input { public static int Current; } " +
+        "public static class Subject { private static readonly int Snapshot; static Subject() { Snapshot = Input.Current; } }")]
+    [TestCase("public static class Subject { public static int Count; private static readonly int Copy = Count; }")]
+    [TestCase("public static class Input { [System.ThreadStatic] public static readonly int[] PerThread; } " +
+        "public static class Subject { private static readonly int[] Copy = Input.PerThread; }")]
     // A throw.
     [TestCase("public static class Subject { private static readonly object Value = (object)null ?? throw new System.InvalidOperationException(); }")]
     [TestCase("public static class Subject { static Subject() { throw new System.InvalidOperationException(); } }")]

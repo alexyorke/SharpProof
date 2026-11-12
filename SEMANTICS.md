@@ -115,8 +115,8 @@ Purity, allocation, capability and effect-contract claims also require entry ini
   - a boxed value;
   - a lambda, or a method group of a static method;
   - `new object()`;
-  - a `new` of a source class whose base is `object`, or of a source struct, through a constructor that only stores its own parameters or admitted values into the new instance's own fields and auto-properties. The class or struct has no object initializer, no chained `this(...)` constructor and no finalizer, and its type initializer is itself admitted.
-  - a read of a static field of the type itself, or of another source type whose own initializer is admitted.
+  - a `new` of a source class whose base is `object`, or of a source struct, through a constructor that only stores its own parameters or admitted values into the new instance's own fields and auto-properties. The class or struct has no object initializer, no chained `this(...)` constructor and no `~T()` method, and its type initializer is itself admitted.
+  - a read of a readonly static field that is neither volatile nor `[ThreadStatic]`, of the type itself or of another source type whose own initializer is admitted. Such a field holds only what its initializer stored, so the read is not an ambient read, and it adds nothing beyond that initializer's class. A read of a mutable static is an ambient read and stays an entry effect.
 
   This class writes no state a body can observe, calls no other code and cannot throw except by running out of memory. The lambda and method-group delegate caches the compiler generates are not observable state. Fresh values do allocate, and the first call that runs the initializer pays for that. So `EnforcePure` and `AllowedCapabilities` accept this class, while `ZeroAllocations`, `EffectContract` and resource bounds do not. Compiler artifact schema 61 records the distinction as `EntryConstructsFreshValues`.
 

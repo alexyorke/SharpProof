@@ -187,15 +187,22 @@ internal static class EntryInitialization
             owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             return SymbolEqualityComparer.Default.Equals(member.ContainingType, owner) && member switch
             {
-                IFieldSymbol { IsStatic: true, IsConst: false, IsReadOnly: true, IsVolatile: false } field =>
-                    !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
-                    {
-                        Name: "ThreadStaticAttribute",
-                        ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
-                    }),
+                IFieldSymbol field => IsInitializedOnly(field),
                 IPropertySymbol { IsStatic: true, SetMethod: null } property => IsAutoProperty(property),
                 _ => false
             };
+        }
+
+        // A static only its type initializer writes, shared by all threads.
+        private static bool IsInitializedOnly(IFieldSymbol field)
+        {
+            field = RepositoryParameterGuard.NotNull(field, nameof(field));
+            return field is { IsStatic: true, IsConst: false, IsReadOnly: true, IsVolatile: false } &&
+                !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
+                {
+                    Name: "ThreadStaticAttribute",
+                    ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+                });
         }
 
         // An auto-property's accessors read and write its backing field and
@@ -376,9 +383,13 @@ internal static class EntryInitialization
                         Instance: null, Method: { IsStatic: true, IsAbstract: false, IsVirtual: false, MethodKind: MethodKind.Ordinary }
                     } ? InitializationEffect.FreshValues : InitializationEffect.Effectful;
                 case IFieldReferenceOperation { Field.IsStatic: true, Instance: null } field when constructor == null:
-                    // Reading a static of the type being initialized starts
-                    // nothing; any other type's initializer runs first.
-                    return SymbolEqualityComparer.Default.Equals(field.Field.ContainingType, owner)
+                    // Only a readonly, non-volatile, process-wide static holds
+                    // nothing but what its initializer stored; reading any
+                    // other static is an ambient read. Reading a static of the
+                    // type being initialized starts nothing; any other type's
+                    // initializer runs first.
+                    return !IsInitializedOnly(field.Field) ? InitializationEffect.Effectful
+                        : SymbolEqualityComparer.Default.Equals(field.Field.ContainingType, owner)
                         ? InitializationEffect.None : Classify(field.Field.ContainingType);
                 default:
                     return InitializationEffect.Effectful;
