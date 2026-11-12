@@ -8,7 +8,7 @@ namespace SharpProof.Worker.Test;
 internal sealed class CalleeInitializationControlTests
 {
     [TestCase("public static int State = 1;")]
-    [TestCase("static C() { }")]
+    [TestCase("static C() { System.Console.WriteLine(); }")]
     public async Task ExistingRootInitializationAdmissionIsClosed(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);

@@ -302,6 +302,7 @@ public sealed class CompilerTotalCallableArtifactTests
     [TestCase("null-exceptions")]
     [TestCase("abstraction")]
     [TestCase("entry-effects")]
+    [TestCase("entry-fresh-values")]
     [TestCase("markers")]
     [TestCase("null-markers")]
     [TestCase("owner")]
@@ -334,6 +335,9 @@ public sealed class CompilerTotalCallableArtifactTests
                 break;
             case "entry-effects":
                 { dto = dto with { EffectsCompleteAtEntry = true }; }
+                break;
+            case "entry-fresh-values":
+                { dto = dto with { EntryConstructsFreshValues = true }; }
                 break;
             case "markers":
                 { dto = dto with { CallPreconditions = [] }; }

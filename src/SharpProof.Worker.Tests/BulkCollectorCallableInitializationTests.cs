@@ -63,8 +63,11 @@ public sealed class BulkCollectorCallableInitializationTests
         }
         finally { runtime.Unload(); }
 
+        // The event's initializer calls int.TryParse and stores into the
+        // event's mutable backing field, so entry effects are incomplete.
         var body = Prepare(compilation);
-        Assert.That(body.EffectsCompleteAtEntry, Is.True);
+        Assert.That(body.EffectsCompleteAtEntry, Is.False);
+        Assert.That(body.EntryConstructsFreshValues, Is.False);
         var replay = new IrProgramInterpreter(body.Program.Factory).Execute(body.Program);
         Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
         Assert.That(replay.ReturnValue!.Integer, Is.EqualTo(1));

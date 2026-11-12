@@ -57,6 +57,24 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Prove purity and capability claims in types whose static initializers only
+  construct fresh values. Such an initializer stores constants, one-dimensional
+  arrays of constant length, boxed values, lambdas, static method groups,
+  `new object()`, or objects built by constructors that only store into the new
+  instance, into the type's own readonly statics. It may also read statics of
+  types whose initializers qualify. Before, any initializer other than a scalar
+  constant kept these claims Unknown with SP0047
+  `Advisory:EntryInitialization:TypeInitializer`. Allocation and effect-contract
+  claims still count the initializer's allocations and stay Unknown. A call,
+  a throw, a cross-type cycle, a static constructor with logic, or a read of a
+  static whose initializer does not qualify is still an entry effect. Explicit
+  static constructors that only store constants, and string, enum,
+  floating-point and `null` constants, now count as effect-free for every
+  effect claim. A static field-like event with an initializer is now an entry
+  effect; before, it was overlooked. SEMANTICS.md defines the class.
+  In the OSS corpus, MoreLINQ `IdFn` and NodaTime `Era.ToString` and
+  `DateAdjusters.DayOfMonth` are now Proven. MoreLINQ `Aggregate` is now
+  Refuted: it invokes caller-supplied delegates. Compiler artifact 61.
 - Stop failing verification of a library with an unused `using` under
   `WarningsAsErrors=CS8019`. The C# compiler reports unused using directives and
   extern aliases (CS8019, CS8020) at Hidden severity without applying the

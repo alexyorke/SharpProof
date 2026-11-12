@@ -10,7 +10,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 60;
+    internal const int Current = 61;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -83,6 +83,10 @@ internal sealed record CompilerTotalCallablePreparation(
     internal ImmutableArray<CompilerTotalExceptionConstraint> ExceptionConstraints { get; init; } = [];
     internal ImmutableArray<CompilerTotalCallPrecondition> CallPreconditions { get; init; } = [];
     internal bool EffectsCompleteAtEntry { get; init; }
+    // Entry initialization writes nothing a body can observe, but may
+    // construct fresh values. EffectsCompleteAtEntry is then false, and only
+    // claims that ignore allocation accept it.
+    internal bool EntryConstructsFreshValues { get; init; }
     internal ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
     // The last parameter is `this`, which is never null.
     internal bool HasReceiver { get; init; }
@@ -165,6 +169,8 @@ internal sealed record CompilerTotalCallableArtifact
     public ImmutableArray<CompilerDisjointInputPair>? DisjointInputs { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool EffectsCompleteAtEntry { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool EntryConstructsFreshValues { get; init; }
     [JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<string> ValidEffectClaimIds { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
