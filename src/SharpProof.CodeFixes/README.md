@@ -10,7 +10,7 @@ This package adds suggestions and code fixes to the IDE:
 - fix a `Contract.Result<T>()` whose type does not match the method's return type.
 
 It contains analyzers and code fixes only. It does not verify anything on its
-own: reference [SharpProof](https://www.nuget.org/packages/SharpProof) for the
+own: reference the `SharpProof` package for the
 contract API, the analyzers and the verifier.
 
 ```xml
