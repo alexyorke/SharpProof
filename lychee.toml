@@ -19,9 +19,13 @@ include_verbatim = true
 # mirror. Message-ID: 41D1C330.8030901@yahoo.co.uk. Debian's host times out in CI.
 # The verbatim LLVM license names plain-HTTP llvm.org, which only redirects to
 # HTTPS and repeatedly refuses connections from CI runners; check the HTTPS site.
+# llvm.org's docs host now refuses CI runners too, so check the LLVM notice's
+# DeveloperPolicy#legacy against the page's source in llvm-project, which
+# declares the `(legacy)=` label for "Legacy License Structure".
 remap = [
   '^https://lists\.debian\.org/debian-legal/2004/12/msg00295\.html$ https://www.mail-archive.com/debian-legal@lists.debian.org/msg29045.html',
   '^http://llvm\.org/?$ https://llvm.org/',
+  '^https://llvm\.org/docs/DeveloperPolicy\.html#legacy$ https://raw.githubusercontent.com/llvm/llvm-project/main/llvm/docs/DeveloperPolicy.md',
 ]
 
 # This normative attestation predicate type is a semantic identifier, not a dereferenceable webpage.
