@@ -1,6 +1,6 @@
 # Coverage gaps in the newer OSS sources
 
-This is a triage of the 300 methods from MoreLINQ, NodaTime and Humanizer (`OSS0201`–`OSS0500`). The aalhour sources are not included. The data comes from master `4ae8b6e93` (manifest 9, before the date/time models below). Each method is counted once, under the **first** reason SharpProof cannot handle it.
+This is a triage of the 300 methods from MoreLINQ, NodaTime and Humanizer (`OSS0201`–`OSS0500`). The original algorithms source is not included. The data comes from master `4ae8b6e93` (manifest 9, before the date/time models below). Each method is counted once, under the **first** reason SharpProof cannot handle it.
 
 ## How the reasons were found
 
@@ -30,7 +30,7 @@ This is a triage of the 300 methods from MoreLINQ, NodaTime and Humanizer (`OSS0
 | 2 | Entry initialization: the method or a callee it calls is declared in a type with a non-constant static initializer. **Skipped**: another session owns type-initializer effects. | 123 | 48 | 37 | 38 | 101 | `OSS0204` Assert, `OSS0243` IdFn, `OSS0310` CivilToScriptural, `OSS0457` Convert |
 | 3 | Interface, virtual and abstract dispatch, including `foreach` over interfaces | 26 | 5 | 16 | 5 | 19 | `OSS0213` Consume, `OSS0359` Parse, `OSS0398` GetZoneInterval, `OSS0473` Convert |
 | 4 | Source value types: `this` field reads, constructors and instance calls on (readonly) structs | 25 | 5 | 20 | 0 | 7 | `OSS0251` AsListLike, `OSS0326` ForOffset, `OSS0345` CompareTo, `OSS0346` FromTrustedDuration |
-| 5 | Iterators (`yield`) and async enumerables | 24 | 24 | 0 | 0 | 23 | `OSS0207` Backsert, `OSS0209` Cartesian, `OSS0273` Repeat, `OSS0281` Sequence |
+| 5 | Iterators (`yield`) and async sequences | 24 | 24 | 0 | 0 | 23 | `OSS0209` Cartesian, `OSS0273` Repeat, `OSS0281` Sequence |
 | 6 | BCL date/time value types: `DateTime`, `DateOnly`, `TimeOnly`, `TimeSpan`, `DateTimeOffset` | 21 | 0 | 0 | 21 | 0 | `OSS0410` Humanize, `OSS0412` Humanize, `OSS0414` Humanize, `OSS0433` Convert |
 | 7 | `ref`/`out` parameters: source callees and `TryGetValue` | 13 | 1 | 3 | 9 | 7 | `OSS0212` TryGetValue, `OSS0341` Add, `OSS0470` CollectPartsUnderAHundred, `OSS0485` ConvertImpl |
 | 8 | Generic type parameters: null tests on `T`, `EqualityComparer<T>.Default`, generic math, generic constructors | 10 | 5 | 5 | 0 | 1 | `OSS0228` IndexOf, `OSS0252` Create, `OSS0361` Add, `OSS0363` ParsePattern |
