@@ -68,6 +68,23 @@ internal static class Program
                 Log.Info(verdict);
                 return failed ? 1 : 0;
             }
+            if (command == "perf-self")
+            {
+                var perf = args.Length == 3 && args[1] == "--perf" ? args[2]
+                    : args.Length == 1 ? Path.Combine(root, "artifacts", "perf")
+                    : throw new ArgumentException("Use perf-self [--perf <directory>].", nameof(args));
+                var projects = PerfSelf.Load(Path.Combine(perf, "self"), Path.Combine(perf, "self-builds.json"));
+                var summary = PerfSelf.Summarize(projects);
+                await File.WriteAllTextAsync(Path.Combine(perf, "self-summary.md"), summary, cancellation.Token).ConfigureAwait(false);
+                Log.Info(summary);
+                // Outcomes never fail this advisory step; no result at all means the lane itself is broken.
+                if (projects.All(static project => project.Response == null))
+                {
+                    Log.Error("perf-self found no published worker result; the self-verification lane is broken.");
+                    return 1;
+                }
+                return 0;
+            }
             if (command == "corpus-update")
             {
                 await CorpusGate.WriteActualSnapshotAsync(root, cancellation.Token)
@@ -75,7 +92,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|perf-baseline|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
             return 2;
         }

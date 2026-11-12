@@ -67,4 +67,16 @@
     <Error Condition="!Exists('$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll')"
            Text="SharpProof self-application requires a bootstrapped analyzer at '$(_SharpProofSelfAnalyzerDirectory)'. Run the self-apply container command to build the analyzer first." />
   </Target>
+
+  <!--
+    The perf-self command verifies each project, which needs the worker and
+    compiler collector that only the packed verifier carries.  It extracts a
+    locally packed SharpProof.Verifier and imports it the way a manual
+    consumer does; the package marks itself present, so the source analyzer
+    items above step aside and the packed analyzer is used instead.
+  -->
+  <Import Project="$(_SharpProofSelfVerifierDirectory)/build/SharpProof.Verifier.props"
+          Condition="'$(SharpProofSelfApplication)' == 'true' AND '$(_SharpProofSelfVerifierDirectory)' != ''" />
+  <Import Project="$(_SharpProofSelfVerifierDirectory)/build/SharpProof.Verifier.targets"
+          Condition="'$(SharpProofSelfApplication)' == 'true' AND '$(_SharpProofSelfVerifierDirectory)' != ''" />
 </Project>

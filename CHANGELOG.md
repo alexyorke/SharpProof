@@ -118,6 +118,9 @@ Entries describe repository changes, not package publication. Confirm available 
   A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
   lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
   solver work with an advisory reference in `eng/acceptance/perf-baseline.json`.
+- Add an advisory nightly `perf-self` step that verifies SharpProof's own `src/`
+  projects and summarizes per-project solver work, time and the costliest callables
+  in `artifacts/perf/self-summary.md`. It never fails on outcomes or cost.
 
 - Stop reporting false `Proven` resource bounds. A local written anywhere in an
   enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
