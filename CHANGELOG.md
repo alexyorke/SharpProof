@@ -267,6 +267,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Developer experience
 
+- Link verifier diagnostics to their documentation. SP0047, SP0048 and SP0051
+  reported by the build now carry the same help link as analyzer diagnostics,
+  and the diagnostics page gains sections for SP0048 and SP0051.
+
 - Add a workspace template with pinned local tools, optional editor assistance,
   feed configuration defaulting to nuget.org, and portable/container profiles; add preview-first
   `init` for existing projects and text/JSON/Markdown command reports.

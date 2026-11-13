@@ -81,6 +81,10 @@ A `[DoesNotThrow]` or `[AllowedExceptions]` contract could not be established. A
 
 A selected callable is outside the portable analyzer's admitted subset or analysis is incomplete. Unannotated unsupported methods can remain quiet; silence must not be counted as proof. Worker callable coverage is a separate accountability record. A reason of `Advisory:EntryInitialization:TypeInitializer` means the body has no site that could violate a purity, allocation, capability or effect-contract claim, but the declaring type or an enclosing type has a static constructor or a static initializer outside the class [semantics](../SEMANTICS.md#effects) admits. The runtime may run that initializer on entry, so the worker has no complete effect summary. For purity and capability claims, the class covers initializers that store only constants or freshly constructed arrays, delegates and objects into the type's own readonly statics. For allocation and effect-contract claims, it covers constants only, because a fresh value allocates. To remove the gap, move the method to a type without such initializers, or make the initializers fit the class. `ModuleInitializer` names a `[ModuleInitializer]` in the assembly, and `CalleeTypeInitializer` names a type initializer that the body reaches and that writes mutable static state. When a callable's only gaps are call-precondition claims that ran out of time, SP0047 is a warning even under `require-proven`, and those calls count as unchecked.
 
+## SP0048
+
+The build depends on something SharpProof was told to assume: a `Contract.Assume`, a `[SharpProofTrusted]` boundary, or a trusted API specification. The claim is proven only if that assumption holds. Under the default assumption policy (`error`) this fails the build. Either remove the assumption and prove the fact, or accept it deliberately by setting `SharpProofAssumptionPolicy` to `warn` or `allow`; see [configuration](configuration.md).
+
 ## SP0049
 
 The collector failed to emit the final compiler manifest needed by verification. Treat this as an infrastructure failure. A missing artifact cannot be replaced by a successful ordinary build or guessed source reparse.
@@ -88,6 +92,10 @@ The collector failed to emit the final compiler manifest needed by verification.
 ## SP0050
 
 The referenced Attributes assembly could not be read/attested. Check exact package identity and payload compatibility. Source shadows and same-named types are not substitutes for the supported contract API.
+
+## SP0051
+
+The verifier found inputs for which a contract is false: a postcondition that does not hold on return, or a call that breaks its callee's `Requires`. The diagnostic is reported at the clause or the call, and its counterexample lists the input values. Fix the code or correct the contract. This is always an error, whatever the verifier policy. [Verification evidence](verification-results.md) explains the recorded result.
 
 ## SP0052
 
