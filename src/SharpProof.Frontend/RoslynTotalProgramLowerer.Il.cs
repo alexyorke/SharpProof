@@ -226,9 +226,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                         {
                             var right = Pop();
                             var left = Pop();
-                            if (code.StartsWith("B", StringComparison.Ordinal))
+                            if (code is "Beq" or "Bne_un" or "Bge" or "Bge_un" or "Bgt" or "Bgt_un" or "Ble" or "Ble_un" or "Blt" or "Blt_un")
                             { _builder.Branch(block, site, IlComparison(factory, code, left, right), Edge(instruction.Target), Edge(index + 1)); terminal = true; }
-                            else if (code.StartsWith("C", StringComparison.Ordinal))
+                            else if (code is "Ceq" or "Cgt" or "Cgt_un" or "Clt" or "Clt_un")
                             { stack.Add(IlLoad(factory, IlComparison(factory, code, left, right))); }
                             else
                             { stack.Add(IlLoad(factory, Rule(IlArithmetic(factory, code, left, right)))); }
@@ -281,7 +281,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         return CSharpOperationSemantics.ConvertInteger(factory, value, target, checkedConversion);
     }
 
-    private static IrTerm IlComparison(IrFactory factory, string code, IrTerm left, IrTerm right)
+    internal static IrTerm IlComparison(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
         code = RepositoryParameterGuard.NotNull(code, nameof(code));
         right = RepositoryParameterGuard.NotNull(right, nameof(right));
@@ -302,12 +302,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             "Bge" or "Bge_un" => IrBinaryOperator.GreaterThanOrEqual,
             "Ble" or "Ble_un" => IrBinaryOperator.LessThanOrEqual,
             "Bgt" or "Bgt_un" or "Cgt" or "Cgt_un" => IrBinaryOperator.GreaterThan,
-            _ => IrBinaryOperator.LessThan
+            "Blt" or "Blt_un" or "Clt" or "Clt_un" => IrBinaryOperator.LessThan,
+            // An opcode this table does not name has no assumed meaning.
+            _ => throw new RegionIncompleteException()
         };
         return factory.Binary(operation, left, right);
     }
 
-    private static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
+    internal static TotalScalarRule IlArithmetic(IrFactory factory, string code, IrTerm left, IrTerm right)
     {
         // Normalized Bool values are 0 or 1, so the integer operators also cover bool &, | and ^.
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
@@ -326,10 +328,16 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (code.EndsWith("_un", StringComparison.Ordinal))
         { var type = factory.GetOrCreateIntegerType(factory.GetTypeInfo(left.Type).Width, false); left = factory.Cast(type, left); right = factory.Cast(type, right); }
-        var operation = code.StartsWith("Add", StringComparison.Ordinal) ? IrBinaryOperator.Add :
-            code.StartsWith("Sub", StringComparison.Ordinal) ? IrBinaryOperator.Subtract :
-            code.StartsWith("Mul", StringComparison.Ordinal) ? IrBinaryOperator.Multiply :
-            code.StartsWith("Div", StringComparison.Ordinal) ? IrBinaryOperator.Divide : IrBinaryOperator.Remainder;
+        var operation = code switch
+        {
+            "Add" or "Add_ovf" or "Add_ovf_un" => IrBinaryOperator.Add,
+            "Sub" or "Sub_ovf" or "Sub_ovf_un" => IrBinaryOperator.Subtract,
+            "Mul" or "Mul_ovf" or "Mul_ovf_un" => IrBinaryOperator.Multiply,
+            "Div" or "Div_un" => IrBinaryOperator.Divide,
+            "Rem" or "Rem_un" => IrBinaryOperator.Remainder,
+            // An opcode this table does not name has no assumed meaning.
+            _ => throw new RegionIncompleteException()
+        };
         if (operation is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
         { return CSharpOperationSemantics.IntegerArithmetic(factory, operation, left, right, code.Contains("_ovf")); }
         return CSharpOperationSemantics.DivideOrRemainder(factory, operation, left, right);

@@ -125,8 +125,8 @@ internal static class TotalIlStack
             case "Ldarg":
                 if (ordinal < 0 || ordinal >= body.Method.Parameters.Length)
                 { return false; }
-                // Decoder admission has already certified this parameter type.
-                _ = TotalIlStackType.TryFromTypeSymbol(body.Method.Parameters[ordinal].Type, out var parameterType);
+                if (!TotalIlStackType.TryFromTypeSymbol(body.Method.Parameters[ordinal].Type, out var parameterType))
+                { return false; }
                 stack.Add(parameterType);
                 return true;
             case "Ldloc":
@@ -170,10 +170,11 @@ internal static class TotalIlStack
                 { if (!Pop().Accepts(method.Parameters[parameter].Type)) { return false; } }
                 if (!method.ReturnsVoid)
                 {
-                    _ = TotalIlStackType.TryFromTypeSymbol(method.ReturnType, out var returnType);
+                    if (!TotalIlStackType.TryFromTypeSymbol(method.ReturnType, out var returnType))
+                    { return false; }
                     stack.Add(returnType);
                 }
-                return method.ReturnsVoid || stack[stack.Count - 1].IsValid;
+                return true;
             case "Ret":
                 return (body.Method.ReturnsVoid || Pop().Accepts(body.Method.ReturnType)) && stack.Count == 0;
         }
