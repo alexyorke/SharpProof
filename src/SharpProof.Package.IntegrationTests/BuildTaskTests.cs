@@ -19,6 +19,18 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [TestCase("SP0047", "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0047")]
+    [TestCase("SP0051", "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0051")]
+    [TestCase("SPB030", "")]
+    [TestCase("SP00X1", "")]
+    [TestCase("", "")]
+    public void VerifierDiagnosticsLinkToTheirDocumentationSection(string code, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        ArgumentNullException.ThrowIfNull(expected);
+        Assert.That(RunVerifier.HelpLink(code), Is.EqualTo(expected));
+    }
+
     [Test]
     public void PresentPathVectorsRejectDefaultAndPreserveNonblankOrderAndDuplicates()
     {
