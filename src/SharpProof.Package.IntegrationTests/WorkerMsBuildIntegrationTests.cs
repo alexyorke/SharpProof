@@ -873,7 +873,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(build.ExitCode, Is.Not.Zero);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(build.Output, Does.Contain("SP0049"));
+            Assert.That(build.Output, Does.Contain("SPB031"));
             Assert.That(
                 build.Output,
                 Does.Contain(
@@ -1269,7 +1269,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(legacyBuild.ExitCode, Is.Not.Zero);
         Assert.That(
             legacyBuild.Output,
-            Does.Contain("SharpProofMode was removed before preview.1"));
+            Does.Contain("SharpProofMode is not supported"));
         Assert.That(File.Exists(legacy.RequestPath), Is.False);
     }
 

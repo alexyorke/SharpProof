@@ -71,10 +71,10 @@
   </PropertyGroup>
   <Target Name="_SharpProofValidateRuntimeClosure"
           Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
-    <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
+    <Error Code="SPB026" Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
-    <Error Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
-           Text="SharpProof verifier package native payload is missing from its build-tool closure." />
+    <Error Code="SPB027" Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
+           Text="SharpProof verifier package native payload is missing from its build-tool closure: '$(_SharpProofPackageNativeZ3Path)'. Restore the SharpProof.Verifier package again." />
   </Target>
 
   <Target Name="_SharpProofResolveVerificationPaths">
@@ -123,9 +123,9 @@
       <_SharpProofInvocationRequestFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'request.json'))</_SharpProofInvocationRequestFile>
       <_SharpProofInvocationResultFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'result.json'))</_SharpProofInvocationResultFile>
     </PropertyGroup>
-    <Error Condition="'$(_SharpProofInvocationIdIsSafe)' != 'True'"
+    <Error Code="SPB028" Condition="'$(_SharpProofInvocationIdIsSafe)' != 'True'"
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
-    <Error Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
+    <Error Code="SPB029" Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
     <PropertyGroup Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
@@ -201,7 +201,7 @@
     </ReadLinesFromFile>
     <Delete Files="$(_SharpProofCompilerManifestPath)"
             Condition="'@(_SharpProofCompletedCapture)' != '$(_SharpProofCompilerCaptureNonce)'" />
-    <Error Code="SP0049"
+    <Error Code="SPB031"
            Condition="'@(_SharpProofCompletedCapture)' != '$(_SharpProofCompilerCaptureNonce)' OR !Exists('$(_SharpProofCompilerManifestPath)')"
            Text="SharpProof did not receive a fresh final compiler manifest for this compilation. Ensure the SharpProof compiler collector runs when verification is enabled." />
   </Target>
@@ -290,27 +290,29 @@
       <_SharpProofCleanupInvocationDirectoryParent>$([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanupInvocationDirectoryFullPath)'))</_SharpProofCleanupInvocationDirectoryParent>
       <_SharpProofCleanupInvocationDirectoryIsContained>$([System.String]::Equals('$(_SharpProofCleanupInvocationDirectoryParent)', '$(_SharpProofCleanupRunsDirectory)', System.StringComparison.Ordinal))</_SharpProofCleanupInvocationDirectoryIsContained>
     </PropertyGroup>
-    <Error Condition="'$(_SharpProofCleanupInvocationIdIsSafe)' != 'True'"
+    <Error Code="SPB028" Condition="'$(_SharpProofCleanupInvocationIdIsSafe)' != 'True'"
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
-    <Error Condition="'$(_SharpProofCleanupInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryIsContained)' != 'True'"
+    <Error Code="SPB029" Condition="'$(_SharpProofCleanupInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation cleanup directory must resolve canonically to a direct child of the package-owned runs directory." />
     <RemoveDir Directories="$(_SharpProofCleanupInvocationDirectoryFullPath)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
-    <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
-           Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64, or SDK-style Windows projects using Visual Studio 2026/MSBuild 18+ through the .NET task host. Portable analyzer profiles remain available on this host." />
-    <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
-           Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
-    <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
-           Text="SharpProofAssumptionPolicy must be allow, warn, or error." />
-    <Error Code="SP0049"
+    <Error Code="SPB021" Condition="'$(_SharpProofVerifierHostSupported)' != 'true' AND '$(_SharpProofVerifierHostIsMusl)' == 'true'"
+           Text="SharpProof verification does not support musl Linux such as Alpine (runtime '$(_SharpProofVerifierRuntimeIdentifier)'): the packaged solver needs glibc. Build in a glibc-based image, or use SharpProofProfile=advisory with SharpProofVerify=false for analysis without proofs." />
+    <Error Code="SPB020" Condition="'$(_SharpProofVerifierHostSupported)' != 'true' AND '$(_SharpProofVerifierHostIsMusl)' != 'true'"
+           Text="SharpProof verification is not supported on this build host. It requires .NET SDK 10.0.100 or newer, a build process whose architecture matches the operating system (an x64 dotnet under ARM64 emulation is rejected), and either Core MSBuild on Windows, macOS or glibc Linux (x64 or ARM64), or Visual Studio 2026/MSBuild 18+ on Windows. Detected: .NET SDK '$(NETCoreSdkVersion)', MSBuild $(MSBuildVersion) ($(MSBuildRuntimeType)), OS architecture $(_SharpProofVerifierHostArchitecture), process architecture $(_SharpProofVerifierProcessArchitecture). Portable analysis remains available with SharpProofProfile=advisory and SharpProofVerify=false." />
+    <Error Code="SPB022" Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
+           Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven. The value is '$(SharpProofVerifyPolicy)'." />
+    <Error Code="SPB023" Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
+           Text="SharpProofAssumptionPolicy must be allow, warn, or error. The value is '$(SharpProofAssumptionPolicy)'." />
+    <Error Code="SPB031"
            Condition="!Exists('$(_SharpProofCompilerManifestPath)')"
            Text="SharpProof did not receive the required final compiler manifest." />
-    <Error Condition="!Exists('$(_SharpProofLauncherPath)')"
+    <Error Code="SPB024" Condition="!Exists('$(_SharpProofLauncherPath)')"
            Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
-    <Error Condition="!Exists('$(_SharpProofWorkerPath)')"
+    <Error Code="SPB025" Condition="!Exists('$(_SharpProofWorkerPath)')"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
     <MakeDir Directories="$(_SharpProofInvocationDirectory)" />
     <ItemGroup>
@@ -371,8 +373,8 @@
       <Output TaskParameter="HasStructuredError"
               PropertyName="_SharpProofVerifierHasStructuredError" />
     </SharpProof.BuildTasks.RunVerifier>
-    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
-           Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
+    <Error Code="SPB030" Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
+           Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode). See docs/build-errors.md for the exit codes." />
     <Message Importance="High"
              Text="SharpProof verifier result: $(_SharpProofEffectiveResultFile)" />
     <Message Condition="'$(_SharpProofEffectiveSarifFile)' != ''"
@@ -415,6 +417,7 @@
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
           Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' != 'true'">
-    <Error Text="SharpProof verification requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64, or SDK-style Windows projects using Visual Studio 2026/MSBuild 18+ through the .NET task host. Linux musl is not supported by the pinned solver payloads. Portable analysis remains available with SharpProofProfile=advisory or SharpProofProfile=off." />
+    <Error Code="SPB021" Condition="'$(_SharpProofVerifierHostIsMusl)' == 'true'" Text="SharpProof verification does not support musl Linux such as Alpine (runtime '$(_SharpProofVerifierRuntimeIdentifier)'): the packaged solver needs glibc. Build in a glibc-based image, or use SharpProofProfile=advisory with SharpProofVerify=false for analysis without proofs." />
+    <Error Code="SPB020" Condition="'$(_SharpProofVerifierHostIsMusl)' != 'true'" Text="SharpProof verification is not supported on this build host. It requires .NET SDK 10.0.100 or newer, a build process whose architecture matches the operating system (an x64 dotnet under ARM64 emulation is rejected), and either Core MSBuild on Windows, macOS or glibc Linux (x64 or ARM64), or Visual Studio 2026/MSBuild 18+ on Windows. Detected: .NET SDK '$(NETCoreSdkVersion)', MSBuild $(MSBuildVersion) ($(MSBuildRuntimeType)), OS architecture $(_SharpProofVerifierHostArchitecture), process architecture $(_SharpProofVerifierProcessArchitecture). Portable analysis remains available with SharpProofProfile=advisory and SharpProofVerify=false." />
   </Target>
 </Project>

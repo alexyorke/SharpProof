@@ -955,11 +955,11 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(
         "SharpProofMode",
         "contracts",
-        "SharpProofMode was removed before preview.1")]
+        "SharpProofMode is not supported")]
     [TestCase(
         "SharpProofPortableAnalyzerPath",
         "legacy.dll",
-        "SharpProofPortableAnalyzerPath was removed before preview.1")]
+        "SharpProofPortableAnalyzerPath is not supported")]
     public async Task SourceConsumerRejectsRetiredConfiguration(
         string property,
         string value,
