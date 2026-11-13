@@ -178,9 +178,9 @@ internal static partial class PortableIrGraphCodec
                     return TermRow(term, ((IrBooleanTerm)term).Value ? 1 : 0);
                 case IrTermKind.Integer:
                     var integer = (IrIntegerTerm)term;
-                    return TermRow(term, number: integer.Width == 0 ? integer.Value : 0) with
+                    return TermRow(term) with
                     {
-                        Bits = integer.Width == 0 ? 0 : integer.Bits
+                        Bits = integer.Bits
                     };
                 case IrTermKind.String:
                     return TermRow(term, text: _factory.GetString(((IrStringTerm)term).Value));
@@ -312,11 +312,6 @@ internal static partial class PortableIrGraphCodec
                     RequireTerm(row.A is 0 or 1);
                     return _factory.Boolean(row.A == 1);
                 case IrTermKind.Integer:
-                    if (_factory.GetTypeInfo(Type(row.Type)).Width == 0)
-                    {
-                        RequireTerm(row.Bits == 0);
-                        return _factory.Integer(row.Number);
-                    }
                     RequireTerm(row.Number == 0);
                     return _factory.IntegerBits(Type(row.Type), row.Bits);
                 case IrTermKind.String:
