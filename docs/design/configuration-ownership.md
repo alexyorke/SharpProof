@@ -10,7 +10,7 @@ effective defaults, limits, wire formats, and explicit caller overrides.
 | Configuration | Owner | Consumers |
 | --- | --- | --- |
 | Analyzer keys, MSBuild property names, profile/features tokens and defaults | [SharpProofConfigurationCatalog](../../src/SharpProof.Compiler.Semantics/Contracts/SharpProofConfigurationCatalog.cs) | Compiler-semantics option registry and parsing, analyzer policy adapter, package-default alias handling |
-| Solver query resource default | [SolverDefaults](../../eng/shared/SolverDefaults.cs) | Source-linked into SMT options and worker protocol; existing public constants remain available |
+| Solver query resource default | [SolverDefaults](../../src/Shared/SolverDefaults.cs) | Source-linked into SMT options and worker protocol; existing public constants remain available |
 | Worker budgets, request expression-depth ceiling, cache defaults, launcher publication deadline | [ProtocolModel.cs](../../src/SharpProof.Worker.Protocol/ProtocolModel.cs) | Request validation, launcher, compiler collector and artifact admission |
 | Convenience-operation deadline | [AnalysisDefaults](../../src/SharpProof.Ir/AnalysisDefaults.cs) | Analyzer, compiler capture, contract binding, frontend queries, IR interpretation; explicit caller-token overloads keep caller deadlines |
 | Dataflow widening and iteration defaults | [ForwardDataflowAnalysisOptions](../../src/SharpProof.Dataflow/ForwardDataflowAnalysis.cs) | General analysis and advisory analysis; advisory analysis retains its separate iteration budget |

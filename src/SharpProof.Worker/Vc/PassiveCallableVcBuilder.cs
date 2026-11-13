@@ -261,9 +261,8 @@ internal sealed class PassiveCallableVcBuilder
             Fact(Equal(reach, Disjoin(predecessors.Select(edge => edge.Reach))), site, "reach");
             var state = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
             var stateOrder = ImmutableArray.CreateBuilder<IrVarId>();
-            void SetState(IrVarId variable /* SPINT001: all values valid - preserve dictionary key storage semantics */, IrTerm replacement)
+            void SetState(IrVarId variable, IrTerm replacement)
             {
-                System.ArgumentNullException.ThrowIfNull(replacement);
                 if (!state.ContainsKey(variable))
                 { stateOrder.Add(variable); }
                 state[variable] = replacement;
@@ -673,8 +672,6 @@ internal sealed class PassiveCallableVcBuilder
     {
         RepositoryParameterGuard.ThrowIfInvalid(destination.IsDefault, nameof(destination));
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        System.ArgumentNullException.ThrowIfNull(condition);
-        System.ArgumentNullException.ThrowIfNull(state);
         Spend(state.Count);
         var edge = Fresh(_factory.BooleanType);
         Fact(Equal(edge, condition), site, "edge");
@@ -695,8 +692,6 @@ internal sealed class PassiveCallableVcBuilder
     private void Fact(IrTerm predicate, OperationId site, string kind, bool userAssume = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        System.ArgumentNullException.ThrowIfNull(kind);
-        System.ArgumentNullException.ThrowIfNull(predicate);
         Spend();
         ProofJustification justification = userAssume
             ? new UserAssumedJustification(new SourceLocationId(site.Value)) : new LoweredJustification(site);
@@ -709,7 +704,6 @@ internal sealed class PassiveCallableVcBuilder
     private bool TryRewrite(IrTerm root, IReadOnlyDictionary<IrVarId, IrTerm> state, out IrTerm value,
         Exit? returned = null, bool postcondition = false, Heap? heap = null)
     {
-        System.ArgumentNullException.ThrowIfNull(state);
         heap ??= _heap;
         var readAncestors = _blockAncestors[returned?.Block ?? _activeBlock];
         if (!Term(root))
@@ -743,7 +737,6 @@ internal sealed class PassiveCallableVcBuilder
         }
         IrTerm? Read(IrTerm original, Func<IrTerm, IrTerm> rewritten)
         {
-            System.ArgumentNullException.ThrowIfNull(rewritten);
             if (original is IrSequenceAccessTerm access)
             { return ElementRead(access, rewritten(access.Sequence), rewritten(access.Index), Snapshot(access.Sequence, rewritten)); }
             if (!IrFieldSites.IsFieldRead(_factory, original))
@@ -821,9 +814,6 @@ internal sealed class PassiveCallableVcBuilder
         }
         IrTerm ElementRead(IrSequenceAccessTerm original, IrTerm sequence, IrTerm index, IrTerm snapshot)
         {
-            System.ArgumentNullException.ThrowIfNull(index);
-            System.ArgumentNullException.ThrowIfNull(original);
-            System.ArgumentNullException.ThrowIfNull(sequence);
             Spend(heap.Stores.Length);
             // An old value reads the arrays as the callable entered.
             if (snapshot is IrBooleanTerm { Value: true })
@@ -868,7 +858,6 @@ internal sealed class PassiveCallableVcBuilder
         // Indexes of every modeled width compare as Int32.
         IrTerm? Position(IrTerm index)
         {
-            System.ArgumentNullException.ThrowIfNull(index);
             return index.Type == _factory.IntegerType ? index
                 : _factory.GetTypeInfo(index.Type) is { Kind: IrTypeKind.Integer, Width: > 0 and < 32 } ? _factory.Cast(_factory.IntegerType, index)
                 : null;
@@ -879,7 +868,6 @@ internal sealed class PassiveCallableVcBuilder
 
     private bool Term(IrTerm root, bool entryFields = false)
     {
-        System.ArgumentNullException.ThrowIfNull(root);
         return !IrTraversal.Any(root, term =>
         {
             System.ArgumentNullException.ThrowIfNull(term);
@@ -986,15 +974,15 @@ internal sealed class PassiveCallableVcBuilder
                     element == _factory.ObjectType || element == _factory.StringType);
     }
     private IrTerm Equal(IrTerm left, IrTerm right)
-    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.Equal, left, right); }
+    { return _factory.Binary(IrBinaryOperator.Equal, left, right); }
     private IrTerm And(IrTerm left, IrTerm right)
-    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.AndAlso, left, right); }
+    { return _factory.Binary(IrBinaryOperator.AndAlso, left, right); }
     private IrTerm Or(IrTerm left, IrTerm right)
-    { System.ArgumentNullException.ThrowIfNull(left, nameof(left)); System.ArgumentNullException.ThrowIfNull(right, nameof(right)); return _factory.Binary(IrBinaryOperator.OrElse, left, right); }
+    { return _factory.Binary(IrBinaryOperator.OrElse, left, right); }
     private IrTerm Not(IrTerm value)
-    { System.ArgumentNullException.ThrowIfNull(value, nameof(value)); return _factory.Unary(IrUnaryOperator.Not, value); }
+    { return _factory.Unary(IrUnaryOperator.Not, value); }
     private IrTerm Guard(IrTerm reach, IrTerm predicate)
-    { System.ArgumentNullException.ThrowIfNull(predicate, nameof(predicate)); System.ArgumentNullException.ThrowIfNull(reach, nameof(reach)); return Or(Not(reach), predicate); }
+    { return Or(Not(reach), predicate); }
     private IrTerm Disjoin(IEnumerable<IrTerm> values)
-    { System.ArgumentNullException.ThrowIfNull(values, nameof(values)); return values.Aggregate((IrTerm)_factory.Boolean(false), Or); }
+    { return values.Aggregate((IrTerm)_factory.Boolean(false), Or); }
 }

@@ -31,5 +31,5 @@ internal static class ExplicitThrowSites
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); ArgumentNullException.ThrowIfNull(factory); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
+    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : ""; }
 }

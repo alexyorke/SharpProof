@@ -42,8 +42,6 @@ internal static class CompilerExceptionTypeIdentity
         INamedTypeSymbol type,
         ImmutableArray<string>.Builder identities)
     {
-        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (type.ContainingType is { } containingType)
         {
             AddNamedTypeArgumentAssemblies(containingType, identities);
@@ -59,8 +57,6 @@ internal static class CompilerExceptionTypeIdentity
         ITypeSymbol type,
         ImmutableArray<string>.Builder identities)
     {
-        identities = RepositoryParameterGuard.NotNull(identities, nameof(identities));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         switch (type)
         {
             case IArrayTypeSymbol array:

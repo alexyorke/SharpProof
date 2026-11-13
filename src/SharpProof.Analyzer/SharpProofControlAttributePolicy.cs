@@ -143,7 +143,6 @@ internal static class SharpProofControlAttributePolicy
 
     private static bool TryGetReason(AttributeData attribute, out string reason)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         reason = attribute.ConstructorArguments.Length == 1 &&
                  attribute.ConstructorArguments[0].Value is string value
             ? value
@@ -171,11 +170,7 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-
         RepositoryParameterGuard.ThrowIfInvalid(attributes.IsDefault, nameof(attributes));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var suppress = false;
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var attribute in attributes)
@@ -204,9 +199,6 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         if (!session.TryMarkAttributeValidated(attribute))
         {
             return;
@@ -226,9 +218,6 @@ internal static class SharpProofControlAttributePolicy
         Location location,
         Action<Diagnostic> reportDiagnostic)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
             suppressing ? "[SharpProofSuppress]" : "[SharpProofTrusted]",
             string.IsNullOrEmpty(reason) ? "<empty>" : reason,
@@ -240,8 +229,6 @@ internal static class SharpProofControlAttributePolicy
         AttributeData attribute,
         ContractSelectionInventory inventory)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return ContractSelectionInventory.GetControlSelection(
             attribute.AttributeClass,
             inventory.Suppress,
@@ -252,8 +239,6 @@ internal static class SharpProofControlAttributePolicy
         INamedTypeSymbol attributeType,
         ContractSelectionInventory inventory)
     {
-        attributeType = RepositoryParameterGuard.NotNull(attributeType, nameof(attributeType));
-        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return ContractSelectionInventory.GetControlSelection(
             attributeType,
             inventory.Suppress,

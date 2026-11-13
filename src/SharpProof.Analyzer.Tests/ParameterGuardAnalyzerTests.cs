@@ -119,6 +119,36 @@ public sealed class ParameterGuardAnalyzerTests
             Is.EqualTo(ImmutableArray.Create("Parameter 'text' has no explicit guard")));
     }
     [Test]
+    public async Task PrivateMethodsAndLocalFunctionsAreNotBoundaries()
+    {
+        const string source = """
+            public sealed class Sample
+            {
+                public int Public(string a) => a.Length;
+                internal int Internal(string b) => b.Length;
+                protected int Protected(string c) => c.Length;
+                private protected int PrivateProtected(string d) => d.Length;
+                private int Private(string e) => e.Length;
+                private static int PrivateStatic(string f) => f.Length;
+                public int Outer(int[] values)
+                {
+                    System.ArgumentNullException.ThrowIfNull(values);
+                    int Local(string g) => g.Length;
+                    return Local("a") + Private("b") + PrivateStatic("c");
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(Messages(diagnostics), Is.EquivalentTo(ImmutableArray.Create(
+            "Parameter 'a' has no explicit guard",
+            "Parameter 'b' has no explicit guard",
+            "Parameter 'c' has no explicit guard",
+            "Parameter 'd' has no explicit guard")));
+    }
+
+    [Test]
     public async Task ReportsEveryUnguardedInputAcrossCallableForms()
     {
         const string source = """
@@ -718,15 +748,14 @@ public sealed class ParameterGuardAnalyzerTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, [],
             testAssembly ? [MetadataReference.CreateFromFile(typeof(Assert).Assembly.Location)] : null,
             filePath: path);
-        if (testAssembly)
-        {
-            compilation = compilation.WithAssemblyName("AnalyzerFixture.Test");
-        }
         if (validateCompilation)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
         }
-        var analyzers = compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
+        var analyzers = testAssembly
+            ? compilation.WithAnalyzers([new ParameterGuardAnalyzer()], new AnalyzerOptions([], new SharpProof.Testing.DictionaryAnalyzerConfigOptionsProvider(
+                ImmutableDictionary<string, string>.Empty.Add("build_property.SharpProofTestProject", "true"))))
+            : compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
         var diagnostics = await analyzers.GetAnalyzerDiagnosticsAsync();
         Assert.That(diagnostics.Any(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id == "AD0001"), Is.False,
             string.Join(Environment.NewLine, diagnostics));

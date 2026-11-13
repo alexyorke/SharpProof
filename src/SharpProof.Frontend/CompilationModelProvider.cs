@@ -59,7 +59,6 @@ internal static class CompilationModelProvider
         Compilation root,
         SyntaxTree tree)
     {
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var index = OwnershipCache.GetValue(
             root,
             static compilation => TreeOwnershipIndex.Create(compilation));

@@ -59,7 +59,6 @@ internal static class IrClosureFrameSite
 
     private static ResourceStorageKind Storage(IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind switch
         {
             IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence => ResourceStorageKind.Reference,

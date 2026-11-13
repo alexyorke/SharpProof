@@ -97,7 +97,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
     {
         // Test runner signatures are framework-owned; test helpers are not
         // production cancellation boundaries.
-        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+        if (TestProjects.Contains(context.Options) ||
             context.Node is not MethodDeclarationSyntax method ||
             method.Body == null && method.ExpressionBody == null ||
             context.SemanticModel.GetDeclaredSymbol(method, context.CancellationToken) is not IMethodSymbol symbol)
@@ -112,7 +112,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeLocalFunction(SyntaxNodeAnalysisContext context)
     {
-        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+        if (TestProjects.Contains(context.Options) ||
             context.Node is not LocalFunctionStatementSyntax local ||
             local.Body == null && local.ExpressionBody == null ||
             context.SemanticModel.GetDeclaredSymbol(local, context.CancellationToken) is not IMethodSymbol symbol)
@@ -127,7 +127,7 @@ public sealed class CancellationFlowAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeAnonymousFunction(SyntaxNodeAnalysisContext context)
     {
-        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+        if (TestProjects.Contains(context.Options) ||
             context.SemanticModel.GetOperation(context.Node, context.CancellationToken) is not IAnonymousFunctionOperation operation)
         {
             return;

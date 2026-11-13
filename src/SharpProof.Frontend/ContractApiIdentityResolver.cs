@@ -137,7 +137,6 @@ internal sealed class ContractApiIdentityResolver
 
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
-        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
         var candidate = _compilation.GetTypeByMetadataName(metadataName);
         return new AttributeResolution(
             Contract is { } contract &&
@@ -175,7 +174,6 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return assembly is not null &&
             ImmutableInterlocked.GetOrAdd(ref _compilationReferenceCache,
             assembly,
@@ -200,13 +198,11 @@ internal sealed class ContractApiIdentityResolver
 
     private bool HasTrustedAttributesPayload(IAssemblySymbol assembly, out string? unreadableReason)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         return PayloadPolicy.HasTrustedPayload(_compilation, assembly, out unreadableReason);
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
     {
-        candidate = RepositoryParameterGuard.NotNull(candidate, nameof(candidate));
         return candidate is
         {
             TypeKind: TypeKind.Class,
@@ -222,8 +218,6 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol candidate,
         INamedTypeSymbol expectedBase)
     {
-        candidate = RepositoryParameterGuard.NotNull(candidate, nameof(candidate));
-        expectedBase = RepositoryParameterGuard.NotNull(expectedBase, nameof(expectedBase));
         return RoslynSymbolFacts.IsOrDerivesFrom(
             candidate,
             expectedBase,

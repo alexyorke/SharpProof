@@ -90,12 +90,8 @@ internal static class CompilerTotalCallableArtifactCodec
         bool isBodyAbstraction, ImmutableArray<CompilerTotalCallPrecondition> callPreconditions,
         CancellationToken cancellationToken)
     {
-
-
-
         RepositoryParameterGuard.RequireInitialized(clauses.IsDefault, nameof(clauses), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(parameters.IsDefault, nameof(parameters), "Array must be initialized.");
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         cancellationToken.ThrowIfCancellationRequested();
         var instructionRows = program?.Blocks.OrderBy(block => block.Id.Value).SelectMany(block => block.Instructions)
             .Select((instruction, index) => instruction is null ? throw new System.ArgumentNullException(nameof(instruction)) : ((instruction.Id, Index: index)));
@@ -285,8 +281,6 @@ internal static class CompilerTotalCallableArtifactCodec
         // comparer caches. Neither case admits an arbitrary executable call.
         static bool IsDefaultComparerValue(PortableIrGraph graph, PortableIrTerm term)
         {
-            graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: true } member &&
                 IrOpaqueCallSite.IsDefaultComparerValueName(member.Name) && member.DeclaringType == term.Type &&
                 member.ReturnType == term.Type && member.ParameterTypes.Length == 0 &&
@@ -296,8 +290,6 @@ internal static class CompilerTotalCallableArtifactCodec
 
         static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
         {
-            graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
                 name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
                 graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
@@ -630,7 +622,6 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static bool OwnsMetadataOrigin(CompilerMetadataClauseOrigin origin, ImmutableArray<CompilerReferenceSnapshot>? references)
     {
-        origin = RepositoryParameterGuard.NotNull(origin, nameof(origin));
         return references is { } snapshot && !snapshot.IsDefault && snapshot.Any(reference => reference != null && reference.Identity == origin.AssemblyIdentity &&
             !reference.Modules.IsDefault && reference.Modules.Any(module => module is null ? throw new System.ArgumentNullException(nameof(module)) : (module != null &&
                 module.Name == origin.ModuleName && module.Mvid == origin.ModuleMvid && module.Sha256 == origin.ImageSha256 &&
@@ -672,7 +663,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool Scalar(IrFactory factory, IrTypeId type)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Boolean || info.Kind == IrTypeKind.Integer && info.Width is 8 or 16 or 32 or 64 ||
             info.Kind == IrTypeKind.Reference || type == factory.StringType || info.Kind == IrTypeKind.Sequence &&
@@ -683,8 +673,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool SupportedType(PortableIrGraph graph, int index)
     {
         RepositoryParameterGuard.RequireInitialized(index < 0, nameof(index), "Value must be initialized.");
-
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var type = graph.Types[index];
         return type.Kind == IrTypeKind.Reference || type.Kind == IrTypeKind.String && type.Name == "string" ||
             type.Kind == IrTypeKind.Sequence && graph.Types[type.Element].Kind != IrTypeKind.Sequence && SupportedType(graph, type.Element) ||
@@ -777,7 +765,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static bool IsSourceInstruction(IrInstruction instruction, IrVarId? result,
         IEnumerable<CompilerTotalParameter> parameters)
     {
-        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         if (instruction is IrHavocInstruction havoc)
         {
             // One approximated temporary: a delegate-emission choice or an
@@ -798,7 +785,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateBodyAbstraction(IrProgram program, IrVarId? result,
         IEnumerable<CompilerTotalClause> clauses, IEnumerable<CompilerTotalParameter> parameters)
     {
-        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         var canonical = parameters.ToImmutableArray();
         Require(program.Blocks.Length == 1 && clauses.All(clause => clause.Kind != CompilerContractKind.Assume),
             "A body abstraction must have one unconstrained normal block and no body assumptions.");
@@ -946,7 +932,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateCanonicalRoleWrites(IrProgram program,
         IEnumerable<CompilerTotalParameter> parameters, CancellationToken cancellationToken)
     {
-        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
         var canonical = parameters.ToImmutableArray();
         var entry = program.GetBlock(program.Entry);
         var inputs = canonical.Select(static parameter => parameter.Entry).ToImmutableHashSet();
@@ -992,9 +977,6 @@ internal static class CompilerTotalCallableArtifactCodec
     private static void ValidateAssumptionPrologue(IrProgram program, IEnumerable<CompilerTotalParameter> parameters,
         IEnumerable<IrBlockId> order, int pointCount, CancellationToken cancellationToken)
     {
-        order = RepositoryParameterGuard.NotNull(order, nameof(order));
-        parameters = RepositoryParameterGuard.NotNull(parameters, nameof(parameters));
-        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var entry = program.GetBlock(program.Entry);
         var initializationCount = 0;
         foreach (var parameter in parameters)
@@ -1048,7 +1030,6 @@ internal static class CompilerTotalCallableArtifactCodec
 
     private static void Require(bool condition, string message)
     {
-        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         if (!condition)
         { throw new InvalidDataException(message); }
     }

@@ -22,7 +22,7 @@
     <ProjectReference Include="..\..\src\SharpProof.Worker\SharpProof.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
   </ItemGroup>
   <ItemGroup>
     <!-- Shared test helpers from eng/testing. -->

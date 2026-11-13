@@ -4,7 +4,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 {
     private IrMemberId HashSetField(string name, IrTypeId value, IrTypeId? key = null)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
         var identity = _factory.InternExternalIdentity(("hash-set", name, value, key),
             EqualityComparer<(string, string, IrTypeId, IrTypeId?)>.Default);
@@ -14,7 +13,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private GuardedExpression? HashSetClause(IOperation operation, TotalParameterState state, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var property = operation as IPropertyReferenceOperation;
         var method = property?.Property.GetMethod;
         var instance = property?.Instance;
@@ -34,7 +32,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrOpaqueTerm HashSetCount(IrTerm owner)
     {
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         // Reentrant equality callbacks can corrupt even an API-constructed set's
         // internal free count. Preserve the signed observable getter; only exact
         // modeled transitions from known construction establish nonnegativity.
@@ -43,7 +40,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? HashSetBody(IOperation operation, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }
@@ -125,10 +121,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue DefaultHashSetState(IOperation operation, IMethodSymbol method, IrTerm owner, IrTerm key, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
-        key = RepositoryParameterGuard.NotNull(key, nameof(key));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         // Even primitive equality can require framework initialization. Preserve
         // allocation, static writes and failure instead of granting unconditional

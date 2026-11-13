@@ -83,7 +83,6 @@ internal static class SetupInitializer
 
     private static bool ValidIdentifiers(string value)
     {
-        ArgumentNullException.ThrowIfNull(value);
         return value.Length > 0 && value.Split('.').All(static identifier =>
         {
             ArgumentNullException.ThrowIfNull(identifier);

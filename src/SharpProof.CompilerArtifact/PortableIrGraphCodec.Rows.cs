@@ -69,7 +69,6 @@ internal static partial class PortableIrGraphCodec
         object kind, Slots used, int a, int b, int c, int d, long number, string? text,
         ImmutableArray<int> items, PortableIrLocation? location)
     {
-        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
         RepositoryParameterGuard.RequireInitialized(items.IsDefault, nameof(items), "Array must be initialized.");
         Require(
             ((used & Slots.A) != 0 || a == -1) &&
@@ -85,7 +84,6 @@ internal static partial class PortableIrGraphCodec
 
     private static void RequireCanonicalTermSlots(PortableIrTerm row)
     {
-        row = RepositoryParameterGuard.NotNull(row, nameof(row));
         RequireCanonicalSlots(row.Kind, TermSlots(row.Kind),
             row.A, row.B, row.C, row.D, row.Number, row.Text, row.Items, null);
         Require(row.Kind == IrTermKind.Integer || row.Bits == 0,
@@ -94,7 +92,6 @@ internal static partial class PortableIrGraphCodec
 
     private static void RequireCanonicalInstructionSlots(PortableIrInstruction row)
     {
-        row = RepositoryParameterGuard.NotNull(row, nameof(row));
         RequireCanonicalSlots(row.Kind, InstructionSlots(row.Kind),
             row.A, row.B, row.C, -1, 0, null, row.Items, row.Location);
         Require(row.Kind == IrInstructionKind.Havoc || row.Origin == IrHavocOrigin.Approximation,
@@ -103,7 +100,6 @@ internal static partial class PortableIrGraphCodec
 
     private static void RequireCanonicalLocationSlots(PortableIrLocation row)
     {
-        row = RepositoryParameterGuard.NotNull(row, nameof(row));
         RequireCanonicalSlots(row.Kind, LocationSlots(row.Kind),
             row.A, row.B, -1, -1, 0, null, row.Items, null);
     }
@@ -182,9 +178,9 @@ internal static partial class PortableIrGraphCodec
                     return TermRow(term, ((IrBooleanTerm)term).Value ? 1 : 0);
                 case IrTermKind.Integer:
                     var integer = (IrIntegerTerm)term;
-                    return TermRow(term, number: integer.Width == 0 ? integer.Value : 0) with
+                    return TermRow(term) with
                     {
-                        Bits = integer.Width == 0 ? 0 : integer.Bits
+                        Bits = integer.Bits
                     };
                 case IrTermKind.String:
                     return TermRow(term, text: _factory.GetString(((IrStringTerm)term).Value));
@@ -227,7 +223,6 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrLocation LocationRow(IrLocation location)
         {
-            location = RepositoryParameterGuard.NotNull(location, nameof(location));
             switch (location)
             {
                 case IrMemberLocation member:
@@ -246,7 +241,6 @@ internal static partial class PortableIrGraphCodec
 
         private PortableIrInstruction InstructionRow(IrInstruction instruction)
         {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
             _cancellationToken.ThrowIfCancellationRequested();
             var operation = OperationIndex(instruction.Operation);
             switch (instruction)
@@ -312,18 +306,12 @@ internal static partial class PortableIrGraphCodec
     {
         private IrTerm DecodeTermRow(PortableIrTerm row, int depth)
         {
-            row = RepositoryParameterGuard.NotNull(row, nameof(row));
             switch (row.Kind)
             {
                 case IrTermKind.Boolean:
                     RequireTerm(row.A is 0 or 1);
                     return _factory.Boolean(row.A == 1);
                 case IrTermKind.Integer:
-                    if (_factory.GetTypeInfo(Type(row.Type)).Width == 0)
-                    {
-                        RequireTerm(row.Bits == 0);
-                        return _factory.Integer(row.Number);
-                    }
                     RequireTerm(row.Number == 0);
                     return _factory.IntegerBits(Type(row.Type), row.Bits);
                 case IrTermKind.String:
@@ -379,8 +367,6 @@ internal static partial class PortableIrGraphCodec
 
         private IrLocation DecodeLocationRow(IrProgramBuilder builder, PortableIrLocation row)
         {
-            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
-            row = RepositoryParameterGuard.NotNull(row, nameof(row));
             return row.Kind switch
             {
                 IrLocationKind.Member => builder.MemberLocationSnapshot(
@@ -393,10 +379,8 @@ internal static partial class PortableIrGraphCodec
         private IrInstruction DecodeInstructionRow(
             IrProgramBuilder builder, IrBlockId block, ImmutableArray<IrBlockId> blocks, PortableIrInstruction row)
         {
-            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
             RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Array must be initialized.");
-            row = RepositoryParameterGuard.NotNull(row, nameof(row));
             switch (row.Kind)
             {
                 case IrInstructionKind.Assign:
@@ -442,9 +426,7 @@ internal static partial class PortableIrGraphCodec
         // index) or a bare region write, and nothing else.
         private IrWriteInstruction DecodeWrite(IrProgramBuilder builder, IrBlockId block, PortableIrInstruction row)
         {
-            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-            row = RepositoryParameterGuard.NotNull(row, nameof(row));
             if (row.Location != null)
             {
                 return row.B < 0 && row.C < 0 && row.Items.Length == 1 &&

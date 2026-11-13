@@ -121,7 +121,6 @@ internal sealed class ContractApiPayloadPolicy
 
     private static Guid GetBoundModuleVersionId(PortableExecutableReference reference)
     {
-        reference = RepositoryParameterGuard.NotNull(reference, nameof(reference));
         return reference.GetMetadata() is AssemblyMetadata metadata &&
             metadata.GetModules() is { Length: 1 } modules
                 ? modules[0].GetModuleVersionId()
@@ -191,7 +190,6 @@ internal sealed class ContractApiPayloadPolicy
 
     private static Guid ReadExpectedModuleVersionId(Assembly owner)
     {
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var values = ReadAssemblyMetadataValues(
             owner, AttributesAssemblyMvidMetadataKey);
         return values.Length == 1 &&
@@ -203,8 +201,6 @@ internal sealed class ContractApiPayloadPolicy
     private static ImmutableArray<string> ReadAssemblyMetadataValues(
         Assembly owner, string key)
     {
-        key = RepositoryParameterGuard.NotNull(key, nameof(key));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         return owner.GetCustomAttributes<AssemblyMetadataAttribute>()
             .Where(attribute => string.Equals(
                 attribute.Key,

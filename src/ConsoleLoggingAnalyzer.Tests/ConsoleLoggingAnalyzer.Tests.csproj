@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>ConsoleLoggingAnalyzer.Test</AssemblyName>
     <RootNamespace>ConsoleLoggingAnalyzer.Test</RootNamespace>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <DefineConstants>$(DefineConstants);SHARPPROOF_PLATFORM_REFERENCES_ONLY</DefineConstants>
   </PropertyGroup>
   <ItemGroup>

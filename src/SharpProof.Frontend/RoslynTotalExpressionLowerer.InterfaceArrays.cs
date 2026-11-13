@@ -15,7 +15,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private GuardedExpression? ArrayCollectionClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (_context.ArrayCollectionReceiver(property) is not { } operand)
         { return null; }
         var array = LowerClause(operand, state, depth + 1);
@@ -39,8 +38,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private TotalBodyValue? ArrayCollectionBody(IPropertyReferenceOperation property, IOperation operation,
         IOperation? assigned, IrBlockId block, int depth)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (_context.ArrayCollectionReceiver(property) is not { } operand)
         { return null; }
@@ -121,10 +118,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private IrBlockId ArrayInterfaceBoundsEffects(IPropertyReferenceOperation property, IOperation operation,
         IrTerm index, IrTerm outside, IrBlockId block)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        index = RepositoryParameterGuard.NotNull(index, nameof(index));
-        outside = RepositoryParameterGuard.NotNull(outside, nameof(outside));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(operation);
         var invalid = _builder!.CreateBlock("interface-array:invalid-index");

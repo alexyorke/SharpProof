@@ -63,8 +63,6 @@ internal sealed class ContractClausePlacementDiagnostics(
         ContractClauseInventory inventory,
         Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
         return inventory.Clauses
             .Where(static clause => clause.Placement == ContractClausePlacement.NestedCallable)
             .Select(clause => SharpProof.Frontend.Host.CompilationModelProvider
@@ -78,9 +76,7 @@ internal sealed class ContractClausePlacementDiagnostics(
         ImmutableArray<ContractClauseOccurrence> clauses,
         Action<Diagnostic> reportDiagnostic)
     {
-
         RepositoryParameterGuard.ThrowIfInvalid(clauses.IsDefault, nameof(clauses));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
         foreach (var clause in clauses)
         {
             if (clause.IsValid ||

@@ -109,9 +109,6 @@ internal sealed class SharpProofWorker : IDisposable
         }
         WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "")
         {
-            System.ArgumentNullException.ThrowIfNull(code);
-            System.ArgumentNullException.ThrowIfNull(inputHash);
-            System.ArgumentNullException.ThrowIfNull(message);
             return Failure(inputHash, reason, request.Budgets, started, Error(code, message), requestHash);
         }
 
@@ -193,7 +190,6 @@ internal sealed class SharpProofWorker : IDisposable
         WorkerVerifyResponse FailedAfterManifest(WorkerRunFailureReason reason,
             IEnumerable<WorkerProtocolError> errors, WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure)
         {
-            System.ArgumentNullException.ThrowIfNull(errors);
             return ManifestFailure(snapshot.InputHash, snapshot.CompilerManifest.Manifest,
                 request.Budgets, started, reason, errors, requestHash, claimReason);
         }
@@ -226,8 +222,6 @@ internal sealed class SharpProofWorker : IDisposable
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)
             {
-                System.ArgumentNullException.ThrowIfNull(callables);
-                System.ArgumentNullException.ThrowIfNull(claims);
                 ThrowIfProjectInterrupted();
                 var assembled = WorkerResultAssembler.Create(snapshot.InputHash, manifest, status, reason, callables, claims,
                     request.Budgets, resultCacheStatus, Elapsed(started), errors,
@@ -325,7 +319,6 @@ internal sealed class SharpProofWorker : IDisposable
             var verificationOrder = VerificationOrder(orderedTargets);
             async Task RunLane(VerificationLane lane)
             {
-                System.ArgumentNullException.ThrowIfNull(lane);
                 while (scheduler.TryClaim(out var position))
                 {
                     var index = verificationOrder[position];
@@ -476,7 +469,6 @@ internal sealed class SharpProofWorker : IDisposable
     private static VerificationCache? CreateCacheIfEnabled(
         WorkerVerifyRequest request, string projectDirectory, out WorkerCacheStatus status)
     {
-        System.ArgumentNullException.ThrowIfNull(projectDirectory);
         if (!request.Cache.Enabled)
         {
             status = WorkerCacheStatus.Disabled;
@@ -504,11 +496,6 @@ internal sealed class SharpProofWorker : IDisposable
         WorkerRunFailureReason reason, IEnumerable<WorkerProtocolError> errors, string requestHash,
         WorkerClaimReason claimReason = WorkerClaimReason.InfrastructureFailure)
     {
-        System.ArgumentNullException.ThrowIfNull(budgets);
-        System.ArgumentNullException.ThrowIfNull(errors);
-        System.ArgumentNullException.ThrowIfNull(inputHash);
-        System.ArgumentNullException.ThrowIfNull(manifest);
-        System.ArgumentNullException.ThrowIfNull(requestHash);
         return WorkerResultAssembler.CreateIncomplete(
             inputHash, requestHash, manifest, budgets,
             WorkerRunStatus.Failed, reason,
@@ -520,9 +507,6 @@ internal sealed class SharpProofWorker : IDisposable
     private static WorkerVerifyResponse Failure(string inputHash, WorkerRunFailureReason reason,
         WorkerBudgets budgets, long started, IEnumerable<WorkerProtocolError> errors, string? requestHash = null)
     {
-        System.ArgumentNullException.ThrowIfNull(budgets);
-        System.ArgumentNullException.ThrowIfNull(errors);
-        System.ArgumentNullException.ThrowIfNull(inputHash);
         return WorkerResultAssembler.Create(
             string.IsNullOrEmpty(inputHash) ? WorkerResultAssembler.EmptyInputHash : inputHash,
             WorkerResultAssembler.EmptyManifest(), WorkerRunStatus.Failed, reason,
@@ -558,8 +542,6 @@ internal sealed class SharpProofWorker : IDisposable
 
     private static ImmutableArray<WorkerProtocolError> Error(string code, string message)
     {
-        System.ArgumentNullException.ThrowIfNull(code);
-        System.ArgumentNullException.ThrowIfNull(message);
         return [new WorkerProtocolError { Code = code, Message = message }];
     }
 
@@ -583,7 +565,6 @@ internal sealed class SharpProofWorker : IDisposable
         int targetCount,
         out ImmutableArray<VerificationLane> lanes, out string? error)
     {
-        System.ArgumentNullException.ThrowIfNull(budgets);
         lanes = [];
         error = null;
         if (targetCount == 0)
@@ -705,7 +686,6 @@ internal sealed class SharpProofWorker : IDisposable
 
     private static Func<long>? ReadResources(ISmtBackend backend)
     {
-        System.ArgumentNullException.ThrowIfNull(backend);
         return backend switch
         {
             NativeCallableBackend native => () => native.ConsumedResourceCount,
@@ -777,7 +757,6 @@ internal sealed class SharpProofWorker : IDisposable
             ISmtBackend backend,
             Func<long>? resourceReader = null)
         {
-            System.ArgumentNullException.ThrowIfNull(backend);
             return (backend, resourceReader ?? ReadResources(backend));
         }
         internal void DisposeOwnedBackend()

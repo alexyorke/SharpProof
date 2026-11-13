@@ -153,9 +153,6 @@ internal static class EffectContractDiagnostics
 
         EffectClaimEvaluation Report(EffectClaimEvaluation evaluation, string subject, string detail)
         {
-            detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-            evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
-            subject = RepositoryParameterGuard.NotNull(subject, nameof(subject));
             var described = "'" + subject + "' " + detail;
             (DiagnosticDescriptor Rule, ImmutableArray<object?> Arguments) diagnostic = evaluation.Kind switch
             {
@@ -202,7 +199,6 @@ internal static class EffectContractDiagnostics
 
     private static string SiteText(Location location)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         var text = location.SourceTree?.GetText().ToString(location.SourceSpan) ?? "";
         text = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         return text.Length <= 80 ? text : text.Substring(0, 77) + "...";
@@ -213,9 +209,6 @@ internal static class EffectContractDiagnostics
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
         RepositoryParameterGuard.ThrowIfInvalid(attributes.IsDefault, nameof(attributes));
-        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         return EffectContractArguments.DecodeCapabilities(attributes,
             (attribute, contract, reason) =>
             {
@@ -230,10 +223,6 @@ internal static class EffectContractDiagnostics
         ImmutableArray<AttributeData> attributes, Compilation compilation, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         return EffectContractArguments.DecodeAllowedExceptions(attributes, compilation,
             (attribute, contract, reason) =>
@@ -249,12 +238,6 @@ internal static class EffectContractDiagnostics
         AttributeData attribute, string contract, string reason, Location fallbackLocation,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        contract = RepositoryParameterGuard.NotNull(contract, nameof(contract));
-        fallbackLocation = RepositoryParameterGuard.NotNull(fallbackLocation, nameof(fallbackLocation));
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (session.TryMarkAttributeValidated(attribute))
         {
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
@@ -285,8 +268,6 @@ internal static class EffectContractDiagnostics
 
     private static Location GetLocation(AttributeData attribute, Location fallback)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
         return attribute.ApplicationSyntaxReference?.SyntaxTree.GetLocation(
             attribute.ApplicationSyntaxReference.Span) ?? fallback;
     }

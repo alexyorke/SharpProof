@@ -436,7 +436,7 @@ internal sealed class IrCSharpDifferentialOracle
         name = info.Kind switch
         {
             IrTypeKind.Boolean => "bool",
-            IrTypeKind.Integer => info.Width == 0 ? "long" : _factory.GetString(info.Name),
+            IrTypeKind.Integer => _factory.GetString(info.Name),
             IrTypeKind.String => "string",
             IrTypeKind.Reference when type == _factory.ObjectType =>
                 "object",

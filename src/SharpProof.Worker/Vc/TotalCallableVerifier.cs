@@ -255,8 +255,6 @@ internal static class TotalCallableVerifier
 
     private static bool ExceedsDepth(IrTerm value, IrTerm safe, int maximumDepth)
     {
-        System.ArgumentNullException.ThrowIfNull(safe);
-        System.ArgumentNullException.ThrowIfNull(value);
         return IrTermAnalysis.GetDepth(value) > maximumDepth || IrTermAnalysis.GetDepth(safe) > maximumDepth;
     }
 

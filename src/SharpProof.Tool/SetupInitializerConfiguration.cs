@@ -22,7 +22,6 @@ internal static class SetupInitializerConfiguration
 
     private static void PlanFeed(SetupInitializerFiles files, string directory)
     {
-        ArgumentNullException.ThrowIfNull(files);
         ArgumentException.ThrowIfNullOrEmpty(directory);
         string? path = null;
         for (var current = new DirectoryInfo(directory); current != null; current = current.Parent)
@@ -195,7 +194,6 @@ internal static class SetupInitializerConfiguration
 
     private static void PlanManifest(SetupInitializerFiles files, string directory, string version)
     {
-        ArgumentNullException.ThrowIfNull(files);
         ArgumentException.ThrowIfNullOrEmpty(directory);
         ArgumentException.ThrowIfNullOrEmpty(version);
         string? path = null;
@@ -251,7 +249,6 @@ internal static class SetupInitializerConfiguration
 
     private static XElement Section(XElement root, string name)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(name);
         var sections = root.Elements(name).ToArray();
         if (sections.Length > 1)
@@ -265,10 +262,8 @@ internal static class SetupInitializerConfiguration
 
     private static XElement[] Entries(XElement section, string elementName, string attributeName, string value)
     {
-        ArgumentNullException.ThrowIfNull(section);
         ArgumentException.ThrowIfNullOrEmpty(elementName);
         ArgumentException.ThrowIfNullOrEmpty(attributeName);
-        ArgumentNullException.ThrowIfNull(value);
         var entries = section.Elements(elementName).Where(element =>
         {
             ArgumentNullException.ThrowIfNull(element);

@@ -46,7 +46,6 @@ internal static class IrSemanticTerms
         IrBinaryOperator @operator,
         bool identity)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (terms.Length == 0)
         {
             return factory.Boolean(identity);

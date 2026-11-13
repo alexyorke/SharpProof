@@ -184,7 +184,7 @@ The coordinator assigned the producer, scanner, transport and native consumer to
 
 | Owner role | Existing files to reserve exclusively | New files to own |
 | --- | --- | --- |
-| Producer and canonical scanner | `src/SharpProof.CompilerCollector/CompilerArtifact/CompilerTaskCarrierCollector.cs`; `src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs`; `src/SharpProof.CompilerArtifact/CompilerForkJoinProjection.cs` | `src/SharpProof.CompilerArtifact/CompilerTaskEmittedFaultBody.cs`; `src/SharpProof.CompilerArtifact/CompilerTaskPrimitiveIlScanner.cs` |
+| Producer and canonical scanner | `src/SharpProof.CompilerCollector/Producer/CompilerTaskCarrierCollector.cs`; `src/SharpProof.CompilerCollector/Producer/CompilerCallableLowerer.cs`; `src/SharpProof.CompilerArtifact/CompilerForkJoinProjection.cs` | `src/SharpProof.CompilerArtifact/CompilerTaskEmittedFaultBody.cs`; `src/SharpProof.CompilerArtifact/CompilerTaskPrimitiveIlScanner.cs` |
 | Nested transport | `src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.cs`; `src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.Carriers.cs` | Optional separate partial `src/SharpProof.CompilerArtifact/CompilerForkJoinProjectionCodec.FaultBodies.cs` |
 | Native consumer | `src/SharpProof.Worker/NativeResourceContractVerifier.cs` | `src/SharpProof.Worker/NativeTaskEmittedFaultSiteVerifier.cs`; `src/SharpProof.Worker/NativeTaskPrimitiveHelperRouteVerifier.cs` |
 | Runtime selection catalog, if separated from native consumer | None of the existing HCall catalog is required to change for this slice | Optional `src/SharpProof.Specs/ResourcePrimitiveHelperRouteCatalog.cs`, only with a concrete consumer |

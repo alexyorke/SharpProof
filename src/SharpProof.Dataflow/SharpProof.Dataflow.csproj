@@ -7,19 +7,19 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
+    <Compile Include="..\Shared\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\Shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+    <Compile Include="..\Shared\Polyfills\EmbeddedAttribute.cs"
              Link="Polyfills\EmbeddedAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Dataflow.Test" />
+    <InternalsVisibleTo Include="SharpProof.Dataflow.Tests" />
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Compiler.Semantics" />
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
-    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
   </ItemGroup>
 </Project>

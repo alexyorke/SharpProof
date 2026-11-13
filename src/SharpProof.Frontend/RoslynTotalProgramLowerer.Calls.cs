@@ -197,7 +197,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private bool TryConstructionInitializers(IMethodSymbol constructor, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
     {
-        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
         initializers = [];
         if (CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken) ||
             !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken))
@@ -286,7 +285,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         (bool IsField, IOperation? Operation, IPropertySymbol? Property) candidate,
         CancellationToken cancellationToken, out (IFieldSymbol Field, IOperation Value) value)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         cancellationToken.ThrowIfCancellationRequested();
         value = default;
         if (candidate.IsField)
@@ -307,7 +305,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         return _preserveSourceCall != null || property.Property.GetMethod is not { } getter ? null
             : InlineSourceMember(property, getter, property.Instance, property.Arguments, block, depth);
     }
@@ -317,7 +314,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceSetter(ISimpleAssignmentOperation assignment, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        assignment = RepositoryParameterGuard.NotNull(assignment, nameof(assignment));
         return _preserveSourceCall != null || assignment.Target is not IPropertyReferenceOperation { Property.SetMethod: { } setter } property
             ? null : InlineSourceMember(assignment, setter, property.Instance, property.Arguments, block, depth, assignment.Value);
     }
@@ -556,7 +552,7 @@ internal sealed partial class RoslynTotalProgramLowerer
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)
-    { value = RepositoryParameterGuard.NotNull(value, nameof(value)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return _context.BridgeValue(value, type); }
+    { RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return _context.BridgeValue(value, type); }
 
     private void RecordCallPreconditions(TotalLoweringContext callee, ImmutableArray<IrTerm> arguments, IrBlockId block, OperationId site, ImmutableArray<TotalShadowCallHop> ancestry)
     {
@@ -591,8 +587,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void LowerSharedFrame(ControlFlowGraph graph, Func<IrBlockId, SourceCallFrame> createFrame)
     {
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
-        createFrame = RepositoryParameterGuard.NotNull(createFrame, nameof(createFrame));
         if (_calls == null || !_calls.Enter(_context.Target))
         { throw new RegionIncompleteException(); }
         try
@@ -607,7 +601,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private void ImportExplicitThrowTypes(RoslynTotalProgramLowerer callee)
     {
-        callee = RepositoryParameterGuard.NotNull(callee, nameof(callee));
         foreach (var entry in callee._explicitThrowTypes)
         {
             SpendRegion();
@@ -622,7 +615,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrExceptionKind kind, OperationId site, Func<IrBlockId, IrBlockId> unwind)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        unwind = RepositoryParameterGuard.NotNull(unwind, nameof(unwind));
         SpendRegion();
         if (callerFilter != null)
         { return unwind(callerFilter.Rejected); }

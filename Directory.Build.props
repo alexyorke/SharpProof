@@ -5,10 +5,7 @@
   </PropertyGroup>
   <Import Project="Sdk.props" Sdk="Microsoft.DotNet.Arcade.Sdk" />
   <PropertyGroup>
-    <!-- Test projects keep their historical ".Test" logical/assembly identities
-         under Arcade's ".Tests"/".IntegrationTests" filenames. -->
-    <SharpProofProjectName>$([System.Text.RegularExpressions.Regex]::Replace('$(MSBuildProjectName)', '\.(Integration)?Tests$', '.Test'))</SharpProofProjectName>
-    <SharpProofProjectName Condition="'$(MSBuildProjectName)' == 'SharpProof.Architecture.Tests'">SharpProof.ArchitectureTest</SharpProofProjectName>
+    <SharpProofProjectName>$(MSBuildProjectName)</SharpProofProjectName>
     <SignAssembly>false</SignAssembly>
     <Company>$(SharpProofPublisher)</Company>
     <Authors>$(SharpProofPublisher)</Authors>
@@ -45,13 +42,17 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060;NU1901;NU1902;NU1903;NU1904;SPINT001;SPINT002;SPINT003;SPINT004;SPINT005</WarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <SharpProofTestProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', 'Test$'))">true</SharpProofTestProject>
+    <SharpProofTestProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(SharpProofProjectName)', '\.(Integration)?Tests$'))">true</SharpProofTestProject>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(SharpProofTestProject)' == 'true'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The repository analyzers skip test projects; they read this property. -->
+    <CompilerVisibleProperty Include="SharpProofTestProject" />
+  </ItemGroup>
 
   <PropertyGroup>
     <SharpProofProductionProject Condition="
@@ -65,17 +66,17 @@
       '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerArtifact' Or
       '$(SharpProofProjectName)' == 'SharpProof.CompilerCollector' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics.Test' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Compiler.Semantics.Tests' Or
       '$(SharpProofProjectName)' == 'SharpProof.Frontend' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Frontend.Test' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Frontend.Tests' Or
       '$(SharpProofProjectName)' == 'SharpProof.Fuzz' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Ir.Test' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Ir.Tests' Or
       '$(SharpProofProjectName)' == 'SharpProof.Smt' Or
       '$(SharpProofProjectName)' == 'SharpProof.Specs' Or
       '$(SharpProofProjectName)' == 'SharpProof.Testing' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Testing.Test' Or
+      '$(SharpProofProjectName)' == 'SharpProof.Testing.Tests' Or
       '$(SharpProofProjectName)' == 'SharpProof.Worker' Or
-      '$(SharpProofProjectName)' == 'SharpProof.Worker.Test'">true</SharpProofUsesIrIdentifiers>
+      '$(SharpProofProjectName)' == 'SharpProof.Worker.Tests'">true</SharpProofUsesIrIdentifiers>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(SharpProofProductionProject)' == 'true' AND $([System.String]::Copy('$(SharpProofProjectName)').StartsWith('SharpProof.')) AND '$(SharpProofProjectName)' != 'SharpProof.Attributes'">
@@ -115,11 +116,11 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(SharpProofHasParameterGuard)' == 'true'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng/ParameterGuard.cs" Link="InternalParameterGuard.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)src/Shared/ParameterGuard.cs" Link="InternalParameterGuard.cs" />
     <Using Include="SharpProof.Internal.$([System.String]::Copy('$(SharpProofProjectName)').Replace('.', '')).ParameterGuard" Alias="RepositoryParameterGuard" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(SharpProofProjectName)' != 'SharpProof.ArchitectureTest' AND '$(SharpProofProjectName)' != 'SharpProof.Attributes.Test'">
+  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true' AND '$(SharpProofProjectName)' != 'SharpProof.Architecture.Tests' AND '$(SharpProofProjectName)' != 'SharpProof.Attributes.Tests'">
     <Compile Include="$(MSBuildThisFileDirectory)eng/testing/ParameterGuardContractTests.cs" Link="ParameterGuardContractTests.cs" />
   </ItemGroup>
 

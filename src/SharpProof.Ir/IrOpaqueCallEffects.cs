@@ -199,7 +199,6 @@ internal static class IrOpaqueCallSite
 
     private static bool IsDefaultComparerPrimitive(string primitive)
     {
-        primitive = RepositoryParameterGuard.NotNull(primitive, nameof(primitive));
         return primitive is "System_SByte" or "System_Byte" or "System_Int16" or "System_UInt16" or "System_Char" or
             "System_Int32" or "System_UInt32" or "System_Int64" or "System_UInt64";
     }

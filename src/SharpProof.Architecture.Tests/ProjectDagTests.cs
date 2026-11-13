@@ -202,9 +202,9 @@ public sealed class ProjectDagTests
                 continue;
             }
             var relative = Path.GetRelativePath(repository, item.Value).Replace('\\', '/');
-            var allowed = relative.StartsWith("eng/shared/", StringComparison.Ordinal) ||
-                relative == "eng/ParameterGuard.cs" || relative == "eng/RoslynSymbolFacts.cs" ||
-                relative == "eng/CompilerAdditionalTextStability.cs" ||
+            var allowed = relative.StartsWith("src/Shared/", StringComparison.Ordinal) ||
+                relative == "src/Shared/ParameterGuard.cs" || relative == "src/Shared/RoslynSymbolFacts.cs" ||
+                relative == "src/Shared/CompilerAdditionalTextStability.cs" ||
                 relative == "src/SharpProof.Ir/IrIdentifierAliases.cs";
             allowed |= item.Project == "SharpProof.EditorSuggestions" &&
                 relative is "src/SharpProof.CodeFixes/CompanionEligibility.cs" or "src/SharpProof.CodeFixes/CompanionSuggestionContract.cs";

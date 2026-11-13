@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Tests" />
     <!-- Child process compiled at test time against this assembly. -->
     <InternalsVisibleTo Include="SharpProof.Fuzz.SignalHost" />
   </ItemGroup>

@@ -25,7 +25,7 @@ internal static class NativeEffectClaims
             claim.Certainty != WorkerEffectEvidenceCertainty.TrustedCompleteBoundary).ToImmutableArray();
         // An invalid contract has nothing to verify, whatever the entry.
         bool Invalid(CompilerEffectClaimArtifact claim)
-        { System.ArgumentNullException.ThrowIfNull(claim, nameof(claim)); return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
+        { return target.Total is { } total && !total.ValidEffectClaimIds.Contains(claim.ClaimId); }
         var invalid = claims.Where(Invalid).Select(claim => Unknown(target, claim.ClaimId, WorkerClaimReason.UnsupportedContract)).ToImmutableArray();
         foreach (var result in invalid)
         { publish?.Invoke(result); }
@@ -41,9 +41,6 @@ internal static class NativeEffectClaims
         Action<WorkerClaimResult>? publish, MethodResourceBudget resourceBudget, CancellationToken cancellationToken)
     {
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
-        System.ArgumentNullException.ThrowIfNull(budgets);
-        System.ArgumentNullException.ThrowIfNull(target);
-        ArgumentNullException.ThrowIfNull(resourceBudget);
         var results = ImmutableDictionary.CreateBuilder<string, WorkerClaimResult>(StringComparer.Ordinal);
         if (entry.IsContradictory)
         {
@@ -92,7 +89,6 @@ internal static class NativeEffectClaims
 
         void Publish(WorkerClaimResult result)
         {
-            ArgumentNullException.ThrowIfNull(result);
             results.Add(result.ClaimId, result);
             publish?.Invoke(result);
         }
@@ -156,7 +152,6 @@ internal static class NativeEffectClaims
     // inlined metadata body) leaves the claim Unknown.
     private static WorkerEffectViolationWitness? Witness(CompilerCallablePreparation target, PassiveCallableCheckResult check)
     {
-        System.ArgumentNullException.ThrowIfNull(check);
         var program = (target.Total ?? throw new InvalidOperationException("A refuted native effect claim requires a total callable.")).Program;
         var factory = program.Factory;
         var site = check switch
@@ -196,14 +191,12 @@ internal static class NativeEffectClaims
     private static string Describe(IrFactory factory, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        System.ArgumentNullException.ThrowIfNull(factory);
         return factory.GetOperationInfo(site).Description is { } description ? factory.GetString(description) : "operation";
     }
 
     private static bool IsArray(IrProgram program, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        System.ArgumentNullException.ThrowIfNull(program);
         return program.Blocks.SelectMany(block => block.Instructions).OfType<IrAllocationInstruction>()
             .Any(allocation => allocation.Operation == site && allocation.Length != null);
     }
@@ -211,7 +204,6 @@ internal static class NativeEffectClaims
     private static WorkerEffectSet WriteEffect(IrProgram program, OperationId site, bool receiver)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        System.ArgumentNullException.ThrowIfNull(program);
         if (receiver)
         { return WorkerEffectSet.WritesReceiverState; }
         var region = program.Blocks.SelectMany(block => block.Instructions).OfType<IrWriteInstruction>()

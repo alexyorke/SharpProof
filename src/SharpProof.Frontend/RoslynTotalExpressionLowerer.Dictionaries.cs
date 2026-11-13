@@ -6,7 +6,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrMemberId DictionaryField(string name, IrTypeId value, IrTypeId? key = null)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
         var storage = (name, value, key);
         if (_dictionaryFields.TryGetValue(storage, out var field))
@@ -20,7 +19,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private GuardedExpression? DictionaryClause(IOperation operation, TotalParameterState state, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var invocation = operation as IInvocationOperation;
         var property = operation as IPropertyReferenceOperation;
         var method = invocation?.TargetMethod ?? property?.Property.GetMethod;
@@ -63,8 +61,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrBlockId DictionaryInitialization(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var source = _factory.GetOperationInfo(_context.Site(operation)).SourceSpan;
@@ -93,7 +89,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? DictionaryBody(IOperation operation, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }
@@ -204,11 +199,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private TotalBodyValue DefaultDictionaryState(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
         string name, bool assigned, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var type = method.ContainingType;
         var count = DictionaryField("count", _factory.IntegerType);

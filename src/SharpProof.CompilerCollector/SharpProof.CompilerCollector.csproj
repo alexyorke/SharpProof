@@ -13,9 +13,9 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\CompilerAdditionalTextStability.cs"
+    <Compile Include="..\Shared\CompilerAdditionalTextStability.cs"
              Link="CompilerAdditionalTextStability.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\IsExternalInit.cs"
+    <Compile Include="..\Shared\Polyfills\IsExternalInit.cs"
              Link="Polyfills\IsExternalInit.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -23,10 +23,10 @@
     <ProjectReference Include="..\SharpProof.CompilerArtifact\SharpProof.CompilerArtifact.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
   </ItemGroup>
 </Project>

@@ -7,14 +7,14 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Tests" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
-    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Tests" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
     <!-- Child process compiled at test time against this assembly. -->
     <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>
@@ -22,7 +22,7 @@
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\shared\SolverDefaults.cs"
+    <Compile Include="..\Shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
 </Project>

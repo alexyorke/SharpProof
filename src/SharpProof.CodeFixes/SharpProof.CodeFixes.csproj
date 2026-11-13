@@ -27,11 +27,11 @@
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeEditorSuggestionsInPackage</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <Compile Include="../Shared/InputValidation.cs" Link="InputValidation.cs" />
     <None Update="README.md" Pack="true" PackagePath="/" />
     <None Include="buildTransitive/SharpProof.CodeFixes.props" Pack="true" PackagePath="buildTransitive" />
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Tests" />
   </ItemGroup>
   <Target Name="IncludeEditorSuggestionsInPackage">
     <MSBuild Projects="../SharpProof.EditorSuggestions/SharpProof.EditorSuggestions.csproj"

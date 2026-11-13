@@ -5,7 +5,7 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <ItemGroup Condition="'$(SharpProofProjectName)' != 'DefensiveCodingAnalyzer' AND '$(SharpProofProjectName)' != 'SharpProof.Analyzer.Test' AND '$(RunAnalyzersDuringBuild)' != 'false'">
+  <ItemGroup Condition="'$(SharpProofProjectName)' != 'DefensiveCodingAnalyzer' AND '$(SharpProofProjectName)' != 'SharpProof.Analyzer.Tests' AND '$(RunAnalyzersDuringBuild)' != 'false'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)src/DefensiveCodingAnalyzer/DefensiveCodingAnalyzer.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
@@ -24,7 +24,7 @@
   <Target Name="_CopySharpProofCompilerRuntime"
           AfterTargets="Build"
           Condition="'$(SharpProofProjectName)' == 'SharpProof.Gates' Or
-                    '$(SharpProofProjectName)' == 'SharpProof.Gates.Test'">
+                    '$(SharpProofProjectName)' == 'SharpProof.Gates.Tests'">
     <Copy SourceFiles="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll;$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll"
           DestinationFolder="$(TargetDir)" />
   </Target>

@@ -403,7 +403,6 @@ internal sealed partial class TotalLoweringContext
 
     private IrSourceSpan Span(SyntaxNode syntax)
     {
-        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         var position = syntax.SyntaxTree.GetLineSpan(syntax.Span).StartLinePosition;
         return new(_document(syntax.SyntaxTree), syntax.SpanStart, syntax.Span.Length,
             position.Line + 1, position.Character + 1);

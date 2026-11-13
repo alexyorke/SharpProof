@@ -195,7 +195,6 @@ internal static class EffectSummaryFixpoint
 
     private static bool HasCycle(IrProgram program, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(program);
         var colors = ImmutableDictionary.CreateBuilder<IrBlockId, int>();
         var pending = ImmutableStack<(IrBlockId Id, bool Exit)>.Empty.Push((program.Entry, false));
         while (!pending.IsEmpty)
@@ -221,7 +220,6 @@ internal static class EffectSummaryFixpoint
 
     private static IEnumerable<IrBlockId> Targets(IrInstruction instruction)
     {
-        System.ArgumentNullException.ThrowIfNull(instruction);
         switch (instruction)
         {
             case IrGotoInstruction go:

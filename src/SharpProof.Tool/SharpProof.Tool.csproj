@@ -22,13 +22,13 @@
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
     <None Update="README.md" Pack="true" PackagePath="/" />
     <None Include="../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="/" />
-    <InternalsVisibleTo Include="SharpProof.Tool.Test" />
+    <InternalsVisibleTo Include="SharpProof.Tool.Tests" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyMetadata Include="SharpProof.TestSdk" Value="$(MicrosoftNETTestSdkVersion)" />
     <AssemblyMetadata Include="SharpProof.NUnit" Value="$(NUnitVersion)" />
     <AssemblyMetadata Include="SharpProof.NUnitAdapter" Value="$(NUnit3TestAdapterVersion)" />
-    <Compile Include="../../eng/shared/InputValidation.cs" Link="Reporting/InputValidation.cs" />
+    <Compile Include="../Shared/InputValidation.cs" Link="Reporting/InputValidation.cs" />
     <EmbeddedResource Include="../SharpProof.Templates/content/container/compose.yaml.template"
                       LogicalName="SharpProof.Tool.compose.yaml.template" />
     <EmbeddedResource Include="../SharpProof.Templates/content/container/Directory.Build.props.template"
@@ -38,6 +38,6 @@
     <ProjectReference Include="../SharpProof.Frontend/SharpProof.Frontend.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="NuGet.Configuration" />
-    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Tests" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>SharpProof.Package.Test</AssemblyName>
     <RootNamespace>SharpProof.Package.Test</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>

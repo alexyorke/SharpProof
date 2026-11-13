@@ -74,7 +74,6 @@ internal static class CompilerEffectClaimArtifactCodec
 
     private static string ComputeSha256(CompilerEffectClaimArtifact value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var constraint = value.Constraint;
         using var hash = new CanonicalHashWriter();
         hash.Add(CompilerEffectEvidenceCatalog.EvidenceDomain)
