@@ -272,11 +272,14 @@ consumer_image() {
 }
 
 release_packages() {
+  # Create the feed directory before any container runs: on Linux the task
+  # entrypoint gives the checkout root to the container user, after which the
+  # calling user can no longer create entries there.
+  rm -rf nupkgs && mkdir -p nupkgs
   if [[ -z "${SHARPPROOF_CONSUMER_IMAGE:-}" ]]; then consumer_image || return; fi
   tooling pack -Configuration Release
   compose_run -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA \
     -e "SHARPPROOF_CONSUMER_IMAGE=$SHARPPROOF_CONSUMER_IMAGE" tooling pack-tool -Configuration Release
-  rm -rf nupkgs && mkdir -p nupkgs
   cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/
   tooling package-tests -Configuration Release -PackageSource nupkgs \
     -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
