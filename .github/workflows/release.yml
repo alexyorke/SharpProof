@@ -221,6 +221,7 @@ jobs:
           subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
+          create-storage-record: false
 
       - name: Exchange GitHub OIDC token for a temporary NuGet key
         id: nuget-login

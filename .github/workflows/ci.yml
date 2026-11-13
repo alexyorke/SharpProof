@@ -63,6 +63,7 @@ jobs:
           subject-name: ${{ steps.tooling.outputs.image-name }}
           subject-digest: ${{ steps.tooling.outputs.image-digest }}
           push-to-registry: true
+          create-storage-record: false
 
   lanes:
     name: ${{ matrix.lane }}
