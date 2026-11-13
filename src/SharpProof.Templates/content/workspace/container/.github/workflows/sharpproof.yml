@@ -1,7 +1,10 @@
 name: SharpProof
 on:
-  push:
-  pull_request:
+  # First run: start this workflow by hand on the default branch with
+  # "initialize-baseline" ticked. Once that run succeeds, uncomment the two
+  # triggers below. Each later run is compared with the run for its base commit.
+  # push:
+  # pull_request:
   workflow_dispatch:
     inputs:
       initialize-baseline:
@@ -26,5 +29,3 @@ jobs:
       initialize-baseline: ${{ github.event_name == 'workflow_dispatch' && inputs.initialize-baseline || false }}
       registry-username: ${{ github.actor }}
       package-feed-url: https://api.nuget.org/v3/index.json
-    secrets:
-      container-read-token: ${{ secrets.SHARPPROOF_PREVIEW_TOKEN }}

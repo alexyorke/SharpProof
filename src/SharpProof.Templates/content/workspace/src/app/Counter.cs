@@ -11,6 +11,8 @@ public static class Counter
         return checked(value + 1);
     }
 
-    // Deliberately emits portable diagnostic SP0027. Change -1 to 0 to fix it.
-    public static int DemonstrateDiagnostic() => Next(-1);
+    // To see a failure, uncomment the next line and build. The call breaks the
+    // precondition on Next: the analyzer reports SP0027, and a verifying build
+    // also refutes the call with SP0051 and fails.
+    // public static int Broken() => Next(-1);
 }

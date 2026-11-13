@@ -13,21 +13,22 @@ Configure the feed containing the matching preview packages, then install the te
 with `dotnet new install SharpProof.Templates::<version>`. Create and enter a project:
 
 ```sh
-dotnet new sharpproof -n MyLibrary -o MyLibrary --verification portable
+dotnet new sharpproof -n MyLibrary -o MyLibrary
 cd MyLibrary
 dotnet build
 ```
 
-The generated project targets net10.0 and pins the compiler SDK, C# 13, and package
-versions. The portable variant explicitly selects advisory analysis without native
-verification. Its demonstration caller deliberately emits SP0027; change -1 to 0 to
-remove it.
+The generated project targets net10.0, accepts any .NET 10 SDK from 10.0.100, and pins
+C# 13 and the package versions. The default `--verification native` variant verifies
+on the host in every build, which is the package default. `--verification portable`
+selects advisory analysis without native verification. The starter builds cleanly;
+uncomment `Counter.Broken` to see a refuted call (SP0027, and SP0051 when verifying).
 
 For a layout that keeps tools, CI, the application, and regressions together, use the
 workspace template instead:
 
 ```sh
-dotnet new sharpproof-workspace -n MyLibrary -o MyLibrary --verification portable
+dotnet new sharpproof-workspace -n MyLibrary -o MyLibrary
 cd MyLibrary
 dotnet tool restore
 dotnet build src/app/MyLibrary.csproj
@@ -42,10 +43,8 @@ published there, configure a container-visible qualified local feed or authentic
 to your chosen private feed before installing and restoring them.
 
 Choose `--verification container` when creating the project to generate strict
-verification, retained evidence, and a CI workflow. Before a successful strict build,
-change the deliberately invalid `Next(-1)` call in `DemonstrateDiagnostic` to `Next(0)`.
-The untouched starter emits SP0027 and its call-precondition claim is Refuted with
-SP0051, so strict verification fails even though `Next` itself is correct. Run `docker compose pull verify`,
+verification in the pinned container, retained evidence, and a comparison workflow.
+Run `docker compose pull verify`,
 `docker compose run --rm verify restore MyLibrary.csproj`, then
 `docker compose run --rm verify build MyLibrary.csproj --no-restore`. The consumer image is pinned
 by digest and derives from the canonical Linux amd64 toolchain. No SharpProof source
@@ -230,8 +229,10 @@ a moving branch or the separate private release workflow SHA.
 | `mode` | `report` by default; `enforce` adds the comparison regression gate |
 | `initialize-baseline` | Default false; explicit reviewed default-branch manual initialization only |
 
-The `container-read-token` secret is a required read-only credential for the private
-image; the generated caller maps `SHARPPROOF_PREVIEW_TOKEN` to it. `package-read-token`
+The `container-read-token` secret is optional: supply a read-only credential only when
+the image is not public. The generated caller passes none and starts with only a manual
+trigger; run it once on the default branch with `initialize-baseline`, then enable its
+`push` and `pull_request` triggers. `package-read-token`
 is needed only with the GitHub feed. Keep publisher/signing credentials out of consumer CI. Fork PRs and
 `pull_request_target` are rejected before credential-bearing work. Reports go to
 the Markdown job summary and retained evidence artifact, not PR comments.
