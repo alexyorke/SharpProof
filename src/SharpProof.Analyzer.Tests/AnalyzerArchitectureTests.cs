@@ -199,18 +199,19 @@ public sealed class AnalyzerArchitectureTests
 
         using (Assert.EnterMultipleScope())
         {
+            // A rule is listed once: in Unshipped until a release moves it to Shipped.
             Assert.That(
-                shipped,
+                shipped.Keys.Intersect(unshipped.Keys),
                 Is.Empty,
-                "The 0.2 release line must not inherit pre-0.2 rules.");
+                "A rule must not be listed as both shipped and unshipped.");
             Assert.That(
-                unshipped.Keys,
+                shipped.Keys.Concat(unshipped.Keys),
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(15));
         }
+        var rules = shipped.SetItems(unshipped);
         foreach (var descriptor in descriptors.Values)
         {
-            var rule = unshipped[descriptor.Id];
+            var rule = rules[descriptor.Id];
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
