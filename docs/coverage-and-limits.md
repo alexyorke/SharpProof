@@ -26,7 +26,7 @@ The typed scalar catalog includes `sbyte`, `byte`, `short`, `ushort`, `char`, `i
 
 Loops can use establishment/preservation-checked invariant candidates. Bounded execution is used for witness search, not universal loop proof. Calls can be inlined or modeled only under the compiler and specification evidence accepted by the current frontend and worker. Opaque calls retain conservative effects and approximation values.
 
-The authoritative admission code is in [RoslynTotalProgramLowerer.cs](../src/SharpProof.Frontend/RoslynTotalProgramLowerer.cs), its partial files, and [CompilerTotalCallableLowerer.cs](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerTotalCallableLowerer.cs). Worker construction and replay may impose further limits.
+The authoritative admission code is in [RoslynTotalProgramLowerer.cs](../src/SharpProof.Frontend/RoslynTotalProgramLowerer.cs), its partial files, and [CompilerTotalCallableLowerer.cs](../src/SharpProof.CompilerCollector/Producer/CompilerTotalCallableLowerer.cs). Worker construction and replay may impose further limits.
 
 ## Heap and reference boundaries
 
