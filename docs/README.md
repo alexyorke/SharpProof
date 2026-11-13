@@ -13,6 +13,7 @@ For a first consumer, start with [getting started](getting-started.md) and the [
 | [Developer tools](developer-experience.md) | Optional packaged templates, project setup checks, evidence comparison, NUnit regression export, and companion scaffolding |
 | [Incremental adoption](adoption.md) | Existing repositories, staged feedback, CI proof gates and performance comparison |
 | [Upgrades](upgrading.md) | Compatibility surfaces, migration checks and rollback |
+| [Build errors](build-errors.md) | `SPB` setup errors from the MSBuild targets and verifier exit codes |
 | [Support](support.md) | Minimal reproductions, private reporting and redaction |
 | [Optional diagnostic tool](../src/SharpProof.Tool/README.md) | Local-manifest installation, SDK discovery, project setup checks, and stored-evidence commands |
 | [NuGet debugging](nuget-debugging.md) | Embedded tool symbols, same-build extraction, Source Link and package debugging |

@@ -131,13 +131,15 @@ internal sealed class PublicationLease : IDisposable
         isReparsePoint ??= IsReparsePoint;
         if (!isLocalNtfs(full[..3]))
         {
-            throw new ArgumentException("SharpProof Windows paths require a fixed local NTFS volume.");
+            throw new ArgumentException(
+                "SharpProof Windows paths require a fixed local NTFS volume; " + DescribeVolume(full[..3]) +
+                " Move the project and its output to an NTFS drive.");
         }
         var current = full[..3];
         foreach (var segment in full[current.Length..].Split('\\', StringSplitOptions.RemoveEmptyEntries))
         {
             var stem = segment.Split('.')[0];
-            if (segment.Contains(':', StringComparison.Ordinal) || segment.Contains('~', StringComparison.Ordinal) || segment.EndsWith('.') || segment.EndsWith(' ') ||
+            if (segment.Contains(':', StringComparison.Ordinal) || IsShortNameAlias(segment) || segment.EndsWith('.') || segment.EndsWith(' ') ||
                 stem.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
                 stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
                 stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
@@ -153,6 +155,46 @@ internal sealed class PublicationLease : IDisposable
             {
                 throw new ArgumentException("SharpProof Windows paths must not traverse reparse points.");
             }
+        }
+    }
+
+    // An 8.3 short name is a second spelling of a long name, such as
+    // PROGRA~1 for "Program Files": at most eight characters ending in a tilde
+    // and digits, then at most a three-character extension. A longer name that
+    // merely contains a tilde cannot be one.
+    internal static bool IsShortNameAlias(string segment)
+    {
+        System.ArgumentNullException.ThrowIfNull(segment);
+        var dot = segment.IndexOf('.', StringComparison.Ordinal);
+        var stem = dot < 0 ? segment : segment[..dot];
+        var extension = dot < 0 ? string.Empty : segment[(dot + 1)..];
+        if (stem.Length > 8 || extension.Length > 3 || extension.Contains('.', StringComparison.Ordinal))
+        { return false; }
+        var tilde = stem.LastIndexOf('~');
+        if (tilde < 1 || tilde == stem.Length - 1)
+        { return false; }
+        for (var index = tilde + 1; index < stem.Length; index++)
+        {
+            if (!char.IsAsciiDigit(stem[index]))
+            { return false; }
+        }
+        return true;
+    }
+
+    // Names what the volume is, so the error says why it was refused. Dev
+    // Drive volumes are ReFS.
+    internal static string DescribeVolume(string root)
+    {
+        System.ArgumentNullException.ThrowIfNull(root);
+        try
+        {
+            var drive = new DriveInfo(root);
+            return "'" + root + "' is a " + drive.DriveType + " " + drive.DriveFormat + " volume" +
+                (drive.DriveFormat == "ReFS" ? " (Dev Drive volumes are ReFS)." : ".");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return "the volume of '" + root + "' could not be inspected.";
         }
     }
 
