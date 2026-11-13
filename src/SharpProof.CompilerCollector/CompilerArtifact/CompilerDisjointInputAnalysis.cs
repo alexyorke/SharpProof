@@ -15,7 +15,6 @@ internal static class CompilerDisjointInputAnalysis
         var eligible = method.Parameters.Select(parameter => CompilerIdentityBridge.IsClosedReferenceType(parameter.Type, cancellationToken)).ToImmutableArray();
         bool Related(INamedTypeSymbol left, INamedTypeSymbol right)
         {
-            left = RepositoryParameterGuard.NotNull(left, nameof(left));
             for (var current = left; current != null; current = current.BaseType)
             {
                 cancellationToken.ThrowIfCancellationRequested();

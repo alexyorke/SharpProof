@@ -161,7 +161,6 @@ internal sealed class CompilerCallableLowerer
 
     private static bool HasManifestParity(ManifestCallableTarget target, BoundMethodContracts contracts)
     {
-        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         var ensures = contracts.Clauses.Where(static clause => clause.Kind == BoundContractKind.Ensures).ToImmutableArray();
         if (ensures.Length != target.Claims.Length ||
             !target.Entry.ClaimIds.Take(target.Claims.Length).SequenceEqual(

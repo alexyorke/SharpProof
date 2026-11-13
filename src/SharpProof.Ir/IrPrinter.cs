@@ -38,7 +38,6 @@ internal sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatChild(IrTerm term, int depth)
     {
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         if (depth >= MaximumFormatDepth)
         {
             throw new InvalidOperationException(
@@ -50,7 +49,6 @@ internal sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatOpaque(IrOpaqueTerm opaque, int depth)
     {
-        opaque = RepositoryParameterGuard.NotNull(opaque, nameof(opaque));
         var prefix = opaque.Purity == IrOpaquePurity.Pure
             ? "pure:"
             : "impure:" + opaque.Operation + ":";
@@ -76,7 +74,6 @@ internal sealed partial class IrPrinter(IrFactory factory)
 
     private static string Quote(string value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var fragments = ImmutableArray.CreateBuilder<string>();
         fragments.Add("\"");
         foreach (var character in value)

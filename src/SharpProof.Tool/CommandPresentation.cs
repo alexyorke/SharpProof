@@ -243,7 +243,6 @@ internal sealed class CommandPresentation
 
     private static void AddAssumptions(ImmutableArray<CommandDetail>.Builder details, ImmutableArray<WorkerAssumptionEvidence> assumptions)
     {
-        ArgumentNullException.ThrowIfNull(details);
         RepositoryParameterGuard.ThrowIfMissing(assumptions.IsDefault, nameof(assumptions));
         foreach (var assumption in assumptions)
         {

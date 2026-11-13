@@ -470,7 +470,6 @@ internal static partial class AnalyzerFeaturePipeline
 
     private static bool IsNestedCallable(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.MethodKind is
             MethodKind.LocalFunction or MethodKind.AnonymousFunction;
     }
@@ -479,7 +478,6 @@ internal static partial class AnalyzerFeaturePipeline
         IMethodSymbol method,
         CancellationToken cancellationToken)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return !method.IsAbstract &&
             !method.IsExtern &&
             method.MethodKind is
@@ -653,9 +651,6 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var inventory = session.GetContractClauses(method);
         if (inventory.HasRejectedContractApiUsage &&
             session.TryMarkRejectedContractApiReported(method))
@@ -681,8 +676,6 @@ internal static partial class AnalyzerFeaturePipeline
         bool rejectedContractApi,
         AnalyzerSession session)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (!rejectedContractApi)
         {
             return false;
@@ -699,10 +692,7 @@ internal static partial class AnalyzerFeaturePipeline
         AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic)
     {
-
         RepositoryParameterGuard.ThrowIfInvalid(violations.IsDefault, nameof(violations));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         foreach (var violation in violations)
         {
             if (!session.TryMarkContractIntrinsicValidated(violation))
@@ -741,8 +731,6 @@ internal static partial class AnalyzerFeaturePipeline
         MethodSelection selection,
         AnalyzerSession session)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         if (!selection.IsSuppressed)
         {
             return false;
@@ -760,10 +748,6 @@ internal static partial class AnalyzerFeaturePipeline
         string methodName,
         object reason)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        methodName = RepositoryParameterGuard.NotNull(methodName, nameof(methodName));
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
-        report = RepositoryParameterGuard.NotNull(report, nameof(report));
         report(Diagnostic.Create(
             GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
             location,
@@ -776,8 +760,6 @@ internal static partial class AnalyzerFeaturePipeline
         ImmutableArray<IOperation> operationBlocks,
         CancellationToken cancellationToken)
     {
-
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(operationBlocks.IsDefault, nameof(operationBlocks), "Array must be initialized.");
         var operationSyntax = operationBlocks
             .OrderByDescending(static operation => operation.Syntax.Span.Length)
@@ -797,7 +779,6 @@ internal static partial class AnalyzerFeaturePipeline
 
     private static SyntaxNode NormalizeDeclaration(SyntaxNode declaration)
     {
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         return declaration switch
         {
             ArrowExpressionClauseSyntax { Parent: { } parent } => parent,

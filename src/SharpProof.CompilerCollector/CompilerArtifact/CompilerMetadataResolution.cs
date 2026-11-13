@@ -78,8 +78,6 @@ internal static class CompilerMetadataResolution
             string moduleName,
             CancellationToken cancellationToken)
         {
-            assemblyIdentity = RepositoryParameterGuard.NotNull(assemblyIdentity, nameof(assemblyIdentity));
-            moduleName = RepositoryParameterGuard.NotNull(moduleName, nameof(moduleName));
             var key = (assemblyIdentity, moduleName);
             if (_referenceModules.TryGetValue(key, out var cached))
             {
@@ -182,7 +180,6 @@ internal static class CompilerMetadataResolution
         CancellationToken cancellationToken,
         out string hash)
     {
-        module = RepositoryParameterGuard.NotNull(module, nameof(module));
         try
         {
             using var stream = new FileStream(

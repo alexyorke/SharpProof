@@ -155,7 +155,6 @@ internal static class CompilerContractsExportJson
 
     private static bool IsValid(CompilerStampedContractsExport stamped)
     {
-        stamped = RepositoryParameterGuard.NotNull(stamped, nameof(stamped));
         var export = stamped.Export;
         return stamped.Schema == CompilerContractsExportVersions.StampedSchema &&
             stamped.Version == CompilerContractsExportVersions.Current &&

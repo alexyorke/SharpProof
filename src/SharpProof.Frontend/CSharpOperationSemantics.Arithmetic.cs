@@ -164,15 +164,15 @@ internal static partial class CSharpOperationSemantics
         var info = factory.GetTypeInfo(left.Type);
         var zero = factory.Integer(left.Type, 0L);
         IrTerm Compare(IrBinaryOperator op, IrTerm a, IrTerm b)
-        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return factory.Binary(op, a, b); }
+        { return factory.Binary(op, a, b); }
         IrTerm And(IrTerm a, IrTerm b)
-        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return Compare(IrBinaryOperator.AndAlso, a, b); }
+        { return Compare(IrBinaryOperator.AndAlso, a, b); }
         IrTerm Or(IrTerm a, IrTerm b)
-        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); b = RepositoryParameterGuard.NotNull(b, nameof(b)); return Compare(IrBinaryOperator.OrElse, a, b); }
+        { return Compare(IrBinaryOperator.OrElse, a, b); }
         IrTerm Negative(IrTerm a)
-        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); return Compare(IrBinaryOperator.LessThan, a, zero); }
+        { return Compare(IrBinaryOperator.LessThan, a, zero); }
         IrTerm Nonnegative(IrTerm a)
-        { a = RepositoryParameterGuard.NotNull(a, nameof(a)); return Compare(IrBinaryOperator.GreaterThanOrEqual, a, zero); }
+        { return Compare(IrBinaryOperator.GreaterThanOrEqual, a, zero); }
         IrTerm overflow;
         if (kind == IrBinaryOperator.Multiply)
         {
@@ -202,9 +202,6 @@ internal static partial class CSharpOperationSemantics
     private static TotalScalarRule CompoundShift(IrFactory factory, ICompoundAssignmentOperation operation, IrTerm left, IrTerm right,
         bool? checkOverflow)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var info = factory.GetTypeInfo(left.Type);
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined ||
             operation.OutConversion.IsUserDefined || info.Kind != IrTypeKind.Integer)
@@ -255,8 +252,6 @@ internal static partial class CSharpOperationSemantics
 
     private static IrTerm PromoteCompoundShiftValue(IrFactory factory, IrTerm left, int width)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
         return width < 32 ? factory.Cast(factory.GetOrCreateIntegerType(32, true), left) : left;
     }
 
@@ -264,9 +259,6 @@ internal static partial class CSharpOperationSemantics
         IrTerm left, bool? isChecked)
     {
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
-
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
         if (isChecked == null)
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var conversion = ConvertInteger(factory, rule.Value, left.Type, isChecked.Value);
@@ -275,7 +267,6 @@ internal static partial class CSharpOperationSemantics
 
     private static bool? CheckedContext(IOperation operation, bool? checkOverflow)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         for (var node = operation.Syntax; node != null; node = node.Parent)
         {
             if (node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CheckedStatement) ||

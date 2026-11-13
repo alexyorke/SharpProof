@@ -47,7 +47,6 @@ internal static class CommandPresentationFormatter
 
     private static string Markdown(CommandPresentation presentation)
     {
-        ArgumentNullException.ThrowIfNull(presentation);
         var text = new StringBuilder();
         text.Append("# SharpProof ").Append(Escape(presentation.Command)).Append("\n\n");
         text.Append("Schema: ").Append(Escape(presentation.Schema)).Append(" v").Append(presentation.SchemaVersion.ToString(CultureInfo.InvariantCulture)).Append("  \n");
@@ -125,7 +124,6 @@ internal static class CommandPresentationFormatter
 
     private static string Escape(string value)
     {
-        ArgumentNullException.ThrowIfNull(value);
         var text = new StringBuilder();
         foreach (var character in value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'))
         {

@@ -80,7 +80,6 @@ internal static partial class ApiSpecTermValidator
 
             void Include(SpecTermDeclaration child)
             {
-                child = RepositoryParameterGuard.NotNull(child, nameof(child));
                 var size = Measure(child, depth + 1);
                 height = Math.Max(height, size.Height + 1);
                 nodes = Math.Min(MaximumExpandedExpressionNodes + 1, nodes + size.Nodes);

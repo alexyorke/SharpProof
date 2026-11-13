@@ -43,9 +43,6 @@ internal static class AdvisoryEffectClaims
     private static string? Violation(EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
         AdvisoryEffectSite site, Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        constraint = RepositoryParameterGuard.NotNull(constraint, nameof(constraint));
-        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         switch (kind)
         {
             case EffectEvaluationContractKind.ResourceUpperBound:
@@ -83,7 +80,6 @@ internal static class AdvisoryEffectClaims
 
     private static EffectContractKind Effects(AdvisoryEffectSite site)
     {
-        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         return site.Kind switch
         {
             AdvisoryEffectSiteKind.Allocation => EffectContractKind.Allocates,
@@ -159,7 +155,6 @@ internal static class AdvisoryEffectClaims
     // type; a runtime fault when its exception type does.
     private static bool Allowed(AdvisoryEffectSite site, ImmutableArray<INamedTypeSymbol> allowed, Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (site.Exception == IrExceptionKind.Explicit)
         {
             var listed = allowed.Select(CompilerExceptionTypeIdentity.Encode).ToImmutableHashSet(StringComparer.Ordinal);
@@ -171,7 +166,6 @@ internal static class AdvisoryEffectClaims
 
     private static string ThrownName(AdvisoryEffectSite site)
     {
-        site = RepositoryParameterGuard.NotNull(site, nameof(site));
         return site.Exception == IrExceptionKind.Explicit
             ? "an explicit exception"
             : IrExceptionKindFacts.MetadataName(site.Exception);

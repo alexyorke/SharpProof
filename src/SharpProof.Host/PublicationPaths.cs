@@ -43,7 +43,6 @@ internal static class PublicationPaths
 
     private static string? RuntimeDirectory(string workerPath)
     {
-        ArgumentNullException.ThrowIfNull(workerPath);
         var directory = new DirectoryInfo(Path.GetDirectoryName(workerPath) ??
             throw new InvalidDataException("The worker runtime path must name a file."));
         // Package runtimes include native payloads beside tools/net10, even

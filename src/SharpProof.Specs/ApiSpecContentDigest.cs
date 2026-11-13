@@ -108,9 +108,6 @@ internal static class ApiSpecContentDigest
         CanonicalHashWriter hash, SpecTermDeclaration term,
         ImmutableDictionary<SpecTermDeclaration, ValidatedSpecTerm> validatedTerms)
     {
-        hash = RepositoryParameterGuard.NotNull(hash, nameof(hash));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        validatedTerms = RepositoryParameterGuard.NotNull(validatedTerms, nameof(validatedTerms));
         var node = validatedTerms[term];
         hash.Add(node.Declaration.GetType().Name.Replace("Declaration", "Term"))
             .Add(node.Declaration.Type);

@@ -76,11 +76,10 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private CanonicalHashWriter Add(Enum value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return AddEnum(value.GetType(), value.ToString(), nameof(value));
     }
 
-    private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */)
+    private CanonicalHashWriter AddNumber<T>(ValueKind kind, T value)
         where T : struct, IFormattable
     {
         return AddFrame(
@@ -90,7 +89,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     }
 
     private CanonicalHashWriter AddFrame(ValueKind kind,
-        ReadOnlySpan<byte> /* SPINT001: all values valid - empty spans produce valid zero-length frames */ bytes)
+        ReadOnlySpan<byte> bytes)
     {
         AddFrameHeader(kind, bytes.Length);
         _hash.AppendData(bytes.ToArray());
@@ -148,8 +147,6 @@ internal sealed class CanonicalHashWriter : IDisposable
         string name,
         string argumentName)
     {
-        argumentName = RepositoryParameterGuard.NotNull(argumentName, nameof(argumentName));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         if (name.Length == 0 || name[0] == '-' || char.IsDigit(name[0]))
         {
             throw new ArgumentOutOfRangeException(

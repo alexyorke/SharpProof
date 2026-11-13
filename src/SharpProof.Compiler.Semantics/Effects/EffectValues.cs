@@ -292,7 +292,6 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static SymbolSortKey GetSortKey(TSymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return SortKeys.GetValue(symbol, static value => new(value));
     }
 
@@ -326,7 +325,6 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
 
     private static string CanonicalIdentity(ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return symbol is ITypeSymbol type
             ? CompilerIdentityBridge.CreateTypeDisplay(type)
             : CompilerIdentityBridge.CreateSymbolDisplay(symbol);

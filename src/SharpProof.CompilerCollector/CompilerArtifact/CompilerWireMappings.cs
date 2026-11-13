@@ -92,10 +92,9 @@ internal static partial class CompilerOptionWireMappings
 
     private static InvalidOperationException Unsupported<T>(
         string name,
-        T /* SPINT001: all values valid - visitor state passes through unchanged */ value)
+        T value)
         where T : struct
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return new($"The compiler option '{name}' has unsupported value '{value}'.");
     }
 }

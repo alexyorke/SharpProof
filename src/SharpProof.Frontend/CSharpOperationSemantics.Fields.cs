@@ -60,7 +60,6 @@ internal static partial class CSharpOperationSemantics
 
     private static bool HasLayoutQualifier(INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var interop = type.ContainingSymbol;
         var runtime = interop.ContainingSymbol;
         var system = runtime?.ContainingSymbol;

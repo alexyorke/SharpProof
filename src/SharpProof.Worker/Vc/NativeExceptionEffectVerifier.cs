@@ -64,7 +64,6 @@ internal static class NativeExceptionEffectVerifier
 
         ImmutableDictionary<string, PassiveCallableCheckResult> All(PassiveCallableCheckResult evidence)
         {
-            System.ArgumentNullException.ThrowIfNull(evidence);
             foreach (var claim in expected)
             {
                 if (!results.ContainsKey(claim.ClaimId))
@@ -75,8 +74,6 @@ internal static class NativeExceptionEffectVerifier
 
         void Publish(string claimId, PassiveCallableCheckResult evidence)
         {
-            ArgumentNullException.ThrowIfNull(claimId);
-            ArgumentNullException.ThrowIfNull(evidence);
             results.Add(claimId, evidence);
             publish?.Invoke(claimId, evidence);
         }

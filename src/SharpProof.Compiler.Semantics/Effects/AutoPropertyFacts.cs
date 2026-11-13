@@ -50,8 +50,6 @@ internal static class AutoPropertyFacts
         IPropertySymbol left,
         IPropertySymbol right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SymbolEqualityComparer.Default.Equals(left, right) ||
             SymbolEqualityComparer.Default.Equals(
                 left.OriginalDefinition,

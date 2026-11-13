@@ -15,7 +15,6 @@ internal sealed partial class BvEncoder
 
     private void AddReferenceFact(BoolExpr fact)
     {
-        fact = RepositoryParameterGuard.NotNull(fact, nameof(fact));
         _referenceFacts.Add(fact);
     }
 
@@ -123,7 +122,6 @@ internal sealed partial class BvEncoder
             void AddMembership(int group, Expr value)
             {
                 RepositoryParameterGuard.ThrowIfInvalid(group < 0 || group >= maskSnapshot.Length, nameof(group));
-                value = RepositoryParameterGuard.NotNull(value, nameof(value));
                 meter.Consume();
                 var tags = (BitVecExpr)owner.Own(context.MkApp(_nominalWitnessTags, value));
                 var masked = owner.Own(context.MkBVAND(tags, owner.Own(context.MkBV(maskSnapshot[group], MaximumNominalWitnessTypes))));
@@ -150,7 +148,6 @@ internal sealed partial class BvEncoder
     {
         RepositoryParameterGuard.ThrowIfInvalid(first.IsDefault, nameof(first));
         RepositoryParameterGuard.ThrowIfInvalid(second.IsDefault, nameof(second));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         return first == second || IsBase(first, second) || IsBase(second, first) ||
             factory.IsInterfaceReferenceType(first) && factory.IsInterfaceReferenceType(second) ||
             factory.GetImplementedReferenceInterfaces(first).Contains(second) || factory.GetImplementedReferenceInterfaces(second).Contains(first);
@@ -175,7 +172,6 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeStringLiteral(IrStringTerm term, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_stringLiterals.TryGetValue(term.Value, out var existing))
         { return existing; }
         var value = owner.Own(context.MkConst("text" + term.Value.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
@@ -201,9 +197,6 @@ internal sealed partial class BvEncoder
         // the operands' content in order and its length their total. SAT
         // still requires replay.
         left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("concat" + term.Id.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         var empty = EncodeStringLiteral(factory.String(""), meter);
@@ -219,7 +212,6 @@ internal sealed partial class BvEncoder
         // EmptyArray terms are canonical per type; Encode's successful identity
         // cache has already handled any previously completed construction.
         meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var value = owner.Own(context.MkConst("empty" + term.Type.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         AddReferenceFact(owner.Own(context.MkEq(EncodeLength(value, meter), owner.Own(context.MkBV(0, 32)))));
@@ -253,8 +245,6 @@ internal sealed partial class BvEncoder
 
     private void AddDistinctReferenceFact(Expr left, Expr right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(left, right)))));
     }
 
@@ -263,14 +253,11 @@ internal sealed partial class BvEncoder
 
     private static bool IsReference(IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String;
     }
 
     private Expr EncodeLength(Expr value, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume();
         if (_length == null)
         {

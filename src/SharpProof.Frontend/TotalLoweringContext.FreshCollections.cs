@@ -10,7 +10,6 @@ internal sealed partial class TotalLoweringContext
     // serves all of them.
     private (bool Arrays, bool Dictionaries, bool HashSets, bool Lists) TrackingBases(ControlFlowGraph graph)
     {
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         if (_trackingBases is { } known && ReferenceEquals(known.Graph, graph))
         { return (known.Arrays, known.Dictionaries, known.HashSets, known.Lists); }
         bool arrays = false, dictionaries = false, hashSets = false, lists = false;
@@ -32,7 +31,6 @@ internal sealed partial class TotalLoweringContext
 
     private void TrackFreshCollections(ControlFlowGraph graph, bool lists, bool dictionaryOrigins = false, bool hashSetOrigins = false)
     {
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var identityOnly = lists || dictionaryOrigins || hashSetOrigins;
         var tracked = hashSetOrigins ? _defaultHashSetOrigins : lists ? _exactLists : dictionaryOrigins ? _defaultDictionaryOrigins : _defaultDictionaries;
         var trackedCaptures = hashSetOrigins ? _defaultHashSetOriginCaptures : lists ? _exactListCaptures : dictionaryOrigins ? _defaultDictionaryOriginCaptures : _defaultDictionaryCaptures;
@@ -137,7 +135,6 @@ internal sealed partial class TotalLoweringContext
 
         void Exclude(IOperation operation, bool capturesReceiver = false)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             var pending = ImmutableStack<IOperation>.Empty.Push(operation);
             while (!pending.IsEmpty)
             {
@@ -157,12 +154,10 @@ internal sealed partial class TotalLoweringContext
         }
         bool All(ImmutableArray<IOperation>.Builder values, int depth)
         {
-            values = RepositoryParameterGuard.NotNull(values, nameof(values));
             return values.Count != 0 && values.All(value => Resolve(value, depth + 1));
         }
         bool Resolve(IOperation operation, int depth)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return false; }
             // A null alternative cannot dispatch to a different implementation.

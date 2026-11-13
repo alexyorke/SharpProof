@@ -70,9 +70,6 @@ internal sealed partial class TotalLoweringContext
 
     private static bool IsKnownList(IOperation operation, ImmutableHashSet<ISymbol>.Builder symbols, ImmutableHashSet<CaptureId>.Builder captures)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        symbols = RepositoryParameterGuard.NotNull(symbols, nameof(symbols));
-        captures = RepositoryParameterGuard.NotNull(captures, nameof(captures));
         while (true)
         {
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
@@ -90,7 +87,6 @@ internal sealed partial class TotalLoweringContext
 
     private static bool IsListRangeAllocation(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IInvocationOperation { TargetMethod: { Name: "GetRange" } method } &&
             CSharpOperationSemantics.IsConcreteListStateMember(method);
     }

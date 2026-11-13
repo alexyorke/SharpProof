@@ -120,8 +120,6 @@ public sealed class StampContractsExport : CancelableBuildTask
     // The module version id and SHA-256 of one produced image.
     private static (string Role, string Mvid, string Sha256) Image(string role, string path)
     {
-        System.ArgumentNullException.ThrowIfNull(role);
-        System.ArgumentNullException.ThrowIfNull(path);
         var bytes = File.ReadAllBytes(path);
         using var pe = new PEReader(new MemoryStream(bytes, writable: false));
         if (!pe.HasMetadata)

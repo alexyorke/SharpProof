@@ -14,7 +14,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private ClaimManifestBuildResult WithContractCalls(ClaimManifestBuildResult result)
     {
-        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         if (!ContractsEnabled || CollectPreconditionCallNames(result.Targets) is not { } calls)
         { return result; }
         var preconditions = ImmutableDictionary.CreateBuilder<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
@@ -56,7 +55,6 @@ internal sealed partial class ClaimManifestBuilder
     // Null when nothing the compiler can see declares a precondition.
     private PreconditionCallNames? CollectPreconditionCallNames(ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> selected)
     {
-        selected = RepositoryParameterGuard.NotNull(selected, nameof(selected));
         var names = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var constructors = false;
         var indexers = false;
@@ -118,8 +116,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private static bool MayCallPrecondition(SyntaxNode node, PreconditionCallNames calls)
     {
-        node = RepositoryParameterGuard.NotNull(node, nameof(node));
-        calls = RepositoryParameterGuard.NotNull(calls, nameof(calls));
         return node switch
         {
             InvocationExpressionSyntax invocation => invocation.Expression switch
@@ -141,7 +137,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private static string RightmostName(NameSyntax name)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return name switch
         {
             QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
@@ -153,8 +148,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private bool CallsPrecondition(IOperation operation, ImmutableDictionary<IMethodSymbol, bool>.Builder known)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        known = RepositoryParameterGuard.NotNull(known, nameof(known));
         return operation switch
         {
             IInvocationOperation invocation => Has(invocation.TargetMethod),
@@ -166,7 +159,6 @@ internal sealed partial class ClaimManifestBuilder
 
         bool Has(IMethodSymbol method)
         {
-            method = RepositoryParameterGuard.NotNull(method, nameof(method));
             if (!known.TryGetValue(method, out var result))
             {
                 result = HasPotentialCallPreconditions(method);
@@ -181,7 +173,6 @@ internal sealed partial class ClaimManifestBuilder
     // claim (dispatched, incomplete or not importable) is counted unchecked.
     private bool HasPotentialCallPreconditions(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _effectSession.HasPotentialCallPreconditions(method) || ContractExports.Covers(method);
     }
 
@@ -189,7 +180,6 @@ internal sealed partial class ClaimManifestBuilder
     // is the assignment.
     private WorkerSourceLocation CallSite(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var site = operation.Parent is ISimpleAssignmentOperation assignment && ReferenceEquals(assignment.Target, operation)
             ? assignment.Syntax : operation.Syntax;
         return ToSourceLocation(site.GetLocation());
@@ -197,8 +187,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private IMethodSymbol? CallRoot(SemanticModel model, SyntaxNode node)
     {
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        node = RepositoryParameterGuard.NotNull(node, nameof(node));
         var symbol = model.GetEnclosingSymbol(node.SpanStart, cancellationToken);
         while (symbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction or MethodKind.LocalFunction })
         { symbol = symbol.ContainingSymbol; }
@@ -209,7 +197,6 @@ internal sealed partial class ClaimManifestBuilder
     // would renumber their siblings.
     private bool IsCallRoot(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.MethodKind is MethodKind.Ordinary or MethodKind.Constructor or MethodKind.ExplicitInterfaceImplementation &&
             CreateSeed(method).Declaration is MethodDeclarationSyntax or ConstructorDeclarationSyntax &&
             CreateSeed(method).Declaration is BaseMethodDeclarationSyntax { } declaration &&
@@ -220,7 +207,6 @@ internal sealed partial class ClaimManifestBuilder
 
     private ManifestCallableTarget CreateContractCaller(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var seed = CreateSeed(method);
         var entry = new WorkerCallableManifestEntry
         {

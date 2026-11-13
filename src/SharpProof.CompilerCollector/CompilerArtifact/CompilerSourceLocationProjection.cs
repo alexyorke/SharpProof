@@ -70,7 +70,6 @@ internal static class CompilerSourceLocationProjection
 
     private static bool IsWindowsDriveAbsolute(string path)
     {
-        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return path.Length >= 3 &&
             (path[0] is >= 'A' and <= 'Z' or >= 'a' and <= 'z') &&
             path[1] == ':' &&

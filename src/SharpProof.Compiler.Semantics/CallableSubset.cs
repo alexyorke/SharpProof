@@ -32,14 +32,12 @@ internal static class CallableSubset
 
     private static bool ContainsUnsafeSyntax(SyntaxNode declaration)
     {
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         return declaration.DescendantNodesAndSelf().Any(static node => node is UnsafeStatementSyntax) ||
             declaration.AncestorsAndSelf().Any(static node => Modifiers(node).Any(static modifier => modifier.IsKind(SyntaxKind.UnsafeKeyword)));
     }
 
     private static SyntaxTokenList Modifiers(SyntaxNode node)
     {
-        node = RepositoryParameterGuard.NotNull(node, nameof(node));
         return node switch
         {
             BaseMethodDeclarationSyntax method => method.Modifiers,

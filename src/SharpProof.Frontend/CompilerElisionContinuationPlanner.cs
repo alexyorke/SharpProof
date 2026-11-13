@@ -106,8 +106,6 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private bool BelongsToCompilerElidedOwner(IOperation operation, IInvocationOperation owner)
     {
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var expression = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         return !_context.IsSpecificationOperation(expression) && _emission?.IsElided(expression) == true &&
             _emission.OwningInvocation(expression) is { } actual &&
@@ -138,7 +136,6 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private ControlFlowRegion CompilerElisionBoundary(ControlFlowRegion region)
     {
-        region = RepositoryParameterGuard.NotNull(region, nameof(region));
         while (region.Kind == ControlFlowRegionKind.LocalLifetime)
         {
             SpendRegion();
@@ -149,7 +146,6 @@ internal sealed class CompilerElisionContinuationPlanner(ControlFlowGraph graph,
 
     private void RestoreCompilerBlock(BasicBlock block)
     {
-        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         if (block.IsReachable || !_compilerRestoredBlocks.Add(block))
         { return; }
         _compilerRestorePending = _compilerRestorePending.Enqueue(block);

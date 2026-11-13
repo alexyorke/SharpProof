@@ -55,7 +55,7 @@ internal static class CodeFixCompilationValidation
     }
 
     private static (DocumentId? Document, string Path, string Id, string Message, TextSpan Span) Identity(
-        Project project, Diagnostic diagnostic, TextSpan span /* SPINT001: all values valid - empty source spans are valid diagnostic locations */)
+        Project project, Diagnostic diagnostic, TextSpan span)
     {
         project = project ?? throw new ArgumentNullException(nameof(project));
         diagnostic = diagnostic ?? throw new ArgumentNullException(nameof(diagnostic));
@@ -64,7 +64,7 @@ internal static class CodeFixCompilationValidation
             diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture), span);
     }
 
-    private static bool TryMap(TextSpan span /* SPINT001: all values valid - empty source spans are valid diagnostic locations */,
+    private static bool TryMap(TextSpan span,
         ImmutableArray<TextChange> changes, out TextSpan mapped)
     {
         if (changes.IsDefault)

@@ -40,7 +40,6 @@ internal static class IrInstructionFacts
 
     private static ImmutableArray<IrTerm> ReadTerms(IrLocation location)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         return location.Accept(LocationReadVisitor.Instance, 0);
     }
 

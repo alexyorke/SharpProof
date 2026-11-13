@@ -250,7 +250,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var hasContractApiCandidate = false;
         ImmutableHashSet<string>? aliases = null;
         foreach (var tree in PotentiallyActivatedTrees(
@@ -324,7 +323,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -448,7 +446,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         GetClosedContractAttributes(
         Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         return ImmutableArray.Create(
                 compilation.GetTypeByMetadataName(
                     ContractApiMetadata.NonNull),
@@ -501,7 +498,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         MetadataReader reader,
         CustomAttribute attribute)
     {
-        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return ApiSpecResolver.TryGetAttributeTypeName(
                 reader,
                 attribute,
@@ -517,7 +513,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes,
         CancellationToken cancellationToken)
     {
-        @namespace = RepositoryParameterGuard.NotNull(@namespace, nameof(@namespace));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var type in @namespace.GetTypeMembers())
         {
@@ -549,7 +544,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableArray<INamedTypeSymbol> closedContractAttributes,
         CancellationToken cancellationToken)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var method in type.GetMembers().OfType<IMethodSymbol>())
         {
@@ -585,7 +579,6 @@ internal sealed partial class SharpProofAnalyzerEngine
 
     private static bool IsContractApiCandidate(ExpressionSyntax expression)
     {
-        expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
         SimpleNameSyntax? name = expression switch
         {
             SimpleNameSyntax simple => simple,
@@ -622,7 +615,6 @@ internal sealed partial class SharpProofAnalyzerEngine
     private static bool IsAssemblyOrModuleAttribute(
         AttributeSyntax attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         var target = (attribute.Parent as AttributeListSyntax)?
             .Target?.Identifier.Kind() ?? SyntaxKind.None;
         return target is
@@ -633,7 +625,6 @@ internal sealed partial class SharpProofAnalyzerEngine
     private static bool IsSharpProofAttributeCandidate(
         AttributeSyntax attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         var simpleName = attribute.Name.GetLastToken().ValueText;
         return ContractApiMetadata.Attributes.Any(descriptor =>
             string.Equals(
@@ -657,7 +648,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var names = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         foreach (var tree in compilation.SyntaxTrees)
         {
@@ -681,8 +671,6 @@ internal sealed partial class SharpProofAnalyzerEngine
         ImmutableHashSet<string> aliases,
         IdentifierNameSyntax name)
     {
-        aliases = RepositoryParameterGuard.NotNull(aliases, nameof(aliases));
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var text = name.Identifier.ValueText;
         return aliases.Contains(text) ||
             aliases.Contains(text + "Attribute");
