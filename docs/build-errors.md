@@ -60,6 +60,7 @@ Verifier exit codes reported by SPB030:
 | --- | --- |
 | 2 | Invalid arguments or input files |
 | 3 | The worker produced no result, a malformed result, or one that could not be published |
+| 4 | The run was canceled |
 | 124 | The run exceeded its time limit |
 
 Any other code is an unexpected verifier failure; please

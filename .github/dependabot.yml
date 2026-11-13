@@ -79,3 +79,7 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "mcr.microsoft.com/powershell"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # ConsumerBaseline.Dockerfile asserts the exact Python version, so a
+      # new minor line is a deliberate change made together with that check.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
