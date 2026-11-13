@@ -1,6 +1,6 @@
 # Upgrade and compatibility policy
 
-SharpProof is a preview. A checked-in version is not evidence that packages are published. Update the single standard `SharpProof` reference from your chosen feed and read release notes before changing a consumer. Its exact-version API/analyzer dependencies restore automatically. The version authority is [eng/Versions.props](../eng/Versions.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
+SharpProof is a preview. Update the single standard `SharpProof` reference and read release notes before changing a consumer. Its exact-version API/analyzer dependencies restore automatically. The version authority is [eng/Versions.props](../eng/Versions.props); release notes live in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Compatibility boundaries
 
@@ -21,10 +21,6 @@ The current development toolchain uses .NET 10. Full verification requires SDK 1
 
 Build-host choice is separate from the application target. Full verification uses Core MSBuild, or Windows x64 full-framework MSBuild 18+ with the out-of-process .NET task-host bridge and a compatible .NET 10 SDK/runtime. Review a successful completed exact-artifact qualification run for the source SHA and host version; job definitions alone do not establish a passed result. The full-framework bridge has package-registration and host-selection tests, but the current release workflow has no actual MSBuild.exe or separate native ARM64 qualification jobs. Its native Windows smoke uses Core MSBuild. Qualify the full-framework host and interactive IDE separately. MSBuild 17.14 with SDK 9.0.300 is an explicit advisory-only path, not a default verifier host. See [legacy compatibility](legacy-compatibility.md) for the target matrix, classic-project exclusions, and old-OS deployment limits.
 
-The main `SharpProof` package now enables strict full verification without activation properties; `SharpProof.Verifier` remains a compatibility entrypoint with the same defaults. Consumers that previously installed the main package without setting a profile must expect selected Unknown/incomplete claims and declared user/trusted assumptions to fail the default gate. SDK 9 hosts require an explicit portable-only advisory configuration; the default SDK 10 verifier cannot run there. Existing explicit policy overrides remain deliberate configuration and should be reviewed during migration.
-
-For the standard setup, replace the old separate Attributes/analyzer/Verifier references with one `SharpProof` reference, remove redundant SharpProof activation properties, and remove `PrivateAssets="all"` from that standard reference so transitive application contracts propagate. Its exact-version graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`. Inspect the resulting package dependency graph and packed-library consumer behavior; do not remove application runtime guards.
-
 1. Save the current package versions, SDK version, source revision and representative results. Read the new release's migration notes and [support matrix](preview-support.md). Keep the application target framework separate from the compiler/worker runtime decision.
 2. Update the standard SharpProof reference in a branch, restore normally, and review dependency/lock-file changes. If maintaining a portable-only setup, retain explicit advisory/verification-disabled settings and keep the transitive Attributes application dependency visible. Leave runtime guards intact.
 3. Build representative portable and full-verification consumers. Compare diagnostic changes, selected callable/claim counts, Unknown reasons, assumptions, vacuity, and replayable violations. Investigate a change in outcomes rather than accepting a greener build as proof of improvement.
@@ -34,7 +30,7 @@ For the standard setup, replace the old separate Attributes/analyzer/Verifier re
 
 ## Maintainer release review
 
-Attributes now carries a full strong-name signature for signed Framework consumers. Its deliberately public open-source identity key is stable and is not an authentication secret. Introducing that identity into the preview requires existing consumers to rebuild; changing the key again would break compiled references. Keep exact API/payload admission intact, and use the [signing policy](../eng/signing/README.md) when reviewing the identity.
+Attributes now carries a full strong-name signature for signed Framework consumers. Its deliberately public open-source identity key is stable and is not an authentication secret. Changing the key would break compiled references. Keep exact API/payload admission intact, and use the [signing policy](../eng/signing/README.md) when reviewing the identity.
 
 Maintain public API declarations and package validation. Set `SharpProofPackageValidationBaselineVersion` to a reviewed, actually published compatible version to opt into a previous-package baseline; [package metadata](../eng/Packaging.props) forwards it to the SDK validation setting. The initial preview supplies no fabricated prior baseline. Do not disable validation for convenience. Document intentional breaks in release notes, including non-API changes that affect proof evidence.
 

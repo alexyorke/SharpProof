@@ -29,6 +29,11 @@ Entries describe repository changes, not package publication. Confirm available 
   `container-read-token` secret is optional, so a public image is pulled
   without credentials, and the generated container workflow starts with only
   a manual trigger until its first baseline exists.
+- Rewrite the documentation for a public reader. The README opens with what
+  SharpProof checks, what it needs, the strict default and how to start in
+  advisory mode; contributor instructions move to the development workflows
+  guide. One status line says the packages are not on nuget.org yet, and the
+  scattered "configured feed" and private-preview wording is gone.
 - Build the consumer image in the release workflow. `SharpProof.Templates` pins
   the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
   and the release could not pack the templates. The package job now builds the

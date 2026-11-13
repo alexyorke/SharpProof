@@ -7,7 +7,7 @@ using SharpProof.Tool;
 namespace SharpProof.Tool.Test;
 
 [TestFixture]
-public sealed class PrivatePreviewCommandRoutingTests
+public sealed class CommandRoutingTests
 {
     [TestCase("init --verification unsupported --project missing.csproj", "--verification must be portable or container.")]
     [TestCase("init --consumer-image image --project missing.csproj", "--consumer-image applies only to container initialization.")]

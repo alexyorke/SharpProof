@@ -1,12 +1,32 @@
 # SharpProof
 
-SharpProof checks C# contracts and effects. Add `SharpProof` to an SDK-style project and build to run the analyzer and full verification automatically.
+SharpProof checks C# contracts at build time with an SMT solver. Add one package to an SDK-style project, write contracts as ordinary C# calls and attributes, and every build reports which of them hold.
 
 **This is an early preview and it has many bugs.** Treat a reported issue as a lead: turn it into a test case (your AI tool of choice can help) that demonstrates the specific failure. `Proven` is conditional on the modeled language subset and recorded assumptions. `Refuted` requires a replayable violation. `Unknown` is an accountable result, not success. See [semantics](SEMANTICS.md) and [coverage and limits](docs/coverage-and-limits.md).
 
-## Packages
+**Status:** version `1.0.0-preview.2` is not on nuget.org yet. Until it is, [pack this checkout](docs/getting-started.md#obtain-this-checkouts-packages) to try it.
 
-The standard setup is `dotnet add package SharpProof --version 1.0.0-preview.2` using your configured feed, or this one reference with no SharpProof configuration properties:
+## What it checks
+
+- **Postconditions:** `Contract.Ensures`, and return attributes such as `NonNull`, `Positive` and `InRange`.
+- **Call preconditions:** every call must satisfy the callee's `Contract.Requires` and parameter attributes.
+- **Purity and effects:** a method declared pure, or with a stated set of effects, does nothing else.
+- **Allocations:** a method declared allocation-free does not allocate.
+- **Exceptions:** a method throws only what its contract allows.
+- **Capabilities:** code uses only the capabilities it declares, such as file or network access.
+- **Resource bounds:** declared upper bounds on loop iterations and array allocation.
+
+Each claim ends as `Proven`, `Refuted` (with a replayable violation) or `Unknown` (with a reason). Code SharpProof cannot prove is reported as incomplete, never as proven. See the [public API](docs/public-api.md) for the contract surface and [verification evidence](docs/verification-results.md) for how to read a run.
+
+## Requirements
+
+- **Build machine:** .NET SDK 10.0.100 or newer with its .NET 10 runtime. The application itself can target an older framework.
+- **Operating system:** Windows, macOS or glibc Linux, on x64 or ARM64. musl Linux (Alpine) is not supported.
+- **Windows paths:** the project must be on a fixed local NTFS volume.
+
+The [support matrix](docs/preview-support.md) has the details.
+
+## Quick start
 
 ```xml
 <ItemGroup>
@@ -14,7 +34,20 @@ The standard setup is `dotnet add package SharpProof --version 1.0.0-preview.2` 
 </ItemGroup>
 ```
 
-It restores the contract API, analyzer, worker, and pinned native solver automatically and defaults to strict verification. Keep the standard reference without `PrivateAssets="all"` so application contract dependencies propagate. The internal dependency graph remains version-matched; no separate installation is needed.
+That one reference is the whole setup: it restores the contract API, the analyzers, the verifier and the pinned solver. Do not add `PrivateAssets="all"`, because projects that consume yours need the contract API too.
+
+Verification is strict by default. The build fails when a selected claim is refuted, when it cannot be proven, or when it depends on a declared assumption. To adopt gradually, start with analyzer diagnostics only and no proofs:
+
+```xml
+<PropertyGroup>
+  <SharpProofProfile>advisory</SharpProofProfile>
+  <SharpProofVerify>false</SharpProofVerify>
+</PropertyGroup>
+```
+
+`dotnet new sharpproof` generates a starter project with either setup; see the [developer tools guide](docs/developer-experience.md#install-and-start).
+
+## Packages
 
 | Package | Purpose |
 | --- | --- |
@@ -22,15 +55,9 @@ It restores the contract API, analyzer, worker, and pinned native solver automat
 | `SharpProof` | Standard complete entrypoint: automatically restores the API, analyzer, build tasks, worker and pinned native solver |
 | `SharpProof.Verifier` | Compatibility entrypoint and implementation payload for analysis and verification |
 
-Full verification covers six native OS/architecture combinations: Windows, macOS, and glibc Linux, each on x64 and ARM64, plus the canonical Linux container, within the [host and filesystem support matrix](docs/preview-support.md). Windows solver payloads include the C++ runtime statically, so no separate Visual C++ redistributable installation is needed. Linux requires a compatible glibc distribution and native runtime dependencies; musl remains unsupported. Repository development commands run in the [canonical container](docs/container-development.md). An explicit advisory/off profile opts out of default strict verification.
-
-The standard setup requires .NET SDK 10.0.100 or newer and its .NET 10 runtime, independently of the application's target framework. Explicit portable-only advisory analysis retains its separate SDK 9.0.300+/Roslyn 4.14 minimum; that older host cannot run the default verifier. The canonical image supplies the pinned SDK.
-
-The consumer application can retain a compatible older target framework. For setup diagnostics, run `dotnet sharpproof doctor --project path/to/Consumer.csproj --format json` with the optional [SharpProof.Tool](src/SharpProof.Tool/README.md); it evaluates a trusted project without restore/build and identifies missing assets or configuration. From this checkout, `pwsh -File eng/scripts/Invoke-SharpProof.ps1 doctor -Target path/to/Consumer.csproj -Format Json` runs the same check in the canonical container. A doctor pass does not execute a proof.
+The consumer application can retain a compatible older target framework. For setup diagnostics, run `dotnet sharpproof doctor --project path/to/Consumer.csproj --format json` with the optional [SharpProof.Tool](src/SharpProof.Tool/README.md); it evaluates a trusted project without restore/build and identifies missing assets or configuration. A doctor pass does not execute a proof.
 
 See [older frameworks, Windows, and Visual Studio](docs/legacy-compatibility.md) for the modern-host application-target matrix, the Windows MSBuild 18+ task-host integration, explicit advisory-only MSBuild 17.14 behavior, and deployment/interactive-IDE qualification limits.
-
-The checked-in package version is `1.0.0-preview.2`. Use packed local artifacts to evaluate this checkout; package availability on a public feed is not implied.
 
 ## A minimal contract
 
@@ -54,19 +81,7 @@ Start with the [single-reference setup](docs/getting-started.md#first-use-in-thr
 
 The [configuration reference](docs/configuration.md) covers selection, IDE behavior, report paths, specification packs, budgets, and caching. Use [verification evidence](docs/verification-results.md) to interpret a run and the [language reference](docs/language-reference.md) to investigate particular C# constructs.
 
-The [developer tools guide](docs/developer-experience.md) covers workspace templates, preview-first project initialization, setup/evidence reports in text/JSON/Markdown, exact-base CI comparison, relocatable NUnit regression export, and optional editor scaffolding. These matching preview packages require a configured feed; this checkout does not imply public package availability.
-
-## Learn by doing
-
-From the repository root, with Docker Compose v2 and Linux containers:
-
-```text
-docker compose build tooling
-docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
-docker compose run --rm tooling pr
-```
-
-`pr` runs Release build and PR semantic/package gates. Coverage, corpus, fuzzing, and security have separate commands; see the [container command reference](docs/container-development.md). Finite tasks copy source into private container workspaces and export artifacts. Run repository .NET, PowerShell, packaging, and acceptance commands there.
+The [developer tools guide](docs/developer-experience.md) covers workspace templates, preview-first project initialization, setup/evidence reports in text/JSON/Markdown, exact-base CI comparison, relocatable NUnit regression export, and optional editor scaffolding.
 
 ## Understanding results
 
@@ -76,24 +91,10 @@ docker compose run --rm tooling pr
 - Review trusted boundaries and API specifications as assumptions. Suppression affects reporting, not evidence.
 - Loops, calls, exceptions, and heap operations have modeled cases and conservative limits; language admission does not guarantee a proof.
 
-## Repository checks
-
-Run all repository lint, spelling, package compatibility, and link checks with one
-Docker command:
-
-```sh
-docker compose run --rm --build lint
-```
-
-It builds the pinned toolchain and lint tools automatically, writes reports under
-`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
-`pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](eng/lint/README.md)
-for scope and individual checks.
-
 ## Documentation
 
 The [documentation index](docs/README.md) links the current guides, implementation references, and validation fixtures. [Contributing](CONTRIBUTING.md) describes development standards. Report vulnerabilities through the [security policy](SECURITY.md).
 
-The [development workflows](docs/development-workflows.md) guide connects repository changes to the relevant container commands and CI evidence.
+To work on SharpProof itself, start with [development workflows](docs/development-workflows.md) and the [container command reference](docs/container-development.md).
 
 Releases use the three-package graph and tag-gated consumer checks described in [the release process](eng/release/README.md).

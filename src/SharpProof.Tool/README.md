@@ -5,10 +5,8 @@ tool is optional. Its read-only commands inspect setup and stored evidence; `ini
 can apply a reviewed setup plan, and `export-test` writes a new regression project.
 Neither command runs verification or executes consumer code.
 
-Install the matching version from nuget.org. The first public version is
-`1.0.0-preview.2`; until it is published, pack this checkout instead. Real-editor
-qualification is pending, and public CI validation versions are distinct from
-release artifacts.
+Install the version that matches your `SharpProof` package reference. The first
+public version is `1.0.0-preview.2`.
 
 Generated templates already pin the matching local tool: use `dotnet tool restore`.
 For an existing project, create a manifest only if one does not already exist, then
@@ -143,6 +141,5 @@ for supported frameworks, exact layout, and export limits.
 For these evidence commands, exit 0 means processing completed, and exit 2 means invalid
 arguments/evidence or unsupported export. Cancellation exits 130. Stored evidence does
 not establish current source freshness or authenticate an arbitrary worker binary.
-The private preview's publication, signed receipt, and Visual Studio stable/VS Code
-C#/Rider Windows x64 interactive acceptance remain pending. Installation or a successful
-diagnostic command does not establish any of those release/host results.
+Interactive acceptance in Visual Studio, VS Code C# and Rider has not been run.
+Installation or a successful diagnostic command does not establish it.

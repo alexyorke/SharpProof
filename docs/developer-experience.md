@@ -3,13 +3,11 @@
 SharpProof's optional developer packages are versioned with the three product packages.
 `SharpProof.Tool` supplies the `sharpproof` .NET tool, `SharpProof.Templates` supplies
 `dotnet new sharpproof`, and `SharpProof.CodeFixes` supplies optional editor actions.
-These additions do not change existing verification or assumption policies. Package
-availability on a public feed is not implied; use the matching packages from your
-configured feed or this checkout's qualified package artifacts.
+These additions do not change existing verification or assumption policies.
 
 ## Install and start
 
-Configure the feed containing the matching preview packages, then install the template
+Install the template
 with `dotnet new install SharpProof.Templates::<version>`. Create and enter a project:
 
 ```sh
@@ -38,9 +36,7 @@ It generates `MyLibrary.slnx`, `src/app/MyLibrary.csproj`, `tests/`, the pinned 
 tool manifest, and a credential-free `NuGet.config` pointing to nuget.org. C# stays
 pinned to 13 for export. Both templates include the matching optional editor package
 with `PrivateAssets="all"` by default; `--editor false` omits it. The core application
-reference remains the `SharpProof` facade. If the matching preview packages are not
-published there, configure a container-visible qualified local feed or authenticate
-to your chosen private feed before installing and restoring them.
+reference remains the `SharpProof` facade.
 
 Choose `--verification container` when creating the project to generate strict
 verification in the pinned container, retained evidence, and a comparison workflow.
@@ -51,9 +47,7 @@ by digest and derives from the canonical Linux amd64 toolchain. No SharpProof so
 checkout is required. Private-feed authentication belongs in your normal NuGet secret
 mechanism, never in a committed generated project.
 The portable variant produces analyzer diagnostics without worker evidence; the
-evidence commands below use the container variant's retained paths. They require
-access to its matching packages and qualified image; public publication is a separate
-release step.
+evidence commands below use the container variant's retained paths.
 
 The CLI executes on the .NET 10 runtime; installing or restoring a local tool also
 requires a .NET SDK. The template's pinned SDK and the consumer image provide both.
@@ -71,8 +65,7 @@ CI workflow likewise needs registry/feed access configured before its restore/bu
 steps. Keep credentials out of the committed configuration.
 Generated configuration restores SharpProof from nuget.org without credentials. Compose
 still forwards `NuGetPackageSourceCredentials_SharpProofPreview`, unset by default, for
-projects that add the GitHub preview feed themselves. Authenticate private GHCR reads
-through your Docker credential store.
+projects that add a private feed themselves.
 
 For the single-project container starter, restore the local tool and inspect setup through the same
 service so evaluation uses its container-owned restore assets:
@@ -131,7 +124,7 @@ that require manual integration.
 Container initialization uses `--verification container` and requires
 `--consumer-image ghcr.io/alexyorke/sharpproof-preview@sha256:<qualified-digest>` unless
 a compatible existing pinned Compose configuration supplies that image. Use the
-qualified immutable digest from the private release receipt; a version tag or an
+immutable digest published with the release; a version tag or an
 invented digest is not image authority. Preview the container plan before applying it.
 
 ## Select a report format
@@ -215,15 +208,15 @@ reviewed change. Existing Refuted build failures remain failures regardless of c
 The generated `.github/workflows/sharpproof.yml` caller uses the
 [reusable consumer workflow](../.github/workflows/sharpproof-consumer.yml). Its `uses`
 pin and `workflow-revision` are the same qualified public source SHA; do not substitute
-a moving branch or the separate private release workflow SHA.
+a moving branch.
 
 | Caller input | Meaning |
 | --- | --- |
 | `project` | Workspace-relative consumer project, such as `src/app/MyLibrary.csproj` |
-| `image` | Exact private-preview SHA-256 image reference from the qualified receipt |
+| `image` | Exact SHA-256 image reference published with the release |
 | `workflow-revision` | Qualified public source SHA, identical to the reusable workflow pin |
 | `caller-workflow` | Exact caller path, generated as `.github/workflows/sharpproof.yml` |
-| `registry-username` | Account authorized to read the private image/feed |
+| `registry-username` | Account name used when a registry or feed credential is supplied |
 | `compose-file`, `service`, `evidence-directory` | Defaults: `compose.yaml`, `verify`, `artifacts/sharpproof` |
 | `package-feed-url` | nuget.org by default; the private GitHub NuGet feed is also accepted |
 | `mode` | `report` by default; `enforce` adds the comparison regression gate |
