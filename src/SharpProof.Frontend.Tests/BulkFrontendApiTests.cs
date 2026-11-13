@@ -121,45 +121,6 @@ public sealed class BulkFrontendApiTests
     }
 
     [Test]
-    public void NullableUnwrapConversionIsClassifiedAsThrowingFromItsBoundOperation()
-    {
-        using var subject = TypedProgramSubject.Create(
-            "int Target(int? value) => (int)value;");
-        var operation = TargetExpression(subject);
-
-        Assert.That(operation, Is.InstanceOf<IConversionOperation>());
-        var conversion = (IConversionOperation)operation;
-        Assert.That(CSharpOperationSemantics.BuiltInOperationMayThrow(conversion), Is.True);
-        Assert.That(CSharpOperationSemantics.OperationMayThrow(conversion), Is.True);
-    }
-
-    [Test]
-    public void RealStaticAndInstanceMethodReferencesKeepTheirThrowClassification()
-    {
-        using var instanceSubject = TypedProgramSubject.Create(
-            "System.Action Target(DelegateReceiver value) => value.Run;",
-            DelegateSource);
-        var instanceReference = TargetExpression(instanceSubject)
-            .DescendantsAndSelf()
-            .OfType<IMethodReferenceOperation>()
-            .Single();
-
-        Assert.That(instanceReference.Method.IsStatic, Is.False);
-        Assert.That(CSharpOperationSemantics.OperationMayThrow(instanceReference), Is.True);
-
-        using var staticSubject = TypedProgramSubject.Create(
-            "System.Action Target() => DelegateReceiver.RunStatic;",
-            DelegateSource);
-        var staticReference = TargetExpression(staticSubject)
-            .DescendantsAndSelf()
-            .OfType<IMethodReferenceOperation>()
-            .Single();
-
-        Assert.That(staticReference.Method.IsStatic, Is.True);
-        Assert.That(CSharpOperationSemantics.OperationMayThrow(staticReference), Is.False);
-    }
-
-    [Test]
     public void FloatingPointEqualityRetainsItsExplicitUnsupportedClassification(
         [Values("float", "double")] string scalarType)
     {

@@ -76,7 +76,7 @@ public sealed class WindowsHostPolicyTests
     [TestCase("C")]
     [TestCase(@"C:/result.json")]
     [TestCase(@"C:\folder\result.json:stream")]
-    [TestCase(@"C:\folder\ALIAS~1.json")]
+    [TestCase(@"C:\folder\ALIAS~1.JSO")]
     [TestCase(@"C:\folder\trailing.")]
     [TestCase("C:\\folder\\trailing ")]
     [TestCase(@"C:\folder\CON.json")]
@@ -98,6 +98,39 @@ public sealed class WindowsHostPolicyTests
         System.ArgumentNullException.ThrowIfNull(path);
         Assert.Throws<ArgumentException>((Action)(() =>
             PublicationLease.ValidateWindowsMember(path, _ => true, _ => false)));
+    }
+
+    [TestCase(@"C:\PROGRA~1\result.json")]
+    [TestCase(@"C:\folder\RESULT~1.JSO")]
+    [TestCase(@"C:\folder\A~12")]
+    [TestCase(@"C:\folder\MYB3F2~1.TXT")]
+    public void WindowsShortNameAliasesAreRejected(string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        Assert.Throws<ArgumentException>((Action)(() =>
+            PublicationLease.ValidateWindowsMember(path, _ => true, _ => false)));
+    }
+
+    // A tilde in an ordinary long name is not an 8.3 alias.
+    [TestCase(@"C:\Users\me\~work\result.json")]
+    [TestCase(@"C:\folder\backup~\result.json")]
+    [TestCase(@"C:\folder\my~project~files\result.json")]
+    [TestCase(@"C:\folder\report~1.final.json")]
+    [TestCase(@"C:\folder\averylongname~1\result.json")]
+    [TestCase(@"C:\folder\name~x1\result.json")]
+    public void WindowsLongNamesMayContainATilde(string path)
+    {
+        System.ArgumentNullException.ThrowIfNull(path);
+        Assert.DoesNotThrow((Action)(() =>
+            PublicationLease.ValidateWindowsMember(path, _ => true, _ => false)));
+    }
+
+    [Test]
+    public void WindowsVolumeRejectionNamesTheVolume()
+    {
+        var rejection = Assert.Throws<ArgumentException>((Action)(() =>
+            PublicationLease.ValidateWindowsMember(@"Q:\folder\result.json", _ => false, _ => false)));
+        Assert.That(rejection!.Message, Does.Contain("fixed local NTFS volume").And.Contain(@"Q:\"));
     }
 
     [TestCase("/", "/", true)]

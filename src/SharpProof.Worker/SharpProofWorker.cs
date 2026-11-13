@@ -623,7 +623,7 @@ internal sealed class SharpProofWorker : IDisposable
             return LaneCreationResult.Success;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and
-            not StackOverflowException and not OperationCanceledException and not AggregateException)
+            not OperationCanceledException and not AggregateException)
         {
             foreach (var lane in created)
             {
@@ -761,7 +761,7 @@ internal sealed class SharpProofWorker : IDisposable
                     return LaneRenewalResult.Success;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
-                    not StackOverflowException and not OperationCanceledException and not AggregateException)
+                    not OperationCanceledException and not AggregateException)
                 {
                     return WorkerHost.IsBackendUnavailable(exception)
                         ? LaneRenewalResult.BackendUnavailable
@@ -799,7 +799,7 @@ internal sealed class SharpProofWorker : IDisposable
                 ownedBackend.Dispose();
             }
             catch (Exception exception) when (exception is not OutOfMemoryException and
-                not StackOverflowException and not OperationCanceledException and not AggregateException)
+                not OperationCanceledException and not AggregateException)
             {
                 // Backend cleanup is best-effort and cannot replace a
                 // completed response or interrupt cleanup of later lanes.

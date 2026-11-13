@@ -122,8 +122,7 @@ internal static class Program
             throw;
         }
         catch (Exception exception) when (
-            exception is not OutOfMemoryException and not StackOverflowException and
-                not OperationCanceledException)
+            exception is not OutOfMemoryException and not OperationCanceledException)
         {
             var failure = ClassifyLauncherFailure(exception);
             Log.Error(failure.ConsoleMessage);

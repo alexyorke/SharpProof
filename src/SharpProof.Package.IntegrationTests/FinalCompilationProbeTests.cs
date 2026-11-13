@@ -265,7 +265,7 @@ public sealed class FinalCompilationProbeTests
         Assert.That(
             build.Output,
             Does.Contain(
-                "Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
+                "SPB020: SharpProof verification is not supported on this build host"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
             workspace.InvocationCompilerManifestPath);

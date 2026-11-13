@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Compiler.Semantics;
 
 internal static class EffectProjections

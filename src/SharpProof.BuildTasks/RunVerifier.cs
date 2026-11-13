@@ -105,6 +105,9 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
             System.Threading.Tasks.Task<string> standardOutput;
             System.Threading.Tasks.Task<string> standardError;
+            // The readers have their own source so a drain timeout can stop
+            // them before the process and its streams are disposed.
+            using var readers = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
             lock (_gate)
             {
                 if (_cancellation.IsCancellationRequested)
@@ -115,8 +118,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 // The supported Linux direct-exec path starts or throws.
                 _ = process.Start();
                 _cancelProcess = () => Kill(process);
-                standardOutput = ReadBoundedAsync(process.StandardOutput, _cancellation.Token);
-                standardError = ReadBoundedAsync(process.StandardError, _cancellation.Token);
+                standardOutput = ReadBoundedAsync(process.StandardOutput, readers.Token);
+                standardError = ReadBoundedAsync(process.StandardError, readers.Token);
             }
 
             var exited = WaitForExitOrCancellation(process, timeout);
@@ -137,6 +140,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
                 Log.LogMessage(
                     MessageImportance.High,
                     "SharpProof verifier left a descendant holding its output; output was discarded.");
+                readers.Cancel();
+                _ = System.Threading.Tasks.Task.WaitAll([standardOutput, standardError], OutputDrainMilliseconds);
             }
             var output = standardOutput.IsCompletedSuccessfully ? standardOutput.Result : string.Empty;
             var error = standardError.IsCompletedSuccessfully ? standardError.Result : string.Empty;
@@ -190,7 +195,8 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
             ExitCode = -1;
             Log.LogMessage(
                 MessageImportance.High,
-                "SharpProof verifier launch failed: {0}",
+                "SharpProof verifier launch failed: {0}: {1}",
+                exception.GetType().Name,
                 exception.Message);
         }
         finally

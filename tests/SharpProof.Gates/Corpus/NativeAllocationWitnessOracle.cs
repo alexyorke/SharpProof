@@ -201,7 +201,7 @@ internal sealed class NativeAllocationWitnessOracle(CSharpCompilation compilatio
     }
 
     private static void Invoke(Action<object?[]> run, object?[] values)
-    { System.ArgumentNullException.ThrowIfNull(run, nameof(run)); System.ArgumentNullException.ThrowIfNull(values, nameof(values)); try { run(values); } catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException) { } }
+    { System.ArgumentNullException.ThrowIfNull(run, nameof(run)); System.ArgumentNullException.ThrowIfNull(values, nameof(values)); try { run(values); } catch (Exception exception) when (exception is not OutOfMemoryException) { } }
 
     private static string MetadataName(INamedTypeSymbol type)
     { System.ArgumentNullException.ThrowIfNull(type, nameof(type)); return CompilerClrTypeMatcher.MetadataName(type); }

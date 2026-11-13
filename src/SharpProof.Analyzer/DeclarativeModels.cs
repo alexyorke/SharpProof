@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Analyzer;
 
 internal sealed partial record EffectClaimEvaluation(

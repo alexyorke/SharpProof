@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Specs;
 
 internal sealed record RelationalSpecPackCatalog(

@@ -711,7 +711,7 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             unsupported.Output,
             Does.Contain(
-                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
+                "SPB020: SharpProof verification is not supported on this build host"));
     }
 
     [Test]
@@ -955,11 +955,11 @@ public sealed class PackageLayoutSmokeTests
     [TestCase(
         "SharpProofMode",
         "contracts",
-        "SharpProofMode was removed before preview.1")]
+        "SharpProofMode is not supported")]
     [TestCase(
         "SharpProofPortableAnalyzerPath",
         "legacy.dll",
-        "SharpProofPortableAnalyzerPath was removed before preview.1")]
+        "SharpProofPortableAnalyzerPath is not supported")]
     public async Task SourceConsumerRejectsRetiredConfiguration(
         string property,
         string value,
@@ -1391,7 +1391,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(
             verification.Output,
             Does.Contain(
-                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
+                "SPB020: SharpProof verification is not supported on this build host")
+                .And.Contain("process architecture X86"));
     }
 
     [Test]
