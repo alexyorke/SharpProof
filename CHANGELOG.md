@@ -267,6 +267,10 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Developer experience
 
+- Add `--verification native` to `dotnet sharpproof init`. It selects strict
+  verification on the build machine, matching the default template variant;
+  before, `init` offered only the portable and container setups.
+
 - Add a workspace template with pinned local tools, optional editor assistance,
   feed configuration defaulting to nuget.org, and portable/container profiles; add preview-first
   `init` for existing projects and text/JSON/Markdown command reports.

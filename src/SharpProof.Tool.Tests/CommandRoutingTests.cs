@@ -9,7 +9,8 @@ namespace SharpProof.Tool.Test;
 [TestFixture]
 public sealed class CommandRoutingTests
 {
-    [TestCase("init --verification unsupported --project missing.csproj", "--verification must be portable or container.")]
+    [TestCase("init --verification unsupported --project missing.csproj", "--verification must be portable, native, or container.")]
+    [TestCase("init --verification native --consumer-image image --project missing.csproj", "--consumer-image applies only to container initialization.")]
     [TestCase("init --consumer-image image --project missing.csproj", "--consumer-image applies only to container initialization.")]
     [TestCase("init --apply --apply --project missing.csproj", "Duplicate option --apply")]
     [TestCase("init --apply false --project missing.csproj", "Expected a named --option")]

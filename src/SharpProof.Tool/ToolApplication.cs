@@ -7,7 +7,7 @@ internal static class ToolApplication
     internal const string Help = """
         SharpProof optional diagnostics tool
         Usage:
-          dotnet sharpproof init --project <csproj> [--verification portable|container] [--apply] [--consumer-image <digest-pinned-image>]
+          dotnet sharpproof init --project <csproj> [--verification portable|native|container] [--apply] [--consumer-image <digest-pinned-image>]
           dotnet sharpproof doctor [--project <csproj> [--verification portable|container]]
           dotnet sharpproof explain --result <result.json> [--claim <id>] [--request <json>] [--compiler-manifest <json>]
           dotnet sharpproof compare --baseline <result.json> --current <result.json> [--fail-on-regression]
