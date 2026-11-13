@@ -396,14 +396,16 @@ internal static class Program
     {
         System.ArgumentNullException.ThrowIfNull(claim);
         System.ArgumentNullException.ThrowIfNull(result);
-        var message = "Refuted " + LauncherPresentation.ClaimKind(claim) +
-            " claim " + result.ClaimId + " for " + claim.CallableId + "." +
+        // Lead with what failed and where, in source terms. The claim ID comes
+        // last: it is only needed to look the claim up in the stored result.
+        var message = "Refuted " + LauncherPresentation.RefutedSubject(claim, result) + "." +
             LauncherPresentation.CallPreconditionDetail(claim) +
             (result.Model is { Length: > 0 }
                 ? " Counterexample: " + string.Join(
                     ", ", result.Model.Select(value =>
                         LauncherPresentation.VariableName(result, value.Variable) + " = " + value.Value)) + "."
-                : string.Empty);
+                : string.Empty) +
+            " Claim " + result.ClaimId + ".";
 
         // Keep this diagnostic on stderr so RunVerifier consumes it through
         // the structured diagnostic channel. The shared transport validator
