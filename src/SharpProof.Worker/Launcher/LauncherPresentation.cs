@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Worker.Launcher;
 
 internal static partial class LauncherPresentation

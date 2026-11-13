@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace SharpProof.CompilerCollector;
 
 internal static class CompilerWireIdentityMappings

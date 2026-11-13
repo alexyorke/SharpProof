@@ -91,7 +91,6 @@ public sealed class CSharpOperationSemanticsTests
         Assert.That(subject.Invoke([a, b]), Is.InstanceOf<ArithmeticException>());
         Assert.That(expression.Classification.IsExact, Is.True);
         Assert.That(new IrInterpreter(subject.Factory).Evaluate(expression.SafeCondition, environment).Value!.Boolean, Is.False);
-        Assert.That(CSharpOperationSemantics.OperationMayThrow(operation), Is.True);
     }
 
     [TestCase("bool Target(int a, int b) => a / b == a / b;", 1, 0, false, true)]

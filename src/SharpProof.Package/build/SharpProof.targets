@@ -58,16 +58,16 @@
           BeforeTargets="CoreCompile"
           DependsOnTargets="_SharpProofValidateConsumerConfiguration"
           Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' == ''"
+    <Error Code="SPB010" Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' == ''"
            Text="SharpProof could not verify the compiler host because NETCoreSdkVersion is unset. SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer when the compiler host cannot be verified." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
-           Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
+    <Error Code="SPB011" Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
+           Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). This build uses .NET SDK '$(NETCoreSdkVersion)'. Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
   </Target>
 
   <Target Name="_SharpProofRequireVerifierPackage"
           BeforeTargets="CoreCompile"
           DependsOnTargets="_SharpProofValidateConfiguration"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. Portable advisory analysis remains available without the verifier package." />
+    <Error Code="SPB012" Text="SharpProof verification requires the matching SharpProof.Verifier package. Portable advisory analysis remains available without the verifier package." />
   </Target>
 </Project>
