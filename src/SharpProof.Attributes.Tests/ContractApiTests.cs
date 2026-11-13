@@ -172,7 +172,12 @@ internal sealed class ContractApiTests
         const SharpProofCapability capabilities = SharpProofCapability.Console | SharpProofCapability.FileRead;
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(new AllowedExceptionsAttribute(exceptions).ExceptionTypes, Is.SameAs(exceptions));
+            var allowed = new AllowedExceptionsAttribute(exceptions);
+            Assert.That(allowed.ExceptionTypes, Is.EqualTo(exceptions).And.Not.SameAs(exceptions));
+            // Neither the caller's array nor a returned one reaches the stored value.
+            exceptions[0] = typeof(object);
+            allowed.ExceptionTypes[0] = typeof(string);
+            Assert.That(allowed.ExceptionTypes[0], Is.Not.EqualTo(typeof(object)).And.Not.EqualTo(typeof(string)));
             Assert.That(new AllowedExceptionsAttribute().ExceptionTypes, Is.Empty);
             Assert.That(new AllowedCapabilitiesAttribute(capabilities).Capabilities, Is.EqualTo(capabilities));
             Assert.That(new ContractForAttribute(typeof(IDisposable)).TargetType, Is.EqualTo(typeof(IDisposable)));
@@ -181,6 +186,34 @@ internal sealed class ContractApiTests
             Assert.That(Assert.Throws<ArgumentNullException>((Action)(() =>
                 _ = new ContractForAttribute(null!)))!.ParamName, Is.EqualTo("targetType"));
         }
+    }
+
+    [Test]
+    public void EffectContractPropertiesValidateAndCopyTheirValues()
+    {
+        var contract = new EffectContractAttribute(SharpProofEffect.Throws);
+        Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(() => contract.Capabilities = (SharpProofCapability)(1 << 30)))!.ParamName, Is.EqualTo("value"));
+        contract.Capabilities = SharpProofCapability.Network | SharpProofCapability.NativeInterop;
+        Assert.That(contract.Capabilities, Is.EqualTo(SharpProofCapability.Network | SharpProofCapability.NativeInterop));
+
+        Assert.That(Assert.Throws<ArgumentNullException>(
+            (Action)(() => contract.ThrownExceptions = null!))!.ParamName, Is.EqualTo("value"));
+        Type[] thrown = [typeof(IOException)];
+        contract.ThrownExceptions = thrown;
+        thrown[0] = typeof(object);
+        contract.ThrownExceptions[0] = typeof(string);
+        Assert.That(contract.ThrownExceptions, Is.EqualTo(new[] { typeof(IOException) }));
+    }
+
+    // Every declared member is accepted, so the masks cannot fall behind the enums.
+    [Test]
+    public void EveryDeclaredEffectAndCapabilityIsAccepted()
+    {
+        foreach (var effect in Enum.GetValues<SharpProofEffect>())
+        { Assert.That(new EffectContractAttribute(effect).Effects, Is.EqualTo(effect)); }
+        foreach (var capability in Enum.GetValues<SharpProofCapability>())
+        { Assert.That(new AllowedCapabilitiesAttribute(capability).Capabilities, Is.EqualTo(capability)); }
     }
 
     [Test]

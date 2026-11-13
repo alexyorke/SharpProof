@@ -159,7 +159,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         { FinishRegionFinally(state, structural); }
     }
 
-    private void ValidateRegionOrder(IrProgram program)
+    // Charges the region budget for one ordering pass over the program. It
+    // does not reject a program: the order itself is not used.
+    private void SpendRegionOrderBudget(IrProgram program)
     {
         program = RepositoryParameterGuard.NotNull(program, nameof(program));
         _ = IrBlockOrder.TryCreateAcyclicOrder(program, _ =>
