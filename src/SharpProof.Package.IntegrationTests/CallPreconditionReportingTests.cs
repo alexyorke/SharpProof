@@ -126,7 +126,7 @@ internal sealed class CallPreconditionReportingTests
             Assert.That(root.GetProperty("code").GetString(), Is.EqualTo("SP0051"));
             Assert.That(root.GetProperty("line").GetInt32(), Is.EqualTo(9));
             Assert.That(root.GetProperty("column").GetInt32(), Is.EqualTo(16));
-            Assert.That(root.GetProperty("message").GetString(), Does.Contain("Refuted CallPrecondition claim claim-1")
+            Assert.That(root.GetProperty("message").GetString(), Does.Contain("Refuted call precondition in ").And.Contain("Claim claim-1.")
                 .And.Contain("Call to M:Subject.F, clause 1 at Subject.cs(3,34)").And.Contain("= 0").And.Not.Contain("Version="));
         }
     }

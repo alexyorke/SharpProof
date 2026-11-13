@@ -33,6 +33,25 @@ internal static partial class LauncherPresentation
         };
     }
 
+    // "postcondition of Counter.Next", "call precondition in Counter.Broken".
+    // The short source name is used when the compiler recorded one; the
+    // documentation ID otherwise.
+    internal static string RefutedSubject(
+        SharpProof.Worker.Protocol.WorkerClaimManifestEntry claim,
+        SharpProof.Worker.Protocol.WorkerClaimResult result
+    )
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        ArgumentNullException.ThrowIfNull(result);
+        var callable = result.Presentation is { Name.Length: > 0 } presentation ? presentation.Name : claim.CallableId;
+        return claim.Kind switch
+        {
+            SharpProof.Worker.Protocol.WorkerClaimKind.Postcondition => "postcondition of " + callable,
+            SharpProof.Worker.Protocol.WorkerClaimKind.CallPrecondition => "call precondition in " + callable,
+            _ => ClaimKind(claim) + " claim for " + callable
+        };
+    }
+
     // Names the callee clause a call-precondition claim checks; the claim's
     // location is the call.
     internal static string CallPreconditionDetail(
