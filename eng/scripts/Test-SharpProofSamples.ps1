@@ -381,7 +381,7 @@ try {
     Assert-ExitCode $outcomes $false 'Mixed-outcomes verification'
     Assert-OutputContains `
         $outcomes `
-    ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('error SP0051: Refuted Postcondition claim'))) `
+    ([Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@('error SP0051: Refuted postcondition of'))) `
         'Mixed-outcomes verification'
     $outcomeResult = Read-WorkerResult $outcomesResultPath
     if ([string]$outcomeResult.runStatus -ne 'Complete' -or
