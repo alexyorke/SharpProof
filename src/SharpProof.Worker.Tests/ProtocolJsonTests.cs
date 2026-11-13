@@ -341,10 +341,10 @@ internal sealed class ProtocolJsonTests
         }
 
         _ = measure(CreateValidationScalingResponse(4));
-        var small = measure(
-            CreateValidationScalingResponse(smallSize));
-        var large = measure(
-            CreateValidationScalingResponse(largeSize));
+        // The fastest of three runs: one garbage collection or a busy runner
+        // otherwise decides the result. A rescan is 64 times slower, not 16.
+        var small = Fastest(measure, CreateValidationScalingResponse(smallSize));
+        var large = Fastest(measure, CreateValidationScalingResponse(largeSize));
         var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
 
         Assert.That(
@@ -352,6 +352,21 @@ internal sealed class ProtocolJsonTests
             Is.LessThanOrEqualTo(maximumLarge),
             $"small={small.TotalMilliseconds:F0} ms, " +
             $"large={large.TotalMilliseconds:F0} ms");
+    }
+
+    private static TimeSpan Fastest(Func<WorkerVerifyResponse, TimeSpan> measure, WorkerVerifyResponse response)
+    {
+        var fastest = measure(response);
+        for (var run = 1; run < 3; run++)
+        {
+            var elapsed = measure(response);
+            if (elapsed < fastest)
+            {
+                fastest = elapsed;
+            }
+        }
+
+        return fastest;
     }
 
     [TestCase(false)]
