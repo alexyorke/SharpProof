@@ -57,7 +57,6 @@ internal static class EffectClaimDeclarations
         void Add(ImmutableArray<AttributeData> selected, EffectEvaluationContractKind kind, EffectClaimConstraint constraint,
             bool valid = true, bool established = false)
         {
-            constraint = RepositoryParameterGuard.NotNull(constraint, nameof(constraint));
             if (selected.IsDefaultOrEmpty)
             { return; }
             established &= trusted && valid;

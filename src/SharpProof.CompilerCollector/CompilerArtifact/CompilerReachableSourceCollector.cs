@@ -179,7 +179,6 @@ internal static class CompilerReachableSourceCollector
 
         CompilerSourceBodyArtifact UpdateRegisteredBody(CompilerSourceBodyArtifact body)
         {
-            body = RepositoryParameterGuard.NotNull(body, nameof(body));
             if (!bodies.ContainsKey(body.BodyId))
             {
                 throw new InvalidOperationException("A collected body must be registered before publication.");
@@ -189,11 +188,10 @@ internal static class CompilerReachableSourceCollector
         }
 
         string Id(SyntaxNode syntax)
-        { syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax)); return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
+        { return CompilerReachableSourceValidator.BodyId(ordinals[syntax.SyntaxTree], syntax.SpanStart, syntax.Span.Length); }
 
         CompilerSourceBodyArtifact? Enqueue(IMethodSymbol requested)
         {
-            requested = RepositoryParameterGuard.NotNull(requested, nameof(requested));
             cancellationToken.ThrowIfCancellationRequested();
             var method = requested.OriginalDefinition;
             if (method.DeclaringSyntaxReferences.Length != 1)
@@ -243,7 +241,6 @@ internal static class CompilerReachableSourceCollector
     private static bool HasUncollectedCall(IOperation operation, Compilation compilation, SemanticModel model,
         CancellationToken cancellationToken, ref int remaining)
     {
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         if (operation is IDeconstructionAssignmentOperation deconstruction)
         {
             var syntax = (AssignmentExpressionSyntax)deconstruction.Syntax;
@@ -299,7 +296,6 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMethod(IMethodSymbol? method, Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var callable = method?.ReducedFrom ?? method;
         return callable != null &&
             (SymbolEqualityComparer.Default.Equals(callable.ContainingAssembly, compilation.Assembly) ||
@@ -308,7 +304,6 @@ internal static class CompilerReachableSourceCollector
 
     private static bool IsUncollectedMember(ISymbol member, Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (member is IMethodSymbol method)
         {
             return IsUncollectedMethod(method, compilation);
@@ -321,9 +316,6 @@ internal static class CompilerReachableSourceCollector
     private static bool RestoreEmittedSpecifications(IOperation operation, TotalLoweringContext context,
         InvocationEmissionPolicy emission, CancellationToken cancellationToken)
     {
-        context = RepositoryParameterGuard.NotNull(context, nameof(context));
-        emission = RepositoryParameterGuard.NotNull(emission, nameof(emission));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var pending = ImmutableStack<IOperation>.Empty;
         pending = pending.Push(operation);
         var remaining = CompilerArtifactLimits.MaximumInstructions;

@@ -69,7 +69,6 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsConstantArrayElement(IOperation element)
     {
-        element = RepositoryParameterGuard.NotNull(element, nameof(element));
         return element is not ISpreadOperation && element.ConstantValue.HasValue &&
             (IsScalar(element.Type) || element.ConstantValue.Value == null && (element.Type == null || IsReferenceDomain(element.Type)) ||
                 element.Type?.SpecialType == SpecialType.System_String && element.ConstantValue.Value is string text &&

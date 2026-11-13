@@ -87,14 +87,12 @@ internal sealed partial class TotalLoweringContext
 
         void Exclude(IOperation operation)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (Symbol(operation) is { } symbol)
             { excluded.Add(symbol); }
         }
 
         IArrayTypeSymbol? ResolveDefinitions(ImmutableArray<IOperation>.Builder values, int depth)
         {
-            values = RepositoryParameterGuard.NotNull(values, nameof(values));
             IArrayTypeSymbol? result = null;
             foreach (var value in values)
             {
@@ -108,7 +106,6 @@ internal sealed partial class TotalLoweringContext
 
         IArrayTypeSymbol? Resolve(IOperation operation, int depth)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return null; }
             if (operation is IConversionOperation { OperatorMethod: null } conversion &&
@@ -230,7 +227,6 @@ internal sealed partial class TotalLoweringContext
 
         bool ResolveNullableSymbol(ISymbol symbol, int depth)
         {
-            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             if (depth > 64 || --remaining < 0 || excluded.Contains(symbol))
             { return false; }
             var entryKnown = _entryNullableDefaultComparers.Contains(symbol);
@@ -248,13 +244,11 @@ internal sealed partial class TotalLoweringContext
 
         bool ResolveNullableDefinitions(ImmutableArray<IOperation>.Builder values, int depth)
         {
-            values = RepositoryParameterGuard.NotNull(values, nameof(values));
             return values.Count != 0 && values.All(value => ResolveNullable(value, depth + 1));
         }
 
         bool ResolveNullable(IOperation operation, int depth)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return false; }
             if (operation.ConstantValue is { HasValue: true, Value: null })
@@ -275,14 +269,12 @@ internal sealed partial class TotalLoweringContext
 
         void Exclude(IOperation operation)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (Symbol(operation) is { } symbol)
             { excluded.Add(symbol); }
         }
 
         bool ResolveDefinitions(ImmutableArray<IOperation>.Builder values, int depth)
         {
-            values = RepositoryParameterGuard.NotNull(values, nameof(values));
             var result = values.Count != 0;
             foreach (var value in values)
             {
@@ -296,7 +288,6 @@ internal sealed partial class TotalLoweringContext
 
         bool Resolve(IOperation operation, int depth)
         {
-            operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
             if (depth > 64 || --remaining < 0)
             { return false; }
             if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion.IsIdentity: true } conversion)
@@ -587,7 +578,6 @@ internal sealed partial class TotalLoweringContext
 
     private static ISymbol? Symbol(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             ILocalReferenceOperation local => local.Local,

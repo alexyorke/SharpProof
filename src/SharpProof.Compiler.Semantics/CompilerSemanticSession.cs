@@ -149,7 +149,6 @@ internal sealed class CompilerSemanticSession
 
     private Lazy<T> CreateLazy<T>(Func<T> valueFactory)
     {
-        valueFactory = RepositoryParameterGuard.NotNull(valueFactory, nameof(valueFactory));
         return new Lazy<T>(
             () =>
             {
@@ -163,7 +162,6 @@ internal sealed class CompilerSemanticSession
 
     private T GetValue<T>(Lazy<T> value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         _cancellationToken.ThrowIfCancellationRequested();
         return value.Value;
     }

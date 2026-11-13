@@ -114,7 +114,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     }
     private ResolvedApiSpecTable Build(Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var failures = ImmutableArray.CreateBuilder<ApiSpecResolutionFailure>();
         var resolved = ImmutableArray.CreateBuilder<(ApiSpecTemplate Template, ISymbol Symbol)>();
         var containingTypes = ImmutableDictionary.CreateBuilder<string, ContainingTypeLookup>(StringComparer.Ordinal);
@@ -170,10 +169,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes,
         ImmutableDictionary<IAssemblySymbol, (ApiSpecReferenceFamily Family, string Path)>.Builder referenceFamilies)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        containingTypes = RepositoryParameterGuard.NotNull(containingTypes, nameof(containingTypes));
-        referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
-        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         var target = template.Target;
         var containingTypeLookup = ResolveContainingType(
             compilation,
@@ -245,7 +240,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         string metadataName,
         ImmutableDictionary<string, ContainingTypeLookup>.Builder containingTypes)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         if (containingTypes.TryGetValue(metadataName, out var lookup))
         {
             return lookup;
@@ -272,7 +266,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
 
     private static bool MatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         if (target.MemberKind == SpecTargetMemberKind.Constructor)
         {
             return symbol is IMethodSymbol
@@ -309,10 +302,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target,
         ImmutableDictionary<IAssemblySymbol, (ApiSpecReferenceFamily Family, string Path)>.Builder referenceFamilies)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        referenceFamilies = RepositoryParameterGuard.NotNull(referenceFamilies, nameof(referenceFamilies));
         var identity = assembly.Identity;
         var identityMatches = target.ApprovedAssemblies
             .Where(approved => ApiSpecAssemblyMatching.Matches(approved, identity))
@@ -352,10 +341,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
         PortableExecutableReference? reference,
         string path)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
-        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         var normalized = path.Replace('\\', '/');
         foreach (var (marker, family) in ReferenceFamilyMarkers)
         {
@@ -398,8 +383,6 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     private static bool IsAttribute(
         MetadataReader reader, CustomAttribute attribute, string metadataName)
     {
-        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
-        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return TryGetAttributeTypeName(
                 reader,
                 attribute,
@@ -450,16 +433,12 @@ internal sealed class ApiSpecResolver(ApiSpecTable table)
     private static ApiSpecResolutionFailure Failure(
         ApiSpecTemplate template, ApiSpecResolutionFailureKind kind, string detail)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         return new(template.Id, template.Target.WitnessIdentifier, kind, detail);
     }
 
     private static (ISymbol?, ApiSpecResolutionFailure) Unresolved(
             ApiSpecTemplate template, ApiSpecResolutionFailureKind kind, string detail)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        template = RepositoryParameterGuard.NotNull(template, nameof(template));
         return (null, Failure(template, kind, detail));
     }
 }

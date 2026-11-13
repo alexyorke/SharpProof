@@ -67,7 +67,6 @@ internal static class SetupInitializerContainer
 
     private static string[] Lines(string text)
     {
-        ArgumentNullException.ThrowIfNull(text);
         if (text.Contains('\t', StringComparison.Ordinal))
         { throw new InvalidOperationException("Compose indentation is ambiguous; use the qualified starter layout."); }
         return text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(static line =>
@@ -83,7 +82,6 @@ internal static class SetupInitializerContainer
 
     private static string[] Service(string[] lines)
     {
-        ArgumentNullException.ThrowIfNull(lines);
         var services = Array.IndexOf(lines, "services:");
         var start = Array.IndexOf(lines, "  verify:");
         if (services < 0 || start <= services || lines.Count(static line => { ArgumentNullException.ThrowIfNull(line); return line == "services:"; }) != 1 ||
@@ -101,7 +99,6 @@ internal static class SetupInitializerContainer
 
     private static bool HasVolumes(string[] lines)
     {
-        ArgumentNullException.ThrowIfNull(lines);
         var start = Array.IndexOf(lines, "volumes:");
         if (start < 0 || lines.Count(static line => { ArgumentNullException.ThrowIfNull(line); return line == "volumes:"; }) != 1)
         { return false; }
@@ -118,9 +115,7 @@ internal static class SetupInitializerContainer
 
     private static void Isolation(XElement root, string name, string value)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        ArgumentNullException.ThrowIfNull(value);
         var matches = root.Descendants(name).ToArray();
         if (matches.Length > 1 || matches.Length == 1 && (matches[0].Value != value ||
             (string?)matches[0].Parent?.Attribute("Condition") != Guard || matches[0].Attribute("Condition") != null))

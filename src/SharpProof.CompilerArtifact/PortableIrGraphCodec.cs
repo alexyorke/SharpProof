@@ -85,7 +85,6 @@ internal static partial class PortableIrGraphCodec
         ImmutableArray<OperationId> operations,
         CancellationToken cancellationToken)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         RepositoryParameterGuard.RequireInitialized(operations.IsDefault, nameof(operations), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(roots.IsDefault, nameof(roots), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(variables.IsDefault, nameof(variables), "Array must be initialized.");
@@ -146,7 +145,6 @@ internal static partial class PortableIrGraphCodec
     {
         RepositoryParameterGuard.RequireInitialized(externalOperationIndices.IsDefault, nameof(externalOperationIndices), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(externalVariableIndices.IsDefault, nameof(externalVariableIndices), "Array must be initialized.");
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var previous = -1;
         var externalVariables = ImmutableArray.CreateBuilder<IrVarId>();
         foreach (var index in externalVariableIndices)
@@ -231,20 +229,18 @@ internal static partial class PortableIrGraphCodec
 
     private static InvalidDataException Bad(string message, Exception? inner = null)
     {
-        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         return new(message, inner);
     }
 
     private static void Require(bool condition, string message)
     {
-        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         if (!condition)
         {
             throw Bad(message);
         }
     }
 
-    private static int Wire<T>(T value /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */, ImmutableArray<T> values) where T : struct, Enum
+    private static int Wire<T>(T value, ImmutableArray<T> values) where T : struct, Enum
     {
 
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
@@ -261,7 +257,6 @@ internal static partial class PortableIrGraphCodec
 
     private static ImmutableDictionary<T, int> Dense<T>(IEnumerable<T> values) where T : notnull
     {
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         var result = ImmutableDictionary.CreateBuilder<T, int>();
         foreach (var value in values)
         {
@@ -401,13 +396,11 @@ internal static partial class PortableIrGraphCodec
             IrTerm term, int a = -1, int b = -1, int c = -1, int d = -1,
             long number = 0, string? text = null, ImmutableArray<int>? items = null)
         {
-            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return new(term.Kind, TypeIndex(term.Type), a, b, c, d, number, text) { Items = items ?? [] };
         }
 
         private PortableIrBlock BlockRow(IrBasicBlock block)
         {
-            block = RepositoryParameterGuard.NotNull(block, nameof(block));
             _cancellationToken.ThrowIfCancellationRequested();
             return new(
                 block.Name.HasValue ? _factory.GetString(block.Name.Value) : null)
@@ -420,7 +413,6 @@ internal static partial class PortableIrGraphCodec
             IrInstruction instruction, int operation, int a = -1, int b = -1, int c = -1,
             ImmutableArray<int>? items = null, PortableIrLocation? location = null)
         {
-            instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
             return new(
                 instruction.Kind, operation,
                 a, b, c, location: location)
@@ -499,7 +491,6 @@ internal static partial class PortableIrGraphCodec
 
         private ImmutableArray<int> TermIndices(IEnumerable<IrTerm> terms)
         {
-            terms = RepositoryParameterGuard.NotNull(terms, nameof(terms));
             return [.. terms.Select(TermIndex)];
         }
 
@@ -781,7 +772,6 @@ internal static partial class PortableIrGraphCodec
         {
             RepositoryParameterGuard.RequireInitialized(blocks.IsDefault, nameof(blocks), "Array must be initialized.");
             RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "instruction row");
             Require(!row.Items.IsDefault, "Portable IR instruction metadata is invalid.");
@@ -795,7 +785,6 @@ internal static partial class PortableIrGraphCodec
 
         private IrLocation Location(IrProgramBuilder builder, PortableIrLocation? row)
         {
-            builder = RepositoryParameterGuard.NotNull(builder, nameof(builder));
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "location row");
             Require(!row.Items.IsDefault, "Portable IR location metadata is invalid.");
@@ -812,7 +801,6 @@ internal static partial class PortableIrGraphCodec
             string kind,
             Func<TRow, TResult> decode) where TRow : class
         {
-            decode = RepositoryParameterGuard.NotNull(decode, nameof(decode));
             var result = ImmutableArray.CreateBuilder<TResult>();
             for (var index = 0; index < rows.Length; index++)
             {
@@ -855,7 +843,6 @@ internal static partial class PortableIrGraphCodec
 
         private static T Required<T>(T? value, string kind) where T : class
         {
-            kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
             return value ?? throw Bad($"Portable IR {kind}s cannot be null.");
         }
 

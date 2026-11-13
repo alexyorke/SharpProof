@@ -582,7 +582,6 @@ internal static class NUnitExporter
 
     private static string ContainingTypeName(INamedTypeSymbol type)
     {
-        ArgumentNullException.ThrowIfNull(type);
         var parts = new Stack<string>();
         for (var current = type; current != null; current = current.ContainingType)
         { parts.Push("@" + current.Name); }

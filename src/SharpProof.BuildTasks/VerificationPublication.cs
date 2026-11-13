@@ -45,7 +45,6 @@ internal sealed class VerificationPublication
         }
         string Resolve(string path)
         {
-            System.ArgumentNullException.ThrowIfNull(path);
             return CancelableBuildTask.ResolveProjectRelativePathFromRoot(workingDirectory, path);
         }
         var request = Resolve(arguments[options["--request"]]);

@@ -146,7 +146,6 @@ internal static class CompilerReachableSourceValidator
     private static bool IsVoidType(IrFactory factory, IrTypeId type)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var info = factory.GetTypeInfo(type);
         return info.Kind == IrTypeKind.Reference && info.Width == 0 && !info.Signed && info.ElementType == null &&
             factory.GetString(info.Name).EndsWith("::System.Void", StringComparison.Ordinal);

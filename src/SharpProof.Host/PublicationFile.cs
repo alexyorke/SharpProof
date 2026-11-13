@@ -33,8 +33,6 @@ internal static class PublicationFile
 
     private static void Write(string destination, Action<FileStream> write, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(destination);
-        System.ArgumentNullException.ThrowIfNull(write);
         var full = Path.GetFullPath(destination);
         var directory = Path.GetDirectoryName(full) ?? throw new ArgumentException("Destination must have a parent directory.", nameof(destination));
         Directory.CreateDirectory(directory);

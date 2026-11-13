@@ -52,7 +52,6 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
         var cache = GeneratedCodeCache.GetValue(
             compilation,
@@ -93,7 +92,6 @@ internal static class AnalyzerGeneratedCodePolicy
 
     private static bool HasGeneratedPath(string path)
     {
-        path = RepositoryParameterGuard.NotNull(path, nameof(path));
         return GeneratedPathSuffixes.Any(suffix =>
             path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
     }
@@ -130,8 +128,6 @@ internal static class AnalyzerGeneratedCodePolicy
         ISymbol symbol,
         Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var generatedCode = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.GeneratedCodeAttribute);
         if (generatedCode == null)

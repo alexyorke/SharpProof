@@ -199,7 +199,6 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     private static bool IsCapturedParameterUse(IParameterReferenceOperation use)
     {
-        use = RepositoryParameterGuard.NotNull(use, nameof(use));
         for (var parent = use.Parent; parent != null; parent = parent.Parent)
         {
             if (parent is IVariableDeclaratorOperation { Symbol.RefKind: not RefKind.None })
@@ -214,7 +213,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     }
 
     private static string IlKey(IMethodSymbol method)
-    { method = RepositoryParameterGuard.NotNull(method, nameof(method)); return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
+    { return method.ContainingAssembly.Identity + "/" + method.ContainingModule.Name + "/" + method.MetadataToken; }
 
     // An instance callee is a nonvirtual member on a reference receiver. Its
     // implicit `this` is never null and is the caller's receiver value.
@@ -513,8 +512,6 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static bool Captures(IOperation body, IMethodSymbol method, CancellationToken cancellationToken,
         ImmutableHashSet<IMethodSymbol>.Builder? visited = null)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (visited is null)
         {
             visited = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -534,7 +531,6 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, ImmutableHashSet<IMethodSymbol>.Builder visited,
         CancellationToken cancellationToken)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         cancellationToken.ThrowIfCancellationRequested();
         target = target.OriginalDefinition;
         if (target.MethodKind != MethodKind.LocalFunction || !visited.Add(target))
@@ -565,7 +561,6 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
 
     private bool TryCheckTypeInitialization(INamedTypeSymbol type, out bool eligible)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         eligible = false;
         for (var current = type; current != null; current = current.ContainingType)
         {

@@ -51,8 +51,6 @@ internal static class OverridePreconditionDiagnostics
         IMethodSymbol method,
         AnalyzerSession session)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var binding = session.BindRequires(method);
         return binding.IsSuccess &&
             binding.Contracts is { Clauses.Length: > 0 } contracts
@@ -64,14 +62,11 @@ internal static class OverridePreconditionDiagnostics
         BoundMethodContracts left,
         BoundMethodContracts right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return RequiresKeys(left).SequenceEqual(RequiresKeys(right), StringComparer.Ordinal);
     }
 
     private static ImmutableArray<string> RequiresKeys(BoundMethodContracts contracts)
     {
-        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
         return [.. contracts.Clauses
             .Where(static clause => clause.Kind == BoundContractKind.Requires)
             .Select(static clause => clause.ComparisonKey)
@@ -80,7 +75,6 @@ internal static class OverridePreconditionDiagnostics
 
     private static bool HasDispatchContract(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.OverriddenMethod != null ||
             GetInheritedMethods(method).Any();
     }
@@ -88,7 +82,6 @@ internal static class OverridePreconditionDiagnostics
     private static IEnumerable<IMethodSymbol> GetInheritedMethods(
         IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (method.OverriddenMethod is { } overridden)
         {
             yield return overridden;

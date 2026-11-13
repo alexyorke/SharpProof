@@ -233,7 +233,7 @@ internal sealed class PassiveCallableVcPlan
     }
 
     private IEnumerable<IrTerm> OpaqueCalls(Func<IrOpaqueCallEffects, bool> selected)
-    { System.ArgumentNullException.ThrowIfNull(selected, nameof(selected)); return _opaqueCalls.Where(call => selected(call.Effects)).Select(call => call.Reach); }
+    { return _opaqueCalls.Where(call => selected(call.Effects)).Select(call => call.Reach); }
 
     internal VerificationQuery AllocationQuery()
     {
@@ -332,7 +332,6 @@ internal sealed class PassiveCallableVcPlan
     private IrProgramExecutionResult ReplayWithOptions(ImmutableDictionary<IrVarId, IrValue> inputs,
         Func<ImmutableDictionary<IrVarId, IrValue>, IrProgramReplayOptions> createOptions, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(createOptions);
         if (!CallableReplayValidator.EntryConstraintsHold(Factory, _candidate.EntryConstraints, inputs, cancellationToken))
         { return new(IrProgramExecutionStatus.Unsupported, null, null, null, null, inputs, 0); }
         var initialBuffer = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
@@ -399,7 +398,6 @@ internal sealed class PassiveCallableVcPlan
 
     private IrValue? ReplayFrameworkValue(IrHavocRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
         return ObserveIntegralConvertInitialization(Factory, request, WarmIntegralConvert) ??
             ObserveDictionaryInitialization(Factory, request, WarmDefaultDictionary) ??
             ObserveScalarExceptionInitialization(Factory, request, ProbeScalarExceptionInitialization) ??
@@ -711,7 +709,6 @@ internal sealed class PassiveCallableVcPlan
 
     private IrTerm BeforeSynchronization(IrTerm goal)
     {
-        System.ArgumentNullException.ThrowIfNull(goal);
         if (_locks.IsEmpty)
         { return goal; }
         return Factory.Binary(IrBinaryOperator.AndAlso, goal,
@@ -725,8 +722,6 @@ internal sealed class PassiveCallableVcPlan
 
     private CallableReplayContext CreateReplay(IrTerm value, IrTerm safe)
     {
-        System.ArgumentNullException.ThrowIfNull(safe);
-        System.ArgumentNullException.ThrowIfNull(value);
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         var old = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId?>();
         foreach (var parameter in _candidate.Parameters)

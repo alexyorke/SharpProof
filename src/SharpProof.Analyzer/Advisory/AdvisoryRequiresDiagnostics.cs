@@ -41,11 +41,6 @@ internal static class AdvisoryRequiresDiagnostics
     private static AnalyzerSemanticOutcome AnalyzeBody(CSharpCompilation compilation, IMethodSymbol method, SyntaxNode declaration,
         AnalyzerSession session, Action<Diagnostic> reportDiagnostic, CancellationToken cancellationToken, (AdvisoryLoweredBody? Body, string? Gap)? lowered = null)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        reportDiagnostic = RepositoryParameterGuard.NotNull(reportDiagnostic, nameof(reportDiagnostic));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var body = (lowered ?? AdvisoryLowering.Lower(compilation, method, declaration, cancellationToken, stopAtFirstAbstention: true)).Body;
         if (body == null)
         { return CallsPreconditions(compilation, declaration, session, cancellationToken) ? AnalyzerSemanticOutcome.Unknown : AnalyzerSemanticOutcome.NotApplicable; }
@@ -85,9 +80,6 @@ internal static class AdvisoryRequiresDiagnostics
     private static bool CallsPreconditions(CSharpCompilation compilation, SyntaxNode declaration, AnalyzerSession session,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
         return model.GetOperation(declaration, cancellationToken)?.DescendantsAndSelf().Any(operation => operation switch
         {
@@ -99,7 +91,6 @@ internal static class AdvisoryRequiresDiagnostics
 
     private static ImmutableArray<IrVarId> Variables(IrProgram program)
     {
-        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
         var terms = ImmutableStack<IrTerm>.Empty;
         foreach (var instruction in program.Blocks.SelectMany(static block => block.Instructions))

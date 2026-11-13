@@ -81,7 +81,6 @@ internal static class CallableProofCore
     private static IEnumerable<string> NormalizeLabels(
         IEnumerable<string> labels)
     {
-        System.ArgumentNullException.ThrowIfNull(labels);
         return labels
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static label => label, StringComparer.Ordinal);

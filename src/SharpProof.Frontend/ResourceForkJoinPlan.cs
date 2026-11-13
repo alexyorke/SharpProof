@@ -83,16 +83,12 @@ internal sealed class ResourceForkJoinPlan
 
     private static bool FrameworkMethod(IMethodSymbol method, INamedTypeSymbol task, string name)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        task = RepositoryParameterGuard.NotNull(task, nameof(task));
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return method.Name == name && method.IsStatic && !method.IsGenericMethod && method.MethodKind == MethodKind.Ordinary &&
             SymbolEqualityComparer.Default.Equals(method.ContainingType, task) && SymbolEqualityComparer.Default.Equals(method.ReturnType, task);
     }
 
     private static bool ScalarParameters(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         foreach (var parameter in method.Parameters)
         {
             if (parameter.RefKind != RefKind.None || parameter.Type.SpecialType != SpecialType.System_Int32)
@@ -103,7 +99,6 @@ internal sealed class ResourceForkJoinPlan
 
     private static IInvocationOperation? ChildInvocation(IBlockOperation body)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         IInvocationOperation? invocation = null;
         foreach (var operation in body.Operations)
         {
@@ -118,9 +113,6 @@ internal sealed class ResourceForkJoinPlan
 
     private static bool SourceChild(IInvocationOperation invocation, IMethodSymbol root, Compilation compilation, CancellationToken cancellationToken)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         var target = invocation.TargetMethod;
         if (invocation.Instance != null || target is not { IsStatic: true, IsAsync: false, IsGenericMethod: false, ReturnsVoid: true, MethodKind: MethodKind.Ordinary } ||
             target.IsExtern || target.IsAbstract || target.IsConditional || target.ContainingType.IsGenericType ||

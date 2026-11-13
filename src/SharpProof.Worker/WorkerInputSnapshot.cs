@@ -76,14 +76,12 @@ internal sealed class WorkerCacheIdentity(
 
     private static string Required(string value, string parameterName)
     {
-        System.ArgumentNullException.ThrowIfNull(parameterName);
         return !string.IsNullOrWhiteSpace(value) ? value :
             throw new ArgumentException("Cache identity values cannot be blank.", parameterName);
     }
 
     private static string RequiredSha256(string value, string parameterName)
     {
-        System.ArgumentNullException.ThrowIfNull(parameterName);
         return WorkerProtocolJson.IsSha256(value) ? value :
             throw new ArgumentException("Cache identity digests must be SHA-256 values.", parameterName);
     }

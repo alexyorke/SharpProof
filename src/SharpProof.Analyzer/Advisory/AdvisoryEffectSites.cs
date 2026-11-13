@@ -110,12 +110,10 @@ internal static class AdvisoryEffectSites
     }
 
     private static AdvisoryEffectAnalysis Gap(string reason)
-    { reason = RepositoryParameterGuard.NotNull(reason, nameof(reason)); return new([], reason); }
+    { return new([], reason); }
 
     private static ImmutableHashSet<IrBlockId> Reachable(IrProgram program, IEnumerable<IrBlockId> roots)
     {
-        program = RepositoryParameterGuard.NotNull(program, nameof(program));
-        roots = RepositoryParameterGuard.NotNull(roots, nameof(roots));
         var reachable = ImmutableHashSet.CreateBuilder<IrBlockId>();
         var pending = ImmutableStack<IrBlockId>.Empty;
         foreach (var root in roots)
@@ -134,7 +132,6 @@ internal static class AdvisoryEffectSites
 
     private static ImmutableHashSet<IrBlockId> Escaping(IrProgram program)
     {
-        program = RepositoryParameterGuard.NotNull(program, nameof(program));
         var predecessors = program.Blocks.SelectMany(block => Successors(block).Select(successor => successor.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(successor)) : ((successor, block.Id))))
             .ToLookup(edge => edge.successor, edge => edge.Id);
         var escaping = ImmutableHashSet.CreateBuilder<IrBlockId>();
@@ -157,7 +154,6 @@ internal static class AdvisoryEffectSites
 
     private static IEnumerable<IrBlockId> Successors(IrBasicBlock block)
     {
-        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         return block.Instructions.LastOrDefault() switch
         {
             IrGotoInstruction go => [go.Target],
@@ -172,7 +168,6 @@ internal static class AdvisoryEffectSites
     private static bool ReadsState(IrFactory factory, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var description = Describe(factory, site);
         return ReadPrefixes.Any(prefix => description.StartsWith(prefix, StringComparison.Ordinal));
     }
@@ -180,7 +175,6 @@ internal static class AdvisoryEffectSites
     private static ImmutableArray<string> ThrownTypes(IrFactory factory, OperationId site)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var description = Describe(factory, site);
         const string Prefix = "explicit-throw:";
         if (!description.StartsWith(Prefix, StringComparison.Ordinal))
@@ -192,5 +186,5 @@ internal static class AdvisoryEffectSites
     }
 
     private static string Describe(IrFactory factory, OperationId site)
-    { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : ""; }
+    { RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site)); return factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : ""; }
 }

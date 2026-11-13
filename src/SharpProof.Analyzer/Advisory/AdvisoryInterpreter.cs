@@ -141,9 +141,6 @@ internal sealed class CoreIrAdvisoryDomain(IrFactory factory, ImmutableArray<IrV
     }
     private CoreIrAdvisoryState Product(CoreIrAdvisoryState result, CoreIrAdvisoryState left, CoreIrAdvisoryState right, bool widen)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        result = RepositoryParameterGuard.NotNull(result, nameof(result));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         result = result with
         {
             HasGap = left.HasGap || right.HasGap,
@@ -396,20 +393,16 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private CoreIrAdvisoryResult Incomplete(string reason)
     {
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
         AddGap(reason);
         return new([], [], [.. _gaps.ToImmutable().OrderBy(static gap => gap, StringComparer.Ordinal)], 0, Accepted: false);
     }
     private void AddGap(string reason)
     {
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
         _gaps.Add(reason);
         _activeTransferHasGap = true;
     }
     private CoreIrAdvisoryState RefineEdge(CoreIrAdvisoryState state, IrTerm condition, bool truth)
     {
-        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         _activeTransferHasGap = state.HasGap;
         var result = Refine(state, condition, truth);
         return result with { HasGap = result.HasGap || _activeTransferHasGap };
@@ -426,14 +419,12 @@ internal sealed class CoreIrAdvisoryInterpreter
     private CoreIrAdvisoryState Forget(CoreIrAdvisoryState state, IrVarId target)
     {
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var kind = _factory.GetTypeInfo(_factory.GetVariableInfo(target).Type).Kind;
         state = ForgetOrigins(state, target);
         return kind is IrTypeKind.String or IrTypeKind.Sequence or IrTypeKind.Reference ? _domain.SetReference(state, target, NullnessValue.MaybeNull, SequenceCardinalityDomain.Instance.Top) : _domain.Set(state, target, _domain.Range(target));
     }
     private static bool ReadsVariable(IrTerm term, IrVarId variable)
     {
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var pending = ImmutableStack<IrTerm>.Empty;
         pending = pending.Push(term);
         while (!pending.IsEmpty)
@@ -449,7 +440,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     private static CoreIrAdvisoryState ForgetOrigins(CoreIrAdvisoryState state, IrVarId target)
     {
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var origins = state.Origins.ToBuilder();
         origins.Remove(target);
         foreach (var pair in state.Origins)
@@ -462,8 +452,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     private static CoreIrAdvisoryState CaptureOrigin(CoreIrAdvisoryState state, IrVarId target, IrTerm value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         state = ForgetOrigins(state, target);
         if (state.Reachable && !ReadsVariable(value, target) && value is IrVariableTerm or IrIntegerTerm or IrBooleanTerm or IrLengthTerm or
             IrBinaryTerm { Operator: IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.LessThan or IrBinaryOperator.LessThanOrEqual or IrBinaryOperator.GreaterThan or IrBinaryOperator.GreaterThanOrEqual })
@@ -472,7 +460,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private CoreIrAdvisoryState Transfer(IrBasicBlock block, CoreIrAdvisoryState state)
     {
-        block = RepositoryParameterGuard.NotNull(block, nameof(block));
         _activeTransferHasGap = state.HasGap;
         if (!state.Reachable)
         {
@@ -568,7 +555,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private (NullnessValue Nullness, SequenceCardinalityValue Cardinality) Reference(IrTerm term, CoreIrAdvisoryState state, int depth = 0)
     {
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         SpendTerm();
         if (depth > 128)
         { AddGap("term depth"); return (NullnessValue.MaybeNull, SequenceCardinalityDomain.Instance.Top); }
@@ -614,7 +600,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private IntervalValue Eval(IrTerm term, CoreIrAdvisoryState state, int depth = 0)
     {
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         SpendTerm();
         if (depth > 128)
         { AddGap("term depth"); return _domain.RangeType(term.Type); }
@@ -856,8 +841,6 @@ internal sealed class CoreIrAdvisoryInterpreter
     }
     private static IrTerm ResolveCapturedScalar(CoreIrAdvisoryState state, IrTerm term)
     {
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var seen = ImmutableHashSet.CreateBuilder<IrVarId>();
         while (term is IrVariableTerm variable && seen.Add(variable.Variable))
         {

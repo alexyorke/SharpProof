@@ -6,7 +6,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrMemberId ListField(string name, IrTypeId value)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
         var storage = (Name: name, Value: value);
         if (_listFields.TryGetValue(storage, out var field))
@@ -20,14 +19,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrTerm ListCount(IrTerm owner)
     {
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         return _factory.Binary(IrBinaryOperator.BitwiseAnd,
             _factory.PureOpaque(ListField("count", _factory.IntegerType), owner), _factory.Integer(int.MaxValue));
     }
 
     private GuardedExpression? ListClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter)
         { return null; }
         var knownElement = _context.KnownValueType(getter.ContainingType.TypeArguments.FirstOrDefault());
@@ -53,7 +50,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? ListBody(IOperation operation, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }
@@ -142,12 +138,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private TotalBodyValue ListRangeBody(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
         string name, IrMemberId contents, IrMemberId countField, IrTerm count, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
-        count = RepositoryParameterGuard.NotNull(count, nameof(count));
         RepositoryParameterGuard.ThrowIfInvalid(contents.IsDefault, nameof(contents));
         RepositoryParameterGuard.ThrowIfInvalid(countField.IsDefault, nameof(countField));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -189,11 +180,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private IrBlockId ListCopySlots(IOperation operation, IrTerm source, IrTerm destination, IrMemberId contents,
         IrTerm index, IrTerm extent, bool reverse, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        destination = RepositoryParameterGuard.NotNull(destination, nameof(destination));
-        index = RepositoryParameterGuard.NotNull(index, nameof(index));
-        extent = RepositoryParameterGuard.NotNull(extent, nameof(extent));
         RepositoryParameterGuard.ThrowIfInvalid(contents.IsDefault, nameof(contents));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(operation);
@@ -233,11 +219,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private IrBlockId ListRangeBounds(IOperation operation, IMethodSymbol method, IrTerm owner, ImmutableArray<IrTerm> values,
         IrTerm outside, IrExceptionKind fault, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
-        outside = RepositoryParameterGuard.NotNull(outside, nameof(outside));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(operation);
         var invalid = _builder!.CreateBlock("list:range-invalid");
@@ -258,10 +240,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrBlockId ListRuntimeEffects(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrTerm full, IrBlockId block, bool initialization = false)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
-        full = RepositoryParameterGuard.NotNull(full, nameof(full));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(operation);
         var fails = _context.Temporary(_factory.BooleanType);

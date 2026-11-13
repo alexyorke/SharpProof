@@ -96,7 +96,6 @@ internal static class FinalCompilationCollector
         CompilationAnalysisContext context,
         AnalyzerConfigOptions options, CompilerConfiguration configuration)
     {
-        configuration = RepositoryParameterGuard.NotNull(configuration, nameof(configuration));
         var compilation = context.Compilation as CSharpCompilation ??
             throw new InvalidOperationException("compilation must be a C# compilation");
         var targetFramework = Get(options, TargetFrameworkOption);
@@ -169,8 +168,6 @@ internal static class FinalCompilationCollector
 
     private static string Get(AnalyzerConfigOptions options, string key)
     {
-        key = RepositoryParameterGuard.NotNull(key, nameof(key));
-        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         return options.TryGetValue(key, out var value) ? value : string.Empty;
     }
 }

@@ -4,7 +4,6 @@ internal sealed partial class IrPrinter
 {
     private string Format(IrTerm term, int depth)
     {
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term.Accept(FormatVisitor.Instance, (this, depth));
     }
 

@@ -82,7 +82,6 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsFrameworkCollectionMember(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (!method.DeclaringSyntaxReferences.IsEmpty)
         { return false; }
         var identity = method.ContainingAssembly.Identity;

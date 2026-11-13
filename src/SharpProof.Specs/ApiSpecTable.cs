@@ -194,8 +194,6 @@ internal sealed partial class ApiSpecTable
         SpecVariableRole role, int ordinal, IrTypeKind type)
     {
         RepositoryParameterGuard.RequireInitialized(id.IsDefault, nameof(id), "Value must be initialized.");
-
-        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         var variable = new SpecVarId(id, variables.Count);
         variables.Add(new SpecVariableInfo(variable, role, ordinal, type));
         return variable;
@@ -206,8 +204,6 @@ internal sealed partial class ApiSpecTable
         SpecVariableRole role, IrTypeKind? type)
     {
         RepositoryParameterGuard.RequireInitialized(id.IsDefault, nameof(id), "Value must be initialized.");
-
-        variables = RepositoryParameterGuard.NotNull(variables, nameof(variables));
         return type.HasValue
             ? AddVariable(id, variables, role, -1, type.Value)
             : null;
@@ -456,7 +452,6 @@ internal sealed partial class ApiSpecTable
 
     private static void ValidateText(string? value, string parameterName)
     {
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("A non-empty value is required.", parameterName);
@@ -476,7 +471,6 @@ internal sealed partial class ApiSpecTable
 
     private static void ValidateSpecType(IrTypeKind value, string parameterName)
     {
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (!IsSupportedSpecType(value))
         {
             throw new ArgumentOutOfRangeException(parameterName);

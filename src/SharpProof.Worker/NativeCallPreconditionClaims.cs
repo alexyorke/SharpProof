@@ -72,8 +72,6 @@ internal static class NativeCallPreconditionClaims
 
     private static WorkerClaimResult Project(CompilerCallablePreparation target, string claimId, PassiveCallableCheckResult check)
     {
-        System.ArgumentNullException.ThrowIfNull(check);
-        System.ArgumentNullException.ThrowIfNull(claimId);
         if (check.Outcome is ProvenOutcome && check.Reason == WorkerClaimReason.None)
         {
             var proven = CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Proven, WorkerClaimReason.None,
@@ -100,8 +98,6 @@ internal static class NativeCallPreconditionClaims
 
     private static WorkerClaimResult Unknown(CompilerCallablePreparation target, string claimId, WorkerClaimReason reason)
     {
-        System.ArgumentNullException.ThrowIfNull(target);
-        System.ArgumentNullException.ThrowIfNull(claimId);
         return CallableClaimResultAssembler.Create(target, claimId, WorkerClaimOutcome.Unknown,
             reason == WorkerClaimReason.None ? WorkerClaimReason.SolverIncomplete : reason, WorkerEffectEvidenceCertainty.Unspecified);
     }

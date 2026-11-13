@@ -105,7 +105,6 @@ internal sealed class ContractIntrinsicValidator
 
     private static IMethodSymbol? GetReferencedMethod(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IInvocationOperation invocation => invocation.TargetMethod,
@@ -117,7 +116,6 @@ internal sealed class ContractIntrinsicValidator
     private static IEnumerable<IOperation> WalkCallableBoundary(
         IOperation root)
     {
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = ImmutableStack<IOperation>.Empty;
         pending = pending.Push(root);
         while (!pending.IsEmpty)
@@ -142,8 +140,6 @@ internal sealed class ContractIntrinsicValidator
         IInvocationOperation invocation, IMethodSymbol owner, IntrinsicContext context,
         bool isResult)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var contextViolation = ClassifyContext(context, isResult);
         if (contextViolation != null &&
             (isResult || context.Clause != BoundContractKind.Ensures))
@@ -170,7 +166,7 @@ internal sealed class ContractIntrinsicValidator
     }
 
     private static ContractIntrinsicViolationClassification ClassifyMethodReference(
-        IntrinsicContext context /* SPINT001: all values valid - every optional clause and nesting state is classified, including default */,
+        IntrinsicContext context,
         bool isResult)
     {
         return ClassifyContext(context, isResult) ??
@@ -201,8 +197,6 @@ internal sealed class ContractIntrinsicValidator
 
     private IntrinsicContext GetContext(IOperation operation, IMethodSymbol owner)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var insideOld = false;
         for (var parent = operation.Parent; parent != null; parent = parent.Parent)
         {
@@ -226,14 +220,12 @@ internal sealed class ContractIntrinsicValidator
 
     private static IMethodSymbol? GetOwner(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation.SemanticModel?.GetEnclosingSymbol(operation.Syntax.SpanStart) as
             IMethodSymbol;
     }
 
     private static bool SameCallable(IMethodSymbol? left, IMethodSymbol right)
     {
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left != null &&
             ContractClauseInventoryBuilder.HaveSameDefinition(left, right);
     }

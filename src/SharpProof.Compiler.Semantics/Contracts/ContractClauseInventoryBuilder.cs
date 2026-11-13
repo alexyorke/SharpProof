@@ -93,7 +93,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         return CreateCore(callable, null, cancellationToken);
     }
 
@@ -102,7 +101,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation implementationBody,
         CancellationToken cancellationToken)
     {
-        implementationBody = RepositoryParameterGuard.NotNull(implementationBody, nameof(implementationBody));
         var candidate = GetBody(implementationBody.Syntax) ??
             implementationBody.Syntax;
         if (GetDeclaredBodies(callable, cancellationToken).Any(body =>
@@ -124,7 +122,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IOperation? implementationBody,
         CancellationToken cancellationToken)
     {
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         // Only Requires, Ensures and Assume calls are clauses or rejected
         // clause calls, and a call to one names it. A body that names none
         // has an empty inventory; bind it only when its operation is read.
@@ -226,7 +223,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool NamesClauseMethod(SyntaxNode body)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
         foreach (var token in body.DescendantTokens())
         {
             if (token.ValueText is ContractApiMetadata.RequiresMethodName or
@@ -263,7 +259,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SyntaxTree tree,
         out SemanticModel model)
     {
-        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         try
         {
             model = SharpProof.Frontend.Host.CompilationModelProvider
@@ -320,9 +315,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         return model.GetEnclosingSymbol(
                 invocation.Syntax.SpanStart,
                 cancellationToken) is
@@ -404,7 +396,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
             directClauseCache,
         CancellationToken cancellationToken)
     {
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         cancellationToken.ThrowIfCancellationRequested();
         if (statement is not ExpressionStatementSyntax expression)
         {
@@ -433,8 +424,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         CancellationToken cancellationToken)
     {
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         cancellationToken.ThrowIfCancellationRequested();
         var statement = syntax.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
         if (statement == null)
@@ -450,7 +439,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool IsConditional(SyntaxNode syntax)
     {
-        syntax = RepositoryParameterGuard.NotNull(syntax, nameof(syntax));
         return syntax is
         IfStatementSyntax or ConditionalExpressionSyntax or
         SwitchStatementSyntax or SwitchExpressionSyntax or
@@ -493,7 +481,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         CancellationToken cancellationToken)
     {
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         var bodies = ImmutableArray.CreateBuilder<SyntaxNode>();
         foreach (var reference in callable.DeclaringSyntaxReferences)
         {
@@ -555,8 +542,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SyntaxSite.IsSame(left, right);
     }
 
@@ -584,7 +569,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static IMethodSymbol GetPartialDefinition(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var definition = method.OriginalDefinition;
         if (definition.AssociatedSymbol is IPropertySymbol property &&
             property.PartialDefinitionPart != null)
@@ -602,8 +586,6 @@ internal sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IPropertySymbol property,
         bool useImplementation)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         var part = useImplementation
             ? property.PartialImplementationPart
             : property.PartialDefinitionPart;

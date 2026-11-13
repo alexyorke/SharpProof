@@ -39,8 +39,6 @@ internal static class IrSubstitution
         IrTerm root,
         ImmutableDictionary<IrVarId, IrTerm> replacementMap)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         if (replacementMap.Count == 0)
         {
             return root;
@@ -189,10 +187,6 @@ internal static class IrSubstitution
         out ImmutableDictionary<IrId, IrTerm> updatedMemo,
         Func<IrTerm, Func<IrTerm, IrTerm>, IrTerm?>? read = null)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
-        replacements = RepositoryParameterGuard.NotNull(replacements, nameof(replacements));
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var allVariablesValid = true;
         var result = IrTraversal.FoldBottomUp(
             root,
@@ -231,9 +225,6 @@ internal static class IrSubstitution
         IrTerm term,
         ImmutableDictionary<IrId, IrTerm> memo)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term.Accept(RewriteVisitor.Instance, (factory, memo));
     }
 
@@ -369,14 +360,11 @@ internal static class IrSubstitution
 
     private static IrTerm Visit(ImmutableDictionary<IrId, IrTerm> memo, IrTerm child)
     {
-        child = RepositoryParameterGuard.NotNull(child, nameof(child));
-        memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
         return memo[child.Id];
     }
 
     private static IrTerm? VisitNullable(ImmutableDictionary<IrId, IrTerm> memo, IrTerm? child)
     {
-        memo = RepositoryParameterGuard.NotNull(memo, nameof(memo));
         return child == null ? null : Visit(memo, child);
     }
 }

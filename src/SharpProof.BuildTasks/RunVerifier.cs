@@ -297,8 +297,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private static string ResolveMSBuildRuntimeMuxer(
         string currentProcessPath, string runtimeAssemblyPath, string? entryAssemblyPath)
     {
-        ArgumentNullException.ThrowIfNull(currentProcessPath);
-        ArgumentNullException.ThrowIfNull(runtimeAssemblyPath);
         var isWindows = OperatingSystem.IsWindows();
         var comparison = DotNetMuxer.PathComparison(isWindows);
         if (!Path.IsPathFullyQualified(currentProcessPath) ||
@@ -344,7 +342,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static string CanonicalInstallationFile(string path)
     {
-        ArgumentNullException.ThrowIfNull(path);
         // Installation files are read-only inputs, so publication-only NTFS
         // restrictions do not apply. Still resolve every parent and leaf link.
         var file = new FileInfo(PublicationLease.CanonicalMember(path, isWindows: false));
@@ -357,7 +354,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private bool WaitForExitOrCancellation(Process process, int timeoutMilliseconds)
     {
-        System.ArgumentNullException.ThrowIfNull(process);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
         deadline.CancelAfter(timeoutMilliseconds);
         try
@@ -373,7 +369,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static void Kill(Process process)
     {
-        System.ArgumentNullException.ThrowIfNull(process);
         try
         {
             if (!process.HasExited)
@@ -391,7 +386,6 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
     private static async System.Threading.Tasks.Task<string> ReadBoundedAsync(
         TextReader reader, CancellationToken cancellationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(reader);
         var captured = new StringBuilder();
         var buffer = new char[4096];
         int count;
