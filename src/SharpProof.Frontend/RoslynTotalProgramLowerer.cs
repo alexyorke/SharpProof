@@ -49,7 +49,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             LowerCore(graph);
             var result = Result();
             if (_regionGraph != null)
-            { ValidateRegionOrder(result.Program); }
+            { SpendRegionOrderBudget(result.Program); }
             return result;
         }
         catch (FrontendLoweringRejectionException incomplete)
