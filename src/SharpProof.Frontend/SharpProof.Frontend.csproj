@@ -19,15 +19,15 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
-    <InternalsVisibleTo Include="SharpProof.Frontend.Test" />
-    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Test" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Frontend.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Compiler.Semantics.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
-    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Tests" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Tests" />
   </ItemGroup>
   <Target Name="GenerateSharpProofAttributesPayloadIdentity"
           BeforeTargets="CoreCompile"

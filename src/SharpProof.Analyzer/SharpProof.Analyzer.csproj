@@ -20,10 +20,10 @@
     <ProjectReference Include="..\SharpProof.Dataflow\SharpProof.Dataflow.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Tests" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />

@@ -128,9 +128,9 @@ public sealed class GatesCommandWorkflowTests : IDisposable
         var start = GateProcess.CreateCaptured("dotnet", repository!.FullName);
         start.ArgumentList.Add("exec");
         start.ArgumentList.Add("--runtimeconfig");
-        start.ArgumentList.Add(Path.Combine(runtimeDirectory!, "SharpProof.Gates.Test.runtimeconfig.json"));
+        start.ArgumentList.Add(Path.Combine(runtimeDirectory!, "SharpProof.Gates.Tests.runtimeconfig.json"));
         start.ArgumentList.Add("--depsfile");
-        start.ArgumentList.Add(Path.Combine(runtimeDirectory!, "SharpProof.Gates.Test.deps.json"));
+        start.ArgumentList.Add(Path.Combine(runtimeDirectory!, "SharpProof.Gates.Tests.deps.json"));
         start.ArgumentList.Add(Path.Combine(runtimeDirectory!, "SharpProof.Gates.dll"));
         foreach (var argument in arguments)
         {

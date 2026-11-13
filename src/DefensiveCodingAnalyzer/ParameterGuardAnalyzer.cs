@@ -44,7 +44,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         // Test methods and test helpers receive runner-owned or test-authored
         // inputs, and an anonymous function's inputs come from the enclosing
         // callable that created it. Neither is an entry point to validate.
-        if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+        if (TestProjects.Contains(context.Options) ||
             IsPrivateMethod(context.Node) ||
             !TryGetCallable(context.Node, out var parameters, out var body))
         {

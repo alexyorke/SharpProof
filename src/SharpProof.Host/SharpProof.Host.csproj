@@ -7,14 +7,14 @@
                       LogicalName="SharpProof.Host.toolchain.json" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Package.Test" />
+    <InternalsVisibleTo Include="SharpProof.Package.IntegrationTests" />
     <InternalsVisibleTo Include="SharpProof.BuildTasks" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
-    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Smt.Tests" />
     <!-- Child process compiled at test time against this assembly. -->
     <InternalsVisibleTo Include="SharpProof.Smt.DispatchChild" />
   </ItemGroup>
