@@ -24,6 +24,21 @@ public sealed class SetupInitializerTests
         Assert.That(Directory.Exists(Path.Combine(fixture.Root, "obj")), Is.False);
     }
 
+    // Native setup is the package default made explicit: strict verification on
+    // the host, with no container files.
+    [Test]
+    public async Task NativeApplySelectsStrictHostVerificationWithoutContainerFiles()
+    {
+        using var fixture = new InitFixture();
+        var result = await fixture.InitializeAsync("native", true, null);
+        var project = XDocument.Parse(await File.ReadAllTextAsync(fixture.ProjectPath, TestContext.CurrentContext.CancellationToken));
+        Assert.That(project.Descendants("SharpProofProfile").Single().Value, Is.EqualTo("strict"));
+        Assert.That(project.Descendants("SharpProofVerify").Single().Value, Is.EqualTo("true"));
+        Assert.That(project.Descendants("SharpProofVerifyResultFile"), Is.Empty);
+        Assert.That(result.Files, Has.Count.EqualTo(3));
+        Assert.That(File.Exists(Path.Combine(fixture.Root, "compose.yaml")), Is.False);
+    }
+
     [Test]
     public async Task PortableApplyPinsFacadePrivateEditorToolAndCredentialFreeFeed()
     {
@@ -56,6 +71,7 @@ public sealed class SetupInitializerTests
     }
 
     [TestCase("portable")]
+    [TestCase("native")]
     [TestCase("container")]
     public async Task RepeatedApplyIsByteStableAndDoesNotRewriteFiles(string verification)
     {
@@ -258,8 +274,9 @@ public sealed class SetupInitializerTests
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         Assert.That(await SetupInitializer.RunAsync(fixture.ProjectPath, "portable", false, null, output, TestContext.CurrentContext.CancellationToken), Is.Zero);
         Assert.That(output.ToString(), Does.Contain("Preview only"));
-        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await fixture.InitializeAsync("native", false, null)));
+        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await fixture.InitializeAsync("unsupported", false, null)));
         Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await fixture.InitializeAsync("portable", false, Image)));
+        Assert.ThrowsAsync<ArgumentException>(new Func<Task>(async () => _ = await fixture.InitializeAsync("native", false, Image)));
     }
 
     [TestCase("ghcr.io/alexyorke/sharpproof", true)]
