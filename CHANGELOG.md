@@ -1,304 +1,111 @@
 # Changelog
 
-Entries describe repository changes, not package publication. Confirm available versions on the configured destination feed.
+The first public version will be `1.0.0-preview.2`. No earlier version was
+published, so the section below describes that release as a whole instead of
+listing changes against an earlier one. Development history is in the Git log.
 
 ## Unreleased
 
-### Packaging
+### Packages and requirements
 
-- Harden the release workflow before its first run. The GitHub release notes are
-  now the changelog section for the tagged version, with repository links made
-  absolute, instead of a generated list of every merged pull request; a tag
-  without that section is rejected. The package job fails at once when the
-  `NUGET_USER` variable is missing, before it pushes the consumer image. The
-  package artifact no longer carries the attempt number, so "Re-run failed jobs"
-  reuses the packages the first attempt built.
-- Complete the package metadata. `SharpProof.CodeFixes` gains a readme, icon,
-  tags and project URL. `SharpProof.Templates` gains an icon, project URL,
-  copyright and tags, takes its description from its project file, and ships
-  its own readme instead of the repository README, whose relative links do not
-  resolve on nuget.org. The `SharpProof` description lists what the package
-  checks. A dry run's `consumer-image/reference.txt` now says its image
-  reference is a local ID that cannot be pulled.
-- Give every MSBuild setup error an `SPB` code, listed in
-  `docs/build-errors.md`. Messages now show the offending value, and the
-  unsupported-host error shows the detected SDK, MSBuild, and OS and process
-  architectures. musl Linux is detected and gets its own error (SPB021) instead
-  of the generic host message. A missing compiler manifest is SPB031 rather
-  than a reuse of the analyzer code SP0049. Messages no longer say a property
-  "was removed before preview.1".
-- Make the project templates work for a new user. `dotnet new sharpproof` and
-  `sharpproof-workspace` gain a `native` variant, now the default, that
-  verifies on the host in every build and ships a plain build workflow. The
-  generated `global.json` accepts any .NET 10 SDK from 10.0.100 instead of one
-  exact version. The starter builds cleanly: the deliberately refuted call is
-  now a commented line to opt into. The reusable consumer workflow's
-  `container-read-token` secret is optional, so a public image is pulled
-  without credentials, and the generated container workflow starts with only
-  a manual trigger until its first baseline exists.
-- Rewrite the documentation for a public reader. The README opens with what
-  SharpProof checks, what it needs, the strict default and how to start in
-  advisory mode; contributor instructions move to the development workflows
-  guide. One status line says the packages are not on nuget.org yet, and the
-  scattered "configured feed" and private-preview wording is gone.
-- Build the consumer image in the release workflow. `SharpProof.Templates` pins
-  the consumer image by digest, and nothing supplied one, so `tooling pack-tool`
-  and the release could not pack the templates. The package job now builds the
-  Dockerfile's `consumer` stage on the exact tooling image it packs with, pushes
-  it to `ghcr.io/alexyorke/sharpproof-preview` on tagged releases only, and passes
-  its digest to packing. A dispatch or a local `./ci.sh release-packages` keeps the
-  image local and publishes nothing.
-- Drop the separate logging assembly: `SharpProof.Logging.dll` is now part of
-  the worker and is no longer in the verifier package. Nothing loads it by path
-  outside the worker.
-- Merge `SharpProof.Analyzer.Core.dll` into `SharpProof.Analyzer.dll`: the
-  package's analyzer folder now ships one analyzer assembly instead of two.
-- Point templates, `init` and the consumer workflow at nuget.org instead of the
-  private GitHub feed and its credentials; the workflow still accepts that feed with
-  `package-read-token`. The package version moves to `1.0.0-preview.2`. It is not
-  published yet, so until it is, restore from a configured feed that carries it.
-- Keep strict verification with the project that references SharpProof. The
-  package's MSBuild files now ship in `build/`, passed to the direct consumer by
-  `include="All"` on the SharpProof -> SharpProof.Verifier dependency, instead of
-  `buildTransitive/`. A project that references a verified library, or a package
-  that depends on SharpProof, gets the contract API but no longer inherits strict
-  verification, the worker run or the SDK 10 requirement.
-- Smoke-test the packed packages on Windows and macOS in the release workflow, and
-  attest package provenance before publishing.
-- Extend the native verifier payload/matrix to Windows, macOS, and glibc Linux on x64/ARM64. Windows solver payloads link their C++ runtime statically, removing the separate Visual C++ redistributable prerequisite. .NET SDK 10.0.100+ remains required; musl and other OS/CPU combinations are outside this support boundary. Exact-artifact native ABI checks establish release qualification separately from compilation/import audits.
-- Make the main `SharpProof` package the single-reference standard setup with automatic strict full verification and transitive contract/analyzer dependencies. The cycle-free graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`; Verifier remains a compatibility entrypoint. Advisory/off are explicit opt-outs. Existing main-package consumers without an explicit profile now receive strict policy and require SDK 10; review upgrade guidance.
-- Move repository toolchain and verifier tasks/worker to .NET 10; full verification now requires SDK 10.0.100+ with the .NET 10 runtime. Portable analyzer minimum remains SDK 9.0.300+/Roslyn 4.14; application targets are independent.
-- Move to SDK 10.0.403 (.NET 10.0.14, a security release) and re-audit the
-  pinned CoreLib facts; patch `libbrotli1` in the tooling image.
-- Move to SDK 10.0.404 (.NET 10.0.15), the 9.0.321 minimum-SDK fixture and the
-  final .NET 8.0.34 test runtime: the November 2026 servicing fixes
-  the high-severity ASP.NET Core advisory and others the image scan reports. Between
-  10.0.14 and 10.0.15 CoreLib changes only floating-point formatting and the VM
-  changes do not touch the audited resource-lock path or fault kinds, so the
-  CoreLib pins move to the 10.0.15 module; 8.0.34 changes no CoreLib source.
-- Run the `net8.0` test projects on .NET 8.0.33, the final .NET 8 release, and drop
-  the scanner exception for the 8.0.32 Brotli advisory (GHSA-p3jp-9v83-76w9). 8.0.33
-  changed no CoreLib or CoreCLR source, so the resource-bound facts reviewed
-  against 8.0.32 and their model identifiers are unchanged.
+- One reference is the whole setup. `SharpProof` brings the contract API
+  (`SharpProof.Attributes`), the analyzers, the MSBuild integration, the worker
+  and the pinned Z3 solver through `SharpProof.Verifier`. The package graph is
+  `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`, all at one
+  version.
+- Verification is strict by default: a build fails when a selected claim is
+  refuted, is not proven, or depends on a declared assumption. The `advisory`
+  and `off` profiles are explicit opt-outs.
+- Verification stays with the project that references the package. A project
+  that references a verified library, or a package that depends on SharpProof,
+  gets the contract API but does not inherit strict verification, the worker
+  run or the SDK requirement.
+- Full verification needs .NET SDK 10.0.100 or newer and runs on Windows, macOS
+  and glibc Linux, each on x64 and ARM64. Windows solver payloads link the C++
+  runtime statically, so no Visual C++ redistributable is needed. musl Linux is
+  not supported. Analyzer-only use needs SDK 9.0.300 or newer. The application
+  can target an older framework; see
+  [the support matrix](docs/preview-support.md).
+- Setup problems are reported as `SPB` errors that name the value or host that
+  was detected; [build errors](docs/build-errors.md) lists them.
+- The optional developer packages are `SharpProof.Tool` (the `dotnet sharpproof`
+  command), `SharpProof.Templates` (`dotnet new sharpproof` and
+  `sharpproof-workspace`) and `SharpProof.CodeFixes` (editor actions).
+- The release workflow smoke-tests the packed packages on Windows and macOS and
+  attests package provenance before publishing. The consumer container image
+  that the templates pin is built from the same tooling image as the packages.
 
 ### Contract API
 
-- Validate and protect attribute values. `EffectContractAttribute.Capabilities`
-  rejects unknown flag bits, as its constructor already did for effects.
-  `EffectContractAttribute.ThrownExceptions` and
-  `AllowedExceptionsAttribute.ExceptionTypes` copy their arrays on the way in
-  and out, and `ThrownExceptions` rejects null. The accepted flag sets are
-  computed from the enums.
-
-- Rename the closed contract `SharpProof.Attributes.NotNullAttribute` to
-  `NonNullAttribute`. A file that imported both `SharpProof.Attributes` and
-  `System.Diagnostics.CodeAnalysis` could not write `[NotNull]` without error
-  CS0104, because the two namespaces each declare a `NotNullAttribute`. Replace
-  `[NotNull]` with `[NonNull]` wherever it named the SharpProof contract. The
-  nullable-analysis `[NotNull]` still selects no SharpProof obligation.
+- Contracts are ordinary C# calls in a method's prologue: `Contract.Requires`,
+  `Ensures`, `Assume`, `Result` and `Old`. They are compiled out of the binary
+  and add no runtime checks.
+- Closed attributes state common conditions: `[NonNull]`, `[Positive]` and
+  `[InRange]` on parameters and returns.
+- Effect contracts: `[EnforcePure]`, `[EffectContract]`, `[ZeroAllocations]`,
+  `[DoesNotThrow]`, `[AllowedExceptions]` and `[AllowedCapabilities]`.
+- `[ResourceUpperBound]` declares upper bounds on loop-body entries, array
+  allocations, allocated elements and allocated bytes.
+- `[ContractFor]` companions attach contracts to members you do not own.
+  `[SharpProofTrusted]` and `[SharpProofSuppress]` record a reviewed
+  assumption or a reporting choice; neither is proof.
+- Attribute constructors and properties reject unknown flag bits, and
+  exception-type arrays are copied on the way in and out.
 
 ### Verification
 
-- Accept Windows paths that contain a tilde. Only a real 8.3 short name such
-  as `PROGRA~1` is rejected; a folder such as `~work` or `backup~` was refused
-  before. The error for a volume that is not NTFS now names the volume and its
-  format, including ReFS Dev Drives, which remain unsupported.
-- Stop the build task's output readers when a verifier descendant keeps the
-  output open past the drain timeout, before the process is disposed. A launch
-  failure now reports the exception type as well as its message.
-- Fail closed in the IL lowering tables. A comparison or arithmetic opcode the
-  tables do not name now abstains; before, the default arms read it as
-  less-than or remainder and relied on an earlier admission check. The IL stack
-  checker rejects a parameter or return type it cannot map instead of ignoring
-  the lookup result, and the fork-join resource check names each metric it
-  supports.
+- Each claim ends as `Proven`, `Refuted` with a replayable counterexample, or
+  `Unknown` with a typed reason. Code outside the modeled subset is reported
+  as incomplete, never as proven.
+- Call preconditions are checked at the call site, as claims of the caller:
+  - calls within a project check the callee's `Requires`;
+  - calls into a project reference built in the same build check the clauses
+    that project exports, when they read only parameters;
+  - calls into other assemblies check the callee's closed parameter attributes
+    and the `Requires` of a `[ContractFor]` companion the caller declares.
 
-- Model calendar and clock values. A non-lifted user-defined binary operator
-  declared in another assembly, such as `DateTime > DateTime`, now lowers as a
-  call to its static operator method after both operands are evaluated; before,
-  every user-defined operator kept the body Unknown. The default API table
-  (version 12) specifies 56 members as pure, non-throwing and non-allocating:
-  the calendar and time-of-day getters of `DateTime`, `DateOnly`, `TimeOnly` and
-  `TimeSpan`, `DateTimeOffset.UtcDateTime` and `UtcTicks`, and the six comparison
-  operators of `DateTime`, `DateOnly`, `TimeOnly` and `TimeSpan`. Validating
-  constructors, arithmetic that can overflow, `Now`/`UtcNow`, `DateTimeOffset`
-  operators and formatting stay unmodeled. Source, lifted, short-circuiting and
-  static abstract operators still abstain. No corpus verdict changes: each of the
-  21 Humanizer methods this unblocks stops at a later reason, as
-  [the coverage triage](tests/SharpProof.Gates/Corpus/coverage-gaps.md) records.
-- Prove purity and capability claims in types whose static initializers only
-  construct fresh values. Such an initializer stores constants, one-dimensional
-  arrays of constant length, boxed values, lambdas, static method groups,
-  `new object()`, or objects built by constructors that only store into the new
-  instance, into the type's own readonly statics. It may also read statics of
-  types whose initializers qualify. Before, any initializer other than a scalar
-  constant kept these claims Unknown with SP0047
-  `Advisory:EntryInitialization:TypeInitializer`. Allocation and effect-contract
-  claims still count the initializer's allocations and stay Unknown. A call,
-  a throw, a cross-type cycle, a static constructor with logic, or a read of a
-  static whose initializer does not qualify is still an entry effect. Explicit
-  static constructors that only store constants, and string, enum,
-  floating-point and `null` constants, now count as effect-free for every
-  effect claim. A static field-like event with an initializer is now an entry
-  effect; before, it was overlooked. SEMANTICS.md defines the class.
-  In the OSS corpus, MoreLINQ `IdFn` and NodaTime `Era.ToString` and
-  `DateAdjusters.DayOfMonth` are now Proven. MoreLINQ `Aggregate` is now
-  Refuted: it invokes caller-supplied delegates. Compiler artifact 61.
-- Stop failing verification of a library with an unused `using` under
-  `WarningsAsErrors=CS8019`. The C# compiler reports unused using directives and
-  extern aliases (CS8019, CS8020) at Hidden severity without applying the
-  options, so such a build still succeeds, but the collector's
-  `Compilation.GetDiagnostics()` call promoted them to errors and the run ended
-  `Failed (CompilationFailure)` listing only CS8019. CS8019 is only computed with
-  XML documentation enabled, so this hit `SharpProof.Attributes` in the nightly
-  self-verification. Those two diagnostics no longer count as compilation errors;
-  every other error, promoted warnings included, still does. A
-  `CompilationFailure` now prefixes each error with its `path(line,column)`.
-- Publish results for projects whose compiler manifest is larger than 16 MiB.
-  The manifest may be up to 32 MiB, but the build task that validates a
-  publication hashed it under the 16 MiB bound for requests and results, so
-  verifying a large project (`SharpProof.Worker.Tests` in the nightly
-  self-verification) failed with `SharpProof verifier launch failed: The JSON
-  file exceeds the 16777216 byte limit.` after the worker had finished. Every
-  manifest reader now shares one 32 MiB bound, documented in
-  `docs/analysis-limits.md`, the validator streams the hash, and size errors
-  name the file, its size and the limit.
-- Prove effect claims in assemblies with more than 4,096 symbols. The check that
-  entry initialization has no effects walked at most 4,096 symbols looking for a
-  `[ModuleInitializer]` and treated a longer walk as finding one. So every purity,
-  allocation, capability and effect-contract claim in a larger assembly stayed
-  Unknown, and so did exception claims, whose module check shared the bound. The
-  search now visits every method member, accessors and operators included, once
-  per compilation, with no symbol bound. Two NodaTime
-  corpus methods, `JulianYearMonthDayCalculator.IsLeapYear` and
-  `RegularYearMonthDayCalculator.GetMonthsInYear`, are now Proven. A third,
-  `ValueCursor.Match`, is now Refuted: it advances the cursor.
-- Name the entry initialization that leaves an effect claim Unknown. When the
-  analyzer finds no site that could violate a purity, allocation, capability or
-  effect-contract claim, but the worker cannot prove it because the type or module
-  initializer is not known to be effect-free, SP0047 now reports
-  `Advisory:EntryInitialization:TypeInitializer`, `ModuleInitializer` or
-  `CalleeTypeInitializer`. Previously the claim was Unknown with no diagnostic. The
-  corpus no longer has silent Unknowns: five trivially pure methods from MoreLINQ,
-  NodaTime and Humanizer, in types with constructed static fields, now carry this
-  reason. Type initializers are still treated as entry effects, so these methods
-  remain Unknown.
-- Check the `Contract.Requires` of project references built in the same build. A
-  verified project now writes a contract export per target framework
-  (`obj/.../SharpProof/contracts-export.json`) with the clauses of its public and
-  internal callables that read only parameters, as portable IR. An MSBuild step
-  inside each compilation stamps it with the produced reference and implementation
-  images, or removes it when the compilation did not complete a capture. A
-  referencing project passes each project reference's export to its compiler as an
-  additional file and accepts it only when the stamp names the exact reference image
-  it compiled against. A call that is not dispatched then checks the exported
-  clauses; the claim names the exporting project (`ExportedBy`) and cites the
-  clause's file and line there. A stale, forged or incomplete export, and a clause
-  that reads a field or `this`, leave the call unchecked and counted; nothing is
-  assumed after the call. Packages, separately built assemblies and other target
-  frameworks have no export. This can fail existing builds: a call that violates a
-  referenced project's `Requires` is now refuted. Protocol 49, manifest 9, cache 72
-  and compiler artifact 60.
-- Check preconditions at calls into other assemblies. A call that is not dispatched
-  and not generic now checks the callee's closed parameter attributes (`[NonNull]`,
-  `[Positive]`, `[InRange]`), read from the referenced image whose hash the compiler
-  artifact records, so reference assemblies work too. It also checks the `Requires`
-  of a `[ContractFor]` companion the calling project declares for the callee; those
-  claims are marked as declared by the calling project. A metadata clause has no
-  source span, so its claim names the assembly, member, parameter and attribute.
-  Calls that cannot be checked stay in the unchecked count, and nothing is assumed
-  after the call. A library's `Contract.Requires` is compiled out of its binary and
-  remains unchecked. This can fail existing builds: a caller that passes a value the
-  library's attributes reject is now refuted. A metadata body the verifier cannot
-  expand is now an opaque call instead of making its caller's body abstract, and a
-  library method that a companion targets but does not cover is no longer selected
-  (it produced an invalid manifest). Protocol 47, manifest 8, cache 70 and compiler
-  artifact 59.
-- Remove the Legacy IR execution mode. Every IR factory now uses the Total
-  semantics the verifier already required: 32-bit default integers, defined
-  division and access results with faults as separate guarded terms. Compiler
-  artifacts drop the graph `semantics` field (artifact schema 58).
-- Route `new string(char, int)` faults through surrounding handlers and model its
-  maximum length, so a handled negative length is no longer treated as escaping.
-- Record a captured instance field read as a read for effect contracts.
-- Treat collection stores as possible aliases when either element type is open, so
-  `List<T>` and `List<int>` can no longer be assumed independent.
-- Stop an open generic thrown or caught type from excluding a `catch` handler, so a
-  handler that runs for some instantiation is no longer treated as unreachable.
-- Match `catch` handlers by runtime type, so tuple element names no longer make
-  `E<(int a, int b)>` and `E<(int, int)>` look unrelated.
-- State the assumption that the ambient culture has no user-defined callbacks when
-  the CLR raises an index or division fault.
-- Match receiver writes by source site, so an allowed receiver write inside a loop no
-  longer becomes a false refutation.
-- Check `Requires` at modeled calls in the strict worker path, as `SEMANTICS.md` promised.
-  Each clause of a call is a `CallPrecondition` claim of the caller, and a body with no
-  contract of its own is selected automatically when it makes such a call. This can fail
-  existing builds: a method that forwards its input to a `Requires` without restating it is
-  now refuted with SP0051 under every verifier policy, and a call that cannot be proven
-  fails `require-proven`. Calls in bodies that do not lower exactly, and calls to virtual,
-  interface or other-assembly callees, stay unchecked; the build summary counts the ones the
-  compiler can see. Protocol 46, manifest 7, cache 69 and compiler artifact 57.
-- Keep those call claims from failing a build on size or timing alone. Bodies selected only
-  for their calls are left out once the compiler artifact reaches 24 MiB, instead of
-  raising SP0049, and a call claim that runs out of time does not fail `require-proven`.
-  Both cases count as unchecked calls. Declared claims are unaffected.
+  A library's own `Contract.Requires` is compiled out of its binary and is not
+  checked across a package boundary. Calls that cannot be checked are counted
+  in the build summary, and nothing is assumed after them.
+- Purity, effect, allocation, capability and exception claims account for type
+  and module initializers. Initializers that only build fresh values are
+  recognized as effect-free; others leave the claim `Unknown` with a reason
+  that names the initializer.
+- The default API table specifies common framework members, including calendar
+  and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
+  and `TimeSpan`.
+- A refuted contract is reported as SP0051 at the clause or call and fails the
+  build under every verifier policy. SP0047 reports incomplete analysis and
+  SP0048 a declared assumption; each links to its documentation.
+- Results are written under `obj/<Configuration>/<TargetFramework>/SharpProof`
+  as a request, a result and a compiler manifest. The worker result records
+  solver work and time per verified callable.
+- On Windows the project must be on a fixed local NTFS volume. Paths may
+  contain a tilde; only 8.3 short names are rejected. ReFS volumes, including
+  Dev Drives, are not supported.
+- Protocol 49, manifest 9, cache 72, compiler artifact 61, default API table
+  version 12.
 
 ### Resource bounds
 
-- Report measured solver work (Z3 resource units) and time per verified callable in
-  the worker result's `summary.costs`, absent on cache hits (protocol 48, cache 71).
-  A new `perf-baseline` gate, run nightly, verifies the pinned corpus on one solver
-  lane, writes `artifacts/perf/baseline.json` and a step summary, and compares total
-  solver work with the reference in `eng/acceptance/perf-baseline.json`. Nightly
-  fails when total solver work rises more than 25% above it.
-- Add an advisory nightly `perf-self` step that verifies SharpProof's own `src/`
-  projects and summarizes per-project solver work, time and the costliest callables
-  in `artifacts/perf/self-summary.md`. It never fails on outcomes or cost.
+- Loop-entry, array-allocation, element and byte bounds are proved as
+  constants or linear functions of a named input size. Shapes the model does
+  not cover are `Unknown`.
+- A nightly runtime oracle generates methods and fails if a compiled method
+  exceeds a bound that was proved.
+- A nightly performance gate verifies a pinned corpus and fails when total
+  solver work rises more than 25% above its reference.
 
-- Stop reporting false `Proven` resource bounds. A local written anywhere in an
-  enclosing loop body no longer keeps its pre-loop value, and a loop bound, loop
-  start or array dimension can no longer allocate without being charged. Both
-  shapes, and methods in a type with a static initializer, are now Unknown.
-- Add a nightly runtime oracle for resource bounds. It generates methods, then
-  fails if a compiled method's loop entries, arrays, elements or allocated bytes
-  exceed the bound proved by SP0060 or the worker. Its run result has its own
-  schema, and the campaign summary moves to schema 6.
+### Developer tools
 
-### Developer experience
-
-- Add `--verification native` to `dotnet sharpproof init`. It selects strict
-  verification on the build machine, matching the default template variant;
-  before, `init` offered only the portable and container setups.
-- Link verifier diagnostics to their documentation. SP0047, SP0048 and SP0051
-  reported by the build now carry the same help link as analyzer diagnostics,
-  and the diagnostics page gains sections for SP0048 and SP0051.
-
-- Add a workspace template with pinned local tools, optional editor assistance,
-  feed configuration defaulting to nuget.org, and portable/container profiles; add preview-first
-  `init` for existing projects and text/JSON/Markdown command reports.
-- Add exact-base-SHA consumer CI comparison with report mode by default and an
-  explicit enforcement mode. Baselines come from trusted successful source-bound
-  runs; missing evidence requires initialization rather than a current-run fallback.
-- Make same-root NUnit project references relative and add workspace export guidance
-  so a complete workspace can move between host paths. Export still checks captured
-  compiler inputs and supports the documented scalar postcondition subset only;
-  standalone cross-drive Windows exports retain the absolute-reference fallback.
-- Add optional analyzer-backed companion assistance alongside the existing
-  refactoring. Preserve conservative action eligibility, ordinary editable source,
-  and separate Result-type Fix All behavior.
-- Separate official private-preview version/package/image/evidence publication from
-  public CI validation versions. Add source/workflow identity, offline signed manifest,
-  symbol retention, private read-back/access receipts, and a three-editor Windows x64
-  acceptance runbook. Owner manual promotion on exact private main is the approval
-  boundary; a separate reviewer rule is optional. All new release and
-  interactive-editor evidence is pending.
-- Rebuild the nightly fuzz runner with the solution-build allowance (600 seconds),
-  instead of the worker's per-project limit (300 seconds), and retain its build streams.
-  Retained/rotating run budgets, seeds, case counts, and proof budgets are unchanged.
-- Separate portable first feedback, full verification, and incremental adoption instructions.
-- Reconcile qualified consumer hosts with the container-only contributor workflow.
-- Remove the checkout-only `templates/` (`sp-verified`/`sp-portable`) and its installer;
-  the packaged `sharpproof` and `sharpproof-workspace` templates cover both the verified
-  and the portable (`--verification portable`) setups.
-- Add upgrade guidance, contributor navigation, structured issue forms, and guidance for preparing sanitized reproductions.
+- `dotnet new sharpproof` and `sharpproof-workspace` generate a starter that
+  builds cleanly. The default `native` variant verifies on the build machine;
+  `container` verifies in a pinned Linux image with retained evidence and a
+  comparison workflow; `portable` runs the analyzers only.
+- `dotnet sharpproof init` plans the same three setups for an existing project
+  and writes nothing without `--apply`. `doctor` checks a project's setup,
+  `explain` and `compare` read stored evidence, and `export-test` writes an
+  NUnit regression for a refuted postcondition.
+- The reusable consumer workflow compares each run with the run for its exact
+  base commit. It reports regressions by default and can enforce them. A
+  first baseline is created only by an explicit manual run.
