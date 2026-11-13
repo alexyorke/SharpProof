@@ -13,26 +13,15 @@ namespace SharpProof.Attributes;
     Inherited = false)]
 public sealed class EffectContractAttribute : Attribute
 {
+    private SharpProofCapability _capabilities;
+    private Type[] _thrownExceptions = [];
+
     /// <summary>Creates an effect summary.</summary>
     /// <param name="effects">The declared effect flags.</param>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="effects"/> contains an unknown flag bit.</exception>
     public EffectContractAttribute(SharpProofEffect effects)
     {
-        const SharpProofEffect known = SharpProofEffect.ReadsReceiverState |
-            SharpProofEffect.ReadsArgumentState | SharpProofEffect.ReadsCapturedState |
-            SharpProofEffect.ReadsStaticState | SharpProofEffect.ReadsAmbientState |
-            SharpProofEffect.WritesReceiverState | SharpProofEffect.WritesArgumentState |
-            SharpProofEffect.WritesCapturedState | SharpProofEffect.WritesStaticState |
-            SharpProofEffect.WritesAmbientState | SharpProofEffect.Allocates |
-            SharpProofEffect.Throws | SharpProofEffect.Synchronizes |
-            SharpProofEffect.UsesNondeterminism | SharpProofEffect.UsesNativeCode |
-            SharpProofEffect.UsesReflection;
-        if ((effects & ~known) != SharpProofEffect.None)
-        {
-            throw new ArgumentOutOfRangeException(nameof(effects));
-        }
-
-        Effects = effects;
+        Effects = SharpProofAttributeValidation.RequireKnown(effects, nameof(effects));
     }
 
     /// <summary>Gets the declared effect flags.</summary>
@@ -43,15 +32,25 @@ public sealed class EffectContractAttribute : Attribute
     /// <summary>Gets or sets the ambient capabilities used by the member.</summary>
     /// <value>The used capabilities; the default is <c>None</c>.</value>
     /// <remarks>Use only known flags. These describe boundary effects, not permission granted to the running process.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value contains an unknown flag bit.</exception>
     public SharpProofCapability Capabilities
     {
-        get; set;
+        get => _capabilities;
+        set => _capabilities = SharpProofAttributeValidation.RequireKnown(value, nameof(value));
     }
 
     /// <summary>Gets or sets the exception types that may escape.</summary>
     /// <value>The escaping exception types; the default is an empty array.</value>
-    /// <remarks>Entries must denote admitted exception types; arbitrary types or null elements are invalid contract data.</remarks>
-    public Type[] ThrownExceptions { get; set; } = [];
+    /// <remarks>
+    /// Entries must denote admitted exception types; arbitrary types or null elements are invalid contract data.
+    /// The array is copied on the way in and out.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">The value is null.</exception>
+    public Type[] ThrownExceptions
+    {
+        get => (Type[])_thrownExceptions.Clone();
+        set => _thrownExceptions = SharpProofAttributeValidation.Copy(value, nameof(value));
+    }
 
     /// <summary>Gets or sets whether the member is deterministic under its declared inputs and ambient reads.</summary>
     /// <value>True when the summary declares deterministic behavior; the default is false.</value>

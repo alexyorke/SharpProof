@@ -76,6 +76,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Contract API
 
+- Validate and protect attribute values. `EffectContractAttribute.Capabilities`
+  rejects unknown flag bits, as its constructor already did for effects.
+  `EffectContractAttribute.ThrownExceptions` and
+  `AllowedExceptionsAttribute.ExceptionTypes` copy their arrays on the way in
+  and out, and `ThrownExceptions` rejects null. The accepted flag sets are
+  computed from the enums.
+
 - Rename the closed contract `SharpProof.Attributes.NotNullAttribute` to
   `NonNullAttribute`. A file that imported both `SharpProof.Attributes` and
   `System.Diagnostics.CodeAnalysis` could not write `[NotNull]` without error

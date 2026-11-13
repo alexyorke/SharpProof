@@ -14,19 +14,7 @@ public sealed class AllowedCapabilitiesAttribute : Attribute
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="capabilities"/> contains an unknown flag bit.</exception>
     public AllowedCapabilitiesAttribute(SharpProofCapability capabilities)
     {
-        const SharpProofCapability known = SharpProofCapability.IO |
-            SharpProofCapability.FileRead | SharpProofCapability.FileWrite |
-            SharpProofCapability.Network | SharpProofCapability.Console |
-            SharpProofCapability.Process | SharpProofCapability.Environment |
-            SharpProofCapability.Registry | SharpProofCapability.Clock |
-            SharpProofCapability.Randomness | SharpProofCapability.Reflection |
-            SharpProofCapability.Synchronization | SharpProofCapability.NativeInterop;
-        if ((capabilities & ~known) != SharpProofCapability.None)
-        {
-            throw new ArgumentOutOfRangeException(nameof(capabilities));
-        }
-
-        Capabilities = capabilities;
+        Capabilities = SharpProofAttributeValidation.RequireKnown(capabilities, nameof(capabilities));
     }
 
     /// <summary>Gets the allowed capability flags.</summary>
