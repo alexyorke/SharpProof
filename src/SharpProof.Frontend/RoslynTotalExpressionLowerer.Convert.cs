@@ -4,8 +4,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 {
     private IrBlockId IntegralConvertInitialization(IInvocationOperation invocation, IrTerm argument, IrBlockId block)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var source = _factory.GetOperationInfo(_context.Site(invocation)).SourceSpan;
         var primitive = invocation.TargetMethod.Parameters[0].Type.SpecialType.ToString();
@@ -33,9 +31,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrBlockId IntegralConvertOverflowEffects(IInvocationOperation invocation, IrTerm argument, IrTerm outside, IrBlockId block)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
-        outside = RepositoryParameterGuard.NotNull(outside, nameof(outside));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var site = _context.Site(invocation);
         var invalid = _builder!.CreateBlock("convert:overflow-resource");
@@ -61,7 +56,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? IntegralConvertBody(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton || !CSharpOperationSemantics.IsIntegralConvertToInt64(invocation.TargetMethod))
         { return null; }

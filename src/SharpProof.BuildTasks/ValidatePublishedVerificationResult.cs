@@ -28,7 +28,6 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             var root = Path.GetFullPath(string.IsNullOrWhiteSpace(ProjectDirectory) ? Environment.CurrentDirectory : ProjectDirectory);
             string Resolve(string path)
             {
-                System.ArgumentNullException.ThrowIfNull(path);
                 return CancelableBuildTask.ResolveProjectRelativePathFromRoot(root, path);
             }
             ValidateFiles(Resolve(RequestPath), Resolve(ResultPath), Resolve(ManifestPath),
@@ -58,13 +57,11 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
         System.ArgumentNullException.ThrowIfNull(resultPath);
         static bool IsPublishableResponse(WorkerVerifyResponse response)
         {
-            System.ArgumentNullException.ThrowIfNull(response);
             return response.RunStatus == WorkerRunStatus.Complete ||
                 response.RunStatus == WorkerRunStatus.TimedOut && response.FailureReason == WorkerRunFailureReason.None;
         }
         string ResolvePath(string path)
         {
-            System.ArgumentNullException.ThrowIfNull(path);
             return CancelableBuildTask.ResolveProjectRelativePathFromRoot(projectRoot ?? Environment.CurrentDirectory, path);
         }
         WorkerVerifyResponse? invocationResponse = null;

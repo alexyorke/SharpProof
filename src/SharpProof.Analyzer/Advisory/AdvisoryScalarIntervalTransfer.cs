@@ -125,7 +125,7 @@ internal static class CoreIrScalarIntervalTransfer
             throw new ArgumentException("The type has no signed Int64 interval representation.", nameof(type));
     }
 
-    private static IntervalValue Bounded(BigInteger lower, BigInteger upper, IntervalValue range /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
+    private static IntervalValue Bounded(BigInteger lower, BigInteger upper, IntervalValue range)
     {
         return lower >= (range.LowerBound ?? long.MinValue) &&
             upper <= (range.UpperBound ?? long.MaxValue)
@@ -134,7 +134,6 @@ internal static class CoreIrScalarIntervalTransfer
 
     private static long Wrap(BigInteger value, IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var modulus = BigInteger.One << type.Width;
         value %= modulus;
         if (value.Sign < 0)

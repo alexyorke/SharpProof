@@ -32,7 +32,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 {
     private IrMemberId QueueField(string name, IrTypeId value)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
         var identity = _factory.InternExternalIdentity(("queue", name, value), EqualityComparer<(string, string, IrTypeId)>.Default);
         return _factory.GetOrCreateMember(identity, _factory.ObjectType, IrFieldSites.Prefix + "queue:" + name, value,
@@ -45,13 +44,11 @@ internal sealed partial class RoslynTotalExpressionLowerer
     // are deliberately absent; unknown writes invalidate these shared fields.
     private IrTerm QueuePosition(IrTerm position)
     {
-        position = RepositoryParameterGuard.NotNull(position, nameof(position));
         return _factory.Binary(IrBinaryOperator.BitwiseAnd, position, _factory.Integer(int.MaxValue));
     }
 
     private GuardedExpression? QueueClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter ||
             !CSharpOperationSemantics.IsQueueStateMember(getter))
         { return null; }
@@ -65,7 +62,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? QueueBody(IOperation operation, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }

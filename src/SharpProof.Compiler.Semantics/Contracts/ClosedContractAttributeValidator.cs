@@ -143,14 +143,11 @@ internal static class ClosedContractAttributeValidator
         ClosedContractAttributeClassification classification,
         string reason)
     {
-        classification = RepositoryParameterGuard.NotNull(classification, nameof(classification));
-        reason = RepositoryParameterGuard.NotNull(reason, nameof(reason));
         return new ClosedContractAttributeValidation(classification, reason);
     }
 
     private static bool IsSupportedInteger(ITypeSymbol type, bool includeUnsigned64)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return CSharpOperationSemantics.IsSupportedInteger(type.SpecialType) ||
             includeUnsigned64 && type.SpecialType == SpecialType.System_UInt64;
     }
@@ -218,38 +215,26 @@ internal sealed class ClosedContractAttributeClassification
 
     private static bool IsTotalReferenceValue(IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence;
     }
 
     private static bool IsTotalIntegerValue(IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind == IrTypeKind.Integer && type.Width > 0;
     }
 
     private static IrTerm CreateTotalNonNullPredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long __, long ___)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
-
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return factory.Binary(IrBinaryOperator.NotEqual, value, factory.Null(value.Type));
     }
 
     private static IrTerm CreateTotalPositivePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long _, long __)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThan, 0);
     }
 
     private static IrTerm CreateTotalRangePredicate(IrFactory factory, IrTerm value, IrTypeInfo type, long minimum, long maximum)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return factory.Binary(IrBinaryOperator.AndAlso,
             CompareTotalBound(factory, value, type, IrBinaryOperator.GreaterThanOrEqual, minimum),
             CompareTotalBound(factory, value, type, IrBinaryOperator.LessThanOrEqual, maximum));
@@ -259,8 +244,6 @@ internal sealed class ClosedContractAttributeClassification
     {
         // Fold bounds outside the scalar domain; never truncate an attribute's long bound.
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var minimum = type.Signed ? type.Width == 64 ? long.MinValue : -(1L << (type.Width - 1)) : 0L;
         var maximum = type.Signed ? type.Width == 64 ? (ulong)long.MaxValue : (1UL << (type.Width - 1)) - 1 :
             type.Width == 64 ? ulong.MaxValue : (1UL << type.Width) - 1;

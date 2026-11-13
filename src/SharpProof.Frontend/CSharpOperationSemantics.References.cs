@@ -79,7 +79,6 @@ internal static partial class CSharpOperationSemantics
 
         static bool IsBridgedReference(ITypeSymbol type)
         {
-            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.TypeParameter &&
                 type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
         }
@@ -139,7 +138,6 @@ internal static partial class CSharpOperationSemantics
 
     private static (IOperation Operand, ITypeSymbol? TestedType)? OpaqueTypeTest(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation switch
         {
             IIsTypeOperation { ValueOperand.Type: ITypeParameterSymbol } test =>
@@ -281,7 +279,6 @@ internal static partial class CSharpOperationSemantics
         { return (operation.LeftOperand, operation.RightOperand); }
         IOperation Unwrap(IOperation operand)
         {
-            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
             return operand is IConversionOperation { IsImplicit: true, OperatorMethod: null } conversion &&
                 conversion.Type?.SpecialType == SpecialType.System_Object && conversion.Conversion.IsReference &&
                 (IsReferenceDomain(conversion.Operand.Type) || conversion.Operand.ConstantValue is { HasValue: true, Value: null })
@@ -301,7 +298,6 @@ internal static partial class CSharpOperationSemantics
     // type it creates: the conversion keeps the reference.
     private static bool IsTargetTypedCreation(IConversionOperation conversion)
     {
-        conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
         return conversion.Operand is IObjectCreationOperation &&
             Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(conversion).IsObjectCreation &&
             SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);

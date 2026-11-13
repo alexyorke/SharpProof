@@ -50,7 +50,6 @@ internal sealed class TrustedBoundaryPolicy
     private bool IsTrusted(
         AttributeData attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return SymbolEqualityComparer.Default.Equals(
             attribute.AttributeClass?.OriginalDefinition,
             _trustedAttribute?.OriginalDefinition);

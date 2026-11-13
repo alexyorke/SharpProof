@@ -27,7 +27,7 @@ internal sealed partial class ContractClauseInventory
             : Clauses.Any(static clause => clause is null ? throw new ArgumentNullException(nameof(clause)) : clause.IsValid);
 
     private static int ComputeHasValidClause(
-        ImmutableArray<ContractClauseOccurrence> clauses /* SPINT001: all values valid - default arrays and null entries defer the original validation failure until the property is read */)
+        ImmutableArray<ContractClauseOccurrence> clauses)
     {
         if (clauses.IsDefault)
         {

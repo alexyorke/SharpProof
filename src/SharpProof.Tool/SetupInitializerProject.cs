@@ -131,7 +131,6 @@ internal static class SetupInitializerProject
 
     private static string? ReadProperty(XElement root, string name)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(name);
         var matches = root.Descendants().Where(element =>
         {
@@ -168,7 +167,6 @@ internal static class SetupInitializerProject
 
     private static IEnumerable<XElement> Items(XElement root, string itemName)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(itemName);
         return root.Descendants().Where(element =>
             (element ?? throw new ArgumentNullException(nameof(element))).Name.ToString().Equals(itemName, StringComparison.OrdinalIgnoreCase));
@@ -176,7 +174,6 @@ internal static class SetupInitializerProject
 
     private static XElement Reference(XElement root, string itemName, string package)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(itemName);
         ArgumentException.ThrowIfNullOrEmpty(package);
         var matches = Items(root, itemName).Where(element =>
@@ -204,7 +201,6 @@ internal static class SetupInitializerProject
 
     private static XElement Group(XElement root, string name)
     {
-        ArgumentNullException.ThrowIfNull(root);
         ArgumentException.ThrowIfNullOrEmpty(name);
         var group = root.Elements(name).FirstOrDefault(static element =>
         {
@@ -220,7 +216,6 @@ internal static class SetupInitializerProject
 
     private static string? Metadata(XElement element, string name)
     {
-        ArgumentNullException.ThrowIfNull(element);
         ArgumentException.ThrowIfNullOrEmpty(name);
         // MSBuild metadata names are case-insensitive, including attribute syntax.
         var attributes = element.Attributes().Where(metadata =>
@@ -238,9 +233,7 @@ internal static class SetupInitializerProject
 
     private static void SetMetadata(XElement element, string name, string value)
     {
-        ArgumentNullException.ThrowIfNull(element);
         ArgumentException.ThrowIfNullOrEmpty(name);
-        ArgumentNullException.ThrowIfNull(value);
         var existing = Metadata(element, name);
         if (existing != null && !existing.Equals(value, StringComparison.OrdinalIgnoreCase))
         { throw new InvalidOperationException("Existing package metadata conflicts with initializer settings: " + name); }

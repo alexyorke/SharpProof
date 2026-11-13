@@ -371,9 +371,8 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
 
     private static string MappedPath(
         SyntaxTree tree,
-        FileLinePositionSpan mapped /* SPINT001: all values valid - default or missing mapped paths fall back to the source tree path */)
+        FileLinePositionSpan mapped)
     {
-        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return CompilerSourceLocationProjection.MappedPath(tree, mapped);
     }
     internal static ImmutableArray<CompilerReferenceSnapshot> CaptureReferences(
@@ -577,7 +576,6 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
     private static CompilerAdditionalFileSnapshot CaptureAdditionalFile(AdditionalText file, string projectDirectory,
         CancellationToken cancellationToken)
     {
-        projectDirectory = RepositoryParameterGuard.NotNull(projectDirectory, nameof(projectDirectory));
         cancellationToken.ThrowIfCancellationRequested();
         file = ArgumentNullGuard.NotNull(file, nameof(file));
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
@@ -622,7 +620,6 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
 
     private static string Identity(MetadataReader reader)
     {
-        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         return reader.IsAssembly
             ? reader.GetAssemblyDefinition().GetAssemblyName().FullName
             : reader.GetString(reader.GetModuleDefinition().Name);
@@ -655,7 +652,6 @@ RepositoryParameterGuard.RequireInitialized(line.Equals(default(Microsoft.CodeAn
 
     private static bool HasResolverDirective(SyntaxTree tree, CancellationToken cancellationToken)
     {
-        tree = RepositoryParameterGuard.NotNull(tree, nameof(tree));
         return tree.GetRoot(cancellationToken).DescendantTrivia(descendIntoTrivia: true)
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
     }

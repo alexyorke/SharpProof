@@ -59,7 +59,6 @@ internal sealed class CompilerSpecificationMethodBinding(
 
     private static bool MatchesAssembly(IAssemblySymbol assembly, ImmutableArray<ApiSpecAssemblyIdentity> approved)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var identity = assembly.Identity;
         return approved.Any(candidate => ApiSpecAssemblyMatching.Matches(candidate, identity));
     }

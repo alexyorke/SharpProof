@@ -198,7 +198,7 @@ internal static class EffectSummaryOperations
     }
 
     private static EffectRegionSet RemapRegions(
-        EffectRegionSet regions, EffectRegionSet receiver /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */, ImmutableArray<EffectRegionSet> arguments)
+        EffectRegionSet regions, EffectRegionSet receiver, ImmutableArray<EffectRegionSet> arguments)
     {
 
         if (regions.IsUnknown)
@@ -234,11 +234,11 @@ internal static class EffectSummaryOperations
     }
 
     private static EffectSummary Create(
-        EffectRegionSet reads /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */ = default,
-        EffectRegionSet writes /* SPINT001: all values valid - Empty, Unknown, and every region set are valid */ = default,
+        EffectRegionSet reads = default,
+        EffectRegionSet writes = default,
         EffectAllocationKind allocation = EffectAllocationKind.None,
-        EffectCapabilitySet capabilities /* SPINT001: all values valid - Empty, Unknown, and every constructed capability set are valid */ = default,
-        EffectThrowSet throws /* SPINT001: all values valid - Empty, Unknown, and every exception set are valid */ = default,
+        EffectCapabilitySet capabilities = default,
+        EffectThrowSet throws = default,
         EffectTermination termination = EffectTermination.Terminates,
         EffectCompleteness completeness = EffectCompleteness.Complete,
         EffectUncertainty uncertainty = EffectUncertainty.None)

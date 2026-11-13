@@ -72,7 +72,7 @@ Verbatim excerpt from the successful series run. These are the runner's projecte
 Verbatim diagnostic message excerpts, with the file/project path and help-link suffix omitted:
 
 ```text
-error SP0051: Refuted Postcondition claim spc1:4c76d18973b56f1f4922190406d233fa7007743d4180980fbade8c57972ce193 for M:Outcomes.Refuted(System.Int64)~System.Int64. Counterexample: parameter:0 = 0.
+error SP0051: Refuted postcondition of Outcomes.Refuted. Counterexample: value = 0. Claim spc1:4c76d18973b56f1f4922190406d233fa7007743d4180980fbade8c57972ce193.
 ```
 
 The replayed input is 0: the method returns 0 and its false contract demands a value greater than 0. The volatile-read claim has `reason=UnsupportedBody`; its callable separately has `coverage=Incomplete` and `reason=SemanticUnknown`. Both records are useful.

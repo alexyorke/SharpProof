@@ -249,8 +249,6 @@ internal static class CompilerIdentityBridge
         IrFactory factory,
         IOperation operation)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var binary = operation as IBinaryOperation;
         var unary = operation as IUnaryOperation;
         var conversion = operation as IConversionOperation;
@@ -319,7 +317,6 @@ internal static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         return CreateReference(
             symbol,
             DocumentationCommentId.CreateDeclarationId);
@@ -327,7 +324,6 @@ internal static class CompilerIdentityBridge
 
     private static string TypeReference(ITypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return CreateReference(
             type,
             DocumentationCommentId.CreateReferenceId);
@@ -338,7 +334,6 @@ internal static class CompilerIdentityBridge
         Func<T, string?> createId)
         where T : ISymbol
     {
-        createId = RepositoryParameterGuard.NotNull(createId, nameof(createId));
         ArgumentNullGuard.NotNull(symbol, nameof(symbol));
         return createId(symbol) is { Length: > 0 } id
             ? id
@@ -347,7 +342,6 @@ internal static class CompilerIdentityBridge
 
     private static string FallbackReference(ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         var owner = symbol.ContainingSymbol;
         var prefix = owner switch
         {

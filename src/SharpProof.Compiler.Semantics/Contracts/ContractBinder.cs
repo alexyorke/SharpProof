@@ -156,8 +156,6 @@ internal sealed class ContractBinder
         ref ImmutableDictionary<IMethodSymbol, ContractBindingResult> cache,
         CancellationToken cancellationToken)
     {
-        cache = RepositoryParameterGuard.NotNull(cache, nameof(cache));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return implementationBody == null
             ? ImmutableInterlocked.GetOrAdd(ref cache,
                 target,
@@ -267,8 +265,6 @@ internal sealed class ContractBinder
         bool intrinsicsAlreadyValidated,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        inventory = RepositoryParameterGuard.NotNull(inventory, nameof(inventory));
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         var body = inventory.ImplementationBody;
         if (body == null)
         {
@@ -326,8 +322,6 @@ internal sealed class ContractBinder
         bool requiresOnly,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(
                      target,
                      includeReturn: !requiresOnly))
@@ -362,7 +356,6 @@ internal sealed class ContractBinder
 
     private static string AttributeKey(AttributeData attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return attribute.AttributeClass?.GetDocumentationCommentId() + "(" +
             string.Join(",", attribute.ConstructorArguments.Select(static argument =>
             {

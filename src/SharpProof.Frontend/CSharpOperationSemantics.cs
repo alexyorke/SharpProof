@@ -159,17 +159,14 @@ internal static partial class CSharpOperationSemantics
     private static IrIntegerTerm Number(IrFactory factory, IrTypeId type, BigInteger value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return value > long.MaxValue ? factory.Integer(type, (ulong)value) : factory.Integer(type, (long)value);
     }
     private static TotalScalarRule Exact(IrTerm value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return new(value, [], FrontendSubsetClassification.Exact);
     }
     private static TotalScalarRule Fail(IrFactory factory, FrontendAbstention reason)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         return new(factory.Boolean(false), [], FrontendSubsetClassification.Abstain(reason));
     }
 }

@@ -272,7 +272,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         // once per invocation, including locals declared inside loops.
         RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
         RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var bindings = _context.Variables.Where(binding => binding.Symbol is ILocalSymbol).ToImmutableArray();
         if (bindings.Length == 0)
         { return; }
@@ -307,7 +306,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasOwnIteratorBody(IOperation root)
     {
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = ImmutableStack<IOperation>.Empty;
         pending = pending.Push(root);
         while (!pending.IsEmpty)
@@ -340,7 +338,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedStaticFieldMutation(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         var conversionAllowed = false;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
@@ -372,7 +369,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private IIncrementOrDecrementOperation? TryDiscardedInstanceFieldMutation(IOperation operation)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var discarded = operation is IExpressionStatementOperation statement ? statement.Operation : operation;
         if (discarded is ISimpleAssignmentOperation { IsRef: false, Target: IDiscardOperation } assignment)
         { discarded = assignment.Value; }
@@ -481,7 +477,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private TotalBodyValue Condition(IOperation operation, IrBlockId block)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = Value(operation, block);
         // Unsupported handler success captures can be untyped; their
         // approximation is not a Boolean branch condition.
@@ -493,7 +488,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
     private TotalBodyValue Value(IOperation operation, IrBlockId block)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var value = _expressions.LowerBodyValue(operation, block);
         if (!value.Classification.IsExact)
         {
@@ -529,7 +523,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool HasUnsupportedRegion(ControlFlowRegion region)
     {
-        region = RepositoryParameterGuard.NotNull(region, nameof(region));
         var pending = ImmutableStack<ControlFlowRegion>.Empty;
         pending = pending.Push(region);
         var remaining = MaximumRegionSteps;
@@ -554,7 +547,6 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
 
     private bool TrySelect(BasicBlock entry, out ImmutableArray<BasicBlock> selected)
     {
-        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         var visited = ImmutableHashSet.CreateBuilder<BasicBlock>();
         var active = ImmutableHashSet.CreateBuilder<BasicBlock>();
         var order = ImmutableArray.CreateBuilder<BasicBlock>();

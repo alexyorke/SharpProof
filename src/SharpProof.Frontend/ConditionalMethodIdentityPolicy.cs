@@ -51,8 +51,6 @@ internal static class ConditionalMethodIdentityPolicy
 
         bool SameType(ITypeSymbol left, ITypeSymbol right)
         {
-            right = RepositoryParameterGuard.NotNull(right, nameof(right));
-            left = RepositoryParameterGuard.NotNull(left, nameof(left));
             return csharp.ClassifyConversion(left, right).IsIdentity && csharp.ClassifyConversion(right, left).IsIdentity;
         }
     }

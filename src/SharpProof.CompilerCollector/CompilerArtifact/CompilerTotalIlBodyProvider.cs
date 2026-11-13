@@ -138,9 +138,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     private static bool NoInitialization(PEReader pe, MetadataReader reader, TypeDefinitionHandle type)
     {
         RepositoryParameterGuard.RequireInitialized(type.IsNil, nameof(type), "Value must be initialized.");
-
-        pe = RepositoryParameterGuard.NotNull(pe, nameof(pe));
-        reader = RepositoryParameterGuard.NotNull(reader, nameof(reader));
         var remaining = 128;
         for (var current = type; !current.IsNil; current = reader.GetTypeDefinition(current).GetDeclaringType())
         {
@@ -222,8 +219,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
 
     private static bool SameSignature(IMethodSymbol expected, IMethodSymbol actual)
     {
-        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
-        expected = RepositoryParameterGuard.NotNull(expected, nameof(expected));
         return CompilerScalarIlDecoder.Candidate(actual) && expected.MetadataToken == actual.MetadataToken &&
             expected.MetadataName == actual.MetadataName && SameType(expected.ReturnType, actual.ReturnType) &&
             expected.Parameters.Length == actual.Parameters.Length &&
@@ -235,8 +230,6 @@ internal sealed class CompilerTotalIlBodyProvider(CSharpCompilation compilation,
     // arrays; compare their bound assembly identities as well as the intrinsic.
     private static bool SameType(ITypeSymbol expected, ITypeSymbol actual)
     {
-        actual = RepositoryParameterGuard.NotNull(actual, nameof(actual));
-        expected = RepositoryParameterGuard.NotNull(expected, nameof(expected));
         return expected.SpecialType == actual.SpecialType && expected.SpecialType != SpecialType.None &&
             expected.ContainingAssembly.Identity.Equals(actual.ContainingAssembly.Identity);
     }

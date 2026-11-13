@@ -4,8 +4,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private TotalBodyValue? InlineMetadataCall(IInvocationOperation invocation, TotalIlBody body, IrBlockId block, int depth)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         // The matched provider admits static methods; Roslyn binds one argument per parameter.
         var arguments = ImmutableArray.CreateBuilder<IrTerm>(body.Method.Parameters.Length);
@@ -43,7 +41,6 @@ internal sealed partial class RoslynTotalProgramLowerer
         RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(anchor.IsDefault, nameof(anchor));
         RepositoryParameterGuard.ThrowIfInvalid(caller.IsDefault, nameof(caller));
-        exceptionTarget = RepositoryParameterGuard.NotNull(exceptionTarget, nameof(exceptionTarget));
         if (_calls == null || !_calls.EnterIl(body.Method))
         { throw new RegionIncompleteException(); }
         try
@@ -245,8 +242,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static IrTerm IlLoad(IrFactory factory, IrTerm value)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var info = factory.GetTypeInfo(value.Type);
         if (info.Kind is IrTypeKind.Reference or IrTypeKind.String)
         { return value; }
@@ -266,9 +261,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private static TotalScalarRule IlConversion(IrFactory factory, string code, IrTerm value)
     {
-        code = RepositoryParameterGuard.NotNull(code, nameof(code));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var checkedConversion = code.StartsWith("Conv_ovf_", StringComparison.Ordinal);
         var suffix = code.Substring(checkedConversion ? 9 : 5);
         var unsignedSource = suffix.EndsWith("_un", StringComparison.Ordinal);
@@ -345,7 +337,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalLoweringContext? PrepareMetadataCallee(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _calls?.PrepareMetadataCallee(_context, method);
     }
 
@@ -358,8 +349,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void RecordMetadataCallPreconditions(IOperation call, TotalLoweringContext frame, ImmutableArray<IrTerm> arguments,
         IrBlockId block)
     {
-        call = RepositoryParameterGuard.NotNull(call, nameof(call));
-        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (arguments.Length != frame.Parameters.Length)
@@ -417,7 +406,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
         void Record(string name, TotalCallPrecondition obligation)
         {
-            name = RepositoryParameterGuard.NotNull(name, nameof(name));
             obligation = RepositoryParameterGuard.ValidateInitialized(obligation, obligation.Value is null, nameof(obligation), "Value must be initialized.");
             var marker = _builder.Assign(block, site, _context.Temporary(factory.BooleanType, name),
                 factory.Binary(IrBinaryOperator.AndAlso, obligation.Safe, obligation.Value));
@@ -427,7 +415,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private IrTerm? ParameterValue(IrTerm value, IrTypeId type)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         var factory = _context.Factory;
         if (value.Type == type)
@@ -446,7 +433,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         RepositoryParameterGuard.ThrowIfInvalid(arguments.IsDefault, nameof(arguments));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        frame = RepositoryParameterGuard.NotNull(frame, nameof(frame));
         var replacements = ImmutableDictionaryCapture.Create(frame.Parameters, parameter => parameter.Entry,
             parameter => arguments[parameter.Parameter.Ordinal]);
         for (var ordinal = 0; ordinal < frame.MetadataCallPreconditions.Length; ordinal++)

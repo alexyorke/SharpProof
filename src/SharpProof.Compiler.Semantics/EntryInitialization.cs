@@ -148,14 +148,12 @@ internal static class EntryInitialization
 
         private bool IsSource(INamedTypeSymbol type)
         {
-            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return !type.DeclaringSyntaxReferences.IsEmpty &&
                 type.DeclaringSyntaxReferences.All(reference => _compilation.ContainsSyntaxTree(reference.SyntaxTree));
         }
 
         private InitializationEffect ClassifyMembers(INamedTypeSymbol owner)
         {
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             // Work is spent per declaration and per value, not per member, so
             // a type with many uninitialized statics or constants stays
             // within budget.
@@ -183,8 +181,6 @@ internal static class EntryInitialization
         // that only readonly state is filled in unobservably.
         private bool IsStaticTarget(ISymbol member, INamedTypeSymbol owner)
         {
-            member = RepositoryParameterGuard.NotNull(member, nameof(member));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             return SymbolEqualityComparer.Default.Equals(member.ContainingType, owner) && member switch
             {
                 IFieldSymbol field => IsInitializedOnly(field),
@@ -196,7 +192,6 @@ internal static class EntryInitialization
         // A static only its type initializer writes, shared by all threads.
         private static bool IsInitializedOnly(IFieldSymbol field)
         {
-            field = RepositoryParameterGuard.NotNull(field, nameof(field));
             return field is { IsStatic: true, IsConst: false, IsReadOnly: true, IsVolatile: false } &&
                 !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
                 {
@@ -209,7 +204,6 @@ internal static class EntryInitialization
         // nothing else.
         private bool IsAutoProperty(IPropertySymbol property)
         {
-            property = RepositoryParameterGuard.NotNull(property, nameof(property));
             return !property.IsAbstract && !property.IsExtern && !property.IsIndexer && property.DeclaringSyntaxReferences.Length == 1 &&
                 property.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is PropertyDeclarationSyntax
                 {
@@ -219,8 +213,6 @@ internal static class EntryInitialization
 
         private InitializationEffect StaticInitializers(ISymbol member, INamedTypeSymbol owner, bool admitted)
         {
-            member = RepositoryParameterGuard.NotNull(member, nameof(member));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             var effect = InitializationEffect.None;
             foreach (var reference in member.DeclaringSyntaxReferences)
             {
@@ -249,15 +241,12 @@ internal static class EntryInitialization
         // the type's own readonly statics.
         private InitializationEffect StaticConstructor(IMethodSymbol constructor, INamedTypeSymbol owner)
         {
-            constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             return Body(constructor) is { Initializer: null } body
                 ? Statements(body, owner, constructor: null) : InitializationEffect.Effectful;
         }
 
         private IConstructorBodyOperation? Body(IMethodSymbol constructor)
         {
-            constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
             if (constructor.IsExtern || constructor.DeclaringSyntaxReferences.Length != 1)
             { return null; }
             var reference = constructor.DeclaringSyntaxReferences[0];
@@ -269,8 +258,6 @@ internal static class EntryInitialization
 
         private InitializationEffect Statements(IConstructorBodyOperation body, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            body = RepositoryParameterGuard.NotNull(body, nameof(body));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             var effect = InitializationEffect.None;
             foreach (var block in new[] { body.BlockBody, body.ExpressionBody })
             {
@@ -282,8 +269,6 @@ internal static class EntryInitialization
 
         private InitializationEffect Statement(IOperation statement, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            statement = RepositoryParameterGuard.NotNull(statement, nameof(statement));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             if (!Spend())
             { return InitializationEffect.Effectful; }
             switch (statement)
@@ -309,8 +294,6 @@ internal static class EntryInitialization
 
         private bool IsStaticStore(IOperation target, INamedTypeSymbol owner)
         {
-            target = RepositoryParameterGuard.NotNull(target, nameof(target));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             return target switch
             {
                 IFieldReferenceOperation { Instance: null } field => IsStaticTarget(field.Field, owner),
@@ -323,8 +306,6 @@ internal static class EntryInitialization
         // construction.
         private bool IsInstanceStore(IOperation target, INamedTypeSymbol type)
         {
-            target = RepositoryParameterGuard.NotNull(target, nameof(target));
-            type = RepositoryParameterGuard.NotNull(type, nameof(type));
             return target switch
             {
                 IFieldReferenceOperation
@@ -346,7 +327,6 @@ internal static class EntryInitialization
         // its own parameters, but no statics and no lambdas.
         private InitializationEffect Value(IOperation? value, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             if (value == null || !Spend())
             { return InitializationEffect.Effectful; }
             if (value.ConstantValue.HasValue)
@@ -406,8 +386,6 @@ internal static class EntryInitialization
 
         private InitializationEffect Array(IArrayCreationOperation array, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            array = RepositoryParameterGuard.NotNull(array, nameof(array));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             if (array.DimensionSizes.Length != 1 || array.DimensionSizes[0].ConstantValue is not { HasValue: true, Value: { } size } ||
                 size is not (int or long or uint or ulong or short or ushort or byte or sbyte) ||
                 Convert.ToDecimal(size, CultureInfo.InvariantCulture) is var length && (length < 0 || length > MaximumArrayLength))
@@ -418,7 +396,6 @@ internal static class EntryInitialization
 
         private InitializationEffect Elements(ImmutableArray<IOperation> elements, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             RepositoryParameterGuard.ThrowIfInvalid(elements.IsDefault, nameof(elements));
             var effect = InitializationEffect.FreshValues;
             foreach (var element in elements)
@@ -439,8 +416,6 @@ internal static class EntryInitialization
         // must be admitted too, unless it is the one being classified.
         private InitializationEffect Creation(IObjectCreationOperation creation, INamedTypeSymbol owner, IMethodSymbol? constructor)
         {
-            creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
-            owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
             if (CSharpOperationSemantics.IsCoreObjectCreation(creation))
             { return InitializationEffect.FreshValues; }
             if (creation.Initializer != null || creation.Constructor is not { } created)
@@ -461,7 +436,6 @@ internal static class EntryInitialization
 
         private InitializationEffect Constructor(IMethodSymbol constructor)
         {
-            constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
             var type = constructor.ContainingType;
             if (!IsSource(type) || type.IsAbstract || type.IsStatic || type.IsRecord || type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
                 type.TypeKind == TypeKind.Class && type.BaseType?.SpecialType != SpecialType.System_Object ||
@@ -497,8 +471,6 @@ internal static class EntryInitialization
         // constructor that does not chain to another of the same type.
         private InitializationEffect InstanceInitializers(INamedTypeSymbol type, IMethodSymbol constructor)
         {
-            type = RepositoryParameterGuard.NotNull(type, nameof(type));
-            constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
             var effect = InitializationEffect.None;
             foreach (var member in type.GetMembers())
             {
@@ -560,7 +532,6 @@ internal static class EntryInitialization
 
     private static bool IsModuleInitializerAttribute(AttributeData attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return attribute.AttributeClass is
         {
             Name: "ModuleInitializerAttribute",

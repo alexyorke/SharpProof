@@ -42,7 +42,6 @@ internal sealed class SmtNativeRunner : IDisposable
 
     private async Task<BackendCheckResult> CheckSerializedAsync(Func<BackendCheckResult> check, CancellationToken cancellationToken)
     {
-        check = RepositoryParameterGuard.NotNull(check, nameof(check));
         var acquired = false;
         try
         {

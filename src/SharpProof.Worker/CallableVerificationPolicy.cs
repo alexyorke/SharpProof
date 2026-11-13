@@ -59,8 +59,6 @@ internal static partial class CallableVerificationPolicy
         CompilerCallablePreparation target, WorkerCallableCoverageReason reason,
         ImmutableArray<WorkerClaimResult> claims)
     {
-
-        System.ArgumentNullException.ThrowIfNull(target);
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         return new(
             new WorkerCallableResult

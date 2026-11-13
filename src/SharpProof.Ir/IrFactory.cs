@@ -641,7 +641,7 @@ internal sealed class IrFactory
         return IntegerCore(type, IrInteger.FromBits(GetTypeInfo(type), bits));
     }
 
-    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value /* SPINT001: all values valid - every integer payload, including default zero, is representable */)
+    private IrIntegerTerm IntegerCore(IrTypeId type, IrInteger value)
     {
         RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
         lock (_gate)
@@ -1082,7 +1082,6 @@ internal sealed class IrFactory
 
     private static void ValidateName(string? value, string parameterName)
     {
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new ArgumentException("A non-empty name is required.", parameterName);
@@ -1115,16 +1114,12 @@ internal sealed class IrFactory
 
     private IrTypeId CreateBuiltInType(string name, IrTypeShape shape)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
-        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         return GetOrCreateTypeCore(CreateIdentityCore(), name, shape, null);
     }
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeShape shape, IrTypeId? elementType)
     {
         RepositoryParameterGuard.ThrowIfInvalid(identity.IsDefault, nameof(identity));
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
-        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var key = (shape.Kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1,
             0, shape.Kind == IrTypeKind.Integer);
         if (_typeIds.TryGetValue(key, out var existing))
@@ -1141,8 +1136,6 @@ internal sealed class IrFactory
         IrTypeShape shape,
         IrTypeId? elementType)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
-        shape = RepositoryParameterGuard.NotNull(shape, nameof(shape));
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
@@ -1153,7 +1146,6 @@ internal sealed class IrFactory
     private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName)
     {
         RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _types, parameterName);
     }
 
@@ -1178,27 +1170,23 @@ internal sealed class IrFactory
     private IrVariableInfo GetVariableInfoCore(IrVarId id, string name)
     {
         RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return GetScoped(id.Scope, id.Value, _variables, name);
     }
 
     private IrMemberInfo GetMemberInfoCore(IrMemberId id, string parameterName)
     {
         RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _members, parameterName);
     }
 
     private IrOperationInfo GetOperationInfoCore(OperationId id, string parameterName)
     {
         RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return GetScoped(id.Scope, id.Value, _operations, parameterName);
     }
 
     private void EnsureTermCore(IrTerm term, string parameterName)
     {
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (term.Id.Scope != _scope ||
             term.Id.Value < 0 ||
             term.Id.Value >= _terms.Count ||
@@ -1210,7 +1198,6 @@ internal sealed class IrFactory
 
     private void EnsureScope(long scope, string parameterName)
     {
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (scope != _scope)
         {
             throw new ArgumentException("The identifier belongs to a different IR factory.", parameterName);
@@ -1219,11 +1206,10 @@ internal sealed class IrFactory
 
     private T Intern<TState, T>(
         StructuralKey key,
-        TState state /* SPINT001: all values valid - opaque caller state is forwarded unchanged and permits every value */,
+        TState state,
         Func<IrId, TState, T> create)
         where T : IrTerm
     {
-        create = RepositoryParameterGuard.NotNull(create, nameof(create));
         if (_termIds.TryGetValue(key, out var existing))
         {
             return existing as T ??
