@@ -32,7 +32,7 @@ its exact SHA-pinned `actions/attest` dependency), plus
 `github/codeql-action/*` and `NuGet/login`. Actions cannot create or approve PRs.
 All external contributors require workflow approval. Keep checkout credentials
 disabled in build/test jobs. Dependabot does not automatically dismiss development
-dependency alerts. Copilot automations are restricted to updating their triggering
+dependency alerts. Copilot automated tasks are restricted to updating their triggering
 resource where GitHub supports that restriction; workflow approvals remain required.
 
 The `nuget.org` environment retains its explicit release-tag allowlist and requires
