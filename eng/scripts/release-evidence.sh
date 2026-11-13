@@ -12,11 +12,13 @@ if command -v cygpath > /dev/null 2>&1; then scratch_mount="$(cygpath -m "$scrat
 syft="$(jq -r .syft eng/security/release-tools.json)"
 grype="$(jq -r .grype eng/security/release-tools.json)"
 mkdir -p artifacts/release-evidence
+status=0
 for subject in consumer packages; do
   source=oci-archive:/repo/artifacts/consumer-image/image.tar
   if [[ "$subject" == packages ]]; then source=dir:/repo/nupkgs; fi
   docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
     -v "$root:/repo" -v "$scratch_mount:/tmp" -w /repo -e HOME=/tmp -e SYFT_CHECK_FOR_APP_UPDATE=false \
+    -e SYFT_GOLANG_CAPTURE_SYMBOLS=extended-stdlib \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DEPTH=3 \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_MEMORY_BYTES=536870912 \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DISK_BYTES=4294967296 \
@@ -29,7 +31,16 @@ for subject in consumer packages; do
   docker run --rm --platform linux/amd64 -v "$root:/repo" -w /repo "$grype" \
     "sbom:artifacts/release-evidence/$subject.syft.json" --config .grype.yaml \
     --output json > "artifacts/release-evidence/$subject.vulnerabilities.json"
-  jq -e '[.matches[] | select((.vulnerability.severity == "High" or
+  if ! jq -e '[.matches[] | select((.vulnerability.severity == "High" or
     .vulnerability.severity == "Critical") and .vulnerability.fix.state == "fixed")] | length == 0' \
-    "artifacts/release-evidence/$subject.vulnerabilities.json"
+    "artifacts/release-evidence/$subject.vulnerabilities.json"; then
+    echo "Fixable High/Critical findings in $subject:" >&2
+    jq -r '.matches[] | select((.vulnerability.severity == "High" or
+      .vulnerability.severity == "Critical") and .vulnerability.fix.state == "fixed") |
+      [.vulnerability.id, .artifact.name, .artifact.version,
+       (.vulnerability.fix.versions | join(","))] | @tsv' \
+      "artifacts/release-evidence/$subject.vulnerabilities.json" >&2
+    status=1
+  fi
 done
+exit "$status"
