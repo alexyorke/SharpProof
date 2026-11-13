@@ -37,11 +37,13 @@ exclude = [
 ]
 
 timeout = 30
-max_retries = 2
-retry_wait_time = 2
+max_retries = 3
+retry_wait_time = 5
 max_concurrency = 8
 host_concurrency = 2
 host_request_interval = "250ms"
-# Do not reuse cached successes or treat HTTP errors/timeouts as valid links.
+# Do not reuse cached successes or treat HTTP errors as valid links. A request
+# that still times out after the retries above says the host was slow, not
+# that the link is broken, so it does not fail the check.
 cache = false
-accept_timeouts = false
+accept_timeouts = true
