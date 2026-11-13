@@ -48,7 +48,9 @@ dotnet sharpproof init --project MyLibrary.csproj --verification portable
 dotnet sharpproof init --project MyLibrary.csproj --verification portable --apply
 ```
 
-Portable is the default; omit `--apply` to leave files unchanged. The plan pins
+Portable is the default; omit `--apply` to leave files unchanged. Use
+`--verification native` to select strict verification on the build machine,
+which is what the package does when no profile is set. The plan pins
 the facade, optional editor reference with `PrivateAssets="all"`, and local tool to the installed tool's
 version and names the nuget.org source, mapping `SharpProof*` to it when the
 configuration already uses package source mapping. It may reuse ancestor
