@@ -8,6 +8,9 @@ repository administration state, not controls installed by cloning this source.
 The public repository is `alexyorke/SharpProof`; its default branch is `master`.
 Private vulnerability reporting, secret scanning, secret push protection, Dependabot
 security updates, and extended CodeQL analysis for C#, Python and GitHub Actions are enabled.
+CodeQL runs from [codeql.yml](../../.github/workflows/codeql.yml) (advanced setup), whose
+config excludes the vendored `eng/common` tree. Keep GitHub's default setup disabled:
+uploads from the workflow are rejected while it is enabled.
 
 The default-branch ruleset requires PRs, resolved review threads, up-to-date required
 checks, and CodeQL results. CodeQL errors and high/critical security findings block
