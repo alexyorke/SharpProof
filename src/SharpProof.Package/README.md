@@ -7,7 +7,7 @@ dotnet add package SharpProof --version 1.0.0-preview.2
 dotnet build -c Release
 ```
 
-Use an available version from your configured feed. This preview's source version does not establish public feed availability. No SharpProof activation properties or separate Attributes/Verifier references are required. The exact-version graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`.
+No SharpProof activation properties or separate Attributes/Verifier references are required. The exact-version graph is `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`.
 
 ```csharp
 using SharpProof.Attributes;

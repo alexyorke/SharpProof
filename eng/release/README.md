@@ -43,6 +43,10 @@
    After a failure, use "Re-run failed jobs": it reuses the packages the first
    attempt built. A full re-run builds new packages and a new consumer image,
    which no longer match anything already pushed.
+9. Once the packages are on nuget.org, remove the two notes that say they are
+   not: the **Status** line at the top of the root `README.md`, and the "Until
+   `1.0.0-preview.2` is on nuget.org" clause in step 1 of
+   `docs/getting-started.md`. They are the only places that say so.
 
 Manual dispatch on a branch exercises packaging and native smoke tests without
 publishing. Its consumer image stays on the runner, and the templates pin the

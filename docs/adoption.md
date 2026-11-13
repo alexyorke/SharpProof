@@ -32,6 +32,6 @@ Measure the same project's clean, no-op, and edited builds before and after adop
 
 ## Consumer CI recipe
 
-Pin your compiler SDK, restore the single standard package reference from your configured feed with the repository's normal lock-file policy, then build the project in Release on a qualified host. Its exact-version dependencies restore automatically. Treat build failure as failure; archive evidence through your CI's restricted artifact mechanism. The SharpProof source repository's Compose tasks qualify SharpProof itself; an external application should use its own consumer build rather than assuming a source-repository sample task builds that application.
+Pin your compiler SDK, restore the single standard package reference with the repository's normal lock-file policy, then build the project in Release on a qualified host. Its exact-version dependencies restore automatically. Treat build failure as failure; archive evidence through your CI's restricted artifact mechanism. The SharpProof source repository's Compose tasks qualify SharpProof itself; an external application should use its own consumer build rather than assuming a source-repository sample task builds that application.
 
 For upgrades, preserve a known-good source revision and evidence, then follow [the upgrade checklist](upgrading.md). For a failure you cannot explain, use [support](support.md).

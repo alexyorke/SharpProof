@@ -12,7 +12,7 @@ internal static class SetupInitializerContainer
         ArgumentNullException.ThrowIfNull(files);
         ArgumentException.ThrowIfNullOrEmpty(directory);
         if (consumerImage != null && !SetupInitializer.IsPinnedConsumerImage(consumerImage))
-        { throw new ArgumentException("--consumer-image must be an immutable SHA-256 image in the SharpProof canonical or private-preview GHCR repository."); }
+        { throw new ArgumentException("--consumer-image must be an immutable SHA-256 image in a SharpProof GHCR repository."); }
         var candidates = ComposeNames.Select(name =>
         {
             ArgumentNullException.ThrowIfNull(name);
