@@ -80,6 +80,14 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Accept Windows paths that contain a tilde. Only a real 8.3 short name such
+  as `PROGRA~1` is rejected; a folder such as `~work` or `backup~` was refused
+  before. The error for a volume that is not NTFS now names the volume and its
+  format, including ReFS Dev Drives, which remain unsupported.
+- Stop the build task's output readers when a verifier descendant keeps the
+  output open past the drain timeout, before the process is disposed. A launch
+  failure now reports the exception type as well as its message.
+
 - Model calendar and clock values. A non-lifted user-defined binary operator
   declared in another assembly, such as `DateTime > DateTime`, now lowers as a
   call to its static operator method after both operands are evaluated; before,
