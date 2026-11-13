@@ -12,10 +12,14 @@ for subject in consumer packages; do
   source=oci-archive:/repo/artifacts/consumer-image/image.tar
   if [[ "$subject" == packages ]]; then source=dir:/repo/nupkgs; fi
   docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
-    -v "$root:/repo" -w /repo -e SYFT_CHECK_FOR_APP_UPDATE=false \
-    -e SYFT_PACKAGE_SEARCH_UNINDEXED_ARCHIVES=true "$syft" "$source" \
+    -v "$root:/repo" -w /repo -e HOME=/tmp -e SYFT_CHECK_FOR_APP_UPDATE=false \
+    -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DEPTH=3 \
+    -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_MEMORY_BYTES=536870912 \
+    -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DISK_BYTES=4294967296 \
+    -e SYFT_DOTNET_EXCLUDE_PROJECT_REFERENCES=false "$syft" "$source" \
     -o "syft-json=/repo/artifacts/release-evidence/$subject.syft.json" \
     -o "spdx-json=/repo/artifacts/release-evidence/$subject.spdx.json"
+  jq -e '.artifacts | length > 0' "artifacts/release-evidence/$subject.syft.json"
   # Retain all findings, including those without fixes. Apply the existing
   # fixed-high/critical policy separately to that complete report.
   docker run --rm --platform linux/amd64 -v "$root:/repo" -w /repo "$grype" \

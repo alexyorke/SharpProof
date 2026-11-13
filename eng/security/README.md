@@ -27,7 +27,8 @@ all assets to a draft before publishing it.
 
 Actions default to read-only tokens, require full action commit SHAs, and permit
 only the used checkout, cache/restore, cache/save, upload-artifact, download-artifact,
-setup-dotnet, dependency-review-action and attest-build-provenance Actions, plus
+setup-dotnet, dependency-review-action and attest-build-provenance Actions (including
+its exact SHA-pinned `actions/attest` dependency), plus
 `github/codeql-action/*` and `NuGet/login`. Actions cannot create or approve PRs.
 All external contributors require workflow approval. Keep checkout credentials
 disabled in build/test jobs. Dependabot does not automatically dismiss development

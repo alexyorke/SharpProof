@@ -111,6 +111,8 @@ class ToolingTests(unittest.TestCase):
                     pointers[path] = pathlib.Path(path).read_text()
             with open(os.environ["MOCK_DOCKER_LOG"], "a") as log:
                 log.write(json.dumps({"args": args, "pointers": pointers}) + "\n")
+            if args[:3] == ["buildx", "imagetools", "inspect"]:
+                print("sha256:" + "a" * 64)
             if "SHARPPROOF_LONGFUZZ_OUTPUT=/workspace/LongFuzzOutput" in args:
                 mount = next(m for m in mounts if m.endswith(":/workspace/LongFuzzOutput"))
                 output = pathlib.Path(mount.rsplit(":", 1)[0])
@@ -192,6 +194,32 @@ class ToolingTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("tooling-regression-tooling:local", self.calls()[0]["args"])
         self.assertFalse(self.calls()[1]["pointers"])
+
+    def test_tooling_cache_requires_verified_provenance_and_patched_cli(self):
+        self.initialize_git()
+        self.env["SHARPPROOF_IMAGE_REGISTRY"] = "ghcr.io/alexyorke/sharpproof-tooling"
+        self.command("gh", '''
+            import os, sys
+            if sys.argv[1] == "--version":
+                print("gh version " + os.environ["MOCK_GH_VERSION"])
+            else:
+                sys.exit(int(os.environ["MOCK_ATTESTATION_STATUS"]))
+        ''')
+        for version, status, trusted in (("2.101.0", "0", False),
+                                         ("2.104.0", "1", False),
+                                         ("2.104.0", "0", True)):
+            with self.subTest(version=version, status=status):
+                self.log.unlink(missing_ok=True)
+                env = dict(self.env, MOCK_GH_VERSION=version, MOCK_ATTESTATION_STATUS=status)
+                result = self.ci("image", env=env)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                calls = [call["args"] for call in self.calls()]
+                pulls = [a for a in calls if a[0] == "pull"]
+                self.assertEqual(trusted, bool(pulls))
+                self.assertEqual(not trusted, any(a[:2] == ["buildx", "build"] for a in calls))
+                if trusted:
+                    self.assertEqual(self.env["SHARPPROOF_IMAGE_REGISTRY"] + "@sha256:" + "a" * 64,
+                                     pulls[0][-1])
 
     def test_linked_worktree_mounts_metadata_for_all_compose_lanes(self):
         self.initialize_git()
