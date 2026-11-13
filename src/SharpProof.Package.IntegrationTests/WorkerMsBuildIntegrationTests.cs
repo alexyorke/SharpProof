@@ -238,7 +238,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(
             build.Output,
-            Does.Contain(property + " was removed"));
+            Does.Contain(property + " is not supported"));
     }
 
     [Test]
@@ -2382,7 +2382,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(
             build.Output,
             Does.Contain(
-                "requires .NET SDK 10.0.100 or newer and Core MSBuild on Linux x64/ARM64 (glibc), macOS ARM64/x64, or Windows x64/ARM64"));
+                "SPB020: SharpProof verification is not supported on this build host"));
     }
 
     [Test]
