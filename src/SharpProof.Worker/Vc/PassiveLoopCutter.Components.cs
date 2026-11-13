@@ -80,7 +80,6 @@ internal sealed partial class PassiveLoopCutter
 
     private ImmutableArray<IrVarId> WrittenVariables(IEnumerable<IrBlockId> nodes)
     {
-        System.ArgumentNullException.ThrowIfNull(nodes);
         var writes = ImmutableHashSet.CreateBuilder<IrVarId>();
         foreach (var node in nodes)
         {

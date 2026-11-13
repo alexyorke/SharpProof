@@ -64,7 +64,6 @@ internal static class IrTraversal
         Func<IrTerm, bool>? predicate,
         bool collectVariables)
     {
-        pending = RepositoryParameterGuard.NotNull(pending, nameof(pending));
         var visited = ImmutableHashSet.CreateBuilder<IrId>();
         var variables = ImmutableHashSet.CreateBuilder<IrVarId>();
         while (!pending.IsEmpty)

@@ -201,9 +201,7 @@ internal sealed class ContractSelectionInventory
         IMethodSymbol method,
         ImmutableArray<AttributeData> callableAttributes)
     {
-
         RepositoryParameterGuard.RequireInitialized(callableAttributes.IsDefault, nameof(callableAttributes), "Array must be initialized.");
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = GetRejectedCallableSelectionFeatures(
             method,
             callableAttributes);
@@ -213,7 +211,6 @@ internal sealed class ContractSelectionInventory
     private ContractSelectionFeatures GetRejectedControlFeatures(
         IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
         for (var type = method.ContainingType;
              type != null;
@@ -240,8 +237,6 @@ internal sealed class ContractSelectionInventory
         IMethodSymbol method,
         IEnumerable<AttributeData> callableAttributes)
     {
-        callableAttributes = RepositoryParameterGuard.NotNull(callableAttributes, nameof(callableAttributes));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
         foreach (var attribute in callableAttributes)
         {

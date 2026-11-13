@@ -41,12 +41,6 @@ internal static partial class SemanticClaimIdentity
         string prefix, string domain, string assemblyName, string callableId,
         string kind, string fingerprint, int duplicateRank)
     {
-        assemblyName = RepositoryParameterGuard.NotNull(assemblyName, nameof(assemblyName));
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
-        domain = RepositoryParameterGuard.NotNull(domain, nameof(domain));
-        fingerprint = RepositoryParameterGuard.NotNull(fingerprint, nameof(fingerprint));
-        kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
-        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
         duplicateRank = ArgumentNullGuard.RequireNonnegative(
             duplicateRank, nameof(duplicateRank));
         using var writer = new CanonicalHashWriter();
@@ -166,9 +160,6 @@ internal static partial class SemanticClaimIdentity
     private static string CreateMalformedInvocationFingerprint(
         IInvocationOperation invocation, IMethodSymbol target, IMethodSymbol source)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var context = new ClaimIdentityContext(target, source, false);
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain).Add("malformed-ensures");
@@ -185,8 +176,6 @@ internal static partial class SemanticClaimIdentity
     private static string CreateOperationFingerprint(IOperation operation, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         using var writer = new CanonicalHashWriter();
         writer.Add(FingerprintDomain);
         WriteOperation(writer, operation, context);
@@ -206,9 +195,6 @@ internal static partial class SemanticClaimIdentity
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         WriteOperation(writer, operation, context, 0);
     }
 
@@ -216,9 +202,6 @@ internal static partial class SemanticClaimIdentity
         CanonicalHashWriter writer, IOperation operation, ClaimIdentityContext context, int depth)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (depth >= MaximumFingerprintDepth)
         {
             // Truncation is deterministic, and claim identity also carries a
@@ -293,8 +276,6 @@ internal static partial class SemanticClaimIdentity
     }
     private static void WriteLocalRole(CanonicalHashWriter writer, ILocalSymbol local)
     {
-        local = RepositoryParameterGuard.NotNull(local, nameof(local));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         var declaration = local.DeclaringSyntaxReferences
             .Select(static reference => reference.GetSyntax()).FirstOrDefault();
         var owner = (local.ContainingSymbol as IMethodSymbol)?.DeclaringSyntaxReferences
@@ -308,7 +289,6 @@ internal static partial class SemanticClaimIdentity
     private static void WriteParameterRole(
         CanonicalHashWriter writer, IParameterSymbol parameter, ClaimIdentityContext context)
     {
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (SymbolEqualityComparer.Default.Equals(
                 parameter.ContainingSymbol.OriginalDefinition, context.Source.OriginalDefinition))
         {
@@ -336,8 +316,6 @@ internal static partial class SemanticClaimIdentity
     private static void WriteSymbol(CanonicalHashWriter writer, ISymbol symbol, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(symbol.Kind.ToString());
         switch (symbol)
         {
@@ -374,8 +352,6 @@ internal static partial class SemanticClaimIdentity
     private static void WriteNamedMember(CanonicalHashWriter writer, ISymbol member, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (RequiresStructuralContainerId(member))
         {
             WriteSpecialContainingTypeIdentity(writer, member);
@@ -393,8 +369,6 @@ internal static partial class SemanticClaimIdentity
         bool forCallableIdentity = false)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (method == null)
         {
             writer.Add("null-method");
@@ -447,9 +421,6 @@ internal static partial class SemanticClaimIdentity
         ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         var chain = ImmutableArray.CreateBuilder<IMethodSymbol>();
         while (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
         {
@@ -512,8 +483,6 @@ internal static partial class SemanticClaimIdentity
     private static bool TryWriteQueryTargetIdentity(CanonicalHashWriter writer, IMethodSymbol method,
         SyntaxNode declaration, ClaimIdentityContext context)
     {
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (!method.IsImplicitlyDeclared || context.Model == null)
         { return false; }
         foreach (var query in declaration.AncestorsAndSelf().OfType<QueryExpressionSyntax>())
@@ -560,15 +529,12 @@ internal static partial class SemanticClaimIdentity
 
     private static bool IsNestedCallableSyntax(SyntaxNode node)
     {
-        node = RepositoryParameterGuard.NotNull(node, nameof(node));
         return node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax;
     }
 
     private static void WriteType(CanonicalHashWriter writer, ITypeSymbol? type, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (type == null)
         {
             writer.Add("null-type");
@@ -619,9 +585,6 @@ internal static partial class SemanticClaimIdentity
         ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        functionPointer = RepositoryParameterGuard.NotNull(functionPointer, nameof(functionPointer));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         var signature = functionPointer.Signature;
         writer.Add("function-pointer")
             .Add(signature.CallingConvention.ToString())
@@ -652,7 +615,6 @@ internal static partial class SemanticClaimIdentity
 
     private static bool RequiresStructuralContainerId(ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
         for (var type = symbol is INamedTypeSymbol named
                 ? named
                 : symbol.ContainingType;
@@ -670,7 +632,6 @@ internal static partial class SemanticClaimIdentity
 
     private static bool HasFunctionPointerSignature(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return ContainsFunctionPointer(method.ReturnType) ||
             method.Parameters.Any(static parameter =>
                 ContainsFunctionPointer(parameter.Type));
@@ -678,7 +639,6 @@ internal static partial class SemanticClaimIdentity
 
     private static bool ContainsFunctionPointer(ITypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type switch
         {
             IFunctionPointerTypeSymbol => true,
@@ -694,8 +654,6 @@ internal static partial class SemanticClaimIdentity
         CanonicalHashWriter writer,
         ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (var type = symbol is INamedTypeSymbol named
                 ? named
@@ -725,7 +683,6 @@ internal static partial class SemanticClaimIdentity
     private static void WriteTypeParameter(
         CanonicalHashWriter writer, ITypeParameterSymbol parameter, ClaimIdentityContext context)
     {
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (parameter.ContainingSymbol is IMethodSymbol owner &&
             SymbolEqualityComparer.Default.Equals(owner.OriginalDefinition, context.Source.OriginalDefinition))
         {
@@ -751,17 +708,13 @@ internal static partial class SemanticClaimIdentity
 
     private static void WriteReferenceId(CanonicalHashWriter writer, ISymbol symbol)
     {
-        symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(DocumentationCommentId.CreateReferenceId(symbol));
     }
 
     private static void WriteOptionalConstant(
-        CanonicalHashWriter writer, Optional<object?> constant /* SPINT001: all values valid - missing and present constants are both encoded */, ClaimIdentityContext context)
+        CanonicalHashWriter writer, Optional<object?> constant, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(constant.HasValue);
         if (constant.HasValue)
         {
@@ -773,9 +726,6 @@ internal static partial class SemanticClaimIdentity
         CanonicalHashWriter writer, AttributeData attribute, ClaimIdentityContext context, bool includeNamed)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(attribute.ConstructorArguments.Length);
         foreach (var argument in attribute.ConstructorArguments)
         {
@@ -796,11 +746,9 @@ internal static partial class SemanticClaimIdentity
     }
 
     private static void WriteTypedConstant(
-        CanonicalHashWriter writer, TypedConstant constant /* SPINT001: all values valid - scalar, array, null, and compiler-error constants are all encoded */, ClaimIdentityContext context)
+        CanonicalHashWriter writer, TypedConstant constant, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         writer.Add(constant.Kind.ToString());
         WriteType(writer, constant.Type, context);
         if (constant.Kind != TypedConstantKind.Array)
@@ -827,8 +775,6 @@ internal static partial class SemanticClaimIdentity
     private static void WriteConstant(CanonicalHashWriter writer, object? value, ClaimIdentityContext context)
     {
         context = RepositoryParameterGuard.ValidateInitialized(context, context.Target is null || context.Source is null, nameof(context), "Value must be initialized.");
-
-        writer = RepositoryParameterGuard.NotNull(writer, nameof(writer));
         if (value == null)
         {
             writer.Add("null");
@@ -877,13 +823,11 @@ internal static partial class SemanticClaimIdentity
 
     private static IMethodSymbol NormalizePartial(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.PartialImplementationPart ?? method;
     }
 
     private static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return NormalizePartial(method).OriginalDefinition;
     }
 
@@ -896,8 +840,6 @@ internal static partial class SemanticClaimIdentity
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return SyntaxSite.IsSame(left, right);
     }
 

@@ -243,21 +243,18 @@ internal static class HornInvariantSearch
 
         private T Own<T>(T expression) where T : Expr
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return owner.Own(expression);
         }
 
         private bool IsRelation(Expr expression)
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             return expression.IsApp && expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED &&
                 encoder.Relations!.Values.Any(relation => relation.Name.ToString() == expression.FuncDecl.Name.ToString());
         }
 
         private bool ContainsRelation(Expr expression)
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             return IsRelation(expression) || expression.IsApp && expression.Args.Any(ContainsRelation);
         }
@@ -277,7 +274,6 @@ internal static class HornInvariantSearch
 
         private void Applications(Expr expression, ImmutableList<Expr>.Builder applications)
         {
-            applications = RepositoryParameterGuard.NotNull(applications, nameof(applications));
             _meter.Consume();
             if (IsRelation(expression))
             {
@@ -316,7 +312,6 @@ internal static class HornInvariantSearch
         // Quantification is added only after this traversal.
         private (ImmutableDictionary<string, Expr> Values, ImmutableList<string> Order) CollectIntegerConstants(Expr expression)
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             var constants = ImmutableDictionary.CreateBuilder<string, Expr>(StringComparer.Ordinal);
             var order = ImmutableList.CreateBuilder<string>();
             CollectIntegerConstantsCore(expression, constants, order);
@@ -326,9 +321,6 @@ internal static class HornInvariantSearch
         private void CollectIntegerConstantsCore(
             Expr expression, ImmutableDictionary<string, Expr>.Builder constants, ImmutableList<string>.Builder order)
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
-            constants = RepositoryParameterGuard.NotNull(constants, nameof(constants));
-            order = RepositoryParameterGuard.NotNull(order, nameof(order));
             _meter.Consume();
             if (expression.FuncDecl.DeclKind == Z3_decl_kind.Z3_OP_UNINTERPRETED && !IsRelation(expression) &&
                 expression.FuncDecl.Name.ToString() != "error")
@@ -345,7 +337,6 @@ internal static class HornInvariantSearch
         // The IR meaning of a cover over boolean and bitvector state.
         private IrTerm? Translate(Expr expression)
         {
-            expression = RepositoryParameterGuard.NotNull(expression, nameof(expression));
             _meter.Consume();
             var arguments = expression.IsApp ? expression.Args.ToImmutableArray() : ImmutableArray<Expr>.Empty;
             var literal = SmtNativeUtilities.DecodeIntegerLiteral(factory, expression, out var nativeKind);

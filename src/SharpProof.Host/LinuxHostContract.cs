@@ -108,8 +108,6 @@ internal sealed class LinuxHostContract
 
     private static (long Bytes, string Sha256) ReadPin(JsonElement element, string sizeProperty, string digestProperty)
     {
-        ArgumentNullException.ThrowIfNull(sizeProperty);
-        ArgumentNullException.ThrowIfNull(digestProperty);
         var bytes = element.GetProperty(sizeProperty).GetInt64();
         var digest = element.GetProperty(digestProperty).GetString();
         if (bytes <= 0 || digest == null || digest.Length != 64 ||
@@ -122,8 +120,6 @@ internal sealed class LinuxHostContract
 
     private static FileStream OpenVerifiedPayload(string path, (long Bytes, string Sha256) pin, string kind)
     {
-        ArgumentNullException.ThrowIfNull(path);
-        ArgumentNullException.ThrowIfNull(kind);
         FileStream? stream = null;
         try
         {
@@ -162,7 +158,6 @@ internal sealed class LinuxHostContract
 
     private static IntPtr LoadVerifiedLibrary(FileStream stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
         return ContainerContract.LoadVerifiedZ3Library(stream, isWindows: false);
     }
 }

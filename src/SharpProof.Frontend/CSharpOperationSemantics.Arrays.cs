@@ -108,7 +108,6 @@ internal static partial class CSharpOperationSemantics
 
     private static TotalScalarRule ArrayReadRule(IrFactory factory, IArrayElementReferenceOperation access, ImmutableArray<IrTerm> operands)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         if (access.Indices.Length != 1 || access.ArrayReference.Type is not IArrayTypeSymbol { IsSZArray: true } array ||
             !IsScalar(array.ElementType) || operands.Length != 2)
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
@@ -188,8 +187,6 @@ internal static partial class CSharpOperationSemantics
 
         static bool IsContainedUse(ILocalReferenceOperation use, SemanticModel model)
         {
-            model = RepositoryParameterGuard.NotNull(model, nameof(model));
-            use = RepositoryParameterGuard.NotNull(use, nameof(use));
             return use.Parent switch
             {
                 IArrayElementReferenceOperation element => element.ArrayReference == use,
@@ -207,8 +204,6 @@ internal static partial class CSharpOperationSemantics
 
         static bool InNestedFunction(IOperation use, IOperation root)
         {
-            root = RepositoryParameterGuard.NotNull(root, nameof(root));
-            use = RepositoryParameterGuard.NotNull(use, nameof(use));
             for (var current = use.Parent; current != null && current != root; current = current.Parent)
             {
                 if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
@@ -220,7 +215,6 @@ internal static partial class CSharpOperationSemantics
 
     private static bool IsFreshCreation(IOperation? value, SemanticModel model)
     {
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         return value switch
         {
             IArrayCreationOperation => true,

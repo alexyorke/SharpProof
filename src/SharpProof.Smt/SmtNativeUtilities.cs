@@ -210,9 +210,6 @@ internal static class SmtNativeUtilities
     // it from their operands' type.
     private static IrTerm Compare(IrFactory factory, IrBinaryOperator @operator, IrTerm left, IrTerm right, bool? signed)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         (left, right) = Unify(factory, left, right);
         if (signed is { } kind && factory.GetTypeInfo(left.Type) is { Kind: IrTypeKind.Integer } info && info.Signed != kind)
         {
@@ -224,10 +221,6 @@ internal static class SmtNativeUtilities
 
     private static IrTerm Conditional(IrFactory factory, IrTerm condition, IrTerm whenTrue, IrTerm whenFalse)
     {
-        condition = RepositoryParameterGuard.NotNull(condition, nameof(condition));
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        whenFalse = RepositoryParameterGuard.NotNull(whenFalse, nameof(whenFalse));
-        whenTrue = RepositoryParameterGuard.NotNull(whenTrue, nameof(whenTrue));
         var (left, right) = Unify(factory, whenTrue, whenFalse);
         return factory.Conditional(condition, left, right);
     }
@@ -235,14 +228,11 @@ internal static class SmtNativeUtilities
     // A literal takes the type of the term it meets.
     private static (IrTerm Left, IrTerm Right) Unify(IrFactory factory, IrTerm left, IrTerm right)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return left is IrIntegerTerm && right is not IrIntegerTerm ? (Like(factory, left, right.Type), right) : (left, Like(factory, right, left.Type));
     }
 
     private static IrTerm Like(IrFactory factory, IrTerm term, IrTypeId type)
-    { factory = RepositoryParameterGuard.NotNull(factory, nameof(factory)); term = RepositoryParameterGuard.NotNull(term, nameof(term)); RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
+    { RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type)); return term.Type == type || factory.GetTypeInfo(type).Kind != IrTypeKind.Integer ? term : factory.Cast(type, term); }
 
     internal static ImmutableArray<IrValue> WithArrayObservations(
         IrFactory factory, IrTypeId elementType, ImmutableArray<IrValue> elements,

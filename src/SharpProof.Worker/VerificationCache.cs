@@ -154,7 +154,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private bool EvictOldest(string protectedPath)
     {
-        System.ArgumentNullException.ThrowIfNull(protectedPath);
         var entries = new DirectoryInfo(_directory)
             .EnumerateFiles("*" + CacheFileSuffix, SearchOption.TopDirectoryOnly)
             .Where(static file => file is not null && IsCacheFileName(file.Name))
@@ -183,7 +182,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static bool IsCacheFileName(string name)
     {
-        ArgumentNullException.ThrowIfNull(name);
         return name.Length == 64 + CacheFileSuffix.Length &&
             name.EndsWith(CacheFileSuffix, StringComparison.Ordinal) &&
             WorkerProtocolJson.IsSha256(name.Substring(0, 64));
@@ -191,7 +189,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private bool TryDelete(string path)
     {
-        System.ArgumentNullException.ThrowIfNull(path);
         try
         {
             _deleteFile(path);

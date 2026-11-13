@@ -43,7 +43,6 @@ internal sealed record CompilerReferenceSiblingLocation(string Name, string? Dir
 
     private static bool HasSafeModuleFileName(string name)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         return !string.IsNullOrEmpty(name) && name is not "." and not ".." &&
             name.IndexOf('\0') < 0 && name.IndexOf('/') < 0;
     }

@@ -66,7 +66,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private GuardedExpression? FieldClause(IOperation operation, IrMemberId member, IOperation owner, TotalParameterState state, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (IsImplicitThis(owner))
         {
             return _context.ReceiverValue(state) is { } self
@@ -730,8 +729,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private TotalBodyValue Pin(IOperation operation, TotalBodyValue value)
     {
         value = RepositoryParameterGuard.ValidateInitialized(value, value.Value is null || value.Continuation.IsDefault, nameof(value), "Value must be initialized.");
-
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var pinned = _context.Temporary(value.Value.Type);
         _builder!.Assign(value.Continuation, _context.Site(operation), pinned, value.Value);
         return new(_factory.Variable(pinned), value.Continuation, value.Classification);
@@ -739,8 +736,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private TotalBodyValue AllocateCapturedDelegate(IOperation operation, IrTerm receiver, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var type = _context.Type(operation.Type);
         var target = _context.Temporary(type);
@@ -849,7 +844,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
         void Collect(IOperation current, int nesting)
         {
-            current = RepositoryParameterGuard.NotNull(current, nameof(current));
             Spend?.Invoke();
             if (nesting < 256 && CSharpOperationSemantics.IsStringConcatenation(current) && !current.ConstantValue.HasValue)
             {
@@ -867,10 +861,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private TotalBodyValue CaptureStringConcatenation(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block,
         bool deferred = false)
     {
-
         RepositoryParameterGuard.RequireInitialized(operands.IsDefault, nameof(operands), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var site = _context.Site(operation);
         var allocation = _builder!.CreateBlock("concat:allocate");
         var join = _builder.CreateBlock("concat:join");
@@ -902,7 +894,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // the remainder, so the subtraction cannot wrap before that disjunct.
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.RequireInitialized(operands.IsDefault, nameof(operands), "Array must be initialized.");
         IrTerm remaining = _factory.Integer(MaximumStringLength);
         IrTerm exceeds = _factory.Boolean(false);
@@ -1013,8 +1004,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // `false`, and a static abstract (generic math) operator stay closed.
     private TotalBodyValue? MetadataOperatorCall(IBinaryOperation operation, IMethodSymbol method, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (!AllowOpaqueCalls || operation.IsLifted ||
             operation.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr ||
@@ -1045,8 +1034,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // what a precondition reads. A null literal cannot change.
     private IrTerm Pin(IOperation source, IrTerm value, IrBlockId block)
     {
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (value is IrNullTerm)
         { return value; }
@@ -1060,7 +1047,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private static ImmutableArray<IrTerm>? ByParameter(IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments,
         ImmutableArray<IrTerm> values, bool assigned)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         if (arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length || values.Length != method.Parameters.Length)
@@ -1083,8 +1069,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private IrMemberId OpaqueCallMember(IMethodSymbol method, IEnumerable<IrTerm> arguments,
         IrTypeId? resultType, out string display)
     {
-        arguments = RepositoryParameterGuard.NotNull(arguments, nameof(arguments));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         display = CompilerIdentityBridge.CreateSymbolDisplay(method);
         return _factory.GetOrCreateMemberSnapshot(
             CompilerIdentityBridge.InternSymbol(_factory, method), _context.Type(method.ContainingType),
@@ -1135,7 +1119,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
@@ -1166,7 +1149,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var constructor = operation.Constructor!;
@@ -1259,7 +1241,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        access = RepositoryParameterGuard.NotNull(access, nameof(access));
         var receiver = LowerBodyValue(access.Instance, block, depth + 1);
         if (!receiver.Classification.IsExact)
         { return Approximate(access, receiver.Continuation, receiver.Classification.Abstention); }
@@ -1279,7 +1260,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private TotalBodyValue ElementAccess(IArrayElementReferenceOperation access, IOperation? mutation, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        access = RepositoryParameterGuard.NotNull(access, nameof(access));
         var array = LowerBodyValue(access.ArrayReference, block, depth + 1);
         if (!array.Classification.IsExact)
         { return Approximate(mutation ?? access, array.Continuation, array.Classification.Abstention); }
@@ -1400,13 +1380,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured = false)
-    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); operation = RepositoryParameterGuard.NotNull(operation, nameof(operation)); RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldRead(operation, field, instance, block, depth, captured, out _); }
+    { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldRead(operation, field, instance, block, depth, captured, out _); }
 
     private TotalBodyValue FieldRead(IOperation operation, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured, out IrTerm? receiver)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         receiver = null;
         var implicitThis = IsImplicitThis(instance);
         if (!implicitThis && !field.IsStatic)
@@ -1460,7 +1439,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private IFieldSymbol BoundField(IFieldSymbol field)
     {
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         // Only concrete scalar substitutions add storage support here. Open and
         // reference-dependent fields retain their existing identity/replay boundary.
         if (_context.KnownScalarType(field.Type) != null && _context.SpecializeSourceType(field.ContainingType) is INamedTypeSymbol owner &&
@@ -1473,7 +1451,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         field = BoundField(field);
         if (field.IsStatic || !field.ContainingType.IsReferenceType ||
             !CSharpOperationSemantics.HasIndependentFieldStorage(field) ||
@@ -1489,17 +1466,16 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     }
 
     private IrTerm AsObject(IrTerm receiver)
-    { receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver)); return receiver.Type == _factory.ObjectType ? receiver : _factory.Cast(_factory.ObjectType, receiver); }
+    { return receiver.Type == _factory.ObjectType ? receiver : _factory.Cast(_factory.ObjectType, receiver); }
 
     // A field increment or compound assignment on `this`, a parameter or a
     // local reads the field (faulting on a null receiver), computes from that
     // approximated value, and writes it back.
     private bool IsMutableField(IFieldReferenceOperation field)
-    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); return IsMutableField(field.Field, field.Instance); }
+    { return IsMutableField(field.Field, field.Instance); }
 
     private bool IsMutableField(IFieldSymbol field, IOperation? instance)
     {
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         field = BoundField(field);
         return CSharpOperationSemantics.IsSupportedFieldRead(field) &&
             CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) &&
@@ -1508,16 +1484,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth,
         bool captured = false)
-    { field = RepositoryParameterGuard.NotNull(field, nameof(field)); operation = RepositoryParameterGuard.NotNull(operation, nameof(operation)); RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldMutation(operation, field, field.Field, field.Instance, block, depth, captured); }
+    { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldMutation(operation, field, field.Field, field.Instance, block, depth, captured); }
 
     // `access` is the field or auto-property reference being mutated.
     private TotalBodyValue FieldMutation(IOperation operation, IOperation access, IFieldSymbol field, IOperation? instance,
         IrBlockId block, int depth, bool captured = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        access = RepositoryParameterGuard.NotNull(access, nameof(access));
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var old = FieldRead(access, field, instance, block, depth, captured, out var receiver);
         if (!old.Classification.IsExact)
         { return Approximate(operation, old.Continuation, old.Classification.Abstention); }
@@ -1551,14 +1524,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldReferenceOperation field, IrBlockId block, int depth, bool captured = false)
-    { assignment = RepositoryParameterGuard.NotNull(assignment, nameof(assignment)); field = RepositoryParameterGuard.NotNull(field, nameof(field)); RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldWrite(assignment, field.Field, field.Instance, block, depth, captured); }
+    { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); return FieldWrite(assignment, field.Field, field.Instance, block, depth, captured); }
 
     private TotalBodyValue FieldWrite(ISimpleAssignmentOperation assignment,
         IFieldSymbol field, IOperation? instance, IrBlockId block, int depth, bool captured = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        assignment = RepositoryParameterGuard.NotNull(assignment, nameof(assignment));
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
         IrTerm? receiver = null;
         var implicitThis = IsImplicitThis(instance);
         if (!field.IsStatic && !implicitThis)
@@ -1596,8 +1567,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         if (receiver != null && region is IrWriteRegion.Field or IrWriteRegion.Parameter && FieldMember(field) is { } member &&
             _factory.GetMemberInfo(member).ReturnType == value.Type)
         { _builder!.FieldStore(block, site, region, AsObject(receiver), member, value); }
@@ -1607,7 +1576,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private OperationId ReceiverWriteSite(IOperation operation, IOperation? instance)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return FreshReceiver && IsImplicitThis(instance) ||
             instance != null && !IsImplicitThis(instance) && CSharpOperationSemantics.IsFreshReceiver(instance.Syntax, _context.Compilation)
             ? _context.FreshWriteSite(operation) : _context.Site(operation);
@@ -1642,10 +1610,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private GuardedExpression Compose(IOperation operation, GuardedExpression receiver, GuardedExpression argument, TotalScalarRule rule)
     {
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
-
-        argument = RepositoryParameterGuard.NotNull(argument, nameof(argument));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
         var classification = First([receiver.Classification, argument.Classification]);
         if (!classification.IsExact)
         { return Failed(operation, classification.Abstention); }
@@ -1657,8 +1621,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private GuardedExpression Compose(IOperation operation, ImmutableArray<GuardedExpression> children)
     {
-
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var classification = First([.. children.Select(value => value.Classification)]);
         if (!classification.IsExact)
         {
@@ -1736,7 +1698,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // exception is thrown. Keep these effects inside the scalar fault guard.
     private IrBlockId ScalarExceptionResourceEffects(IInvocationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (!ShadowCallSkeleton)
@@ -1805,8 +1766,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private IrBlockId ExceedsMaximumArrayLength(IOperation operation, IOperation size, IrTerm length, IrBlockId block)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        length = RepositoryParameterGuard.NotNull(length, nameof(length));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (size.ConstantValue is { HasValue: true, Value: <= SmallestMaximumArrayLength })
         { return block; }
         return MayFault(operation, _factory.Binary(IrBinaryOperator.GreaterThan, length,
@@ -1820,9 +1779,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private IrBlockId MayFault(IOperation operation, IrTerm beyond, string label, IrBlockId block)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        beyond = RepositoryParameterGuard.NotNull(beyond, nameof(beyond));
-        label = RepositoryParameterGuard.NotNull(label, nameof(label));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var site = _context.Site(operation);
         var uncertain = _builder!.CreateBlock(label);
         var thrown = _builder.CreateBlock("throw");
@@ -1843,7 +1799,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return rule.Classification.IsExact ? ApplyRule(operation, rule, block, beforeThrow)
             : Approximate(abstentionOperation ?? operation, block, rule.Classification.Abstention);
     }
@@ -1854,7 +1809,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         rule = RepositoryParameterGuard.ValidateInitialized(rule, rule.Value is null, nameof(rule), "Value must be initialized.");
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         foreach (var fault in rule.Throws)
         {
             var thrown = _builder!.CreateBlock("throw");
@@ -1899,10 +1853,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         IOperation whenFalse, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        conditionOperation = RepositoryParameterGuard.NotNull(conditionOperation, nameof(conditionOperation));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        whenFalse = RepositoryParameterGuard.NotNull(whenFalse, nameof(whenFalse));
-        whenTrue = RepositoryParameterGuard.NotNull(whenTrue, nameof(whenTrue));
         var condition = LowerBodyValue(conditionOperation, block, depth + 1);
         if (!condition.Classification.IsExact)
         {
@@ -1927,7 +1877,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
         var rule = CSharpOperationSemantics.Increment(_factory, operation, old.Value);
         if (!rule.Classification.IsExact)
@@ -1942,7 +1891,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var old = Capture(operation, new(_factory.Variable(target), block, FrontendSubsetClassification.Exact));
         var right = LowerBodyValue(operation.Value, old.Continuation, depth + 1);
         if (!right.Classification.IsExact)
@@ -1960,7 +1908,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private TotalBodyValue Capture(IOperation operation, TotalBodyValue value, OperationId? site = null)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         if (value.Value is IrNullTerm)
         { return value; }
         var target = _context.Temporary(value.Value.Type);
@@ -2000,7 +1947,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private bool TryStorage(IOperation operation, out IrVarId target)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         target = operation switch
         {
             IParameterReferenceOperation parameter when _context.OwnsParameter(parameter.Parameter) => _context.Variable(parameter.Parameter),
@@ -2044,18 +1990,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     private GuardedExpression Failed(IOperation operation, FrontendAbstention reason)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return new(Default(operation.Type), _factory.Boolean(false), FrontendSubsetClassification.Abstain(reason));
     }
     private GuardedExpression Exact(IrTerm value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return new(value, _factory.Boolean(true), FrontendSubsetClassification.Exact);
     }
     private TotalBodyValue Approximate(IOperation operation, IrBlockId block, FrontendAbstention reason)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         var target = _context.Temporary(_context.Type(operation.Type));
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Abstain(reason));
@@ -2118,19 +2061,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     }
     private IrTerm And(IrTerm first, IrTerm second)
     {
-        first = RepositoryParameterGuard.NotNull(first, nameof(first));
-        second = RepositoryParameterGuard.NotNull(second, nameof(second));
         return _factory.Binary(IrBinaryOperator.AndAlso, first, second);
     }
     private IrTerm Or(IrTerm first, IrTerm second)
     {
-        first = RepositoryParameterGuard.NotNull(first, nameof(first));
-        second = RepositoryParameterGuard.NotNull(second, nameof(second));
         return _factory.Binary(IrBinaryOperator.OrElse, first, second);
     }
     private IrTerm Not(IrTerm value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return _factory.Unary(IrUnaryOperator.Not, value);
     }
     private static FrontendSubsetClassification First(ImmutableArray<FrontendSubsetClassification> classifications)

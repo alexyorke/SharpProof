@@ -148,7 +148,6 @@ internal static class SarifProjection
         ImmutableDictionary<string, TEntry> entries, string id, string kind)
         where TEntry : class
     {
-        System.ArgumentNullException.ThrowIfNull(kind);
         return entries.TryGetValue(id, out var entry)
             ? entry
             : throw new InvalidDataException(
@@ -159,10 +158,6 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerClaimResult result,
         WorkerClaimManifestEntry claim, string projectDirectory)
     {
-        System.ArgumentNullException.ThrowIfNull(claim);
-        System.ArgumentNullException.ThrowIfNull(projectDirectory);
-        System.ArgumentNullException.ThrowIfNull(request);
-        System.ArgumentNullException.ThrowIfNull(result);
         var outcome = result.Outcome;
         var reasonValue = result.Reason;
         var effectWitness = result.EffectWitness;
@@ -218,10 +213,6 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable, string projectDirectory, bool timedOutCalls)
     {
-        System.ArgumentNullException.ThrowIfNull(callable);
-        System.ArgumentNullException.ThrowIfNull(projectDirectory);
-        System.ArgumentNullException.ThrowIfNull(request);
-        System.ArgumentNullException.ThrowIfNull(result);
         var callableId = result.CallableId;
         var reason = result.Reason;
         var presentation = UnknownPresentation(timedOutCalls ? LauncherPresentation.TimingOnlyPolicy(request.VerifyPolicy) : request.VerifyPolicy);
@@ -244,10 +235,6 @@ internal static class SarifProjection
         WorkerVerifyRequest request, WorkerCallableResult result,
         WorkerCallableManifestEntry callable, string projectDirectory)
     {
-        System.ArgumentNullException.ThrowIfNull(callable);
-        System.ArgumentNullException.ThrowIfNull(projectDirectory);
-        System.ArgumentNullException.ThrowIfNull(request);
-        System.ArgumentNullException.ThrowIfNull(result);
         var assumptions = result.Assumptions
             .Where(IsPolicyAssumption)
             .ToImmutableArray();
@@ -270,7 +257,6 @@ internal static class SarifProjection
     private static bool IsPolicyAssumption(
         WorkerAssumptionEvidence assumption)
     {
-        System.ArgumentNullException.ThrowIfNull(assumption);
         return assumption.Kind is WorkerAssumptionKind.UserAssume or
             WorkerAssumptionKind.TrustedBoundary;
     }
@@ -307,14 +293,6 @@ internal static class SarifProjection
         WorkerSourceLocation location, string semanticId, object properties,
         string projectDirectory)
     {
-        System.ArgumentNullException.ThrowIfNull(kind);
-        System.ArgumentNullException.ThrowIfNull(level);
-        System.ArgumentNullException.ThrowIfNull(location);
-        System.ArgumentNullException.ThrowIfNull(message);
-        System.ArgumentNullException.ThrowIfNull(projectDirectory);
-        System.ArgumentNullException.ThrowIfNull(properties);
-        System.ArgumentNullException.ThrowIfNull(ruleId);
-        System.ArgumentNullException.ThrowIfNull(semanticId);
         return new
         {
             ruleId,
@@ -345,9 +323,6 @@ internal static class SarifProjection
     private static object Notification(
         string id, string message, string level = "error")
     {
-        System.ArgumentNullException.ThrowIfNull(id);
-        System.ArgumentNullException.ThrowIfNull(level);
-        System.ArgumentNullException.ThrowIfNull(message);
         return new
         {
             descriptor = new
@@ -423,14 +398,12 @@ internal static class SarifProjection
 
     private static bool IsUnixAbsolute(string path)
     {
-        System.ArgumentNullException.ThrowIfNull(path);
         return path.Length != 0 && path[0] == '/';
     }
 
     private static string NormalizeAbsolutePath(
         string path, bool windowsPath)
     {
-        System.ArgumentNullException.ThrowIfNull(path);
         var normalized = windowsPath ? path.Replace('\\', '/') : path;
         var segments = normalized[(windowsPath ? 2 : 1)..].Split(
             '/', StringSplitOptions.RemoveEmptyEntries).ToImmutableArray();
@@ -497,7 +470,6 @@ internal static class SarifProjection
 
     private static bool IsWindowsDriveAbsolute(string path)
     {
-        System.ArgumentNullException.ThrowIfNull(path);
         return path.Length >= 3 &&
             char.IsAsciiLetter(path[0]) &&
             path[1] == ':' &&
@@ -506,7 +478,6 @@ internal static class SarifProjection
 
     private static string EscapePath(string path)
     {
-        System.ArgumentNullException.ThrowIfNull(path);
         return string.Join(
             "/",
             path.Split('/').Select(

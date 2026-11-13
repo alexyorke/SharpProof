@@ -87,7 +87,6 @@ internal sealed class CompilerConfiguration
             out (bool Found, string Value, bool HasConflict, string Conflict)
                 featuresAliases)
     {
-        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         profileAliases = ReadOptionAliases(
             options,
             CompilerConfigurationOptionRegistry.Profile);
@@ -132,8 +131,6 @@ internal sealed class CompilerConfiguration
         AnalyzerConfigOptions options,
         CompilerConfigurationOption option)
     {
-        option = RepositoryParameterGuard.NotNull(option, nameof(option));
-        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         var candidateBuffer = ImmutableArray.CreateBuilder<(string Key, string Value)>(3);
         foreach (var key in ImmutableArray.Create(
                      option.Key,
@@ -219,7 +216,6 @@ internal sealed class CompilerConfiguration
             (bool Found, string Value, bool HasConflict, string Conflict)?
                 featuresAliases = null)
     {
-        options = RepositoryParameterGuard.NotNull(options, nameof(options));
         foreach (var option in CompilerConfigurationOptionRegistry.All)
         {
             var aliases = option == CompilerConfigurationOptionRegistry.Profile &&
@@ -306,10 +302,6 @@ internal sealed class CompilerConfiguration
         string key,
         string value)
     {
-        key = RepositoryParameterGuard.NotNull(key, nameof(key));
-        option = RepositoryParameterGuard.NotNull(option, nameof(option));
-        options = RepositoryParameterGuard.NotNull(options, nameof(options));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return string.Equals(
                 key,
                 "build_property." + option.BuildPropertyName,
@@ -325,8 +317,6 @@ internal sealed class CompilerConfiguration
         CompilerConfigurationOption option,
         string value)
     {
-        option = RepositoryParameterGuard.NotNull(option, nameof(option));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return option == CompilerConfigurationOptionRegistry.Profile
             ? Is(value, SharpProofConfigurationCatalog.DefaultProfile)
             : option == CompilerConfigurationOptionRegistry.Features &&
@@ -338,7 +328,6 @@ internal sealed class CompilerConfiguration
         CompilerConfigurationOption option,
         out string value)
     {
-        option = RepositoryParameterGuard.NotNull(option, nameof(option));
         var keys = ImmutableArray.Create(
             option.Key,
             "build_property." + option.Key,
@@ -358,7 +347,6 @@ internal sealed class CompilerConfiguration
 
     private static SharpProofProfile ParseProfile(string value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return Is(value, SharpProofConfigurationCatalog.ProfileOff)
             ? SharpProofProfile.Off :
         Is(value, SharpProofConfigurationCatalog.ProfileStrict) ? SharpProofProfile.Strict :
@@ -367,7 +355,6 @@ internal sealed class CompilerConfiguration
 
     private static SharpProofFeatures ParseFeatures(string value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return Enum.TryParse(
             value.Trim(),
             true,

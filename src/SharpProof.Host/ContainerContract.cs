@@ -427,7 +427,6 @@ internal static class ContainerContract
 
     private static JsonDocument ReadBoundedJson(Stream stream)
     {
-        System.ArgumentNullException.ThrowIfNull(stream);
         var bytes = new byte[MaximumContractBytes + 1];
         var length = 0;
         while (length < bytes.Length)
@@ -550,9 +549,6 @@ internal static class ContainerContract
         IEqualityComparer<T>? comparer = null)
     {
         RepositoryParameterGuard.RequireInitialized(element.ValueKind == System.Text.Json.JsonValueKind.Undefined, nameof(element), "Value must be initialized.");
-
-        System.ArgumentNullException.ThrowIfNull(accessor);
-        System.ArgumentNullException.ThrowIfNull(name);
         var actual = accessor(element, name);
         if (!(comparer ?? EqualityComparer<T>.Default).Equals(actual, expected))
         {

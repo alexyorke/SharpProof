@@ -50,7 +50,6 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr Encode(IrTerm term, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         meter.PollCancellation();
         if (_encoded.TryGetValue(term.Id, out var existing))
         {
@@ -89,8 +88,6 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeDefaultComparerValue(IrOpaqueTerm term, SmtQueryResourceMeter meter)
     {
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         var value = owner.Own(context.MkConst("defaultComparer" + term.Member.Value.ToString(CultureInfo.InvariantCulture), ReferenceSort));
         AddReferenceFact(owner.Own(context.MkNot(owner.Own(context.MkEq(value, NullReference)))));
         foreach (var previous in _defaultComparerOrder.ToImmutable())
@@ -117,8 +114,6 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeRelation(IrOpaqueTerm relation, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        relation = RepositoryParameterGuard.NotNull(relation, nameof(relation));
         var arguments = relation.Arguments.Select(argument => Encode(argument, meter)).ToImmutableArray();
         var relations = _relations ?? throw new InvalidOperationException("Invariant relations require Relations to be set.");
         if (!relations.TryGetValue(relation.Member, out var declaration))
@@ -133,8 +128,6 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private Expr EncodeOperator(IrTerm term, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         if (term is IrUnaryTerm unary)
         {
             var operand = Encode(unary.Operand, meter);
@@ -266,7 +259,6 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
 
     private static bool IsInteger(IrTypeInfo type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.Kind == IrTypeKind.Integer && type.Width is 8 or 16 or 32 or 64;
     }
 }

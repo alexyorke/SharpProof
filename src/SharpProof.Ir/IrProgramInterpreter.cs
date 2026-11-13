@@ -235,8 +235,6 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values,
         CancellationToken cancellationToken)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         return location.Accept(LocationOperandVisitor.Instance, (this, storedValue, values, cancellationToken));
     }
 
@@ -317,7 +315,6 @@ internal sealed class IrProgramInterpreter(IrFactory factory)
         ReplayValues values,
         CancellationToken cancellationToken)
     {
-        values = RepositoryParameterGuard.NotNull(values, nameof(values));
         if (storedValue == null)
         {
             return null;

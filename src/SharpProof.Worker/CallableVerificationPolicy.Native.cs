@@ -98,7 +98,6 @@ internal static partial class CallableVerificationPolicy
 
         void PublishEntry(CallableEntryFeasibility entry)
         {
-            System.ArgumentNullException.ThrowIfNull(entry);
             entryPublished = true;
             entryFeasibility = entry;
             foreach (var evidence in target.EffectClaims.Where(evidence => !NativeEffectClaims.IsNative(evidence.ContractKind) ||

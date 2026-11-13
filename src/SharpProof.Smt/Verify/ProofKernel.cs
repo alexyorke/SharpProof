@@ -132,7 +132,6 @@ internal sealed class ProofKernel(ISmtBackend backend)
         var observedCaches = ImmutableDictionary.CreateBuilder<IrMemberId, (object Identity, IrTypeId Type)>();
         IrValue? Observe(IrOpaqueTerm term)
         {
-            term = RepositoryParameterGuard.NotNull(term, nameof(term));
             var value = (ConcreteOpaqueValueProvider ?? replayContext?.ReplayOptions?.ConcreteOpaqueValueProvider)?.Invoke(term);
             if (value == null && IrOpaqueCallSite.DefaultComparerValueKind(query.Factory, term) != null)
             { unavailable = true; }
@@ -237,7 +236,6 @@ internal sealed class ProofKernel(ISmtBackend backend)
 
     private static bool IsBoolean(IrEvaluationResult result, bool expected)
     {
-        result = RepositoryParameterGuard.NotNull(result, nameof(result));
         return result.Status == IrEvaluationStatus.Value &&
         result.Value is { Kind: IrValueKind.Boolean } value &&
         value.Boolean == expected;

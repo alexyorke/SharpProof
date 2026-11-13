@@ -115,7 +115,6 @@ internal static class TotalContractInvocationMaterialization
         ContractIntrinsicValidator intrinsics, IMethodSymbol source,
         IOperation? body, bool requiresOnly)
     {
-        intrinsics = RepositoryParameterGuard.NotNull(intrinsics, nameof(intrinsics));
         foreach (var violation in intrinsics.Validate(source, body))
         {
             if (!requiresOnly || violation.EnclosingClauseKind == BoundContractKind.Requires)

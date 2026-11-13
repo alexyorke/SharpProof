@@ -557,8 +557,6 @@ internal static class WorkerResultAssembler
 
     private static bool HasPrefix(string value, string prefix)
     {
-        prefix = RepositoryParameterGuard.NotNull(prefix, nameof(prefix));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.StartsWith(prefix, StringComparison.Ordinal);
     }
 

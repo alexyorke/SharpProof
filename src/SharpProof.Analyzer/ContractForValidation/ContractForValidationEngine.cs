@@ -18,7 +18,6 @@ internal static class ContractForValidationEngine
         var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
         void Report(Diagnostic diagnostic)
         {
-            diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
             diagnostics.Add(diagnostic);
         }
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
@@ -137,7 +136,6 @@ internal static class ContractForValidationEngine
     private static ImmutableArray<Diagnostic> Order(
         IEnumerable<Diagnostic> diagnostics)
     {
-        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         return [.. diagnostics
             .OrderBy(static diagnostic =>
                 diagnostic.Location.SourceTree?.FilePath,
@@ -183,10 +181,6 @@ internal static class ContractForValidationEngine
         Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
-
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        contractFor = RepositoryParameterGuard.NotNull(contractFor, nameof(contractFor));
-        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
         RepositoryParameterGuard.RequireInitialized(candidates.IsDefault, nameof(candidates), "Array must be initialized.");
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
         foreach (var companion in candidates)
@@ -234,9 +228,6 @@ internal static class ContractForValidationEngine
         Location fallback,
         CancellationToken cancellationToken)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
         var location = attribute.ApplicationSyntaxReference?
             .GetSyntax(cancellationToken)
             .GetLocation();

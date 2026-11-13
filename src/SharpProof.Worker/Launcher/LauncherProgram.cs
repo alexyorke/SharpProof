@@ -184,7 +184,6 @@ internal static class Program
 
     private static LauncherFailure ClassifyLauncherFailure(Exception exception)
     {
-        System.ArgumentNullException.ThrowIfNull(exception);
         return exception switch
         {
             OverflowException => new(3, WorkerRunStatus.Failed, WorkerRunFailureReason.InvalidRequest,
@@ -394,8 +393,6 @@ internal static class Program
     private static void ReportRefutedClaim(
         WorkerClaimManifestEntry claim, WorkerClaimResult result)
     {
-        System.ArgumentNullException.ThrowIfNull(claim);
-        System.ArgumentNullException.ThrowIfNull(result);
         // Lead with what failed and where, in source terms. The claim ID comes
         // last: it is only needed to look the claim up in the stored result.
         var message = "Refuted " + LauncherPresentation.RefutedSubject(claim, result) + "." +
@@ -433,7 +430,6 @@ internal static class Program
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)
     {
-        System.ArgumentNullException.ThrowIfNull(response);
         var callablesById = ImmutableDictionaryCapture.Create(
             response.Manifest.Callables,
             static callable => callable.CallableId,
@@ -466,9 +462,6 @@ internal static class Program
     private static void ReportDiagnostic(
         WorkerSourceLocation location, string severity, string id, string message)
     {
-        System.ArgumentNullException.ThrowIfNull(id);
-        System.ArgumentNullException.ThrowIfNull(location);
-        System.ArgumentNullException.ThrowIfNull(message);
         var prefix = string.IsNullOrWhiteSpace(location.Path)
             ? "SharpProof"
             : location.Path + FormattableString.Invariant(
@@ -568,13 +561,6 @@ internal static class Program
         WorkerRunStatus status,
         WorkerRunFailureReason reason, string code, string message, CancellationToken publicationToken)
     {
-        System.ArgumentNullException.ThrowIfNull(artifact);
-        System.ArgumentNullException.ThrowIfNull(code);
-        System.ArgumentNullException.ThrowIfNull(expectedInputHash);
-        System.ArgumentNullException.ThrowIfNull(expectedVersions);
-        System.ArgumentNullException.ThrowIfNull(message);
-        System.ArgumentNullException.ThrowIfNull(path);
-        System.ArgumentNullException.ThrowIfNull(request);
         var timeout = status == WorkerRunStatus.TimedOut;
         var response = WorkerResultAssembler.CreateIncomplete(
             expectedInputHash,
@@ -669,8 +655,6 @@ internal static class Program
     private static void WriteErrors(
         IEnumerable<WorkerProtocolError> errors, string prefix)
     {
-        System.ArgumentNullException.ThrowIfNull(errors);
-        System.ArgumentNullException.ThrowIfNull(prefix);
         foreach (var error in errors)
         {
             Log.Error(prefix + error.Code + ": " + error.Message);
@@ -836,7 +820,6 @@ internal sealed partial class LauncherArguments
 
     private string? OptionalFullPath(string key)
     {
-        System.ArgumentNullException.ThrowIfNull(key);
         return Optional(key) is { } value
             ? Program.NormalizeAbsolutePath(value)
             : null;
@@ -850,14 +833,12 @@ internal sealed partial class LauncherArguments
 
     private string? Optional(string key)
     {
-        System.ArgumentNullException.ThrowIfNull(key);
         return _values.TryGetValue(key, out var value) &&
         !string.IsNullOrWhiteSpace(value) ? value : null;
     }
 
-    private T Number<T>(string key, T fallback /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */) where T : struct, INumberBase<T>
+    private T Number<T>(string key, T fallback) where T : struct, INumberBase<T>
     {
-        System.ArgumentNullException.ThrowIfNull(key);
         return _values.TryGetValue(key, out var value) ? T.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture) : fallback;
     }
 

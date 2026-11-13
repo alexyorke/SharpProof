@@ -132,8 +132,6 @@ internal static class ContractForCompanionValidator
             ImmutableArray<object?> arguments)
         {
             RepositoryParameterGuard.ThrowIfMissing(arguments.IsDefault, nameof(arguments));
-            descriptor = RepositoryParameterGuard.NotNull(descriptor, nameof(descriptor));
-            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             diagnostics(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
@@ -219,7 +217,6 @@ internal static class ContractForCompanionValidator
     private static ImmutableArray<IMethodSymbol> GetLogicalMethods(
         INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return [.. ContractForSymbolMatcher.GetOrdinaryMethods(type)
             .Select(ContractClauseInventoryBuilder.NormalizeCallable)
             .Distinct((IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default)];
@@ -234,11 +231,6 @@ internal static class ContractForCompanionValidator
         Location fallback,
         CancellationToken cancellationToken)
     {
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        diagnostics = RepositoryParameterGuard.NotNull(diagnostics, nameof(diagnostics));
-        fallback = RepositoryParameterGuard.NotNull(fallback, nameof(fallback));
-        intrinsics = RepositoryParameterGuard.NotNull(intrinsics, nameof(intrinsics));
         var inventory = clauses.Create(
             method,
             implementationBody: null,

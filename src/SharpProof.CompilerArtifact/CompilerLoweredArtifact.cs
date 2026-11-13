@@ -107,10 +107,7 @@ internal static partial class CompilerLoweredArtifact
         CompilerCompilationSnapshot compilation,
         CancellationToken cancellationToken)
     {
-
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         cancellationToken.ThrowIfCancellationRequested();
         if (artifact.FailureReason !=
                 CompilerCallableArtifactReasonCatalog.SuccessReason &&

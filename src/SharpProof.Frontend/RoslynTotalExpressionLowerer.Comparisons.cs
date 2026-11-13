@@ -4,7 +4,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 {
     private GuardedExpression? ReferenceEqualsClause(IInvocationOperation invocation, TotalParameterState state, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
         { return null; }
         var values = ImmutableArray.CreateBuilder<GuardedExpression>(2);
@@ -18,7 +17,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? ReferenceEqualsBody(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (!CSharpOperationSemantics.IsObjectReferenceEquals(invocation.TargetMethod))
         { return null; }
@@ -38,7 +36,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private GuardedExpression? IntegerComparisonClause(IInvocationOperation invocation, TotalParameterState state, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         var primitive = CSharpOperationSemantics.IsIntegerCompareTo(invocation.TargetMethod) || _context.IsConstrainedIntegerComparable(invocation);
         if (!primitive && !_context.IsDefaultIntegerComparison(invocation))
         { return null; }
@@ -62,7 +59,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? IntegerComparisonBody(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (CSharpOperationSemantics.HasRefComparableReceiver(invocation))
         { return null; }

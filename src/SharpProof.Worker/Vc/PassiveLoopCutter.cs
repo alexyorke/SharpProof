@@ -302,7 +302,6 @@ internal sealed partial class PassiveLoopCutter
                 instruction is IrHavocInstruction { HavocKind: IrHavocKind.Memory or IrHavocKind.VariablesAndMemory }) ? null : ImmutableArray.CreateBuilder<Cell>();
             bool StableAddress(IrTerm target)
             {
-                System.ArgumentNullException.ThrowIfNull(target);
                 return !IrTraversal.Any(target, term =>
                 {
                     System.ArgumentNullException.ThrowIfNull(term);
@@ -345,7 +344,6 @@ internal sealed partial class PassiveLoopCutter
         var allocatedBlocks = 0;
         IrBlockId CreateBlock(string name)
         {
-            System.ArgumentNullException.ThrowIfNull(name);
             Spend();
             if (++allocatedBlocks > PassiveCallableVcBuilder.MaximumSteps)
             { throw new ConstructionLimitException(); }
@@ -535,7 +533,6 @@ internal sealed partial class PassiveLoopCutter
             // that skipped operation/effect sites execute. Each original body
             // stays shared, and no pending exception is synthesized here.
             RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-            System.ArgumentNullException.ThrowIfNull(component);
             var length = component.Blocks.Length;
             var missingOriginalBlocks = 0;
             foreach (var original in component.Blocks)
@@ -593,7 +590,6 @@ internal sealed partial class PassiveLoopCutter
 
     private static IEnumerable<IrBlockId> Targets(IrInstruction terminator)
     {
-        System.ArgumentNullException.ThrowIfNull(terminator);
         if (terminator is IrBranchInstruction branch)
         { yield return branch.WhenTrue; yield return branch.WhenFalse; }
         else if (terminator is IrGotoInstruction go)
