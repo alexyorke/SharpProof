@@ -73,7 +73,7 @@ internal static partial class CallableVerificationPolicy
         }
         catch (AggregateException)
         { throw; }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             return Interrupted(WorkerHost.IsBackendUnavailable(exception) ? WorkerClaimReason.BackendUnavailable : WorkerClaimReason.InfrastructureFailure,
                 WorkerCallableCoverageReason.InfrastructureFailure);

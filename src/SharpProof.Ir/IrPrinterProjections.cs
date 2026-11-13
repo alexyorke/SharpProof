@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Ir;
 
 internal sealed partial class IrPrinter

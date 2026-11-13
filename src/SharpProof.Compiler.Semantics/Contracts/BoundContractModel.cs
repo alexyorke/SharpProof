@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace SharpProof.Compiler.Semantics;
 
 internal enum BoundContractKind

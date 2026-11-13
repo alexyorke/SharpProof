@@ -23,7 +23,7 @@ internal static class WorkerHost
             return await worker.VerifyAsync(request, preparedInput, cancellationToken, operationStarted).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not
-            OutOfMemoryException and not StackOverflowException and not AggregateException)
+            OutOfMemoryException and not AggregateException)
         {
             return Failure(exception, budgets);
         }

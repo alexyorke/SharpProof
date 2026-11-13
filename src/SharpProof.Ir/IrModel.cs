@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace SharpProof.Ir;
 
 internal interface IIrIdentifierTag

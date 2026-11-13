@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Smt;
 
 internal static class VerificationProjections
