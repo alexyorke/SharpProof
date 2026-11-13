@@ -419,14 +419,25 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             HasStructuredError = true;
             Log.LogError(
-                string.Empty, diagnostic.Code, string.Empty, diagnostic.File,
+                string.Empty, diagnostic.Code, string.Empty, HelpLink(diagnostic.Code), diagnostic.File,
                 diagnostic.Line, diagnostic.Column, 0, 0, diagnostic.Message);
             return;
         }
 
         Log.LogWarning(
-            string.Empty, diagnostic.Code, string.Empty, diagnostic.File,
+            string.Empty, diagnostic.Code, string.Empty, HelpLink(diagnostic.Code), diagnostic.File,
             diagnostic.Line, diagnostic.Column, 0, 0, diagnostic.Message);
+    }
+
+    // The same page the analyzer descriptors link to; each code has a section there.
+    internal static string HelpLink(string code)
+    {
+        System.ArgumentNullException.ThrowIfNull(code);
+        return code.Length == 6 && code.StartsWith("SP", StringComparison.Ordinal) &&
+            code.AsSpan(2).IndexOfAnyExceptInRange('0', '9') < 0
+            ? string.Concat(
+                "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp", code.AsSpan(2))
+            : string.Empty;
     }
 
     private static string ValidateDotNetInstallation(string candidate)

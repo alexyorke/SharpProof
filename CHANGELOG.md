@@ -270,6 +270,9 @@ Entries describe repository changes, not package publication. Confirm available 
 - Add `--verification native` to `dotnet sharpproof init`. It selects strict
   verification on the build machine, matching the default template variant;
   before, `init` offered only the portable and container setups.
+- Link verifier diagnostics to their documentation. SP0047, SP0048 and SP0051
+  reported by the build now carry the same help link as analyzer diagnostics,
+  and the diagnostics page gains sections for SP0048 and SP0051.
 
 - Add a workspace template with pinned local tools, optional editor assistance,
   feed configuration defaulting to nuget.org, and portable/container profiles; add preview-first
