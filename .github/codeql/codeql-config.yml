@@ -1,0 +1,11 @@
+name: SharpProof CodeQL
+
+queries:
+  - uses: security-extended
+
+# eng/common is vendored byte-for-byte from dotnet/arcade (eng/arcade-source.json)
+# and is never built here. Its internal/ and sdl/ NuGet.config files name
+# Microsoft-internal feeds that answer 401, which the C# extractor reports on
+# the tool status page as "Found unreachable NuGet feeds".
+paths-ignore:
+  - eng/common
