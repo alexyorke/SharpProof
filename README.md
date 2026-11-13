@@ -36,7 +36,7 @@ The [support matrix](docs/preview-support.md) has the details.
 
 That one reference is the whole setup: it restores the contract API, the analyzers, the verifier and the pinned solver. Do not add `PrivateAssets="all"`, because projects that consume yours need the contract API too.
 
-Verification is strict by default. The build fails when a selected claim is refuted, when it cannot be proven, or when it depends on a declared assumption. To adopt gradually, start with analyzer diagnostics only and no proofs:
+Verification is strict by default. The build fails when a selected claim is refuted, when it cannot be proven, or when it depends on a declared assumption. The one exception is a call-precondition check that only runs out of time: it is reported as an unchecked call and does not fail the build. To adopt gradually, start with analyzer diagnostics only and no proofs:
 
 ```xml
 <PropertyGroup>
