@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Smt;
 
 internal sealed partial class BackendModel

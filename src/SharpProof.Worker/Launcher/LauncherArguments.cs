@@ -1,5 +1,3 @@
-#nullable enable
-
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;

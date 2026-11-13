@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace SharpProof.Worker.Protocol;
 
 internal static class WorkerInvocationArguments

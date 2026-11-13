@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.Worker;
 
 internal static class WorkerProjections

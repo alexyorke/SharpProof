@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Collections.Immutable;
 using SharpProof.Ir;
 

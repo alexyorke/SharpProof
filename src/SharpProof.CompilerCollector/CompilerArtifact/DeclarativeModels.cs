@@ -1,4 +1,3 @@
-#nullable enable
 namespace SharpProof.CompilerCollector;
 
 internal sealed partial record ClaimManifestBuildResult(

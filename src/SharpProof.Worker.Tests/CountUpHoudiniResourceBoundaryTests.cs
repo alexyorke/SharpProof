@@ -258,7 +258,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 projectCanceled = projectBoundary.IsCancellationRequested;
             }
         }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             failureType = exception.GetType().FullName;
             throw;
@@ -410,7 +410,7 @@ public sealed class CountUpHoudiniResourceBoundaryTests
                 result = await _guarded_session.CheckAsync(query, cancellationToken).ConfigureAwait(false);
                 return result;
             }
-            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+            catch (Exception exception) when (exception is not OutOfMemoryException)
             {
                 failureType = exception.GetType().FullName;
                 throw;

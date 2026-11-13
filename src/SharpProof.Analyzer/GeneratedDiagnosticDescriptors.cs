@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace SharpProof.Analyzer;
 
 internal static class GeneratedDiagnosticDescriptors

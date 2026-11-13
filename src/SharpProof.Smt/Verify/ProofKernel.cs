@@ -38,8 +38,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
         }
         catch (Exception exception) when (
             exception is not OperationCanceledException and
-            not OutOfMemoryException and
-            not StackOverflowException)
+            not OutOfMemoryException)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Unknown(AbstentionReason.InfrastructureFailure);
