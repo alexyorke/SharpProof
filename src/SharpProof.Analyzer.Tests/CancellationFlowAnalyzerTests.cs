@@ -201,7 +201,7 @@ public sealed class CancellationFlowAnalyzerTests
 
         var diagnostics = await Analyze(
             source.Replace("DISABLED_TOKEN", "None", StringComparison.Ordinal),
-            assemblyName: "Sample.Test");
+            testProject: true);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
     }
@@ -218,7 +218,7 @@ public sealed class CancellationFlowAnalyzerTests
             }
             """;
 
-        var diagnostics = await Analyze(source, assemblyName: "Sample.Test");
+        var diagnostics = await Analyze(source, testProject: true);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.NoTokenId]));
     }
@@ -234,7 +234,7 @@ public sealed class CancellationFlowAnalyzerTests
             }
             """;
 
-        var diagnostics = await Analyze(source, assemblyName: "Sample.Test");
+        var diagnostics = await Analyze(source, testProject: true);
         Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo([CancellationFlowAnalyzer.OptionalTokenId]));
     }
@@ -252,7 +252,7 @@ public sealed class CancellationFlowAnalyzerTests
 
         Assert.That(await Analyze(source, isExe: true), Is.Empty);
         Assert.That(await Analyze("public static class Sample { public static int Value() => 1; }",
-            assemblyName: "Sample.Test"), Is.Empty);
+            testProject: true), Is.Empty);
         Assert.That(await Analyze("using System.Threading.Tasks; public static class Sample { public static async Task WorkAsync() => await Task.Yield(); }",
             filePath: "Sample.g.cs"), Is.Empty);
     }
@@ -277,7 +277,7 @@ public sealed class CancellationFlowAnalyzerTests
             }
             """;
         Assert.That(await Analyze(source), Is.Empty);
-        Assert.That(await Analyze(source, assemblyName: "Sample.Test"), Is.Empty);
+        Assert.That(await Analyze(source, testProject: true), Is.Empty);
     }
 
     [Test]
@@ -717,7 +717,7 @@ public sealed class CancellationFlowAnalyzerTests
 
 
     private static async Task<ImmutableArray<Diagnostic>> Analyze(string source,
-        string filePath = "input.cs", string? assemblyName = null, bool isExe = false, bool validateCompilation = false)
+        string filePath = "input.cs", bool testProject = false, bool isExe = false, bool validateCompilation = false)
     {
         System.ArgumentNullException.ThrowIfNull(filePath);
         System.ArgumentNullException.ThrowIfNull(source);
@@ -726,16 +726,15 @@ public sealed class CancellationFlowAnalyzerTests
         {
             compilation = compilation.WithOptions(compilation.Options.WithOutputKind(OutputKind.ConsoleApplication));
         }
-        if (assemblyName != null)
-        {
-            compilation = compilation.WithAssemblyName(assemblyName);
-        }
         if (validateCompilation)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
         }
-        var diagnostics = await compilation.WithAnalyzers([new CancellationFlowAnalyzer()])
-            .GetAnalyzerDiagnosticsAsync();
+        var analyzers = testProject
+            ? compilation.WithAnalyzers([new CancellationFlowAnalyzer()], new AnalyzerOptions([], new SharpProof.Testing.DictionaryAnalyzerConfigOptionsProvider(
+                ImmutableDictionary<string, string>.Empty.Add("build_property.SharpProofTestProject", "true"))))
+            : compilation.WithAnalyzers([new CancellationFlowAnalyzer()]);
+        var diagnostics = await analyzers.GetAnalyzerDiagnosticsAsync();
         Assert.That(diagnostics.Any(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id == "AD0001"), Is.False,
             string.Join(Environment.NewLine, diagnostics));
         return diagnostics;

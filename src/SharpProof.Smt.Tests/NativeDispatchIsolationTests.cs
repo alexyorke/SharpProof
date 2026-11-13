@@ -58,8 +58,8 @@ public sealed class NativeDispatchIsolationTests : IDisposable
     {
         var start = ProcessRunner.CreateStartInfo(runtimeDirectory!, "dotnet",
         [
-            "exec", "--runtimeconfig", Path.Combine(runtimeDirectory!, "SharpProof.Smt.Test.runtimeconfig.json"),
-            "--depsfile", Path.Combine(runtimeDirectory!, "SharpProof.Smt.Test.deps.json"),
+            "exec", "--runtimeconfig", Path.Combine(runtimeDirectory!, "SharpProof.Smt.Tests.runtimeconfig.json"),
+            "--depsfile", Path.Combine(runtimeDirectory!, "SharpProof.Smt.Tests.deps.json"),
             Path.Combine(runtimeDirectory!, "SharpProof.Smt.DispatchChild.dll"), occupyPool ? "busy" : "control"
         ]);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));

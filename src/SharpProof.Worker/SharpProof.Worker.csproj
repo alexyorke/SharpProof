@@ -11,10 +11,10 @@
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Package.Test" />
+    <InternalsVisibleTo Include="SharpProof.Package.IntegrationTests" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
   </ItemGroup>
 </Project>
