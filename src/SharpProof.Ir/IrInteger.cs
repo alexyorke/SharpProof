@@ -25,7 +25,7 @@ internal readonly struct IrInteger(ulong bits, int width, bool signed)
         {
             throw new ArgumentException("An integer type is required.", nameof(type));
         }
-        var width = type.Width == 0 ? 64 : type.Width;
+        var width = type.Width;
         if ((bits & ~Mask(width)) != 0)
         {
             throw new ArgumentOutOfRangeException(nameof(bits), "The bits exceed the integer width.");
@@ -36,7 +36,7 @@ internal readonly struct IrInteger(ulong bits, int width, bool signed)
     internal static IrInteger FromNumber(IrTypeInfo type, BigInteger value)
     {
         ArgumentNullGuard.NotNull(type, nameof(type));
-        var width = type.Width == 0 ? 64 : type.Width;
+        var width = type.Width;
         var minimum = type.Signed ? -(BigInteger.One << (width - 1)) : BigInteger.Zero;
         var maximum = type.Signed ? (BigInteger.One << (width - 1)) - 1 : (BigInteger.One << width) - 1;
         if (value < minimum || value > maximum)
