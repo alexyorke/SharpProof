@@ -18,13 +18,13 @@
    `nuget.org` environment. The package job fails at once when the variable is
    missing. Run the workflow by manual dispatch on `master` and fix what it
    finds: release tags are immutable, so a tag that fails cannot be moved.
-4. Tag a `master` commit whose `ci.yml` run succeeded.
+4. Tag a `master` commit whose latest `ci.yml` and `codeql.yml` push runs succeeded.
+   The release preflight enforces workflow identity, exact SHA and master ancestry.
 5. The package job builds the consumer image (`./ci.sh consumer-image`): the
    Dockerfile's `consumer` stage on top of the exact tooling image the job packs
-   with. A tagged canonical run pushes it to `ghcr.io/alexyorke/sharpproof-preview`
-   and pins its registry digest. GHCR creates a new package as private, and the
-   templates on nuget.org pin that image, so make it public before approving the
-   `nuget.org` deployment. The job then runs `tooling pack` and
+   with. It exports an OCI archive and pins its manifest digest without pushing
+   anything. The existing `ghcr.io/alexyorke/sharpproof-preview` package must be public
+   for public consumers. The job then runs `tooling pack` and
    `tooling pack-tool` in the canonical Linux amd64 container (`SharpProof.Templates`
    pins the consumer image by that digest) and runs the package tests against that
    exact feed. The uploaded artifact includes `consumer-image/reference.txt`.
@@ -32,13 +32,17 @@
    and require one Proven postcondition and its Refuted broken counterpart. These
    jobs use the runner's architecture and Core MSBuild; they do not qualify every
    packaged architecture or full-framework MSBuild.exe.
-7. Tagged canonical-repository runs attest the `.nupkg` files with GitHub build
-   provenance. The workflow does not currently generate an SPDX SBOM, a signed
-   offline manifest, or an attestation for the `.snupkg` files.
+7. The package job generates Syft and SPDX SBOMs for the staged image and all
+   packed packages, then scans both. Fixed high/critical vulnerabilities block
+   publication; complete reports also retain unfixed findings for triage.
 8. The publish job (canonical repository only, `nuget.org` environment) requires
-   packaging, both native smoke jobs and attestation. It pushes every
+   preflight, packaging/scanning and both native smoke jobs. After approval it
+   rechecks release eligibility, copies the OCI archive without changing its digest,
+   and attests the image, `.nupkg`, `.snupkg`, SBOM and vulnerability-report files.
+   It pushes every
    `.nupkg` with its `.snupkg` through NuGet OIDC and creates the GitHub release with
-   the same archives. NuGet and GitHub publication are separate operations: a GitHub
+   the same archives and evidence, uploading assets to a draft before publishing
+   the immutable release. NuGet and GitHub publication are separate operations: a GitHub
    release failure after the NuGet push does not roll back published packages.
    After a failure, use "Re-run failed jobs": it reuses the packages the first
    attempt built. A full re-run builds new packages and a new consumer image,
@@ -49,20 +53,28 @@
    `docs/getting-started.md`. They are the only places that say so.
 
 Manual dispatch on a branch exercises packaging and native smoke tests without
-publishing. Its consumer image stays on the runner, and the templates pin the
-local image ID instead of a registry digest, so a dispatch's packages are never
-release artifacts. `./ci.sh release-packages` runs the same dry run locally. Dispatch against a `v*` tag still satisfies the workflow's tag-gated
-publication conditions. A passing workflow definition or source version is not
+publishing. Its image is retained as a seven-day workflow artifact and the template
+digest refers to that unpublished archive. `./ci.sh release-packages` runs the same
+dry run locally. Dispatch against a `v*` tag is also a dry run. A passing workflow definition or source version is not
 evidence that the corresponding packages have reached NuGet.org.
 
 For a published package, verify the original `.nupkg` against its GitHub build
 provenance and inspect the attested source and workflow identity:
 
 ```sh
-gh attestation verify <package.nupkg> --repo alexyorke/SharpProof
+gh attestation verify <package.nupkg> --repo alexyorke/SharpProof \
+  --signer-workflow alexyorke/SharpProof/.github/workflows/release.yml \
+  --source-ref refs/tags/v<VERSION> --source-digest <COMMIT-SHA> --deny-self-hosted-runners
+gh attestation verify oci://ghcr.io/alexyorke/sharpproof-preview@sha256:<DIGEST> \
+  --repo alexyorke/SharpProof \
+  --signer-workflow alexyorke/SharpProof/.github/workflows/release.yml \
+  --source-ref refs/tags/v<VERSION> --source-digest <COMMIT-SHA> --deny-self-hosted-runners
 ```
 
-NuGet repository signatures cover a different verification boundary; a public
+Use GitHub CLI 2.102 or newer; older versions have workflow/ref identity matching
+bugs. Verify downloaded symbol packages and SBOM files with the same file command.
+These are build-provenance attestations over the SBOM bytes, not SPDX predicate
+attestations. NuGet repository signatures cover a different verification boundary; a public
 assembly strong name is not publisher authentication.
 
 Public CI uses distinct `0.0.0-ci.<run>.<attempt>` versions through

@@ -104,24 +104,38 @@ build_image() {
 
 # With SHARPPROOF_IMAGE_REGISTRY set (CI sets ghcr.io/<owner>/sharpproof-tooling),
 # reuse the image published for this exact eng/container tree, or build it.
-# The Dockerfile pins every base image and download by digest, so the tree's
-# git hash identifies the image. SHARPPROOF_IMAGE_PUSH=1 publishes a fresh build.
+# The tree hash selects a cache candidate; provenance authorizes its use.
+# SHARPPROOF_IMAGE_PUSH=1 always builds, publishes and reports its digest for attestation.
 pull_or_build_image() {
   local registry="${SHARPPROOF_IMAGE_REGISTRY:-}"
   if [[ -z "$registry" ]]; then
     build_image
     return
   fi
-  local remote
+  local remote digest version
   remote="$registry:$(git ls-files --stage eng/container | sha256sum | cut -c1-64)"
-  if docker pull --quiet --platform linux/amd64 "$remote"; then
-    docker tag "$remote" "$image"
-    return
+  if [[ "${SHARPPROOF_IMAGE_PUSH:-}" != 1 ]]; then
+    digest="$(docker buildx imagetools inspect "$remote" --format '{{.Manifest.Digest}}' 2> /dev/null || true)"
+    version="$(gh --version 2> /dev/null | head -1 | awk '{print $3}' || true)"
+    # CLI 2.102 fixes workflow-prefix and case-insensitive source-ref matching.
+    if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] &&
+      [[ "$(printf '%s\n' 2.102.0 "$version" | sort -V | head -1)" == 2.102.0 ]] &&
+      gh attestation verify "oci://$registry@$digest" --repo alexyorke/SharpProof \
+        --signer-workflow alexyorke/SharpProof/.github/workflows/ci.yml \
+        --source-ref refs/heads/master --deny-self-hosted-runners &&
+      docker pull --quiet --platform linux/amd64 "$registry@$digest"; then
+      docker tag "$registry@$digest" "$image"
+      return
+    fi
+    echo "::notice::No verified tooling cache available; building pinned sources."
   fi
   build_image
   if [[ "${SHARPPROOF_IMAGE_PUSH:-}" == 1 ]]; then
     docker tag "$image" "$remote"
-    docker push --quiet "$remote" || echo "::warning::Could not publish $remote."
+    docker push --quiet "$remote"
+    digest="$(docker buildx imagetools inspect "$remote" --format '{{.Manifest.Digest}}')"
+    [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+    printf 'image-name=%s\nimage-digest=%s\n' "$registry" "$digest" >> "$GITHUB_OUTPUT"
   fi
 }
 
@@ -232,50 +246,43 @@ fuzz_shard() {
 # Pack the product and developer packages, then run the package tests
 # against that packed feed (task workspaces copy nupkgs/, not artifacts/).
 # The consumer image is the consumer stage on top of the exact tooling image
-# this run packs with. SHARPPROOF_CONSUMER_PUSH=1 (tagged releases only)
-# pushes it and pins the registry digest; otherwise it stays local and the
-# pin is the local image ID, enough for a dry run that publishes nothing.
+# this run packs with. Export an OCI archive before packaging so templates
+# pin its manifest digest without granting the build any registry write access.
 consumer_image() {
   local repository="${SHARPPROOF_CONSUMER_REPOSITORY:-ghcr.io/alexyorke/sharpproof-preview}"
-  local version digest output=(--load)
+  local version digest skopeo
   # The host needs only Docker: PowerShell runs in the tooling image.
   version="$(docker run --rm --platform linux/amd64 --entrypoint pwsh -e SHARPPROOF_CI_PACKAGE_VERSION \
     --volume "$(docker_host_path "$PWD"):/repo:ro" --workdir /repo "$image" -NoLogo -NoProfile -Command \
     'Import-Module ./eng/scripts/SharpProof.ReleaseConfiguration.psm1; Get-SharpProofEffectivePackageVersion -RepositoryRoot .')" || return
   mkdir -p artifacts/consumer-image
-  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" == 1 ]]; then
-    output=(--push --metadata-file artifacts/consumer-image/metadata.json)
-  fi
   docker buildx build --platform linux/amd64 --file eng/container/Dockerfile --target consumer \
     --build-context "toolchain=docker-image://$image" \
     --build-arg "SHARPPROOF_PACKAGE_VERSION=$version" \
-    --tag "$repository:$version" "${output[@]}" --progress plain . || return
-  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" == 1 ]]; then
-    digest="$(jq -r '."containerimage.digest"' artifacts/consumer-image/metadata.json)"
-  else
-    docker run --rm --platform linux/amd64 "$repository:$version" --info > /dev/null || return
-    digest="$(docker image inspect --format '{{.Id}}' "$repository:$version")"
-  fi
+    --tag "$repository:$version" --load --progress plain . || return
+  docker run --rm --platform linux/amd64 "$repository:$version" --info > /dev/null || return
+  skopeo="$(jq -r .skopeo eng/security/release-tools.json)"
+  docker run --rm --platform linux/amd64 -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$(docker_host_path "$PWD/artifacts/consumer-image"):/out" "$skopeo" copy \
+    "docker-daemon:$repository:$version" oci-archive:/out/image.tar:consumer || return
+  digest="$(docker run --rm --platform linux/amd64 \
+    -v "$(docker_host_path "$PWD/artifacts/consumer-image"):/out:ro" "$skopeo" inspect \
+    --format '{{.Digest}}' oci-archive:/out/image.tar)" || return
   if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
     echo "The consumer image build reported no digest." >&2
     return 1
   fi
   SHARPPROOF_CONSUMER_IMAGE="$repository@$digest"
-  local note=""
-  if [[ "${SHARPPROOF_CONSUMER_PUSH:-}" != 1 ]]; then
-    # A local image ID is not a registry digest: nothing can pull this
-    # reference, so templates packed from it are not release artifacts.
-    note=" (dry run: local image ID, not pushed and not pullable)"
-  fi
-  echo "$SHARPPROOF_CONSUMER_IMAGE$note" > artifacts/consumer-image/reference.txt
-  echo "Consumer image: $SHARPPROOF_CONSUMER_IMAGE$note"
+  echo "$SHARPPROOF_CONSUMER_IMAGE" > artifacts/consumer-image/reference.txt
+  echo "Consumer image staged for approval: $SHARPPROOF_CONSUMER_IMAGE"
 }
 
 release_packages() {
-  # Create the feed directory before any container runs: on Linux the task
-  # entrypoint gives the checkout root to the container user, after which the
-  # calling user can no longer create entries there.
-  rm -rf nupkgs && mkdir -p nupkgs
+  # The canonical entrypoint normalizes repository/artifacts ownership to
+  # UID 1000. Hosted runners use a different UID: create host-written export
+  # directories before entering the container, and retain their ownership.
+  mkdir -p nupkgs artifacts/release-evidence artifacts/consumer-image
+  rm -f nupkgs/*.nupkg nupkgs/*.snupkg
   if [[ -z "${SHARPPROOF_CONSUMER_IMAGE:-}" ]]; then consumer_image || return; fi
   tooling pack -Configuration Release
   compose_run -e GITHUB_RUN_ID -e GITHUB_RUN_ATTEMPT -e GITHUB_SHA \
@@ -283,6 +290,8 @@ release_packages() {
   cp artifacts/container-packages/*.nupkg artifacts/container-packages/*.snupkg nupkgs/
   tooling package-tests -Configuration Release -PackageSource nupkgs \
     -TestFilter 'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+  cp artifacts/tool-packages/*.nupkg nupkgs/
+  bash eng/scripts/release-evidence.sh
 }
 
 docs() { tooling docs; }

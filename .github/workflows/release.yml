@@ -18,13 +18,30 @@ env:
   SHARPPROOF_CONTAINER_CPU_LIMIT: 4
 
 jobs:
-  package:
-    name: Pack and test packages
+  preflight:
+    name: Authorize release commit
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 5
     permissions:
       contents: read
-      packages: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require canonical master CI for the exact tagged commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 eng/scripts/Check-ReleaseTrust.py
+
+  package:
+    name: Pack and test packages
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -73,18 +90,17 @@ jobs:
 
       - uses: ./.github/actions/setup-tooling
 
-      # Only a tagged canonical release pushes the consumer image that the
-      # templates pin; a dispatch keeps it local and publishes nothing.
-      - name: Log in to GHCR to publish the consumer image
-        if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-        env:
-          TOKEN: ${{ github.token }}
-        run: docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin <<< "$TOKEN"
-
       - name: ./ci.sh release-packages
-        env:
-          SHARPPROOF_CONSUMER_PUSH: ${{ startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof' && '1' || '' }}
         run: ./ci.sh release-packages
+
+      - name: Retain scan evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-scan-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release-evidence/*.json
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -96,9 +112,19 @@ jobs:
             artifacts/tool-packages/*.nupkg
             artifacts/consumer-image/reference.txt
             artifacts/release-notes/notes.md
+            artifacts/release-evidence/*.json
           if-no-files-found: error
           # A full re-run replaces the first attempt's packages; a re-run of
           # failed jobs alone finds them under the same name.
+          overwrite: true
+      - name: Retain the exact consumer image for approved publication
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-image-${{ github.sha }}
+          path: artifacts/consumer-image/image.tar
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
           overwrite: true
 
   # Every other job runs on Linux; these load the Windows and macOS payloads.
@@ -129,37 +155,27 @@ jobs:
         shell: pwsh
         run: ./eng/scripts/Test-SharpProofNativeSmoke.ps1 -PackageSource nupkgs/container-packages
 
-  attest:
-    name: Attest package provenance
-    needs: package
-    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: nuget-packages-${{ github.sha }}
-          path: nupkgs
-
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: nupkgs/**/*.nupkg
-
   publish:
-    name: Publish to nuget.org and GitHub
-    needs: [package, native-smoke, attest]
-    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
+    name: Publish approved image, packages, and provenance
+    needs: [preflight, package, native-smoke]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.repository == 'alexyorke/SharpProof'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: nuget.org
     permissions:
       contents: write
       id-token: write
+      packages: write
+      attestations: write
+      actions: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Recheck release eligibility after environment approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 eng/scripts/Check-ReleaseTrust.py
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.x
@@ -168,6 +184,53 @@ jobs:
         with:
           name: nuget-packages-${{ github.sha }}
           path: nupkgs
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: consumer-image-${{ github.sha }}
+          path: consumer-image
+
+      - name: Publish the scanned OCI archive without changing its digest
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repository=ghcr.io/alexyorke/sharpproof-preview
+          reference="$(cat nupkgs/consumer-image/reference.txt)"
+          digest="${reference#"$repository@"}"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          skopeo="$(jq -r .skopeo eng/security/release-tools.json)"
+          actual="$(docker run --rm -v "$PWD/consumer-image:/image:ro" "$skopeo" inspect --format '{{.Digest}}' oci-archive:/image/image.tar)"
+          test "$actual" = "$digest"
+          # The temporary auth file is mounted read-only and never retained.
+          auth="$(mktemp -d)"
+          trap 'rm -rf "$auth"' EXIT
+          printf '%s' "$GH_TOKEN" | docker run --rm -i -v "$auth:/auth" "$skopeo" login \
+            --authfile /auth/config.json -u "$GITHUB_ACTOR" --password-stdin ghcr.io
+          docker run --rm -v "$auth:/auth:ro" -v "$PWD/consumer-image:/image:ro" "$skopeo" copy \
+            --authfile /auth/config.json --preserve-digests oci-archive:/image/image.tar \
+            "docker://$repository:${GITHUB_REF_NAME#v}"
+          echo "name=$repository" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Attest packages, symbols, and SBOMs
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            nupkgs/**/*.nupkg
+            nupkgs/**/*.snupkg
+            nupkgs/release-evidence/*.json
+            nupkgs/consumer-image/reference.txt
+
+      - name: Attest the exact consumer image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
 
       - name: Exchange GitHub OIDC token for a temporary NuGet key
         id: nuget-login
@@ -192,6 +255,7 @@ jobs:
           set -euo pipefail
           flags=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
-          mapfile -t assets < <(find nupkgs -name '*.nupkg' -o -name '*.snupkg' | sort)
+          mapfile -t assets < <(find nupkgs -name '*.nupkg' -o -name '*.snupkg' -o -name '*.json' -o -name reference.txt | sort)
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --target "$GITHUB_SHA" --notes-file nupkgs/release-notes/notes.md "${flags[@]}" "${assets[@]}"
+            --draft --target "$GITHUB_SHA" --notes-file nupkgs/release-notes/notes.md "${flags[@]}" "${assets[@]}"
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
