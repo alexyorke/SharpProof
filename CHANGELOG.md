@@ -20,6 +20,13 @@ Entries describe repository changes, not package publication. Confirm available 
   resolve on nuget.org. The `SharpProof` description lists what the package
   checks. A dry run's `consumer-image/reference.txt` now says its image
   reference is a local ID that cannot be pulled.
+- Give every MSBuild setup error an `SPB` code, listed in
+  `docs/build-errors.md`. Messages now show the offending value, and the
+  unsupported-host error shows the detected SDK, MSBuild, and OS and process
+  architectures. musl Linux is detected and gets its own error (SPB021) instead
+  of the generic host message. A missing compiler manifest is SPB031 rather
+  than a reuse of the analyzer code SP0049. Messages no longer say a property
+  "was removed before preview.1".
 - Make the project templates work for a new user. `dotnet new sharpproof` and
   `sharpproof-workspace` gain a `native` variant, now the default, that
   verifies on the host in every build and ships a plain build workflow. The

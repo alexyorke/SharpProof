@@ -54,7 +54,7 @@ public sealed class CompilerCaptureFreshnessControlTests
         using var consumer = new Consumer(PureSource);
         var build = await consumer.BuildAsync([(disabledProperty, "false")]);
         Assert.That(build.Code, Is.Not.Zero, build.Output);
-        Assert.That(build.Output, Does.Contain("SP0049"));
+        Assert.That(build.Output, Does.Contain("SPB031"));
         Assert.That(File.Exists(consumer.ResultPath), Is.False);
         Assert.That(File.Exists(consumer.StagingPath), Is.False);
     }
