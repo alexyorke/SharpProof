@@ -4,7 +4,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 export MSYS_NO_PATHCONV=1
 root="$PWD"
+scratch="$(mktemp -d)"
+trap 'rm -rf -- "$scratch"' EXIT
+scratch_mount="$scratch"
 if command -v cygpath > /dev/null 2>&1; then root="$(cygpath -m "$root")"; fi
+if command -v cygpath > /dev/null 2>&1; then scratch_mount="$(cygpath -m "$scratch")"; fi
 syft="$(jq -r .syft eng/security/release-tools.json)"
 grype="$(jq -r .grype eng/security/release-tools.json)"
 mkdir -p artifacts/release-evidence
@@ -12,7 +16,7 @@ for subject in consumer packages; do
   source=oci-archive:/repo/artifacts/consumer-image/image.tar
   if [[ "$subject" == packages ]]; then source=dir:/repo/nupkgs; fi
   docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
-    -v "$root:/repo" -w /repo -e HOME=/tmp -e SYFT_CHECK_FOR_APP_UPDATE=false \
+    -v "$root:/repo" -v "$scratch_mount:/tmp" -w /repo -e HOME=/tmp -e SYFT_CHECK_FOR_APP_UPDATE=false \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DEPTH=3 \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_MEMORY_BYTES=536870912 \
     -e SYFT_PACKAGE_NESTED_ARCHIVE_MAX_DISK_BYTES=4294967296 \
