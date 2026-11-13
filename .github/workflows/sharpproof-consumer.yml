@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       image:
-        description: Qualified private preview image pinned by SHA-256.
+        description: Qualified consumer image pinned by SHA-256.
         required: true
         type: string
       workflow-revision:
@@ -45,8 +45,8 @@ on:
         type: boolean
     secrets:
       container-read-token:
-        description: Explicit read-only read:packages credential for the private preview image.
-        required: true
+        description: Read-only read:packages credential. Needed only when the image is not public.
+        required: false
       package-read-token:
         description: Read-only read:packages credential, required only with the private GitHub feed.
         required: false
@@ -223,7 +223,7 @@ jobs:
             --evidence-directory "$EVIDENCE_DIRECTORY" --event-name "$EVENT_NAME" \
             --source-sha "$SOURCE_SHA" --source-ref "$SOURCE_REF" --event-file "$GITHUB_EVENT_PATH" \
             --output "$RUNNER_TEMP/consumer-baseline-plan.json" "${extra[@]}"
-      - name: Require the pinned canonical private image
+      - name: Require the pinned canonical image
         working-directory: consumer
         run: |
           set -euo pipefail
@@ -234,18 +234,21 @@ jobs:
           config = json.loads((Path(os.environ['RUNNER_TEMP']) / 'consumer-compose.json').read_text())
           service = config['services'][os.environ['VERIFY_SERVICE']]
           if service.get('image') != os.environ['EXPECTED_IMAGE'] or service.get('platform') != 'linux/amd64':
-              raise SystemExit('Verification requires the exact qualified private Linux amd64 image.')
+              raise SystemExit('Verification requires the exact qualified Linux amd64 image.')
           if service.get('build') or service.get('entrypoint') or service.get('privileged'):
               raise SystemExit('Consumer verification cannot rebuild or replace the canonical image entrypoint.')
           PY
-      - name: Authenticate private image reads
+      - name: Sign in to the registry when a read token is supplied
         env:
           CONTAINER_READ_TOKEN: ${{ secrets.container-read-token }}
         run: |
           set -euo pipefail
-          test -n "$CONTAINER_READ_TOKEN"
+          if [[ -z "$CONTAINER_READ_TOKEN" ]]; then
+            echo 'No container-read-token was supplied; the image is pulled anonymously.'
+            exit 0
+          fi
           printf '%s' "$CONTAINER_READ_TOKEN" | docker login ghcr.io --username "$REGISTRY_USERNAME" --password-stdin
-      - name: Pull the qualified private image
+      - name: Pull the qualified image
         working-directory: consumer
         run: docker compose -f "$COMPOSE_FILE_PATH" pull "$VERIFY_SERVICE"
       - name: Require newly produced evidence rather than checked-in outputs
@@ -376,6 +379,6 @@ jobs:
             test "$BASELINE_OUTCOME" = success
             test "$COMPARE_OUTCOME" = success
           fi
-      - name: Remove private registry session
+      - name: Remove the registry session
         if: always()
         run: docker logout ghcr.io >/dev/null 2>&1 || true

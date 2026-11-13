@@ -1,60 +1,84 @@
 # SharpProofStarter
 
-This project uses SharpProof __SHARPPROOF_VERSION__ and the qualified compiler SDK.
-The starter targets .NET 10 and pins C# 13 for compatibility with the packaged
-Roslyn exporter. Its single SharpProof reference supplies the contract API,
-analyzers, and verifier. The matching local tool is pinned in
-`.config/dotnet-tools.json`; run `dotnet tool restore` before `dotnet sharpproof`.
-The optional editor package is included by default; use `--editor false` when
-generating a project to omit it.
+This project uses SharpProof __SHARPPROOF_VERSION__. It targets .NET 10 and pins
+C# 13. The one `SharpProof` package reference supplies the contract API, the
+analyzers and the verifier. The matching `dotnet sharpproof` tool is pinned in
+`.config/dotnet-tools.json`; run `dotnet tool restore` to install it.
 
-`NuGet.config` restores every package, SharpProof included, from nuget.org and
-needs no credentials for that source. If the matching preview packages are not
-published there, configure your qualified local or private feed before restore. Authenticate Docker to `ghcr.io/alexyorke/sharpproof-preview` using your
-credential store before pulling the private container image.
+You need the .NET 10 SDK (10.0.100 or later). Packages restore from nuget.org
+without credentials.
 
-The portable variant explicitly disables native verification; the container
-variant enables strict verification.
-For the portable variant, run `dotnet restore`, then `dotnet build`.
-Portable analyzer silence is not a native proof.
+`Counter.Next` has a precondition and a postcondition, and its proof succeeds.
+To see a failure, uncomment `Counter.Broken` in `Counter.cs`: it calls
+`Next(-1)`, which breaks the precondition.
 
-For the container variant, run `docker compose pull verify`,
-`docker compose run --rm verify restore SharpProofStarter.csproj`, then
-`docker compose run --rm verify build SharpProofStarter.csproj`.
-Run `docker compose run --rm verify tool restore` to install the pinned tool in
-the container. Its package and resolver caches use private named volumes.
-The native report should prove the postcondition on `Counter.Next`.
-Its reports are retained under `artifacts/sharpproof/`. Host and container
-compiler intermediates are isolated.
+How contracts are checked depends on the `--verification` option used when the
+project was generated. Follow the one section that applies.
 
-`Counter.DemonstrateDiagnostic` intentionally produces SP0027 in both variants.
-In the strict container variant, its call-precondition claim is also Refuted
-with SP0051 and fails the build. Change its argument from -1 to 0 before
-expecting a successful strict build; `Counter.Next` itself has a valid proof.
+## native (the default)
 
-After restoring the local tool, for the portable variant run
-`dotnet sharpproof doctor --project SharpProofStarter.csproj --verification portable`.
-For the native variant, run `docker compose run --rm verify tool run dotnet-sharpproof -- doctor --project SharpProofStarter.csproj --verification container`.
-Stored native reports can be explained
-on the host with
-`dotnet sharpproof explain --result artifacts/sharpproof/result.json`.
-The explain command validates the matching request and compiler manifest when
-both sibling files exist or a companion path is explicitly supplied. Otherwise
-it can report the standalone stored result. Comparison and regression export
-require the complete set.
-Export regression tests to a sibling directory outside this project. The
-generated Compose service mounts this project only; running a sibling test
-project in that service requires an additional bind mount.
-Generate `sharpproof-workspace` for a root that already mounts both `src/app`
-and `tests`, with regressions exported below `tests/`.
+Every build verifies the contracts on this machine and fails if one is refuted
+or cannot be proven. Supported hosts are Windows, macOS and glibc Linux on x64
+or ARM64.
 
-The container CI caller pins the reusable baseline workflow to source revision
-`__SHARPPROOF_SOURCE_REVISION__`. Set read-only `SHARPPROOF_PREVIEW_TOKEN` in your
-repository for private image reads. Packages default to nuget.org; configure the
-optional package-read token only if you choose the GitHub package feed. Comparison starts in `report`
-mode; set `mode: enforce` in the caller when ready to gate regressions. Baseline
-selection requires the exact PR base commit. Use the explicit default-branch
-manual `initialize-baseline` input to establish the first baseline.
+```text
+dotnet build SharpProofStarter.csproj
+dotnet tool restore
+dotnet sharpproof doctor --project SharpProofStarter.csproj
+dotnet sharpproof explain --result obj/Debug/net10.0/SharpProof/result.json
+```
 
-Contracts are static declarations. They do not perform runtime input validation.
-Keep runtime checks at application boundaries where required.
+`.github/workflows/build.yml` runs the same build on every push and pull
+request.
+
+## container
+
+Verification runs in a Linux amd64 container image pinned by digest in
+`compose.yaml`, so every machine and CI run uses the same toolchain. Reports are
+kept under `artifacts/sharpproof/`.
+
+```text
+docker compose pull verify
+docker compose run --rm verify tool restore
+docker compose run --rm verify restore SharpProofStarter.csproj
+docker compose run --rm verify build SharpProofStarter.csproj
+docker compose run --rm verify tool run dotnet-sharpproof -- doctor --project SharpProofStarter.csproj --verification container
+docker compose run --rm verify tool run dotnet-sharpproof -- explain --result artifacts/sharpproof/result.json
+```
+
+`.github/workflows/sharpproof.yml` compares each run with the run for its base
+commit. It calls the SharpProof reusable workflow at source revision
+`__SHARPPROOF_SOURCE_REVISION__`. It starts with only a manual trigger, because
+the first comparison needs a baseline:
+
+1. On the default branch, run the workflow by hand with `initialize-baseline`
+   ticked.
+2. When that run succeeds, uncomment the `push` and `pull_request` triggers in
+   the workflow file.
+
+Comparison starts in `report` mode, which records regressions without failing.
+Set `mode: enforce` in the workflow to fail on them. A refuted contract fails
+the build in either mode.
+
+The container mounts this project only. To keep exported regression tests
+beside the application, generate `sharpproof-workspace` instead.
+
+## portable
+
+The analyzers run in the editor and the build, but no proofs are run
+(`SharpProofProfile=advisory`, `SharpProofVerify=false`). A build with no
+diagnostics is not a proof.
+
+```text
+dotnet build SharpProofStarter.csproj
+dotnet tool restore
+dotnet sharpproof doctor --project SharpProofStarter.csproj --verification portable
+```
+
+## Notes
+
+The optional `SharpProof.CodeFixes` editor package is referenced by default.
+Generate with `--editor false` to leave it out.
+
+Contracts are static declarations. They do not validate input at run time; keep
+runtime checks where your application needs them.
