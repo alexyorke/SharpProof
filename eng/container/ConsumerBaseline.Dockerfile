@@ -1,5 +1,5 @@
 # Test-only Python runtime; the shipping toolchain and consumer image stay separate.
-FROM python:3.13-slim-bookworm@sha256:e32be0e55814a08977501ca863271d9bd02443710db8f2afaf8372e2c4508530 AS python
+FROM python:3.15-slim-bookworm@sha256:96599df822d0e1c6bb700014a05c7f3c8cabc6e0f7ff3c4f9f69cee033b4b5d9 AS python
 FROM canonical_tooling AS consumer-baseline-tests
 USER root
 COPY --from=python /usr/local/ /opt/sharpproof/python/
