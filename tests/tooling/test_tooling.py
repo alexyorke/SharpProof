@@ -5,6 +5,7 @@ No .NET build, test campaign, network access, or nested Docker is required.
 """
 
 import fcntl
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -21,6 +22,57 @@ import unittest
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 GIT = shutil.which("git")
+
+spec = importlib.util.spec_from_file_location("release_trust", REPOSITORY / "eng/scripts/Check-ReleaseTrust.py")
+release_trust = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release_trust)
+
+
+class ReleaseTrustTests(unittest.TestCase):
+    def setUp(self):
+        self.sha = "a" * 40
+        self.workflow = {"id": 7, "path": ".github/workflows/ci.yml", "state": "active"}
+        self.run = {"id": 10, "workflow_id": 7, "path": self.workflow["path"],
+                    "head_sha": self.sha, "head_branch": "master", "event": "push",
+                    "repository": {"id": 42}, "head_repository": {"id": 42},
+                    "status": "completed", "conclusion": "success"}
+
+    def test_accepts_exact_canonical_success(self):
+        release_trust.validate_run(self.run, self.workflow, self.sha, 42)
+
+    def test_rejects_forged_pending_failed_and_wrong_commit_runs(self):
+        for change in ({"head_sha": "b" * 40}, {"workflow_id": 8},
+                       {"path": ".github/workflows/impostor.yml"}, {"head_branch": "Master"},
+                       {"event": "pull_request"}, {"repository": {"id": 43}},
+                       {"head_repository": {"id": 43}}, {"status": "in_progress"},
+                       {"conclusion": "failure"}, {"conclusion": "cancelled"}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                release_trust.validate_run(dict(self.run, **change), self.workflow, self.sha, 42)
+
+    def test_dispatch_and_forks_cannot_authorize_publication(self):
+        for repository, event in (("other/SharpProof", "push"),
+                                  (release_trust.REPOSITORY, "workflow_dispatch")):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                release_trust.check(self.sha, "refs/tags/v1.0.0", repository, event,
+                                    lambda route: self.fail("Must reject before API access"))
+
+    def test_latest_attempt_must_pass_and_commit_must_be_on_master(self):
+        def fetch(route):
+            if route == "":
+                return {"full_name": release_trust.REPOSITORY, "default_branch": "master", "id": 42}
+            if route.startswith("compare/"):
+                return {"status": "ahead", "merge_base_commit": {"sha": self.sha}}
+            if "/runs?" in route:
+                return {"workflow_runs": [dict(self.run, id=9), self.run]}
+            if route == "actions/runs/10":
+                return dict(self.run, conclusion="failure")
+            return self.workflow
+        with self.assertRaisesRegex(ValueError, "Latest CI attempt"):
+            release_trust.check(self.sha, "refs/tags/v1.0.0", release_trust.REPOSITORY, "push", fetch)
+        def diverged(route):
+            return {"status": "diverged"} if route.startswith("compare/") else fetch(route)
+        with self.assertRaisesRegex(ValueError, "not an ancestor"):
+            release_trust.check(self.sha, "refs/tags/v1.0.0", release_trust.REPOSITORY, "push", diverged)
 
 
 class ToolingTests(unittest.TestCase):

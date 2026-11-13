@@ -15,6 +15,13 @@ inputs:
   from-source:
     description: Compile the Windows Z3 payload from source instead of restoring it.
     default: "false"
+outputs:
+  image-name:
+    description: Published tooling image repository.
+    value: ${{ steps.image.outputs.image-name }}
+  image-digest:
+    description: Published tooling manifest digest.
+    value: ${{ steps.image.outputs.image-digest }}
 runs:
   using: composite
   steps:
@@ -43,8 +50,10 @@ runs:
         path: ${{ steps.key.outputs.path }}
         key: ${{ steps.key.outputs.key }}
     - name: Pull or build the tooling image
+      id: image
       shell: bash
       env:
+        GH_TOKEN: ${{ github.token }}
         SHARPPROOF_WINDOWS_NATIVE_CACHE: ${{ steps.key.outputs.path }}
         SHARPPROOF_IMAGE_REGISTRY: ${{ steps.registry.outputs.registry }}
         SHARPPROOF_IMAGE_PUSH: ${{ inputs.publish == 'true' && '1' || '' }}

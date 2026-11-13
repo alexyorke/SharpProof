@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Build evidence from the exact OCI archive and package bytes that will ship.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+export MSYS_NO_PATHCONV=1
+root="$PWD"
+if command -v cygpath > /dev/null 2>&1; then root="$(cygpath -m "$root")"; fi
+syft="$(jq -r .syft eng/security/release-tools.json)"
+grype="$(jq -r .grype eng/security/release-tools.json)"
+mkdir -p artifacts/release-evidence
+for subject in consumer packages; do
+  source=oci-archive:/repo/artifacts/consumer-image/image.tar
+  if [[ "$subject" == packages ]]; then source=dir:/repo/nupkgs; fi
+  docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
+    -v "$root:/repo" -w /repo -e SYFT_CHECK_FOR_APP_UPDATE=false \
+    -e SYFT_PACKAGE_SEARCH_UNINDEXED_ARCHIVES=true "$syft" "$source" \
+    -o "syft-json=/repo/artifacts/release-evidence/$subject.syft.json" \
+    -o "spdx-json=/repo/artifacts/release-evidence/$subject.spdx.json"
+  # Retain all findings, including those without fixes. Apply the existing
+  # fixed-high/critical policy separately to that complete report.
+  docker run --rm --platform linux/amd64 -v "$root:/repo" -w /repo "$grype" \
+    "sbom:artifacts/release-evidence/$subject.syft.json" --config .grype.yaml \
+    --output json > "artifacts/release-evidence/$subject.vulnerabilities.json"
+  jq -e '[.matches[] | select((.vulnerability.severity == "High" or
+    .vulnerability.severity == "Critical") and .vulnerability.fix.state == "fixed")] | length == 0' \
+    "artifacts/release-evidence/$subject.vulnerabilities.json"
+done
