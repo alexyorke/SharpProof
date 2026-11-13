@@ -9,7 +9,7 @@
     <PackageReference Include="System.Collections.Immutable" />
     <Compile Include="../SharpProof.CodeFixes/CompanionEligibility.cs" Link="CompanionEligibility.cs" />
     <Compile Include="../SharpProof.CodeFixes/CompanionSuggestionContract.cs" Link="CompanionSuggestionContract.cs" />
-    <Compile Include="../../eng/shared/InputValidation.cs" Link="InputValidation.cs" />
+    <Compile Include="../Shared/InputValidation.cs" Link="InputValidation.cs" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
     <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Tests" />

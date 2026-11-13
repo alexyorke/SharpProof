@@ -22,7 +22,7 @@
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\shared\SolverDefaults.cs"
+    <Compile Include="..\Shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
 </Project>

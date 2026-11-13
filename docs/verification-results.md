@@ -36,7 +36,7 @@ A callable can be selected for effects, contracts, or both. Selection reasons in
 
 `Requires` restricts entry and produces obligations at modeled calls, reported as described below. It does not automatically create a selected postcondition. Direct clauses take precedence over valid companion clauses for the member. The selected manifest records the effective evidence, including assumptions; inspect it when a companion or annotation appears to have no effect.
 
-See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../src/SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs), and [manifest regression tests](../src/SharpProof.Worker.Tests/ClaimManifestBuilderTests.cs).
+See [public API](public-api.md), [companion tutorial](tutorials/07-companion.md), [claim discovery](../src/SharpProof.CompilerCollector/Producer/ClaimManifestBuilder.cs), and [manifest regression tests](../src/SharpProof.Worker.Tests/ClaimManifestBuilderTests.cs).
 
 ## Call preconditions
 
@@ -61,7 +61,7 @@ A satisfiable query that does not replay stays Unknown with `CounterexampleNotRe
 
 A caller that forwards its input without restating the clause is refuted, because the input it accepts can violate the callee's `Requires`: `int Root(int value) => Positive(value);` fails with `value = 0`. This holds for private helpers too, since each body is checked alone. Add the clause to the caller or guard the call. An argument the solver cannot bound stays Unknown, and `Assume` does not help under the strict assumption policy, so guard the call or relax `SharpProofVerifyPolicy`.
 
-See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs), [limit tests](../src/SharpProof.Worker.Tests/CallPreconditionLimitTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/CompilerArtifact/CompilerCallPreconditionClaims.cs).
+See [call-precondition tests](../src/SharpProof.Worker.Tests/CallPreconditionClaimTests.cs), [limit tests](../src/SharpProof.Worker.Tests/CallPreconditionLimitTests.cs) and the [claim construction](../src/SharpProof.CompilerCollector/Producer/CompilerCallPreconditionClaims.cs).
 
 ## Proofs, models, and replay
 

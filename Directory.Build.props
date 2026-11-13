@@ -116,7 +116,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(SharpProofHasParameterGuard)' == 'true'">
-    <Compile Include="$(MSBuildThisFileDirectory)eng/ParameterGuard.cs" Link="InternalParameterGuard.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)src/Shared/ParameterGuard.cs" Link="InternalParameterGuard.cs" />
     <Using Include="SharpProof.Internal.$([System.String]::Copy('$(SharpProofProjectName)').Replace('.', '')).ParameterGuard" Alias="RepositoryParameterGuard" />
   </ItemGroup>
 

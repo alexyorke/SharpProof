@@ -15,9 +15,9 @@
     <PackageReleaseNotes>First public preview: compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and composable effect contracts.</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\Shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+    <Compile Include="..\Shared\Polyfills\EmbeddedAttribute.cs"
              Link="Polyfills\EmbeddedAttribute.cs" />
     <None Update="README.md">
 

@@ -9,17 +9,17 @@
     <NoWarn>$(NoWarn);RS1035;RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\eng\CompilerAdditionalTextStability.cs"
+    <Compile Include="..\..\src\Shared\CompilerAdditionalTextStability.cs"
              Link="CompilerAdditionalTextStability.cs" />
-    <Compile Include="..\..\eng\shared\HashEncoding.cs"
+    <Compile Include="..\..\src\Shared\HashEncoding.cs"
              Link="HashEncoding.cs" />
-    <Compile Include="..\..\eng\shared\ArgumentNullGuard.cs"
+    <Compile Include="..\..\src\Shared\ArgumentNullGuard.cs"
              Link="ArgumentNullGuard.cs" />
     <Compile Include="..\..\src\SharpProof.Ir\AtomicFile.cs"
              Link="AtomicFile.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\NotNullAttribute.cs"
+    <Compile Include="..\..\src\Shared\Polyfills\NotNullAttribute.cs"
              Link="Polyfills\NotNullAttribute.cs" />
-    <Compile Include="..\..\eng\shared\Polyfills\EmbeddedAttribute.cs"
+    <Compile Include="..\..\src\Shared\Polyfills\EmbeddedAttribute.cs"
              Link="Polyfills\EmbeddedAttribute.cs" />
     <Using Include="System.Threading.Tasks" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
