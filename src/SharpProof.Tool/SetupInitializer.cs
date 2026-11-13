@@ -22,9 +22,9 @@ internal static class SetupInitializer
         ArgumentException.ThrowIfNullOrEmpty(projectPath);
         ArgumentException.ThrowIfNullOrEmpty(verification);
         cancellationToken.ThrowIfCancellationRequested();
-        if (verification is not ("portable" or "container"))
-        { throw new ArgumentException("--verification must be portable or container."); }
-        if (verification == "portable" && consumerImage != null)
+        if (verification is not ("portable" or "native" or "container"))
+        { throw new ArgumentException("--verification must be portable, native, or container."); }
+        if (verification != "container" && consumerImage != null)
         { throw new ArgumentException("--consumer-image applies only to container initialization."); }
         projectPath = Path.GetFullPath(projectPath);
         if (!File.Exists(projectPath) || !projectPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
