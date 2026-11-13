@@ -93,7 +93,7 @@ The [developer tools guide](docs/developer-experience.md) covers workspace templ
 
 ## Documentation
 
-The [documentation index](docs/README.md) links the current guides, implementation references, and validation fixtures. [Contributing](CONTRIBUTING.md) describes development standards. Report vulnerabilities through the [security policy](SECURITY.md).
+The [documentation index](docs/README.md) links the current guides, implementation references, and validation fixtures. [Contributing](CONTRIBUTING.md) describes development standards. Participation is covered by the [code of conduct](CODE_OF_CONDUCT.md). Report vulnerabilities through the [security policy](SECURITY.md).
 
 To work on SharpProof itself, start with [development workflows](docs/development-workflows.md) and the [container command reference](docs/container-development.md).
 
