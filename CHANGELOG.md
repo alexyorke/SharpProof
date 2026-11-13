@@ -92,6 +92,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Accept Windows paths that contain a tilde. Only a real 8.3 short name such
+  as `PROGRA~1` is rejected; a folder such as `~work` or `backup~` was refused
+  before. The error for a volume that is not NTFS now names the volume and its
+  format, including ReFS Dev Drives, which remain unsupported.
+- Stop the build task's output readers when a verifier descendant keeps the
+  output open past the drain timeout, before the process is disposed. A launch
+  failure now reports the exception type as well as its message.
 - Fail closed in the IL lowering tables. A comparison or arithmetic opcode the
   tables do not name now abstains; before, the default arms read it as
   less-than or remainder and relied on an earlier admission check. The IL stack
