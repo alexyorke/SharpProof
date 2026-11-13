@@ -15,11 +15,18 @@ public sealed class AllowedExceptionsAttribute : Attribute
     /// <exception cref="ArgumentNullException"><paramref name="exceptionTypes"/> is null.</exception>
     public AllowedExceptionsAttribute(params Type[] exceptionTypes)
     {
-        ExceptionTypes = exceptionTypes ?? throw new ArgumentNullException(nameof(exceptionTypes));
+        if (exceptionTypes is null)
+        {
+            throw new ArgumentNullException(nameof(exceptionTypes));
+        }
+
+        _exceptionTypes = (Type[])exceptionTypes.Clone();
     }
 
     /// <summary>Gets the allowed exception types.</summary>
     /// <value>The allowed exception types.</value>
     /// <remarks>Type validity is checked by SharpProof; listing a type is not evidence that the body satisfies the allowance.</remarks>
-    public Type[] ExceptionTypes { get; }
+    public Type[] ExceptionTypes => (Type[])_exceptionTypes.Clone();
+
+    private readonly Type[] _exceptionTypes;
 }
