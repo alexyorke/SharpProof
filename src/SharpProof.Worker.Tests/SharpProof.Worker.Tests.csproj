@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>SharpProof.Worker.Test</AssemblyName>
     <RootNamespace>SharpProof.Worker.Test</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
     <!-- Restore this test project as its project-reference closure, without

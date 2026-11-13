@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>SharpProof.Gates.Test</AssemblyName>
     <RootNamespace>SharpProof.Gates.Test</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>

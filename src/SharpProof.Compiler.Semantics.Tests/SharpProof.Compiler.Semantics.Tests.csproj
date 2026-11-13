@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>SharpProof.Compiler.Semantics.Test</AssemblyName>
     <RootNamespace>SharpProof.Compiler.Semantics.Test</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>

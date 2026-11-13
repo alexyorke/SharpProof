@@ -101,8 +101,8 @@ public sealed class FuzzHostSignalTests : IDisposable
         var ready = Path.Combine(directory!.FullName, "ready-" + Guid.NewGuid().ToString("N"));
         var start = ProcessRunner.CreateStartInfo(runtimeDirectory!, "dotnet",
         [
-            "exec", "--runtimeconfig", Path.Combine(runtimeDirectory!, "SharpProof.Fuzz.Test.runtimeconfig.json"),
-            "--depsfile", Path.Combine(runtimeDirectory!, "SharpProof.Fuzz.Test.deps.json"),
+            "exec", "--runtimeconfig", Path.Combine(runtimeDirectory!, "SharpProof.Fuzz.Tests.runtimeconfig.json"),
+            "--depsfile", Path.Combine(runtimeDirectory!, "SharpProof.Fuzz.Tests.deps.json"),
             Path.Combine(runtimeDirectory!, "SharpProof.Fuzz.SignalHost.dll"),
             cases.ToString(CultureInfo.InvariantCulture), ready
         ]);

@@ -748,15 +748,14 @@ public sealed class ParameterGuardAnalyzerTests
         var compilation = AnalyzerTestHost.CreateCompilation(source, [],
             testAssembly ? [MetadataReference.CreateFromFile(typeof(Assert).Assembly.Location)] : null,
             filePath: path);
-        if (testAssembly)
-        {
-            compilation = compilation.WithAssemblyName("AnalyzerFixture.Test");
-        }
         if (validateCompilation)
         {
             Assert.That(compilation.GetDiagnostics().Where(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Severity == DiagnosticSeverity.Error), Is.Empty);
         }
-        var analyzers = compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
+        var analyzers = testAssembly
+            ? compilation.WithAnalyzers([new ParameterGuardAnalyzer()], new AnalyzerOptions([], new SharpProof.Testing.DictionaryAnalyzerConfigOptionsProvider(
+                ImmutableDictionary<string, string>.Empty.Add("build_property.SharpProofTestProject", "true"))))
+            : compilation.WithAnalyzers([new ParameterGuardAnalyzer()]);
         var diagnostics = await analyzers.GetAnalyzerDiagnosticsAsync();
         Assert.That(diagnostics.Any(static diagnostic => (diagnostic ?? throw new ArgumentNullException(nameof(diagnostic))).Id == "AD0001"), Is.False,
             string.Join(Environment.NewLine, diagnostics));
