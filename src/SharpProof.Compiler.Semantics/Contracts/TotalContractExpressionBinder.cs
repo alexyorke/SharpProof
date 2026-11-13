@@ -211,7 +211,6 @@ internal sealed class TotalContractBinder
         var clauses = materialized.Clauses.ToBuilder();
         void AppendClause(BoundTotalContractClause clause)
         {
-            clause = RepositoryParameterGuard.NotNull(clause, nameof(clause));
             clauses.Add(clause);
         }
         var attributeFailure = includeAttributes ? BindTotalAttributes(context, requiresOnly, AppendClause) : ContractBindingFailure.None;
@@ -241,8 +240,6 @@ internal sealed class TotalContractBinder
     private ContractBindingFailure BindTotalAttributes(TotalLoweringContext context, bool requiresOnly,
         Action<BoundTotalContractClause> clauses)
     {
-        clauses = RepositoryParameterGuard.NotNull(clauses, nameof(clauses));
-        context = RepositoryParameterGuard.NotNull(context, nameof(context));
         foreach (var site in ClosedContractAttributeValidator.EnumerateValueSites(context.Target, includeReturn: !requiresOnly))
         {
             var name = site.IsReturn ? "result" : context.Target.Parameters[site.ParameterIndex].Name;

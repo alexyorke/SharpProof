@@ -40,9 +40,6 @@ internal static class TotalBodyLowering
         bool pinElementReads, bool stopAtFirstAbstention, Func<TotalLoweringContext, bool>? prepareMetadataCallee,
         CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        context = RepositoryParameterGuard.NotNull(context, nameof(context));
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var apiSpecs = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
         var contracts = new ExternalEffectResolver(compilation, apiSpecs);
         var invocationEmission = new InvocationEmissionPolicy(compilation);
@@ -166,8 +163,6 @@ internal static class TotalBodyLowering
     // implementation is not inlined.
     private static IrOpaqueCallEffects? TrustedContractEffects(ExternalEffectResolver contracts, IMethodSymbol method)
     {
-        contracts = RepositoryParameterGuard.NotNull(contracts, nameof(contracts));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var contract = contracts.ResolveContract(method);
         return contract.Kind == EffectContractResolutionKind.Valid ||
             contract is { Kind: EffectContractResolutionKind.Incomplete, Summary.AnalysisIncompleteReason: EffectAnalysisIncompleteReason.CallPreconditionNotProven } &&
@@ -179,12 +174,11 @@ internal static class TotalBodyLowering
     // the callee's preconditions do; one without parameter contracts has none.
     private static bool HasParameterContracts(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.Parameters.SelectMany(parameter => parameter.GetAttributes()).Any(attribute =>
             attribute.AttributeClass?.ContainingNamespace is { Name: "Attributes", ContainingNamespace: { Name: "SharpProof", ContainingNamespace.IsGlobalNamespace: true } });
     }
 
-    private static IrOpaqueCallEffects ContractEffects(EffectProjection declared /* SPINT001: all values valid - every effect bitset is projected, including unknown and empty sets */)
+    private static IrOpaqueCallEffects ContractEffects(EffectProjection declared)
     {
         const EffectContractKind Writes = EffectContractKind.WritesReceiverState | EffectContractKind.WritesArgumentState |
             EffectContractKind.WritesCapturedState | EffectContractKind.WritesStaticState | EffectContractKind.WritesAmbientState;

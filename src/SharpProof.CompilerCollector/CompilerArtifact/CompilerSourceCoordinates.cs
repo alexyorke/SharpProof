@@ -17,7 +17,6 @@ internal static class CompilerSourceCoordinates
 
     private static int RememberedTree(WorkerSourceLocation location)
     {
-        location = RepositoryParameterGuard.NotNull(location, nameof(location));
         return TreeBindings.TryGetValue(location, out var binding) ? binding.Ordinal : -1;
     }
     private static bool TryValidateLineMap(

@@ -173,7 +173,7 @@ internal static class ForwardDataflowAnalysis
     private static DataflowAnalysisResult<T>? AnalyzeCore<T>(
         DataflowGraph<T> graph,
         IAbstractDomain<T> domain,
-        T initialState /* SPINT001: all values valid - generic values are forwarded or serialized, including null when the type permits it */,
+        T initialState,
         ForwardDataflowAnalysisOptions options,
         bool produceResult)
     {
@@ -308,7 +308,6 @@ internal static class ForwardDataflowAnalysis
     private static ImmutableSortedSet<int> FindReachableBlocks<T>(
         DataflowGraph<T> graph)
     {
-        graph = RepositoryParameterGuard.NotNull(graph, nameof(graph));
         var reachable = ImmutableSortedSet.Create(graph.EntryBlockId).ToBuilder();
         var pending = ImmutableStack<int>.Empty;
         pending = pending.Push(graph.EntryBlockId);

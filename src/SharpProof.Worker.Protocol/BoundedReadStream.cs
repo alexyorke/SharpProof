@@ -156,7 +156,6 @@ internal sealed class BoundedReadStream : Stream
         int count,
         CancellationToken cancellationToken)
     {
-        buffer = RepositoryParameterGuard.NotNull(buffer, nameof(buffer));
         var read = await _inner.ReadAsync(
                 buffer,
                 offset,

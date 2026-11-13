@@ -194,7 +194,6 @@ internal sealed class CSharpInvocationEmissionPolicy(Compilation compilation)
 
     private ImmutableArray<string> GetConditionalSymbols(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var symbols = ImmutableArray.CreateBuilder<string>();
         for (IMethodSymbol? current = method; current != null; current = current.OverriddenMethod)
         {

@@ -4,7 +4,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 {
     private TotalBodyValue? ArrayClearBody(IInvocationOperation invocation, IrBlockId block, int depth)
     {
-        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton || !CSharpOperationSemantics.IsArrayClear(invocation.TargetMethod))
         { return null; }

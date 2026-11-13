@@ -92,8 +92,6 @@ internal static class IrSequenceReads
 
     private static void Transfer(IrInstruction instruction, ImmutableHashSet<IrVarId>.Builder fresh)
     {
-        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
-        fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
         // Evaluate assignment provenance before removing the old target value.
         var local = instruction is IrAllocationInstruction ||
             instruction is IrAssignInstruction assign && IsLocal(assign.Value, fresh);
@@ -108,8 +106,6 @@ internal static class IrSequenceReads
 
     private static bool IsLocal(IrTerm sequence, ImmutableHashSet<IrVarId>.Builder fresh)
     {
-        fresh = RepositoryParameterGuard.NotNull(fresh, nameof(fresh));
-        sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));
         return sequence switch
         {
             IrVariableTerm variable => fresh.Contains(variable.Variable),

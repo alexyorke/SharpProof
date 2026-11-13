@@ -131,8 +131,6 @@ internal sealed class EvidenceSet
 
     private static void ValidateDescriptions(WorkerVerifyResponse response, CompilerManifestArtifact artifact, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(response);
-        ArgumentNullException.ThrowIfNull(artifact);
         var claims = artifact.Manifest.Claims.ToDictionary(static claim =>
         {
             ArgumentNullException.ThrowIfNull(claim);

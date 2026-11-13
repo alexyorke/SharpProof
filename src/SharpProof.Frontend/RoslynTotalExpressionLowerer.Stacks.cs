@@ -6,7 +6,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrMemberId StackField(string name, IrTypeId value)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         RepositoryParameterGuard.ThrowIfInvalid(value.IsDefault, nameof(value));
         var storage = (Name: name, Value: value);
         if (_stackFields.TryGetValue(storage, out var field))
@@ -20,14 +19,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrTerm StackCount(IrTerm owner)
     {
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         return _factory.Binary(IrBinaryOperator.BitwiseAnd,
             _factory.PureOpaque(StackField("count", _factory.IntegerType), owner), _factory.Integer(int.MaxValue));
     }
 
     private GuardedExpression? StackClause(IPropertyReferenceOperation property, TotalParameterState state, int depth)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         if (property.Instance is not { } instance || property.Property.GetMethod is not { } getter ||
             !CSharpOperationSemantics.IsStackStateMember(getter))
         { return null; }
@@ -40,7 +37,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private TotalBodyValue? StackBody(IOperation operation, IrBlockId block, int depth)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return null; }
@@ -121,10 +117,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     private IrBlockId StackExceptionalPath(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrTerm invalid, IrBlockId block)
     {
-        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
-        invalid = RepositoryParameterGuard.NotNull(invalid, nameof(invalid));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var failure = _builder!.CreateBlock("stack:invalid");
         var normal = _builder.CreateBlock("stack:normal");

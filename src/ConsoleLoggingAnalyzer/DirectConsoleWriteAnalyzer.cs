@@ -57,7 +57,6 @@ public sealed class DirectConsoleWriteAnalyzer : DiagnosticAnalyzer
 
     private static bool IsConsoleWriter(IOperation? receiver, INamedTypeSymbol console)
     {
-        console = RepositoryParameterGuard.NotNull(console, nameof(console));
         while (receiver is IConversionOperation conversion)
         {
             receiver = conversion.Operand;

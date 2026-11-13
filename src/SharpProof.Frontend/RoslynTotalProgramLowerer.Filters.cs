@@ -17,7 +17,6 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private RegionFilter? EnclosingRegionFilter(ControlFlowRegion source)
     {
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
         for (var region = source; region != null; region = region.EnclosingRegion)
         {
             SpendRegion();
@@ -31,7 +30,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
-        filter = RepositoryParameterGuard.NotNull(filter, nameof(filter));
         if (source.FallThroughSuccessor?.Semantics == ControlFlowBranchSemantics.Throw)
         {
             if (source.BranchValue != null && CSharpOperationSemantics.IsNullThrow(source.BranchValue))
@@ -154,7 +152,6 @@ internal sealed partial class RoslynTotalProgramLowerer
     private void FinishRegionFilter(RegionFilter filter, OperationId structural)
     {
         RepositoryParameterGuard.ThrowIfInvalid(structural.IsDefault, nameof(structural));
-        filter = RepositoryParameterGuard.NotNull(filter, nameof(filter));
         Dispatch(filter.Accepted, true);
         Dispatch(filter.Rejected, false);
 

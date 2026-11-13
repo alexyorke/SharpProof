@@ -82,8 +82,6 @@ internal static class CallableClaimResultAssembler
         CompilerCallablePreparation target,
         Func<WorkerAssumptionEvidence, bool> isUsed)
     {
-        System.ArgumentNullException.ThrowIfNull(isUsed);
-        System.ArgumentNullException.ThrowIfNull(target);
         return [.. target.Entry.Assumptions.Select(evidence =>
             new WorkerAssumptionEvidence
             {
@@ -142,8 +140,6 @@ internal static class CallableClaimResultAssembler
         bool hasEffectEvidence,
         bool projectAssumptions = true)
     {
-        System.ArgumentNullException.ThrowIfNull(claimId);
-        System.ArgumentNullException.ThrowIfNull(target);
         return Create(
             target,
             claimId,

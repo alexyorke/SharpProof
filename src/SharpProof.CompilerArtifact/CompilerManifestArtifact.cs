@@ -293,7 +293,6 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact value,
         CancellationToken cancellationToken)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         try
         {
             _ = CompilerLoweredArtifact.Decode(
@@ -384,7 +383,6 @@ internal static class CompilerManifestArtifactJson
         ImmutableArray<CompilerCallableArtifact> callables,
         WorkerClaimManifest manifest)
     {
-        manifest = RepositoryParameterGuard.NotNull(manifest, nameof(manifest));
         return !callables.IsDefault && callables.Length == manifest.Callables.Length &&
         callables.All(static item => item != null) &&
         callables.Select(static item => item?.CallableId).SequenceEqual(

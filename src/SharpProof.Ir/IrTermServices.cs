@@ -237,7 +237,6 @@ internal static class IrTermServices
         long left,
         long right)
     {
-        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
         var result = IrScalarOperations.Evaluate(@operator, left, right);
         return result.Kind switch
         {
@@ -301,7 +300,6 @@ internal static class IrTermServices
 
     private static bool IsNonNullLiteral(IrTerm term)
     {
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
     }
 

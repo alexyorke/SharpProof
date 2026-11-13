@@ -188,7 +188,7 @@ internal sealed class IntervalDomain : CanonicalAbstractDomain<IntervalValue>
     }
 
     private static (BigInteger Modulus, BigInteger Remainder) GetCongruenceHull(
-        IntervalValue left /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */, IntervalValue right /* SPINT001: all values valid - Bottom, Top, and every interval are valid abstract-domain inputs */)
+        IntervalValue left, IntervalValue right)
     {
         var difference = BigInteger.Abs(left.Remainder - right.Remainder);
         var modulus = BigInteger.GreatestCommonDivisor(

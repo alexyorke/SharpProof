@@ -101,7 +101,6 @@ internal sealed partial class ClaimManifestBuilder(
     private CompilerPotentialCallInventory DiscoverPotentialCallShadow(
         ImmutableDictionary<IMethodSymbol, ManifestCallableTarget> published, bool allowReferenceOwners = false)
     {
-        published = RepositoryParameterGuard.NotNull(published, nameof(published));
         var owners = ImmutableArray.CreateBuilder<CompilerPotentialCallOwner>();
         var gaps = ImmutableArray.CreateBuilder<CompilerPotentialCallGap>();
         var seen = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -206,9 +205,6 @@ internal sealed partial class ClaimManifestBuilder(
     private static ImmutableArray<PotentialRequiresCallSite> PotentialCalls(IMethodSymbol owner, IOperation body,
         Func<IMethodSymbol, bool> hasPreconditions)
     {
-        body = RepositoryParameterGuard.NotNull(body, nameof(body));
-        hasPreconditions = RepositoryParameterGuard.NotNull(hasPreconditions, nameof(hasPreconditions));
-        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         var calls = ImmutableArray.CreateBuilder<PotentialRequiresCallSite>();
         foreach (var operation in body.Descendants().OrderBy(static operation => operation.Syntax.SpanStart))
         {
@@ -230,7 +226,6 @@ internal sealed partial class ClaimManifestBuilder(
 
     private static bool SupportedShadowOwnerType(ITypeSymbol type, bool allowReferenceOwners)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return SharpProof.Frontend.CSharpOperationSemantics.IsScalar(type) ||
             allowReferenceOwners && type.TypeKind != TypeKind.Dynamic &&
             type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate;
@@ -294,7 +289,6 @@ internal sealed partial class ClaimManifestBuilder(
     private bool TryCollectPotentialSyntax(SyntaxNode root, ref int remainingNodes,
         out ImmutableArray<SyntaxNode> nodes, int maximumNodes = 65_536)
     {
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = ImmutableArray.CreateBuilder<(SyntaxNode Node, int Depth)>();
         var collected = ImmutableArray.CreateBuilder<SyntaxNode>();
         pending.Add((root, 0));
@@ -327,8 +321,6 @@ internal sealed partial class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         seed = RepositoryParameterGuard.ValidateInitialized(seed, seed.Method is null, nameof(seed), "Value must be initialized.");
-
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
         var target = seed.Method;
 
         var resolution = _contractSources.Resolve(target, implementationBody: null, cancellationToken);
@@ -514,11 +506,6 @@ internal sealed partial class ClaimManifestBuilder(
         string callableId,
         Location companionLocation)
     {
-
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
-        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         if (!ContractsEnabled)
         {
             return [];
@@ -603,12 +590,7 @@ internal sealed partial class ClaimManifestBuilder(
         ImmutableArray<(ISymbol Scope, AttributeData Attribute)> trustedAttributes,
         bool includeContractAssumptions)
     {
-
-
         RepositoryParameterGuard.RequireInitialized(trustedAttributes.IsDefault, nameof(trustedAttributes), "Array must be initialized.");
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
-        source = RepositoryParameterGuard.NotNull(source, nameof(source));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
         if (includeContractAssumptions)
         {
@@ -693,11 +675,7 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         bool isSupported,
         Location companionLocation)
     {
-
         RepositoryParameterGuard.RequireInitialized(evaluations.IsDefault, nameof(evaluations), "Array must be initialized.");
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
-        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var claims = ImmutableArray.CreateBuilder<ManifestEffectClaim>();
         var ranks = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
@@ -774,13 +752,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         Location companionLocation,
         Location? locationOverride = null)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        callableId = RepositoryParameterGuard.NotNull(callableId, nameof(callableId));
-        companionLocation = RepositoryParameterGuard.NotNull(companionLocation, nameof(companionLocation));
-        evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
-        fingerprint = RepositoryParameterGuard.NotNull(fingerprint, nameof(fingerprint));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        ranks = RepositoryParameterGuard.NotNull(ranks, nameof(ranks));
         var claimId = SemanticClaimIdentity.Create(
             AssemblyName, callableId, fingerprint, NextRank(ranks, fingerprint));
         var location = locationOverride ?? AttributeLocation(attribute, method, companionLocation);
@@ -807,8 +778,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         EffectClaimDeclaration evaluation,
         bool isSupported, CancellationToken cancellationToken)
     {
-        claimId = RepositoryParameterGuard.NotNull(claimId, nameof(claimId));
-        evaluation = RepositoryParameterGuard.NotNull(evaluation, nameof(evaluation));
         var evidence = new CompilerEffectClaimArtifact
         {
             ClaimId = claimId,
@@ -862,7 +831,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
         IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         foreach (var scope in CompilerMethodScopes.Enumerate(method))
         {
             foreach (var attribute in scope.GetAttributes())
@@ -1053,7 +1021,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
     private bool RequiresScopeDiscovery(AttributeData attribute)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return ContractSelectionInventory.Is(attribute, _attributes.Trusted) ||
             _attributes.IsRejectedControlAttribute(attribute);
     }
@@ -1091,7 +1058,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
     private CallableSeed CreateSeed(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var declaration = method.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax(cancellationToken))
@@ -1204,7 +1170,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
         void Resolve(IMethodSymbol method)
         {
-            method = RepositoryParameterGuard.NotNull(method, nameof(method));
             var unresolved = ImmutableArray.CreateBuilder<IMethodSymbol>();
             string parentId;
             while (true)
@@ -1271,8 +1236,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
 
     private static int NextRank(ImmutableDictionary<string, int>.Builder ranks, string key)
     {
-        key = RepositoryParameterGuard.NotNull(key, nameof(key));
-        ranks = RepositoryParameterGuard.NotNull(ranks, nameof(ranks));
         ranks.TryGetValue(key, out var rank);
         ranks[key] = rank + 1;
         return rank;
@@ -1303,8 +1266,6 @@ candidate = RepositoryParameterGuard.ValidateInitialized(candidate, candidate.Fi
         IMethodSymbol target,
         Location? companionLocation = null)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
         target.Locations.FirstOrDefault(static location => location.IsInSource) ??
         companionLocation ?? Location.None;

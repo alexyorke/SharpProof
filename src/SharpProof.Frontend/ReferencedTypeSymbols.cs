@@ -77,7 +77,6 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         CancellationToken cancellationToken)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         var snapshot = CachedSnapshots.GetValue(
             assembly,
             value => new TypeSnapshot(
@@ -93,7 +92,6 @@ internal static class ReferencedTypeSymbols
     private static IEnumerable<IAssemblySymbol> GetAssemblies(
         Compilation compilation)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
         yield return compilation.Assembly;
         foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
         {
@@ -105,7 +103,6 @@ internal static class ReferencedTypeSymbols
         IAssemblySymbol assembly,
         IAssemblySymbol referencedAssembly)
     {
-        assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
         foreach (var module in assembly.Modules)
         {
             foreach (var reference in module.ReferencedAssemblySymbols)
@@ -125,7 +122,6 @@ internal static class ReferencedTypeSymbols
         INamespaceOrTypeSymbol container,
         CancellationToken cancellationToken)
     {
-        container = RepositoryParameterGuard.NotNull(container, nameof(container));
         var pending = ImmutableStack<INamespaceOrTypeSymbol>.Empty;
         pending = pending.Push(container);
 

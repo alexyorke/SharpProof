@@ -144,7 +144,6 @@ internal sealed class ExternalEffectResolver
 
     private IEnumerable<AttributeData> EnumerateDirectContractAttributes(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return method.GetAttributes()
             .Concat(method.AssociatedSymbol is IPropertySymbol property ? property.GetAttributes() : [])
             .Where(attribute => IsAttribute(attribute, _effectContractAttribute));
@@ -279,7 +278,6 @@ internal sealed class ExternalEffectResolver
 
     private EffectSummary ResolveSpec(ApiSpecTemplate spec)
     {
-        spec = RepositoryParameterGuard.NotNull(spec, nameof(spec));
         var effects = spec.Facets.Effects.Effects;
         var reads = EffectRegionSet.Empty;
         var writes = EffectRegionSet.Empty;
@@ -377,14 +375,12 @@ internal sealed class ExternalEffectResolver
 
     private static bool IsAttribute(AttributeData attribute, INamedTypeSymbol? attributeType)
     {
-        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
         return attributeType != null &&
         SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, attributeType.OriginalDefinition);
     }
 
     private bool IsException(INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return !type.IsUnboundGenericType &&
         _exceptionType != null &&
         EffectTypeFacts.IsDerivedFrom(type, _exceptionType);
@@ -392,7 +388,6 @@ internal sealed class ExternalEffectResolver
 
     private static bool TryConvertEffects(object value, out EffectContractKind effects)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var converted = EffectContractMetadata.TryConvertInt64(value, out var result);
         effects = converted ? (EffectContractKind)result : EffectContractKind.None;
         return converted;
@@ -401,7 +396,6 @@ internal sealed class ExternalEffectResolver
     private static bool TryConvertCapabilities(
         object value, out EffectContractCapabilityKind capabilities)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var converted = EffectContractMetadata.TryConvertInt64(value, out var result) &&
             result is >= int.MinValue and <= int.MaxValue;
         capabilities = converted ? (EffectContractCapabilityKind)result : EffectContractCapabilityKind.None;

@@ -110,10 +110,6 @@ internal static class CompilerForkJoinResourceLowering
         IMethodSymbol child, SemanticModel model, Func<ChildBody, CompilerForkJoinProjectionResult?> continuation,
         CancellationToken cancellationToken)
     {
-        declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
-        child = RepositoryParameterGuard.NotNull(child, nameof(child));
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        continuation = RepositoryParameterGuard.NotNull(continuation, nameof(continuation));
         cancellationToken.ThrowIfCancellationRequested();
         var graph = TotalSourceCallSession.CreateGraph(declaration, child, model, cancellationToken);
         if (graph == null)

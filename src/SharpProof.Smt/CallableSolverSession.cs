@@ -139,7 +139,6 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
 
     private Status Check(ImmutableArray<BoolExpr> selectors, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         RepositoryParameterGuard.RequireInitialized(selectors.IsDefault, nameof(selectors), "Array must be initialized.");
         using var parameters = _runner.Context.MkParams();
         SmtNativeUtilities.AddOwnedParameter(parameters, _runner.Context.MkSymbol("rlimit"), meter.GetRemainingBudget());
@@ -153,7 +152,6 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
     // A model preference for string and array lengths, inactive in proof checks.
     private BoolExpr? SmallReferenceWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_smallReferences.TryGetValue(query, out var existing))
         { return existing; }
         var bound = _encoder.SmallReferenceBound(query, meter);
@@ -167,8 +165,6 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
 
     private BoolExpr? NominalReferenceWitnesses(VerificationQuery query, SmtQueryResourceMeter meter)
     {
-        query = RepositoryParameterGuard.NotNull(query, nameof(query));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_nominalReferences.TryGetValue(query, out var existing))
         { return existing; }
         var bound = _encoder.NominalReferenceBound(query, meter);
@@ -220,8 +216,6 @@ internal sealed class CallableSolverSession : ISmtBackend, IDisposable
 
     private BackendCheckResult CreateModel(VerificationQuery query, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        query = RepositoryParameterGuard.NotNull(query, nameof(query));
         using var model = _solver.Model;
         // Z3 reports SAT without a retrievable model only on a malformed backend result.
         var values = model is null ? null : _encoder.DecodeModel(query, model, meter);

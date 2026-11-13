@@ -113,7 +113,6 @@ internal static class CompilerManifestArtifactProducer
         CompilerManifestArtifact Compose(WorkerClaimManifest composedManifest, ImmutableArray<CompilerCallableArtifact> composedCallables,
             ImmutableArray<ManifestCallableTarget> composedTargets)
         {
-            composedManifest = RepositoryParameterGuard.NotNull(composedManifest, nameof(composedManifest));
             RepositoryParameterGuard.RequireInitialized(composedCallables.IsDefault, nameof(composedCallables), "Array must be initialized.");
             RepositoryParameterGuard.RequireInitialized(composedTargets.IsDefault, nameof(composedTargets), "Array must be initialized.");
             var composedSnapshot = resourceSnapshot;
@@ -180,8 +179,6 @@ internal static class CompilerManifestArtifactProducer
         this CompilerCallableArtifact artifact,
         ManifestCallableTarget target)
     {
-        artifact = RepositoryParameterGuard.NotNull(artifact, nameof(artifact));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         var claims = target.EffectClaims;
         var evidence = ImmutableArray.CreateBuilder<CompilerEffectClaimArtifact>(claims.Length);
         for (var index = 0; index < claims.Length; index++)
@@ -216,9 +213,6 @@ internal static class CompilerManifestArtifactProducer
         CSharpCompilation sourceCompilation,
         CompilerCompilationSnapshot compilation)
     {
-        sourceCompilation = RepositoryParameterGuard.NotNull(sourceCompilation, nameof(sourceCompilation));
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        diagnostic = RepositoryParameterGuard.NotNull(diagnostic, nameof(diagnostic));
         var source = diagnostic.Location.IsInSource;
         var location = CompilerSourceLocationProjection.Create(diagnostic.Location);
         var sourceTreeOrdinal = -1;

@@ -747,10 +747,7 @@ internal sealed partial class ApiSpecTable
     private static ApiSpecDeclaration ImmutablePairGetterDeclaration(string property,
         ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
     {
-        property = RepositoryParameterGuard.NotNull(property, nameof(property));
         RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
-        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
-        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
         const string type = "System.Collections.Generic.KeyValuePair`2";
         return new ApiSpecDeclaration(
             new ApiSpecTarget("bcl.key-value-pair." + property.ToLowerInvariant(), "P:" + type + "." + property,
@@ -776,8 +773,6 @@ internal sealed partial class ApiSpecTable
         ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
     {
         RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
-        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
-        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
         ImmutableArray<(string Type, string Member, IrTypeKind Result)> getters = [
             ("DateTime", "Ticks", IrTypeKind.Integer), ("DateTime", "Year", IrTypeKind.Integer),
             ("DateTime", "Month", IrTypeKind.Integer), ("DateTime", "Day", IrTypeKind.Integer),
@@ -836,7 +831,6 @@ internal sealed partial class ApiSpecTable
 
     private static string Kebab(string name)
     {
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var text = new System.Text.StringBuilder(name.Length + 8);
         foreach (var character in name.StartsWith("op_", StringComparison.Ordinal) ? "Op" + name.Substring(3) : name)
         {
@@ -849,9 +843,6 @@ internal sealed partial class ApiSpecTable
 
     private static ApiSpecDeclaration CalendarValueDeclaration(ApiSpecTarget target, SpecEvidence documented, SpecEvidence observed)
     {
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
-        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
         return new ApiSpecDeclaration(target,
             new ApiSpecFacets(
                 new SpecEffectFacet(SpecEffect.None, documented),
@@ -866,11 +857,7 @@ internal sealed partial class ApiSpecTable
     private static ApiSpecDeclaration CollectionCountDeclaration(string identifier, string type,
         ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
     {
-        identifier = RepositoryParameterGuard.NotNull(identifier, nameof(identifier));
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
-        documented = RepositoryParameterGuard.NotNull(documented, nameof(documented));
-        observed = RepositoryParameterGuard.NotNull(observed, nameof(observed));
         return new ApiSpecDeclaration(
             new ApiSpecTarget(identifier, "P:" + type + ".Count", type, SpecTargetMemberKind.PropertyGet, "Count",
                 false, 0, IrTypeKind.Reference, [], IrTypeKind.Integer, assemblies),

@@ -49,7 +49,6 @@ internal static class CompilerContractsExportProducer
     // Methods, constructors and accessors another assembly can name.
     private static IEnumerable<IMethodSymbol> Callables(INamespaceSymbol root, CancellationToken cancellationToken)
     {
-        root = RepositoryParameterGuard.NotNull(root, nameof(root));
         var pending = new Stack<INamespaceOrTypeSymbol>();
         pending.Push(root);
         while (pending.Count != 0)
@@ -71,7 +70,6 @@ internal static class CompilerContractsExportProducer
 
         static bool Visible(ISymbol symbol)
         {
-            symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
             return symbol.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal or Accessibility.ProtectedOrInternal;
         }
     }
@@ -80,11 +78,6 @@ internal static class CompilerContractsExportProducer
         ImmutableDictionary<SyntaxTree, string> trees, ImmutableDictionary<string, SyntaxTree> documents,
         IMethodSymbol method, CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
-        trees = RepositoryParameterGuard.NotNull(trees, nameof(trees));
-        documents = RepositoryParameterGuard.NotNull(documents, nameof(documents));
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         var resolution = session.ResolveContractSource(method);
         var requires = resolution.Inventory.Clauses.Where(static clause => clause.Kind == BoundContractKind.Requires).ToImmutableArray();
         if (requires.IsEmpty || method.GetDocumentationCommentId() is not { Length: > 0 } documentationId)
@@ -125,7 +118,6 @@ internal static class CompilerContractsExportProducer
     private static string DeclarationDigest(IMethodSymbol method, ImmutableArray<ContractClauseOccurrence> requires,
         CancellationToken cancellationToken)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         RepositoryParameterGuard.RequireInitialized(requires.IsDefault, nameof(requires), "Array must be initialized.");
         var text = new StringBuilder();
         text.Append(method.GetDocumentationCommentId()).Append('\n');
@@ -197,8 +189,6 @@ internal sealed class CompilerContractExports
         var rejected = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
         void Reject(string assembly, IEnumerable<string> callables)
         {
-            assembly = RepositoryParameterGuard.NotNull(assembly, nameof(assembly));
-            callables = RepositoryParameterGuard.NotNull(callables, nameof(callables));
             rejected[assembly] = (rejected.TryGetValue(assembly, out var known) ? known : ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal))
                 .Union(callables);
         }
@@ -243,7 +233,6 @@ internal sealed class CompilerContractExports
 
     private bool TryFind(IMethodSymbol method, out Accepted accepted, out CompilerExportedCallable callable)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         accepted = null!;
         callable = null!;
         return !_accepted.IsEmpty && method.DeclaringSyntaxReferences.IsEmpty &&
@@ -263,7 +252,6 @@ internal sealed class CompilerContractExports
 
     private bool IsRejected(IMethodSymbol method)
     {
-        method = RepositoryParameterGuard.NotNull(method, nameof(method));
         return _rejected.Count != 0 && method.DeclaringSyntaxReferences.IsEmpty &&
             _rejected.TryGetValue(method.ContainingAssembly.Identity.ToString(), out var callables) &&
             method.GetDocumentationCommentId() is { } id && callables.Contains(id);

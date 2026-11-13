@@ -54,13 +54,11 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
     {
         string ResolvePath(string path)
         {
-            System.ArgumentNullException.ThrowIfNull(path);
             return PublicationLease.CanonicalMember(ResolveProjectRelativePath(ProjectDirectory, path));
         }
 
         ImmutableArray<string> ResolveCompilerInputPaths(string path)
         {
-            ArgumentNullException.ThrowIfNull(path);
             var member = ResolvePath(path);
             var input = new FileInfo(member);
             var target = input.LinkTarget == null ? null : input.ResolveLinkTarget(returnFinalTarget: true);

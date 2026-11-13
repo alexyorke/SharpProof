@@ -9,8 +9,6 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeArrayAccess(IrSequenceAccessTerm access, SmtQueryResourceMeter meter)
     {
-        access = RepositoryParameterGuard.NotNull(access, nameof(access));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         var info = factory.GetTypeInfo(access.Type);
         if (info.Kind != IrTypeKind.Boolean && !IsInteger(info))
         { throw new UnsupportedIrEncodingException(); }
@@ -38,8 +36,6 @@ internal sealed partial class BvEncoder
 
     private ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> DecodeArrayObservations(Model model, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
         var observations = ImmutableDictionary.CreateBuilder<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>.Builder>();
         foreach (var access in _arrayAccessOrder.ToImmutable())
         {
@@ -74,8 +70,6 @@ internal sealed partial class BvEncoder
     private IrValue DecodeArrayWitness(IrTypeId type, int count, string token,
         ImmutableDictionary<(IrTypeId Type, string Token), ImmutableDictionary<int, IrValue>> observations)
     {
-        observations = RepositoryParameterGuard.NotNull(observations, nameof(observations));
-        token = RepositoryParameterGuard.NotNull(token, nameof(token));
         var elementType = factory.GetTypeInfo(type).ElementType
             ?? throw new UnsupportedIrEncodingException();
         var elements = Enumerable.Repeat(DefaultValue(elementType), count).ToImmutableArray();

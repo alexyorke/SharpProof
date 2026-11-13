@@ -123,7 +123,6 @@ internal sealed partial class IrValue
 
     private T Get<T>(IrValueKind expectedKind, string message)
     {
-        message = RepositoryParameterGuard.NotNull(message, nameof(message));
         return Kind == expectedKind ? (T)Payload! : throw new InvalidOperationException(message);
     }
 }
@@ -250,8 +249,6 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBounded(IrTerm term, EvaluationState state)
     {
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
-        term = RepositoryParameterGuard.NotNull(term, nameof(term));
         var result = term.Accept(EvaluationVisitor.Instance, (this, state));
         state.Results.Add(term.Id, result);
         return result;
@@ -414,15 +411,12 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private static IrEvaluationResult ValidateFieldValue(IrOpaqueTerm field, IrValue value)
     {
-        field = RepositoryParameterGuard.NotNull(field, nameof(field));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.Type == field.Type ? Value(value) :
             InvalidValue("The supplied field value has the wrong type for " + field.Member + ".");
     }
 
     private IrEvaluationResult EvaluateUnary(IrUnaryTerm unary, EvaluationState state)
     {
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var operand = EvaluateCore(unary.Operand, state);
         if (operand.Status != IrEvaluationStatus.Value)
         {
@@ -466,8 +460,6 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateBinary(IrBinaryTerm binary, EvaluationState state)
     {
-        binary = RepositoryParameterGuard.NotNull(binary, nameof(binary));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var left = EvaluateCore(binary.Left, state);
         if (left.Status != IrEvaluationStatus.Value)
         {
@@ -634,8 +626,6 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateConditional(IrConditionalTerm conditional, EvaluationState state)
     {
-        conditional = RepositoryParameterGuard.NotNull(conditional, nameof(conditional));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var condition = EvaluateCore(conditional.Condition, state);
         if (condition.Status != IrEvaluationStatus.Value)
         {
@@ -652,8 +642,6 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateCast(IrCastTerm cast, EvaluationState state)
     {
-        cast = RepositoryParameterGuard.NotNull(cast, nameof(cast));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var operand = EvaluateCore(cast.Operand, state);
         return EvaluateCastValue(cast.Type, operand);
     }
@@ -760,8 +748,6 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateLength(IrLengthTerm length, EvaluationState state)
     {
-        length = RepositoryParameterGuard.NotNull(length, nameof(length));
-        state = RepositoryParameterGuard.NotNull(state, nameof(state));
         var value = EvaluateCore(length.Value, state);
         if (value.Status != IrEvaluationStatus.Value)
         {
@@ -865,31 +851,26 @@ internal sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult Text(string value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return Value(_factory.CreateStringValue(value));
     }
 
     private static IrEvaluationResult Value(IrValue value)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return IrEvaluationResult.FromValue(value);
     }
 
     private static IrEvaluationResult InvalidValue(string detail)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return Unsupported(IrUnsupportedReason.InvalidVariableValue, detail);
     }
 
     private static IrEvaluationResult Unsupported(IrUnsupportedReason reason, string detail)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return IrEvaluationResult.FromUnsupported(reason, detail);
     }
 
     private static IrEvaluationResult Fault(IrExceptionKind kind, string detail)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
         return IrEvaluationResult.FromException(kind, detail);
     }
 

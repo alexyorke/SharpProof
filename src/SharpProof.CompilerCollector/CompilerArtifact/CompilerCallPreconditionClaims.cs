@@ -102,7 +102,6 @@ internal static class CompilerCallPreconditionClaims
     // carry them all.
     private static bool IsVerified(LoweredCallable callable)
     {
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
         return callable.Target.IsVerifierSupported && callable.Preparation.IsSuccess &&
             callable.Preparation.Total is { IsBodyAbstraction: false };
     }
@@ -111,10 +110,6 @@ internal static class CompilerCallPreconditionClaims
         CSharpCompilation compilation, ImmutableDictionary<string, SyntaxTree> documents, LoweredCallable callable,
         ImmutableHashSet<string> verified, CancellationToken cancellationToken)
     {
-        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
-        documents = RepositoryParameterGuard.NotNull(documents, nameof(documents));
-        callable = RepositoryParameterGuard.NotNull(callable, nameof(callable));
-        verified = RepositoryParameterGuard.NotNull(verified, nameof(verified));
         var total = callable.Preparation.Total!;
         if (total.CallPreconditions.IsEmpty)
         { return default; }
@@ -169,8 +164,6 @@ internal static class CompilerCallPreconditionClaims
     // the call was inlined through.
     private static bool IsOwned(CompilerTotalCallPrecondition row, ImmutableHashSet<string> verified)
     {
-        row = RepositoryParameterGuard.NotNull(row, nameof(row));
-        verified = RepositoryParameterGuard.NotNull(verified, nameof(verified));
         return !row.Ancestry.Take(row.Ancestry.Length - 1)
             .Any(hop => verified.Contains(hop.CalleeIdentity));
     }
@@ -186,15 +179,12 @@ internal static class CompilerCallPreconditionClaims
 
     private static WorkerSourceLocation Project(ImmutableDictionary<string, SyntaxTree> documents, IrSourceSpan span)
     {
-        documents = RepositoryParameterGuard.NotNull(documents, nameof(documents));
-        span = RepositoryParameterGuard.NotNull(span, nameof(span));
         return CompilerSourceLocationProjection.Create(Location.Create(documents[span.Document],
             new Microsoft.CodeAnalysis.Text.TextSpan(span.Start, span.Length)));
     }
 
     private static WorkerCallableManifestEntry WithClaims(WorkerCallableManifestEntry entry, ImmutableArray<WorkerClaimManifestEntry> claims)
     {
-        entry = RepositoryParameterGuard.NotNull(entry, nameof(entry));
         RepositoryParameterGuard.RequireInitialized(claims.IsDefault, nameof(claims), "Array must be initialized.");
         return entry with
         {

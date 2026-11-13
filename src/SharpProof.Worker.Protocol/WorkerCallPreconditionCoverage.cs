@@ -52,7 +52,6 @@ internal static class WorkerCallPreconditionCoverage
 
     private static Dictionary<string, WorkerClaimManifestEntry> Claims(WorkerVerifyResponse response)
     {
-        response = RepositoryParameterGuard.NotNull(response, nameof(response));
         var claims = new Dictionary<string, WorkerClaimManifestEntry>(StringComparer.Ordinal);
         foreach (var claim in response.Manifest.Claims)
         {

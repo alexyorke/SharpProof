@@ -475,8 +475,6 @@ internal static class ContractForSymbolMatcher
         ImmutableDictionary<INamedTypeSymbol,
             ImmutableArray<CompanionDescriptor>> targetIndex)
     {
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        targetIndex = RepositoryParameterGuard.NotNull(targetIndex, nameof(targetIndex));
         return EnumerateIndexed();
 
         IEnumerable<CompanionDescriptor> EnumerateIndexed()
@@ -568,10 +566,6 @@ internal static class ContractForSymbolMatcher
         IMethodSymbol target,
         ValidatedCompanionLayers companionLayers)
     {
-        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
-        companionLayers = RepositoryParameterGuard.NotNull(companionLayers, nameof(companionLayers));
-        definition = RepositoryParameterGuard.NotNull(definition, nameof(definition));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return ContractSpecializationPolicy.TrySpecialize(
             (companion, definition, target, companionLayers),
             static state =>
@@ -604,8 +598,6 @@ internal static class ContractForSymbolMatcher
         ValidatedCompanionLayers validatedLayers,
         INamedTypeSymbol target)
     {
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        validatedLayers = RepositoryParameterGuard.NotNull(validatedLayers, nameof(validatedLayers));
         var companionLayers = validatedLayers.Layers;
         var targetLayers = GetGenericTypeLayers(target);
 
@@ -642,7 +634,6 @@ internal static class ContractForSymbolMatcher
     private static bool RequiresConstructedSignatureCheck(
         IMethodSymbol target)
     {
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return !SymbolEqualityComparer.Default.Equals(
                    target, target.OriginalDefinition) ||
                GetTypeLayers(target.ContainingType).Any(layer =>
@@ -653,14 +644,12 @@ internal static class ContractForSymbolMatcher
     private static ImmutableArray<INamedTypeSymbol> GetGenericTypeLayers(
         INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return [.. GetTypeLayers(type).Where(static layer => layer.Arity > 0)];
     }
 
     private static ImmutableArray<INamedTypeSymbol> GetTypeLayers(
         INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         var layers = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         for (INamedTypeSymbol? current = type;
              current != null;
@@ -673,16 +662,12 @@ internal static class ContractForSymbolMatcher
 
     private static bool HasUniqueTarget(IMethodSymbol target, IMethodSymbol companion)
     {
-        companion = RepositoryParameterGuard.NotNull(companion, nameof(companion));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return GetOrdinaryMethods(target.ContainingType)
             .Count(candidate => MemberSignaturesMatch(candidate, companion)) == 1;
     }
 
     private static bool IsReceiver(IMethodSymbol target, IParameterSymbol receiver)
     {
-        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
-        target = RepositoryParameterGuard.NotNull(target, nameof(target));
         return receiver is { RefKind: RefKind.None, ScopedKind: ScopedKind.None, IsParams: false, IsOptional: false } &&
         TypesMatch(target.ContainingType.WithNullableAnnotation(NullableAnnotation.NotAnnotated),
             receiver.Type, target, receiver.ContainingSymbol, normalizeMappedTypeParameters: true);
@@ -690,8 +675,6 @@ internal static class ContractForSymbolMatcher
 
     private static bool ParametersMatch(IParameterSymbol left, IParameterSymbol right)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         return (left.RefKind, left.ScopedKind, left.IsParams,
                    left.IsOptional, left.HasExplicitDefaultValue) ==
                (right.RefKind, right.ScopedKind, right.IsParams,
@@ -711,7 +694,6 @@ internal static class ContractForSymbolMatcher
         IParameterSymbol left,
         IParameterSymbol right)
     {
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         if (!left.HasExplicitDefaultValue)
         {
             return true;
@@ -792,7 +774,6 @@ internal static class ContractForSymbolMatcher
 
     private static bool IsCompilerInAttribute(INamedTypeSymbol type)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.ContainingType == null &&
                string.Equals(type.MetadataName, "InAttribute", StringComparison.Ordinal) &&
                type.ContainingNamespace is { Name: "InteropServices" } interopServices &&
@@ -1092,7 +1073,6 @@ internal static class ContractForSymbolMatcher
         CustomModifier modifier,
         ImmutableArray<INamedTypeSymbol> callingConventions)
     {
-        modifier = RepositoryParameterGuard.NotNull(modifier, nameof(modifier));
         return callingConventions.Any(type =>
             SymbolEqualityComparer.Default.Equals(
                 modifier.Modifier,
@@ -1108,10 +1088,6 @@ internal static class ContractForSymbolMatcher
         bool compareRuntimeShape,
         Func<ITypeSymbol, ITypeSymbol>? mapTypeParameter)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        leftScope = RepositoryParameterGuard.NotNull(leftScope, nameof(leftScope));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        rightScope = RepositoryParameterGuard.NotNull(rightScope, nameof(rightScope));
         return (left.RefKind, left.ScopedKind) ==
                    (right.RefKind, right.ScopedKind) &&
                CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
@@ -1192,7 +1168,6 @@ internal static class ContractForSymbolMatcher
         ITypeSymbol type,
         bool normalizeMappedTypeParameters)
     {
-        type = RepositoryParameterGuard.NotNull(type, nameof(type));
         return type.NullableAnnotation == NullableAnnotation.None &&
         (normalizeMappedTypeParameters ||
          type is not ITypeParameterSymbol)

@@ -50,7 +50,6 @@ internal static partial class LauncherPresentation
 
     private static string Advice(ReasonExplanation explanation)
     {
-        ArgumentNullException.ThrowIfNull(explanation);
         return explanation.Description + " " + explanation.NextAction + UnknownHelp;
     }
 

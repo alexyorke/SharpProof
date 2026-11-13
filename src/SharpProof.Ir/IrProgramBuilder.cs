@@ -340,7 +340,6 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     private T Append<T>(IrBlockId blockId, T instruction) where T : IrInstruction, IIrTerminator
     {
         RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
-        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         EnsureMutable();
         _factory.GetOperationInfo(instruction.Operation);
         instruction.Accept(TerminatorValidationVisitor.Instance, this);
@@ -526,7 +525,6 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     private T AppendValidated<T>(IrBlockId blockId, T instruction) where T : IrInstruction
     {
         RepositoryParameterGuard.ThrowIfInvalid(blockId.IsDefault, nameof(blockId));
-        instruction = RepositoryParameterGuard.NotNull(instruction, nameof(instruction));
         var block = GetBlock(blockId);
         if (block.Instructions.Count != 0 &&
             block.Instructions[block.Instructions.Count - 1].IsTerminal)
@@ -659,8 +657,6 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     private static void RequireSameType(
         IrTypeId actual, IrTypeId expected, string detail, string parameterName)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         if (actual != expected)
         {
             throw new ArgumentException(detail, parameterName);
@@ -670,8 +666,6 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     private static ArgumentException InvalidArgument(
         string detail, string parameterName)
     {
-        detail = RepositoryParameterGuard.NotNull(detail, nameof(detail));
-        parameterName = RepositoryParameterGuard.NotNull(parameterName, nameof(parameterName));
         return new(detail, parameterName);
     }
 

@@ -16,9 +16,6 @@ internal sealed partial class BvEncoder
 
     private Expr EncodeStringEquals(Expr left, Expr right, SmtQueryResourceMeter meter)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
         var leftNull = owner.Own(context.MkEq(left, NullReference));
         var rightNull = owner.Own(context.MkEq(right, NullReference));
         var sameText = owner.Own(context.MkEq(Text(left, meter), Text(right, meter)));
@@ -29,7 +26,6 @@ internal sealed partial class BvEncoder
     // The content of a non-null string; its length is the reference's length.
     private SeqExpr Text(Expr value, SmtQueryResourceMeter meter)
     {
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume();
         EnsureText(meter);
         var text = (SeqExpr)owner.Own(context.MkApp(_text!, value));
@@ -45,7 +41,6 @@ internal sealed partial class BvEncoder
 
     private void EnsureText(SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         if (_initializingText)
         { return; }
         if (_text == null)
@@ -77,19 +72,12 @@ internal sealed partial class BvEncoder
 
     private void AddLiteralText(Expr value, string content, SmtQueryResourceMeter meter)
     {
-        content = RepositoryParameterGuard.NotNull(content, nameof(content));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         meter.Consume(content.Length + 1L);
         AddReferenceFact(owner.Own(context.MkEq(Text(value, meter), Literal(content))));
     }
 
     private void RegisterConcatenation(Expr value, Expr left, Expr right, SmtQueryResourceMeter meter)
     {
-        left = RepositoryParameterGuard.NotNull(left, nameof(left));
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        right = RepositoryParameterGuard.NotNull(right, nameof(right));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         var concatenation = (value, left, right);
         _concatenations.Add(concatenation);
         if (_text != null)
@@ -99,10 +87,8 @@ internal sealed partial class BvEncoder
     // A null operand concatenates as the empty string.
     private void AddConcatenationText((Expr Value, Expr Left, Expr Right) concatenation, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
         SeqExpr Operand(Expr operand)
         {
-            operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
             return (SeqExpr)owner.Own(context.MkITE(owner.Own(context.MkEq(operand, NullReference)),
                 owner.Own(context.MkEmptySeq(_textSort!)), Text(operand, meter)));
         }
@@ -134,9 +120,6 @@ internal sealed partial class BvEncoder
     // content of another length; the caller then keeps the length.
     private string? DecodeText(Expr value, Model model, SmtQueryResourceMeter meter)
     {
-        meter = RepositoryParameterGuard.NotNull(meter, nameof(meter));
-        model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        value = RepositoryParameterGuard.NotNull(value, nameof(value));
         if (_text == null)
         { return null; }
         using var evaluated = model.Evaluate(owner.Own(context.MkApp(_text, value)), true);

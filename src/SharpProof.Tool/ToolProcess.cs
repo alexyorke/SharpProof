@@ -88,7 +88,6 @@ internal static class ToolProcess
 
     private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(reader);
         var output = new StringBuilder();
         var buffer = new char[4096];
         while (true)
@@ -104,7 +103,6 @@ internal static class ToolProcess
 
     private static async Task DrainAsync(StreamReader reader, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(reader);
         // Diagnostics are not returned to callers; do not retain a second unbounded string.
         var buffer = new char[4096];
         while (await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) != 0)

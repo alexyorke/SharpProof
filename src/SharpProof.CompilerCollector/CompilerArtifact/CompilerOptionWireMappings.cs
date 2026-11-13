@@ -33,8 +33,6 @@ internal static partial class CompilerOptionWireMappings
         Type declaringType,
         string name)
     {
-        declaringType = RepositoryParameterGuard.NotNull(declaringType, nameof(declaringType));
-        name = RepositoryParameterGuard.NotNull(name, nameof(name));
         var property = declaringType.GetProperty(
             name,
             System.Reflection.BindingFlags.Instance |
