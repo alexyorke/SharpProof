@@ -8,7 +8,7 @@ This document describes the implemented verifier host/filesystem boundary and th
 | --- | --- | --- |
 | Attributes API | netstandard2.0-compatible application targets | Application target is separate from compiler SDK |
 | Older application targets | SDK-style Framework 4.6.1/4.6.2/4.7.2/4.8/4.8.1, Standard 2.0, Core 2.0/3.1, .NET 5-10 | Actual default proof/refutation tests on a modern build host; see [legacy compatibility and qualification limits](legacy-compatibility.md) |
-| Explicit advisory-only analyzer consumers | Linux x64, Windows x64, macOS ARM64/x64; SDK 9.0.300+ / Roslyn 4.14+ | The default full verifier still requires SDK 10 |
+| Explicit advisory-only analyzer consumers | Windows, macOS and Linux, x64 or ARM64; SDK 9.0.300+ / Roslyn 4.14+ | The default full verifier still requires SDK 10 |
 | Full verification | Canonical Linux amd64 container | Pinned .NET 10 SDK/runtime, payload, Docker resource isolation |
 | Full verification | Native Windows x64/ARM64, fixed local NTFS; SDK 10.0.100+ | .NET 10 runtime; architecture-matched solver with static C++ runtime; release smoke coverage is limited to the Windows runner below |
 | Full verification | Native macOS ARM64/x64; SDK 10.0.100+ | .NET 10 runtime; architecture-matched packaged solver; release smoke coverage is limited to one macOS runner |
@@ -17,9 +17,9 @@ This document describes the implemented verifier host/filesystem boundary and th
 | Older Visual Studio command-line build host | MSBuild 17.14 with SDK 9.0.300 and Roslyn 4.14 | Explicit advisory-only eligibility; no current native CI matrix for this host; default strict verification is unsupported |
 | Repository build/test/pack/acceptance | Canonical Linux amd64 container only | Includes repository PowerShell commands |
 | IDE typing/navigation | Portable diagnostics and design-time configuration | No separate IDE/version qualification promise; design-time builds do not run proofs |
-| musl Linux, other OS/architecture combinations, older full-framework MSBuild verifier hosts | Unqualified | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
+| Full verification on musl Linux, other OS/architecture combinations, or older full-framework MSBuild hosts | Unsupported | No universal OS/architecture guarantee; a successful portable build does not extend qualification |
 
-The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.321 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The primary repository SDK remains 10.0.403. Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
+The explicit advisory eligibility floor remains SDK 9.0.300 / Roslyn 4.14. The canonical compatibility fixture uses serviced SDK 9.0.321 from the same 9.0.3xx feature band; that fixture pin does not raise the consumer minimum. The repository SDK is the one pinned in [global.json](../global.json). Secondary .NET 8 fixtures use 8.0.32 servicing packs/runtime.
 
 Compiler-host minimums are checked separately from the current repository SDK in [global.json](../global.json). Installing a newer SDK does not retarget an application's framework. IDE support also depends on its embedded Roslyn host; installing a command-line SDK alone does not establish that host's compatibility.
 

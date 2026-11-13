@@ -163,7 +163,7 @@ def make_plan(api, event, repository, run_id, attempt, revision, workflow, image
     require(SHA.fullmatch(revision) is not None and SHA.fullmatch(source_sha) is not None,
             "Workflow and source revisions must be exact 40-character commit SHAs.")
     require(WORKFLOW.fullmatch(workflow) is not None, "Caller workflow must be an exact .github/workflows YAML path.")
-    require(IMAGE.fullmatch(image) is not None, "Use the qualified private preview image pinned by SHA-256.")
+    require(IMAGE.fullmatch(image) is not None, "Use the qualified consumer image pinned by SHA-256.")
     relative_path(project, ".csproj")
     relative_path(compose_file)
     relative_path(evidence_directory)
