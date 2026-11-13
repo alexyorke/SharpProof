@@ -6,6 +6,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Packaging
 
+- Harden the release workflow before its first run. The GitHub release notes are
+  now the changelog section for the tagged version, with repository links made
+  absolute, instead of a generated list of every merged pull request; a tag
+  without that section is rejected. The package job fails at once when the
+  `NUGET_USER` variable is missing, before it pushes the consumer image. The
+  package artifact no longer carries the attempt number, so "Re-run failed jobs"
+  reuses the packages the first attempt built.
 - Complete the package metadata. `SharpProof.CodeFixes` gains a readme, icon,
   tags and project URL. `SharpProof.Templates` gains an icon, project URL,
   copyright and tags, takes its description from its project file, and ships
