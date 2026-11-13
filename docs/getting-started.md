@@ -1,6 +1,6 @@
 # Getting started
 
-Run `dotnet add package SharpProof --version 1.0.0-preview.2` in an SDK-style C# project using your configured feed, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
+Run `dotnet add package SharpProof --version 1.0.0-preview.2` in an SDK-style C# project, then build. The package brings the contract API and analyzer transitively and enables strict verification automatically; no SharpProof properties or separate Attributes/analyzer references are required. `SharpProof.Verifier` remains a compatibility entrypoint.
 
 The
 [workspace template](developer-experience.md#install-and-start) supplies the matching
@@ -12,7 +12,7 @@ Targeting an older application framework does not require running the verifier o
 
 ## First use in three steps
 
-1. Obtain the current packages from your configured feed; this checkout does not imply public NuGet availability. See [obtaining packages](#obtain-this-checkouts-packages).
+1. Get the packages. Until `1.0.0-preview.2` is on nuget.org, see [obtaining packages](#obtain-this-checkouts-packages).
 2. Add this single reference to your project, or use the [`sharpproof` project template](developer-experience.md#install-and-start):
 
    ```xml
@@ -86,4 +86,4 @@ This explicit portable-only configuration requires SDK 9.0.300+/Roslyn 4.14+ and
 
 Use [Unknown reasons](unknown-reasons.md) to understand unsupported semantics or exhausted budgets before changing limits. `Assume` and trusted boundaries are assumptions, not fixes for a failing claim. Follow the [tutorial series](tutorials/README.md) for supported examples and [upgrades](upgrading.md) when changing versions.
 
-The optional [developer tools](developer-experience.md) add packaged project templates, configuration checks, evidence comparison, NUnit regression export, and companion scaffolding. They use matching preview packages from your configured feed; the standard single-reference setup above remains sufficient for build verification.
+The optional [developer tools](developer-experience.md) add packaged project templates, configuration checks, evidence comparison, NUnit regression export, and companion scaffolding. The standard single-reference setup above remains sufficient for build verification.

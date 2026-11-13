@@ -28,14 +28,20 @@
       "datatype": "choice",
       "choices": [
         {
-          "choice": "portable"
+          "choice": "native",
+          "description": "Verify on this machine during every build (the package default, strict)."
         },
         {
-          "choice": "container"
+          "choice": "container",
+          "description": "Verify in the pinned Linux amd64 container, with retained evidence and a comparison workflow."
+        },
+        {
+          "choice": "portable",
+          "description": "Analyzer diagnostics only; no proofs are run."
         }
       ],
-      "defaultValue": "portable",
-      "description": "Portable analysis or strict verification in the canonical Linux amd64 container."
+      "defaultValue": "native",
+      "description": "Where contracts are verified."
     }
   },
   "sources": [
@@ -43,6 +49,8 @@
       "source": "./",
       "target": "./",
       "exclude": [
+        "native/**",
+        "native-editor/**",
         "portable/**",
         "container/**",
         "portable-editor/**",
@@ -54,6 +62,30 @@
       "rename": {
         "global.json.template": "global.json",
         "SharpProofStarter.slnx.template": "SharpProofStarter.slnx"
+      }
+    },
+    {
+      "source": "./native/",
+      "target": "./",
+      "condition": "(verification == \"native\")",
+      "modifiers": [
+        {
+          "condition": "(editor)",
+          "exclude": [
+            "src/app/SharpProofStarter.csproj.template"
+          ]
+        }
+      ],
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj"
+      }
+    },
+    {
+      "source": "./native-editor/",
+      "target": "./",
+      "condition": "(verification == \"native\" && editor)",
+      "rename": {
+        "src/app/SharpProofStarter.csproj.template": "src/app/SharpProofStarter.csproj"
       }
     },
     {

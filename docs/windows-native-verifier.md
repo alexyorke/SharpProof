@@ -18,7 +18,7 @@ Add the single standard reference to the consuming SDK project. Full strict veri
 </ItemGroup>
 ```
 
-Use the package version from your configured feed and keep the standard reference without `PrivateAssets="all"` so transitive application contract dependencies propagate. The required SDK/runtime above remains a host prerequisite; adding a NuGet reference does not install it. Use matching native OS and .NET process architectures; emulation does not replace native ARM64 qualification.
+Keep the standard reference without `PrivateAssets="all"` so transitive application contract dependencies propagate. The required SDK/runtime above remains a host prerequisite; adding a NuGet reference does not install it. Use matching native OS and .NET process architectures; emulation does not replace native ARM64 qualification.
 
 Run `dotnet build` from a native Windows x64 or ARM64 .NET installation. No container
 marker, separately installed Z3, PATH changes, or native-root environment override

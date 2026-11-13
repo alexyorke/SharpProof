@@ -2,6 +2,18 @@
 
 Use the canonical Linux amd64 container for repository execution. Host commands below start at the repository root. Commands beginning with `sp`, `pwsh`, or `dotnet` run inside the persistent canonical development container; [container development](container-development.md) explains its workspace and the disposable finite task workspace.
 
+## First run
+
+From the repository root, with Docker Compose v2 and Linux containers:
+
+```text
+docker compose build tooling
+docker compose run --rm tooling test -Target src/SharpProof.Analyzer.Tests/SharpProof.Analyzer.Tests.csproj -TestFilter FullyQualifiedName~DocumentationSnippetTests
+docker compose run --rm tooling pr
+```
+
+`pr` runs Release build and PR semantic/package gates. Coverage, corpus, fuzzing, and security have separate commands; see the [container command reference](container-development.md). Finite tasks copy source into private container workspaces and export artifacts. Run repository .NET, PowerShell, packaging, and acceptance commands there.
+
 ## Choose a workflow
 
 | Need | Entry point | Evidence and limits |
@@ -28,6 +40,20 @@ The nightly fuzz runner rebuild uses the 600-second solution-build allowance. Th
 worker's default per-project wall-time budget remains 300 seconds; these measure
 different boundaries. See [analysis limits](analysis-limits.md) before changing either
 value.
+
+## Lint and repository checks
+
+Run all repository lint, spelling, package compatibility, and link checks with one
+Docker command:
+
+```sh
+docker compose run --rm --build lint
+```
+
+It builds the pinned toolchain and lint tools automatically, writes reports under
+`artifacts/lint`, and exits nonzero if a check fails. For host Git worktrees, use
+`pwsh -File eng/scripts/Invoke-SharpProof.ps1 lint`. See [quality gates](../eng/lint/README.md)
+for scope and individual checks.
 
 ## Parameters and test selection
 
