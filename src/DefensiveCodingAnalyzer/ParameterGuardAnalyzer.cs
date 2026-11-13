@@ -19,7 +19,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         "DefensiveCoding",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "Every input parameter of a concrete callable must occur in an explicit validation that rejects invalid input.");
+        description: "Every input parameter of a callable that other types can reach must occur in an explicit validation that rejects invalid input.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
 
@@ -33,7 +33,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
             SyntaxKind.ConstructorDeclaration,
             SyntaxKind.OperatorDeclaration,
             SyntaxKind.ConversionOperatorDeclaration,
-            SyntaxKind.LocalFunctionStatement,
             SyntaxKind.ClassDeclaration,
             SyntaxKind.StructDeclaration,
             SyntaxKind.RecordDeclaration,
@@ -46,6 +45,7 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         // inputs, and an anonymous function's inputs come from the enclosing
         // callable that created it. Neither is an entry point to validate.
         if (context.Compilation.AssemblyName?.EndsWith(".Test", StringComparison.Ordinal) == true ||
+            IsPrivateMethod(context.Node) ||
             !TryGetCallable(context.Node, out var parameters, out var body))
         {
             return;
@@ -99,6 +99,17 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    // A private method is called only from its own type, where the compiler's
+    // nullable analysis already checks every caller, and a local function only
+    // from its enclosing callable. The boundary to guard is the member that
+    // other types can reach.
+    private static bool IsPrivateMethod(SyntaxNode node)
+    {
+        return node is MethodDeclarationSyntax method &&
+            method.Modifiers.Any(static token => token.IsKind(SyntaxKind.PrivateKeyword)) &&
+            !method.Modifiers.Any(static token => token.IsKind(SyntaxKind.ProtectedKeyword));
+    }
+
     private static bool TryGetCallable(
         SyntaxNode node,
         out ImmutableArray<ParameterSyntax> parameters,
@@ -124,10 +135,6 @@ public sealed class ParameterGuardAnalyzer : DiagnosticAnalyzer
                 when ((SyntaxNode?)conversion.Body ?? conversion.ExpressionBody) is { } conversionBody:
                 parameters = conversion.ParameterList.Parameters.ToImmutableArray();
                 body = conversionBody;
-                return true;
-            case LocalFunctionStatementSyntax local when ((SyntaxNode?)local.Body ?? local.ExpressionBody) is { } localBody:
-                parameters = local.ParameterList.Parameters.ToImmutableArray();
-                body = localBody;
                 return true;
             case TypeDeclarationSyntax type when type.ParameterList is { } primary:
                 parameters = primary.Parameters.ToImmutableArray();
