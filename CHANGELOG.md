@@ -14,8 +14,11 @@ listing changes against an earlier one. Development history is in the Git log.
   `SharpProof -> SharpProof.Verifier -> SharpProof.Attributes`, all at one
   version.
 - Verification is strict by default: a build fails when a selected claim is
-  refuted, is not proven, or depends on a declared assumption. The `advisory`
-  and `off` profiles are explicit opt-outs.
+  refuted, is not proven, or depends on a declared assumption. There is one
+  exception: a call-precondition claim that only runs out of time does not
+  fail the build. It is counted as an unchecked call, so a passing strict
+  build does not prove it. The `advisory` and `off` profiles are explicit
+  opt-outs.
 - Verification stays with the project that references the package. A project
   that references a verified library, or a package that depends on SharpProof,
   gets the contract API but does not inherit strict verification, the worker
@@ -68,9 +71,11 @@ listing changes against an earlier one. Development history is in the Git log.
   checked across a package boundary. Calls that cannot be checked are counted
   in the build summary, and nothing is assumed after them.
 - Purity, effect, allocation, capability and exception claims account for type
-  and module initializers. Initializers that only build fresh values are
-  recognized as effect-free; others leave the claim `Unknown` with a reason
-  that names the initializer.
+  and module initializers. For purity and capability claims, a type
+  initializer that only builds fresh values counts as effect-free. Allocation,
+  effect-contract and resource-bound claims still count what such an
+  initializer allocates and stay `Unknown`. Any other initializer leaves the
+  claim `Unknown` with a reason that names it.
 - The default API table specifies common framework members, including calendar
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
