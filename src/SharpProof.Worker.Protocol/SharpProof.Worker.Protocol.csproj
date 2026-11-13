@@ -23,20 +23,20 @@
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
-    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
-    <InternalsVisibleTo Include="SharpProof.Package.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Package.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Tool" />
-    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Tests" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Gates.Test" />
-    <InternalsVisibleTo Include="SharpProof.Tool.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Tool.Tests" />
     <Compile Include="..\..\eng\shared\SolverDefaults.cs"
              Link="Configuration\SolverDefaults.cs" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Tests" />
   </ItemGroup>
 </Project>

@@ -12,8 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Fuzz" />
-    <InternalsVisibleTo Include="SharpProof.Fuzz.Test" />
-    <InternalsVisibleTo Include="SharpProof.Testing.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz.Tests" />
+    <InternalsVisibleTo Include="SharpProof.Testing.Tests" />
   </ItemGroup>
   <ItemGroup>
     <!-- Shared test helpers from eng/testing. -->

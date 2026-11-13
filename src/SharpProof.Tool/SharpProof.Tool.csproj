@@ -22,7 +22,7 @@
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
     <None Update="README.md" Pack="true" PackagePath="/" />
     <None Include="../../THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="/" />
-    <InternalsVisibleTo Include="SharpProof.Tool.Test" />
+    <InternalsVisibleTo Include="SharpProof.Tool.Tests" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyMetadata Include="SharpProof.TestSdk" Value="$(MicrosoftNETTestSdkVersion)" />
@@ -38,6 +38,6 @@
     <ProjectReference Include="../SharpProof.Frontend/SharpProof.Frontend.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="NuGet.Configuration" />
-    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Test" />
+    <InternalsVisibleTo Include="SharpProof.DeveloperExperience.Tests" />
   </ItemGroup>
 </Project>

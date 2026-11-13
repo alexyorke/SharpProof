@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyName>SharpProof.Specs.Test</AssemblyName>
     <RootNamespace>SharpProof.Specs.Test</RootNamespace>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>preview</LangVersion>
