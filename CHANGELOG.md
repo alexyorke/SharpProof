@@ -92,6 +92,13 @@ Entries describe repository changes, not package publication. Confirm available 
 
 ### Verification
 
+- Fail closed in the IL lowering tables. A comparison or arithmetic opcode the
+  tables do not name now abstains; before, the default arms read it as
+  less-than or remainder and relied on an earlier admission check. The IL stack
+  checker rejects a parameter or return type it cannot map instead of ignoring
+  the lookup result, and the fork-join resource check names each metric it
+  supports.
+
 - Model calendar and clock values. A non-lifted user-defined binary operator
   declared in another assembly, such as `DateTime > DateTime`, now lowers as a
   call to its static operator method after both operands are evaluated; before,
