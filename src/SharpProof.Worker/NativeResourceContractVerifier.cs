@@ -332,7 +332,9 @@ internal static class NativeResourceContractVerifier
                     {
                         WorkerResourceMetric.ArrayAllocations => ResourceExpression.Add(costs.Arrays, ResourceExpression.One),
                         WorkerResourceMetric.AllocatedElements => ResourceExpression.Add(costs.Elements, ResourceExpression.Literal(projection.Children.Length)),
-                        _ => costs.LoopEntries
+                        WorkerResourceMetric.LoopBodyEntries => costs.LoopEntries,
+                        // The metric check above admits only the three arms here.
+                        _ => throw new InvalidOperationException("Unsupported fork-join resource metric.")
                     };
                 }
                 var limit = ResourceExpressionCodec.DecodeForCallable(constraint.UpperBound, target.Entry.CallableId, entry, cancellation);
