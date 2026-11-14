@@ -49,6 +49,12 @@ internal static class Program
                 Log.Info(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
+            if (command == "contract-oracle")
+            {
+                var contracts = await OssContractGate.RunAsync(root, cancellation.Token).ConfigureAwait(false);
+                Log.Info(JsonSerializer.Serialize(contracts, SharpProofJsonDefaults.Indented));
+                return contracts.Passed ? 0 : 1;
+            }
             if (command == "corpus")
             {
                 var wallTime = System.Diagnostics.Stopwatch.StartNew();
@@ -123,7 +129,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|library-build|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|library-build|perf-baseline|perf-self|contract-oracle|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count> | --source <source-id>]");
             return 2;
         }
