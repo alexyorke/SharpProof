@@ -37,7 +37,7 @@ internal static class NativeEffectSiteVerifier
         // Constructing fresh values uses no capability.
         if (!preparation.Total.EffectsCompleteAtEntry && !preparation.Total.EntryConstructsFreshValues)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation, effectClaim: true)!;
         return await VerifyCapabilityProjectionAsync(candidate, claims[0].Constraint.AllowedCapabilities, budgets, cancellationToken, resourceBudget)
             .ConfigureAwait(false);
     }
@@ -101,7 +101,7 @@ internal static class NativeEffectSiteVerifier
         { return Unknown(WorkerClaimReason.UnsupportedContract); }
         if (!total.EffectsCompleteAtEntry)
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation, effectClaim: true)!;
         return await VerifyEffectContractProjectionAsync(candidate, claims[0].Constraint, exceptions.AllowedKinds,
             budgets, cancellationToken, resourceBudget).ConfigureAwait(false);
     }
@@ -270,7 +270,7 @@ internal static class NativeEffectSiteVerifier
         if (!preparation.Total.EffectsCompleteAtEntry &&
             !(contract == WorkerEffectContractKind.EnforcePure && preparation.Total.EntryConstructsFreshValues))
         { return Unknown(WorkerClaimReason.UnsupportedBody); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation)!;
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation, effectClaim: true)!;
         if (candidate.Requires.Any(clause => IrTermAnalysis.GetDepth(clause.Value) > budgets.MaximumExpressionDepth ||
             IrTermAnalysis.GetDepth(clause.Safe) > budgets.MaximumExpressionDepth))
         { return Unknown(WorkerClaimReason.UnsupportedExpression); }

@@ -61,6 +61,19 @@ Once a constructor's stores to its own readonly fields and get-only auto-propert
 
 When a source callee declared in the caller's own type began to be inlined under that type's initializer (SEMANTICS.md, "Calls and loops"), 48 selected methods that had stopped at SP0047 `Advisory:Lowering:UnsupportedOperationKind` lowered completely. None of them became Proven or Refuted: each is still Unknown, now with SP0002 because its effects are not proved (most enumerate a caller's sequence or invoke a caller's delegate). The ratchet therefore moved 48 from the SP0047 ceiling (281 to 233) to the SP0002 ceiling (184 to 232). Total Unknown, the supported floors and every support label are unchanged. [verdicts-by-source.md](verdicts-by-source.md) shows the per-source split.
 
+## Contracts on real code
+
+The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.
+
+`SharpProof.Gates contract-oracle` runs them, and `OssContractGateTests` fails when any verdict changes. Today one is Proven: NodaTime `JulianYearMonthDayCalculator.IsLeapYear` (OSS0315), a sealed override. The others are Unknown for reasons each review names:
+
+- Humanizer's formatter methods are overrides in unsealed classes. A postcondition there is a contract for every override, so it is not verified, and the two false contracts among them are not refuted either.
+- NodaTime's checked 32-bit multiply with a remainder (OSS0311) exhausts the query budget.
+- Witnesses through a callee whose type has a static initializer (OSS0310), or through a loop and `Math.Sqrt` (OSS0124), cannot be replayed.
+- A base-class property read (OSS0393), an enum result (OSS0453), `Math.Abs` with a loop (OSS0015) and recursion (OSS0180) are not modeled for postconditions.
+
+A change that turns one of them into Proven or Refuted updates its entry and this list.
+
 ## Reproduce, update, or add a source
 
 Use a persistent canonical container workspace so edits survive (`docker compose run --rm tooling dev`, or the Dev Container). Inside its shell, clone the upstream repository, check out the commit pinned in `sources.json`, and import it:

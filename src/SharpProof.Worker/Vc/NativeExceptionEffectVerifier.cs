@@ -25,7 +25,7 @@ internal static class NativeExceptionEffectVerifier
         var results = ImmutableDictionary.CreateBuilder<string, PassiveCallableCheckResult>(StringComparer.Ordinal);
         if (expected.Length == 0)
         { return results.ToImmutable(); }
-        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation);
+        var candidate = PassiveCallableArtifactAdapter.Enroll(preparation, effectClaim: true);
         if (candidate == null)
         { return All(Unknown(WorkerClaimReason.UnsupportedBody)); }
         var constraints = ImmutableDictionaryCapture.Create(preparation.Total?.ExceptionConstraints ?? [], constraint => constraint.ClaimId, static constraint => constraint, StringComparer.Ordinal);
