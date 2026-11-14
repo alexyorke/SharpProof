@@ -14,9 +14,11 @@ namespace SharpProof.Gates.Corpus;
 
 // Lowers every method of every pinned source with the advisory pipeline and
 // counts the constructs the frontend abstains on. The "sole" count of a
-// construct is the number of methods it alone keeps from lowering exactly:
-// what supporting that construct by itself could gain. Developer evidence
-// only; it publishes no verdict.
+// construct is the number of methods where it is the only blocker the
+// lowering reports. That is an upper bound on what supporting the construct
+// by itself could gain: an expression that abstains on one operand does not
+// lower its other operands, so their blockers stay hidden until the first is
+// fixed. Developer evidence only; it publishes no verdict.
 internal static class BlockerCensus
 {
     private const string Exact = "(lowers exactly)";
@@ -243,7 +245,10 @@ internal static class BlockerCensus
         text.Append("# Lowering blockers across whole pinned sources\n\n");
         text.Append("Methods: ").Append(totals.Sum().ToString(CultureInfo.InvariantCulture)).Append(" (")
             .AppendJoin(", ", sources.Select((id, index) => $"{id} {totals[index]}")).Append(").\n\n");
-        text.Append("Sole counts methods where the construct is the only blocker; Any counts methods that contain it.\n\n");
+        text.Append("Any counts methods that report the construct. Sole counts methods that report nothing else; it is an upper bound ");
+        text.Append("on the gain from supporting the construct, because an abstaining operand hides blockers in sibling operands.
+
+");
         text.Append("| Construct | Sole | Any | ").AppendJoin(" | ", sources.Select(static id => $"`{id}` sole")).Append(" |\n");
         text.Append("| --- | ---: | ---: |").Insert(text.Length, " ---: |", sources.Length).Append('\n');
         foreach (var row in any
