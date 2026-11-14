@@ -31,6 +31,7 @@ docker compose run --rm tooling pr
 | Retained and rotating fuzz | `tooling fuzz-nightly -Configuration Release` | Bounded clean-source campaign with validated per-run results |
 | Verification performance | `tooling perf-baseline` | Verifies the pinned corpus on one solver lane and writes per-callable solver work and time to `artifacts/perf` |
 | Self-verification cost | `tooling perf-self` | Verifies every tracked `src/` project with SharpProof applied, writes each worker result to `artifacts/perf/self/<project>.json` and per-project totals to `artifacts/perf/self-summary.md`; advisory |
+| Whole-library build | `tooling library-build` | Packs the product, then builds all of the pinned NodaTime source as a user project: `[EnforcePure]` on every candidate method, `SharpProof` from the local feed, advisory verification. Writes build time, compiler manifest size against the 32 MiB limit, claim outcomes and SharpProof diagnostics to `artifacts/perf/library-nodatime`; fails only when the build crashes or exceeds 45 minutes |
 | Scheduled nightly profile | `tooling nightly` | Runs the sequential nightly profile, including corpus, performance baseline, bounded fuzz and, last, self-verification cost; CI uploads all evidence |
 | Exploratory generative campaign | `tooling test ... -TestFilter TestCategory=LongFuzz` | Explicit test harnesses; findings are recorded for review and CI checks error severity afterward |
 

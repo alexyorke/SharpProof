@@ -339,6 +339,7 @@ run_lane() {
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         cat artifacts/perf/summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
         cat artifacts/perf/self-summary.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
+        cat artifacts/perf/library-nodatime/library-nodatime.md >> "$GITHUB_STEP_SUMMARY" 2> /dev/null || true
       fi
       return "$nightly_status"
       ;;
