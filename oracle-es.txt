@@ -1,0 +1,98 @@
+ Volume ores_sharpproof-nuget Creating 
+ Volume ores_sharpproof-nuget Creating 
+ Volume ores_sharpproof-dotnet-home Creating 
+ Volume ores_sharpproof-dotnet-home Creating 
+ Volume ores_sharpproof-nuget Created 
+ Volume ores_sharpproof-nuget Created 
+ Volume ores_sharpproof-dotnet-home Created 
+ Volume ores_sharpproof-dotnet-home Created 
+ Image ores-tooling:local Pulling 
+ Image ores-tooling:local pull access denied for ores-tooling, repository does not exist or may require 'docker login' 
+ Image ores-tooling:local Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 870B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 12.15kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb
+#3 ...
+
+#4 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:9.0.321-bookworm-slim@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84
+#4 DONE 0.2s
+
+#3 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb
+#3 DONE 0.2s
+
+#5 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:8.0.428-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5
+#5 DONE 0.2s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 178B done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 DONE 0.0s
+
+#8 [powershell 2/3] ADD --checksum=sha256:db85ae1f45005ffd20e456890585167257151fa99406ccd7ab344f7cf3a766fd https://github.com/PowerShell/PowerShell/releases/download/v7.5.12/powershell-7.5.12-linux-x64.tar.gz /tmp/powershell.tar.gz
+#8 DONE 0.0s
+
+#9 [api-inventory 1/2] ADD --checksum=sha256:645538957cff063262a94e2cca4644611e63e5eef8e4a31fe193e8d061e789c5 https://api.nuget.org/v3-flatcontainer/microsoft.netcore.app.ref/9.0.18/microsoft.netcore.app.ref.9.0.18.nupkg /tmp/reference-pack.nupkg
+#9 DONE 0.0s
+
+#10 [minimum-framework 1/1] FROM mcr.microsoft.com/dotnet/sdk:8.0.428-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5
+#10 resolve mcr.microsoft.com/dotnet/sdk:8.0.428-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5 0.1s done
+#10 DONE 0.1s
+
+#11 [windows-native 1/5] FROM mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb
+#11 resolve mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb 0.1s done
+#11 DONE 0.1s
+
+#12 [minimum-sdk 1/1] FROM mcr.microsoft.com/dotnet/sdk:9.0.321-bookworm-slim@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84
+#12 resolve mcr.microsoft.com/dotnet/sdk:9.0.321-bookworm-slim@sha256:1dfdb27e9c2c345cb598925ccf6b13719ecfebea8467bd4745c23a3c108cdf84 0.1s done
+#12 DONE 0.1s
+
+#7 [internal] load build context
+#7 transferring context: 1.22kB done
+#7 DONE 0.0s
+
+#13 [toolchain 28/28] WORKDIR /workspace/SharpProof
+#13 CACHED
+
+#14 exporting to image
+#14 exporting layers 0.0s done
+#14 exporting manifest sha256:946ef6fc089843222f73f737442ee1fcff979bfcec81762282a77fde2c1c145d 0.0s done
+#14 exporting config sha256:c9a7587133580578fcc94d8c6342fccf19cd1a602ece52188c4f0c8f919fe96f
+#14 exporting config sha256:c9a7587133580578fcc94d8c6342fccf19cd1a602ece52188c4f0c8f919fe96f 0.0s done
+#14 exporting attestation manifest sha256:925f43f3630be9b9be55b90cb5d74944a61a4183a9868e0b781731bb7220f113 0.1s done
+#14 exporting manifest list sha256:e6b29259f71d2febbcb51fb4e7bb4e0435b54d9be9900b1c72fcd89a611c3bb0
+#14 exporting manifest list sha256:e6b29259f71d2febbcb51fb4e7bb4e0435b54d9be9900b1c72fcd89a611c3bb0 0.0s done
+#14 naming to docker.io/library/ores-tooling:local 0.0s done
+#14 unpacking to docker.io/library/ores-tooling:local 0.0s done
+#14 DONE 0.3s
+
+#15 resolving provenance for metadata file
+#15 DONE 0.0s
+ Image ores-tooling:local Built 
+ Container ores-tooling-run-9fca12f4c7f1 Creating 
+ Container ores-tooling-run-9fca12f4c7f1 Created 
+An issue was encountered verifying workloads. For more information, run "dotnet workload update".
+aalhour-c-sharp-algorithms:     "SolverIncomplete": 1
+aalhour-c-sharp-algorithms:   },
+aalhour-c-sharp-algorithms:   "Rows": []
+aalhour-c-sharp-algorithms: }
+morelinq:     "UnsupportedBody": 283
+morelinq:   },
+morelinq:   "Rows": []
+morelinq: }
+nodatime:     "UnsupportedBody": 952
+nodatime:   },
+nodatime:   "Rows": []
+nodatime: }
+humanizer:     "ResourceLimit": 3
+humanizer:   },
+humanizer:   "Rows": []
+humanizer: }
+exit 0
