@@ -97,8 +97,17 @@ internal static partial class CSharpOperationSemantics
             {
                 return Fail(factory, unary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
             }
-            if (IsEnum(unary.Operand.Type) && unary.OperatorKind != UnaryOperatorKind.BitwiseNegation)
-            { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+            if (IsEnum(unary.Operand.Type))
+            {
+                // `~e` is `(E)~(U)e`: the complement at the underlying width,
+                // also for a byte, sbyte, short or ushort enum.
+                var info = factory.GetTypeInfo(value.Type);
+                if (unary.OperatorKind != UnaryOperatorKind.BitwiseNegation || value.Type != target || info.Kind != IrTypeKind.Integer ||
+                    info.Width is not (8 or 16 or 32 or 64))
+                { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
+                var ones = info.Width == 64 ? ulong.MaxValue : (1UL << info.Width) - 1;
+                return Exact(factory.Binary(IrBinaryOperator.BitwiseXor, value, factory.IntegerBits(value.Type, ones)));
+            }
             return ApplyUnaryScalar(factory, unary.OperatorKind, unary.IsChecked, value, target);
         }
         if (operation is not IBinaryOperation binary || operands.Length != 2)

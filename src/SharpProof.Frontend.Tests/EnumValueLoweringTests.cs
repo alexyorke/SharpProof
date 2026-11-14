@@ -12,7 +12,8 @@ public sealed class EnumValueLoweringTests
         "public enum Small : byte { A = 1, B = 200 } " +
         "[System.Flags] public enum Flags { None = 0, A = 1, B = 2, C = 4 } " +
         "public enum Wide : uint { Low = 0, High = 0xFFFFFFFF } " +
-        "public enum Signed : sbyte { Min = -128, Zero = 0 }";
+        "public enum Signed : sbyte { Min = -128, Zero = 0 } " +
+        "public enum Half : ushort { Top = 0x8000 }";
 
     [TestCase("int Target(int x) { var e = (Small)x; return e == Small.B ? 1 : 0; }", 200, 1)]
     [TestCase("int Target(int x) { var e = (Small)x; return e == Small.B ? 1 : 0; }", 456, 1)]
@@ -27,6 +28,12 @@ public sealed class EnumValueLoweringTests
     [TestCase("int Target(int x) { switch ((Flags)x) { case Flags.A: return 10; case Flags.B: return 20; default: return 0; } }", 2, 20)]
     [TestCase("int Target(int x) => (Flags)x is Flags.C ? 1 : 0;", 4, 1)]
     [TestCase("int Target(int x) { Flags f = default; return f == Flags.None ? x : -x; }", 7, 7)]
+    // Complement at the underlying width of narrow enums.
+    [TestCase("int Target(int x) => (int)~(Small)x;", 1, 254)]
+    [TestCase("int Target(int x) => (int)~(Signed)x;", -128, 127)]
+    [TestCase("int Target(int x) => (int)~(Signed)x;", 5, -6)]
+    [TestCase("int Target(int x) => ~(Small)x == Small.A ? 1 : 0;", 254, 1)]
+    [TestCase("int Target(int x) => (int)~(Half)x;", 0x8000, 0x7FFF)]
     public void EnumValuesReplayLikeTheRuntime(string members, int input, int expected)
     {
         System.ArgumentNullException.ThrowIfNull(members);
