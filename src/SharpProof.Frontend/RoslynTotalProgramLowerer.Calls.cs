@@ -97,6 +97,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
     }
 
+    // `left + right` with an operator declared in source calls it like a
+    // static method of its parameters, left to right.
+    private TotalBodyValue? InlineSourceOperator(IOperation operation, IMethodSymbol method, ImmutableArray<IOperation> operands,
+        IrBlockId block, int depth)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (operands.IsDefault)
+        { throw new ArgumentNullException(nameof(operands)); }
+        return _preserveSourceCall != null ? null : InlineSourceMember(operation, method, null, [], block, depth, operands: operands);
+    }
+
     // `new C(arguments)` evaluates the arguments, allocates the object and
     // runs instance initializers, the constructor body, then object initializers.
     // A body CFG does not contain the separate field/property initializers.
@@ -120,13 +131,22 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (!TryConstructionInitializers(constructor, out var initializers))
         { return null; }
+        var valueStruct = CSharpOperationSemantics.IsModeledStruct(creation.Type);
+        if (valueStruct && constructor.IsImplicitlyDeclared)
+        {
+            return creation.Arguments.IsEmpty && (creation.Initializer?.Initializers ?? []).IsEmpty
+                ? new(_context.Factory.Null(_context.Type(creation.Type)), block, FrontendSubsetClassification.Exact)
+                : null;
+        }
         IrTerm? created = null;
         IrBlockId Allocate(IrBlockId current)
         {
             RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
             var allocatedType = _context.Type(creation.Type);
-            var initializeDefaults = false;
-            if (CSharpOperationSemantics.CompleteObjectStorage(creation.Type, _cancellationToken) is { } storage &&
+            if (valueStruct)
+            { _context.Factory.RegisterValueStructType(allocatedType); }
+            var initializeDefaults = valueStruct;
+            if (!valueStruct && CSharpOperationSemantics.CompleteObjectStorage(creation.Type, _cancellationToken) is { } storage &&
                 _context.Factory.TryGetClosedClassReferenceBase(allocatedType, out var parent) && !parent.HasValue)
             {
                 _context.Factory.RegisterObjectStorageType(allocatedType, storage);
@@ -320,11 +340,13 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
-        Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null)
+        Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default)
     {
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null, constructorInitializers: constructedReceiver != null) &&
+        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
+                constructorInitializers: constructedReceiver != null, operands: operands) &&
             !(_expressions.AllowOpaqueCalls &&
-                _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true, constructorInitializers: constructedReceiver != null)))
+                _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
+                    constructorInitializers: constructedReceiver != null, operands: operands)))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
@@ -366,6 +388,15 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         var argumentBuffer = ImmutableArray.CreateBuilder<IrTerm>(callee.Parameters.Length);
         argumentBuffer.Count = callee.Parameters.Length;
+        for (var ordinal = 0; !operands.IsDefault && ordinal < operands.Length; ordinal++)
+        {
+            SpendRegion();
+            var value = _expressions.LowerReceiverValue(operands[ordinal], block, depth + 1);
+            block = value.Continuation;
+            if (!value.Classification.IsExact)
+            { return new(marker, block, value.Classification); }
+            argumentBuffer[ordinal] = Bridge(value.Value, _context.Factory.GetVariableInfo(callee.Parameters[ordinal].Entry).Type);
+        }
         foreach (var argument in callArguments)
         {
             SpendRegion();
@@ -403,7 +434,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             marker = value.Value;
         }
         var arguments = argumentBuffer.ToImmutable();
-        if (receiver != null)
+        if (receiver != null && !CSharpOperationSemantics.IsModeledStruct(method.ContainingType))
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
         if (prelude != null)
         { block = prelude(block); }

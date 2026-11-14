@@ -76,6 +76,12 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- Values of source `readonly struct` types are analyzed: construction,
+  `default`, field and property reads, instance members and user-defined
+  operators. Purity, capability and postcondition claims over them can be
+  proved. A body that builds such a value keeps allocation, effect-contract
+  and resource-bound claims `Unknown`, because the model allocates it and the
+  CLR does not.
 - A constructor's assignments to its own readonly fields and get-only
   auto-properties are modeled, so a value read back from an object built by such
   a constructor is known. Before, immutable objects built this way could not be

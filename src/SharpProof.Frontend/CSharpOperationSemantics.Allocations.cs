@@ -151,8 +151,10 @@ internal static partial class CSharpOperationSemantics
             constructor.ContainingType is not
             {
                 TypeKind: TypeKind.Class, IsRecord: false, BaseType.SpecialType: SpecialType.System_Object
-            } type)
+            } and not { TypeKind: TypeKind.Struct } ||
+            constructor.ContainingType is { TypeKind: TypeKind.Struct } && !IsModeledStruct(constructor.ContainingType))
         { return false; }
+        var type = constructor.ContainingType;
         foreach (var reference in constructor.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax syntax ||

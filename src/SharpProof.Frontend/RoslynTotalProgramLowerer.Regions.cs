@@ -111,6 +111,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            SourceOperator = InlineSourceOperator,
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,

@@ -155,7 +155,8 @@ internal sealed partial class TotalLoweringContext
 
     internal void ModelReceiver()
     {
-        if (Receiver != null || Target.IsStatic || !Target.ContainingType.IsReferenceType)
+        if (Receiver != null || Target.IsStatic ||
+            !Target.ContainingType.IsReferenceType && !CSharpOperationSemantics.IsModeledStruct(Target.ContainingType))
         { return; }
         var ordinal = Parameters.Length.ToString(CultureInfo.InvariantCulture);
         var type = Type(Target.ContainingType);
