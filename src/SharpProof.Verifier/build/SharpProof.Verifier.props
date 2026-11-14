@@ -38,7 +38,7 @@
     <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == ''">dotnet</_SharpProofDotNetHost>
   </PropertyGroup>
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilerCaptureRequestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth;_SharpProofContractsExportPath" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilerCaptureRequestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth;SharpProofTrustExceptionMessages;_SharpProofContractsExportPath" />
     <!-- Marks a referenced project's contract export among the additional files. -->
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="SharpProofContractsExport" />
   </ItemGroup>

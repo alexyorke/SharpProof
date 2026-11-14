@@ -134,6 +134,9 @@ internal static class NativeEffectClaims
         RepositoryParameterGuard.RequireInitialized(core.IsDefault, nameof(core), "Array must be initialized.");
         var requires = (target.Total ?? throw new InvalidOperationException("A proven native effect claim requires a total callable.")).Clauses.Where(clause => clause.Kind == CompilerContractKind.Requires).ToImmutableArray();
         var used = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        if (core.Any(static label => label.StartsWith(ExceptionMessageTrust.FactLabel + ":", StringComparison.Ordinal)) &&
+            PassiveCallableArtifactAdapter.TrustsExceptionMessages(target.Entry))
+        { used.Add(ExceptionMessageTrust.AssumptionId(target.Entry.CallableId)); }
         for (var ordinal = 0; ordinal < requires.Length; ordinal++)
         {
             if (core.Contains("requires:" + ordinal.ToString(CultureInfo.InvariantCulture)) && requires[ordinal].AssumptionId is { } id)

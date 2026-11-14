@@ -15,7 +15,7 @@ internal static class PassiveCallableArtifactAdapter
             [.. total.CallPreconditions.Select(static call => new PassiveCallPrecondition(call.Instruction, call.Value, call.Safe))]);
     }
 
-    internal static PassiveCallableCandidate? Enroll(CompilerCallablePreparation preparation)
+    internal static PassiveCallableCandidate? Enroll(CompilerCallablePreparation preparation, bool effectClaim = false)
     {
         ArgumentNullGuard.NotNull(preparation, nameof(preparation));
         var total = preparation.Total;
@@ -34,6 +34,16 @@ internal static class PassiveCallableArtifactAdapter
             [.. total.Parameters.Select(parameter => ((parameter.Entry.IsDefault || parameter.Current.IsDefault || parameter.Old.IsDefault) ? throw new System.ArgumentException("Value must be initialized.", nameof(parameter)) : (new PassiveParameterBinding(parameter.Entry, parameter.Current, parameter.Old))))],
             total.Result, Clauses(CompilerContractKind.Requires), Clauses(CompilerContractKind.Ensures), total.IsBodyAbstraction,
             [.. total.CallPreconditions.Select(call => new PassiveCallPrecondition(call.Instruction, call.Value, call.Safe))], total.DisjointInputs)
-        { HasReceiver = total.HasReceiver };
+        {
+            HasReceiver = total.HasReceiver,
+            TrustsExceptionMessages = effectClaim && TrustsExceptionMessages(preparation.Entry)
+        };
+    }
+
+    internal static bool TrustsExceptionMessages(WorkerCallableManifestEntry entry)
+    {
+        ArgumentNullGuard.NotNull(entry, nameof(entry));
+        var id = ExceptionMessageTrust.AssumptionId(entry.CallableId);
+        return entry.Assumptions.Any(assumption => assumption.Kind == WorkerAssumptionKind.TrustedBoundary && assumption.Id == id);
     }
 }

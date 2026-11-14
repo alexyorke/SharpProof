@@ -13,7 +13,9 @@ internal static class FinalCompilationCollector
         SpecificationPacksOption =
             "build_property.SharpProofSpecificationPacks",
         MaximumExpressionDepthOption =
-            "build_property.SharpProofVerifyMaximumExpressionDepth";
+            "build_property.SharpProofVerifyMaximumExpressionDepth",
+        TrustExceptionMessagesOption =
+            "build_property.SharpProofTrustExceptionMessages";
     internal static void Collect(CompilationAnalysisContext context, CompilerConfiguration configuration)
     {
         try
@@ -108,9 +110,13 @@ internal static class FinalCompilationCollector
             string.Equals(marked, "true", StringComparison.OrdinalIgnoreCase))];
         var exports = CompilerContractExports.Load(compilation, exportFiles, Get(options, ProjectDirectoryOption),
             context.CancellationToken);
+        var trust = Get(options, TrustExceptionMessagesOption);
+        if (!string.IsNullOrEmpty(trust) && !bool.TryParse(trust, out _))
+        { throw new InvalidOperationException("SharpProofTrustExceptionMessages must be true or false."); }
         var builder = new ClaimManifestBuilder(compilation, features, context.CancellationToken)
         {
-            ContractExports = exports
+            ContractExports = exports,
+            TrustExceptionMessages = string.Equals(trust, "true", StringComparison.OrdinalIgnoreCase)
         };
         var discovery = builder.Build();
         if (!int.TryParse(

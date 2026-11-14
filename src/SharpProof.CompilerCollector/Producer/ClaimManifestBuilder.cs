@@ -29,6 +29,10 @@ internal sealed partial class ClaimManifestBuilder(
     // The accepted contract exports of referenced projects in this build.
     internal CompilerContractExports ContractExports { get; init; } = CompilerContractExports.Empty;
 
+    // SharpProofTrustExceptionMessages: each callable with an effect claim
+    // declares the exception-message trust assumption (initially unused).
+    internal bool TrustExceptionMessages { get; init; }
+
     private const string TopLevelMainCallableId =
         "M:Program.<Main>$(System.String[])";
 
@@ -445,6 +449,15 @@ internal sealed partial class ClaimManifestBuilder(
                 Kind = WorkerAssumptionKind.TrustedBoundary,
                 Used = false
             }));
+        }
+        if (TrustExceptionMessages && !effects.IsDefaultOrEmpty)
+        {
+            assumptions = assumptions.Add(new WorkerAssumptionEvidence
+            {
+                Id = ExceptionMessageTrust.AssumptionId(callableId),
+                Kind = WorkerAssumptionKind.TrustedBoundary,
+                Used = false
+            });
         }
         var features = selected.ToImmutableHashSet().ToBuilder();
         if (!postconditions.IsDefaultOrEmpty)
