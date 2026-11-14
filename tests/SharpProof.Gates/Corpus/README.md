@@ -43,7 +43,7 @@ The reviewed correction lowered the supported-case and supported-OSS floors by o
 
 ### Reviewed classification for recursive purity
 
-When a recursive call into the method being verified began to be assumed pure by the purity check alone, by induction on recursion depth (SEMANTICS.md, "Calls and loops"), aalhour `GreatestCommonDivisor.Stein` (OSS0180) became Proven. Its body only compares, shifts and subtracts its two `int` arguments and calls itself; it reads and writes no state. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (265 to 266, 39 to 40); the total-Unknown ceiling (497 to 496) and the SP0002 ceiling (237 to 236) fell by one.
+When a recursive call into the method being verified began to be assumed pure by the purity check alone, by induction on recursion depth (SEMANTICS.md, "Calls and loops"), `aalhour-c-sharp-algorithms` `GreatestCommonDivisor.Stein` (OSS0180) became Proven. Its body only compares, shifts and subtracts its two `int` arguments and calls itself; it reads and writes no state. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (265 to 266, 39 to 40); the total-Unknown ceiling (497 to 496) and the SP0002 ceiling (237 to 236) fell by one.
 
 ### Reviewed classification for ref and out source callees
 
