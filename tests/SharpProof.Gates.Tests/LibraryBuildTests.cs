@@ -36,4 +36,22 @@ public sealed class LibraryBuildTests
         Assert.That(LibraryBuild.Summarize(report), Does.Contain("| Compiler manifest | not written |"));
         Assert.That(LibraryBuild.Summarize(report), Does.Contain("| Verdict | the build crashed or timed out |"));
     }
+
+    [TestCase("error SP0051: Refuted effect:EnforcePure claim for A.B.", false)]
+    [TestCase("error SP0049: The compiler manifest is 40000000 bytes, which exceeds the 33554432 byte limit", false)]
+    [TestCase("error SP0049: Unexpected exception while collecting the compiler manifest.", true)]
+    [TestCase("error CS0103: The name 'x' does not exist in the current context", true)]
+    [TestCase("", true)]
+    public void OnlyRefutationsAndTheSizeLimitAreExpectedStops(string log, bool crashed)
+    {
+        System.ArgumentNullException.ThrowIfNull(log);
+        Assert.That(LibraryBuild.IsCrash(exitCode: 1, timedOut: false, log), Is.EqualTo(crashed));
+    }
+
+    [Test]
+    public void ASuccessfulBuildIsNotACrash()
+    {
+        Assert.That(LibraryBuild.IsCrash(exitCode: 0, timedOut: false, "warning SP0047: x"), Is.False);
+        Assert.That(LibraryBuild.IsCrash(exitCode: 0, timedOut: true, ""), Is.True);
+    }
 }

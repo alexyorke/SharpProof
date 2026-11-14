@@ -37,8 +37,11 @@ internal static partial class LibraryBuild
     internal const long ManifestLimitBytes = 32L * 1024 * 1024;
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(45);
 
-    [GeneratedRegex(@"\b(?<severity>warning|error) (?<id>SP\d{4})\b")]
+    [GeneratedRegex(@"\b(?<severity>warning|error) (?<id>SP\d{4})\b(?<message>[^\r\n]*)")]
     private static partial Regex DiagnosticPattern();
+
+    [GeneratedRegex(@"\berror (?<id>[A-Z]+\d{4})\b(?<message>[^\r\n]*)")]
+    private static partial Regex ErrorPattern();
 
     [GeneratedRegex(@"^SharpProof\.(?<version>\d[^/\\]*)\.nupkg$")]
     private static partial Regex PackagePattern();
@@ -50,17 +53,26 @@ internal static partial class LibraryBuild
         ArgumentNullException.ThrowIfNull(sourceId);
         ArgumentNullException.ThrowIfNull(feed);
         ArgumentNullException.ThrowIfNull(output);
+        root = Path.GetFullPath(root);
+        feed = Path.GetFullPath(feed);
+        output = Path.GetFullPath(output);
         var version = Directory.EnumerateFiles(feed, "SharpProof.*.nupkg")
             .Select(path => PackagePattern().Match(Path.GetFileName(path)))
             .Where(static match => match.Success)
             .Select(static match => match.Groups["version"].Value)
             .SingleOrDefault() ?? throw new InvalidDataException("The feed has no single SharpProof package: " + feed);
         Directory.CreateDirectory(output);
-        var work = Path.Combine(output, "work");
+        // Restored packages and build outputs stay in a private workspace;
+        // only reports and the worker result are exported.
+        var work = Path.Combine(root, "artifacts", "tmp", "library-" + sourceId);
         if (Directory.Exists(work))
         {
             Directory.Delete(work, recursive: true);
         }
+        var result = Path.Combine(output, "result.json");
+        var manifest = Path.Combine(work, "compiler-manifest.json");
+        // A run that stops before verification must not report an earlier run's result.
+        File.Delete(result);
         var project = Path.Combine(work, "project");
         Directory.CreateDirectory(project);
         // Stand alone like a user's project: do not inherit the repository's
@@ -71,7 +83,7 @@ internal static partial class LibraryBuild
                 ? "<Project><PropertyGroup><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally></PropertyGroup></Project>\n"
                 : "<Project />\n", new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
         }
-        var methods = WriteProject(root, sourceId, project, version, output, cancellationToken);
+        var methods = WriteProject(root, sourceId, project, version, result, manifest, cancellationToken);
         var config = WriteNuGetConfig(work, feed);
         var packages = Path.Combine(work, "packages");
         var projectFile = Path.Combine(project, "Library.csproj");
@@ -100,16 +112,17 @@ internal static partial class LibraryBuild
         var seconds = wall.Elapsed.TotalSeconds;
         await File.WriteAllTextAsync(Path.Combine(output, "build.log"), log.ToString(), cancellationToken).ConfigureAwait(false);
 
-        var manifest = Path.Combine(output, "compiler-manifest.json");
-        var result = Path.Combine(output, "result.json");
         var response = File.Exists(result) ? WorkerProtocolJson.DeserializeResponse(await File.ReadAllTextAsync(result, cancellationToken).ConfigureAwait(false)) : null;
         var diagnostics = DiagnosticPattern().Matches(log.ToString())
             .Select(static match => match.Groups["severity"].Value + " " + match.Groups["id"].Value)
             .GroupBy(static key => key, StringComparer.Ordinal)
             .ToImmutableSortedDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
         var results = response?.ClaimResults ?? [];
-        // A build that stops at a diagnosed SharpProof limit is a finding, not a crash.
-        var diagnosedStop = diagnostics.Keys.Any(static key => key.StartsWith("error SP", StringComparison.Ordinal));
+        // A build that fails only on refuted claims (SP0051) or on the
+        // compiler manifest size limit (SP0049 with that message) is a
+        // finding. Any other error, including an SP0049 for an unexpected
+        // collector exception, is a crash.
+
         var report = new LibraryBuildReport(
             sourceId,
             methods,
@@ -125,7 +138,7 @@ internal static partial class LibraryBuild
                 .GroupBy(static claim => claim.Reason.ToString(), StringComparer.Ordinal)
                 .ToImmutableSortedDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal),
             diagnostics,
-            timedOut || exitCode != 0 && !diagnosedStop);
+            IsCrash(exitCode, timedOut, log.ToString()));
         await File.WriteAllTextAsync(Path.Combine(output, "library-" + sourceId + ".json"),
             JsonSerializer.Serialize(report, SharpProofJsonDefaults.Indented), cancellationToken).ConfigureAwait(false);
         await File.WriteAllTextAsync(Path.Combine(output, "library-" + sourceId + ".md"), Summarize(report), cancellationToken)
@@ -133,7 +146,23 @@ internal static partial class LibraryBuild
         return report;
     }
 
-    private static int WriteProject(string root, string sourceId, string project, string version, string output,
+    internal static bool IsCrash(int exitCode, bool timedOut, string log)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+        if (timedOut)
+        {
+            return true;
+        }
+        if (exitCode == 0)
+        {
+            return false;
+        }
+        var errors = ErrorPattern().Matches(log).ToImmutableArray();
+        return errors.IsEmpty || !errors.All(static error => error.Groups["id"].Value == "SP0051" ||
+            error.Groups["id"].Value == "SP0049" && error.Groups["message"].Value.Contains("byte limit", StringComparison.Ordinal));
+    }
+
+    private static int WriteProject(string root, string sourceId, string project, string version, string result, string manifest,
         CancellationToken cancellationToken)
     {
         var document = OpenSourceCorpusCatalog.Load(root);
@@ -174,8 +203,8 @@ internal static partial class LibraryBuild
                 <SharpProofProfile>advisory</SharpProofProfile>
                 <SharpProofVerify>true</SharpProofVerify>
                 <SharpProofVerifyCacheEnabled>false</SharpProofVerifyCacheEnabled>
-                <SharpProofVerifyResultFile>{Escape(Path.Combine(output, "result.json"))}</SharpProofVerifyResultFile>
-                <SharpProofCompilerManifestFile>{Escape(Path.Combine(output, "compiler-manifest.json"))}</SharpProofCompilerManifestFile>
+                <SharpProofVerifyResultFile>{Escape(result)}</SharpProofVerifyResultFile>
+                <SharpProofCompilerManifestFile>{Escape(manifest)}</SharpProofCompilerManifestFile>
               </PropertyGroup>
               <ItemGroup>
                 <PackageReference Include="SharpProof" Version="{Escape(version)}" />
