@@ -16,6 +16,7 @@ The implementation authority is [the consumer contract](../src/SharpProof.Packag
 | `SharpProofVerifyPolicy` | `require-proven` for strict; `advisory` otherwise | `advisory`, `warn-on-unknown`, `require-proven`; controls incomplete selected coverage |
 | `SharpProofAssumptionPolicy` | `error` for strict; `allow` otherwise | `allow`, `warn`, `error`; governs declared user assumptions and trusted boundaries |
 | `SharpProofSpecificationPacks` | Unset | Semicolon-delimited embedded pack IDs; currently `dotnet.scalar` |
+| `SharpProofTrustExceptionMessages` | `false` | `true`, `false`; assumes framework exception message lookup has no effects (see below) |
 
 `strict` requires `SharpProofVerify=true`; explicitly setting it false is a configuration error. Strict defaults can be overridden for verifier and assumption policies. `off` omits the portable analyzer and disables verification. An enabled worker requires the matching Verifier package, SDK 10.0.100+, Core MSBuild or the supported Windows MSBuild 18+ task-host path, and a host/filesystem in the [support matrix](preview-support.md): the canonical Linux amd64 container or native Windows, macOS, or glibc Linux on x64/ARM64. Design-time builds do not run the worker.
 
@@ -24,6 +25,14 @@ Feature selection does not mean that every method receives every possible proof.
 `advisory` reports incomplete selected coverage as information; `warn-on-unknown` reports warnings; `require-proven` rejects it. The exception is a call-precondition claim with `MethodTimeout` or `ProjectTimeout`: it is a warning under `require-proven` and counts as an unchecked call. Other gaps, including a timed-out declared claim in the same caller, still fail that policy. See [call preconditions](verification-results.md#call-preconditions). A replayed Refuted claim is an error under every policy. Infrastructure failures remain failures. Assumption policy checks declarations even when a particular claim does not mark them used. Preconditions and resolved API specifications remain recorded evidence and are outside that user-declaration rejection rule.
 
 Specification packs add reviewed relational semantics for exact supported members. `dotnet.scalar` currently supplies the Int32 `Math.Max` relation. Unknown IDs, duplicate IDs, and empty entries within a nonempty list are rejected. Selecting a pack changes semantic evidence and cache identity; it does not increase a timeout or grant blanket framework support. See the [API catalog](api-spec-catalog.md).
+
+## Trusting exception messages
+
+`new ArgumentNullException(nameof(x))` and similar framework constructors look up a localized message when none is given. That lookup goes through resource managers, enters a runtime lock and can run user culture callbacks. So by default an effect claim (`[EnforcePure]`, `[DoesNotThrow]`, and the other effect contracts) on a method that constructs one is Unknown, or Refuted when the lock replays.
+
+`SharpProofTrustExceptionMessages=true` assumes instead that this lookup has no effects, takes no lock, and does not throw: an assumption about effects users cannot observe, not a fact the runtime guarantees. It covers only the framework exception constructors SharpProof models; any other constructor is still an opaque call. It applies to effect claims only; postconditions never use it.
+
+Every method with an effect claim then declares the trusted-boundary assumption `exception-messages-v1:<callable id>`. A result marks it used only when the proof depended on it. Because it is a declared trusted boundary, the default strict assumption policy (`error`) rejects it: set `SharpProofAssumptionPolicy` to `warn` or `allow` together with this property.
 
 ## A CI consumer example
 

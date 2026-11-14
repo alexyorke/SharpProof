@@ -142,6 +142,10 @@ internal sealed class PassiveCallableCandidate
     internal ImmutableArray<PassiveParameterBinding> Parameters { get; }
     // The last parameter is `this`, which is never null.
     internal bool HasReceiver { get; init; }
+    // The callable opted in to SharpProofTrustExceptionMessages and this
+    // check is an effect claim: framework exception message lookup is
+    // assumed not to run, as labelled facts the proof core reports.
+    internal bool TrustsExceptionMessages { get; init; }
     internal IrVarId? Result { get; }
     internal ImmutableArray<PassiveContractClause> Requires { get; }
     internal ImmutableArray<PassiveContractClause> Ensures { get; }
