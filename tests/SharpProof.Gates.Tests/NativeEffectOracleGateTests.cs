@@ -20,7 +20,7 @@ internal sealed class NativeEffectOracleGateTests
     // remain unchanged. The universe spans every pinned source's methods (500 since the multi-source corpus). The
     // exact module-initializer search re-reviewed eight expected verdicts and three support labels, and admitting
     // fresh-value type initializers re-reviewed four of each (Corpus/README.md).
-    private const string ReviewedUniverseSha256 = "B38819F6CB622D4F1AD8F8E6E02682E1417732371321ECDC77645C8930D5579C";
+    private const string ReviewedUniverseSha256 = "6648FC566C0EDB20DF7B71AE8582C9CD27A48B419B454FD544FE323019D9A70F";
 
     [Test]
     public async Task RecursiveSourceSummariesAreObservedWithoutPublishingProofs()

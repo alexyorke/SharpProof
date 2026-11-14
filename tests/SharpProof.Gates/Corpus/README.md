@@ -41,6 +41,10 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
+### Reviewed classification for exact dispatch targets
+
+When a dispatched call whose target the program text fixes began to be inlined (SEMANTICS.md, "Calls and loops"), NodaTime `CopticYearMonthDayCalculator.CalculateStartOfYearDays` (OSS0304) became Proven. It calls `IsLeapYear` on `this` in a sealed calculator, which inherits the override `(year & 3) == 3`; the rest is `int` arithmetic on its argument. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (266 to 267, 40 to 41); the total-Unknown ceiling (496 to 495) and the SP0002 ceiling (236 to 235) fell by one.
+
 ### Reviewed classification for recursive purity
 
 When a recursive call into the method being verified began to be assumed pure by the purity check alone, by induction on recursion depth (SEMANTICS.md, "Calls and loops"), `aalhour-c-sharp-algorithms` `GreatestCommonDivisor.Stein` (OSS0180) became Proven. Its body only compares, shifts and subtracts its two `int` arguments and calls itself; it reads and writes no state. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (265 to 266, 39 to 40); the total-Unknown ceiling (497 to 496) and the SP0002 ceiling (237 to 236) fell by one.
