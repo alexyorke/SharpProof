@@ -1001,11 +1001,11 @@ public sealed class CorpusGateTests
 , static item => item.Reason, static item => item.Count),
                 Is.EquivalentTo(
                     ImmutableDictionaryCapture.Create(ImmutableArray.Create(
-                        new KeyValuePair<string, int>("SP0002", 184),
+                        new KeyValuePair<string, int>("SP0002", 232),
                         new KeyValuePair<string, int>("SP0016", 18),
                         new KeyValuePair<string, int>("SP0045", 9),
                         new KeyValuePair<string, int>("SP0046", 9),
-                        new KeyValuePair<string, int>("SP0047", 281)),
+                        new KeyValuePair<string, int>("SP0047", 233)),
                         static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
             Assert.That(
                 result.UnknownRate,

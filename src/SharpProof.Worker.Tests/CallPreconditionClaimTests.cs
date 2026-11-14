@@ -348,17 +348,41 @@ public sealed class CallPreconditionClaimTests
         """, TestName = "RefParameter")]
     [TestCase("""
         using SharpProof.Attributes;
-        public static class C {
+        public static class T {
             private static readonly int[] Table = new int[4];
             public static int M(int n) { Contract.Requires(n > 0); return n; }
-            public static int Caller() { return M(0); }
         }
+        public static class C { public static int Caller() { return T.M(0); } }
         """, TestName = "InitializedCalleeType")]
     public async Task CallToAnUnmodeledCalleeHasNoClaim(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
         var response = await Verify(source);
         Assert.That(CallClaims(response, "C.Caller"), Is.Empty);
+    }
+
+    // A callee in the caller's own type runs under the initializer the caller
+    // already answers for, so its Requires is checked at the call.
+    [Test]
+    public async Task CallToASameTypeCalleeUnderAnInitializerIsChecked()
+    {
+        var response = await Verify("""
+            using SharpProof.Attributes;
+            public static class C {
+                private static readonly int[] Table = new int[4];
+                public static int M(int n) { Contract.Requires(n > 0); return n; }
+                public static int Caller() { return M(0); }
+                public static int Fine() { return M(1); }
+            }
+            """);
+        using (Assert.EnterMultipleScope())
+        {
+            // A refutation needs an entry free of initializer effects, and
+            // this initializer allocates, so the violation is not reported
+            // as definite. It is never Proven.
+            Assert.That(SingleCallClaim(response, "C.Caller").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(SingleCallClaim(response, "C.Fine").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
     }
 
     [Test]
