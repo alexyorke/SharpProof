@@ -383,6 +383,25 @@ class ToolingTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual("FullyQualifiedName~ChosenFixture", json.loads(arguments.read_text())["TestFilter"])
 
+    def test_coverage_lane_enforces_the_floor_on_the_merged_total(self):
+        self.copy("eng/scripts/Invoke-SharpProofCoverage.ps1")
+        self.copy("eng/scripts/Resolve-SharpProofContainedPath.ps1")
+
+        def shard(name, first, last):
+            self.write(f"artifacts/coverage/{name}/lines.tsv", "".join(
+                f"src/Subject/Subject.cs:{line}\t{int(first <= line <= last)}\n" for line in range(1, 201)))
+
+        # Each shard covers about half of the lines; only their union is judged.
+        shard("a", 1, 100)
+        shard("b", 101, 198)
+        result = self.ci("coverage")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("| **Total** | 198 | 200 | 99.00 |", result.stdout)
+        shard("b", 101, 196)
+        result = self.ci("coverage")
+        self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Line coverage 98.00% is below the 98.5% floor.", result.stdout + result.stderr)
+
     def changed_fixture(self):
         self.powershell_fixture()
         self.copy("eng/scripts/Invoke-SharpProofChangedTests.ps1")

@@ -347,7 +347,8 @@ run_lane() {
     consumer-image) consumer_image ;;
     image) pull_or_build_image ;;
     image-key) image_key ;;
-    coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge ;;
+    # The floor applies to the merged total only; a single shard never sees it.
+    coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge -MinimumLinePercent 98.5 ;;
     *)
       echo "Unknown lane '$1'. Lanes: ${lanes[*]} coverage nightly fuzz-<n> release-packages consumer-image image image-key" >&2
       return 2
