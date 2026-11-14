@@ -76,6 +76,9 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- `[EnforcePure]` can prove a method that calls itself, when it has no
+  `Requires`: the purity check assumes the recursive call is pure, by
+  induction on recursion depth. Other checks still treat the call as unknown.
 - Calls to source methods with `ref` and `out` parameters are analyzed when
   each such argument is a local or parameter of the caller, passed once, and
   the call is outside any `try` block of the caller. Before, such calls kept
