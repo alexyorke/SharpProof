@@ -102,7 +102,7 @@ docker compose run --rm tooling samples -Configuration Release -PackageSource nu
 docker compose run --rm tooling coverage -Configuration Release
 ```
 
-Coverage builds Release, collects Cobertura line coverage of the C# sources from the semantic and package tests, and writes a merged per-project summary to `artifacts/coverage/summary.md`. See [development workflows](development-workflows.md#coverage).
+Coverage builds Release, collects Cobertura line coverage of the C# sources from the semantic and package tests, and writes a merged per-project summary to `artifacts/coverage/summary.md`. This command only reports; the 98.5% floor on the merged total is enforced by `./ci.sh coverage`. See [development workflows](development-workflows.md#coverage).
 
 ## Long-running fuzz campaign
 
