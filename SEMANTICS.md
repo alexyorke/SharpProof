@@ -52,7 +52,7 @@ Approximation values can support sound over-approximate proof obligations only w
 
 ## Calls and loops
 
-Source and admissible metadata calls are resolved through compiler evidence and lowered or modeled within the available boundary. A dispatched call whose body the program text fixes is lowered like a nonvirtual one: a `base.` call, a sealed override or a member of a sealed type, and a call on a receiver whose static type is sealed, which runs the final override along that type's bases. Unknown targets and recursive or opaque call paths carry conservative effects and values. An external declaration is not a source-body proof.
+Source and admissible metadata calls are resolved through compiler evidence and lowered or modeled within the available boundary. A dispatched call whose body the program text fixes is lowered like a non-virtual one: a `base.` call, a sealed override or a member of a sealed type, and a call on a receiver whose static type is sealed, which runs the final override along that type's bases. Unknown targets and recursive or opaque call paths carry conservative effects and values. An external declaration is not a source-body proof.
 
 Natural loops use cut encodings and invariant candidates. Candidate invariants must pass establishment and preservation checks before use in a proof. Bounded witness search is separate from the proof encoding; finite unrolling cannot prove an arbitrary loop or termination. Unsupported CFG shapes or exhausted construction limits produce Unknown.
 
