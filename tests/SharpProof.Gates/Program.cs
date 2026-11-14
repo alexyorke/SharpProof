@@ -32,13 +32,20 @@ internal static class Program
             var command = args.Length == 0 ? "corpus" : args[0];
             if (command is "exception-oracle" or "allocation-oracle" or "purity-oracle" or "capability-oracle" or "effectcontract-oracle")
             {
-                var maximumMethods = args.Length == 1 ? 0 : args.Length == 3 && args[1] == "--limit"
+                // --source widens one pinned source to every method it declares.
+                var wholeSource = args.Length == 3 && args[1] == "--source" ? args[2] : null;
+                var maximumMethods = args.Length == 1 || wholeSource != null ? 0 : args.Length == 3 && args[1] == "--limit"
                     ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture)
                     : throw new ArgumentException("Use exception-oracle, allocation-oracle, purity-oracle, capability-oracle or " +
-                        "effectcontract-oracle [--limit <method-count>].", nameof(args));
+                        "effectcontract-oracle [--limit <method-count> | --source <source-id>].", nameof(args));
                 var result = await NativeEffectOracleGate.RunAsync(root, cancellation.Token, maximumMethods, allocations: command == "allocation-oracle",
                     purity: command == "purity-oracle", capabilities: command == "capability-oracle",
-                    summary: command == "effectcontract-oracle").ConfigureAwait(false);
+                    summary: command == "effectcontract-oracle", wholeSource: wholeSource).ConfigureAwait(false);
+                if (wholeSource != null)
+                {
+                    // Thousands of rows would bury the summary.
+                    result = result with { Rows = [.. result.Rows.Where(static row => row.RuntimeOracle == "Contradiction")] };
+                }
                 Log.Info(JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
@@ -93,7 +100,7 @@ internal static class Program
                 return 0;
             }
             Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
-                "capability-oracle|effectcontract-oracle] [--limit <method-count>]");
+                "capability-oracle|effectcontract-oracle] [--limit <method-count> | --source <source-id>]");
             return 2;
         }
         catch (Exception exception)

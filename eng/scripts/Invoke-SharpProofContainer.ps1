@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'perf-baseline', 'perf-self', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'effect-oracles', 'perf-baseline', 'perf-self', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -514,6 +514,7 @@ switch ($Command) {
     'nightly' {
         Invoke-PipelineCommand 'dependency-audit' 'Release'
         Invoke-PipelineCommand 'corpus' 'Release'
+        Invoke-PipelineCommand 'effect-oracles' 'Release'
         Invoke-PipelineCommand 'perf-baseline' 'Release'
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
         # Last: its bootstrap build would leave the fuzz runner's outputs
@@ -678,14 +679,39 @@ switch ($Command) {
             'Sample validation failed.' `
         ([ordered]@{ Configuration = $Configuration; PackageSource = $PackageSource }).AsReadOnly()
     }
-    { $_ -in @('corpus', 'corpus-update', 'perf-baseline') } {
-        $gateMode = $Command
+    { $_ -in @('corpus', 'corpus-update', 'effect-oracles', 'perf-baseline') } {
+        # effect-oracles runs every native effect oracle over the selected
+        # open-source methods, then over every method each pinned source
+        # declares. Each run fails on a runtime contradiction.
+        $gateRuns = [Collections.Generic.List[string[]]]::new()
+        if ($Command -eq 'effect-oracles') {
+            $oracleModes = @('exception-oracle', 'allocation-oracle', 'purity-oracle',
+                'capability-oracle', 'effectcontract-oracle')
+            $sourcesPath = Join-Path $repositoryRoot 'tests/SharpProof.Gates/Corpus/sources.json'
+            $sourceIds = @((Get-Content -LiteralPath $sourcesPath -Raw | ConvertFrom-Json).sources.id)
+            foreach ($oracleMode in $oracleModes) {
+                $gateRuns.Add([string[]]@($oracleMode))
+            }
+            foreach ($sourceId in $sourceIds) {
+                foreach ($oracleMode in $oracleModes) {
+                    $gateRuns.Add([string[]]@($oracleMode, '--source', $sourceId))
+                }
+            }
+        }
+        else {
+            $gateRuns.Add([string[]]@($Command))
+        }
         $gateProject = 'tests/SharpProof.Gates/SharpProof.Gates.csproj'
         Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')
         Invoke-SharpProofRequiredDotnet @(
-            'run', '--project', $gateProject,
-            '--configuration', $Configuration,
-            '--no-restore', '--', $gateMode)
+            'build', $gateProject, '--configuration', $Configuration, '--no-restore', '--nologo')
+        foreach ($gateRun in $gateRuns) {
+            Write-Host ('Gate: ' + ($gateRun -join ' '))
+            Invoke-SharpProofRequiredDotnet (@(
+                    'run', '--project', $gateProject,
+                    '--configuration', $Configuration,
+                    '--no-build', '--') + $gateRun)
+        }
     }
     'coverage' {
         # Semantic and Package shards build only their own test closures.
