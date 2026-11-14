@@ -76,6 +76,10 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- A constructor's assignments to its own readonly fields and get-only
+  auto-properties are modeled, so a value read back from an object built by such
+  a constructor is known. Before, immutable objects built this way could not be
+  proved pure, and postconditions about their fields stayed `Unknown`.
 - A method that calls another method of its own type is analyzed through that
   call even when the type has a static initializer. The initializer is
   accounted for once, at the calling method's entry.

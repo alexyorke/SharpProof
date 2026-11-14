@@ -79,6 +79,9 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         var freshReceiver = _context.Target.MethodKind == MethodKind.Constructor &&
             graph.OriginalOperation.Descendants().OfType<IInstanceReferenceOperation>()
                 .All(static receiver => receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+                    // A get-only auto-property names its backing field.
+                    receiver.Parent is IPropertyReferenceOperation property && property.Instance == receiver &&
+                        CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) != null ||
                     CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent));
         // Roslyn captures a local or parameter that a branching right-hand
         // side assigns; every capture of that id names the same variable.

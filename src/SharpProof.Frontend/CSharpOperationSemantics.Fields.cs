@@ -88,6 +88,38 @@ internal static partial class CSharpOperationSemantics
                 !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
     }
 
+    // C# lets only an instance constructor of the declaring type assign a
+    // readonly instance field, and only through its own `this`: the object
+    // under construction. Such a store is modeled like any other instance
+    // store. A store through another instance of the type, or from any other
+    // member, is not.
+    internal static bool IsConstructorReadOnlyStore(IFieldSymbol field, IOperation? instance, IMethodSymbol target, IAssemblySymbol sourceAssembly)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
+        return field is { IsReadOnly: true, IsStatic: false, IsVolatile: false, IsConst: false } &&
+            target is { MethodKind: MethodKind.Constructor, IsStatic: false } &&
+            SymbolEqualityComparer.Default.Equals(target.ContainingType.OriginalDefinition, field.ContainingType.OriginalDefinition) &&
+            instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
+            HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType;
+    }
+
+    // The backing field of a get-only auto-property, which a constructor of
+    // its type assigns by assigning the property.
+    internal static IFieldSymbol? GetOnlyAutoPropertyField(IPropertySymbol property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        if (property.IsStatic || property.IsIndexer || property.IsVirtual || property.IsOverride || property.IsAbstract ||
+            property.SetMethod != null || property.GetMethod is not { } getter ||
+            getter.DeclaringSyntaxReferences.Length != 1 ||
+            getter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
+        { return null; }
+        return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+    }
+
     // An instance field read runs no code; its only fault is a null receiver.
     // A static field read runs no code when its type has no initializer.
     // A scalar or reference instance field of a class is modeled; any other

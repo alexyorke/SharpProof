@@ -517,8 +517,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     return right;
                 }
             case ISimpleAssignmentOperation { IsRef: false, Target: IFieldReferenceOperation field } assignment
-                when CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(field.Field), _context.Target.ContainingAssembly):
+                when CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(field.Field), _context.Target.ContainingAssembly) ||
+                    CSharpOperationSemantics.IsConstructorReadOnlyStore(BoundField(field.Field), field.Instance, _context.Target,
+                        _context.Target.ContainingAssembly):
                 return FieldWrite(assignment, field, block, depth);
+            case ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Arguments.Length: 0 } property } assignment
+                when CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) is { } backing &&
+                    CSharpOperationSemantics.IsConstructorReadOnlyStore(BoundField(backing), property.Instance, _context.Target,
+                        _context.Target.ContainingAssembly):
+                return FieldWrite(assignment, BoundField(backing), property.Instance, block, depth);
             case IIncrementOrDecrementOperation increment when TryStorage(increment.Target, out var target):
                 return Increment(increment, target, block);
             case ICompoundAssignmentOperation compound when TryStorage(compound.Target, out var target):

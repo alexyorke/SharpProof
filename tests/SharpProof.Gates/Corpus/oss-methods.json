@@ -8031,8 +8031,8 @@
       "declarationSha256": "57d9e77e5b2c6563d5a611b8cb970447d0cc2631a00d183bad4b94bb73724a45",
       "methodName": "FromYears",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0357",
