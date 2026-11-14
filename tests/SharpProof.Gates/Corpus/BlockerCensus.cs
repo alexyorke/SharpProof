@@ -69,7 +69,7 @@ internal static class BlockerCensus
 
     // The distinct effect sites that can keep an exactly lowered body from
     // being proved observably pure: writes outside locals, static reads,
-    // locks, and calls with effects beyond throwing and allocating.
+    // locks, and calls whose effects are observably impure.
     internal static ImmutableArray<string> EffectSites(
         CSharpCompilation compilation, MethodDeclarationSyntax declaration, CancellationToken cancellationToken)
     {
@@ -85,7 +85,7 @@ internal static class BlockerCensus
         {
             return ["Gap: " + analysis.Gap];
         }
-        const IrOpaqueCallEffects Benign = IrOpaqueCallEffects.Throws | IrOpaqueCallEffects.Allocates;
+        const IrOpaqueCallEffects Benign = IrOpaqueCallEffects.Throws | IrOpaqueCallEffects.Allocates | IrOpaqueCallEffects.Reads;
         var sites = analysis.Sites
             .Select(site => site.Kind switch
             {
@@ -94,7 +94,9 @@ internal static class BlockerCensus
                 SharpProof.Analyzer.AdvisoryEffectSiteKind.Read when site.Static =>
                     "static read: " + Construct(site.Location, compilation, cancellationToken),
                 SharpProof.Analyzer.AdvisoryEffectSiteKind.Lock => "lock",
-                SharpProof.Analyzer.AdvisoryEffectSiteKind.Call when (site.Effects & ~Benign) != IrOpaqueCallEffects.None =>
+                // The same predicate the advisory claims and the worker use:
+                // ordinary reads and a zero-capability declaration are pure.
+                SharpProof.Analyzer.AdvisoryEffectSiteKind.Call when IrOpaqueCallSite.IsObservablyImpure(site.Effects) =>
                     "call (" + (site.Effects == IrOpaqueCallEffects.All ? "unknown effects" : (site.Effects & ~Benign).ToString()) + "): " +
                     Construct(site.Location, compilation, cancellationToken),
                 _ => null
