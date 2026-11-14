@@ -64,6 +64,21 @@ internal static class Program
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
+            if (command == "library-build")
+            {
+                // library-build --source <source-id> --feed <directory> [--output <directory>]
+                string? Option(string name)
+                {
+                    var index = Array.IndexOf(args, name);
+                    return index > 0 && index + 1 < args.Length ? args[index + 1] : null;
+                }
+                var source = Option("--source") ?? throw new ArgumentException("library-build requires --source <source-id>.", nameof(args));
+                var feed = Option("--feed") ?? throw new ArgumentException("library-build requires --feed <directory>.", nameof(args));
+                var output = Option("--output") ?? Path.Combine(root, "artifacts", "perf", "library-" + source);
+                var report = await LibraryBuild.RunAsync(root, source, feed, output, cancellation.Token).ConfigureAwait(false);
+                Log.Info(LibraryBuild.Summarize(report));
+                return report.Crashed ? 1 : 0;
+            }
             if (command is "blocker-census" or "effect-census")
             {
                 var census = BlockerCensus.Run(root, cancellation.Token, effects: command == "effect-census");
@@ -108,7 +123,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|library-build|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count> | --source <source-id>]");
             return 2;
         }

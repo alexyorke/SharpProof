@@ -120,6 +120,10 @@ listing changes against an earlier one. Development history is in the Git log.
 
 ### Developer tools
 
+- `tooling library-build` builds the whole pinned NodaTime source as a user
+  project through the packed package, with a purity claim on every method,
+  and reports build time, compiler manifest size against the 32 MiB limit and
+  claim outcomes. The nightly lane runs it.
 - `dotnet new sharpproof` and `sharpproof-workspace` generate a starter that
   builds cleanly. The default `native` variant verifies on the build machine;
   `container` verifies in a pinned Linux image with retained evidence and a
