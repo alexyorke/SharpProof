@@ -85,7 +85,10 @@ internal static class CompilerTotalCallableLowerer
         var ensures = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Ensures).ToImmutableArray();
         // A postcondition on an overridable method is a contract for every
         // override; only effect claims, which describe this body, are verified.
-        if (ensures.Length != 0 && (target.Method.IsVirtual || target.Method.IsOverride))
+        // A sealed override, or one in a sealed type, has no further
+        // override: its postcondition describes this body alone.
+        if (ensures.Length != 0 && (target.Method.IsVirtual || target.Method.IsOverride) &&
+            !(target.Method.IsSealed || target.Method.ContainingType.IsSealed))
         { return null; }
         var requires = binding.Clauses.Where(clause => clause.Kind == BoundContractKind.Requires).ToImmutableArray();
         var preconditions = target.Entry.Assumptions.Where(assumption => assumption.Kind == WorkerAssumptionKind.Precondition).ToImmutableArray();

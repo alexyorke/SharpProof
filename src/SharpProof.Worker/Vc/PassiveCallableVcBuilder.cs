@@ -538,6 +538,15 @@ internal sealed class PassiveCallableVcBuilder
                             }
                             else if (_inputBindings.TryGetValue(variable, out var approximatedInput) && approximatedInput == variable)
                             { return null; }
+                            else if (_candidate.TrustsExceptionMessages && type == _factory.BooleanType &&
+                                (IrOpaqueCallSite.ExceptionInitializationKind(_factory, havoc.Operation) != null ||
+                                 IrOpaqueCallSite.ScalarExceptionInitializationKind(_factory, havoc.Operation) != null ||
+                                 IrOpaqueCallSite.ExceptionResourceLockKind(_factory, havoc.Operation) != null))
+                            {
+                                // The opted-in assumption: the framework's
+                                // resource message path is not taken.
+                                Fact(Not(replacement), havoc.Operation, ExceptionMessageTrust.FactLabel);
+                            }
                             SetState(variable, replacement);
                         }
                         if (pendingException != null && _pendingThrows.TryGetValue(havoc.Id, out var possibleThrows))

@@ -81,7 +81,8 @@ internal static class EffectClaimResultAssembler
                 target,
                 target.Entry.Assumptions
                     .Where(static assumption =>
-                        assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+                        assumption.Kind == WorkerAssumptionKind.TrustedBoundary &&
+                        !assumption.Id.StartsWith(ExceptionMessageTrust.AssumptionPrefix, StringComparison.Ordinal))
                     .Select(static assumption => assumption.Id)
                     .ToImmutableHashSet(StringComparer.Ordinal))
             };
