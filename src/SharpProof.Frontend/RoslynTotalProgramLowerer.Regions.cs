@@ -112,6 +112,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
             SourceOperator = InlineSourceOperator,
+            TypeInitializationFree = type => _calls?.HasNoTypeInitialization(type) == true,
             SourceGetter = InlineSourceGetter,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,

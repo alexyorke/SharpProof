@@ -50,6 +50,12 @@ public sealed class ReadonlyStructValueTests
             public Chained(int ticks) : this((long)ticks) { }
             public long Ticks => ticks;
         }
+        public readonly struct Initialized
+        {
+            static Initialized() { C.State = 1; }
+            public Initialized(long ticks) { Ticks = ticks; }
+            public long Ticks { get; }
+        }
         public readonly struct Noisy
         {
             public static int Count;
@@ -85,6 +91,9 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return (new Span(x) + new Span(x)).Ticks; }")]
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 1); return default(Span).Ticks; }")]
     [TestCase("public static bool M(long x, long y) { Contract.Ensures(Contract.Result<bool>()); return new Span(x) == new Span(y); }")]
+    // Boxing a struct, even default(S), yields an object.
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return (object)default(Span); }")]
+    [TestCase("public static object M(Span s) { Contract.Ensures(Contract.Result<object>() == null); return s; }")]
     [TestCase("public static long M(Span s) { Contract.Ensures(Contract.Result<long>() == 0); return s.Ticks; }")]
     public async Task WrongPostconditionsAreNotProven(string member)
     {
@@ -102,9 +111,14 @@ public sealed class ReadonlyStructValueTests
         Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
-    // Modeling struct values does not hide a real effect.
+    // Modeling struct values does not hide a real effect. Calling an
+    // instance member of a struct runs its static constructor, so a getter
+    // on default(S) or on a parameter has that constructor's effects.
     [TestCase("[EnforcePure] public static long M(long x) { return new Noisy(x).Ticks; }")]
-    [TestCase("public static int State; [EnforcePure] public static long M(long x) { State = 1; return new Span(x).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(long x) { State = 1; return new Span(x).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M() { return default(Initialized).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(Initialized value) { return value.Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(long x) { return new Initialized(x).Ticks; }")]
     public async Task RealEffectsAreNotProvenPure(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -123,7 +137,7 @@ public sealed class ReadonlyStructValueTests
     private static async Task<WorkerClaimResult> ResultAsync(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
-        using var project = new ShadowTestProject(Types + "\npublic static class C { " + member + " }\n");
+        using var project = new ShadowTestProject(Types + "\npublic static class C { public static int State; " + member + " }\n");
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));

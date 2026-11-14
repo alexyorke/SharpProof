@@ -317,7 +317,10 @@ internal static partial class CSharpOperationSemantics
         if (operation is IConversionOperation conversion && IsReferenceDomain(operation.Type))
         {
             var target = new RoslynTypeMapper(factory).GetTypeId(operation.Type);
-            if (conversion.OperatorMethod == null && (operands[0] is IrNullTerm ||
+            // Converting a modeled struct to a reference type boxes it, which
+            // yields a new object even for default(S), modeled as null.
+            if (conversion.OperatorMethod == null && (operands[0] is IrNullTerm &&
+                    !IsModeledStruct(conversion.Operand.Type) ||
                     (conversion.Conversion.IsIdentity || IsTargetTypedCreation(conversion)) && operands[0].Type == target))
             {
                 return Exact(operands[0] is IrNullTerm ? factory.Null(target) : operands[0]);

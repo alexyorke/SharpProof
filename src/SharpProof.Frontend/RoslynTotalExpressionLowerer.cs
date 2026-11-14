@@ -22,6 +22,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; init; }
     internal Action? Spend { get; init; }
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; init; }
+    // Whether a type's initializer can run with no effect a body can observe.
+    internal Func<INamedTypeSymbol, bool>? TypeInitializationFree { get; init; }
+
     // A user-defined operator declared in source, called with its operands.
     internal Func<IOperation, IMethodSymbol, ImmutableArray<IOperation>, IrBlockId, int, TotalBodyValue?>? SourceOperator { get; init; }
 
@@ -361,12 +364,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             OpaqueCall(operation, setMethod, opaqueTarget.Instance, opaqueTarget.Arguments, block, depth, opaqueStore.Value) is { } setterCalled)
         { return setterCalled; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
-            CSharpOperationSemantics.GetterField(sourceProperty.Property, CSharpOperationSemantics.IsBaseAccess(sourceProperty.Instance)) == null &&
+            BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
         { return gotten; }
         if (depth < 256 && operation is IPropertyReferenceOperation { Property.GetMethod: { } getter } opaqueProperty &&
             !CSharpOperationSemantics.IsLength(opaqueProperty) &&
-            CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
+            BodyGetterField(opaqueProperty) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         {
             // Keep the getter's initialization effects, but its normal value is
@@ -451,7 +454,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
         { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
         if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
-            CSharpOperationSemantics.GetterField(propertyRead.Property, CSharpOperationSemantics.IsBaseAccess(propertyRead.Instance)) is { } getterField)
+            BodyGetterField(propertyRead) is { } getterField)
         { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }
         // Roslyn's null test for `??` and `?.` on a reference compares it with
         // null; it runs no code.
@@ -1284,6 +1287,22 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             captured ? _context.CapturedFieldReadSite(operation) : _context.Site(operation),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
+    }
+
+    // The field a getter call reads, when the call can be read as that field.
+    // Calling an instance member of a value type runs the type's initializer
+    // (ECMA-335 II.10.5.3.1); a class's instance members do not. So a struct
+    // getter is a plain read only when that initializer has no effect, or
+    // when the caller belongs to the struct and has run it already. Any other
+    // struct getter is inlined, which checks initialization.
+    private IFieldSymbol? BodyGetterField(IPropertyReferenceOperation property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        var field = CSharpOperationSemantics.GetterField(property.Property, CSharpOperationSemantics.IsBaseAccess(property.Instance));
+        var owner = property.Property.ContainingType;
+        return field == null || property.Property.IsStatic || !CSharpOperationSemantics.IsModeledStruct(owner) ||
+            SymbolEqualityComparer.Default.Equals(_context.Target.ContainingType, owner) || TypeInitializationFree?.Invoke(owner) == true
+            ? field : null;
     }
 
     // A field of a modeled struct value. Null is default(S), whose fields
