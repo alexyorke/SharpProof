@@ -41,6 +41,10 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
+### Reviewed bucket move for same-type callees
+
+When a source callee declared in the caller's own type began to be inlined under that type's initializer (SEMANTICS.md, "Calls and loops"), 48 selected methods that had stopped at SP0047 `Advisory:Lowering:UnsupportedOperationKind` lowered completely. None of them became Proven or Refuted: each is still Unknown, now with SP0002 because its effects are not proved (most enumerate a caller's sequence or invoke a caller's delegate). The ratchet therefore moved 48 from the SP0047 ceiling (281 to 233) to the SP0002 ceiling (184 to 232). Total Unknown, the supported floors and every support label are unchanged. [verdicts-by-source.md](verdicts-by-source.md) shows the per-source split.
+
 ## Reproduce, update, or add a source
 
 Use a persistent canonical container workspace so edits survive (`docker compose run --rm tooling dev`, or the Dev Container). Inside its shell, clone the upstream repository, check out the commit pinned in `sources.json`, and import it:

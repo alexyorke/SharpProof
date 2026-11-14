@@ -76,6 +76,9 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- A method that calls another method of its own type is analyzed through that
+  call even when the type has a static initializer. The initializer is
+  accounted for once, at the calling method's entry.
 - The default API table specifies common framework members, including calendar
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
