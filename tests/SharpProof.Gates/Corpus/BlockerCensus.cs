@@ -246,9 +246,7 @@ internal static class BlockerCensus
         text.Append("Methods: ").Append(totals.Sum().ToString(CultureInfo.InvariantCulture)).Append(" (")
             .AppendJoin(", ", sources.Select((id, index) => $"{id} {totals[index]}")).Append(").\n\n");
         text.Append("Any counts methods that report the construct. Sole counts methods that report nothing else; it is an upper bound ");
-        text.Append("on the gain from supporting the construct, because an abstaining operand hides blockers in sibling operands.
-
-");
+        text.Append("on the gain from supporting the construct, because an abstaining operand hides blockers in sibling operands.\n\n");
         text.Append("| Construct | Sole | Any | ").AppendJoin(" | ", sources.Select(static id => $"`{id}` sole")).Append(" |\n");
         text.Append("| --- | ---: | ---: |").Insert(text.Length, " ---: |", sources.Length).Append('\n');
         foreach (var row in any
