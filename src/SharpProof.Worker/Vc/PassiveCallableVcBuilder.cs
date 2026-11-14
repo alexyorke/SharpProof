@@ -387,7 +387,7 @@ internal sealed class PassiveCallableVcBuilder
                                 Spend();
                                 var freshOwner = referenceObject && allocated.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, allocated) : allocated;
                                 var existingOwner = referenceObject && existing.Type != _factory.ObjectType ? _factory.Cast(_factory.ObjectType, existing) : existing;
-                                Fact(Guard(reach, Not(Equal(freshOwner, existingOwner))), allocation.Operation, "allocation-fresh");
+                                Fact(Guard(And(reach, EntryOwnerExists(existing)), Not(Equal(freshOwner, existingOwner))), allocation.Operation, "allocation-fresh");
                             }
                             SetState(allocatedTarget, allocated);
                         }
@@ -759,7 +759,7 @@ internal sealed class PassiveCallableVcBuilder
                 foreach (var fresh in _freshReferences)
                 {
                     Spend();
-                    Fact(Guard(fresh.Reach, Not(Equal(_factory.Cast(_factory.ObjectType, fresh.Value),
+                    Fact(Guard(And(fresh.Reach, EntryOwnerExists(entry)), Not(Equal(_factory.Cast(_factory.ObjectType, fresh.Value),
                         _factory.Cast(_factory.ObjectType, entry)))), fresh.Site, "allocation-entry-field-fresh");
                 }
             }
@@ -983,6 +983,17 @@ internal sealed class PassiveCallableVcBuilder
     { return _factory.Unary(IrUnaryOperator.Not, value); }
     private IrTerm Guard(IrTerm reach, IrTerm predicate)
     { return Or(Not(reach), predicate); }
+
+    // A field of an entry object names an existing object only when that
+    // owner exists. A null owner has no field: a body never reads one without
+    // a guard or a fault, so freshness is stated only for a non-null owner.
+    private IrTerm EntryOwnerExists(IrTerm value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return value is IrOpaqueTerm { Receiver: { } owner } && IrFieldSites.IsFieldRead(_factory, value)
+            ? Not(Equal(owner, _factory.Null(owner.Type)))
+            : _factory.Boolean(true);
+    }
     private IrTerm Disjoin(IEnumerable<IrTerm> values)
     { return values.Aggregate((IrTerm)_factory.Boolean(false), Or); }
 }

@@ -88,6 +88,39 @@ internal static partial class CSharpOperationSemantics
                 !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
     }
 
+    // A source readonly struct whose instance fields hold scalars, references
+    // or other such structs. Its value is modeled as a reference to an
+    // immutable object, and null stands for default(S): the two cannot be told
+    // apart, because every modeled read of a struct value is guarded and
+    // returns the field's default for null, boxing yields an unconstrained
+    // reference, and C# has no reference comparison of struct values.
+    // Readonly fields make construction the only store.
+    internal static bool IsModeledStruct(ITypeSymbol? type)
+    { return IsModeledStruct(type, 0); }
+
+    private static bool IsModeledStruct(ITypeSymbol? type, int depth)
+    {
+        if (depth > 8 || type is not INamedTypeSymbol
+            {
+                TypeKind: TypeKind.Struct, IsReadOnly: true, IsRefLikeType: false, IsRecord: false, IsGenericType: false,
+                SpecialType: SpecialType.None, IsUnmanagedType: var _
+            } named ||
+            named.DeclaringSyntaxReferences.IsEmpty || named.ContainingType is { IsGenericType: true } ||
+            named.GetAttributes().Any(static attribute => attribute.AttributeClass is
+            {
+                Name: "StructLayoutAttribute", ContainingNamespace: { Name: "InteropServices" }
+            }))
+        { return false; }
+        foreach (var member in named.GetMembers())
+        {
+            if (member is IFieldSymbol { IsStatic: false, IsConst: false } field &&
+                (!HasIndependentFieldStorage(field) || field.IsVolatile || field.IsFixedSizeBuffer ||
+                    !(IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsModeledStruct(field.Type, depth + 1))))
+            { return false; }
+        }
+        return true;
+    }
+
     // C# lets only an instance constructor of the declaring type assign a
     // readonly instance field, and only through its own `this`: the object
     // under construction. Such a store is modeled like any other instance
@@ -103,7 +136,8 @@ internal static partial class CSharpOperationSemantics
             SymbolEqualityComparer.Default.Equals(target.ContainingType.OriginalDefinition, field.ContainingType.OriginalDefinition) &&
             instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
             HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
-            (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType;
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsModeledStruct(field.Type)) &&
+            (field.ContainingType.IsReferenceType || IsModeledStruct(field.ContainingType));
     }
 
     // The backing field of a get-only auto-property, which a constructor of
@@ -128,7 +162,8 @@ internal static partial class CSharpOperationSemantics
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));
         return HasIndependentFieldStorage(field) && !field.IsVolatile && !field.HasConstantValue && IsValueDomain(field.Type) &&
-            (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0 : field.ContainingType.IsReferenceType);
+            (field.IsStatic ? field.ContainingType.StaticConstructors.Length == 0
+                : field.ContainingType.IsReferenceType || IsModeledStruct(field.ContainingType));
     }
 
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
@@ -165,7 +200,7 @@ internal static partial class CSharpOperationSemantics
     {
         if (property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
             property.IsAbstract || property.GetMethod is not { } getter || HasSynchronizedEntry(getter) ||
-            !property.IsStatic && !property.ContainingType.IsReferenceType)
+            !property.IsStatic && !property.ContainingType.IsReferenceType && !IsModeledStruct(property.ContainingType))
         { return null; }
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));

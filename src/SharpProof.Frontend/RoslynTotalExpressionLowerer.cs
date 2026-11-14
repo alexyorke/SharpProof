@@ -22,6 +22,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal Func<IrExceptionKind, OperationId, IrBlockId>? ExceptionTarget { get; init; }
     internal Action? Spend { get; init; }
     internal Func<IInvocationOperation, IrBlockId, int, TotalBodyValue?>? SourceCall { get; init; }
+    // Whether a type's initializer can run with no effect a body can observe.
+    internal Func<INamedTypeSymbol, bool>? TypeInitializationFree { get; init; }
+
+    // A user-defined operator declared in source, called with its operands.
+    internal Func<IOperation, IMethodSymbol, ImmutableArray<IOperation>, IrBlockId, int, TotalBodyValue?>? SourceOperator { get; init; }
 
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
     internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
@@ -58,7 +63,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
         return (instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } ||
                 instance is IFlowCaptureReferenceOperation capture && _context.IsThisCapture(capture.Id)) &&
-            !_context.Target.IsStatic && _context.Target.ContainingType.IsReferenceType;
+            !_context.Target.IsStatic &&
+            (_context.Target.ContainingType.IsReferenceType || CSharpOperationSemantics.IsModeledStruct(_context.Target.ContainingType));
     }
 
     // A clause's read of a modeled field: through `this` once it is modeled,
@@ -69,10 +75,16 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (IsImplicitThis(owner))
         {
             return _context.ReceiverValue(state) is { } self
-                ? new(_factory.PureOpaque(member, AsObject(self)), _factory.Boolean(true), FrontendSubsetClassification.Exact)
+                ? new(StructGuardedRead(owner.Type, member, self), _factory.Boolean(true), FrontendSubsetClassification.Exact)
                 : null;
         }
         var receiver = LowerClause(owner, state, depth + 1);
+        if (CSharpOperationSemantics.IsModeledStruct(owner.Type))
+        {
+            return receiver.Classification.IsExact
+                ? new(StructGuardedRead(owner.Type, member, receiver.Value), receiver.SafeCondition, receiver.Classification)
+                : Failed(operation, receiver.Classification.Abstention);
+        }
         return receiver.Classification.IsExact
             ? new(_factory.PureOpaque(member, AsObject(receiver.Value)),
                 And(receiver.SafeCondition, Not(_factory.Binary(IrBinaryOperator.Equal, receiver.Value, _factory.Null(receiver.Value.Type)))),
@@ -352,12 +364,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             OpaqueCall(operation, setMethod, opaqueTarget.Instance, opaqueTarget.Arguments, block, depth, opaqueStore.Value) is { } setterCalled)
         { return setterCalled; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
-            CSharpOperationSemantics.GetterField(sourceProperty.Property, CSharpOperationSemantics.IsBaseAccess(sourceProperty.Instance)) == null &&
+            BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
         { return gotten; }
         if (depth < 256 && operation is IPropertyReferenceOperation { Property.GetMethod: { } getter } opaqueProperty &&
             !CSharpOperationSemantics.IsLength(opaqueProperty) &&
-            CSharpOperationSemantics.GetterField(opaqueProperty.Property, CSharpOperationSemantics.IsBaseAccess(opaqueProperty.Instance)) == null &&
+            BodyGetterField(opaqueProperty) == null &&
             OpaqueCall(operation, getter, opaqueProperty.Instance, opaqueProperty.Arguments, block, depth) is { } read)
         {
             // Keep the getter's initialization effects, but its normal value is
@@ -379,7 +391,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
         if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
             CSharpOperationSemantics.IsOpaqueDomain(operation.Type) &&
-            !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null))
+            !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null) &&
+            !(operation is IDefaultValueOperation && CSharpOperationSemantics.IsModeledStruct(operation.Type)))
         {
             // Opaque constants and defaults have no effects; their values remain unknown.
             var constant = _context.Temporary(_context.Type(operation.Type));
@@ -441,7 +454,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
         { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
         if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
-            CSharpOperationSemantics.GetterField(propertyRead.Property, CSharpOperationSemantics.IsBaseAccess(propertyRead.Instance)) is { } getterField)
+            BodyGetterField(propertyRead) is { } getterField)
         { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }
         // Roslyn's null test for `??` and `?.` on a reference compares it with
         // null; it runs no code.
@@ -468,6 +481,19 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IImplicitIndexerReferenceOperation stringLast &&
             CSharpOperationSemantics.IsLastStringIndex(stringLast))
         { return LastStringIndex(stringLast, block, depth); }
+        if (depth < 256 && SourceOperator != null && operation is IBinaryOperation
+            {
+                OperatorMethod: { DeclaringSyntaxReferences.IsEmpty: false } sourceBinary, IsLifted: false,
+                OperatorKind: not (BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr)
+            } binaryOperator &&
+            SourceOperator(operation, sourceBinary, [binaryOperator.LeftOperand, binaryOperator.RightOperand], block, depth) is { } sourceBinaryCall)
+        { return sourceBinaryCall; }
+        if (depth < 256 && SourceOperator != null && operation is IUnaryOperation
+            {
+                OperatorMethod: { DeclaringSyntaxReferences.IsEmpty: false } sourceUnary, IsLifted: false
+            } unaryOperator &&
+            SourceOperator(operation, sourceUnary, [unaryOperator.Operand], block, depth) is { } sourceUnaryCall)
+        { return sourceUnaryCall; }
         if (depth < 256 && operation is IBinaryOperation { OperatorMethod: { } operatorMethod, IsLifted: false } userOperator &&
             MetadataOperatorCall(userOperator, operatorMethod, block, depth) is { } operatorCall)
         { return operatorCall; }
@@ -1237,6 +1263,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             }
             block = lowered.Continuation;
         }
+        if ((receiver ?? (implicitThis && !captured ? _context.ReceiverValue() : null)) is { } structOwner && !ApproximateElementReads &&
+            CSharpOperationSemantics.IsModeledStruct(field.ContainingType) && FieldMember(field) is { } structMember)
+        {
+            var structRead = new TotalBodyValue(StructGuardedRead(field.ContainingType, structMember, structOwner), block,
+                FrontendSubsetClassification.Exact);
+            return PinElementReads ? Pin(operation, structRead) : structRead;
+        }
+        if (CSharpOperationSemantics.IsModeledStruct(field.ContainingType))
+        { receiver = null; }
         if ((receiver ?? (implicitThis && !captured ? _context.ReceiverValue() : null)) is { } owner && !ApproximateElementReads &&
             FieldMember(field) is { } member)
         {
@@ -1252,6 +1287,34 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             captured ? _context.CapturedFieldReadSite(operation) : _context.Site(operation),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
+    }
+
+    // The field a getter call reads, when the call can be read as that field.
+    // Calling an instance member of a value type runs the type's initializer
+    // (ECMA-335 II.10.5.3.1); a class's instance members do not. So a struct
+    // getter is a plain read only when that initializer has no effect, or
+    // when the caller belongs to the struct and has run it already. Any other
+    // struct getter is inlined, which checks initialization.
+    private IFieldSymbol? BodyGetterField(IPropertyReferenceOperation property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        var field = CSharpOperationSemantics.GetterField(property.Property, CSharpOperationSemantics.IsBaseAccess(property.Instance));
+        var owner = property.Property.ContainingType;
+        return field == null || property.Property.IsStatic || !CSharpOperationSemantics.IsModeledStruct(owner) ||
+            SymbolEqualityComparer.Default.Equals(_context.Target.ContainingType, owner) || TypeInitializationFree?.Invoke(owner) == true
+            ? field : null;
+    }
+
+    // A field of a modeled struct value. Null is default(S), whose fields
+    // hold their defaults; a struct value is never a null receiver.
+    private IrTerm StructGuardedRead(ITypeSymbol? owner, IrMemberId member, IrTerm value)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(member.IsDefault, nameof(member));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        var read = _factory.PureOpaque(member, AsObject(value));
+        return !CSharpOperationSemantics.IsModeledStruct(owner) ? read : _factory.Conditional(
+            _factory.Binary(IrBinaryOperator.Equal, value, _factory.Null(value.Type)),
+            CSharpOperationSemantics.DefaultValue(_factory, read.Type), read);
     }
 
     // A scalar or reference instance field of a class: its reads and stores
@@ -1286,9 +1349,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private IrMemberId? FieldMember(IFieldSymbol field)
     {
         field = BoundField(field);
-        if (field.IsStatic || !field.ContainingType.IsReferenceType ||
+        if (field.IsStatic || !field.ContainingType.IsReferenceType && !CSharpOperationSemantics.IsModeledStruct(field.ContainingType) ||
             !CSharpOperationSemantics.HasIndependentFieldStorage(field) ||
-            !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type))
+            !CSharpOperationSemantics.IsScalar(field.Type) && !CSharpOperationSemantics.IsReferenceDomain(field.Type) &&
+                !CSharpOperationSemantics.IsModeledStruct(field.Type))
         { return null; }
         // Inlined source bodies bind declaration symbols. A field whose type
         // does not change under substitution must name the same slot there
@@ -1768,6 +1832,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 CSharpOperationSemantics.Literal(_factory, scalar, null),
             IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>
                 CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
+            // Null stands for default(S) of a modeled struct.
+            IDefaultValueOperation when CSharpOperationSemantics.IsModeledStruct(operation.Type) =>
+                _factory.Null(_context.Type(operation.Type)),
             IParameterReferenceOperation parameter => _factory.Variable(_context.Variable(parameter.Parameter, state)),
             ILocalReferenceOperation local when local.Local.HasConstantValue => CSharpOperationSemantics.Literal(_factory, local.Type!, local.Local.ConstantValue),
             ILocalReferenceOperation local when local.Local.RefKind == RefKind.None => _factory.Variable(_context.Variable(local.Local)),

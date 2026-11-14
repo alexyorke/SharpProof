@@ -7899,8 +7899,8 @@
       "declarationSha256": "dc6f3fa420658eb899abb4542e97523c730a59681766bdb009f98731496e164c",
       "methodName": "CompareTo",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0346",
@@ -7995,8 +7995,8 @@
       "declarationSha256": "f43b468f462c75d214770307c3f28cde79327f9c8146555d2e79c144300946c0",
       "methodName": "WithOffset",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0354",

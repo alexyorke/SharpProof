@@ -13,6 +13,10 @@ internal sealed class IrFactory
     private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType, int Width, bool Signed), IrTypeId> _typeIds = [];
     private readonly List<IrTypeInfo> _types = [];
     private readonly HashSet<IrTypeId> _closedSealedReferenceTypes = [];
+    // Types of modeled struct values this factory's programs construct. The
+    // producer reads it to keep allocation-sensitive claims Unknown; it is not
+    // part of the portable program.
+    private readonly HashSet<IrTypeId> _valueStructTypes = [];
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
     private readonly List<IrMemberInfo> _members = [];
@@ -185,6 +189,24 @@ internal sealed class IrFactory
         {
             EnsureScope(identity.Scope, nameof(identity));
             return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Reference, null);
+        }
+    }
+
+    internal void RegisterValueStructType(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            _valueStructTypes.Add(type);
+        }
+    }
+
+    internal bool IsValueStructType(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            return _valueStructTypes.Contains(type);
         }
     }
 

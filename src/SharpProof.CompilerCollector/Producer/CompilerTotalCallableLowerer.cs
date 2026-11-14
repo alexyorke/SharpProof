@@ -178,6 +178,11 @@ internal static class CompilerTotalCallableLowerer
         var entryInitialization = lowering.SourceInitializationEffectsComplete
             ? EntryInitialization.ClassifyEntry(compilation, target.Method.ContainingType, cancellationToken)
             : InitializationEffect.Effectful;
+        // A modeled struct value is built as an IR allocation, though the CLR
+        // does not allocate it on the heap. Only allocation-insensitive claims
+        // accept such a body, as they accept fresh-value initialization.
+        if (entryInitialization == InitializationEffect.None && ConstructsValueStructs(context.Factory, program))
+        { entryInitialization = InitializationEffect.FreshValues; }
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
@@ -356,6 +361,14 @@ internal static class CompilerTotalCallableLowerer
             opaqueCalls, prepareMetadataCallee: metadataCallees
                 ? frame => PrepareMetadataCallee(compilation, images, RepositoryParameterGuard.NotNull(frame, nameof(frame)),
                     contractExports ?? CompilerContractExports.Empty, cancellationToken) : null);
+    }
+
+    internal static bool ConstructsValueStructs(IrFactory factory, IrProgram program)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        program = RepositoryParameterGuard.NotNull(program, nameof(program));
+        return program.Blocks.SelectMany(static block => block.Instructions).OfType<IrAllocationInstruction>()
+            .Any(allocation => factory.IsValueStructType(allocation.AllocatedType));
     }
 
     private static Func<INamedTypeSymbol, bool> CreateShadowInitializationPredicate(

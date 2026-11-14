@@ -227,12 +227,18 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // set only by a caller that explicitly lowers instance initializers.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
-        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false)
+        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (arguments.IsDefault)
         { throw new ArgumentNullException(nameof(arguments)); }
+        // Operands stand for the arguments of a user-defined operator, which
+        // takes them positionally and has no optional or params parameters.
+        if (!operands.IsDefault && (method.MethodKind != MethodKind.UserDefinedOperator || !arguments.IsEmpty || assigned ||
+            operands.Length != method.Parameters.Length || operands.Any(static operand => operand is null)))
+        { frame = null; graph = null; return false; }
+        var argumentCount = operands.IsDefault ? arguments.Length : operands.Length;
         frame = null;
         graph = null;
         if (!Spend(method.Parameters.Length + 1))
@@ -254,13 +260,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             KnownSourceValue(method.ReturnType) != null;
         if (!contractOnly && IsActive(method) ||
             method.MethodKind is not (MethodKind.Ordinary or MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.Constructor or
-                MethodKind.LocalFunction) ||
+                MethodKind.LocalFunction) && !(method.MethodKind == MethodKind.UserDefinedOperator && !operands.IsDefault) ||
             assigned != (method.MethodKind == MethodKind.PropertySet) ||
             (method.MethodKind == MethodKind.Constructor
                 ? instance != null || !CSharpOperationSemantics.IsDirectObjectConstructor(method, constructorInitializers, cancellationToken) &&
                     !(contractOnly && method.ContainingType.TypeKind == TypeKind.Class)
                 : method.MethodKind == MethodKind.LocalFunction ? instance != null : method.IsStatic != (instance == null)) ||
-            instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) ||
+            instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) &&
+                !(CSharpOperationSemantics.IsModeledStruct(method.ContainingType) &&
+                    SymbolEqualityComparer.Default.Equals(instance.Type, method.ContainingType)) ||
             method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
@@ -279,7 +287,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingAssembly, _compilation.Assembly) ||
-            method.DeclaringSyntaxReferences.Length != 1 || arguments.Length + (assigned ? 1 : 0) != method.Parameters.Length)
+            method.DeclaringSyntaxReferences.Length != 1 || argumentCount + (assigned ? 1 : 0) != method.Parameters.Length)
         { return false; }
         var ordinals = ImmutableHashSet.CreateBuilder<int>();
         foreach (var argument in arguments)
@@ -304,7 +312,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // An expression-bodied property or indexer (`int P => 0;`) declares
         // its getter by the arrow clause itself.
         if (!_compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
-            declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or AccessorDeclarationSyntax { Body: not null } or
+            declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or OperatorDeclarationSyntax or
+                AccessorDeclarationSyntax { Body: not null } or
                 AccessorDeclarationSyntax { ExpressionBody: not null } or
                 ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
                 LocalFunctionStatementSyntax))

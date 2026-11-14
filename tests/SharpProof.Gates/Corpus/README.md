@@ -10,7 +10,7 @@ The corpus includes 500 selected methods from four real, buildable libraries, se
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `aalhour-c-sharp-algorithms` | `https://github.com/aalhour/C-Sharp-Algorithms` | `b82432474a916ac784cd1446eabcba615c333463` | MIT | `Algorithms/`, `DataStructures/` | 200 (87) | 17 | 9 / 8 / 183 |
 | `morelinq` | `https://github.com/morelinq/MoreLINQ` | `d217ab1e8eac68247650c27e977b767dd66bcab0` | Apache-2.0 | `MoreLinq/` | 100 (100) | 4 | 3 / 1 / 96 |
-| `nodatime` | `https://github.com/nodatime/nodatime` | `6e024ddefed3ea21169f0eca5ab5c32312adb9cf` | Apache-2.0 | `src/NodaTime/` | 100 (100) | 6 | 5 / 1 / 94 |
+| `nodatime` | `https://github.com/nodatime/nodatime` | `6e024ddefed3ea21169f0eca5ab5c32312adb9cf` | Apache-2.0 | `src/NodaTime/` | 100 (100) | 8 | 7 / 1 / 92 |
 | `humanizer` | `https://github.com/Humanizr/Humanizer` | `3ebc38de585fc641a04b0e78ed69468453b0f8a1` (v2.14.1) | MIT | `src/Humanizer/` | 100 (100) | 9 | 9 / 0 / 91 |
 
 No Unknown is silent: each carries a diagnostic that names its reason, and the ratchet allows no `silent-unclassified` bucket. Two trivially pure methods, NodaTime `HebrewScripturalCalculator.IsLeapYear` and Humanizer `IsAndSplitNeeded`, remain Unknown with SP0047 `Advisory:EntryInitialization:TypeInitializer`. Each declaring type's static initializer calls code (`YearStartCacheEntry.CreateCache()`, and a `Dictionary` collection initializer), which is an entry effect. The gate prints this table's last three columns per source on every run. [verdicts-by-source.md](verdicts-by-source.md) is generated with the snapshot and breaks the Unknowns down by diagnostic and reason for each source.
@@ -40,6 +40,10 @@ The [ratchet](unknown-reason-ratchet.json) sets floors for supported cases overa
 Only this declaration is reclassified IntentionallyUnsupported/Unknown until exceptional resource callbacks have an exact purity model. Its source file hash `fd34466c9843b6b88c3f73cb71a18f6a2e9236393d4ceafaf1f1b3c8afce7f0f`, declaration hash `905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554`, signature, and body remain unchanged. `ResourceCallbackCorrectionRetainsPinnedGreatestCommonDivisorSource` executes that exact pinned source with a culture callback; `ExceptionalFrameworkCultureTests` also covers resource callback effects and exception substitution.
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
+
+### Reviewed classification for readonly struct values
+
+When source `readonly struct` values were modeled (SEMANTICS.md, "Heap"), ten NodaTime methods that had stopped at SP0047 `Advisory:Lowering:UnsupportedOperationKind` lowered completely. Two became Proven and were reviewed against their bodies: `Instant64.CompareTo` (OSS0345, `=> nanoseconds.CompareTo(other.nanoseconds)`, two `long` field reads and a pure framework comparison) and `OffsetDate.WithOffset` (OSS0353, `=> new OffsetDate(date, offset)`, whose constructor only stores its two arguments). Both are marked Supported/Proven. Of the other eight, six are Unknown with SP0002 (their effects are not proved) and two with SP0047 `Advisory:EntryInitialization:TypeInitializer`. The supported floors rose by two (262 to 264, 36 to 38); the total-Unknown ceiling fell by two (500 to 498), the SP0047 ceiling fell by eight (233 to 225) and the SP0002 ceiling rose by six (231 to 237).
 
 ### Reviewed classification for constructor readonly stores
 
