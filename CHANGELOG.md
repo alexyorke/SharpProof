@@ -76,6 +76,10 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- Calls to source methods with `ref` and `out` parameters are analyzed when
+  each such argument is a local or parameter of the caller, passed once, and
+  the call is outside any `try` block of the caller. Before, such calls kept
+  the whole caller `Unknown`.
 - Values of source `readonly struct` types are analyzed: construction,
   `default`, field and property reads, instance members and user-defined
   operators. Purity, capability and postcondition claims over them can be

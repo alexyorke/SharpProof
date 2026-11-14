@@ -4,7 +4,10 @@ internal sealed partial class RoslynTotalProgramLowerer
 {
     private IrProgram InvalidateReferenceInputs(IrProgram program)
     {
-        var references = _context.Parameters.Where(binding => binding.Parameter.RefKind is RefKind.Ref or RefKind.In)
+        // A copy-backed frame's ref parameter is the frame's own variable: it
+        // aliases no field or element, so no write can change it.
+        var references = _context.Parameters.Where(binding => binding.Parameter.RefKind is RefKind.Ref or RefKind.In &&
+                !(_context.WritesBackReferences && binding.Parameter.RefKind == RefKind.Ref))
             .Select(binding => binding.Current).OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
         if (references.IsEmpty)
         { return program; }

@@ -207,6 +207,13 @@ public sealed class CallPreconditionClaimTests
             public static int Caller() { return M(0); }
         }
         """, TestName = "ClosedParameterAttribute")]
+    [TestCase("""
+        using SharpProof.Attributes;
+        public static class C {
+            public static int M(ref int n) { Contract.Requires(n > 0); return n; }
+            public static int Caller() { var n = 0; return M(ref n); }
+        }
+        """, TestName = "RefLocalArgument")]
     public async Task EveryModeledCallFormIsChecked(string source)
     {
         System.ArgumentNullException.ThrowIfNull(source);
@@ -339,13 +346,6 @@ public sealed class CallPreconditionClaimTests
             public static int Caller(C c) { return c.M(0); }
         }
         """, TestName = "Virtual")]
-    [TestCase("""
-        using SharpProof.Attributes;
-        public static class C {
-            public static int M(ref int n) { Contract.Requires(n > 0); return n; }
-            public static int Caller() { var n = 0; return M(ref n); }
-        }
-        """, TestName = "RefParameter")]
     [TestCase("""
         using SharpProof.Attributes;
         public static class T {

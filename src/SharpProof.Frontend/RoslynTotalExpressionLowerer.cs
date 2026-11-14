@@ -1846,6 +1846,23 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return value != null;
     }
 
+    // A caller local or parameter that a ref or out argument can be written
+    // back to: not a ref local, and not captured by the root closure, whose
+    // field copy a direct write would leave stale.
+    internal bool TryReferenceArgumentStorage(IOperation variable, out IrVarId target)
+    {
+        variable = RepositoryParameterGuard.NotNull(variable, nameof(variable));
+        target = default;
+        ISymbol? symbol = variable switch
+        {
+            ILocalReferenceOperation local => local.Local,
+            IParameterReferenceOperation parameter => parameter.Parameter,
+            _ => null
+        };
+        return symbol != null && (RootClosure == null || !RootClosure.Captures.Contains(symbol, SymbolEqualityComparer.Default)) &&
+            TryStorage(variable, out target);
+    }
+
     private bool TryStorage(IOperation operation, out IrVarId target)
     {
         target = operation switch

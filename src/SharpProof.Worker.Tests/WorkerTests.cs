@@ -2533,12 +2533,13 @@ internal sealed partial class WorkerTests
 
         var response = await worker.VerifyAsync(request, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
+        // The callee is inlined with its ref argument written back, so the
+        // null it stores refutes the claim; the array summary proves nothing.
         Assert.That(response.Errors, Is.Empty);
-        var record = AssertClaimVerdict(
+        AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.UnsupportedBody);
-        Assert.That(record.ProofCore, Is.Empty);
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None);
     }
 
     [Test]

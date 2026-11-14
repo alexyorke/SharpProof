@@ -342,9 +342,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
         Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default)
     {
+        var references = ReferenceArguments(callArguments);
         if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
-                constructorInitializers: constructedReceiver != null, operands: operands) &&
-            !(_expressions.AllowOpaqueCalls &&
+                constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null) &&
+            !(_expressions.AllowOpaqueCalls && references == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands)))
         { return null; }
@@ -401,6 +402,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             SpendRegion();
             var parameter = argument.Parameter!;
+            // An out argument's value is never read: the callee assigns it
+            // first. A ref argument passes the variable itself, so its value
+            // is read when the callee is entered, after every argument.
+            if (parameter.RefKind == RefKind.Out)
+            {
+                argumentBuffer[parameter.Ordinal] = CSharpOperationSemantics.DefaultValue(_context.Factory,
+                    _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
+                continue;
+            }
+            if (parameter.RefKind == RefKind.Ref && references != null)
+            { continue; }
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
                 if (_calls.PrepareEmptyParamsArray(argument) is not { } prepared ||
@@ -433,6 +445,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                 _context.Factory.GetVariableInfo(callee.Parameters[callee.Parameters.Length - 1].Entry).Type);
             marker = value.Value;
         }
+        foreach (var (ordinal, local) in references ?? [])
+        {
+            if (local is { } storage && method.Parameters[ordinal].RefKind == RefKind.Ref)
+            {
+                argumentBuffer[ordinal] = Bridge(_context.Factory.Variable(storage),
+                    _context.Factory.GetVariableInfo(callee.Parameters[ordinal].Entry).Type);
+            }
+        }
         var arguments = argumentBuffer.ToImmutable();
         if (receiver != null && !CSharpOperationSemantics.IsModeledStruct(method.ContainingType))
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
@@ -452,9 +472,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         // A recursive call checks its callee's preconditions, then runs the
         // callee as an unknown call: it may do anything, throw included. So
         // does a call to an iterator, which has none, and a call whose
-        // callee body does not lower.
+        // callee body does not lower. An unknown call could write a local it
+        // received by reference to anything, so such a call is not expanded.
         if (graph == null)
-        { return Opaque(); }
+        { return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)) : Opaque(); }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -483,12 +504,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             foreach (var parameter in callee.Parameters)
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
             _builder.Goto(block, site, composed._frame!.Entry);
+            WriteBack(continued);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
         var expanded = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry);
         var lowering = expanded.Lower(graph!);
         if (!lowering.IsExact)
-        { return _expressions.AllowOpaqueCalls ? Opaque() : new(marker, block, lowering.Classification); }
+        { return _expressions.AllowOpaqueCalls && references == null ? Opaque() : new(marker, block, lowering.Classification); }
         ImportExplicitThrowTypes(expanded);
         var program = lowering.Program;
         var instructionCount = 0;
@@ -564,7 +586,23 @@ internal sealed partial class RoslynTotalProgramLowerer
                 }
             }
         }
+        WriteBack(continuation);
         return new(marker, continuation, FrontendSubsetClassification.Exact);
+
+        // On normal return a ref or out local holds what the callee last
+        // assigned to the parameter.
+        void WriteBack(IrBlockId continued)
+        {
+            foreach (var (ordinal, local) in references ?? [])
+            {
+                if (local is not { } storage)
+                { continue; }
+                var value = Bridge(_context.Factory.Variable(callee.Parameters[ordinal].Input.Current),
+                    _context.Factory.GetVariableInfo(storage).Type);
+                var write = _builder.Assign(continued, site, storage, value);
+                _builder.Write(continued, write.Operation, IrWriteRegion.Local);
+            }
+        }
 
         TotalBodyValue Opaque()
         {
@@ -580,6 +618,45 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Throws; their generic edges do not target an exceptional exit.
             return blocks[target];
         }
+    }
+
+    // The ref and out arguments of a call, with the caller variable each one
+    // writes back to (none for a discard), when every one is a local or
+    // parameter of the caller passed once and no handler of the caller can
+    // observe a variable the call
+    // leaves half written: an exception that leaves this frame ends its
+    // locals. Null when the call has no such argument or one is not admitted.
+    private ImmutableArray<(int Ordinal, IrVarId? Local)>? ReferenceArguments(ImmutableArray<IArgumentOperation> arguments)
+    {
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var references = ImmutableArray.CreateBuilder<(int Ordinal, IrVarId? Local)>();
+        var variables = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var argument in arguments)
+        {
+            if (argument.Parameter is not { RefKind: RefKind.Ref or RefKind.Out } parameter)
+            { continue; }
+            for (var region = _regionGraph == null ? null : _regionSource.EnclosingRegion; region != null; region = region.EnclosingRegion)
+            {
+                if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime))
+                { return null; }
+            }
+            var value = argument.Value is IDeclarationExpressionOperation { Expression: var declared } ? declared : argument.Value;
+            if (value is IDiscardOperation && parameter.RefKind == RefKind.Out)
+            {
+                references.Add((parameter.Ordinal, null));
+                continue;
+            }
+            ISymbol? symbol = value switch
+            {
+                ILocalReferenceOperation local => local.Local,
+                IParameterReferenceOperation owned => owned.Parameter,
+                _ => null
+            };
+            if (symbol == null || !variables.Add(symbol) || !_expressions.TryReferenceArgumentStorage(value, out var storage))
+            { return null; }
+            references.Add((parameter.Ordinal, storage));
+        }
+        return references.Count == 0 ? null : references.ToImmutable();
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)
