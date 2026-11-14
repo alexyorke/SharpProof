@@ -691,7 +691,7 @@ try {
             [System.Collections.Immutable.ImmutableArray]::CreateRange[string]([string[]]@(
                     'CompilerCaptureFreshnessControlTests',
                     'CompilerCaptureFreshnessRegressionTests',
-                    'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|CallPreconditionReportingTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests',
+                    'CompilerProbeInputConsistencyTests|CompilerProbeSnapshotTests|SarifProjectionTests|CallPreconditionReportingTests|VerifierDiagnosticTransportTests|LauncherArgumentTests|LauncherWorkflowTests|LauncherResultPresentationTests|RefutedContractDiagnosticTests|RuntimeEnvironmentIsolationTests|StampContractsExportTests',
                     'NaNPublicBuildWorkflowAuditTests',
                     'VerifierPackageDefaultsTests',
                     'VerificationPublicationNullArgumentTests',

@@ -92,7 +92,7 @@ PR lanes ([ci.yml](../.github/workflows/ci.yml): pull requests, `master` pushes,
 
 The `repository` and `evidence` lanes run every component check and then fail if any failed.
 
-Then `coverage` merges every shard's `lines.tsv`, and `build-and-test`, the single required check, succeeds only when every lane, the merge, and (on pull requests) GitHub's dependency review succeeded. Each test suite runs once, under the coverage collector, with the filter `TestCategory!=Performance&TestCategory!=Coverage`, so CI also runs `Corpus` tests.
+Then `coverage` merges every shard's `lines.tsv` and fails when the merged total line coverage is below 98.5%, and `build-and-test`, the single required check, succeeds only when every lane, the merge, and (on pull requests) GitHub's dependency review succeeded. Each test suite runs once, under the coverage collector, with the filter `TestCategory!=Performance&TestCategory!=Coverage`, so CI also runs `Corpus` tests.
 
 Other lanes: [nightly.yml](../.github/workflows/nightly.yml) runs `nightly` and `fuzz-0`..`fuzz-5`, [release.yml](../.github/workflows/release.yml) runs `release-packages`, and every workflow builds its image with `image` and `image-key`.
 
@@ -102,7 +102,9 @@ Other lanes: [nightly.yml](../.github/workflows/nightly.yml) runs `nightly` and 
 docker compose run --rm tooling coverage
 ```
 
-[Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) builds Release, runs the semantic and package tests with the Microsoft collector (Cobertura), and collects `SharpProof.Attributes` and the Fuzz console in their own test hosts. It reduces the reports to repository-relative line hits in `lines.tsv`, then writes per-project and total line coverage to `artifacts/coverage/summary.md`; a line is covered when any report hit it. `-MinimumLinePercent` optionally fails below an aggregate floor. CI splits the same work with `-CoveragePart Semantic|Package|Isolated`; each shard writes its own `artifacts/coverage/<shard>/lines.tsv`, and `./ci.sh coverage` merges whatever shards are present.
+[Invoke-SharpProofCoverage.ps1](../eng/scripts/Invoke-SharpProofCoverage.ps1) builds Release, runs the semantic and package tests with the Microsoft collector (Cobertura), and collects `SharpProof.Attributes` and the Fuzz console in their own test hosts. It reduces the reports to repository-relative line hits in `lines.tsv`, then writes per-project and total line coverage to `artifacts/coverage/summary.md`; a line is covered when any report hit it. CI splits the same work with `-CoveragePart Semantic|Package|Isolated`; each shard writes its own `artifacts/coverage/<shard>/lines.tsv`, and `./ci.sh coverage` merges whatever shards are present.
+
+The only enforced floor is on that merge: `./ci.sh coverage` passes `-MinimumLinePercent 98.5`, so the lane fails when the merged total is below 98.5%. The floor is on the total over all projects; per-project percentages are reported but not gated, and a single shard is never checked. Because the merge covers whatever shards are present, a local merge of only some lanes can fall below the floor. `tooling coverage` passes no floor and only reports.
 
 ## Tooling image
 
