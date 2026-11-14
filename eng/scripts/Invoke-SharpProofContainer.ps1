@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'effect-oracles', 'perf-baseline', 'perf-self', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'effect-oracles', 'perf-baseline', 'perf-self', 'library-build', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -521,6 +521,7 @@ switch ($Command) {
         # up to date (the fuzz receipt rejects them as stale), and its
         # self-applied rebuilds rewrite shared bin outputs.
         Invoke-PipelineCommand 'perf-self' 'Release'
+        Invoke-PipelineCommand 'library-build' 'Release'
     }
     'security' {
         Invoke-DependencyAudit
@@ -569,6 +570,18 @@ switch ($Command) {
     'perf-self' {
         # Advisory: only a failure of the tooling itself fails this command.
         Invoke-PerfSelf
+    }
+    'library-build' {
+        # Advisory: builds each pinned NodaTime source as a user would, through
+        # the packed SharpProof package. Only a crash or a timeout fails it.
+        Invoke-ProductPack
+        $gateProject = 'tests/SharpProof.Gates/SharpProof.Gates.csproj'
+        Invoke-SharpProofRequiredDotnet @('restore', $gateProject, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet @(
+            'run', '--project', $gateProject, '--configuration', $Configuration, '--no-restore', '--',
+            'library-build', '--source', 'nodatime',
+            '--feed', (Join-Path $repositoryRoot 'artifacts/container-packages'),
+            '--output', (Join-Path $repositoryRoot 'artifacts/perf/library-nodatime'))
     }
     'check' {
         & (Join-Path $repositoryRoot 'eng/scripts/Invoke-SharpProofDevCheck.ps1') `
