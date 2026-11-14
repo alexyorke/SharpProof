@@ -23,7 +23,12 @@ internal static class BlockerCensus
 {
     private const string Exact = "(lowers exactly)";
 
-    internal static string Run(string root, CancellationToken cancellationToken)
+    private const string NotExact = "(does not lower exactly)";
+    private const string NoSite = "(no purity-relevant effect site)";
+
+    // effects: tabulate the purity-relevant effect sites of the bodies that
+    // lower exactly, instead of the constructs that keep bodies from lowering.
+    internal static string Run(string root, CancellationToken cancellationToken, bool effects = false)
     {
         ArgumentNullException.ThrowIfNull(root);
         var document = OpenSourceCorpusCatalog.Load(root);
@@ -44,6 +49,10 @@ internal static class BlockerCensus
                 {
                     totals[index]++;
                     var blockers = Blockers(compilation, declaration, cancellationToken);
+                    if (effects)
+                    {
+                        blockers = blockers is [Exact] ? EffectSites(compilation, declaration, cancellationToken) : [NotExact];
+                    }
                     foreach (var blocker in blockers)
                     {
                         Count(any, blocker, sources.Length)[index]++;
@@ -55,7 +64,60 @@ internal static class BlockerCensus
                 }
             }
         }
-        return Render(sources, totals, any, sole);
+        return Render(sources, totals, any, sole, effects);
+    }
+
+    // The distinct effect sites that can keep an exactly lowered body from
+    // being proved observably pure: writes outside locals, static reads,
+    // locks, and calls with effects beyond throwing and allocating.
+    internal static ImmutableArray<string> EffectSites(
+        CSharpCompilation compilation, MethodDeclarationSyntax declaration, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(declaration);
+        var model = CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
+        if (model.GetDeclaredSymbol(declaration, cancellationToken) is not { } method)
+        {
+            return [NotExact];
+        }
+        var analysis = SharpProof.Analyzer.AdvisoryEffectSites.Analyze(compilation, method, declaration, cancellationToken);
+        if (analysis.Gap != null)
+        {
+            return ["Gap: " + analysis.Gap];
+        }
+        const IrOpaqueCallEffects Benign = IrOpaqueCallEffects.Throws | IrOpaqueCallEffects.Allocates;
+        var sites = analysis.Sites
+            .Select(site => site.Kind switch
+            {
+                SharpProof.Analyzer.AdvisoryEffectSiteKind.Write when site.Region != IrWriteRegion.Local =>
+                    "write " + site.Region + ": " + Construct(site.Location, compilation, cancellationToken),
+                SharpProof.Analyzer.AdvisoryEffectSiteKind.Read when site.Static =>
+                    "static read: " + Construct(site.Location, compilation, cancellationToken),
+                SharpProof.Analyzer.AdvisoryEffectSiteKind.Lock => "lock",
+                SharpProof.Analyzer.AdvisoryEffectSiteKind.Call when (site.Effects & ~Benign) != IrOpaqueCallEffects.None =>
+                    "call (" + (site.Effects == IrOpaqueCallEffects.All ? "unknown effects" : (site.Effects & ~Benign).ToString()) + "): " +
+                    Construct(site.Location, compilation, cancellationToken),
+                _ => null
+            })
+            .Where(static label => label != null)
+            .Select(static label => label!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToImmutableArray();
+        return sites.IsEmpty ? [NoSite] : sites;
+    }
+
+    private static string Construct(Location location, CSharpCompilation compilation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        ArgumentNullException.ThrowIfNull(compilation);
+        if (location.SourceTree is not { } tree || !compilation.ContainsSyntaxTree(tree))
+        {
+            return "unlocated";
+        }
+        var node = tree.GetRoot(cancellationToken).FindNode(location.SourceSpan, getInnermostNodeForTie: true);
+        var operation = CompilationModelProvider.GetSemanticModel(compilation, tree).GetOperation(node, cancellationToken);
+        return operation == null ? node.Kind().ToString() : Describe(operation, compilation);
     }
 
     private static int[] Count(SortedDictionary<string, int[]> counts, string key, int width)
@@ -236,13 +298,16 @@ internal static class BlockerCensus
     }
 
     private static string Render(
-        ImmutableArray<string> sources, int[] totals, SortedDictionary<string, int[]> any, SortedDictionary<string, int[]> sole)
+        ImmutableArray<string> sources, int[] totals, SortedDictionary<string, int[]> any, SortedDictionary<string, int[]> sole,
+        bool effects)
     {
         ArgumentNullException.ThrowIfNull(totals);
         ArgumentNullException.ThrowIfNull(any);
         ArgumentNullException.ThrowIfNull(sole);
         var text = new StringBuilder();
-        text.Append("# Lowering blockers across whole pinned sources\n\n");
+        text.Append(effects
+            ? "# Purity-relevant effect sites in bodies that lower exactly\n\n"
+            : "# Lowering blockers across whole pinned sources\n\n");
         text.Append("Methods: ").Append(totals.Sum().ToString(CultureInfo.InvariantCulture)).Append(" (")
             .AppendJoin(", ", sources.Select((id, index) => $"{id} {totals[index]}")).Append(").\n\n");
         text.Append("Any counts methods that report the construct. Sole counts methods that report nothing else; it is an upper bound ");
