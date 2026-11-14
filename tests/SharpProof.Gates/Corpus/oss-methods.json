@@ -5919,8 +5919,8 @@
       "declarationSha256": "003e1136818a2a2e582bdecd942120d6303fccf20bde15a6071dedafd1ef7dcf",
       "methodName": "Stein",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0181",

@@ -231,6 +231,26 @@ internal static class IrOpaqueCallSite
     internal static string Describe(IrOpaqueCallEffects effects, string member)
     { member = RepositoryParameterGuard.NotNull(member, nameof(member)); return Prefix + ((int)effects).ToString(CultureInfo.InvariantCulture) + ":" + member; }
 
+    // A recursive call to the callable being verified. It may do anything:
+    // every check but purity treats it as an unknown call. Purity alone may
+    // skip it, by induction on recursion depth: if the body is pure whenever
+    // its nested calls are, the first impure step of any execution would sit
+    // in a frame whose nested calls had all been pure, which the proof
+    // excludes.
+    private const string InductiveRootMember = "inductive-root:";
+
+    internal static string DescribeInductiveRootCall(string member)
+    { member = RepositoryParameterGuard.NotNull(member, nameof(member)); return Describe(IrOpaqueCallEffects.All, InductiveRootMember + member); }
+
+    internal static bool IsInductiveRootCall(IrFactory factory, OperationId site)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        var description = factory.GetOperationInfo(site).Description is { } id ? factory.GetString(id) : "";
+        return description.StartsWith(Prefix + ((int)IrOpaqueCallEffects.All).ToString(CultureInfo.InvariantCulture) + ":" + InductiveRootMember,
+            StringComparison.Ordinal);
+    }
+
     // A call site that does not carry this description may do anything.
     internal static IrOpaqueCallEffects Effects(IrFactory factory, OperationId site)
     {
