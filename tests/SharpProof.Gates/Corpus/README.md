@@ -8,7 +8,7 @@ The corpus includes 500 selected methods from four real, buildable libraries, se
 
 | Source | Repository | Commit | License | Roots | Methods (files) | Supported | Proven / Refuted / Unknown |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `aalhour-c-sharp-algorithms` | `https://github.com/aalhour/C-Sharp-Algorithms` | `b82432474a916ac784cd1446eabcba615c333463` | MIT | `Algorithms/`, `DataStructures/` | 200 (87) | 17 | 9 / 8 / 183 |
+| `aalhour-c-sharp-algorithms` | `https://github.com/aalhour/C-Sharp-Algorithms` | `b82432474a916ac784cd1446eabcba615c333463` | MIT | `Algorithms/`, `DataStructures/` | 200 (87) | 18 | 9 / 9 / 182 |
 | `morelinq` | `https://github.com/morelinq/MoreLINQ` | `d217ab1e8eac68247650c27e977b767dd66bcab0` | Apache-2.0 | `MoreLinq/` | 100 (100) | 4 | 3 / 1 / 96 |
 | `nodatime` | `https://github.com/nodatime/nodatime` | `6e024ddefed3ea21169f0eca5ab5c32312adb9cf` | Apache-2.0 | `src/NodaTime/` | 100 (100) | 8 | 7 / 1 / 92 |
 | `humanizer` | `https://github.com/Humanizr/Humanizer` | `3ebc38de585fc641a04b0e78ed69468453b0f8a1` (v2.14.1) | MIT | `src/Humanizer/` | 100 (100) | 9 | 9 / 0 / 91 |
@@ -40,6 +40,10 @@ The [ratchet](unknown-reason-ratchet.json) sets floors for supported cases overa
 Only this declaration is reclassified IntentionallyUnsupported/Unknown until exceptional resource callbacks have an exact purity model. Its source file hash `fd34466c9843b6b88c3f73cb71a18f6a2e9236393d4ceafaf1f1b3c8afce7f0f`, declaration hash `905e65ea85f97ec8985ab0a655079eb25464267fb4e8fc6e05027eec3ddec554`, signature, and body remain unchanged. `ResourceCallbackCorrectionRetainsPinnedGreatestCommonDivisorSource` executes that exact pinned source with a culture callback; `ExceptionalFrameworkCultureTests` also covers resource callback effects and exception substitution.
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
+
+### Reviewed classification for ref and out source callees
+
+When source callees with `ref` and `out` parameters began to be inlined (SEMANTICS.md, "Calls and loops"), six selected methods left SP0047 `Advisory:Lowering:UnsupportedOperationKind`. aalhour `ChainedHashTable._contractCapacity` (OSS0125) became Refuted: after its `_rehash(ref newHashTableStore, ...)` call it assigns `_hashTableStore`, an instance field of `this`. It was reviewed against the body and marked Supported/Refuted. The other five now stop at SP0047 `Advisory:Lowering:UnsupportedControlFlow`. The supported floors rose by one (264 to 265, 38 to 39); the total-Unknown ceiling (498 to 497) and the SP0047 ceiling (225 to 224) fell by one.
 
 ### Reviewed classification for readonly struct values
 

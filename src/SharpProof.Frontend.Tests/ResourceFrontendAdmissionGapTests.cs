@@ -92,7 +92,7 @@ public sealed class ResourceFrontendAdmissionGapTests
     public void RepeatedCharacterAllocationCannotHideAnUnresolvedLengthCall()
     {
         using var subject = TypedProgramSubject.Create(
-            "int Target(int value) => new string('x', Count(ref value)).Length; " +
+            "int Target(int value) { s_count = value; return new string('x', Count(ref s_count)).Length; } static int s_count; " +
             "static int Count(ref int value) { value++; return value; }");
         Assert.That(subject.Invoke([3]), Is.EqualTo(4));
         var tree = subject.Compilation.SyntaxTrees.Single();
@@ -144,7 +144,7 @@ public sealed class ResourceFrontendAdmissionGapTests
     {
         const string declaration = "public sealed class Payload { public int Value; }";
         using var subject = TypedProgramSubject.Create(
-            "int Target(int value) { var item = new Payload { Value = Read(ref value) }; return item.Value; } " +
+            "int Target(int value) { s_seed = value; var item = new Payload { Value = Read(ref s_seed) }; return item.Value; } static int s_seed; " +
             "static int Read(ref int value) { value++; return value; }", declaration);
         Assert.That(subject.Invoke([5]), Is.EqualTo(6));
         var lowered = subject.LowerSourceCalls();

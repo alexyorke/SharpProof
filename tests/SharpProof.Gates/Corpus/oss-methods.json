@@ -5259,8 +5259,8 @@
       "declarationSha256": "a4548ff38bc22650fae1cb62c889974723875872e94463ee8a840abaa2dd94e9",
       "methodName": "_contractCapacity",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0126",

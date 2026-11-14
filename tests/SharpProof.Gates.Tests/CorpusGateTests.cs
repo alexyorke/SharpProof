@@ -933,7 +933,7 @@ public sealed class CorpusGateTests
             Assert.That(
                 document.Methods.Count(static method =>
                     method.Support == CorpusSupport.Supported),
-                Is.EqualTo(38));
+                Is.EqualTo(39));
             Assert.That(
                 document.Methods.Select(static method => method.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
@@ -993,9 +993,9 @@ public sealed class CorpusGateTests
                     methods.Count(static method => method.ExpectedVerdict is CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown));
             })));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(498));
+            Assert.That(result.UnknownCount, Is.EqualTo(497));
             Assert.That(result.SilentUnknownCount, Is.Zero);
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(498));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(497));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
 , static item => item.Reason, static item => item.Count),
@@ -1005,7 +1005,7 @@ public sealed class CorpusGateTests
                         new KeyValuePair<string, int>("SP0016", 18),
                         new KeyValuePair<string, int>("SP0045", 9),
                         new KeyValuePair<string, int>("SP0046", 9),
-                        new KeyValuePair<string, int>("SP0047", 225)),
+                        new KeyValuePair<string, int>("SP0047", 224)),
                         static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
             Assert.That(
                 result.UnknownRate,

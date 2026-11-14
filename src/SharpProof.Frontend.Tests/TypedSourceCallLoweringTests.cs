@@ -311,11 +311,40 @@ public sealed class TypedSourceCallLoweringTests
         Assert.That(execution.GetCurrentValue(subject.Context.Parameters[0].Current)!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(1)));
     }
 
+    // A ref or out argument that is a caller local or parameter is bound to
+    // it and written back on normal return; replay agrees with the CLR.
+    [TestCase("int Target(int x) { return ByReference(ref x); } static int ByReference(ref int value) => value;", 5, 5)]
+    [TestCase("int Target(int x) { Bump(ref x); Bump(ref x); return x; } static void Bump(ref int value) { value = value + 1; }", 5, 7)]
+    [TestCase("int Target(int x) { return Half(x, out var h) ? h : -1; } static bool Half(int x, out int h) { h = x / 2; return x % 2 == 0; }", 8, 4)]
+    [TestCase("int Target(int x) { return Half(x, out var h) ? h : -1; } static bool Half(int x, out int h) { h = x / 2; return x % 2 == 0; }", 7, -1)]
+    [TestCase("int Target(int x) { var a = x; var b = 1; Swap(ref a, ref b); return a * 10 + b; } static void Swap(ref int a, ref int b) { var t = a; a = b; b = t; }", 3, 13)]
+    public void ReferenceArgumentsReplayLikeTheRuntime(string members, int input, int expected)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.Invoke([input]), Is.EqualTo(expected));
+        var lowered = subject.LowerSourceCalls();
+        Assert.That(lowered.IsExact, Is.True, lowered.Classification.Abstention.ToString());
+        var replay = subject.Execute(lowered, [input]);
+        Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
+        Assert.That(replay.ConsumedApproximation, Is.False);
+        Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new System.Numerics.BigInteger(expected)));
+    }
+
+    [TestCase("int Target(int x) { s_field = x; Bump(ref s_field); return s_field; } static int s_field; static void Bump(ref int value) { value = value + 1; }")]
+    [TestCase("int Target(int x) { Swap(ref x, ref x); return x; } static void Swap(ref int a, ref int b) { var t = a; a = b; b = t; }")]
+    [TestCase("int Target(int x) { try { Bump(ref x); } catch (System.Exception) { } return x; } static void Bump(ref int value) { value = value + 1; }")]
+    public void UnadmittedReferenceArgumentsClose(string members)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        using var subject = TypedProgramSubject.Create(members);
+        Assert.That(subject.LowerSourceCalls().IsExact, Is.False);
+    }
+
     [TestCase("int Target(int x) { return Recurse(x); } static int Recurse(int value) { return Recurse(value); }")]
     [TestCase("int Target(int x) { return A(x); } static int A(int value) { return B(value); } static int B(int value) { return A(value); }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static External() { } public static int Add(int x) => x + 1; }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static int state = System.Environment.TickCount; public static int Add(int x) => x + 1; }")]
-    [TestCase("int Target(int x) { return ByReference(ref x); } static int ByReference(ref int value) => value;")]
     [TestCase("int Target(int x) { return Params(x); } static int Params(params int[] value) => value[0];")]
     [TestCase("int Target(int x) { return System.Math.Abs(x); }")]
     public void UnsupportedSourceCallShapesClose(string members, string additionalSource = "")

@@ -227,7 +227,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // set only by a caller that explicitly lowers instance initializers.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
-        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default)
+        bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default,
+        bool referenceArguments = false)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -282,7 +283,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                      (declared is not ITypeParameterSymbol || KnownSourceValue(parameter.Type) == null));
             }).Any() ||
             !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !valueReturnSpecialization ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None ||
+            // A ref or out parameter is admitted only when the caller has checked
+            // that each such argument is a local it can write back.
+            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None &&
+                    !(referenceArguments && parameter.RefKind is RefKind.Ref or RefKind.Out) ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
@@ -364,6 +368,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Reconcile parameter and
         // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
+        frame.WritesBackReferences = referenceArguments;
         // A constructed symbol supplies exact scalar/reference type arguments even when no
         // value parameter mentions them. Preserve each declaration's own symbols.
         if (!Spend(method.TypeArguments.Length))

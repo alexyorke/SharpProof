@@ -199,9 +199,17 @@ internal sealed partial class TotalLoweringContext
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
-        Parameters.All(binding => (binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter)) &&
+        Parameters.All(binding => (binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter) ||
+                WritesBackReferences && binding.Parameter.RefKind is RefKind.Ref or RefKind.Out &&
+                    (CSharpOperationSemantics.IsScalar(binding.Parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(binding.Parameter.Type))) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
+
+    // An inlined frame whose caller passes each ref or out argument as one of
+    // its own variables, used nowhere else in the call, and copies the
+    // parameter back on normal return. Such a parameter is an ordinary
+    // variable of the frame.
+    internal bool WritesBackReferences { get; set; }
 
     // A `ref` or `in` parameter of a scalar or reference type that the body
     // never writes (no assignment, increment, compound assignment or ref or
