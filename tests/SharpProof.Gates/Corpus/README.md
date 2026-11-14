@@ -13,7 +13,7 @@ The corpus includes 500 selected methods from four real, buildable libraries, se
 | `nodatime` | `https://github.com/nodatime/nodatime` | `6e024ddefed3ea21169f0eca5ab5c32312adb9cf` | Apache-2.0 | `src/NodaTime/` | 100 (100) | 5 | 4 / 1 / 95 |
 | `humanizer` | `https://github.com/Humanizr/Humanizer` | `3ebc38de585fc641a04b0e78ed69468453b0f8a1` (v2.14.1) | MIT | `src/Humanizer/` | 100 (100) | 9 | 9 / 0 / 91 |
 
-No Unknown is silent: each carries a diagnostic that names its reason, and the ratchet allows no `silent-unclassified` bucket. Two trivially pure methods, NodaTime `HebrewScripturalCalculator.IsLeapYear` and Humanizer `IsAndSplitNeeded`, remain Unknown with SP0047 `Advisory:EntryInitialization:TypeInitializer`. Each declaring type's static initializer calls code (`YearStartCacheEntry.CreateCache()`, and a `Dictionary` collection initializer), which is an entry effect. The gate prints this table's last three columns per source on every run.
+No Unknown is silent: each carries a diagnostic that names its reason, and the ratchet allows no `silent-unclassified` bucket. Two trivially pure methods, NodaTime `HebrewScripturalCalculator.IsLeapYear` and Humanizer `IsAndSplitNeeded`, remain Unknown with SP0047 `Advisory:EntryInitialization:TypeInitializer`. Each declaring type's static initializer calls code (`YearStartCacheEntry.CreateCache()`, and a `Dictionary` collection initializer), which is an entry effect. The gate prints this table's last three columns per source on every run. [verdicts-by-source.md](verdicts-by-source.md) is generated with the snapshot and breaks the Unknowns down by diagnostic and reason for each source.
 
 Source notes:
 

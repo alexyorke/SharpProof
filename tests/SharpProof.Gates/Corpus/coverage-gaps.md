@@ -1,5 +1,7 @@
 # Coverage gaps in the newer OSS sources
 
+> This triage is a dated, hand-made analysis of master `4ae8b6e93`. Its counts are not updated: since then, type initializers that only construct fresh values are admitted, and more methods are Supported. For current numbers see the generated [verdicts-by-source.md](verdicts-by-source.md). The buckets below remain the best description of *which C# constructs* stop the analysis.
+
 This is a triage of the 300 methods from MoreLINQ, NodaTime and Humanizer (`OSS0201`–`OSS0500`). The original algorithms source is not included. The data comes from master `4ae8b6e93` (manifest 9, before the date/time models below). Each method is counted once, under the **first** reason SharpProof cannot handle it.
 
 ## How the reasons were found

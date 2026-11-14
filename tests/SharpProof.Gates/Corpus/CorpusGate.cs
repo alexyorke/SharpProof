@@ -539,7 +539,7 @@ internal static class CorpusGate
         })];
     }
 
-    private static async Task<string> RenderActualSnapshotAsync(
+    private static async Task<(string Snapshot, string ReasonTable)> RenderActualSnapshotAsync(
         OpenSourceCorpusDocument openSourceDocument,
         CancellationToken cancellationToken)
     {
@@ -549,10 +549,11 @@ internal static class CorpusGate
                 openSourceDocument,
                 cancellationToken)
             .ConfigureAwait(false);
-        return CorpusSnapshotFormat.Render(
+        var snapshot = CorpusSnapshotFormat.Render(
             observations
                 .Select(static observation => observation.ToCanonicalLine())
                 .OrderBy(static line => line, StringComparer.Ordinal));
+        return (snapshot, OpenSourceReasonTable.Render(openSourceDocument, observations));
     }
 
     public static async Task WriteActualSnapshotAsync(
@@ -571,12 +572,15 @@ internal static class CorpusGate
         var snapshotPath = Path.Combine(
             corpusDirectory,
             "expected.canonical.snapshot");
-        var snapshot = await RenderActualSnapshotAsync(
+        var (snapshot, reasonTable) = await RenderActualSnapshotAsync(
                 document,
                 cancellationToken)
             .ConfigureAwait(false);
         var updates = import?.Updates.ToBuilder() ?? ImmutableArray.CreateBuilder<CorpusFileUpdate>();
         updates.Add(new CorpusFileUpdate(snapshotPath, snapshot));
+        updates.Add(new CorpusFileUpdate(
+            Path.Combine(corpusDirectory, OpenSourceReasonTable.FileName),
+            reasonTable));
         await CorpusFileTransaction.WriteAllAsync(
                 corpusDirectory,
                 updates.ToImmutable(),
