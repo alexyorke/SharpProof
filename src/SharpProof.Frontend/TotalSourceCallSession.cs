@@ -342,7 +342,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (contractOnly && !IsActive(method) && !iterator &&
             !(method.MethodKind == MethodKind.Constructor && !CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)))
         { return false; }
-        if (!HasNoTypeInitialization(method.ContainingType) || !Spend(method.Parameters.Length * 3 + 1))
+        // A callee declared in the caller's own type runs under the initializer
+        // the caller's frame already answers for: its body is as if written in
+        // the caller, so the root's entry classification, or this check on an
+        // earlier frame, covers it. Constructed types are compared as written
+        // (C<int> does not share an initializer with C<string>), and an
+        // enclosing type does not qualify: its initializer need not have run.
+        if (!SymbolEqualityComparer.Default.Equals(caller.Target.ContainingType, method.ContainingType) &&
+                !HasNoTypeInitialization(method.ContainingType) ||
+            !Spend(method.Parameters.Length * 3 + 1))
         { return false; }
         // Source operations bind to declaration symbols. Reconcile parameter and
         // result storage from validated arguments before binding contracts or bodies.
