@@ -5919,8 +5919,8 @@
       "declarationSha256": "003e1136818a2a2e582bdecd942120d6303fccf20bde15a6071dedafd1ef7dcf",
       "methodName": "Stein",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0181",
@@ -7407,8 +7407,8 @@
       "declarationSha256": "a57afa469f9fdad8dae0b0ebbb4b3129cdf1389b61f982c5a0ddbce7663b08ed",
       "methodName": "CalculateStartOfYearDays",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0305",

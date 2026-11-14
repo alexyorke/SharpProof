@@ -940,7 +940,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // throws are approximation havocs, so no refutation may depend on them. An
     // assignment's value is the assigned one.
     internal TotalBodyValue EmitOpaqueCall(IOperation operation, IMethodSymbol method, ImmutableArray<IrTerm> values, IrBlockId block,
-        IrTerm? assigned, IrOpaqueCallEffects effects)
+        IrTerm? assigned, IrOpaqueCallEffects effects, bool inductiveRoot = false)
     {
         RepositoryParameterGuard.RequireInitialized(values.IsDefault, nameof(values), "Array must be initialized.");
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -954,7 +954,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (CSharpOperationSemantics.IsComparisonIntegerType(primitive))
         { site = _factory.CreateOperation(IrOpaqueCallSite.DefaultComparerReplay(primitive!.SpecialType.ToString()), _factory.GetOperationInfo(site).SourceSpan); }
         var member = OpaqueCallMember(method, values, resultType, out var display);
-        _builder!.CallSnapshot(block, _context.OpaqueCallSite(operation, effects, display), null, member, null, values);
+        _builder!.CallSnapshot(block, _context.OpaqueCallSite(operation, effects, display, inductiveRoot), null, member, null, values);
         ImmutableArray<TotalThrow> faults = [];
         if ((effects & IrOpaqueCallEffects.Throws) != 0)
         {
