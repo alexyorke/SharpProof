@@ -353,15 +353,17 @@ internal static class FiniteDomainSmtDifferentialOracle
         // Nested bitvector division can exhaust a symbolic domain check even
         // with few inputs. Partition that same bounded domain into exact input
         // assignments; every partition must be UNSAT before reporting UNSAT.
+        // Each partition substitutes its literals into the formula: asserting
+        // only `v == literal` beside it leaves Z3 to bit-blast the same
+        // symbolic division circuit, which can exhaust the limit again.
         using var session = FuzzSmtSession.Create(factory);
         var kernel = new ProofKernel(session);
-        var goal = new Goal(factory, factory.Unary(IrUnaryOperator.Not, formula),
-            ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0));
         for (var assignment = 0; assignment < assignmentCount; assignment++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var remaining = assignment;
             var assumptionBuilder = ImmutableArray.CreateBuilder<Assumption>(variables.Length);
+            var literals = new Dictionary<IrVarId, IrTerm>();
             foreach (var variable in variables)
             {
                 var type = factory.GetVariableInfo(variable).Type;
@@ -370,11 +372,14 @@ internal static class FiniteDomainSmtDifferentialOracle
                 var ordinal = remaining % domainSize;
                 remaining /= domainSize;
                 var literal = CreateDomainLiteral(factory, type, ordinal);
+                literals.Add(variable, literal);
                 assumptionBuilder.Add(new Assumption(factory,
                     factory.Binary(IrBinaryOperator.Equal, factory.Variable(variable), literal),
                     new LoweredJustification(factory.CreateOperation("finite-domain-assignment"))));
             }
             var assumptions = assumptionBuilder.MoveToImmutable();
+            var goal = new Goal(factory, factory.Unary(IrUnaryOperator.Not, IrSubstitution.Substitute(factory, formula, literals)),
+                ProofDiagnosticKind.InternalConsistency, new SourceLocationId(0));
             var proof = await kernel.VerifyAsync(new VerificationQuery(factory, assumptions, goal),
                 cancellationToken).ConfigureAwait(false);
             if (proof is RefutedOutcome)
