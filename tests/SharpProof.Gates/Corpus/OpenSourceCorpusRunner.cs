@@ -214,6 +214,19 @@ internal static class OpenSourceCorpusRunner
             source.Methods.Select(static method => method.Id).ToImmutableArray()))];
     }
 
+    // A single-source compilation with no effect attribute: the selected
+    // methods are only annotated with their corpus IDs, and each companion
+    // source is added as its own syntax tree.
+    internal static CSharpCompilation PrepareContracts(OpenSourceCorpusDocument document, ImmutableArray<string> companions,
+        CancellationToken cancellationToken, OpenSourceCorpusDocument? loaded = null)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (companions.IsDefault)
+        { throw new ArgumentNullException(nameof(companions)); }
+        return Prepare(document, string.Empty, cancellationToken, includeExternalEffectsFixture: false, loaded: loaded,
+            companions: companions).Compilation;
+    }
+
     internal static string? CorpusMethodId(SyntaxNode? declaration)
     { return declaration?.GetAnnotations(AnnotationKind).SingleOrDefault()?.Data; }
 
@@ -224,7 +237,7 @@ internal static class OpenSourceCorpusRunner
     }
 
     private static PreparedCorpus Prepare(OpenSourceCorpusDocument document, string effectAttribute, CancellationToken cancellationToken,
-        bool includeExternalEffectsFixture = true, OpenSourceCorpusDocument? loaded = null)
+        bool includeExternalEffectsFixture = true, OpenSourceCorpusDocument? loaded = null, ImmutableArray<string> companions = default)
     {
         System.ArgumentNullException.ThrowIfNull(effectAttribute);
         // A per-source split reuses the parse caches of the catalog-loaded document.
@@ -324,6 +337,11 @@ internal static class OpenSourceCorpusRunner
                     new TargetInfo(method, tree, declaration.FullSpan, declaration));
             }
         }
+        for (var index = 0; !companions.IsDefault && index < companions.Length; index++)
+        {
+            trees.Add(CSharpSyntaxTree.ParseText(companions[index], parseOptions,
+                $"__SharpProofOssContracts{index.ToString(System.Globalization.CultureInfo.InvariantCulture)}.cs", Encoding.UTF8, cancellationToken));
+        }
         if (targets.Count != document.Methods.Length)
         {
             throw new InvalidDataException(
@@ -359,6 +377,8 @@ internal static class OpenSourceCorpusRunner
         System.ArgumentNullException.ThrowIfNull(declaration);
         System.ArgumentNullException.ThrowIfNull(effectAttribute);
         System.ArgumentNullException.ThrowIfNull(id);
+        if (effectAttribute.Length == 0)
+        { return declaration.WithAdditionalAnnotations(new SyntaxAnnotation(AnnotationKind, id)); }
         return declaration
             .WithAttributeLists(
                 declaration.AttributeLists.Insert(
