@@ -84,7 +84,7 @@ A missing export, an export that cannot be read, or one whose stamp does not mat
 Nothing else is checked. A passing build says nothing about these calls:
 
 - Calls in a body that does not lower exactly or is abstracted.
-- Calls in lambdas, and in local functions that a selected body does not inline. Lambdas and local functions are not selected as roots.
+- Calls in lambdas, and in local functions that a selected body does not inline. Lambdas and local functions are not selected as roots. A local function is inlined when it captures nothing, or when its owner calls it and it only reads the owner's locals and parameters; it then reads the owner's own variables.
 - Calls in top-level statements, and in property accessors and operators unless a selected caller lowers them inline.
 - Calls to virtual, interface and abstract callees. A `Requires` on an interface or base method is therefore not checked at its dispatched calls.
 - Calls to async and extern callees, and to callees with `ref`, `in` or `out` parameters, except the source calls described next. A source callee's `ref` or `out` parameter is admitted when its argument is a local or parameter of the caller, no variable is passed by reference twice in the call, and the call is outside every `try` region of the caller. The callee then works on its own copy, which is written back to the variable when the call returns normally; an exception that leaves the caller ends the variable, so no handler can observe the difference. `in` parameters, fields, array elements and ref locals passed by reference stay unmodeled.
