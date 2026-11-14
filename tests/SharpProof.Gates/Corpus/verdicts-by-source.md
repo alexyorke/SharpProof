@@ -4,10 +4,10 @@
 
 | Verdict or diagnostic | Total | `aalhour-c-sharp-algorithms` | `morelinq` | `nodatime` | `humanizer` |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Proven | 30 | 10 | 3 | 8 | 9 |
-| Refuted | 11 | 9 | 1 | 1 | 0 |
-| SP0002 | 235 | 123 | 39 | 35 | 38 |
-| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 179 | 33 | 53 | 52 | 41 |
+| Proven | 31 | 10 | 3 | 9 | 9 |
+| Refuted | 13 | 9 | 1 | 3 | 0 |
+| SP0002 | 233 | 123 | 39 | 33 | 38 |
+| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 178 | 33 | 53 | 51 | 41 |
 | SP0047 `Advisory:Lowering:UnsupportedControlFlow` | 15 | 7 | 0 | 1 | 7 |
 | SP0047 `Advisory:ContractBinding:UnsupportedTarget` | 9 | 6 | 1 | 0 | 2 |
 | SP0047 `Advisory:Lowering:UnsupportedType` | 8 | 5 | 2 | 0 | 1 |

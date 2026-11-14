@@ -18,7 +18,7 @@ internal sealed class OssContractGateTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Contracts, Is.EqualTo(15));
-            Assert.That(result.Proven, Is.EqualTo(1));
+            Assert.That(result.Proven, Is.EqualTo(2));
             Assert.That(result.Refuted, Is.Zero);
             Assert.That(result.Passed, Is.True);
         }

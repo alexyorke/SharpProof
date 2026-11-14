@@ -52,8 +52,8 @@
     {
       "methodId": "OSS0453",
       "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumberDetector))]\ninternal static class OSS0453Contracts\n{\n    public static Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber Detect(long number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number != 21 || SharpProof.Attributes.Contract.Result<Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber>() == Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber.Singular);\n        return default!;\n    }\n}\n",
-      "expectedVerdict": "Unknown",
-      "review": "True (21 has tens digit 2 and unit digit 1, so Singular), but enum values are not modeled yet."
+      "expectedVerdict": "Proven",
+      "review": "True: 21 has tens digit 2 and unit digit 1, so the body returns Singular. Proven since enum values lower as their underlying integer."
     },
     {
       "methodId": "OSS0311",
