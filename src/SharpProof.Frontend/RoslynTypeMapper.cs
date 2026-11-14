@@ -43,7 +43,7 @@ internal sealed class RoslynTypeMapper(IrFactory factory)
                 "error:" + CompilerIdentityBridge.CreateTypeDisplay(type));
         }
 
-        if (CSharpOperationSemantics.MapType(_factory, type.SpecialType) is { } scalar)
+        if (CSharpOperationSemantics.MapType(_factory, CSharpOperationSemantics.ScalarSpecialType(type)) is { } scalar)
         {
             return scalar;
         }

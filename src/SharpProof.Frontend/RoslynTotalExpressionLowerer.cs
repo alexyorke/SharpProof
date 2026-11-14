@@ -1524,7 +1524,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         {
             return Failed(operation, classification.Abstention);
         }
-        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
+        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)],
+            _context.Compilation?.Options.CheckOverflow);
         if (!rule.Classification.IsExact)
         {
             return Failed(operation, rule.Classification.Abstention);
@@ -1559,7 +1560,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, compared);
             return new(_factory.Variable(compared), block, FrontendSubsetClassification.Exact);
         }
-        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)]);
+        var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)],
+            _context.Compilation?.Options.CheckOverflow);
         return ApplyClassifiedRule(operation, rule, block);
     }
 

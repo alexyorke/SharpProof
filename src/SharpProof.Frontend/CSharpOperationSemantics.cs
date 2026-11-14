@@ -24,7 +24,21 @@ internal static partial class CSharpOperationSemantics
 {
     internal static bool IsScalar(ITypeSymbol? type)
     {
-        return type != null && (type.SpecialType == SpecialType.System_Boolean || TryGetScalarInteger(type.SpecialType, out _));
+        return type != null && (type.SpecialType == SpecialType.System_Boolean || TryGetScalarInteger(ScalarSpecialType(type), out _));
+    }
+
+    // An enum value is its underlying integer: comparisons, bitwise operators
+    // and conversions act on that integer. Boxing (a boxed enum is not a boxed
+    // integer), enum arithmetic and increments are refused where they occur.
+    internal static SpecialType ScalarSpecialType(ITypeSymbol type)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        return type is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlying } ? underlying.SpecialType : type.SpecialType;
+    }
+
+    internal static bool IsEnum(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol { TypeKind: TypeKind.Enum };
     }
 
     internal static IrTypeId? MapType(IrFactory factory, SpecialType type)
@@ -43,14 +57,15 @@ internal static partial class CSharpOperationSemantics
         { return factory.String(text); }
         if (type == null)
         { throw new ArgumentNullException(nameof(type), "A non-null literal requires its type."); }
-        var mapped = MapType(factory, type.SpecialType)
+        var mapped = MapType(factory, ScalarSpecialType(type))
             ?? throw new InvalidOperationException("The literal type has no scalar IR domain.");
         return type.SpecialType == SpecialType.System_Boolean ? factory.Boolean(value is true)
             : value is ulong unsigned ? factory.Integer(mapped, unsigned)
             : factory.Integer(mapped, value == null ? 0 : value is char character ? character : Convert.ToInt64(value, CultureInfo.InvariantCulture));
     }
 
-    internal static TotalScalarRule Apply(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)
+    internal static TotalScalarRule Apply(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands,
+        bool? checkOverflow = null)
     {
         if (ReferenceRule(factory, operation, operands) is { } reference)
         { return reference; }
@@ -59,12 +74,20 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, FrontendAbstention.UnsupportedType);
         }
         var value = operands[0];
-        var target = MapType(factory, operation.Type!.SpecialType)!.Value;
+        var target = MapType(factory, ScalarSpecialType(operation.Type!))!.Value;
         if (operation is IConversionOperation conversion)
         {
             if (conversion.OperatorMethod != null)
             {
                 return Fail(factory, FrontendAbstention.UserDefinedOperator);
+            }
+            // Roslyn reports IsChecked for numeric conversions only. An
+            // enumeration conversion converts the underlying integers and
+            // faults like them in a checked context.
+            if (IsEnum(conversion.Type) || IsEnum(conversion.Operand.Type))
+            {
+                return CheckedContext(conversion, checkOverflow ?? conversion.SemanticModel?.Compilation.Options.CheckOverflow) is { } isChecked
+                    ? ConvertInteger(factory, value, target, isChecked) : Fail(factory, FrontendAbstention.UnsupportedOperationKind);
             }
             return ConvertInteger(factory, value, target, conversion.IsChecked);
         }
@@ -74,6 +97,8 @@ internal static partial class CSharpOperationSemantics
             {
                 return Fail(factory, unary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
             }
+            if (IsEnum(unary.Operand.Type) && unary.OperatorKind != UnaryOperatorKind.BitwiseNegation)
+            { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
             return ApplyUnaryScalar(factory, unary.OperatorKind, unary.IsChecked, value, target);
         }
         if (operation is not IBinaryOperation binary || operands.Length != 2)
@@ -85,6 +110,14 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, binary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
         }
         var right = operands[1];
+        // Enum addition and subtraction convert through the underlying type
+        // with their own result type; only comparisons and bitwise operators
+        // on enums are modeled.
+        if ((IsEnum(binary.LeftOperand.Type) || IsEnum(binary.RightOperand.Type)) &&
+            binary.OperatorKind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals or BinaryOperatorKind.LessThan or
+                BinaryOperatorKind.LessThanOrEqual or BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual or
+                BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr))
+        { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
         if (IsShift(binary.OperatorKind))
         { return Shift(factory, binary.OperatorKind, value, right); }
         if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind))
