@@ -64,12 +64,12 @@ internal static class Program
                     JsonSerializer.Serialize(result, SharpProofJsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
-            if (command == "blocker-census")
+            if (command is "blocker-census" or "effect-census")
             {
-                var census = BlockerCensus.Run(root, cancellation.Token);
+                var census = BlockerCensus.Run(root, cancellation.Token, effects: command == "effect-census");
                 var directory = Path.Combine(root, "artifacts", "corpus");
                 Directory.CreateDirectory(directory);
-                await File.WriteAllTextAsync(Path.Combine(directory, "blocker-census.md"), census, cancellation.Token).ConfigureAwait(false);
+                await File.WriteAllTextAsync(Path.Combine(directory, command + ".md"), census, cancellation.Token).ConfigureAwait(false);
                 Log.Info(census);
                 return 0;
             }
@@ -108,7 +108,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|perf-baseline|perf-self|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count> | --source <source-id>]");
             return 2;
         }
