@@ -43,7 +43,7 @@ The reviewed correction lowered the supported-case and supported-OSS floors by o
 
 ### Reviewed classification for ref and out source callees
 
-When source callees with `ref` and `out` parameters began to be inlined (SEMANTICS.md, "Calls and loops"), six selected methods left SP0047 `Advisory:Lowering:UnsupportedOperationKind`. aalhour `ChainedHashTable._contractCapacity` (OSS0125) became Refuted: after its `_rehash(ref newHashTableStore, ...)` call it assigns `_hashTableStore`, an instance field of `this`. It was reviewed against the body and marked Supported/Refuted. The other five now stop at SP0047 `Advisory:Lowering:UnsupportedControlFlow`. The supported floors rose by one (264 to 265, 38 to 39); the total-Unknown ceiling (498 to 497) and the SP0047 ceiling (225 to 224) fell by one.
+When source callees with `ref` and `out` parameters began to be inlined (SEMANTICS.md, "Calls and loops"), six selected methods left SP0047 `Advisory:Lowering:UnsupportedOperationKind`. `aalhour-c-sharp-algorithms` `ChainedHashTable._contractCapacity` (OSS0125) became Refuted: after its `_rehash(ref newHashTableStore, ...)` call it assigns `_hashTableStore`, an instance field of `this`. It was reviewed against the body and marked Supported/Refuted. The other five now stop at SP0047 `Advisory:Lowering:UnsupportedControlFlow`. The supported floors rose by one (264 to 265, 38 to 39); the total-Unknown ceiling (498 to 497) and the SP0047 ceiling (225 to 224) fell by one.
 
 ### Reviewed classification for readonly struct values
 

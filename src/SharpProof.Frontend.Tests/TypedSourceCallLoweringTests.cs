@@ -318,6 +318,9 @@ public sealed class TypedSourceCallLoweringTests
     [TestCase("int Target(int x) { return Half(x, out var h) ? h : -1; } static bool Half(int x, out int h) { h = x / 2; return x % 2 == 0; }", 8, 4)]
     [TestCase("int Target(int x) { return Half(x, out var h) ? h : -1; } static bool Half(int x, out int h) { h = x / 2; return x % 2 == 0; }", 7, -1)]
     [TestCase("int Target(int x) { var a = x; var b = 1; Swap(ref a, ref b); return a * 10 + b; } static void Swap(ref int a, ref int b) { var t = a; a = b; b = t; }", 3, 13)]
+    [TestCase("int Target(int x) { var y = 1; Keep(ref y, y = x); return y; } static void Keep(ref int value, int unused) { }", 5, 5)]
+    [TestCase("int Target(int x) { var y = 1; Add(ref y, y = x); return y; } static void Add(ref int value, int other) { value = value + other; }", 5, 10)]
+    [TestCase("int Target(int x) { try { x = x * 2; } finally { x = x + 1; } Bump(ref x); return x; } static void Bump(ref int value) { value = value + 1; }", 5, 12)]
     public void ReferenceArgumentsReplayLikeTheRuntime(string members, int input, int expected)
     {
         System.ArgumentNullException.ThrowIfNull(members);

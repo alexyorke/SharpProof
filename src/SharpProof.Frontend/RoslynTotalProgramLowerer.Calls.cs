@@ -402,13 +402,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             SpendRegion();
             var parameter = argument.Parameter!;
-            // An out argument's value is never read: the callee assigns it first.
+            // An out argument's value is never read: the callee assigns it
+            // first. A ref argument passes the variable itself, so its value
+            // is read when the callee is entered, after every argument.
             if (parameter.RefKind == RefKind.Out)
             {
                 argumentBuffer[parameter.Ordinal] = CSharpOperationSemantics.DefaultValue(_context.Factory,
                     _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
                 continue;
             }
+            if (parameter.RefKind == RefKind.Ref && references != null)
+            { continue; }
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
                 if (_calls.PrepareEmptyParamsArray(argument) is not { } prepared ||
@@ -440,6 +444,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             argumentBuffer[argumentBuffer.Count - 1] = Bridge(value.Value,
                 _context.Factory.GetVariableInfo(callee.Parameters[callee.Parameters.Length - 1].Entry).Type);
             marker = value.Value;
+        }
+        foreach (var (ordinal, local) in references ?? [])
+        {
+            if (local is { } storage && method.Parameters[ordinal].RefKind == RefKind.Ref)
+            {
+                argumentBuffer[ordinal] = Bridge(_context.Factory.Variable(storage),
+                    _context.Factory.GetVariableInfo(callee.Parameters[ordinal].Entry).Type);
+            }
         }
         var arguments = argumentBuffer.ToImmutable();
         if (receiver != null && !CSharpOperationSemantics.IsModeledStruct(method.ContainingType))
@@ -623,8 +635,11 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             if (argument.Parameter is not { RefKind: RefKind.Ref or RefKind.Out } parameter)
             { continue; }
-            if (_regionGraph != null && _regionSource.EnclosingRegion != null)
-            { return null; }
+            for (var region = _regionGraph == null ? null : _regionSource.EnclosingRegion; region != null; region = region.EnclosingRegion)
+            {
+                if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime))
+                { return null; }
+            }
             var value = argument.Value is IDeclarationExpressionOperation { Expression: var declared } ? declared : argument.Value;
             if (value is IDiscardOperation && parameter.RefKind == RefKind.Out)
             {

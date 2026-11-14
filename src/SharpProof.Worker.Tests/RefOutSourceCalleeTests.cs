@@ -27,6 +27,8 @@ public sealed class RefOutSourceCalleeTests
             public static void Noisy(ref int x) { Counter = 1; x = 1; }
             public static void Keep(ref int x) { }
             public static void Set(out int x) { x = 7; }
+            public static void SetAndCount(ref int x) { x = 7; Counter = 1; }
+            public static void Keep(ref int value, int unused) { }
         }
         """;
 
@@ -39,6 +41,11 @@ public sealed class RefOutSourceCalleeTests
     [TestCase("[EnforcePure] public static int M(int x) { var y = x; T.Bump(ref y); return y; }")]
     [TestCase("public static int M(int x) { Contract.Ensures(Contract.Result<int>() == x); var y = x; T.Keep(ref y); return y; }")]
     [TestCase("public static int M(int x) { Contract.Ensures(Contract.Result<int>() == 7); T.Set(out var y); return y; }")]
+    // The callee reads a ref argument when it is entered, after later
+    // arguments have run.
+    [TestCase("public static int M(int x) { Contract.Ensures(Contract.Result<int>() == x); var y = 1; T.Keep(ref y, y = x); return y; }")]
+    // A heap write in the callee does not forget a copy-backed ref parameter.
+    [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 7); var y = 0; T.SetAndCount(ref y); return y; }")]
     public async Task ReferenceArgumentsAreModeled(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
