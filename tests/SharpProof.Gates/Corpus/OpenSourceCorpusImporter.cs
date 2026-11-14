@@ -572,8 +572,9 @@ internal static class OpenSourceCorpusImporter
             : string.Equals(path, exclude, StringComparison.Ordinal));
     }
 
-    private static bool IsCandidate(MethodDeclarationSyntax method)
+    internal static bool IsCandidate(MethodDeclarationSyntax method)
     {
+        System.ArgumentNullException.ThrowIfNull(method);
         if (method.Body == null && method.ExpressionBody == null)
         {
             return false;

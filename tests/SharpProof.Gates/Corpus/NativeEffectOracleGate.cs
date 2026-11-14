@@ -43,12 +43,16 @@ internal sealed record NativeEffectOracleReport(string UniverseSha256, int Unive
 // each refutation's witness. It never publishes worker authority.
 internal static class NativeEffectOracleGate
 {
+    private const int WholeSourceBatchSize = 250;
+
     internal static async Task<NativeEffectOracleReport> RunAsync(string root, CancellationToken cancellationToken, int maximumMethods = 0,
-        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false)
+        bool allocations = false, bool purity = false, bool capabilities = false, bool summary = false, string? wholeSource = null)
     {
         var wall = Stopwatch.StartNew();
         ArgumentNullException.ThrowIfNull(root);
         var document = OpenSourceCorpusCatalog.Load(root);
+        if (wholeSource != null)
+        { document = ExpandToWholeSource(document, wholeSource, cancellationToken); }
         if (maximumMethods < 0 || maximumMethods > document.Methods.Length)
         { throw new ArgumentOutOfRangeException(nameof(maximumMethods)); }
         var universeSha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(
@@ -60,8 +64,13 @@ internal static class NativeEffectOracleGate
         };
         // Each source is its own assembly; merge the per-source reports.
         var reports = ImmutableArray.CreateBuilder<NativeEffectOracleReport>();
-        foreach (var (compilation, methodIds) in OpenSourceCorpusRunner.PrepareExceptionProbes(
-                     selected, cancellationToken, allocations, purity, capabilities, summary))
+        // Claims on every method of a whole source can exceed the compiler
+        // manifest's size limit, so a whole source is verified in batches.
+        var batches = wholeSource == null
+            ? [selected]
+            : selected.Methods.Chunk(WholeSourceBatchSize).Select(batch => selected with { Methods = [.. batch] }).ToImmutableArray();
+        foreach (var (compilation, methodIds) in batches.SelectMany(batch => OpenSourceCorpusRunner.PrepareExceptionProbes(
+                     batch, cancellationToken, allocations, purity, capabilities, summary)))
         {
             reports.Add(await ObserveAsync(compilation, methodIds, root, universeSha256, document.Methods.Length,
                 cancellationToken, allocations, purity, capabilities, summary).ConfigureAwait(false));
@@ -74,6 +83,38 @@ internal static class NativeEffectOracleGate
             ReachableSourceMayDivergeCount = reports.Sum(static report => report.ReachableSourceMayDivergeCount),
             ReachableSourceUnknownEffectCount = reports.Sum(static report => report.ReachableSourceUnknownEffectCount)
         };
+    }
+
+    // The universe of one pinned source alone, widened from its selected
+    // methods to every method declaration the importer could have selected.
+    internal static OpenSourceCorpusDocument ExpandToWholeSource(
+        OpenSourceCorpusDocument document, string sourceId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(sourceId);
+        var files = document.Files.Where(file => string.Equals(file.SourceId, sourceId, StringComparison.Ordinal)).ToImmutableArray();
+        if (files.IsEmpty)
+        { throw new ArgumentException($"The corpus pins no source named '{sourceId}'.", nameof(sourceId)); }
+        var parseOptions = OpenSourceCorpusCatalog.GetParseOptions(OpenSourceCorpusCatalog.GetCompilationOptions(document, sourceId));
+        var methods = ImmutableArray.CreateBuilder<OpenSourceCorpusMethod>();
+        var hashes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        foreach (var file in files.OrderBy(static file => file.Path, StringComparer.Ordinal))
+        {
+            var tree = CSharpSyntaxTree.ParseText(OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content), parseOptions, file.Path,
+                cancellationToken: cancellationToken);
+            foreach (var method in tree.GetCompilationUnitRoot(cancellationToken).DescendantNodes()
+                         .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().OrderBy(static method => method.SpanStart))
+            {
+                var hash = OpenSourceCorpusCatalog.ComputeNormalizedSha256(OpenSourceCorpusCatalog.GetDeclaration(method));
+                if (!OpenSourceCorpusImporter.IsCandidate(method) || !hashes.Add(hash))
+                { continue; }
+                var lines = tree.GetLineSpan(method.Span, cancellationToken);
+                methods.Add(new OpenSourceCorpusMethod($"ALL{methods.Count + 1:D5}", sourceId, file.Path,
+                    lines.StartLinePosition.Line + 1, lines.EndLinePosition.Line + 1, hash, method.Identifier.ValueText,
+                    "effects", CorpusVerdict.Unknown, CorpusSupport.IntentionallyUnsupported));
+            }
+        }
+        return document with { Files = files, Methods = methods.ToImmutable() };
     }
 
     internal static async Task<NativeEffectOracleReport> ObserveAsync(CSharpCompilation compilation,

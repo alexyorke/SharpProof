@@ -66,6 +66,7 @@ The `loop` service uses a separate named workspace with read-only host source in
 | `pack-tool` | Optional Tool, CodeFixes, and Templates packages |
 | `corpus` | Canonical corpus and support-ratchet checks |
 | `corpus-update` | Intentional corpus observation update |
+| `effect-oracles` | The five native effect oracles over the selected open-source methods, then over every method of each pinned source |
 | `coverage` | Release Cobertura line coverage of the C# sources with a merged summary |
 | `dependency-audit` | Locked restore and dependency vulnerability audit |
 | `security` | Dependency audit and full Release build with banned-API enforcement |
