@@ -110,6 +110,9 @@ internal sealed class PassiveCallableVcBuilder
         _callPreconditions.ToImmutable();
     internal ImmutableArray<IrTerm> PotentialExceptionAllocations => _potentialExceptionAllocations.ToImmutable();
     internal ImmutableArray<(IrTerm Reach, IrOpaqueCallEffects Effects)> OpaqueCalls => _opaqueCalls.ToImmutable();
+    // Indices into OpaqueCalls of recursive calls into the verified root.
+    private readonly ImmutableHashSet<int>.Builder _inductiveRootCalls = ImmutableHashSet.CreateBuilder<int>();
+    internal ImmutableHashSet<int> InductiveRootCalls => _inductiveRootCalls.ToImmutable();
     internal bool HasUnmodeledAllocations => _hasUnmodeledStringAllocations;
     internal ImmutableArray<Assumption> Facts => _facts.ToImmutable();
     internal ImmutableArray<IrVarId> Model => [.. _model.Distinct()];
@@ -453,6 +456,8 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                         }
                         var effects = IrOpaqueCallSite.Effects(_factory, call.Operation);
+                        if (IrOpaqueCallSite.IsInductiveRootCall(_factory, call.Operation))
+                        { _inductiveRootCalls.Add(_opaqueCalls.Count); }
                         _opaqueCalls.Add((reach, effects));
                         if ((effects & IrOpaqueCallEffects.Writes) != 0)
                         { _heap = _heap with { Stores = _heap.Stores.Add((reach, null, null, null, null, false, blockId, null)) }; }

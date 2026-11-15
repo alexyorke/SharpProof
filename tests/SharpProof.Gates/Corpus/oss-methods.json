@@ -5919,8 +5919,8 @@
       "declarationSha256": "003e1136818a2a2e582bdecd942120d6303fccf20bde15a6071dedafd1ef7dcf",
       "methodName": "Stein",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0181",
@@ -7407,8 +7407,8 @@
       "declarationSha256": "a57afa469f9fdad8dae0b0ebbb4b3129cdf1389b61f982c5a0ddbce7663b08ed",
       "methodName": "CalculateStartOfYearDays",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0305",
@@ -7755,8 +7755,8 @@
       "declarationSha256": "73ca71952a6525905409d20c606c7f9c1ee1de25b4c049f92395c4cb0f3d5b5f",
       "methodName": "ToIsoDayOfWeek",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0334",
@@ -7767,8 +7767,8 @@
       "declarationSha256": "a80ef15b6ac7e888dd6d6db2a7bd51fc2f2205165c3a9cb324fb1fdfc0ec12b9",
       "methodName": "ToDayOfWeek",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0335",
@@ -8391,8 +8391,8 @@
       "declarationSha256": "3f19fba9457b522bc55993960bcb57666d35e06c052064cc247149959f2f5c14",
       "methodName": "HasAny",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0387",
