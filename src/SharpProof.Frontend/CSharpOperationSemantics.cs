@@ -36,6 +36,27 @@ internal static partial class CSharpOperationSemantics
         return type is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlying } ? underlying.SpecialType : type.SpecialType;
     }
 
+    // `E + U`, `U + E`, `E - U` and `E - E` over an int, uint, long or ulong
+    // underlying type: `(E)((U)x + y)` is the underlying arithmetic at that
+    // width, checked or not as the context is.
+    internal static bool IsWideEnumArithmetic(BinaryOperatorKind kind, ITypeSymbol? left, ITypeSymbol? right)
+    {
+        if (kind is not (BinaryOperatorKind.Add or BinaryOperatorKind.Subtract) || left == null || right == null ||
+            !(IsEnum(left) || IsEnum(right)) || !IsScalar(left) || !IsScalar(right) ||
+            kind == BinaryOperatorKind.Add && IsEnum(left) && IsEnum(right))
+        { return false; }
+        var underlying = ScalarSpecialType(left);
+        return underlying == ScalarSpecialType(right) && IsWideEnumUnderlying(underlying);
+    }
+
+    internal static bool IsWideEnum(ITypeSymbol? type)
+    { return type != null && IsEnum(type) && IsWideEnumUnderlying(ScalarSpecialType(type)); }
+
+    private static bool IsWideEnumUnderlying(SpecialType underlying)
+    {
+        return underlying is SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
+    }
+
     internal static bool IsEnum(ITypeSymbol? type)
     {
         return type is INamedTypeSymbol { TypeKind: TypeKind.Enum };
@@ -119,13 +140,13 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, binary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
         }
         var right = operands[1];
-        // Enum addition and subtraction convert through the underlying type
-        // with their own result type; only comparisons and bitwise operators
-        // on enums are modeled.
+        // Enum addition and subtraction are modeled only at a 32- or 64-bit
+        // underlying width, where no promotion or narrowing intervenes.
         if ((IsEnum(binary.LeftOperand.Type) || IsEnum(binary.RightOperand.Type)) &&
             binary.OperatorKind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals or BinaryOperatorKind.LessThan or
                 BinaryOperatorKind.LessThanOrEqual or BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual or
-                BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr))
+                BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr) &&
+            !IsWideEnumArithmetic(binary.OperatorKind, binary.LeftOperand.Type, binary.RightOperand.Type))
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
         return ApplyBinaryScalar(factory, binary.OperatorKind, binary.IsChecked, value, right);
     }

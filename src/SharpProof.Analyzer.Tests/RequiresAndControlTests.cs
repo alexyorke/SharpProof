@@ -80,7 +80,7 @@ public sealed class RequiresAndControlTests
             }
             """, "SP0027", 2),
         RequiresCase(
-            "StaticAccessorsCheckRequiresAndConditionalAccessFailsClosed",
+            "StaticAccessorsAndConditionalAccessCheckRequires",
             """
             using SharpProof.Attributes;
             public sealed class Subject {
@@ -93,7 +93,7 @@ public sealed class RequiresAndControlTests
                 public static void StaticCalls() { _ = StaticValue; StaticValue = -1; }
                 public static void ConditionalCall(Subject? subject) { _ = subject?.InstanceValue; }
             }
-            """, "SP0027", 2),
+            """, "SP0027", 3),
         RequiresCase(
             "AllNormallyEvaluatedArgumentsCanProduceARefutation",
             """

@@ -275,11 +275,9 @@ public sealed class TypedProgramLoweringTests
         Assert.That(subject.Lower().IsExact, Is.False);
     }
 
-    [TestCase("bool? Target(bool? x, bool? y) => x ^ y;")]
     [TestCase("int Target(Box x, Box y) => x & y; public sealed class Box { public static int operator &(Box x, Box y) => 1; }")]
     [TestCase("int Target(Box x, Box y) => x ^ y; public sealed class Box { public static int operator ^(Box x, Box y) => 1; }")]
     [TestCase("int Target(Box x) => ~x; public sealed class Box { public static int operator ~(Box x) => 1; }")]
-    [TestCase("System.DayOfWeek? Target(System.DayOfWeek? x, System.DayOfWeek? y) => x | y;")]
     public void LiftedAndUserDefinedBitwiseRemainClosed(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);

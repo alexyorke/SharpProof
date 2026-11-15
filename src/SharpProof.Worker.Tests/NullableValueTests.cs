@@ -19,6 +19,13 @@ public sealed class NullableValueTests
             public Span(long ticks) { this.ticks = ticks; }
             public long Ticks => ticks;
         }
+        public readonly struct Tagged
+        {
+            private readonly int tag;
+            public Tagged(int tag) { this.tag = tag; }
+            public int Tag => tag;
+            public static implicit operator Tagged?(string? text) => new Tagged(5);
+        }
         """;
 
     [TestCase("public static int M(int x) { Contract.Ensures(Contract.Result<int>() == x); int? n = x; return n.Value; }")]
@@ -40,6 +47,12 @@ public sealed class NullableValueTests
     [TestCase("[EnforcePure] public static int M(int? n) { return n.HasValue ? n.Value : 0; }")]
     [TestCase("[DoesNotThrow] public static int M(int? n) { return n.GetValueOrDefault(); }")]
     [TestCase("[ZeroAllocations] public static int M(int? n) { return n ?? 0; }")]
+    [TestCase("public static bool M(bool? a) { Contract.Ensures(Contract.Result<bool>()); return (a & false) == false; }")]
+    [TestCase("public static bool M(bool? a) { Contract.Ensures(Contract.Result<bool>()); return (a | true) == true; }")]
+    [TestCase("public static int M(int? n) { Contract.Ensures(Contract.Result<int>() == (n.HasValue ? n.Value : -1)); n++; return n ?? -1; }")]
+    [TestCase("public static bool M(int? n) { Contract.Ensures(Contract.Result<bool>() == (n.HasValue && n.Value == 3)); return n.Equals(3); }")]
+    [TestCase("public static int M(int? n) { Contract.Ensures(Contract.Result<int>() == (n.HasValue ? n.Value : 0)); return n.GetHashCode(); }")]
+    [TestCase("public static int M(long? n) { Contract.Ensures(Contract.Result<int>() == (n.HasValue ? (int)n.Value : -1)); return ((int?)n) ?? -1; }")]
     public async Task NullableClaimsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -66,6 +79,11 @@ public sealed class NullableValueTests
     [TestCase("[EnforcePure] public static int M(int? n) { return n.Value; }")]
     [TestCase("[EnforcePure] public static int M(int? n) { return (int)n; }")]
     [TestCase("[DoesNotThrow] public static int M(int? n) { return n.Value; }")]
+    // Boxing for Equals allocates; formatting reads the current culture.
+    [TestCase("[ZeroAllocations] public static bool M(int? n) { return n.Equals(3); }")]
+    [TestCase("[EnforcePure] public static string M(int? n) { return n.ToString(); }")]
+    // A user-defined conversion from null runs and returns a value.
+    [TestCase("public static bool M() { Contract.Ensures(!Contract.Result<bool>()); Tagged? t = (string?)null; return t.HasValue; }")]
     public async Task AnEmptyValueReadIsNotProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

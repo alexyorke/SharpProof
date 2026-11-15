@@ -10,6 +10,7 @@ namespace SharpProof.Frontend.Test;
 public sealed class NullableValueLoweringTests
 {
     private const string Maybe = "int? n = x < 0 ? null : x; ";
+    private const string Bools = "bool? p = x < 0 ? null : x > 1; bool? q = y < 0 ? null : y > 1; ";
     private const string Pair = "int? a = x < 0 ? null : x; int? b = y < 0 ? null : y; ";
 
     [TestCase("int Target(int x) { " + Maybe + "return n ?? -7; }")]
@@ -37,6 +38,30 @@ public sealed class NullableValueLoweringTests
     [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; return d == System.DayOfWeek.Monday ? 1 : d < System.DayOfWeek.Friday ? 2 : 0; }")]
     // The variable holds the value, not a copy of a mutable cell.
     [TestCase("int Target(int x) { " + Maybe + "var m = n; n = null; return (m ?? -1) * 10 + (n ?? -1); }")]
+    [TestCase("int Target(int x) { " + Maybe + "n++; return n ?? -1; }")]
+    [TestCase("int Target(int x) { " + Maybe + "var a = n++; return (a ?? -1) * 1000 + (n ?? -1); }")]
+    [TestCase("int Target(int x) { " + Maybe + "var a = --n; return (a ?? -1) * 1000 + (n ?? -1); }")]
+    [TestCase("int Target(int x) { " + Maybe + "n += 2; n *= 3; return n ?? -1; }")]
+    [TestCase("int Target(int x) { " + Maybe + "byte? b = (byte?)(n * 100); return b ?? -1; }")]
+    [TestCase("int Target(int x) { " + Maybe + "long? w = n; int? back = (int?)(w * 1000000); return back ?? -1; }")]
+    [TestCase("long Target(int x) { " + Maybe + "return x < 0 ? -1L : (long)n; }")]
+    [TestCase("int Target(int x) { " + Maybe + "return x < 0 ? -1 : (byte)(n * 100); }")]
+    [TestCase("int Target(int x) { " + Maybe + "object o = n; return o == null ? 0 : 1; }")]
+    [TestCase("int Target(int x) { " + Maybe + "return n.Equals(3) ? 1 : 0; }")]
+    [TestCase("int Target(int x) { " + Maybe + "return n.Equals(null) ? 1 : 0; }")]
+    [TestCase("int Target(int x) { " + Maybe + "int? m = 3; return n.Equals(m) ? 1 : 0; }")]
+    [TestCase("int Target(int x) { " + Maybe + "int? m = null; return n.Equals(m) ? 1 : 0; }")]
+    [TestCase("int Target(int x) { " + Maybe + "return n.GetHashCode(); }")]
+    [TestCase("int Target(int x) { uint? u = x < 0 ? null : (uint)x * 1000000000u; return u.GetHashCode(); }")]
+    [TestCase("int Target(int x) { bool? b = x < 0 ? null : x > 5; return b.GetHashCode(); }")]
+    [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; return d.GetHashCode(); }")]
+    [TestCase("int Target(int x) { bool? b = x < 0 ? null : x > 5; var t = b.ToString(); return t == \"True\" ? 1 : t == \"False\" ? 0 : t == \"\" ? -1 : -2; }")]
+    [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; return (int)((d + 1) ?? System.DayOfWeek.Sunday); }")]
+    [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; return (d - System.DayOfWeek.Monday) ?? -9; }")]
+    [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; d++; return (int)(d ?? System.DayOfWeek.Sunday); }")]
+    [TestCase("int Target(int x) { System.DayOfWeek? d = x < 0 ? null : (System.DayOfWeek)x; return (int)((d | System.DayOfWeek.Monday) ?? System.DayOfWeek.Sunday); }")]
+    [TestCase("int Target(int x) { var d = (System.DayOfWeek)x; return (int)(d + 2) * 10 + (d - System.DayOfWeek.Tuesday); }")]
+    [TestCase("int Target(int x) { var d = (System.DayOfWeek)x; d++; return (int)d; }")]
     public void UnaryNullablesReplayLikeTheRuntime(string members)
     {
         foreach (var input in new[] { -3, 0, 1, 3, 6, 12 })
@@ -58,6 +83,13 @@ public sealed class NullableValueLoweringTests
     [TestCase("int Target(int x, int y) { " + Pair + "return a == b ? 1 : 0; }")]
     [TestCase("int Target(int x, int y) { " + Pair + "return a != b ? 1 : 0; }")]
     [TestCase("int Target(int x, int y) { " + Pair + "return (a ?? b) ?? -1; }")]
+    [TestCase("int Target(int x, int y) { " + Pair + "a += b; return a ?? -1; }")]
+    [TestCase("int Target(int x, int y) { " + Pair + "return a.Equals((object)b) ? 1 : 0; }")]
+    // bool? & and | are three-valued: false & null is false, true | null is true.
+    [TestCase("int Target(int x, int y) { " + Bools + "var r = p & q; return r == true ? 1 : r == false ? 0 : -1; }")]
+    [TestCase("int Target(int x, int y) { " + Bools + "var r = p | q; return r == true ? 1 : r == false ? 0 : -1; }")]
+    [TestCase("int Target(int x, int y) { " + Bools + "var r = p ^ q; return r == true ? 1 : r == false ? 0 : -1; }")]
+    [TestCase("int Target(int x, int y) { " + Bools + "p &= q; return p == true ? 1 : p == false ? 0 : -1; }")]
     public void BinaryNullablesReplayLikeTheRuntime(string members)
     {
         foreach (var x in new[] { -1, 0, 3, 50000 })
@@ -65,6 +97,29 @@ public sealed class NullableValueLoweringTests
             foreach (var y in new[] { -1, 0, 2, 50000 })
             { AssertAgrees(members, [x, y]); }
         }
+    }
+
+    // Checked lifted steps and conversions fault only when a value is present.
+    [TestCase("int Target(int x) { int? n = x < 0 ? null : int.MaxValue - x; checked { n++; } return n ?? -1; }")]
+    [TestCase("int Target(int x) { int? n = x < 0 ? null : x * 100; byte? b = checked((byte?)n); return b ?? -1; }")]
+    [TestCase("int Target(int x) { int? n = x < 0 ? null : x * 100; return x < 0 ? -1 : checked((byte)n); }")]
+    [TestCase("int Target(int x) { var d = (System.DayOfWeek)(int.MaxValue - x); return (int)checked(d + 1); }")]
+    public void CheckedNullablesFaultLikeTheRuntime(string members)
+    {
+        foreach (var input in new[] { -1, 0, 1, 2, 3 })
+        { AssertAgrees(members, [input]); }
+    }
+
+    // Formatting a present value goes through the current culture: an unknown
+    // call. An empty value formats as "".
+    [Test]
+    public void FormattingAPresentValueIsAnUnknownCall()
+    {
+        const string members = "int Target(int x) { " + Maybe + "return n.ToString().Length; }";
+        AssertAgrees(members, [-1]);
+        using var subject = TypedProgramSubject.Create(members);
+        var replay = subject.Execute(subject.LowerSourceCalls(), [5]);
+        Assert.That(replay.Status != IrProgramExecutionStatus.Returned || replay.ConsumedApproximation, Is.True);
     }
 
     // Reading the value of an empty T? builds an InvalidOperationException
@@ -82,19 +137,17 @@ public sealed class NullableValueLoweringTests
         AssertAgrees(members, [4]);
     }
 
-    // Boxing, member calls other than HasValue, Value and GetValueOrDefault,
-    // narrowing and lifted user-defined conversions, the three-valued bool?
-    // operators, lifted enum arithmetic and lifted increments stay closed.
-    [TestCase("object Target(int x) { int? n = x; return n; }")]
-    [TestCase("bool Target(int x) { int? n = x; return n.Equals(3); }")]
-    [TestCase("int Target(int x) { int? n = x; return n.GetHashCode(); }")]
-    [TestCase("string Target(int x) { int? n = x; return n.ToString(); }")]
-    [TestCase("int Target(int x) { int? n = x; byte? b = (byte?)n; return b ?? 0; }")]
-    [TestCase("int Target(int x) { long? n = x; int? b = (int?)n; return b ?? 0; }")]
-    [TestCase("int Target(bool x) { bool? b = x ? null : true; return (b & false) == false ? 1 : 0; }")]
-    [TestCase("int Target(bool x) { bool? b = x ? null : true; return (b | true) == true ? 1 : 0; }")]
-    [TestCase("int Target(int x) { System.DayOfWeek? d = (System.DayOfWeek)x; return (int)(d | System.DayOfWeek.Monday ?? 0); }")]
-    [TestCase("int Target(int x) { int? n = x; n++; return n ?? 0; }")]
+    // Equals with an argument of another type or an unknown object, hash
+    // codes whose formula depends on the runtime, enum boxing, conversions
+    // into enums, byte-sized enum arithmetic (which promotes and narrows),
+    // and other underlying types stay closed.
+    [TestCase("bool Target(int x) { int? n = x; return n.Equals(3L); }")]
+    [TestCase("bool Target(int x, object o) { int? n = x; return n.Equals(o); }")]
+    [TestCase("int Target(int x) { long? n = x; return n.GetHashCode(); }")]
+    [TestCase("object Target(int x) { System.DayOfWeek? d = (System.DayOfWeek)x; return d; }")]
+    [TestCase("int Target(int x) { int? n = x; System.DayOfWeek? d = (System.DayOfWeek?)n; return (int)(d ?? 0); }")]
+    [TestCase("int Target(int x) { Small? s = (Small)x; s++; return (int)(s ?? 0); } enum Small : byte { A }")]
+    [TestCase("int Target(int x) { var s = (Small)x; return (int)(s + 1); } enum Small : byte { A }")]
     [TestCase("int Target(int x) { decimal? n = x; return n > 1 ? 1 : 0; }")]
     public void OtherNullableShapesStayClosed(string members)
     {
