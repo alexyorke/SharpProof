@@ -133,7 +133,20 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (!Spend() || _active.Count >= 256)
         { return false; }
+        if (_active.Count == 0)
+        { Root ??= method; }
         return _active.Add(method);
+    }
+
+    // The callable this session lowers: the first one entered.
+    internal IMethodSymbol? Root { get; private set; }
+
+    // A call that recurses into the root: an ordinary method, called with
+    // the root's own type arguments, while the root is being lowered.
+    internal bool IsRecursiveRootCall(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return Root is { MethodKind: MethodKind.Ordinary } root && SymbolEqualityComparer.Default.Equals(method, root) && IsActive(method);
     }
 
     internal bool IsActive(IMethodSymbol method)

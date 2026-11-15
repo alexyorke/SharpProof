@@ -52,7 +52,7 @@ Approximation values can support sound over-approximate proof obligations only w
 
 ## Calls and loops
 
-Source and admissible metadata calls are resolved through compiler evidence and lowered or modeled within the available boundary. Unknown targets and recursive or opaque call paths carry conservative effects and values. An external declaration is not a source-body proof.
+Source and admissible metadata calls are resolved through compiler evidence and lowered or modeled within the available boundary. Unknown targets and recursive or opaque call paths carry conservative effects and values. An external declaration is not a source-body proof. One exception: a call that recurses into the method being verified, an ordinary method without `Requires`, is assumed pure by the purity check alone, by induction on recursion depth. If the body is pure whenever its nested calls are, the first impure step of any execution would sit in a frame whose nested calls had all been pure, which the proof excludes. Every other check, and a recursive helper that is not the verified method, still treats such a call as unknown.
 
 Natural loops use cut encodings and invariant candidates. Candidate invariants must pass establishment and preservation checks before use in a proof. Bounded witness search is separate from the proof encoding; finite unrolling cannot prove an arbitrary loop or termination. Unsupported CFG shapes or exhausted construction limits produce Unknown.
 

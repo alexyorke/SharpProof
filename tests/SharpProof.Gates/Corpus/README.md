@@ -41,6 +41,10 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
+### Reviewed classification for recursive purity
+
+When a recursive call into the method being verified began to be assumed pure by the purity check alone, by induction on recursion depth (SEMANTICS.md, "Calls and loops"), `aalhour-c-sharp-algorithms` `GreatestCommonDivisor.Stein` (OSS0180) became Proven. Its body only compares, shifts and subtracts its two `int` arguments and calls itself; it reads and writes no state. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (265 to 266, 39 to 40); the total-Unknown ceiling (497 to 496) and the SP0002 ceiling (237 to 236) fell by one.
+
 ### Reviewed classification for ref and out source callees
 
 When source callees with `ref` and `out` parameters began to be inlined (SEMANTICS.md, "Calls and loops"), six selected methods left SP0047 `Advisory:Lowering:UnsupportedOperationKind`. `aalhour-c-sharp-algorithms` `ChainedHashTable._contractCapacity` (OSS0125) became Refuted: after its `_rehash(ref newHashTableStore, ...)` call it assigns `_hashTableStore`, an instance field of `this`. It was reviewed against the body and marked Supported/Refuted. The other five now stop at SP0047 `Advisory:Lowering:UnsupportedControlFlow`. The supported floors rose by one (264 to 265, 38 to 39); the total-Unknown ceiling (498 to 497) and the SP0047 ceiling (225 to 224) fell by one.

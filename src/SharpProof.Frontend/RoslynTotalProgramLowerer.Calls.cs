@@ -475,7 +475,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         // callee body does not lower. An unknown call could write a local it
         // received by reference to anything, so such a call is not expanded.
         if (graph == null)
-        { return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)) : Opaque(); }
+        {
+            return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
+                : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
+        }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -604,10 +607,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
 
-        TotalBodyValue Opaque()
+        // A recursive call into a root without preconditions is marked so
+        // that purity alone may assume it by induction; see
+        // IrOpaqueCallSite.DescribeInductiveRootCall.
+        TotalBodyValue Opaque(bool inductiveRoot = false)
         {
             var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
-                IrOpaqueCallEffects.All);
+                IrOpaqueCallEffects.All, inductiveRoot);
             return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
         }
 
