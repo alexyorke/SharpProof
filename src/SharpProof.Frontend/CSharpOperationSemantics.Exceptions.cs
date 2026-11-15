@@ -84,6 +84,54 @@ internal static partial class CSharpOperationSemantics
             !RejectsPossiblyNullInnerException(creation, exception);
     }
 
+    // A source exception constructor that only forwards its parameters, in
+    // order, to a core exception constructor of its direct base type:
+    // `Derived(string message) : base(message) { }`. Its type declares no
+    // member but such constructors and has no static initialization, so no
+    // override or field can run during construction, and `new Derived(...)`
+    // allocates a Derived and runs exactly that base constructor. Returns the
+    // base constructor, or null.
+    internal static IMethodSymbol? ForwardedCoreExceptionConstructor(IObjectCreationOperation creation, Compilation? compilation,
+        CancellationToken cancellationToken)
+    {
+        creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
+        if (compilation == null || creation is not { Initializer: null, Constructor: { } constructor } ||
+            constructor.DeclaringSyntaxReferences.Length != 1 ||
+            constructor.ContainingType is not { TypeKind: TypeKind.Class, IsGenericType: false, ContainingType: null, BaseType: { } baseType } type ||
+            CoreException(type) == null || !SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, CoreException(type)!.ContainingAssembly) ||
+            creation.Arguments.Any(argument => argument.ArgumentKind is not ArgumentKind.Explicit))
+        { return null; }
+        if (!type.GetMembers().All(member => member is IMethodSymbol { MethodKind: MethodKind.Constructor, IsStatic: false }) ||
+            type.DeclaringSyntaxReferences.Length != 1 ||
+            constructor.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax { Body.Statements.Count: 0, ExpressionBody: null, Initializer: { } initializer } declaration ||
+            !initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.BaseKeyword) ||
+            initializer.ArgumentList.Arguments.Count != constructor.Parameters.Length ||
+            !compilation.ContainsSyntaxTree(declaration.SyntaxTree))
+        { return null; }
+        var model = Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
+        if (model.GetSymbolInfo(initializer, cancellationToken).Symbol is not IMethodSymbol { MethodKind: MethodKind.Constructor } target ||
+            !SymbolEqualityComparer.Default.Equals(target.ContainingType, baseType) ||
+            target.Parameters.Length != constructor.Parameters.Length)
+        { return null; }
+        for (var ordinal = 0; ordinal < constructor.Parameters.Length; ordinal++)
+        {
+            var parameter = constructor.Parameters[ordinal];
+            if (initializer.ArgumentList.Arguments[ordinal] is not { NameColon: null, RefKindKeyword.RawKind: 0 } argument ||
+                model.GetSymbolInfo(argument.Expression, cancellationToken).Symbol is not IParameterSymbol forwarded ||
+                !SymbolEqualityComparer.Default.Equals(forwarded, parameter) ||
+                parameter.RefKind != RefKind.None || parameter.IsParams || parameter.HasExplicitDefaultValue ||
+                !SymbolEqualityComparer.Default.Equals(parameter.Type, target.Parameters[ordinal].Type))
+            { return null; }
+        }
+        // The base constructor must itself be one the core exception rules admit.
+        var exception = CoreException(type)!;
+        return (SymbolEqualityComparer.Default.Equals(target.ContainingAssembly, exception.ContainingAssembly) ||
+                IsAuditedMessageExceptionDeclaration(target)) &&
+            target.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
+                (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception))) &&
+            !RejectsPossiblyNullInnerException(creation, exception, target.ContainingType) ? target : null;
+    }
+
     internal static bool IsAuditedMessageExceptionDeclaration(ISymbol symbol)
     {
         symbol = RepositoryParameterGuard.NotNull(symbol, nameof(symbol));
@@ -365,9 +413,12 @@ internal static partial class CSharpOperationSemantics
         return constructors.ToImmutable();
     }
 
-    private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception)
+    // constructed is the type whose constructor runs: the created type, or
+    // the core base type a forwarding source constructor delegates to.
+    private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception,
+        ITypeSymbol? constructed = null)
     {
-        if (!SymbolEqualityComparer.Default.Equals(creation.Type,
+        if (!SymbolEqualityComparer.Default.Equals(constructed ?? creation.Type,
                 exception.ContainingAssembly.GetTypeByMetadataName("System.AggregateException")))
         { return false; }
         // AggregateException(string, Exception) throws ArgumentNullException

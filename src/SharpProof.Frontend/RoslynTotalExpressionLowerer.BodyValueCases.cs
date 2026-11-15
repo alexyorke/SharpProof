@@ -98,7 +98,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
     }
 
     // Construction of a core exception type.
-    private TotalBodyValue LowerExceptionCreation(IOperation operation, IObjectCreationOperation exceptionCreation, IrBlockId block, int depth)
+    private TotalBodyValue LowerExceptionCreation(IOperation operation, IObjectCreationOperation exceptionCreation, IrBlockId block, int depth,
+        IMethodSymbol? forwarded = null)
     {
         var argumentValues = ImmutableArray.CreateBuilder<IrTerm>(exceptionCreation.Arguments.Length);
         argumentValues.Count = exceptionCreation.Arguments.Length;
@@ -115,7 +116,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         // newobj allocates before the constructor executes. A callback
         // failure must not erase that already observable allocation.
         var allocated = AllocateValue(operation, block);
-        block = ExceptionConstructorRuntimeEffects(exceptionCreation, values, allocated.Continuation);
+        block = ExceptionConstructorRuntimeEffects(exceptionCreation, values, allocated.Continuation, forwarded);
         return new(allocated.Value, block, allocated.Classification);
     }
 

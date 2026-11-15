@@ -248,6 +248,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return LowerRepeatedCharacterString(operation, stringCreation, block, depth); }
         if (depth < 256 && HashSetBody(operation, block, depth) is { } hashSet)
         { return Capture(operation, hashSet); }
+        if (depth < 256 && operation is IObjectCreationOperation forwardedCreation &&
+            CSharpOperationSemantics.ForwardedCoreExceptionConstructor(forwardedCreation, _context.Compilation, default) is { } forwarded)
+        { return LowerExceptionCreation(operation, forwardedCreation, block, depth, forwarded); }
         if (depth < 256 && operation is IObjectCreationOperation sourceCreation &&
             SourceConstruction?.Invoke(sourceCreation, block, depth) is { } constructed)
         { return constructed; }
@@ -977,18 +980,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         return ApplyRule(operation, new TotalScalarRule(result, faults, FrontendSubsetClassification.Exact), block);
     }
 
-    private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
+    // A forwarding source constructor runs its core base constructor, which
+    // then stands in for it here.
+    private IrBlockId ExceptionConstructorRuntimeEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block,
+        IMethodSymbol? forwarded = null)
     {
         RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (ShadowCallSkeleton)
         { return block; }
-        var constructor = operation.Constructor!;
+        var constructor = forwarded ?? operation.Constructor!;
         var guard = CSharpOperationSemantics.ExceptionConstructorMessageGuard(constructor);
         if (guard == -1)
         { return block; }
         if (guard is not { } ordinal)
-        { return ExceptionResourceEffects(operation, values, block); }
+        { return ExceptionResourceEffects(operation, values, block, forwarded); }
         // Arguments have already been evaluated and pinned. A compiler-known
         // nonnull message cannot take the resource path; omit that unreachable
         // effect site so syntactic advisory summaries retain the same boundary.
@@ -1002,16 +1008,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // Resource managers can invoke user culture callbacks. Neither catalog
         // facts about ordinary construction nor a fresh receiver certify their
         // effects, exception set, allocation or termination.
-        var initialized = ExceptionResourceEffects(operation, values, runtime);
+        var initialized = ExceptionResourceEffects(operation, values, runtime, forwarded);
         _builder.Goto(initialized, _context.Site(operation), done);
         return done;
     }
 
-    private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block)
+    private IrBlockId ExceptionResourceEffects(IObjectCreationOperation operation, ImmutableArray<IrTerm> values, IrBlockId block,
+        IMethodSymbol? forwarded = null)
     {
         RepositoryParameterGuard.ThrowIfMissing(values.IsDefault, nameof(values));
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        var constructor = operation.Constructor!;
+        var constructor = forwarded ?? operation.Constructor!;
         if (CSharpOperationSemantics.ExceptionInitializationKind(constructor) is not { } kind)
         { return EmitOpaqueCall(operation, constructor, values, block, null, IrOpaqueCallEffects.All).Continuation; }
         if (CSharpOperationSemantics.IsExceptionResourceLockDeclaration(constructor))
