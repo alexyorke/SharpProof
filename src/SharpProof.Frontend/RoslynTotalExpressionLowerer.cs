@@ -1887,7 +1887,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     {
         if (depth >= 256)
         { return FrontendAbstention.ExpressionDepthLimit; }
-        if (operation is IParameterReferenceOperation parameter && !_context.OwnsParameter(parameter.Parameter))
+        if (operation is IParameterReferenceOperation parameter && !_context.ReadsParameter(parameter.Parameter))
         { return FrontendAbstention.UnsupportedOperationKind; }
         if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
         { return FrontendAbstention.UnsupportedInvocationShape; }

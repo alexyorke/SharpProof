@@ -33,15 +33,20 @@ public sealed class LocalFunctionSessionApiCoverageTests
         Assert.That(invocation.Arguments[0].ArgumentKind, Is.EqualTo(ArgumentKind.Explicit));
         Assert.That(invocation.Arguments[0].Value.ConstantValue.Value, Is.EqualTo(1));
         Assert.That(SymbolEqualityComparer.Default.Equals(model.GetDeclaredSymbol(local), invocation.TargetMethod), Is.True);
-        var localGraph = TotalSourceCallSession.CreateGraph(local, invocation.TargetMethod, model, default);
-        Assert.That(localGraph == null, Is.EqualTo(captures));
+        // On its own, a capturing local function has no graph; called from its
+        // owner, which it only reads, the session admits it over the owner's
+        // variables.
+        Assert.That(TotalSourceCallSession.CreateGraph(local, invocation.TargetMethod, model, default) == null, Is.EqualTo(captures));
+        Assert.That(TotalSourceCallSession.ReadsOnlyOwner(local, invocation.TargetMethod, subject.Context.Target, model, default),
+            Is.EqualTo(captures));
+        var localGraph = TotalSourceCallSession.CreateGraph(local, invocation.TargetMethod, model, default, readOnlyCaptures: captures);
         var preparations = 0;
         bool PrepareCallee(TotalLoweringContext candidate)
         {
             System.ArgumentNullException.ThrowIfNull(candidate);
             preparations++;
-            Assert.That(captures, Is.False);
             Assert.That(localGraph, Is.Not.Null);
+            Assert.That(candidate.CaptureOwner, captures ? Is.SameAs(subject.Context) : Is.Null);
             Assert.That(candidate.Factory, Is.SameAs(subject.Factory));
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target, invocation.TargetMethod), Is.True);
             Assert.That(SymbolEqualityComparer.Default.Equals(candidate.Target.ContainingAssembly,
@@ -56,13 +61,12 @@ public sealed class LocalFunctionSessionApiCoverageTests
         }
         var session = new TotalSourceCallSession(subject.Compilation, PrepareCallee, null, default);
         Assert.That(session.TryPrepare(subject.Context, invocation.TargetMethod, invocation.Instance,
-            invocation.Arguments, out var frame, out var graph), Is.EqualTo(!captures));
-        Assert.That(preparations, Is.EqualTo(captures ? 0 : 1));
-        Assert.That(frame == null, Is.EqualTo(captures));
-        Assert.That(graph == null, Is.EqualTo(captures));
+            invocation.Arguments, out var frame, out var graph), Is.True);
+        Assert.That(preparations, Is.EqualTo(1));
+        Assert.That(frame, Is.Not.Null);
+        Assert.That(graph, Is.Not.Null);
         Assert.That(session.ConstructionLimitExceeded, Is.False);
         Assert.That(session.IsActive(invocation.TargetMethod), Is.False);
-        if (!captures)
         {
             Assert.That(SymbolEqualityComparer.Default.Equals(frame!.Target, invocation.TargetMethod), Is.True);
             Assert.That(graph!.OriginalOperation.SemanticModel!.Compilation, Is.SameAs(subject.Compilation));
@@ -72,7 +76,7 @@ public sealed class LocalFunctionSessionApiCoverageTests
             var replay = subject.Execute(lowering, [8]);
             Assert.That(replay.Status, Is.EqualTo(IrProgramExecutionStatus.Returned));
             Assert.That(replay.ConsumedApproximation, Is.False);
-            Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(2)));
+            Assert.That(replay.ReturnValue!.IntegerNumericValue, Is.EqualTo(new BigInteger(captures ? 9 : 2)));
         }
     }
 }

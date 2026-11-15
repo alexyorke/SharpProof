@@ -255,11 +255,23 @@ internal sealed partial class TotalLoweringContext
         return _types.GetTypeId(type);
     }
 
+    // An inlined local function that only reads its owner's locals and
+    // parameters shares the owner frame's variables for them.
+    internal TotalLoweringContext? CaptureOwner { get; set; }
+
     internal bool OwnsParameter(IParameterSymbol parameter)
     { parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter)); return Parameters.Any(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)); }
 
+    // A parameter this frame may read: its own, or one it captured from its owner.
+    internal bool ReadsParameter(IParameterSymbol parameter)
+    { parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter)); return OwnsParameter(parameter) || CaptureOwner?.ReadsParameter(parameter) == true; }
+
     internal IrVarId Variable(ISymbol symbol, TotalParameterState state = TotalParameterState.Current)
     {
+        if (CaptureOwner is { } owner &&
+            (symbol is IParameterSymbol captured && !OwnsParameter(captured) ||
+             symbol is ILocalSymbol capturedLocal && !SymbolEqualityComparer.Default.Equals(capturedLocal.ContainingSymbol, Target)))
+        { return owner.Variable(symbol); }
         if (symbol is IParameterSymbol parameter)
         {
             var binding = Parameters.Single(item => SymbolEqualityComparer.Default.Equals(item.Parameter, parameter));

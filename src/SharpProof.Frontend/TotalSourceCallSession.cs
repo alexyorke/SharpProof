@@ -337,14 +337,23 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
                 LocalFunctionStatementSyntax))
         { return false; }
-        // A local function runs from its arguments alone only when it
-        // captures nothing; its graph is part of its owner's.
+        // A local function runs from its arguments alone when it captures
+        // nothing. Called from its owner's own frame, it may also read the
+        // owner's locals and parameters, which it then shares; its graph is
+        // part of its owner's.
         ControlFlowGraph? localGraph = null;
-        if (declaration is LocalFunctionStatementSyntax)
+        var readsOwner = false;
+        if (declaration is LocalFunctionStatementSyntax localFunction)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            localGraph = CreateGraph(declaration, method.OriginalDefinition,
-                CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree), cancellationToken);
+            var model = CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree);
+            localGraph = CreateGraph(declaration, method.OriginalDefinition, model, cancellationToken);
+            if (localGraph == null && SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingSymbol, caller.Target) &&
+                ReadsOnlyOwner(localFunction, method.OriginalDefinition, caller.Target, model, cancellationToken))
+            {
+                localGraph = CreateGraph(declaration, method.OriginalDefinition, model, cancellationToken, readOnlyCaptures: true);
+                readsOwner = localGraph != null;
+            }
             if (localGraph == null)
             { return false; }
         }
@@ -384,6 +393,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
         frame.WritesBackReferences = referenceArguments;
+        if (readsOwner)
+        { frame.CaptureOwner = caller; }
         // A constructed symbol supplies exact scalar/reference type arguments even when no
         // value parameter mentions them. Preserve each declaration's own symbols.
         if (!Spend(method.TypeArguments.Length))
@@ -512,7 +523,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // initializers or a base constructor other than object's, and a local
     // function that captures state.
     internal static ControlFlowGraph? CreateGraph(SyntaxNode declaration, IMethodSymbol method, SemanticModel model,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool readOnlyCaptures = false)
     {
         declaration = RepositoryParameterGuard.NotNull(declaration, nameof(declaration));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -525,7 +536,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     return CSharpOperationSemantics.IsPlainConstructor(method, cancellationToken)
                         ? ControlFlowGraph.Create(constructor, model, cancellationToken) : null;
                 case LocalFunctionStatementSyntax local:
-                    if (model.GetOperation(local, cancellationToken) is not { } operation || Captures(operation, method, cancellationToken))
+                    if (model.GetOperation(local, cancellationToken) is not { } operation ||
+                        !readOnlyCaptures && Captures(operation, method, cancellationToken))
                     { return null; }
                     var owner = local.Ancestors().FirstOrDefault(node => node is LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax ||
                         IsBodyDeclaration(node));
@@ -563,6 +575,56 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             IMethodReferenceOperation reference => LocalFunctionCaptures(body, reference.Method, visited, cancellationToken),
             _ => false
         });
+    }
+
+    // A local function whose only captures are reads of its owner's own
+    // locals and parameters: no `this`, no nested or referenced function, a
+    // callee local function that captures nothing, and no write to any
+    // captured variable, so the owner's facts about them stay true.
+    internal static bool ReadsOnlyOwner(LocalFunctionStatementSyntax local, IMethodSymbol method, IMethodSymbol owner,
+        SemanticModel model, CancellationToken cancellationToken)
+    {
+        local = RepositoryParameterGuard.NotNull(local, nameof(local));
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        model = RepositoryParameterGuard.NotNull(model, nameof(model));
+        // A by-reference parameter could alias a captured variable, and the
+        // callee's copy of it is written back only on return, so a capture
+        // read would miss the write.
+        if (method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            model.GetOperation(local, cancellationToken) is not { } body)
+        { return false; }
+        var visited = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+        visited.Add(method);
+        var captured = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var operation in body.Descendants())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (operation)
+            {
+                case IInstanceReferenceOperation or ILocalFunctionOperation or IAnonymousFunctionOperation:
+                    return false;
+                case IInvocationOperation invocation when LocalFunctionCaptures(body, invocation.TargetMethod, visited, cancellationToken):
+                    return false;
+                case IMethodReferenceOperation:
+                    return false;
+                case ILocalReferenceOperation reference when !SymbolEqualityComparer.Default.Equals(reference.Local.ContainingSymbol, method):
+                    if (!SymbolEqualityComparer.Default.Equals(reference.Local.ContainingSymbol, owner) || reference.Local.RefKind != RefKind.None)
+                    { return false; }
+                    captured.Add(reference.Local);
+                    break;
+                case IParameterReferenceOperation reference when !SymbolEqualityComparer.Default.Equals(reference.Parameter.ContainingSymbol, method):
+                    if (!SymbolEqualityComparer.Default.Equals(reference.Parameter.ContainingSymbol, owner) || reference.Parameter.RefKind != RefKind.None)
+                    { return false; }
+                    captured.Add(reference.Parameter);
+                    break;
+            }
+        }
+        SyntaxNode? region = local.Body ?? (SyntaxNode?)local.ExpressionBody?.Expression;
+        if (captured.Count == 0 || region == null)
+        { return false; }
+        var flow = region is ExpressionSyntax expression ? model.AnalyzeDataFlow(expression) : model.AnalyzeDataFlow((StatementSyntax)region);
+        return flow is { Succeeded: true } && !flow.WrittenInside.Any(captured.Contains);
     }
 
     private static bool LocalFunctionCaptures(IOperation body, IMethodSymbol target, ImmutableHashSet<IMethodSymbol>.Builder visited,
