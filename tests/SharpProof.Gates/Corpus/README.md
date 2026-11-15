@@ -41,6 +41,10 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
+### Reviewed classification for nullable values
+
+When nullable value types over scalars began to lower (SEMANTICS.md, "Typed execution model"), two selected methods changed reason and both stay Unknown. MoreLINQ `Repeat(sequence, int count)` (OSS0273) passes `count` to `RepeatImpl(IEnumerable<T>, int?)`; that `int` to `int?` conversion was SP0047 `Advisory:Lowering:UnsupportedType`, and the method now lowers and stops at SP0002 because the iterator callee is not proven pure. Humanizer `DateHumanizeExtensions.Humanize` (OSS0410) assigns `utcDate ??= ...` on a `bool?`, which is now modeled, and stops at SP0047 `Advisory:Lowering:UnsupportedOperationKind` on its `DateTime?` argument, which is not. No verdict changed. The SP0002 ceiling rose by one (233 to 234) and the SP0047 ceiling fell by one (223 to 222); the total-Unknown ceiling is unchanged.
+
 ### Reviewed classification for enum values
 
 When enum values began to lower as their underlying integer (SEMANTICS.md, "Typed execution model"), three NodaTime methods left Unknown. `PatternFields.HasAny` (OSS0386, `(fields & target) != 0`) is Proven. `DayOfWeekExtensions.ToIsoDayOfWeek` (OSS0333) and `IsoDayOfWeekExtensions.ToDayOfWeek` (OSS0334) are Refuted: each calls a `BclConversions` method that, for an out-of-range day, throws `new ArgumentOutOfRangeException(nameof(...))`, whose message lookup enters the runtime resource lock, a synchronization effect the worker replays. All three were reviewed against their bodies and marked Supported. The supported floors rose by three (267 to 270, 41 to 44); the total-Unknown ceiling fell by three (495 to 492), the SP0002 ceiling by two (235 to 233) and the SP0047 ceiling by one (224 to 223).

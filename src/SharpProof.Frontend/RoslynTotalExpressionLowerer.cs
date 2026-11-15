@@ -99,6 +99,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     internal GuardedExpression LowerClause(IOperation operation,
         TotalParameterState state = TotalParameterState.Current, int depth = 0)
     {
+        if (depth < 256 && NullableClause(operation, state, depth) is { } nullableClause)
+        { return nullableClause; }
         if (depth < 256 && operation is IPropertyReferenceOperation stackProperty &&
             StackClause(stackProperty, state, depth) is { } stackClause)
         { return stackClause; }
@@ -210,6 +212,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         Spend?.Invoke();
         if (CSharpOperationSemantics.IsIntercepted(operation, _context.Compilation))
         { return Approximate(operation, block, FrontendAbstention.UnsupportedInvocationShape); }
+        if (depth < 256 && NullableBody(operation, block, depth) is { } nullableValue)
+        { return nullableValue; }
         if (depth < 256 && operation is IConversionOperation
             { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } collectionConversion &&
             !collectionConversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(collectionConversion.Type, converted.Type) &&

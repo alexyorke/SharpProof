@@ -291,6 +291,7 @@ internal static class BlockerCensus
             ITypeParameterSymbol => "type parameter",
             IArrayTypeSymbol => "array",
             { SpecialType: not SpecialType.None } => type.SpecialType.ToString(),
+            INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } => "nullable",
             { TypeKind: TypeKind.Enum } => "enum",
             { TypeKind: TypeKind.Struct } => "struct",
             { TypeKind: TypeKind.Interface } => "interface",

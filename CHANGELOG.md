@@ -79,6 +79,13 @@ listing changes against an earlier one. Development history is in the Git log.
 - Enum values are analyzed as their underlying integer: comparisons, `&`,
   `|`, `^`, `~` and conversions, including checked conversions that
   overflow. Enum arithmetic, increments and boxing are still `Unknown`.
+- Nullable value types over a `bool`, an integer, an enum or a modeled
+  readonly struct are analyzed: `HasValue`, `Value`, `GetValueOrDefault`,
+  `??`, null tests, lifted comparisons and integer arithmetic, widening
+  conversions and patterns such as `n is int v`. Reading `Value` when there
+  is none stays an unknown call that throws, so such a read is not proven
+  pure. Boxing, other members, narrowing conversions and the `bool?` `&` and
+  `|` operators are still `Unknown`.
 - A call to a virtual member is analyzed like a non-virtual one when the
   code fixes its target: a `base.` call, a sealed override or a member of a
   sealed type, or a receiver whose static type is sealed.

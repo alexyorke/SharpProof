@@ -127,16 +127,26 @@ internal static partial class CSharpOperationSemantics
                 BinaryOperatorKind.LessThanOrEqual or BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual or
                 BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr))
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
-        if (IsShift(binary.OperatorKind))
-        { return Shift(factory, binary.OperatorKind, value, right); }
-        if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind))
+        return ApplyBinaryScalar(factory, binary.OperatorKind, binary.IsChecked, value, right);
+    }
+
+    // A built-in binary operator on two scalar values of its operand type;
+    // lifted operators apply it to the underlying values.
+    internal static TotalScalarRule ApplyBinaryScalar(IrFactory factory, BinaryOperatorKind operatorKind, bool isChecked, IrTerm value, IrTerm right)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        if (IsShift(operatorKind))
+        { return Shift(factory, operatorKind, value, right); }
+        if (value.Type != right.Type || !TryBinary(operatorKind, out var kind))
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
         if (IsBitwise(kind))
         { return Bitwise(factory, kind, value, right); }
         if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
-        { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
+        { return IntegerArithmetic(factory, kind, value, right, isChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
         { return DivideOrRemainder(factory, kind, value, right); }
         return new(factory.Binary(kind, value, right), [], FrontendSubsetClassification.Exact);
