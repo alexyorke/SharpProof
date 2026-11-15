@@ -28,11 +28,14 @@ public sealed class CapturingLocalFunctionTests
     }
 
     // A write to a captured variable, a capture through another capturing
-    // local function, and a nested lambda are not admitted.
+    // local function, a nested lambda and a by-reference parameter are not admitted.
     [TestCase("int Target(int x) { var y = x; Bump(); return y; void Bump() { y++; } }")]
     [TestCase("int Target(int x) { var y = x; Set(); return y; void Set() => y = 7; }")]
     [TestCase("int Target(int x) { return Outer(); int Outer() => Inner() + 1; int Inner() => x; }")]
     [TestCase("int Target(int x) { return Make()(); System.Func<int> Make() => () => x; }")]
+    // A ref argument may alias a capture: the write through it is visible to the capture read.
+    [TestCase("int Target(int x) { var y = x; return Set(ref y); int Set(ref int z) { z = 7; return y; } }")]
+    [TestCase("int Target(int x) { var y = x; return Read(in y); int Read(in int z) => z + y; }")]
     public void OtherCapturesClose(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);

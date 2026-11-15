@@ -588,7 +588,11 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
         model = RepositoryParameterGuard.NotNull(model, nameof(model));
-        if (model.GetOperation(local, cancellationToken) is not { } body)
+        // A by-reference parameter could alias a captured variable, and the
+        // callee's copy of it is written back only on return, so a capture
+        // read would miss the write.
+        if (method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+            model.GetOperation(local, cancellationToken) is not { } body)
         { return false; }
         var visited = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
         visited.Add(method);
