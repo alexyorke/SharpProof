@@ -133,7 +133,20 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
         if (!Spend() || _active.Count >= 256)
         { return false; }
+        if (_active.Count == 0)
+        { Root ??= method; }
         return _active.Add(method);
+    }
+
+    // The callable this session lowers: the first one entered.
+    internal IMethodSymbol? Root { get; private set; }
+
+    // A call that recurses into the root: an ordinary method, called with
+    // the root's own type arguments, while the root is being lowered.
+    internal bool IsRecursiveRootCall(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return Root is { MethodKind: MethodKind.Ordinary } root && SymbolEqualityComparer.Default.Equals(method, root) && IsActive(method);
     }
 
     internal bool IsActive(IMethodSymbol method)
@@ -228,7 +241,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default,
-        bool referenceArguments = false)
+        bool referenceArguments = false, bool exactTarget = false)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -270,7 +283,9 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             instance != null && (instance.Type?.IsReferenceType != true || !method.ContainingType.IsReferenceType) &&
                 !(CSharpOperationSemantics.IsModeledStruct(method.ContainingType) &&
                     SymbolEqualityComparer.Default.Equals(instance.Type, method.ContainingType)) ||
-            method.IsVirtual || method.IsOverride || method.IsAbstract || method.IsAsync || method.IsExtern ||
+            // A dispatched member runs this body only when the caller resolved
+            // it as the call's exact target.
+            !exactTarget && (method.IsVirtual || method.IsOverride) || method.IsAbstract || method.IsAsync || method.IsExtern ||
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>

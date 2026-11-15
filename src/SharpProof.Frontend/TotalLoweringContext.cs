@@ -419,8 +419,15 @@ internal sealed partial class TotalLoweringContext
         return Factory.CreateOperation("explicit-throw:" + (exact ? "exact:" : "") + string.Join(";", hierarchy.ToImmutable()), Span(thrown.Syntax));
     }
 
-    internal OperationId OpaqueCallSite(IOperation call, IrOpaqueCallEffects effects, string member)
-    { call = RepositoryParameterGuard.NotNull(call, nameof(call)); member = RepositoryParameterGuard.NotNull(member, nameof(member)); return Factory.CreateOperation(IrOpaqueCallSite.Describe(effects, member), Span(call.Syntax)); }
+    internal OperationId OpaqueCallSite(IOperation call, IrOpaqueCallEffects effects, string member, bool inductiveRoot = false)
+    {
+        call = RepositoryParameterGuard.NotNull(call, nameof(call));
+        member = RepositoryParameterGuard.NotNull(member, nameof(member));
+        if (inductiveRoot && effects != IrOpaqueCallEffects.All)
+        { throw new ArgumentException("An inductive root call may do anything.", nameof(effects)); }
+        return Factory.CreateOperation(inductiveRoot ? IrOpaqueCallSite.DescribeInductiveRootCall(member) : IrOpaqueCallSite.Describe(effects, member),
+            Span(call.Syntax));
+    }
 
     private IrSourceSpan Span(SyntaxNode syntax)
     {

@@ -94,7 +94,41 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (invocation.TargetMethod.DeclaringSyntaxReferences.IsEmpty && _calls?.PrepareIl(invocation.TargetMethod) is { } body &&
             (!_expressions.AllowOpaqueCalls || TotalIlStack.TryValidate(body, _calls.Spend, out _)))
         { return InlineMetadataCall(invocation, body, block, depth); }
+        if (ExactVirtualTarget(invocation.TargetMethod, invocation.Instance, baseCall: !invocation.IsVirtual) is { } exact)
+        { return InlineSourceMember(invocation, exact, invocation.Instance, invocation.Arguments, block, depth, exactTarget: true); }
         return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
+    }
+
+    // The body a dispatched call runs when the program text fixes it: a base
+    // call, a sealed override or a member of a sealed type, or a receiver
+    // whose static type is sealed, whose runtime type is then exactly that
+    // type (its final override along the base types). Null for any other
+    // virtual, abstract or interface member, and for a nonvirtual one, which
+    // needs no resolution.
+    internal static IMethodSymbol? ExactVirtualTarget(IMethodSymbol method, IOperation? instance, bool baseCall)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        if (!(method.IsVirtual || method.IsOverride || method.IsAbstract) || instance == null ||
+            method.ContainingType.TypeKind == TypeKind.Interface)
+        { return null; }
+        if (baseCall)
+        { return method.IsAbstract ? null : method; }
+        if (!method.IsAbstract && (method.IsSealed || method.ContainingType.IsSealed))
+        { return method; }
+        if (instance.Type is not INamedTypeSymbol { IsSealed: true, TypeKind: TypeKind.Class or TypeKind.Struct } receiver)
+        { return null; }
+        for (INamedTypeSymbol? type = receiver; type != null; type = type.BaseType)
+        {
+            foreach (var candidate in type.GetMembers(method.Name).OfType<IMethodSymbol>())
+            {
+                for (var overridden = candidate; overridden != null; overridden = overridden.OverriddenMethod)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(overridden.OriginalDefinition, method.OriginalDefinition))
+                    { return candidate.IsAbstract ? null : candidate; }
+                }
+            }
+        }
+        return null;
     }
 
     // `left + right` with an operator declared in source calls it like a
@@ -325,7 +359,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        return _preserveSourceCall != null || property.Property.GetMethod is not { } getter ? null
+        if (_preserveSourceCall != null || property.Property.GetMethod is not { } getter)
+        { return null; }
+        return ExactVirtualTarget(getter, property.Instance, baseCall: property.Instance?.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax) is { } exact
+            ? InlineSourceMember(property, exact, property.Instance, property.Arguments, block, depth, exactTarget: true)
             : InlineSourceMember(property, getter, property.Instance, property.Arguments, block, depth);
     }
 
@@ -340,14 +377,16 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
-        Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default)
+        Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default,
+        bool exactTarget = false)
     {
         var references = ReferenceArguments(callArguments);
         if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
-                constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null) &&
+                constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
+                exactTarget: exactTarget) &&
             !(_expressions.AllowOpaqueCalls && references == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
-                    constructorInitializers: constructedReceiver != null, operands: operands)))
+                    constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget)))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
@@ -475,7 +514,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         // callee body does not lower. An unknown call could write a local it
         // received by reference to anything, so such a call is not expanded.
         if (graph == null)
-        { return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)) : Opaque(); }
+        {
+            return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
+                : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
+        }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -604,10 +646,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
 
-        TotalBodyValue Opaque()
+        // A recursive call into a root without preconditions is marked so
+        // that purity alone may assume it by induction; see
+        // IrOpaqueCallSite.DescribeInductiveRootCall.
+        TotalBodyValue Opaque(bool inductiveRoot = false)
         {
             var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
-                IrOpaqueCallEffects.All);
+                IrOpaqueCallEffects.All, inductiveRoot);
             return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
         }
 

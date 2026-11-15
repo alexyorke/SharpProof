@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    {
+      "methodId": "OSS0315",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(NodaTime.Calendars.JulianYearMonthDayCalculator))]\ninternal static class OSS0315Contracts\n{\n    public static bool IsLeapYear(NodaTime.Calendars.JulianYearMonthDayCalculator receiver, int year)\n    {\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<bool>() == ((year & 3) == 0));\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Proven",
+      "review": "The body is `(year & 3) == 0`; the contract states exactly that result."
+    },
+    {
+      "methodId": "OSS0431",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.CollectionFormatters.OxfordStyleCollectionFormatter))]\ninternal static class OSS0431Contracts\n{\n    public static string GetConjunctionFormatString(Humanizer.Localisation.CollectionFormatters.OxfordStyleCollectionFormatter receiver, int itemCount)\n    {\n        SharpProof.Attributes.Contract.Ensures(itemCount <= 2 || SharpProof.Attributes.Contract.Result<string>() == \"{0}, {1} {2}\");\n        SharpProof.Attributes.Contract.Ensures(itemCount > 2 || SharpProof.Attributes.Contract.Result<string>() == \"{0} {1} {2}\");\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: the body returns the serial-comma format for more than two items and the plain format otherwise. Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0440",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.ArabicFormatter))]\ninternal static class OSS0440Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.ArabicFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number != 2 || SharpProof.Attributes.Contract.Result<string>() == resourceKey + \"_Dual\");\n        SharpProof.Attributes.Contract.Ensures(number == 2 || (number >= 3 && number <= 10) || SharpProof.Attributes.Contract.Result<string>() == resourceKey);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: two appends DualPostfix (\"_Dual\"), 3 to 10 append PluralPostfix, and every other count returns the key unchanged. Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0441",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.CroatianFormatter))]\ninternal static class OSS0441Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.CroatianFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number != 12 || SharpProof.Attributes.Contract.Result<string>() == resourceKey);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: 12 ends in 2 but is excluded explicitly (`number != 12`), so the key is returned unchanged. Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0442",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.CzechSlovakPolishFormatter))]\ninternal static class OSS0442Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.CzechSlovakPolishFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures((number > 1 && number < 5) || SharpProof.Attributes.Contract.Result<string>() == resourceKey);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: only counts 2 to 4 take the paucal suffix; every other count returns the key unchanged. Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0446",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.HebrewFormatter))]\ninternal static class OSS0446Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.HebrewFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<string>() == resourceKey);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "Deliberately false: for number == 2 the body appends \"_Dual\". Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0451",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.SerbianFormatter))]\ninternal static class OSS0451Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.SerbianFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number % 10 != 7 || SharpProof.Attributes.Contract.Result<string>() == resourceKey);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: only a last digit of 2 to 4 takes the paucal suffix; a last digit of 7 returns the key unchanged. Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0452",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.Formatters.SlovenianFormatter))]\ninternal static class OSS0452Contracts\n{\n    public static string GetResourceKey(Humanizer.Localisation.Formatters.SlovenianFormatter receiver, string resourceKey, int number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number != 4 || SharpProof.Attributes.Contract.Result<string>() == resourceKey + \"_Dual\");\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "Deliberately false: 4 takes TrialQuadralPostfix (\"_TrialQuadral\"), not \"_Dual\". Unknown: an override in an unsealed class, so a postcondition would be a contract for every override and is not verified."
+    },
+    {
+      "methodId": "OSS0453",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumberDetector))]\ninternal static class OSS0453Contracts\n{\n    public static Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber Detect(long number)\n    {\n        SharpProof.Attributes.Contract.Ensures(number != 21 || SharpProof.Attributes.Contract.Result<Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber>() == Humanizer.Localisation.GrammaticalNumber.RussianGrammaticalNumber.Singular);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Proven",
+      "review": "True: 21 has tens digit 2 and unit digit 1, so the body returns Singular. Proven since enum values lower as their underlying integer."
+    },
+    {
+      "methodId": "OSS0311",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(NodaTime.Calendars.HebrewScripturalCalculator))]\ninternal static class OSS0311Contracts\n{\n    public static bool IsLeapYear(int year)\n    {\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<bool>() == (((year * 7) + 1) % 19 < 7));\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: the body is `((year * 7) + 1) % 19 < 7`. Unknown (ResourceLimit): NodaTime compiles with checked arithmetic, and the checked 32-bit multiply with the remainder exhausts the query budget."
+    },
+    {
+      "methodId": "OSS0310",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(NodaTime.Calendars.HebrewMonthConverter))]\ninternal static class OSS0310Contracts\n{\n    public static int CivilToScriptural(int year, int month)\n    {\n        SharpProof.Attributes.Contract.Ensures(month < 7 || SharpProof.Attributes.Contract.Result<int>() != 1);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "Deliberately false: civil month 7 in a non-leap year is scriptural month 1 (Nisan). Unknown (CounterexampleNotReplayable): the witness runs through HebrewScripturalCalculator.IsLeapYear, whose declaring type has a static initializer the replay cannot certify."
+    },
+    {
+      "methodId": "OSS0393",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(NodaTime.Text.ValueCursor))]\ninternal static class OSS0393Contracts\n{\n    public static bool Match(NodaTime.Text.ValueCursor receiver, char character)\n    {\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<bool>() || receiver.Current != character);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: a false result means the current character differed and the cursor did not move. Unknown (UnsupportedBody): the contract reads `Current`, a property of the TextCursor base class."
+    },
+    {
+      "methodId": "OSS0124",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(DataStructures.Common.PrimesList))]\ninternal static class OSS0124Contracts\n{\n    public static bool IsPrime(DataStructures.Common.PrimesList receiver, int candidate)\n    {\n        SharpProof.Attributes.Contract.Ensures(candidate != 2 || SharpProof.Attributes.Contract.Result<bool>());\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True: an even candidate returns `candidate == 2` before the loop. Unknown (CounterexampleNotReplayable): the candidate witness runs through the loop and Math.Sqrt(double), which the replay does not model."
+    },
+    {
+      "methodId": "OSS0015",
+      "companion": "[SharpProof.Attributes.ContractFor(typeof(Algorithms.Numeric.GreatestCommonDivisor))]\ninternal static class GreatestCommonDivisorContracts\n{\n    public static int FindGCDEuclidean(int a, int b)\n    {\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<int>() >= 0);\n        return default!;\n    }\n    private static int Stein(int a, int b)\n    {\n        SharpProof.Attributes.Contract.Requires(a >= 0 && b >= 0);\n        SharpProof.Attributes.Contract.Ensures(SharpProof.Attributes.Contract.Result<int>() >= 0);\n        return default!;\n    }\n}\n",
+      "expectedVerdict": "Unknown",
+      "review": "True on normal return, but the body loops and calls Math.Abs, whose fault path is not modeled."
+    },
+    {
+      "methodId": "OSS0180",
+      "sharedWith": "OSS0015",
+      "expectedVerdict": "Unknown",
+      "review": "Recursive: a postcondition gets no induction over its own recursive calls. Shares the OSS0015 companion."
+    }
+  ]
+}

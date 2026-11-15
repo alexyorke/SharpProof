@@ -41,7 +41,8 @@ internal static partial class CSharpOperationSemantics
 
     internal static TotalScalarRule Increment(IrFactory factory, IIncrementOrDecrementOperation operation, IrTerm value)
     {
-        if (operation.IsLifted || operation.OperatorMethod != null || factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer)
+        if (operation.IsLifted || operation.OperatorMethod != null || factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
+            IsEnum(operation.Type))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         // Built-in ++/-- converts the promoted arithmetic result back to the storage
         // type. Its wrap value and checked range fault are exactly this one-unit step.
@@ -123,7 +124,8 @@ internal static partial class CSharpOperationSemantics
         { return CompoundShift(factory, operation, left, right, checkOverflow); }
         if (operation.IsLifted || operation.OperatorMethod != null || operation.InConversion.IsUserDefined || operation.OutConversion.IsUserDefined ||
             !TryBinary(operation.OperatorKind, out var kind) ||
-            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder) && !IsBitwise(kind))
+            kind is not (IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder) && !IsBitwise(kind) ||
+            IsEnum(operation.Target.Type) && !IsBitwise(kind))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         var first = factory.GetTypeInfo(left.Type);
         var second = factory.GetTypeInfo(right.Type);
