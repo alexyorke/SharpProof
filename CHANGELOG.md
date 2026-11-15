@@ -76,6 +76,9 @@ listing changes against an earlier one. Development history is in the Git log.
   effect-contract and resource-bound claims still count what such an
   initializer allocates and stay `Unknown`. Any other initializer leaves the
   claim `Unknown` with a reason that names it.
+- A call to a virtual member is analyzed like a non-virtual one when the
+  code fixes its target: a `base.` call, a sealed override or a member of a
+  sealed type, or a receiver whose static type is sealed.
 - `[EnforcePure]` can prove a method that calls itself, when it has no
   `Requires`: the purity check assumes the recursive call is pure, by
   induction on recursion depth. Other checks still treat the call as unknown.
