@@ -288,7 +288,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsScalarBoxing(IConversionOperation conversion)
     {
         conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
-        return conversion.Type?.SpecialType == SpecialType.System_Object && IsScalar(conversion.Operand.Type) &&
+        return conversion.Type?.SpecialType == SpecialType.System_Object && IsScalar(conversion.Operand.Type) && !IsEnum(conversion.Operand.Type) &&
             conversion.OperatorMethod == null && conversion.Conversion.Exists && !conversion.IsTryCast;
     }
 }

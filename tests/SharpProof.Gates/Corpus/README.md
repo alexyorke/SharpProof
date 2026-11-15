@@ -41,6 +41,10 @@ Only this declaration is reclassified IntentionallyUnsupported/Unknown until exc
 
 The reviewed correction lowered the supported-case and supported-OSS floors by one and raised the total-Unknown and SP0002 ceilings by one. All other classifications, reason buckets, snapshot entries, and support rules remain unchanged. This corrects one invalid historical proof; it is not a general allowance for precision regressions.
 
+### Reviewed classification for enum values
+
+When enum values began to lower as their underlying integer (SEMANTICS.md, "Typed execution model"), three NodaTime methods left Unknown. `PatternFields.HasAny` (OSS0386, `(fields & target) != 0`) is Proven. `DayOfWeekExtensions.ToIsoDayOfWeek` (OSS0333) and `IsoDayOfWeekExtensions.ToDayOfWeek` (OSS0334) are Refuted: each calls a `BclConversions` method that, for an out-of-range day, throws `new ArgumentOutOfRangeException(nameof(...))`, whose message lookup enters the runtime resource lock, a synchronization effect the worker replays. All three were reviewed against their bodies and marked Supported. The supported floors rose by three (267 to 270, 41 to 44); the total-Unknown ceiling fell by three (495 to 492), the SP0002 ceiling by two (235 to 233) and the SP0047 ceiling by one (224 to 223).
+
 ### Reviewed classification for exact dispatch targets
 
 When a dispatched call whose target the program text fixes began to be inlined (SEMANTICS.md, "Calls and loops"), NodaTime `CopticYearMonthDayCalculator.CalculateStartOfYearDays` (OSS0304) became Proven. It calls `IsLeapYear` on `this` in a sealed calculator, which inherits the override `(year & 3) == 3`; the rest is `int` arithmetic on its argument. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (266 to 267, 40 to 41); the total-Unknown ceiling (496 to 495) and the SP0002 ceiling (236 to 235) fell by one.
@@ -69,12 +73,12 @@ When a source callee declared in the caller's own type began to be inlined under
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.
 
-`SharpProof.Gates contract-oracle` runs them, and `OssContractGateTests` fails when any verdict changes. Today one is Proven: NodaTime `JulianYearMonthDayCalculator.IsLeapYear` (OSS0315), a sealed override. The others are Unknown for reasons each review names:
+`SharpProof.Gates contract-oracle` runs them, and `OssContractGateTests` fails when any verdict changes. Today two are Proven: NodaTime `JulianYearMonthDayCalculator.IsLeapYear` (OSS0315), a sealed override, and Humanizer `RussianGrammaticalNumberDetector.Detect` (OSS0453), whose result is an enum. The others are Unknown for reasons each review names:
 
 - Humanizer's formatter methods are overrides in unsealed classes. A postcondition there is a contract for every override, so it is not verified, and the two false contracts among them are not refuted either.
 - NodaTime's checked 32-bit multiply with a remainder (OSS0311) exhausts the query budget.
 - Witnesses through a callee whose type has a static initializer (OSS0310), or through a loop and `Math.Sqrt` (OSS0124), cannot be replayed.
-- A base-class property read (OSS0393), an enum result (OSS0453), `Math.Abs` with a loop (OSS0015) and recursion (OSS0180) are not modeled for postconditions.
+- A base-class property read (OSS0393), `Math.Abs` with a loop (OSS0015) and recursion (OSS0180) are not modeled for postconditions.
 
 A change that turns one of them into Proven or Refuted updates its entry and this list.
 

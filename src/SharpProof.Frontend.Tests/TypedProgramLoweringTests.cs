@@ -280,12 +280,11 @@ public sealed class TypedProgramLoweringTests
     [TestCase("int? Target(int? x, int? y) => x | y;")]
     [TestCase("bool? Target(bool? x, bool? y) => x ^ y;")]
     [TestCase("int? Target(int? x) => ~x;")]
-    [TestCase("System.DayOfWeek Target(System.DayOfWeek x, System.DayOfWeek y) => x | y;")]
-    [TestCase("System.DayOfWeek Target(System.DayOfWeek x) => ~x;")]
     [TestCase("int Target(Box x, Box y) => x & y; public sealed class Box { public static int operator &(Box x, Box y) => 1; }")]
     [TestCase("int Target(Box x, Box y) => x ^ y; public sealed class Box { public static int operator ^(Box x, Box y) => 1; }")]
     [TestCase("int Target(Box x) => ~x; public sealed class Box { public static int operator ~(Box x) => 1; }")]
-    public void LiftedEnumAndUserDefinedBitwiseRemainClosed(string members)
+    [TestCase("System.DayOfWeek? Target(System.DayOfWeek? x, System.DayOfWeek? y) => x | y;")]
+    public void LiftedAndUserDefinedBitwiseRemainClosed(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
         using var subject = TypedProgramSubject.Create(members);
