@@ -129,7 +129,7 @@ internal static partial class CSharpOperationSemantics
                 IsAuditedMessageExceptionDeclaration(target)) &&
             target.Parameters.All(parameter => parameter.RefKind == RefKind.None &&
                 (parameter.Type.SpecialType == SpecialType.System_String || SymbolEqualityComparer.Default.Equals(parameter.Type, exception))) &&
-            !RejectsPossiblyNullInnerException(creation, exception) ? target : null;
+            !RejectsPossiblyNullInnerException(creation, exception, target.ContainingType) ? target : null;
     }
 
     internal static bool IsAuditedMessageExceptionDeclaration(ISymbol symbol)
@@ -413,9 +413,12 @@ internal static partial class CSharpOperationSemantics
         return constructors.ToImmutable();
     }
 
-    private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception)
+    // constructed is the type whose constructor runs: the created type, or
+    // the core base type a forwarding source constructor delegates to.
+    private static bool RejectsPossiblyNullInnerException(IObjectCreationOperation creation, INamedTypeSymbol exception,
+        ITypeSymbol? constructed = null)
     {
-        if (!SymbolEqualityComparer.Default.Equals(creation.Type,
+        if (!SymbolEqualityComparer.Default.Equals(constructed ?? creation.Type,
                 exception.ContainingAssembly.GetTypeByMetadataName("System.AggregateException")))
         { return false; }
         // AggregateException(string, Exception) throws ArgumentNullException

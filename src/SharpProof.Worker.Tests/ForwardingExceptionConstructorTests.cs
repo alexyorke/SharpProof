@@ -41,6 +41,16 @@ internal sealed class ForwardingExceptionConstructorTests
         Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
 
+    // AggregateException(string, Exception) throws for a null inner exception;
+    // forwarding to it keeps that guard.
+    [Test]
+    public async Task ForwardingToAggregateExceptionKeepsTheNullInnerGuard()
+    {
+        var claim = await Verify("public sealed class Failure : System.AggregateException { public Failure(string message, System.Exception inner) : base(message, inner) { } } ",
+            "[DoesNotThrow]", "var e = new Failure(\"outer\", null!); return x;");
+        Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
     // A member that could run during construction, a field, a reordered or
     // changed argument and a body each keep the construction unknown.
     [TestCase("public sealed class Failure : System.Exception { public Failure(string message) : base(message) { } public override string Message => \"m\"; } ")]
