@@ -78,7 +78,18 @@ listing changes against an earlier one. Development history is in the Git log.
   claim `Unknown` with a reason that names it.
 - Enum values are analyzed as their underlying integer: comparisons, `&`,
   `|`, `^`, `~` and conversions, including checked conversions that
-  overflow. Enum arithmetic, increments and boxing are still `Unknown`.
+  overflow. Addition, subtraction, `++` and `--` are analyzed for enums
+  over `int`, `uint`, `long` and `ulong`. Arithmetic on narrower enums and
+  enum boxing are still `Unknown`.
+- Nullable value types over a `bool`, an integer, an enum or a modeled
+  readonly struct are analyzed: `HasValue`, `Value`, `GetValueOrDefault`,
+  `??`, null tests, lifted comparisons and integer arithmetic, widening
+  conversions and patterns such as `n is int v`, along with `++`, `--`,
+  compound assignment, narrowing conversions, the three-valued `bool?` `&`
+  and `|`, boxing, `Equals` against `null` or a boxed value, and
+  `GetHashCode` for `int`, `uint` and `bool`. Reading `Value` when there is
+  none, and `ToString` of a non-`bool` value, stay unknown calls, so they are
+  not proven pure.
 - A call to a virtual member is analyzed like a non-virtual one when the
   code fixes its target: a `base.` call, a sealed override or a member of a
   sealed type, or a receiver whose static type is sealed.

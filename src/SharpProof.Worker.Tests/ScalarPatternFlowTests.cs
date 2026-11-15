@@ -87,7 +87,6 @@ internal sealed class ScalarPatternFlowTests
     // Controls: patterns that test or bind a type are still not modeled.
     [TestCase("object o = x; return o is int k ? 10 / k : 0;")]
     [TestCase("return x is var k ? 10 / (k - k) : 0;")]
-    [TestCase("int? n = x; return n is 3 ? 10 / (x - x) : 0;")]
     public async Task TypeAndDeclarationPatternsStayUnknown(string body)
     {
         System.ArgumentNullException.ThrowIfNull(body);

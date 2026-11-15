@@ -33,7 +33,6 @@ public sealed class NativeTypeParameterTests
     }
 
     [TestCase("System.DateTime")]
-    [TestCase("int?")]
     public async Task OpaqueStructDefaultsHaveNoEffects(string type)
     {
         System.ArgumentNullException.ThrowIfNull(type);
@@ -41,6 +40,20 @@ public sealed class NativeTypeParameterTests
         Assert.That(preparation.Total, Is.Not.Null);
         var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
         Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.True);
+        Assert.That(instructions.Any(instruction => instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction), Is.False);
+        Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+        Assert.That((await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    // default(int?) is the modeled "no value", null: exact, with no effects.
+    [Test]
+    public async Task NullableDefaultIsExactlyNoValue()
+    {
+        var preparation = Prepare("[DoesNotThrow, ZeroAllocations, EnforcePure] public static int? Target() => default(int?);");
+        Assert.That(preparation.Total, Is.Not.Null);
+        var instructions = preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions).ToImmutableArray();
+        Assert.That(instructions.OfType<IrHavocInstruction>().Any(havoc => havoc.Origin == IrHavocOrigin.Approximation), Is.False);
         Assert.That(instructions.Any(instruction => instruction is IrCallInstruction or IrAllocationInstruction or IrWriteInstruction), Is.False);
         Assert.That((await NativeExceptionEffectVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());
         Assert.That((await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken)).Outcome, Is.TypeOf<ProvenOutcome>());

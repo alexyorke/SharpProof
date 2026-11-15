@@ -36,6 +36,27 @@ internal static partial class CSharpOperationSemantics
         return type is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlying } ? underlying.SpecialType : type.SpecialType;
     }
 
+    // `E + U`, `U + E`, `E - U` and `E - E` over an int, uint, long or ulong
+    // underlying type: `(E)((U)x + y)` is the underlying arithmetic at that
+    // width, checked or not as the context is.
+    internal static bool IsWideEnumArithmetic(BinaryOperatorKind kind, ITypeSymbol? left, ITypeSymbol? right)
+    {
+        if (kind is not (BinaryOperatorKind.Add or BinaryOperatorKind.Subtract) || left == null || right == null ||
+            !(IsEnum(left) || IsEnum(right)) || !IsScalar(left) || !IsScalar(right) ||
+            kind == BinaryOperatorKind.Add && IsEnum(left) && IsEnum(right))
+        { return false; }
+        var underlying = ScalarSpecialType(left);
+        return underlying == ScalarSpecialType(right) && IsWideEnumUnderlying(underlying);
+    }
+
+    internal static bool IsWideEnum(ITypeSymbol? type)
+    { return type != null && IsEnum(type) && IsWideEnumUnderlying(ScalarSpecialType(type)); }
+
+    private static bool IsWideEnumUnderlying(SpecialType underlying)
+    {
+        return underlying is SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
+    }
+
     internal static bool IsEnum(ITypeSymbol? type)
     {
         return type is INamedTypeSymbol { TypeKind: TypeKind.Enum };
@@ -119,24 +140,34 @@ internal static partial class CSharpOperationSemantics
             return Fail(factory, binary.IsLifted ? FrontendAbstention.LiftedOperator : FrontendAbstention.UserDefinedOperator);
         }
         var right = operands[1];
-        // Enum addition and subtraction convert through the underlying type
-        // with their own result type; only comparisons and bitwise operators
-        // on enums are modeled.
+        // Enum addition and subtraction are modeled only at a 32- or 64-bit
+        // underlying width, where no promotion or narrowing intervenes.
         if ((IsEnum(binary.LeftOperand.Type) || IsEnum(binary.RightOperand.Type)) &&
             binary.OperatorKind is not (BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals or BinaryOperatorKind.LessThan or
                 BinaryOperatorKind.LessThanOrEqual or BinaryOperatorKind.GreaterThan or BinaryOperatorKind.GreaterThanOrEqual or
-                BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr))
+                BinaryOperatorKind.And or BinaryOperatorKind.Or or BinaryOperatorKind.ExclusiveOr) &&
+            !IsWideEnumArithmetic(binary.OperatorKind, binary.LeftOperand.Type, binary.RightOperand.Type))
         { return Fail(factory, FrontendAbstention.UnsupportedOperationKind); }
-        if (IsShift(binary.OperatorKind))
-        { return Shift(factory, binary.OperatorKind, value, right); }
-        if (value.Type != right.Type || !TryBinary(binary.OperatorKind, out var kind))
+        return ApplyBinaryScalar(factory, binary.OperatorKind, binary.IsChecked, value, right);
+    }
+
+    // A built-in binary operator on two scalar values of its operand type;
+    // lifted operators apply it to the underlying values.
+    internal static TotalScalarRule ApplyBinaryScalar(IrFactory factory, BinaryOperatorKind operatorKind, bool isChecked, IrTerm value, IrTerm right)
+    {
+        factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        right = RepositoryParameterGuard.NotNull(right, nameof(right));
+        if (IsShift(operatorKind))
+        { return Shift(factory, operatorKind, value, right); }
+        if (value.Type != right.Type || !TryBinary(operatorKind, out var kind))
         {
             return Fail(factory, FrontendAbstention.UnsupportedOperationKind);
         }
         if (IsBitwise(kind))
         { return Bitwise(factory, kind, value, right); }
         if (kind is IrBinaryOperator.Add or IrBinaryOperator.Subtract or IrBinaryOperator.Multiply)
-        { return IntegerArithmetic(factory, kind, value, right, binary.IsChecked); }
+        { return IntegerArithmetic(factory, kind, value, right, isChecked); }
         if (kind is IrBinaryOperator.Divide or IrBinaryOperator.Remainder)
         { return DivideOrRemainder(factory, kind, value, right); }
         return new(factory.Binary(kind, value, right), [], FrontendSubsetClassification.Exact);

@@ -42,7 +42,7 @@ internal static partial class CSharpOperationSemantics
     internal static TotalScalarRule Increment(IrFactory factory, IIncrementOrDecrementOperation operation, IrTerm value)
     {
         if (operation.IsLifted || operation.OperatorMethod != null || factory.GetTypeInfo(value.Type).Kind != IrTypeKind.Integer ||
-            IsEnum(operation.Type))
+            IsEnum(operation.Type) && !IsWideEnum(operation.Type))
         { return Fail(factory, FrontendAbstention.UnsupportedMutation); }
         // Built-in ++/-- converts the promoted arithmetic result back to the storage
         // type. Its wrap value and checked range fault are exactly this one-unit step.
@@ -267,8 +267,9 @@ internal static partial class CSharpOperationSemantics
         return new(conversion.Value, conversion.Throws, conversion.Classification);
     }
 
-    private static bool? CheckedContext(IOperation operation, bool? checkOverflow)
+    internal static bool? CheckedContext(IOperation operation, bool? checkOverflow)
     {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         for (var node = operation.Syntax; node != null; node = node.Parent)
         {
             if (node.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CheckedStatement) ||

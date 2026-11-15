@@ -41,11 +41,12 @@ public sealed class FrontendSemanticEdgeCaseTests
             Exact("long", "long value", "unchecked((int)value)", [long.MaxValue]),
             Closed("string?", "object? value", "value as string", FrontendAbstention.UnsupportedOperationKind, ["proof"]),
             Closed("long", "long value", "(long)new SharpProofGeneratedConvertible(value)", FrontendAbstention.UnsupportedOperationKind, [1L]),
-            Closed("long?", "", "(long?)1L", FrontendAbstention.UnsupportedType, []),
-            Closed("long?", "long value", "(long?)value", FrontendAbstention.UnsupportedType, [1L]),
-            Closed("long?", "long? value", "value + 1L", FrontendAbstention.UnsupportedType, [(long?)1L]),
-            Closed("bool", "long? value", "value == 0L", FrontendAbstention.UnsupportedType, [(long?)0L]),
-            Closed("long?", "long? value", "-value", FrontendAbstention.UnsupportedType, [(long?)1L]));
+            // Nullable values are modeled; results leave through ?? or a comparison.
+            Exact("long", "", "((long?)1L) ?? -1L", []),
+            Exact("long", "long value", "((long?)value) ?? -1L", [1L]),
+            Exact("long", "long value", "(((long?)value) + 1L) ?? -1L", [long.MaxValue]),
+            Exact("bool", "long value", "((long?)value) == 0L", [0L]),
+            Exact("long", "long value", "(-(long?)value) ?? -1L", [1L]));
 
         var results = FrontendDifferentialOracle.CompareSemanticEdges(cases, cancellationToken: TestContext.CurrentContext.CancellationToken);
 
