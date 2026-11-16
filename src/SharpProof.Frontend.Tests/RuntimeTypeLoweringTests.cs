@@ -23,6 +23,11 @@ public sealed class RuntimeTypeLoweringTests
     [TestCase("int Target(int x) { object o = x > 0 ? (object)x : null; var n = o as int?; return n ?? -1; }")]
     [TestCase("int Target(int x) { object o = x > 0 ? (object)x : (object)(long)x; var n = o as int?; return n ?? -1; }")]
     [TestCase("int Target(int x) { object o = (System.DayOfWeek)x; return (int)o; }")]
+    // An enum box unboxes to its underlying type, but not to that type's nullable.
+    [TestCase("int Target(int x) { object o = (System.DayOfWeek)x; return (o as int?) ?? -1; }")]
+    [TestCase("int Target(int x) { object o = (System.DayOfWeek)x; return ((int?)o) ?? -1; }")]
+    // The receiver is read after the argument assigns it.
+    [TestCase("int Target(int x) { int y = 1; return y.Equals((object)(y = x)) ? 1 : 0; }")]
     [TestCase("int Target(int x) { object o = (System.DayOfWeek)x; return o is int ? 1 : 0; }")]
     [TestCase("int Target(int x) { object o = (System.DayOfWeek)x; return o is System.DayOfWeek d ? (int)d + 10 : -1; }")]
     [TestCase("int Target(int x) { object o = x; return (int)(System.DayOfWeek)o; }")]

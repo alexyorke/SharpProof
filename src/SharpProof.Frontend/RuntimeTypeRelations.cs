@@ -183,7 +183,7 @@ internal static class RuntimeTypeRelations
     {
         return type.TypeKind is TypeKind.Error or TypeKind.TypeParameter or TypeKind.Pointer or TypeKind.FunctionPointer ||
             type is INamedTypeSymbol { IsUnboundGenericType: true } ||
-            type is INamedTypeSymbol named && named.TypeArguments.Any(IsOpen) ||
+            type is INamedTypeSymbol named && (named.TypeArguments.Any(IsOpen) || named.ContainingType is { } outer && IsOpen(outer)) ||
             type is IArrayTypeSymbol array && IsOpen(array.ElementType);
     }
 }

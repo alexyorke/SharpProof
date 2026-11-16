@@ -143,14 +143,18 @@ internal sealed partial class RoslynTotalExpressionLowerer
             case IInvocationOperation { Instance: { Type: { } receiverType } receiver, TargetMethod: { Name: "Equals", Parameters.Length: 1 } method, Arguments.Length: 1 } equals when
                 CSharpOperationSemantics.IsScalar(receiverType) && !CSharpOperationSemantics.IsEnum(receiverType) &&
                 method.Parameters[0].Type.SpecialType == SpecialType.System_Object &&
-                SymbolEqualityComparer.Default.Equals(method.ContainingType, receiverType):
+                SymbolEqualityComparer.Default.Equals(method.ContainingType, receiverType) &&
+                (receiver is ILocalReferenceOperation or IParameterReferenceOperation || receiver.ConstantValue.HasValue):
                 {
-                    var self = LowerBodyValue(receiver, block, depth + 1);
-                    if (!self.Classification.IsExact)
-                    { return Approximate(operation, self.Continuation, self.Classification.Abstention); }
-                    var other = LowerBodyValue(equals.Arguments[0].Value, self.Continuation, depth + 1);
+                    // The call keeps the receiver variable's address, so its
+                    // value is read after the argument, which may assign it.
+                    var other = LowerBodyValue(equals.Arguments[0].Value, block, depth + 1);
                     if (!other.Classification.IsExact)
                     { return Approximate(operation, other.Continuation, other.Classification.Abstention); }
+                    var self = LowerBodyValue(receiver, other.Continuation, depth + 1);
+                    if (!self.Classification.IsExact)
+                    { return Approximate(operation, self.Continuation, self.Classification.Abstention); }
+                    other = new(other.Value, self.Continuation, other.Classification);
                     var boxOfT = RuntimeTest(other.Value, receiverType, RuntimeTypeRelations.TestKind.Box);
                     return Capture(operation, new(_factory.Conditional(boxOfT,
                         _factory.Binary(IrBinaryOperator.Equal, BoxRead(other.Value, receiverType, _factory.Boolean(true)), self.Value),
@@ -170,7 +174,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var isNull = _factory.Binary(IrBinaryOperator.Equal, source.Value, _factory.Null(source.Value.Type));
         if (CSharpOperationSemantics.ModeledNullableUnderlying(unboxing.Type) is { } underlying)
         {
-            var fits = RuntimeTest(source.Value, underlying, RuntimeTypeRelations.TestKind.Unbox);
+            // Unboxing to V? needs a box of exactly V: unlike `(V)o`, an enum
+            // box does not unbox to its underlying type's nullable.
+            var fits = RuntimeTest(source.Value, underlying, RuntimeTypeRelations.TestKind.Box);
             var checkedFit = ApplyRule(operation, new TotalScalarRule(_factory.Boolean(false),
                 [new(IrExceptionKind.InvalidCast, And(Not(isNull), Not(fits)))], FrontendSubsetClassification.Exact), source.Continuation);
             return MaterializeNullable(operation, unboxing.Type!, Not(isNull),
@@ -190,7 +196,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return Approximate(operation, source.Continuation, source.Classification.Abstention); }
         if (CSharpOperationSemantics.ModeledNullableUnderlying(tryCast.Type) is { } underlying)
         {
-            var fits = RuntimeTest(source.Value, underlying, RuntimeTypeRelations.TestKind.Unbox);
+            // Unboxing to V? needs a box of exactly V: unlike `(V)o`, an enum
+            // box does not unbox to its underlying type's nullable.
+            var fits = RuntimeTest(source.Value, underlying, RuntimeTypeRelations.TestKind.Box);
             return MaterializeNullable(operation, tryCast.Type!, fits,
                 present => new(BoxRead(source.Value, underlying, fits), present, FrontendSubsetClassification.Exact), source.Continuation);
         }
