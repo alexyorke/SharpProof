@@ -15,6 +15,7 @@ internal interface IIrTermVisitor<TState, TResult>
     TResult Visit(IrCastTerm term, TState state);
     TResult Visit(IrLengthTerm term, TState state);
     TResult Visit(IrSequenceAccessTerm term, TState state);
+    TResult Visit(IrTypeTestTerm term, TState state);
 }
 
 internal abstract class IrTerm
@@ -478,6 +479,34 @@ internal sealed class IrLengthTerm : IrTerm
     }
 
     public IrTerm Value { get; }
+}
+
+// Whether a reference's runtime type is exactly Tested (Exact) or converts
+// to Tested at run time, as the CLR's isinst decides. Null is never an
+// instance. Runtime types are known only for objects whose allocation
+// records one; for any other object the answer is not known.
+internal sealed class IrTypeTestTerm : IrTerm
+{
+    internal override TResult Accept<TState, TResult>(IIrTermVisitor<TState, TResult> visitor, TState /* SPINT001: all values valid - visitor state passes through unchanged */ state)
+    {
+        visitor = RepositoryParameterGuard.NotNull(visitor, nameof(visitor));
+        return visitor.Visit(this, state);
+    }
+
+    internal IrTypeTestTerm(IrId id, IrTypeId type, IrTerm value, IrTypeId tested, bool exact) : base(id, type, IrTermKind.TypeTest)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        RepositoryParameterGuard.ThrowIfInvalid(tested.IsDefault, nameof(tested));
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        Value = value;
+        Tested = tested;
+        Exact = exact;
+    }
+
+    public IrTerm Value { get; }
+    public IrTypeId Tested { get; }
+    public bool Exact { get; }
 }
 
 internal sealed class IrSequenceAccessTerm : IrTerm

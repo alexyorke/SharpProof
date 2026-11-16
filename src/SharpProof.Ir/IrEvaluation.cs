@@ -23,7 +23,10 @@ internal enum IrUnsupportedReason
     MissingVariable = 1,
     InvalidVariableValue = 2,
     UnsupportedCast = 3,
-    UnsupportedOperation = 4
+    UnsupportedOperation = 4,
+    // A type test on an object whose runtime type the evaluation does not
+    // know: an approximation, never a contradiction of the model.
+    UnknownRuntimeType = 5
 }
 
 internal enum IrExceptionKind

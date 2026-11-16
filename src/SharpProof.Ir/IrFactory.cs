@@ -17,6 +17,14 @@ internal sealed class IrFactory
     // producer reads it to keep allocation-sensitive claims Unknown; it is not
     // part of the portable program.
     private readonly HashSet<IrTypeId> _valueStructTypes = [];
+    // Runtime types: the exact type of each object an allocation records,
+    // in registration order (a type's tag is its position plus one), and,
+    // per runtime type and reference type, whether one converts to the other
+    // at run time. An absent pair is not known.
+    private readonly List<IrTypeId> _runtimeTypes = [];
+    private readonly Dictionary<(IrTypeId Runtime, IrTypeId Target), bool> _runtimeConversions = [];
+    private readonly Dictionary<OperationId, IrTypeId> _allocationRuntimeTypes = [];
+    private bool _hasTypeTests;
     private readonly List<IrVariableInfo> _variables = [];
     private readonly Dictionary<StructuralKey, IrMemberId> _memberIds = new(StructuralKeyComparer.Instance);
     private readonly List<IrMemberInfo> _members = [];
@@ -189,6 +197,98 @@ internal sealed class IrFactory
         {
             EnsureScope(identity.Scope, nameof(identity));
             return GetOrCreateTypeCore(identity, displayName, IrNullableTypeShape.Reference, null);
+        }
+    }
+
+    internal void RegisterRuntimeType(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            if (GetTypeInfoCore(type, nameof(type)).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence))
+            { throw new ArgumentException("A runtime type is a reference or sequence type.", nameof(type)); }
+            if (!_runtimeTypes.Contains(type))
+            { _runtimeTypes.Add(type); }
+        }
+    }
+
+    internal ImmutableArray<IrTypeId> RuntimeTypes
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _runtimeTypes];
+            }
+        }
+    }
+
+    // The positive tag of a registered runtime type, or 0.
+    internal int RuntimeTypeTag(IrTypeId type)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        lock (_gate)
+        {
+            return _runtimeTypes.IndexOf(type) + 1;
+        }
+    }
+
+    internal void RegisterRuntimeConversion(IrTypeId runtime, IrTypeId target, bool converts)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(runtime.IsDefault, nameof(runtime));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        lock (_gate)
+        {
+            if (!_runtimeTypes.Contains(runtime))
+            { throw new ArgumentException("A runtime conversion starts at a registered runtime type.", nameof(runtime)); }
+            GetTypeInfoCore(target, nameof(target));
+            if (_runtimeConversions.TryGetValue((runtime, target), out var existing) && existing != converts)
+            { throw new ArgumentException("A runtime conversion was registered with both answers.", nameof(converts)); }
+            _runtimeConversions[(runtime, target)] = converts;
+        }
+    }
+
+    internal bool TryGetRuntimeConversion(IrTypeId runtime, IrTypeId target, out bool converts)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(runtime.IsDefault, nameof(runtime));
+        RepositoryParameterGuard.ThrowIfInvalid(target.IsDefault, nameof(target));
+        lock (_gate)
+        {
+            return _runtimeConversions.TryGetValue((runtime, target), out converts);
+        }
+    }
+
+    internal ImmutableArray<(IrTypeId Target, bool Converts)> GetRuntimeConversions(IrTypeId runtime)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(runtime.IsDefault, nameof(runtime));
+        lock (_gate)
+        {
+            return [.. _runtimeConversions.Where(pair => pair.Key.Runtime == runtime)
+                .Select(pair => (pair.Key.Target, pair.Value))];
+        }
+    }
+
+    // The object an allocation at this operation creates has exactly this
+    // runtime type. Operation ids are unique per instruction.
+    internal void RegisterAllocationRuntimeType(OperationId operation, IrTypeId runtime)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        RepositoryParameterGuard.ThrowIfInvalid(runtime.IsDefault, nameof(runtime));
+        lock (_gate)
+        {
+            GetOperationInfoCore(operation, nameof(operation));
+            if (!_runtimeTypes.Contains(runtime))
+            { throw new ArgumentException("An allocation's runtime type must be registered.", nameof(runtime)); }
+            _allocationRuntimeTypes[operation] = runtime;
+        }
+    }
+
+    internal bool TryGetAllocationRuntimeType(OperationId operation, out IrTypeId runtime)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        lock (_gate)
+        {
+            return _allocationRuntimeTypes.TryGetValue(operation, out runtime);
         }
     }
 
@@ -965,6 +1065,38 @@ internal sealed class IrFactory
                     first: value.Id.Value),
                 (value, IntegerType),
                 static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id)) : (new IrLengthTerm(id, state.IntegerType, state.value)));
+        }
+    }
+
+    // Whether any type test term exists in this factory.
+    internal bool HasTypeTests
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hasTypeTests;
+            }
+        }
+    }
+
+    public IrTerm TypeTest(IrTerm value, IrTypeId tested, bool exact)
+    {
+        ArgumentNullGuard.NotNull(value, nameof(value));
+        lock (_gate)
+        {
+            _hasTypeTests = true;
+            EnsureTermCore(value, nameof(value));
+            if (GetTypeInfoCore(value.Type, nameof(value)).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String) ||
+                GetTypeInfoCore(tested, nameof(tested)).Kind is not (IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String))
+            { throw new ArgumentException("A type test reads a reference, array or string against a reference or sequence type.", nameof(value)); }
+            if (value is IrNullTerm)
+            { return Boolean(false); }
+            return Intern(
+                new StructuralKey(IrTermKind.TypeTest, BooleanType.Value, first: value.Id.Value, second: tested.Value, third: exact ? 1 : 0),
+                (value, tested, exact, BooleanType),
+                static (id, state) => id.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(id))
+                    : new IrTypeTestTerm(id, state.BooleanType, state.value, state.tested, state.exact));
         }
     }
 

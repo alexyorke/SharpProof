@@ -17,6 +17,7 @@ internal static class IrTraversal
                 [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
             IrCastTerm cast => [cast.Operand],
             IrLengthTerm length => [length.Value],
+            IrTypeTestTerm test => [test.Value],
             IrSequenceAccessTerm access => [access.Sequence, access.Index],
             _ => []
         };

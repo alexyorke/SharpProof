@@ -375,6 +375,20 @@ internal static partial class PortableIrGraphCodec
             }
             var blocks = _blocks.Select(BlockRow).ToImmutableArray();
             _cancellationToken.ThrowIfCancellationRequested();
+            // Every row exists now; runtime facts only name present rows.
+            var runtimeTypes = ImmutableArray.CreateBuilder<int>();
+            var conversions = ImmutableArray.CreateBuilder<PortableIrRuntimeConversion>();
+            foreach (var runtime in _factory.RuntimeTypes)
+            {
+                if (!_types.TryGetValue(runtime, out var runtimeIndex))
+                { continue; }
+                runtimeTypes.Add(runtimeIndex);
+                foreach (var (target, converts) in _factory.GetRuntimeConversions(runtime))
+                {
+                    if (_types.TryGetValue(target, out var targetIndex))
+                    { conversions.Add(new() { Runtime = runtimeIndex, Target = targetIndex, Converts = converts }); }
+                }
+            }
             var graph = new PortableIrGraph
             {
                 HasProgram = _program != null,
@@ -386,7 +400,10 @@ internal static partial class PortableIrGraphCodec
                 Terms = _terms.Rows,
                 Blocks = blocks,
                 Entry = _program == null ? -1 : BlockIndex(_program.Entry),
-                Roots = roots
+                Roots = roots,
+                RuntimeTypes = runtimeTypes.Count == 0 ? null : runtimeTypes.ToImmutable(),
+                RuntimeConversions = conversions.Count == 0 ? null
+                    : [.. conversions.OrderBy(static row => row.Runtime).ThenBy(static row => row.Target)]
             };
             return new EncodedPortableIrGraph(
                 graph, _variables.Indices, _instructionIndices, _operations.Indices);
@@ -522,6 +539,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             RequireGraphShape();
             DecodeTypes();
+            DecodeRuntimeTypes();
             DecodeIdentities();
             _variables = DecodeRows(_graph.Variables, "variable",
                 row => _factory.CreateVariable(row.Name, Type(row.Type)));
@@ -543,6 +561,29 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             return new DecodedPortableIrGraph(
                 _factory, program, roots, _variables, instructions, _operations);
+        }
+
+        // Runtime types register in tag order before any operation names one.
+        private void DecodeRuntimeTypes()
+        {
+            var runtimeTypes = _graph.RuntimeTypes ?? [];
+            Require(!runtimeTypes.IsDefault && runtimeTypes.Distinct().Count() == runtimeTypes.Length,
+                "Portable IR runtime types must be distinct.");
+            foreach (var index in runtimeTypes)
+            {
+                var type = Type(index);
+                Require(_factory.GetTypeInfo(type).Kind is IrTypeKind.Reference or IrTypeKind.Sequence,
+                    "A runtime type is a reference or sequence type.");
+                _factory.RegisterRuntimeType(type);
+            }
+            var conversions = _graph.RuntimeConversions ?? [];
+            Require(!conversions.IsDefault, "Portable IR runtime conversions cannot be null.");
+            foreach (var conversion in conversions)
+            {
+                Required(conversion, "runtime conversion");
+                Require(runtimeTypes.Contains(conversion.Runtime), "A runtime conversion starts at a runtime type.");
+                _factory.RegisterRuntimeConversion(Type(conversion.Runtime), Type(conversion.Target), conversion.Converts);
+            }
         }
 
         private void RequireGraphShape()
@@ -815,8 +856,15 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             RequireCanonicalOptionalText(row.Description, "operation description");
-            return _factory.CreateOperation(row.Description, row.SourceSpan is { } span
+            var operation = _factory.CreateOperation(row.Description, row.SourceSpan is { } span
                 ? new IrSourceSpan(span.Document, span.Start, span.Length, span.Line, span.Column) : null);
+            if (row.RuntimeType is { } runtime)
+            {
+                var type = Type(runtime);
+                Require(_factory.RuntimeTypeTag(type) != 0, "An allocation's runtime type must be a runtime type.");
+                _factory.RegisterAllocationRuntimeType(operation, type);
+            }
+            return operation;
         }
 
         private static void RequireCanonicalOptionalText(string? value, string kind)

@@ -11,7 +11,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     public void DiscardedFieldIncrementRetainsRejectedReceiverConversion(bool missing)
     {
         using var subject = TypedProgramSubject.Create(
-            "int Target(object value) { try { ((Box)(object)(int)value).Value++; return 17; } catch (System.NullReferenceException) { return 19; } }",
+            "int Target(object value) { try { ((Box)(object)(int)(decimal)value).Value++; return 17; } catch (System.NullReferenceException) { return 19; } }",
             "public sealed class Box { public int Value; }");
         if (missing)
         { Assert.That(subject.Invoke([null!]), Is.EqualTo(19)); }
@@ -20,7 +20,7 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
         var lowering = RoslynProgramLowering.LowerCandidate(subject.Graph, subject.Context,
             static _ => true, null, default, approximateElementReads: true);
         Assert.That(lowering.IsExact, Is.False);
-        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
+        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
     }
 
@@ -30,13 +30,13 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     {
         var declaration = "public class Box { public " + (dispatched ? "virtual " : "") + "int Value { set { } } }";
         using var subject = TypedProgramSubject.Create(
-            "int Target(object value) { var box = new Box(); box.Value = (int)value; return 17; }",
+            "int Target(object value) { var box = new Box(); box.Value = (int)(decimal)value; return 17; }",
             declaration);
-        Assert.That(subject.Invoke([23]), Is.EqualTo(17));
+        Assert.That(subject.Invoke([23m]), Is.EqualTo(17));
         Assert.That(subject.Invoke(["word"]), Is.InstanceOf<InvalidCastException>());
         var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowering.IsExact, Is.False);
-        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
+        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         using var supported = TypedProgramSubject.Create(
             "int Target(int value) { var box = new Box(); box.Value = value; return 17; }",
@@ -49,13 +49,13 @@ public sealed class BulkEffectBoundaryRouteCoverageTests
     public void InlinedInstanceCallRetainsRejectedReceiverDowncast()
     {
         using var subject = TypedProgramSubject.Create(
-            "int Target(object value) => ((Box)(object)(int)value).Read();",
+            "int Target(object value) => ((Box)(object)(int)(decimal)value).Read();",
             "public sealed class Box { public int Read() => 17; }");
         Assert.That(subject.Invoke([new object()]), Is.InstanceOf<InvalidCastException>());
         Assert.That(subject.Invoke([null!]), Is.InstanceOf<NullReferenceException>());
         var lowering = subject.LowerSourceCalls();
         Assert.That(lowering.IsExact, Is.False);
-        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
+        Assert.That(lowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(lowering.ConstructionLimitExceeded, Is.False);
         using var supported = TypedProgramSubject.Create(
             "int Target() { var box = new Box(); return box.Read(); }",

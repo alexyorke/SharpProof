@@ -43,6 +43,10 @@ internal sealed class IrObjectState
 {
     internal ImmutableDictionary<IrMemberId, IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<IrMemberId, IrValue>();
 
+    // The object's runtime type, when the counterexample names a registered
+    // runtime type that every view of the object admits.
+    internal IrTypeId? RuntimeType { get; set; }
+
     internal ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder KeyedFields { get; } = ImmutableDictionary.CreateBuilder<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>();
 
     internal IrObjectState WithKeyedField(IrMemberId field, IrValue key, IrValue value)
@@ -106,6 +110,43 @@ internal sealed class IrHeap
     internal ImmutableDictionary<(object Identity, IrMemberId Field), IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<(object Identity, IrMemberId Field), IrValue>(FieldKey.Instance);
     internal bool ConsumedApproximation { get; private set; }
     private bool UnknownContents { get; set; }
+    // Runtime types of allocated objects and arrays. They never change, so
+    // invalidating the contents keeps them.
+    private readonly Dictionary<object, IrTypeId> _objectRuntimeTypes = new(ObjectKey.Instance);
+    private readonly ImmutableDictionary<IrValue, IrTypeId>.Builder _sequenceRuntimeTypes = ImmutableDictionary.CreateBuilder<IrValue, IrTypeId>(IrValueIdentity.Instance);
+
+    // A read the execution cannot answer exactly, such as a type test on an
+    // object of unknown runtime type: the run is then not a replayable witness.
+    internal void ConsumeApproximation()
+    { ConsumedApproximation = true; }
+
+    internal void RecordRuntimeType(IrValue value, IrTypeId type)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        RepositoryParameterGuard.ThrowIfInvalid(type.IsDefault, nameof(type));
+        if (value.Kind == IrValueKind.Sequence)
+        { _sequenceRuntimeTypes[value.SequenceIdentity] = type; }
+        else if (value.Kind == IrValueKind.Reference)
+        { _objectRuntimeTypes[value.Reference] = type; }
+    }
+
+    internal bool TryGetRuntimeType(IrValue value, out IrTypeId type)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        type = default;
+        if (value.Kind == IrValueKind.Sequence)
+        { return _sequenceRuntimeTypes.TryGetValue(value.SequenceIdentity, out type); }
+        if (value.Kind != IrValueKind.Reference)
+        { return false; }
+        if (_objectRuntimeTypes.TryGetValue(value.Reference, out type))
+        { return true; }
+        // An array widened to object keeps the array as its identity.
+        if (value.Reference is IrValue array && _sequenceRuntimeTypes.TryGetValue(array, out type))
+        { return true; }
+        if (value.Reference is IrObjectState { RuntimeType: { } entry })
+        { type = entry; return true; }
+        return false;
+    }
 
     internal void Invalidate()
     {

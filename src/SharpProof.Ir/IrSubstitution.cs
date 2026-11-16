@@ -337,6 +337,15 @@ internal static class IrSubstitution
                 : state.Factory.Cast(cast.Type, operand);
         }
 
+        public IrTerm Visit(IrTypeTestTerm test, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
+        {
+            test = RepositoryParameterGuard.NotNull(test, nameof(test));
+            var value = IrSubstitution.Visit(state.Memo, test.Value);
+            return ReferenceEquals(value, test.Value)
+                ? test
+                : state.Factory.TypeTest(value, test.Tested, test.Exact);
+        }
+
         public IrTerm Visit(IrLengthTerm length, (IrFactory Factory, ImmutableDictionary<IrId, IrTerm> Memo) state)
         {
             length = RepositoryParameterGuard.NotNull(length, nameof(length));

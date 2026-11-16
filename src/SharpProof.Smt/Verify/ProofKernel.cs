@@ -144,6 +144,9 @@ internal sealed class ProofKernel(ISmtBackend backend)
             cancellationToken.ThrowIfCancellationRequested();
             var evaluated = interpreter.Evaluate(assumption.Predicate,
                 model.Assignments, null, null, cancellationToken, concreteOpaqueValueProvider: Observe);
+            // An object's unknown runtime type is an approximation of the
+            // model, like an unobserved opaque value.
+            unavailable |= evaluated.Unsupported?.Reason == IrUnsupportedReason.UnknownRuntimeType;
             if (!IsBoolean(evaluated, expected: true))
             {
                 return Unknown(unavailable ? AbstentionReason.CounterexampleNotReplayable : AbstentionReason.CounterexampleReplayFailed);
@@ -151,6 +154,7 @@ internal sealed class ProofKernel(ISmtBackend backend)
         }
         cancellationToken.ThrowIfCancellationRequested();
         var goal = interpreter.Evaluate(query.Goal.Predicate, model.Assignments, null, null, cancellationToken, concreteOpaqueValueProvider: Observe);
+        unavailable |= goal.Unsupported?.Reason == IrUnsupportedReason.UnknownRuntimeType;
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch

@@ -11,14 +11,14 @@ public sealed class OpaqueConstructorChildAdmissionCoverageTests
     public void ActualExceptionConstructionRetainsUnboxingChildAndTypedAllocationControl()
     {
         using var rejected = TypedProgramSubject.Create(
-            "object Target(object value) => new System.ArgumentOutOfRangeException(\"value\", (int)value, \"bad\");");
-        var actual = rejected.Invoke([17]);
+            "object Target(object value) => new System.ArgumentOutOfRangeException(\"value\", (int)(decimal)value, \"bad\");");
+        var actual = rejected.Invoke([17m]);
         Assert.That(actual, Is.TypeOf<ArgumentOutOfRangeException>());
         Assert.That(((ArgumentOutOfRangeException)actual!).ActualValue, Is.EqualTo(17));
         Assert.That(((ArgumentOutOfRangeException)actual!).ParamName, Is.EqualTo("value"));
         var rejectedLowering = rejected.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(rejectedLowering.IsExact, Is.False);
-        Assert.That(rejectedLowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
+        Assert.That(rejectedLowering.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         Assert.That(rejectedLowering.ConstructionLimitExceeded, Is.False);
 
         using var supported = TypedProgramSubject.Create(

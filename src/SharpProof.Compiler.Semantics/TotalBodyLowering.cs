@@ -253,6 +253,9 @@ internal static class TotalBodyLowering
                 case IrLengthTerm length:
                     pending = pending.Push(length.Value);
                     break;
+                case IrTypeTestTerm test:
+                    pending = pending.Push(test.Value);
+                    break;
             }
         }
         return false;

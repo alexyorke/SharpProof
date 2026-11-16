@@ -38,6 +38,8 @@ internal sealed class PassiveCallableVcBuilder
     }
     private readonly PassiveCallableCandidate _candidate;
     private readonly IrFactory _factory;
+    // Read before the builder adds facts of its own.
+    private readonly bool _typeTests;
     private readonly IrProgram _program;
     private readonly ImmutableHashSet<IrInstructionId> _stops;
     private readonly ImmutableArray<Assumption>.Builder _facts = ImmutableArray.CreateBuilder<Assumption>();
@@ -125,6 +127,7 @@ internal sealed class PassiveCallableVcBuilder
         System.ArgumentNullException.ThrowIfNull(candidate);
         _candidate = candidate;
         _factory = candidate.Factory;
+        _typeTests = _factory.HasTypeTests;
         _program = encoding?.Program ?? candidate.Program;
         _sequenceReaders = IrSequenceReads.Readers(_program, cancellationToken);
         _stops = encoding?.Stops ?? [];
@@ -343,6 +346,10 @@ internal sealed class PassiveCallableVcBuilder
                             { return null; }
                             var allocated = Fresh(allocation.AllocatedType);
                             Fact(Guard(reach, Not(Equal(allocated, _factory.Null(allocated.Type)))), allocation.Operation, "allocation-nonnull");
+                            // The object's runtime type, when the allocation records one.
+                            // Only a type test reads it; without one the fact is unused.
+                            if (_typeTests && _factory.TryGetAllocationRuntimeType(allocation.Operation, out var runtimeType))
+                            { Fact(Guard(reach, _factory.TypeTest(allocated, runtimeType, exact: true)), allocation.Operation, "allocation-runtime-type"); }
                             if (_factory.GetTypeInfo(allocation.AllocatedType).Kind == IrTypeKind.Reference)
                             {
                                 Spend(_heap.Stores.Length);
@@ -894,7 +901,7 @@ internal sealed class PassiveCallableVcBuilder
                 { _entryFieldReferenceOrder.Add(term.Id); }
                 _entryFieldReferences[term.Id] = term;
             }
-            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm) ||
+            return !Scalar(term.Type) || term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrVariableTerm or IrNullTerm or IrEmptyArrayTerm or IrLengthTerm or IrSequenceAccessTerm or IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm or IrOpaqueTerm or IrTypeTestTerm) ||
                 term is IrOpaqueTerm opaque && !IrFieldSites.IsFieldRead(_factory, term) && !IrInvariantRelations.IsRelation(_factory, term) &&
                     IrOpaqueCallSite.DefaultComparerValueKind(_factory, opaque) == null ||
                 term is IrSequenceAccessTerm && _factory.GetTypeInfo(term.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer) ||

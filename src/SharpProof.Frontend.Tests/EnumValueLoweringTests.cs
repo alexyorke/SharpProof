@@ -76,7 +76,6 @@ public sealed class EnumValueLoweringTests
     [TestCase("int Target(int x) => (int)((Small)x - Small.A);")]
     [TestCase("int Target(int x) { var e = (Small)x; e++; return (int)e; }")]
     [TestCase("int Target(int x) { var e = (Small)x; e += 1; return (int)e; }")]
-    [TestCase("int Target(int x) { object o = (Small)x; return o is byte ? 1 : 0; }")]
     public void UnmodeledEnumOperationsClose(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);

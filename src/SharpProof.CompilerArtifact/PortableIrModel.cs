@@ -23,6 +23,12 @@ internal sealed record PortableIrGraph
     public int Entry { get; init; } = -1;
     [System.Text.Json.Serialization.JsonConverter(typeof(SharpProof.Worker.Protocol.ProtocolArrayJsonConverter))]
     public ImmutableArray<int> Roots { get; init; } = [];
+    // Runtime types present in the graph, in tag order, and whether each
+    // converts to another present type at run time. Absent when empty.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<int>? RuntimeTypes { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<PortableIrRuntimeConversion>? RuntimeConversions { get; init; }
 
 }
 
@@ -123,9 +129,22 @@ internal sealed record PortableIrMember
 
 }
 
+internal sealed record PortableIrRuntimeConversion
+{
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Runtime { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public int Target { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Converts { get; init; }
+}
+
 internal sealed record PortableIrOperation
 {
     public string? Description { get; init; }
+    // The exact runtime type of the object an allocation here creates.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? RuntimeType { get; init; }
     [System.Text.Json.Serialization.JsonRequired]
     public PortableIrSourceSpan? SourceSpan { get; init; }
 

@@ -67,7 +67,10 @@ public sealed class IrTraversalTests
                     [sequenceTerm]),
                 (IrTermKind.SequenceAccess,
                     factory.SequenceAccess(sequenceTerm, integerTerm),
-                    [sequenceTerm, integerTerm])
+                    [sequenceTerm, integerTerm]),
+                (IrTermKind.TypeTest,
+                    factory.TypeTest(receiverTerm, receiverType, exact: true),
+                    [receiverTerm])
             );
 
         Assert.That(

@@ -214,6 +214,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return Approximate(operation, block, FrontendAbstention.UnsupportedInvocationShape); }
         if (depth < 256 && NullableBody(operation, block, depth) is { } nullableValue)
         { return nullableValue; }
+        if (depth < 256 && RuntimeTypeBody(operation, block, depth) is { } runtimeTyped)
+        { return runtimeTyped; }
         if (depth < 256 && operation is IConversionOperation
             { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } collectionConversion &&
             !collectionConversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(collectionConversion.Type, converted.Type) &&
@@ -294,10 +296,20 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             var operand = LowerBodyValue(downcast.Operand, block, depth + 1);
             if (!operand.Classification.IsExact)
             { return Approximate(operation, operand.Continuation, operand.Classification.Abstention); }
-            var fits = _context.Temporary(_factory.BooleanType);
-            _builder!.Havoc(operand.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, fits);
+            // Whether the value fits is its runtime type's conversion, which
+            // stays unknown for objects the program did not allocate.
+            IrTerm fits;
+            if (downcast.Type is { IsReferenceType: true } and not ITypeParameterSymbol && downcast.Type.TypeKind != TypeKind.Dynamic &&
+                !RuntimeTypeRelationsIsOpen(downcast.Type))
+            { fits = RuntimeTest(operand.Value, downcast.Type, RuntimeTypeRelations.TestKind.Reference); }
+            else
+            {
+                var unknown = _context.Temporary(_factory.BooleanType);
+                _builder!.Havoc(operand.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+                fits = _factory.Variable(unknown);
+            }
             return ApplyRule(operation, CSharpOperationSemantics.ReferenceDowncast(_factory, _context.Type(downcast.Type), operand.Value,
-                _factory.Variable(fits)), operand.Continuation);
+                fits), operand.Continuation);
         }
         if (depth < 256 && operation is IConversionOperation boxing && CSharpOperationSemantics.IsScalarBoxing(boxing))
         {
@@ -627,6 +639,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             DelegateBinding?.Invoke(((IMethodReferenceOperation)creation.Target).Method) == true
             ? _context.StaticDelegateAllocationSite(operation) : _context.Site(operation);
         _builder!.Allocate(block, site, type, target);
+        if (TryAllocationRuntimeType(operation, out var runtime))
+        {
+            var runtimeType = _context.Type(runtime);
+            RuntimeTypeRelations.RegisterRuntime(_factory, _context.Compilation, runtimeType, runtime, box: false);
+            _factory.RegisterAllocationRuntimeType(site, runtimeType);
+        }
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
     }
 

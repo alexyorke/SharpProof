@@ -35,8 +35,9 @@ internal sealed partial class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(total.IsBodyAbstraction, Is.False);
-            Assert.That(instructions.OfType<IrHavocInstruction>().Any(instruction =>
-                instruction.Origin == IrHavocOrigin.Approximation), Is.True);
+            // The parameter's runtime type is unknown, so a type test decides the fault.
+            Assert.That(instructions.OfType<IrBranchInstruction>().Any(instruction =>
+                IrTraversal.Any(instruction.Condition, static term => term is IrTypeTestTerm)), Is.True);
             Assert.That(total.ExceptionConstraints.Single().AllowedKinds, Does.Contain(kind));
             Assert.That(IrExceptionKindFacts.MetadataName(kind), Is.EqualTo("System.InvalidCastException"));
         }

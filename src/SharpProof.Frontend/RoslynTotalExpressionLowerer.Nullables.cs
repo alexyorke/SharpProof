@@ -316,9 +316,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 LiftedShape(compound.OperatorKind, targetType, valueType, targetType) != LiftedKind.None:
                 return LiftedStore(operation, compound.Target, compound, block, depth, null, returnsOld: false);
             case IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsUserDefined: false }, Type.SpecialType: SpecialType.System_Object } boxing when
-                CSharpOperationSemantics.ModeledNullableUnderlying(boxing.Operand.Type) is { } boxed && CSharpOperationSemantics.IsScalar(boxed) &&
-                !CSharpOperationSemantics.IsEnum(boxed):
-                return WithParts(boxing.Operand, block, depth, (parts, current) => BoxNullable(operation, parts, current));
+                CSharpOperationSemantics.ModeledNullableUnderlying(boxing.Operand.Type) is { } boxed && IsBoxableValue(boxed):
+                return WithParts(boxing.Operand, block, depth, (parts, current) => BoxNullable(operation, parts, current, boxed));
             case IInvocationOperation { Instance: { } instance, Arguments.Length: <= 1 } member when
                 CSharpOperationSemantics.ModeledNullableUnderlying(instance.Type) is { } underlying && CSharpOperationSemantics.IsScalar(underlying) &&
                 member.TargetMethod.ContainingType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
@@ -374,7 +373,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
 
     // Boxing a T? yields null when it has no value, and otherwise a fresh box
     // of the value, as boxing the value itself does.
-    private TotalBodyValue BoxNullable(IOperation operation, NullableParts parts, IrBlockId block)
+    private TotalBodyValue BoxNullable(IOperation operation, NullableParts parts, IrBlockId block, ITypeSymbol? boxed = null)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var type = _context.Type(operation.Type);
@@ -386,7 +385,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var absent = _builder.CreateBlock("nullable:box-null");
         var join = _builder.CreateBlock("nullable:box-join");
         _builder.Branch(block, site, parts.HasValue, present, absent);
-        var box = AllocateValue(operation, present);
+        var box = boxed != null ? AllocateBox(operation, boxed, parts.Value, present) : AllocateValue(operation, present);
         _builder.Assign(box.Continuation, site, result, box.Value);
         _builder.Goto(box.Continuation, site, join);
         _builder.Assign(absent, site, result, _factory.Null(type));
@@ -408,7 +407,24 @@ internal sealed partial class RoslynTotalExpressionLowerer
                     { return (parts, current) => Capture(member, new(Not(parts.HasValue), current, FrontendSubsetClassification.Exact)); }
                     if (argument is not IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsUserDefined: false }, Type.SpecialType: SpecialType.System_Object } boxing ||
                         boxing.Operand.Type is not { IsValueType: true } boxedType)
-                    { return null; }
+                    {
+                        // Any other object: equal when it is a box of exactly T holding the value.
+                        if (!IsReferenceInput(argument.Type) || !IsBoxableValue(underlying))
+                        { return null; }
+                        return (parts, current) =>
+                        {
+                            var other = LowerBodyValue(argument, current, 1);
+                            if (!other.Classification.IsExact)
+                            { return Approximate(member, other.Continuation, other.Classification.Abstention); }
+                            var isNull = _factory.Binary(IrBinaryOperator.Equal, other.Value, _factory.Null(other.Value.Type));
+                            var boxOfT = RuntimeTest(other.Value, underlying, RuntimeTypeRelations.TestKind.Box);
+                            var same = _factory.Conditional(boxOfT,
+                                _factory.Binary(IrBinaryOperator.Equal, BoxRead(other.Value, underlying, _factory.Boolean(true)), parts.Value),
+                                _factory.Boolean(false));
+                            return Capture(member, new(_factory.Conditional(isNull, Not(parts.HasValue), And(parts.HasValue, same)),
+                                other.Continuation, FrontendSubsetClassification.Exact));
+                        };
+                    }
                     if (SymbolEqualityComparer.Default.Equals(boxedType, underlying))
                     {
                         return (parts, current) =>
@@ -416,7 +432,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
                             var value = LowerBodyValue(boxing.Operand, current, 1);
                             if (!value.Classification.IsExact)
                             { return Approximate(member, value.Continuation, value.Classification.Abstention); }
-                            var box = AllocateValue(boxing, value.Continuation);
+                            var box = AllocateBox(boxing, boxedType, value.Value, value.Continuation);
                             return Capture(member, new(And(parts.HasValue, _factory.Binary(IrBinaryOperator.Equal, parts.Value, value.Value)),
                                 box.Continuation, FrontendSubsetClassification.Exact));
                         };
@@ -429,7 +445,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
                         { return Approximate(member, current, FrontendAbstention.UnsupportedOperationKind); }
                         if (!other.Lowered.Classification.IsExact)
                         { return Approximate(member, other.Lowered.Continuation, other.Lowered.Classification.Abstention); }
-                        var box = BoxNullable(boxing, other.Parts, other.Lowered.Continuation);
+                        var box = BoxNullable(boxing, other.Parts, other.Lowered.Continuation, underlying);
                         return LiftedComparison(BinaryOperatorKind.Equals, parts, other.Parts) is { } equal
                             ? Capture(member, new(equal, box.Continuation, FrontendSubsetClassification.Exact))
                             : Approximate(member, box.Continuation, FrontendAbstention.UnsupportedOperationKind);
