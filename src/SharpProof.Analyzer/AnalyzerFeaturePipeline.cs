@@ -711,10 +711,13 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        // A ContractFor companion's effect attributes select the target's
+        // effect claims, as the build collector does.
+        var contractSource = session.ResolveContractSource(method);
         var features = session.Attributes.Select(
             method,
-            session.Configuration.ContractsEnabled &&
-            session.ResolveContractSource(method).HasSelectedContractIntent) &
+            session.Configuration.ContractsEnabled && contractSource.HasSelectedContractIntent,
+            contractSource.UsesCompanion ? contractSource.Source : null) &
             ((session.Configuration.ContractsEnabled
                   ? ContractSelectionFeatures.Contracts
                   : ContractSelectionFeatures.None) |

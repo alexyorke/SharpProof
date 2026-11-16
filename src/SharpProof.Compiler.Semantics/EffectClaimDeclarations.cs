@@ -10,13 +10,10 @@ internal static class EffectClaimDeclarations
         session = ArgumentNullGuard.NotNull(session, nameof(session));
         // A ContractFor companion member may declare effect claims for a
         // method its author cannot annotate.
-        var attributes = ContractSelectionInventory.GetCallableAttributes(method)
-            .Concat(session.Attributes.GetCompanionEffectAttributes(session.ResolveCompanionMember(method))).ToImmutableArray();
+        var ownAttributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
+        var companionAttributes = session.Attributes.GetCompanionEffectAttributes(session.ResolveCompanionMember(method));
+        var attributes = ownAttributes.AddRange(companionAttributes);
         var summaryContracts = Select(attributes, session.Attributes.EffectContract);
-        var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
-        var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);
-        var capabilities = EffectContractArguments.DecodeCapabilities(capabilitiesAttributes, static (_, _, _) => { });
-        var exceptions = EffectContractArguments.DecodeAllowedExceptions(allowedExceptions, session.Compilation, static (_, _, _) => { });
         cancellationToken.ThrowIfCancellationRequested();
         var contract = summaryContracts.IsDefaultOrEmpty
             ? new EffectContractResolution(EffectContractResolutionKind.Missing, EffectSummary.Bottom)
@@ -30,15 +27,27 @@ internal static class EffectClaimDeclarations
             established: EffectContractMappings.IsObservablePure(contract.Summary));
         Add(Select(attributes, session.Attributes.ZeroAllocations), EffectEvaluationContractKind.ZeroAllocations, EffectClaimConstraint.Empty,
             established: (declared.Effects & EffectContractKind.Allocates) == 0);
-        Add(capabilitiesAttributes, EffectEvaluationContractKind.AllowedCapabilities,
-            new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []), capabilities.IsValid,
-            (declared.Capabilities & ~capabilities.Value) == 0);
+        // An allowance is decoded per declaration: a companion's allowance is
+        // a separate claim and never widens the target's own.
+        foreach (var declaration in (ImmutableArray<AttributeData>[])[ownAttributes, companionAttributes])
+        {
+            var capabilitiesAttributes = Select(declaration, session.Attributes.AllowedCapabilities);
+            var capabilities = EffectContractArguments.DecodeCapabilities(capabilitiesAttributes, static (_, _, _) => { });
+            Add(capabilitiesAttributes, EffectEvaluationContractKind.AllowedCapabilities,
+                new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []), capabilities.IsValid,
+                (declared.Capabilities & ~capabilities.Value) == 0);
+        }
         Add(Select(attributes, session.Attributes.DoesNotThrow), EffectEvaluationContractKind.DoesNotThrow, EffectClaimConstraint.Empty,
             established: throws.IsEmpty);
-        Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
-            new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
-            !throws.IncludesUnknown && throws.Types.All(type => exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(
-                type ?? throw new ArgumentNullException(nameof(type)), allowed ?? throw new ArgumentNullException(nameof(allowed))))));
+        foreach (var declaration in (ImmutableArray<AttributeData>[])[ownAttributes, companionAttributes])
+        {
+            var allowedExceptions = Select(declaration, session.Attributes.AllowedExceptions);
+            var exceptions = EffectContractArguments.DecodeAllowedExceptions(allowedExceptions, session.Compilation, static (_, _, _) => { });
+            Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions,
+                new EffectClaimConstraint(EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types), exceptions.IsValid,
+                !throws.IncludesUnknown && throws.Types.All(type => exceptions.Types.Any(allowed => EffectTypeFacts.IsDerivedFrom(
+                    type ?? throw new ArgumentNullException(nameof(type)), allowed ?? throw new ArgumentNullException(nameof(allowed))))));
+        }
         Add(summaryContracts, EffectEvaluationContractKind.EffectContract,
             new EffectClaimConstraint(declared.Effects, declared.Capabilities, contract.Summary.Throws.Types),
             contract.Kind != EffectContractResolutionKind.Invalid, true);

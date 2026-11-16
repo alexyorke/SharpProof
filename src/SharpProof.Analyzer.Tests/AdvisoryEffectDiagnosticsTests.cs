@@ -31,6 +31,38 @@ public sealed class AdvisoryEffectDiagnosticsTests
     }
 
     [Test]
+    public async Task ACompanionEffectClaimIsAdvisedOnTheTarget()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync("""
+            using SharpProof.Attributes;
+            public static class Fixture { public static int Target(int x) => 10 / x; }
+            [ContractFor(typeof(Fixture))]
+            public static class FixtureContracts { [DoesNotThrow] public static int Target(int x) => 0; }
+            """, "effects", ["SP0046"]);
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0046"]);
+    }
+
+    // A companion's broader allowance is a claim of its own; it does not
+    // widen the allowance the target declares.
+    [Test]
+    public async Task ACompanionAllowanceDoesNotWidenTheTargetsAllowance()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync("""
+            using SharpProof.Attributes;
+            public static class Fixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static int Target(object gate) { lock (gate) { } return 0; }
+            }
+            [ContractFor(typeof(Fixture))]
+            public static class FixtureContracts {
+                [AllowedCapabilities(SharpProofCapability.Synchronization)]
+                public static int Target(object gate) => 0;
+            }
+            """, "effects", ["SP0016"]);
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0016"]);
+    }
+
+    [Test]
     public async Task ABodyWithoutViolatingSitesIsStillNotProven()
     {
         var factory = new RecordingSessionFactory();

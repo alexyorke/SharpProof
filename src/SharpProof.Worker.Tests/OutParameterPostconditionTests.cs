@@ -66,6 +66,26 @@ public sealed class OutParameterPostconditionTests
         Assert.That(outcomes, Is.EqualTo(new[] { WorkerClaimOutcome.Unknown }));
     }
 
+    // Called as Read(box, out box.Value), the write breaks both clauses even
+    // though the body itself reads no memory.
+    [Test]
+    public async Task ContractReadOfMemoryAnOutArgumentMayAliasIsUnknown()
+    {
+        var outcomes = await Outcomes("""
+            using SharpProof.Attributes;
+            public sealed class Box { public int Value; }
+            public static class Holder {
+                public static int Read([NonNull] Box box, out int written) {
+                    Contract.Requires(box.Value == 0);
+                    Contract.Ensures(box.Value == 0);
+                    written = 1;
+                    return 0;
+                }
+            }
+            """);
+        Assert.That(outcomes, Is.EqualTo(new[] { WorkerClaimOutcome.Unknown }));
+    }
+
     [Test]
     public async Task EffectClaimOnAnOutParameterMethodIsUnknown()
     {

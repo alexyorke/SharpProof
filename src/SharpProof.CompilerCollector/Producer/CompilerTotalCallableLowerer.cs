@@ -126,8 +126,12 @@ internal static class CompilerTotalCallableLowerer
         // An out parameter may be a field or element the caller passed, so a
         // write to it may change memory the body later reads. Such a body is
         // admitted only when it touches no memory and makes no call.
+        // A clause that reads memory may read storage the out argument
+        // aliases, so each clause must read parameters and the result alone.
         if (target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) &&
-            (graph == null || !IsMemoryFree(graph.OriginalOperation, compilation)))
+            (graph == null || !IsMemoryFree(graph.OriginalOperation, compilation) ||
+                binding.Clauses.Any(clause => !ReadsOnlyParameters(clause.Value, context) ||
+                    !ReadsOnlyParameters(clause.SafeCondition, context))))
         { return null; }
         cancellationToken.ThrowIfCancellationRequested();
         if (reportDiagnostic != null && !lowering.Abstentions.IsDefaultOrEmpty)
@@ -219,6 +223,21 @@ internal static class CompilerTotalCallableLowerer
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
+    }
+
+    // A clause term over parameters, the result and constants alone: no
+    // field, element, length, type test or opaque read.
+    private static bool ReadsOnlyParameters(IrTerm term, TotalLoweringContext context)
+    {
+        term = RepositoryParameterGuard.NotNull(term, nameof(term));
+        if (IrTraversal.Any(term, static node => node is not (IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrVariableTerm or
+            IrUnaryTerm or IrBinaryTerm or IrConditionalTerm or IrCastTerm)))
+        { return false; }
+        var allowed = new HashSet<IrVarId>(context.Inputs.SelectMany(static input => new[] { input.Entry, input.Current, input.PreState })
+            .Concat(context.Parameters.SelectMany(static parameter => new[] { parameter.Entry, parameter.Current, parameter.PreState })));
+        if (context.Result is { } result)
+        { allowed.Add(result); }
+        return IrTraversal.CollectVariables(term).All(allowed.Contains);
     }
 
     // A body over locals, parameters and constants alone: no field, element,
