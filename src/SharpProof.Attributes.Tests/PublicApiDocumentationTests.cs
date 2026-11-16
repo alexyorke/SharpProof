@@ -158,6 +158,12 @@ internal sealed class PublicApiDocumentationTests
     private static string GetParameterTypeName(Type type)
     {
         System.ArgumentNullException.ThrowIfNull(type);
+        // A documentation ID writes a ref or out parameter's type with a
+        // trailing @.
+        if (type.IsByRef)
+        {
+            return GetParameterTypeName(type.GetElementType()!) + "@";
+        }
         return type.IsArray
             ? GetParameterTypeName(type.GetElementType()!) + "[]"
             : type.IsGenericParameter

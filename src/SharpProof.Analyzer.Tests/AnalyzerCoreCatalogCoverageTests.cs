@@ -10,7 +10,7 @@ public sealed class AnalyzerCoreCatalogCoverageTests
     public void InvalidOldSignatureNamesTheRequiredValueArgument()
     {
         var description = AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
-            ContractBindingFailure.InvalidIntrinsicSignature, isOld: true);
+            ContractBindingFailure.InvalidIntrinsicSignature, ContractIntrinsic.Old);
         Assert.That(description.Argument, Is.EqualTo("<signature>"));
         Assert.That(description.Reason, Does.Contain("exactly one value argument"));
     }

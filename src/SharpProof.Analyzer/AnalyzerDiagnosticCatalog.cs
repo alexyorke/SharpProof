@@ -3,20 +3,20 @@ namespace SharpProof.Analyzer;
 internal static class AnalyzerDiagnosticCatalog
 {
     internal static (string Argument, string Reason) DescribeIntrinsicViolation(
-        ContractBindingFailure failure, bool isOld)
+        ContractBindingFailure failure, ContractIntrinsic intrinsic)
     {
-        return (failure, isOld) switch
+        return (failure, intrinsic) switch
         {
-            (ContractBindingFailure.NestedOld, true) => (
+            (ContractBindingFailure.NestedOld, _) => (
                 "<nesting>",
-                "Contract.Old cannot be nested inside Contract.Old"),
-            (ContractBindingFailure.NestedOld, false) => (
-                "<nesting>",
-                "Contract.Result cannot be nested inside Contract.Old"),
-            (ContractBindingFailure.InvalidIntrinsicSignature, true) => (
+                "Contract." + intrinsic + " cannot be nested inside Contract.Old"),
+            (ContractBindingFailure.InvalidIntrinsicSignature, ContractIntrinsic.Old) => (
                 "<signature>",
                 "expected exactly one value argument"),
-            (ContractBindingFailure.InvalidIntrinsicSignature, false) => (
+            (ContractBindingFailure.InvalidIntrinsicSignature, ContractIntrinsic.ValueAtReturn) => (
+                "<signature>",
+                "expected an out parameter of the enclosing callable"),
+            (ContractBindingFailure.InvalidIntrinsicSignature, _) => (
                 "<signature>",
                 "expected a result type matching the callable return type"),
             _ => ("<placement>",
