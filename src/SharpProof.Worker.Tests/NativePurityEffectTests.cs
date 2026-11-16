@@ -174,7 +174,6 @@ internal sealed class NativePurityEffectTests
 
     [TestCase("public static volatile int State;", "State = x; return x;")]
     [TestCase("public static int State = 1;", "State = x; return x;")]
-    [TestCase("", "return (int)(object)x;")]
     [TestCase("public static object State = new object();", "return x;")]
     public async Task UnmodeledEffectsAndInitializationRemainUnknown(string members, string body)
     {

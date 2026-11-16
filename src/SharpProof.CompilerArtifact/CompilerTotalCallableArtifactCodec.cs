@@ -263,7 +263,7 @@ internal static class CompilerTotalCallableArtifactCodec
         {
             cancellationToken.ThrowIfCancellationRequested();
             Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
-                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque && SupportedType(artifact.Graph, term.Type) &&
+                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque or IrTermKind.TypeTest && SupportedType(artifact.Graph, term.Type) &&
                 (term.Kind != IrTermKind.Opaque || IsFieldRead(artifact.Graph, term) || IsDefaultComparerValue(artifact.Graph, term)) &&
                 (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
                 (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&

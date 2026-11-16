@@ -137,14 +137,11 @@ public sealed class NullableValueLoweringTests
         AssertAgrees(members, [4]);
     }
 
-    // Equals with an argument of another type or an unknown object, hash
-    // codes whose formula depends on the runtime, enum boxing, conversions
-    // into enums, byte-sized enum arithmetic (which promotes and narrows),
+    // Equals with an argument of another type, hash codes whose formula
+    // depends on the runtime, conversions into enums, byte-sized enum arithmetic (which promotes and narrows),
     // and other underlying types stay closed.
     [TestCase("bool Target(int x) { int? n = x; return n.Equals(3L); }")]
-    [TestCase("bool Target(int x, object o) { int? n = x; return n.Equals(o); }")]
     [TestCase("int Target(int x) { long? n = x; return n.GetHashCode(); }")]
-    [TestCase("object Target(int x) { System.DayOfWeek? d = (System.DayOfWeek)x; return d; }")]
     [TestCase("int Target(int x) { int? n = x; System.DayOfWeek? d = (System.DayOfWeek?)n; return (int)(d ?? 0); }")]
     [TestCase("int Target(int x) { Small? s = (Small)x; s++; return (int)(s ?? 0); } enum Small : byte { A }")]
     [TestCase("int Target(int x) { var s = (Small)x; return (int)(s + 1); } enum Small : byte { A }")]

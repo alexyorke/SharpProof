@@ -7887,8 +7887,8 @@
       "declarationSha256": "04875c7d3a0b6bcc270c617a08d7ba512217b764492c916b275088d359f76f17",
       "methodName": "Equals",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0345",

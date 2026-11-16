@@ -7,20 +7,20 @@ namespace SharpProof.Frontend.Test;
 internal sealed class ArrayChildConversionAdmissionCoverageTests
 {
     [TestCase("receiver", FrontendAbstention.UnsupportedOperationKind)]
-    [TestCase("index", FrontendAbstention.ConversionMayChangeValue)]
-    [TestCase("compound", FrontendAbstention.ConversionMayChangeValue)]
+    [TestCase("index", FrontendAbstention.UnsupportedType)]
+    [TestCase("compound", FrontendAbstention.UnsupportedType)]
     public void ActualArrayChildConversionsPreserveClosureAndTypedParameterControls(string route, FrontendAbstention expected)
     {
         System.ArgumentNullException.ThrowIfNull(route);
         var source = route switch
         {
             "receiver" => "bool Target(object values) => ((float[])values)[0] == 1f;",
-            "index" => "bool Target(float[] values, object index) => values[(int)index] == 1f;",
-            _ => "bool Target(int[] values, object next) { values[0] += (int)next; return values[0] == 3; }"
+            "index" => "bool Target(float[] values, object index) => values[(int)(decimal)index] == 1f;",
+            _ => "bool Target(int[] values, object next) { values[0] += (int)(decimal)next; return values[0] == 3; }"
         };
         using var rejected = TypedProgramSubject.Create(source);
-        ImmutableArray<object> arguments = route == "compound" ? [new[] { 1 }, 2]
-            : route == "index" ? [new[] { 1f }, 0] : [new[] { 1f }];
+        ImmutableArray<object> arguments = route == "compound" ? [new[] { 1 }, 2m]
+            : route == "index" ? [new[] { 1f }, 0m] : [new[] { 1f }];
         Assert.That(rejected.Invoke(arguments), Is.True);
         if (route == "compound")
         { Assert.That(((int[])arguments[0])[0], Is.EqualTo(3)); }

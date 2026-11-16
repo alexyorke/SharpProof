@@ -30,7 +30,8 @@ internal sealed class IrClosedTermDispatchTests
             (factory.Conditional(flag, integer, factory.Integer(2)), "(v0 ? v1 : 2)"),
             (factory.Cast(factory.ObjectType, owner), "((" + TypeName(factory, factory.ObjectType) + ")v2)"),
             (factory.Length(sequence), "len(v3)"),
-            (factory.SequenceAccess(sequence, integer), "v3[v1]")
+            (factory.SequenceAccess(sequence, integer), "v3[v1]"),
+            (factory.TypeTest(owner, ownerType, exact: false), "is-type(v2, " + TypeName(factory, ownerType) + ")")
         );
         Assert.That(shapes.Select(shape => shape.Term.Kind), Is.EquivalentTo(Enum.GetValues<IrTermKind>()));
         var printer = new IrPrinter(factory);

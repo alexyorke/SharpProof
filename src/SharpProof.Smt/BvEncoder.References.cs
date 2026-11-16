@@ -4,6 +4,8 @@ internal sealed partial class BvEncoder
 {
     private Sort? _referenceSort;
     private FuncDecl? _length;
+    private FuncDecl? _runtimeType;
+    private readonly Dictionary<(IrTypeId Tested, bool Exact), FuncDecl> _unknownInstances = [];
     private FuncDecl? _nominalWitnessTags;
     private Expr? _nullReference;
     private readonly ImmutableDictionary<IrTypeId, Expr>.Builder _emptyArrays = ImmutableDictionary.CreateBuilder<IrTypeId, Expr>();
@@ -256,6 +258,68 @@ internal sealed partial class BvEncoder
         return type.Kind is IrTypeKind.Reference or IrTypeKind.Sequence or IrTypeKind.String;
     }
 
+    // rtype maps each reference to a tag: a registered runtime type's tag
+    // (its position plus one), or any other value for a type the program
+    // does not know. Only allocations fix it; everything else stays open.
+    private FuncDecl RuntimeTypeFunction
+    {
+        get
+        {
+            if (_runtimeType == null)
+            {
+                using var tag = context.MkBitVecSort(32);
+                _runtimeType = context.MkFuncDecl("rtype", ReferenceSort, tag);
+            }
+            return _runtimeType;
+        }
+    }
+
+    // Whether a value of an unknown runtime type is a T (or exactly T): an
+    // uninterpreted predicate per tested type.
+    private FuncDecl UnknownInstance(IrTypeId tested, bool exact)
+    {
+        if (!_unknownInstances.TryGetValue((tested, exact), out var predicate))
+        {
+            using var boolean = context.MkBoolSort();
+            predicate = context.MkFuncDecl((exact ? "rtype_exact" : "rtype_is") + tested.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ReferenceSort, boolean);
+            _unknownInstances.Add((tested, exact), predicate);
+        }
+        return predicate;
+    }
+
+    private BoolExpr EncodeTypeTest(IrTypeTestTerm test, SmtQueryResourceMeter meter)
+    {
+        meter.Consume();
+        var value = Encode(test.Value, meter);
+        var tag = (BitVecExpr)owner.Own(context.MkApp(RuntimeTypeFunction, value));
+        BoolExpr Is(IrTypeId runtime)
+        { return (BoolExpr)owner.Own(context.MkEq(tag, owner.Own(context.MkBV(factory.RuntimeTypeTag(runtime), 32)))); }
+        var decided = new List<BoolExpr>();
+        var holds = new List<BoolExpr>();
+        foreach (var runtime in factory.RuntimeTypes)
+        {
+            meter.Consume();
+            bool? converts = test.Exact ? runtime == test.Tested
+                : factory.TryGetRuntimeConversion(runtime, test.Tested, out var known) ? known : null;
+            if (converts is not { } answer)
+            { continue; }
+            decided.Add(Is(runtime));
+            if (answer)
+            { holds.Add(Is(runtime)); }
+        }
+        // An object whose tag no decided type has may or may not pass, except
+        // that a registered type has its own tag, so no other tag is exactly it.
+        if (!test.Exact || factory.RuntimeTypeTag(test.Tested) == 0)
+        {
+            holds.Add((BoolExpr)owner.Own(context.MkAnd(
+                (BoolExpr)owner.Own(context.MkNot((BoolExpr)owner.Own(context.MkOr([.. decided])))),
+                (BoolExpr)owner.Own(context.MkApp(UnknownInstance(test.Tested, test.Exact), value)))));
+        }
+        var nonNull = (BoolExpr)owner.Own(context.MkNot((BoolExpr)owner.Own(context.MkEq(value, NullReference))));
+        return (BoolExpr)owner.Own(context.MkAnd(nonNull, (BoolExpr)owner.Own(context.MkOr([.. holds]))));
+    }
+
     private Expr EncodeLength(Expr value, SmtQueryResourceMeter meter)
     {
         meter.Consume();
@@ -280,6 +344,7 @@ internal sealed partial class BvEncoder
         var certifiedTypes = ImmutableDictionary.CreateBuilder<string, IrTypeId>(StringComparer.Ordinal);
         var shared = ImmutableDictionary.CreateBuilder<string, object>(StringComparer.Ordinal);
         var classTypes = ImmutableDictionary.CreateBuilder<string, ImmutableArray<IrTypeId>.Builder>(StringComparer.Ordinal);
+        var unknownRuntimeTypes = new HashSet<string>(StringComparer.Ordinal);
         var cacheTypes = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<IrTypeId>.Builder>(StringComparer.Ordinal);
         // Preserve observed framework cache aliases in every SSA/object view.
         // Unavailable observations stay symbolic and cannot confirm a witness.
@@ -357,6 +422,34 @@ internal sealed partial class BvEncoder
             if (certifiedTypes.TryGetValue(token, out var previous) && previous != type)
             { throw new UnsupportedIrEncodingException(); }
             certifiedTypes[token] = type;
+        }
+
+        // The model's runtime type for an entry object holds only if every
+        // view of it admits that type. A view that rules it out refuses the
+        // model; a view whose answer is not known leaves the type unknown.
+        void DecodeRuntimeType(IrObjectState state, string token, IrTypeId view, Expr evaluated)
+        {
+            if (_runtimeType == null || unknownRuntimeTypes.Contains(token))
+            { state.RuntimeType = null; return; }
+            meter.Consume();
+            using var tagValue = model.Evaluate(owner.Own(context.MkApp(_runtimeType, evaluated)), true);
+            var tag = tagValue is BitVecNum number ? number.BigInteger : -1;
+            IrTypeId? runtime = null;
+            foreach (var candidate in factory.RuntimeTypes)
+            {
+                if (factory.RuntimeTypeTag(candidate) == tag)
+                { runtime = candidate; }
+            }
+            if (runtime is not { } known)
+            { unknownRuntimeTypes.Add(token); state.RuntimeType = null; return; }
+            if (view != factory.ObjectType && view != known)
+            {
+                if (!factory.TryGetRuntimeConversion(known, view, out var converts))
+                { unknownRuntimeTypes.Add(token); state.RuntimeType = null; return; }
+                if (!converts)
+                { throw new UnsupportedIrEncodingException(); }
+            }
+            state.RuntimeType = known;
         }
 
         bool IsClassBase(IrTypeId ancestor, IrTypeId descendant)
@@ -439,6 +532,8 @@ internal sealed partial class BvEncoder
                         FillObjectState(state, evaluated, model, meter, Decode);
                     }
                 }
+                if (identity is IrObjectState decodedState)
+                { DecodeRuntimeType(decodedState, token, type, evaluated); }
                 value = factory.CreateReferenceValue(type, identity);
             }
             else
@@ -505,6 +600,9 @@ internal sealed partial class BvEncoder
         foreach (var element in _elementOrder.ToImmutable())
         { element.Dispose(); }
         _length?.Dispose();
+        _runtimeType?.Dispose();
+        foreach (var predicate in _unknownInstances.Values)
+        { predicate.Dispose(); }
         _nominalWitnessTags?.Dispose();
         DisposeStrings();
         DisposeFields();

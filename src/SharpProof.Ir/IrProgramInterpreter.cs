@@ -499,6 +499,8 @@ internal sealed partial class IrAllocationInstruction
             var createdArray = state.Interpreter._factory.CreateSequenceValue(this.AllocatedType, elements);
             state.Values[this.Target!.Value] = createdArray;
             state.Values.Heap.RegisterFreshArray(createdArray);
+            if (state.Interpreter._factory.TryGetAllocationRuntimeType(this.Operation, out var arrayRuntime))
+            { state.Values.Heap.RecordRuntimeType(createdArray, arrayRuntime); }
             state.ReplayOptions?.ArrayAllocationPrefixObserver?.Invoke(this, count, state.Values.ConsumedApproximation);
         }
         else if (this.Target is { } allocatedTarget)
@@ -506,6 +508,8 @@ internal sealed partial class IrAllocationInstruction
             var created = state.Interpreter._factory.CreateReferenceValue(this.AllocatedType, new object());
             state.Values[allocatedTarget] = created;
             state.Values.Heap.RegisterFreshObject(created);
+            if (state.Interpreter._factory.TryGetAllocationRuntimeType(this.Operation, out var objectRuntime))
+            { state.Values.Heap.RecordRuntimeType(created, objectRuntime); }
         }
         state.ReplayOptions?.AllocationObserver?.Invoke(this);
         state.ReplayOptions?.AllocationPrefixObserver?.Invoke(this, state.Values.ConsumedApproximation);

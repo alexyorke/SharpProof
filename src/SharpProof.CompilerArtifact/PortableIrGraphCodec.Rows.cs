@@ -32,7 +32,7 @@ internal static partial class PortableIrGraphCodec
             IrTermKind.Null or IrTermKind.EmptyArray => Slots.None,
             IrTermKind.Opaque => Slots.A | Slots.B | Slots.C | Slots.D | Slots.Items,
             IrTermKind.Unary or IrTermKind.SequenceAccess => Slots.A | Slots.B,
-            IrTermKind.Binary or IrTermKind.Conditional => Slots.A | Slots.B | Slots.C,
+            IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.TypeTest => Slots.A | Slots.B | Slots.C,
             _ => throw Bad($"Portable IR {kind} slots are not declared.")
         };
     }
@@ -162,7 +162,8 @@ internal static partial class PortableIrGraphCodec
                     Length = span.Length,
                     Line = span.Line,
                     Column = span.Column
-                } : null
+                } : null,
+                RuntimeType = _factory.TryGetAllocationRuntimeType(id, out var runtime) ? TypeIndex(runtime) : null
             };
         }
 
@@ -213,6 +214,9 @@ internal static partial class PortableIrGraphCodec
                     return TermRow(term, TermIndex(((IrCastTerm)term).Operand));
                 case IrTermKind.Length:
                     return TermRow(term, TermIndex(((IrLengthTerm)term).Value));
+                case IrTermKind.TypeTest:
+                    var test = (IrTypeTestTerm)term;
+                    return TermRow(term, TermIndex(test.Value), TypeIndex(test.Tested), test.Exact ? 1 : 0);
                 case IrTermKind.SequenceAccess:
                     var access = (IrSequenceAccessTerm)term;
                     return TermRow(term, TermIndex(access.Sequence), TermIndex(access.Index));
@@ -347,6 +351,9 @@ internal static partial class PortableIrGraphCodec
                     return _factory.Cast(Type(row.Type), DecodeTerm(row.A, depth + 1));
                 case IrTermKind.Length:
                     return _factory.Length(DecodeTerm(row.A, depth + 1));
+                case IrTermKind.TypeTest:
+                    RequireTerm(row.C is 0 or 1);
+                    return _factory.TypeTest(DecodeTerm(row.A, depth + 1), Type(row.B), row.C == 1);
                 case IrTermKind.SequenceAccess:
                     return _factory.SequenceAccess(DecodeTerm(row.A, depth + 1), DecodeTerm(row.B, depth + 1));
                 default:

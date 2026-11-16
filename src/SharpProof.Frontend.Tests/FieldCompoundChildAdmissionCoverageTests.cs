@@ -7,17 +7,17 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 internal sealed class FieldCompoundChildAdmissionCoverageTests
 {
-    [TestCase(false, FrontendAbstention.ConversionMayChangeValue)]
+    [TestCase(false, FrontendAbstention.UnsupportedType)]
     [TestCase(true, FrontendAbstention.None)]
     public void ActualFieldCompoundRetainsChildAdmissionAndTypedReplay(bool division, FrontendAbstention reason)
     {
         var members = division
             ? "int Target(int next) { var cell = new Cell(); cell.Value = 4; cell.Value /= next; return cell.Value; }"
-            : "int Target(object next) { var cell = new Cell(); cell.Value = 1; cell.Value += (int)next; return cell.Value; }";
+            : "int Target(object next) { var cell = new Cell(); cell.Value = 1; cell.Value += (int)(decimal)next; return cell.Value; }";
         const string cell = "public sealed class Cell { public int Value; }";
         using var subject = TypedProgramSubject.Create(members, cell);
         var expected = division ? 2 : 3;
-        Assert.That(subject.Invoke([2]), Is.EqualTo(expected));
+        Assert.That(subject.Invoke([division ? (object)2 : 2m]), Is.EqualTo(expected));
         var tree = subject.Compilation.SyntaxTrees.Single();
         var assignment = tree.GetRoot().DescendantNodes().OfType<AssignmentExpressionSyntax>()
             .Single(node => node.OperatorToken.ValueText is "+=" or "/=");

@@ -21,7 +21,13 @@ internal sealed partial class RoslynTotalExpressionLowerer
             : arrayCreation.Initializer.ElementValues.Select(element =>
                 CSharpOperationSemantics.Literal(_factory, element.Type, element.ConstantValue.Value)).ToImmutableArray();
         var length = arrayCreation.Initializer == null ? dimension.Value : _factory.Integer(initialValues.Length);
-        _builder!.Allocate(block, _context.Site(operation), type, target, length, initialValues);
+        var arraySite = _context.Site(operation);
+        _builder!.Allocate(block, arraySite, type, target, length, initialValues);
+        if (TryAllocationRuntimeType(arrayCreation, out var arrayRuntime) && _context.Type(arrayRuntime) == type)
+        {
+            RuntimeTypeRelations.RegisterRuntime(_factory, _context.Compilation, type, arrayRuntime, box: false);
+            _factory.RegisterAllocationRuntimeType(arraySite, type);
+        }
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Exact);
     }
 

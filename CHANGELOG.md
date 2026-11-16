@@ -90,6 +90,12 @@ listing changes against an earlier one. Development history is in the Git log.
   `GetHashCode` for `int`, `uint` and `bool`. Reading `Value` when there is
   none, and `ToString` of a non-`bool` value, stay unknown calls, so they are
   not proven pure.
+- Objects carry runtime types. Allocations and boxes in the analyzed code
+  record their exact type, so `is T`, `as T`, type patterns such as
+  `obj is Foo f`, unboxing, downcasts, enum boxing and `Equals(object)` are
+  analyzed for them. A value whose allocation the code does not show, such
+  as a parameter, keeps an unknown runtime type and is never refuted from a
+  guessed one.
 - A call to a virtual member is analyzed like a non-virtual one when the
   code fixes its target: a `base.` call, a sealed override or a member of a
   sealed type, or a receiver whose static type is sealed.

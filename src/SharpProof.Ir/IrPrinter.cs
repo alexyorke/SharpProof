@@ -24,6 +24,7 @@ internal sealed partial class IrPrinter(IrFactory factory)
             {
                 IrStringTerm text => _factory.GetString(text.Value).Length,
                 IrNullTerm or IrCastTerm or IrEmptyArrayTerm => _factory.GetString(_factory.GetTypeInfo(node.Type).Name).Length,
+                IrTypeTestTerm test => _factory.GetString(_factory.GetTypeInfo(test.Tested).Name).Length,
                 _ => 0
             };
             var cost = 64L + 6L * textLength + children.Sum(child => costs[child.Id]);

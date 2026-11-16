@@ -1318,7 +1318,10 @@ public sealed class PortableIrGraphCodecTests
             conditional,
             factory.Cast(factory.ObjectType, boxTerm),
             factory.Length(sequenceTerm),
-            factory.SequenceAccess(sequenceTerm, numberTerm)
+            factory.SequenceAccess(sequenceTerm, numberTerm),
+            // Runtime types appear only in the allocation fixture, which keeps
+            // the canonical wire golden unchanged.
+            .. (includeAllocation ? [factory.TypeTest(boxTerm, boxTerm.Type, exact: false)] : ImmutableArray<IrTerm>.Empty)
         ];
 
         var builder = new IrProgramBuilder(factory);
@@ -1337,6 +1340,12 @@ public sealed class PortableIrGraphCodecTests
         if (includeAllocation)
         {
             builder.Allocate(entry, factory.CreateOperation("allocate"), factory.ObjectType);
+            // An allocation that records its runtime type, with one conversion.
+            factory.RegisterRuntimeType(boxTerm.Type);
+            factory.RegisterRuntimeConversion(boxTerm.Type, boxTerm.Type, converts: true);
+            var typed = factory.CreateOperation("allocate-typed");
+            factory.RegisterAllocationRuntimeType(typed, boxTerm.Type);
+            builder.Allocate(entry, typed, boxTerm.Type);
             builder.Allocate(entry, factory.CreateOperation("allocate-string"), factory.StringType);
             builder.Allocate(entry, factory.CreateOperation("allocate-value"), boxType, box);
             builder.Lock(entry, factory.CreateOperation("synchronize"), boxTerm);

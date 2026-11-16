@@ -209,6 +209,15 @@ internal static class BlockerCensus
                 (property.Property.IsStatic ? " static" : ""),
             IFieldReferenceOperation field => "field " + Owner(field.Field.ContainingType, compilation) +
                 (field.Field.IsStatic ? " static" : ""),
+            // Operations that depend on an object's runtime type.
+            IConversionOperation { IsTryCast: true } tryCast => "as " + Kind(tryCast.Type),
+            IConversionOperation { Operand.Type.IsReferenceType: true, Type.IsValueType: true } unboxing => "unboxing to " + Kind(unboxing.Type),
+            IConversionOperation { Operand.Type.IsReferenceType: true, Type.IsReferenceType: true, Conversion.IsImplicit: false } downcast =>
+                "downcast to " + Kind(downcast.Type),
+            IConversionOperation { Type.SpecialType: SpecialType.System_Object, Operand.Type.TypeKind: TypeKind.Enum } => "enum boxing",
+            IIsTypeOperation typeTest => "type test " + Kind(typeTest.TypeOperand),
+            IIsPatternOperation { Pattern: IDeclarationPatternOperation or ITypePatternOperation or IRecursivePatternOperation } pattern
+                when pattern.Value.Type is { IsReferenceType: true } or ITypeParameterSymbol => "type pattern on " + Kind(pattern.Value.Type),
             IConversionOperation conversion => "conversion to " + Kind(conversion.Type),
             IBinaryOperation binary => "binary " + binary.OperatorKind + " on " + Kind(binary.LeftOperand.Type),
             _ => operation.Kind + (operation.Type == null ? "" : " of " + Kind(operation.Type))

@@ -77,6 +77,13 @@ internal sealed partial class IrPrinter
             return "((" + state.Printer.TypeName(term.Type) + ")" + state.Printer.FormatChild(term.Operand, state.Depth) + ")";
         }
 
+        public string Visit(IrTypeTestTerm term, (IrPrinter Printer, int Depth) state)
+        {
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
+            return (term.Exact ? "exact-type(" : "is-type(") + state.Printer.FormatChild(term.Value, state.Depth) + ", " +
+                state.Printer.TypeName(term.Tested) + ")";
+        }
+
         public string Visit(IrLengthTerm term, (IrPrinter Printer, int Depth) state)
         {
             term = RepositoryParameterGuard.NotNull(term, nameof(term));

@@ -10,8 +10,8 @@ public sealed class PatternChildAdmissionCoverageTests
     [Test]
     public void ActualPatternInputKeepsUnboxingClosureAndIntegerReplayControl()
     {
-        using var rejected = TypedProgramSubject.Create("bool Target(object value) => (int)value is >= 0;");
-        Assert.That(rejected.Invoke([0]), Is.True);
+        using var rejected = TypedProgramSubject.Create("bool Target(object value) => (int)(decimal)value is >= 0;");
+        Assert.That(rejected.Invoke([0m]), Is.True);
         var tree = rejected.Compilation.SyntaxTrees.Single();
         var pattern = tree.GetRoot().DescendantNodes().OfType<IsPatternExpressionSyntax>().Single();
         var operation = rejected.Compilation.GetSemanticModel(tree).GetOperation(pattern)!;
@@ -20,7 +20,7 @@ public sealed class PatternChildAdmissionCoverageTests
         builder.SetEntry(entry);
         var child = new RoslynTotalExpressionLowerer(rejected.Context, builder).LowerBodyValue(operation, entry);
         Assert.That(child.Classification.IsExact, Is.False);
-        Assert.That(child.Classification.Abstention, Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
+        Assert.That(child.Classification.Abstention, Is.EqualTo(FrontendAbstention.UnsupportedType));
         var rejectedProgram = rejected.Lower();
         Assert.That(rejectedProgram.IsExact, Is.False);
         Assert.That(rejectedProgram.ConstructionLimitExceeded, Is.False);

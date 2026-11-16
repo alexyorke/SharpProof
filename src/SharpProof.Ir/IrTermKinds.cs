@@ -14,7 +14,8 @@ internal enum IrTermKind
     Cast = 9,
     Length = 10,
     SequenceAccess = 11,
-    EmptyArray = 12
+    EmptyArray = 12,
+    TypeTest = 13
 }
 
 internal enum IrOpaquePurity

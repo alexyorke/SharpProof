@@ -335,6 +335,12 @@ internal sealed class IrInterpreter(IrFactory factory)
             term = RepositoryParameterGuard.NotNull(term, nameof(term));
             return state.Interpreter.EvaluateSequenceAccess(term, state.Evaluation);
         }
+
+        public IrEvaluationResult Visit(IrTypeTestTerm term, (IrInterpreter Interpreter, EvaluationState Evaluation) state)
+        {
+            term = RepositoryParameterGuard.NotNull(term, nameof(term));
+            return state.Interpreter.EvaluateTypeTest(term, state.Evaluation);
+        }
     }
 
     private static IrEvaluationResult EvaluateVariable(
@@ -744,6 +750,42 @@ internal sealed class IrInterpreter(IrFactory factory)
 
         return Unsupported(IrUnsupportedReason.UnsupportedCast,
             "The interpreter has no runtime type relation for this cast.");
+    }
+
+    // Null is no instance. Otherwise the answer needs the object's runtime
+    // type and, for a non-exact test, its registered conversion. Without
+    // them the answer is an approximation, like a havoc: the run continues
+    // but is no replayable witness.
+    private IrEvaluationResult EvaluateTypeTest(IrTypeTestTerm test, EvaluationState state)
+    {
+        var value = EvaluateCore(test.Value, state);
+        if (value.Status != IrEvaluationStatus.Value)
+        { return value; }
+        if (value.Value!.Kind == IrValueKind.Null)
+        { return Value(_factory.CreateBooleanValue(false)); }
+        // Without an execution heap (checking a model's assignments), a
+        // decoded entry object still carries the runtime type it was given.
+        var known = state.Heap is { } current ? current.TryGetRuntimeType(value.Value, out var runtime)
+            : TryEntryRuntimeType(value.Value, out runtime);
+        if (known)
+        {
+            if (test.Exact)
+            { return Value(_factory.CreateBooleanValue(runtime == test.Tested)); }
+            if (_factory.TryGetRuntimeConversion(runtime, test.Tested, out var converts))
+            { return Value(_factory.CreateBooleanValue(converts)); }
+        }
+        if (state.Heap is not { } heap)
+        { return Unsupported(IrUnsupportedReason.UnknownRuntimeType, "The value's runtime type is not known."); }
+        heap.ConsumeApproximation();
+        return Value(_factory.CreateBooleanValue(false));
+    }
+
+    private static bool TryEntryRuntimeType(IrValue value, out IrTypeId runtime)
+    {
+        runtime = default;
+        if (value is { Kind: IrValueKind.Reference, Reference: IrObjectState { RuntimeType: { } entry } })
+        { runtime = entry; return true; }
+        return false;
     }
 
     private IrEvaluationResult EvaluateLength(IrLengthTerm length, EvaluationState state)
