@@ -511,15 +511,17 @@ internal sealed class PassiveCallableVcBuilder
                         Fact(Guard(reach, Equal(assigned, value)), assign.Operation, "write");
                         // Rewritten array reads already denote a fixed heap snapshot.
                         // Forward those atoms and one arithmetic term of frozen operands
-                        // to avoid bit-blasting duplicate arithmetic circuits.
+                        // to avoid bit-blasting duplicate arithmetic circuits. A
+                        // widened operand stays the same term as a contract's
+                        // widening of that input, so equal products share one
+                        // circuit instead of needing a multiplier equivalence.
                         SetState(assign.Target, value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm or
-                            IrSequenceAccessTerm { Sequence: IrVariableTerm, Index: IrVariableTerm or IrIntegerTerm } or
-                            IrBinaryTerm
-                        {
-                            Operator: IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder,
-                            Left: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm,
-                            Right: IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm
-                        }
+                            IrSequenceAccessTerm { Sequence: IrVariableTerm, Index: IrVariableTerm or IrIntegerTerm } ||
+                            IsIntegerCastOfAtom(value) ||
+                            value is IrBinaryTerm
+                            {
+                                Operator: IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder
+                            } arithmetic && IsArithmeticOperand(arithmetic.Left) && IsArithmeticOperand(arithmetic.Right)
                             ? value : assigned);
                         break;
                     case IrHavocInstruction havoc:
@@ -1004,6 +1006,21 @@ internal sealed class PassiveCallableVcBuilder
     { return _factory.Unary(IrUnaryOperator.Not, value); }
     private IrTerm Guard(IrTerm reach, IrTerm predicate)
     { return Or(Not(reach), predicate); }
+
+    // An integer conversion of a frozen value has no effect and no fault.
+    private bool IsIntegerCastOfAtom(IrTerm value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return value is IrCastTerm { Operand: IrVariableTerm or IrIntegerTerm } cast &&
+            _factory.GetTypeInfo(cast.Type).Kind == IrTypeKind.Integer &&
+            _factory.GetTypeInfo(cast.Operand.Type).Kind == IrTypeKind.Integer;
+    }
+
+    private bool IsArithmeticOperand(IrTerm operand)
+    {
+        operand = RepositoryParameterGuard.NotNull(operand, nameof(operand));
+        return operand is IrVariableTerm or IrIntegerTerm or IrSequenceAccessTerm || IsIntegerCastOfAtom(operand);
+    }
 
     // A field of an entry object names an existing object only when that
     // owner exists. A null owner has no field: a body never reads one without
