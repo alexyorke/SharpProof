@@ -144,7 +144,7 @@ internal sealed partial class TotalLoweringContext
     internal TotalLoweringContext CreateContractFrame(IMethodSymbol target, bool omitReceiver)
     {
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
-        return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer);
+        return new(Factory, target, _document, omitReceiver ? 1 : 0, _allowGenericContainer) { AdmitsOutParameters = AdmitsOutParameters };
     }
     public ImmutableArray<TotalParameterBinding> Parameters { get; private set; }
 
@@ -201,9 +201,20 @@ internal sealed partial class TotalLoweringContext
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
         Parameters.All(binding => (binding.Parameter.RefKind == RefKind.None || IsReadOnlyReference(binding.Parameter) ||
                 WritesBackReferences && binding.Parameter.RefKind is RefKind.Ref or RefKind.Out &&
-                    (CSharpOperationSemantics.IsScalar(binding.Parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(binding.Parameter.Type))) &&
+                    (CSharpOperationSemantics.IsScalar(binding.Parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(binding.Parameter.Type)) ||
+                AdmitsOutParameters && binding.Parameter.RefKind == RefKind.Out && CSharpOperationSemantics.IsScalar(binding.Parameter.Type) &&
+                    Parameters.Count(other => other.Parameter.RefKind != RefKind.None) == 1) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
+
+    // A root callable verified for its postconditions, and its companion's
+    // contract frame, admit a scalar out parameter. It is an ordinary
+    // variable whose entry value C# never reads; Ensures names its final
+    // value through Contract.ValueAtReturn. The caller may pass a field or
+    // element, so the collector admits such a body only when it touches no
+    // memory. It must be the only by-reference parameter: a caller may pass
+    // one variable to two of them, and writes to one would change the other.
+    internal bool AdmitsOutParameters { get; set; }
 
     // An inlined frame whose caller passes each ref or out argument as one of
     // its own variables, used nowhere else in the call, and copies the

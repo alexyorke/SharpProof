@@ -51,3 +51,4 @@ SharpProof.Attributes.ResourceUpperBoundAttribute.Constant.get -> long
 SharpProof.Attributes.ResourceUpperBoundAttribute.Metric.get -> SharpProof.Attributes.ResourceMetric
 SharpProof.Attributes.ResourceUpperBoundAttribute.ResourceUpperBoundAttribute(SharpProof.Attributes.ResourceMetric metric, long constant, string? sizeParameter = null, long coefficient = 0) -> void
 SharpProof.Attributes.ResourceUpperBoundAttribute.SizeParameter.get -> string?
+static SharpProof.Attributes.Contract.ValueAtReturn<T>(out T value) -> T

@@ -103,6 +103,16 @@ internal static class ContractForDiagnosticDescriptors
         description: "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0010");
 
+    internal static readonly DiagnosticDescriptor UnsupportedCompanionAttribute = new(
+        id: "SPCF0011",
+        title: "Unsupported attribute on a ContractFor member",
+        messageFormat: "Companion method '{0}' declares {1}, which a ContractFor member cannot declare for its target",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "A companion member may declare EnforcePure, ZeroAllocations, AllowedCapabilities, DoesNotThrow and AllowedExceptions for its target; EffectContract and ResourceUpperBound must be on the target itself.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#spcf0011");
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         InvalidTarget,
         DuplicateCompanion,
@@ -113,6 +123,7 @@ internal static class ContractForDiagnosticDescriptors
         BodyRequired,
         InvalidClausePlacement,
         SelfTarget,
-        CyclicRelationship
+        CyclicRelationship,
+        UnsupportedCompanionAttribute
     ];
 }

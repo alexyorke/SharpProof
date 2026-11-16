@@ -144,6 +144,16 @@ public sealed class ContractApiCatalogParityTests
             case ContractApiMethodShape.Result:
                 AssertGenericIntrinsic(method, parameters, parameterCount: 0);
                 break;
+            case ContractApiMethodShape.ValueAtReturn:
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(method.IsGenericMethodDefinition, Is.True);
+                    Assert.That(parameters, Has.Length.EqualTo(1));
+                    Assert.That(parameters[0].IsOut, Is.True);
+                    Assert.That(parameters[0].ParameterType, Is.EqualTo(method.GetGenericArguments()[0].MakeByRefType()));
+                    Assert.That(method.ReturnType, Is.EqualTo(method.GetGenericArguments()[0]));
+                }
+                break;
             default:
                 Assert.Fail("The catalog contains an unknown method shape.");
                 break;

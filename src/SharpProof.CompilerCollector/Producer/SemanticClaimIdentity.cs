@@ -377,7 +377,7 @@ internal static partial class SemanticClaimIdentity
         writer.Add(method.MethodKind.ToString()).Add(method.Arity).Add(method.IsStatic);
         WriteSpecialContainingTypeIdentity(writer, method);
         if (forCallableIdentity && method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction ||
-            context.Intrinsics is { } intrinsics && (intrinsics.IsResult(method) || intrinsics.IsOld(method)))
+            context.Intrinsics is { } intrinsics && (intrinsics.IsResult(method) || intrinsics.IsOld(method) || intrinsics.IsValueAtReturn(method)))
         {
             // Nested callable identity is supplied by its ancestor and sibling
             // slot. Synthesized names must not make it depend on source trivia.

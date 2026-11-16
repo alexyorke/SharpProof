@@ -156,9 +156,28 @@ internal sealed class ContractSelectionInventory
         Is(attribute, EffectContract);
     }
 
+    // Effect attributes a ContractFor companion member may declare for its
+    // target. EffectContract and ResourceUpperBound resolve against the
+    // target's own declaration and are reported on a companion instead.
+    internal bool IsCompanionEffectContract(AttributeData attribute)
+    {
+        attribute = RepositoryParameterGuard.NotNull(attribute, nameof(attribute));
+        return Is(attribute, EnforcePure) ||
+            Is(attribute, ZeroAllocations) ||
+            Is(attribute, AllowedCapabilities) ||
+            Is(attribute, DoesNotThrow) ||
+            Is(attribute, AllowedExceptions);
+    }
+
+    internal ImmutableArray<AttributeData> GetCompanionEffectAttributes(IMethodSymbol? companion)
+    {
+        return companion == null ? [] : [.. companion.GetAttributes().Where(IsCompanionEffectContract)];
+    }
+
     internal ContractSelectionFeatures Select(
         IMethodSymbol method,
-        bool hasContractClause = false)
+        bool hasContractClause = false,
+        IMethodSymbol? companion = null)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         var selected = ContractSelectionFeatures.None;
@@ -171,7 +190,7 @@ internal sealed class ContractSelectionInventory
         }
 
         var callableAttributes = GetCallableAttributes(method).ToImmutableArray();
-        if (callableAttributes.Any(IsEffectContract))
+        if (callableAttributes.Any(IsEffectContract) || !GetCompanionEffectAttributes(companion).IsEmpty)
         {
             selected |= ContractSelectionFeatures.Effects;
         }

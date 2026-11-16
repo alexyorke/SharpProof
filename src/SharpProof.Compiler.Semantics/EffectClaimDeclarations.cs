@@ -8,7 +8,10 @@ internal static class EffectClaimDeclarations
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         session = ArgumentNullGuard.NotNull(session, nameof(session));
-        var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
+        // A ContractFor companion member may declare effect claims for a
+        // method its author cannot annotate.
+        var attributes = ContractSelectionInventory.GetCallableAttributes(method)
+            .Concat(session.Attributes.GetCompanionEffectAttributes(session.ResolveCompanionMember(method))).ToImmutableArray();
         var summaryContracts = Select(attributes, session.Attributes.EffectContract);
         var capabilitiesAttributes = Select(attributes, session.Attributes.AllowedCapabilities);
         var allowedExceptions = Select(attributes, session.Attributes.AllowedExceptions);

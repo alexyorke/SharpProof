@@ -63,6 +63,7 @@ internal static class ContractForValidationEngine
 
         companions = accepted.ToImmutable();
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
+        var selections = ContractSelectionInventory.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
             relationships.Accepted,
@@ -78,6 +79,7 @@ internal static class ContractForValidationEngine
                     clauses,
                     Report,
                     cancellationToken);
+                ReportUnsupportedAttributes(companion, selections, Report);
                 continue;
             }
             Report(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
@@ -88,6 +90,27 @@ internal static class ContractForValidationEngine
         // diagnostics may only point into the compilation being analyzed. The
         // source participant above is the actionable location for the group.
         return Order(diagnostics.ToImmutable());
+    }
+
+    // A companion member may declare effect claims for its target, but not
+    // an EffectContract or ResourceUpperBound: those resolve against the
+    // target's own declaration, so on a companion they would be ignored.
+    private static void ReportUnsupportedAttributes(ResolvedCompanion companion, ContractSelectionInventory selections,
+        Action<Diagnostic> report)
+    {
+        foreach (var member in companion.Companion.GetMembers().OfType<IMethodSymbol>())
+        {
+            foreach (var attribute in member.GetAttributes())
+            {
+                if (attribute.AttributeClass is not { } type ||
+                    !SymbolEqualityComparer.Default.Equals(type, selections.EffectContract) &&
+                    !SymbolEqualityComparer.Default.Equals(type, selections.ResourceUpperBound))
+                { continue; }
+                report(Diagnostic.Create(ContractForDiagnosticDescriptors.UnsupportedCompanionAttribute,
+                    attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation() ?? companion.AttributeLocation,
+                    member.Name, type.Name));
+            }
+        }
     }
 
     internal static ImmutableArray<INamedTypeSymbol> FindCandidates(

@@ -49,6 +49,12 @@ internal sealed class ContractApiIdentityResolver
                 : null;
         Result = shape?.Result;
         Old = shape?.Old;
+        ValueAtReturn = shape?.ValueAtReturn;
+    }
+
+    internal IMethodSymbol? ValueAtReturn
+    {
+        get;
     }
 
     internal INamedTypeSymbol? Contract

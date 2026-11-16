@@ -92,6 +92,7 @@ internal static class OssContractGate
             source = source with { Methods = [.. source.Methods.Where(method => selected.Contains(method.Id))] };
             var compilation = OpenSourceCorpusRunner.PrepareContracts(source, [.. group.Select(static contract => contract.Companion).OfType<string>()],
                 cancellationToken, loaded: corpus);
+            RejectInvalidCompanions(compilation, group.Key, cancellationToken);
             var reasons = new Dictionary<string, string>(StringComparer.Ordinal);
             var verdicts = (await NativeCorpusVerifier.VerifyAsync(compilation, cancellationToken, observeResponse: response =>
                 {
@@ -122,6 +123,26 @@ internal static class OssContractGate
             all.Count(static row => row.Actual == nameof(WorkerClaimOutcome.Refuted)),
             all.Count(static row => row.Actual is not (nameof(WorkerClaimOutcome.Proven) or nameof(WorkerClaimOutcome.Refuted))),
             mismatches.IsEmpty, mismatches);
+    }
+
+    // A companion the ContractFor rules reject declares no claim, so its
+    // contracts would read as Unknown or NoClaim instead of failing; a
+    // reviewed companion must be valid. A reviewed companion covers only the
+    // members it has contracts for, so SPCF0004 (a target member without a
+    // companion member) is expected.
+    private static void RejectInvalidCompanions(Compilation compilation, string sourceId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        static bool IsCompanion(SyntaxTree tree)
+        { return Path.GetFileName(tree.FilePath).StartsWith("__SharpProofOssContracts", StringComparison.Ordinal); }
+        var errors = SharpProof.Analyzer.ContractForValidationEngine.Validate(compilation,
+                SharpProof.Analyzer.ContractForValidationEngine.FindCandidates(compilation, IsCompanion, cancellationToken),
+                cancellationToken, IsCompanion)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id != "SPCF0004")
+            .Select(static diagnostic => diagnostic.ToString())
+            .ToImmutableArray();
+        if (!errors.IsEmpty)
+        { throw new InvalidDataException("The OSS contract companions for " + sourceId + " are invalid: " + string.Join("; ", errors)); }
     }
 
     // A manifest callable ID is the documentation ID with a return-type suffix.

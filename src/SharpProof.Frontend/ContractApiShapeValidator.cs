@@ -12,7 +12,9 @@ internal sealed class ContractApiShapeValidator
         _metadataNames = metadataNames;
     }
 
-    internal (IMethodSymbol Result, IMethodSymbol Old)? TryResolve(
+    // ValueAtReturn is optional, so a contract API that predates it still
+    // resolves; its postconditions just cannot name an out parameter.
+    internal (IMethodSymbol Result, IMethodSymbol Old, IMethodSymbol? ValueAtReturn)? TryResolve(
         INamedTypeSymbol contract)
     {
         if (contract is not
@@ -37,8 +39,13 @@ internal sealed class ContractApiShapeValidator
             contract,
             ContractApiMetadata.OldMethodName,
             parameterCount: 1);
+        var valueAtReturn = GetSingleGenericIdentityMethod(
+            contract,
+            ContractApiMetadata.ValueAtReturnMethodName,
+            parameterCount: 1,
+            RefKind.Out);
         return result is { } resultMethod && old is { } oldMethod
-            ? (resultMethod, oldMethod)
+            ? (resultMethod, oldMethod, valueAtReturn)
             : null;
     }
 
@@ -117,7 +124,8 @@ internal sealed class ContractApiShapeValidator
     private static IMethodSymbol? GetSingleGenericIdentityMethod(
         INamedTypeSymbol contract,
         string name,
-        int parameterCount)
+        int parameterCount,
+        RefKind parameterRefKind = RefKind.None)
     {
         if (GetSingleMethod(contract, name) is not
             {
@@ -135,11 +143,11 @@ internal sealed class ContractApiShapeValidator
                 method.TypeParameters[0]) ||
             (parameterCount != 0 && (method.Parameters[0] is not
             {
-                RefKind: RefKind.None,
-                ScopedKind: ScopedKind.None,
                 IsParams: false,
                 IsOptional: false
-            } parameter ||
+            } parameter || parameter.RefKind != parameterRefKind ||
+            // An out parameter is implicitly scoped.
+            parameter.ScopedKind != (parameterRefKind == RefKind.Out ? ScopedKind.ScopedRef : ScopedKind.None) ||
             !SymbolEqualityComparer.Default.Equals(
                 parameter.Type,
                 method.TypeParameters[0]))))

@@ -5,6 +5,7 @@ internal enum ContractApiMethodShape
     Clause,
     Old,
     Result,
+    ValueAtReturn,
 }
 
 internal enum ContractApiClauseRole
@@ -65,6 +66,7 @@ internal static class ContractApiCatalog
     internal const string AssumeMethodName = "Assume";
     internal const string OldMethodName = "Old";
     internal const string ResultMethodName = "Result";
+    internal const string ValueAtReturnMethodName = "ValueAtReturn";
     internal const string ContractFor = AttributesNamespace + ".ContractForAttribute";
     internal const string EnforcePure = AttributesNamespace + ".EnforcePureAttribute";
     internal const string ZeroAllocations = AttributesNamespace + ".ZeroAllocationsAttribute";
@@ -103,6 +105,10 @@ internal static class ContractApiCatalog
             new(
                 ResultMethodName,
                 ContractApiMethodShape.Result,
+                ContractApiClauseRole.None),
+            new(
+                ValueAtReturnMethodName,
+                ContractApiMethodShape.ValueAtReturn,
                 ContractApiClauseRole.None),
         ];
 
@@ -232,6 +238,8 @@ internal static partial class ContractApiMetadata
         ContractApiCatalog.OldMethodName;
     internal const string ResultMethodName =
         ContractApiCatalog.ResultMethodName;
+    internal const string ValueAtReturnMethodName =
+        ContractApiCatalog.ValueAtReturnMethodName;
     internal const string ContractFor =
         ContractApiCatalog.ContractFor;
     internal const string EnforcePure =

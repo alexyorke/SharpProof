@@ -72,6 +72,7 @@ internal static class CompilerTotalCallableLowerer
         var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree])
         {
             CaptureCallFrames = true,
+            AdmitsOutParameters = true,
             CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
         };
         context.ModelReceiver();
@@ -121,6 +122,12 @@ internal static class CompilerTotalCallableLowerer
                 cancellationToken, opaqueCalls: true, metadataCallees: true, contractExports: contractExports);
         }
         if (lowering == null)
+        { return null; }
+        // An out parameter may be a field or element the caller passed, so a
+        // write to it may change memory the body later reads. Such a body is
+        // admitted only when it touches no memory and makes no call.
+        if (target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) &&
+            (graph == null || !IsMemoryFree(graph.OriginalOperation, compilation)))
         { return null; }
         cancellationToken.ThrowIfCancellationRequested();
         if (reportDiagnostic != null && !lowering.Abstentions.IsDefaultOrEmpty)
@@ -204,11 +211,43 @@ internal static class CompilerTotalCallableLowerer
             DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
             EffectsCompleteAtEntry = entryInitialization == InitializationEffect.None,
             EntryConstructsFreshValues = entryInitialization == InitializationEffect.FreshValues,
-            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
-                .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
+            // A write to an out parameter writes the caller's storage, which
+            // effect claims do not model: none is verified on such a body.
+            ValidEffectClaimIds = target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) ? [] :
+                [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
+                    .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
         };
+    }
+
+    // A body over locals, parameters and constants alone: no field, element,
+    // property, object, call or exception object. Contract clauses are
+    // bound separately and not executed.
+    private static bool IsMemoryFree(IOperation body, CSharpCompilation compilation)
+    {
+        var contract = ContractApiIdentityResolver.ForCompilation(compilation).Contract;
+        var pending = new Stack<IOperation>();
+        pending.Push(body);
+        while (pending.Count != 0)
+        {
+            var operation = pending.Pop();
+            if (operation is IInvocationOperation invocation && contract != null &&
+                SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, contract))
+            { continue; }
+            if (operation is IFieldReferenceOperation { Field.IsConst: false } ||
+                operation.Kind is not (OperationKind.MethodBody or OperationKind.Block or OperationKind.ExpressionStatement or
+                    OperationKind.VariableDeclarationGroup or OperationKind.VariableDeclaration or OperationKind.VariableDeclarator or
+                    OperationKind.VariableInitializer or OperationKind.SimpleAssignment or OperationKind.CompoundAssignment or
+                    OperationKind.Increment or OperationKind.Decrement or OperationKind.Binary or OperationKind.Unary or
+                    OperationKind.Conversion or OperationKind.Literal or OperationKind.LocalReference or OperationKind.ParameterReference or
+                    OperationKind.FieldReference or OperationKind.Conditional or OperationKind.Return or OperationKind.Branch or
+                    OperationKind.Labeled or OperationKind.Loop or OperationKind.Parenthesized or OperationKind.Empty))
+            { return false; }
+            foreach (var child in operation.ChildOperations)
+            { pending.Push(child); }
+        }
+        return true;
     }
 
     // Captured snapshots are indexed by compilation tree ordinal; a mismatch
