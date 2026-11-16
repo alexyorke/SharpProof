@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace SharpProof.Smt;
 
 internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3ExpressionOwner owner, bool enableInvariantRelations = false, Func<IrOpaqueTerm, IrValue?>? /* SPINT001: all values valid - null leaves framework values symbolic */ concreteOpaqueValueProvider = null)
@@ -230,6 +232,9 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         {
             throw new UnsupportedIrEncodingException();
         }
+        if (target.Width > source.Width && cast.Operand is IrBinaryTerm sum &&
+            EncodeWidenedConstantSum(sum, source, target, meter) is { } widenedSum)
+        { return widenedSum; }
         var value = Encode(cast.Operand, meter) as BitVecExpr ?? throw new UnsupportedIrEncodingException();
         if (source.Width == target.Width)
         {
@@ -238,6 +243,57 @@ internal sealed partial class BvEncoder(Context context, IrFactory factory, Z3Ex
         return owner.Own(target.Width < source.Width ? context.MkExtract((uint)target.Width - 1, 0, value)
             : source.Signed ? context.MkSignExt((uint)(target.Width - source.Width), value)
             : context.MkZeroExt((uint)(target.Width - source.Width), value));
+    }
+
+    // A widened a + k or a - k, for a constant k, is ext(a) + k, less 2^w
+    // when the narrow sum wraps up and plus 2^w when it wraps down. The
+    // operand then stays widened on its own, so a product of the sum is
+    // distributed over it instead of compared as a separate multiplier.
+    private BitVecExpr? EncodeWidenedConstantSum(IrBinaryTerm sum, IrTypeInfo source, IrTypeInfo target, SmtQueryResourceMeter meter)
+    {
+        sum = RepositoryParameterGuard.NotNull(sum, nameof(sum));
+        IrTerm operand;
+        IrIntegerTerm constant;
+        if (sum.Operator is IrBinaryOperator.Add or IrBinaryOperator.Subtract && sum.Right is IrIntegerTerm right)
+        { (operand, constant) = (sum.Left, right); }
+        else if (sum.Operator == IrBinaryOperator.Add && sum.Left is IrIntegerTerm left)
+        { (operand, constant) = (sum.Right, left); }
+        else
+        { return null; }
+        var operandType = factory.GetTypeInfo(operand.Type);
+        var constantType = factory.GetTypeInfo(constant.Type);
+        if (!IsInteger(operandType) || operandType.Width != source.Width || operandType.Signed != source.Signed ||
+            constantType.Width != source.Width || constantType.Signed != source.Signed)
+        { return null; }
+        var value = Encode(operand, meter) as BitVecExpr ?? throw new UnsupportedIrEncodingException();
+        var k = sum.Operator == IrBinaryOperator.Subtract ? -constant.Integer.NumericValue : constant.Integer.NumericValue;
+        var extended = owner.Own(source.Signed ? context.MkSignExt((uint)(target.Width - source.Width), value)
+            : context.MkZeroExt((uint)(target.Width - source.Width), value));
+        var widened = owner.Own(context.MkBVAdd(extended, WideConstant(k)));
+        if (k.IsZero)
+        { return widened; }
+        var minimum = source.Signed ? -(BigInteger.One << (source.Width - 1)) : BigInteger.Zero;
+        var maximum = source.Signed ? (BigInteger.One << (source.Width - 1)) - 1 : (BigInteger.One << source.Width) - 1;
+        var threshold = owner.Own(context.MkBV(Modulo(k.Sign > 0 ? maximum - k : minimum - k, source.Width).ToString(CultureInfo.InvariantCulture),
+            (uint)source.Width));
+        var wraps = owner.Own(k.Sign > 0
+            ? source.Signed ? context.MkBVSGT(value, threshold) : context.MkBVUGT(value, threshold)
+            : source.Signed ? context.MkBVSLT(value, threshold) : context.MkBVULT(value, threshold));
+        var span = BigInteger.One << source.Width;
+        return (BitVecExpr)owner.Own(context.MkBVAdd(widened, (BitVecExpr)owner.Own(context.MkITE(wraps,
+            WideConstant(k.Sign > 0 ? -span : span), WideConstant(BigInteger.Zero)))));
+
+        BitVecExpr WideConstant(BigInteger number)
+        {
+            return owner.Own(context.MkBV(Modulo(number, target.Width).ToString(CultureInfo.InvariantCulture), (uint)target.Width));
+        }
+
+        static BigInteger Modulo(BigInteger number, int width)
+        {
+            var modulus = BigInteger.One << width;
+            var remainder = BigInteger.Remainder(number, modulus);
+            return remainder.Sign < 0 ? remainder + modulus : remainder;
+        }
     }
 
     internal static IrValue? CreateValue(IrFactory factory, IrTypeId type, Expr expression)

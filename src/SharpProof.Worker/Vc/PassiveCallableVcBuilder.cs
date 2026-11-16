@@ -517,7 +517,7 @@ internal sealed class PassiveCallableVcBuilder
                         // circuit instead of needing a multiplier equivalence.
                         SetState(assign.Target, value is IrVariableTerm or IrBooleanTerm or IrIntegerTerm or IrNullTerm or IrEmptyArrayTerm or
                             IrSequenceAccessTerm { Sequence: IrVariableTerm, Index: IrVariableTerm or IrIntegerTerm } ||
-                            IsIntegerCastOfAtom(value) ||
+                            IsIntegerCastOfAtom(value) || IsConstantSumOfAtom(value) ||
                             value is IrBinaryTerm
                             {
                                 Operator: IrBinaryOperator.Multiply or IrBinaryOperator.Divide or IrBinaryOperator.Remainder
@@ -1007,13 +1007,27 @@ internal sealed class PassiveCallableVcBuilder
     private IrTerm Guard(IrTerm reach, IrTerm predicate)
     { return Or(Not(reach), predicate); }
 
-    // An integer conversion of a frozen value has no effect and no fault.
+    // An integer conversion of a frozen value, or of a frozen value plus or
+    // minus a constant, has no effect and no fault. The SMT encoding keeps
+    // such a widened sum linear in the widened value.
     private bool IsIntegerCastOfAtom(IrTerm value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
-        return value is IrCastTerm { Operand: IrVariableTerm or IrIntegerTerm } cast &&
+        return value is IrCastTerm cast && (cast.Operand is IrVariableTerm or IrIntegerTerm || IsConstantSumOfAtom(cast.Operand)) &&
             _factory.GetTypeInfo(cast.Type).Kind == IrTypeKind.Integer &&
             _factory.GetTypeInfo(cast.Operand.Type).Kind == IrTypeKind.Integer;
+    }
+
+    // A frozen integer plus or minus a constant. A later widening of it then
+    // sees the sum, which the SMT encoding keeps linear in the operand.
+    private bool IsConstantSumOfAtom(IrTerm value)
+    {
+        value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        return value is IrBinaryTerm
+        {
+            Operator: IrBinaryOperator.Add or IrBinaryOperator.Subtract, Left: IrVariableTerm, Right: IrIntegerTerm
+        } or IrBinaryTerm { Operator: IrBinaryOperator.Add, Left: IrIntegerTerm, Right: IrVariableTerm } &&
+            _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.Integer;
     }
 
     private bool IsArithmeticOperand(IrTerm operand)
