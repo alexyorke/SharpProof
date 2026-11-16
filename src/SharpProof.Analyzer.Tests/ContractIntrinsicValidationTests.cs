@@ -8,6 +8,38 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class ContractIntrinsicValidationTests
 {
+    [TestCase("Contract.Requires(Contract.ValueAtReturn(out rest) > 0); rest = 1;", "expected use inside Contract.Ensures",
+        TestName = "ValueAtReturnInRequiresIsMisplaced")]
+    [TestCase("Contract.Ensures(Contract.Old(Contract.ValueAtReturn(out rest)) > 0); rest = 1;", "cannot be nested inside Contract.Old",
+        TestName = "ValueAtReturnInsideOldIsNested")]
+    [TestCase("Contract.Ensures(Contract.ValueAtReturn(out value) > 0); rest = 1;", "expected an out parameter of the enclosing callable",
+        TestName = "ValueAtReturnOfAValueParameterIsInvalid")]
+    public async Task ValueAtReturnMisuseIsReported(string body, string reason)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(reason);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes;\npublic static class C {\n    public static int M(int value, out int rest) {\n        " + body + "\n        return 0;\n    }\n}\n",
+            "contracts",
+            ["SP0024"]);
+
+        AnalyzerTestHost.AssertIds(diagnostics, ["SP0024"]);
+        Assert.That(
+            diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("Contract.ValueAtReturn").And.Contain(reason));
+    }
+
+    [Test]
+    public async Task ValueAtReturnOfAnOutParameterInEnsuresIsValid()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "using SharpProof.Attributes;\npublic static class C {\n    public static int M(out int rest) {\n        Contract.Ensures(Contract.ValueAtReturn(out rest) == 1);\n        rest = 1;\n        return 0;\n    }\n}\n",
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
     [Test]
     public async Task ResultInsideOldReportsNestingForDirectContract()
     {

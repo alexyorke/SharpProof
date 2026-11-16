@@ -117,6 +117,7 @@ All companion-validation descriptors default to Error. They validate compiler sy
 | SPCF0008 | Invalid clause placement |
 | SPCF0009 | Companion targets itself |
 | SPCF0010 | Cyclic companion relationship |
+| SPCF0011 | Effect attribute a companion member cannot declare |
 
 ### SPCF0001
 
@@ -157,6 +158,10 @@ A companion cannot target itself. Point it at the distinct interface or class wh
 ### SPCF0010
 
 Companion relationships must be acyclic. Remove the reported cycle; otherwise the relationship cannot provide an effective contract source.
+
+### SPCF0011
+
+A companion member can declare `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]` and `[AllowedExceptions]` for its target. `[EffectContract]` and `[ResourceUpperBound]` resolve against the target's own declaration, so put them on the target, or drop them.
 
 ## SP0060
 

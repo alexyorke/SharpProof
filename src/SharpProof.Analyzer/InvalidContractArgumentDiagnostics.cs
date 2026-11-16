@@ -9,8 +9,8 @@ internal static class InvalidContractArgumentDiagnostics
         var (argument, reason) =
             AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
                 violation.Failure,
-                violation.IsOld);
-        if (!violation.IsOld && violation.Failure == ContractBindingFailure.InvalidIntrinsicSignature)
+                violation.Intrinsic);
+        if (violation.Intrinsic == ContractIntrinsic.Result && violation.Failure == ContractBindingFailure.InvalidIntrinsicSignature)
         {
             return Diagnostic.Create(
                 GeneratedDiagnosticDescriptors.InvalidContractArgumentRule,
@@ -19,7 +19,7 @@ internal static class InvalidContractArgumentDiagnostics
                 messageArgs: ["Contract.Result", argument, reason]);
         }
         return Create(
-            violation.IsOld ? "Contract.Old" : "Contract.Result",
+            "Contract." + violation.Intrinsic,
             argument,
             reason,
             violation.Operation.Syntax.GetLocation());

@@ -5,17 +5,36 @@ namespace SharpProof.Compiler.Semantics;
 // Whether their bodies are supported is decided by lowering.
 internal static class CallableSubset
 {
-    internal static bool IsSupported(IMethodSymbol method, SyntaxNode declaration)
+    // With allowOutParameter, one out parameter of a bool, integer or enum
+    // type is admitted: its postconditions can be verified, but writes to it
+    // are writes to the caller's storage, which effect claims do not model.
+    internal static bool IsSupported(IMethodSymbol method, SyntaxNode declaration, bool allowOutParameter = false)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
+        var outParameters = allowOutParameter && HasOneScalarOutParameter(method) ? 1 : 0;
         return !method.IsAsync && method.TypeParameters.Length == 0 && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
             !IsUnsupportedType(method.ReturnType) &&
-            !method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None || IsUnsupportedType(parameter.Type)) &&
+            method.Parameters.Count(static parameter => parameter.RefKind != RefKind.None) == outParameters &&
+            !method.Parameters.Any(static parameter => IsUnsupportedType(parameter.Type)) &&
             !ContainsUnsafeSyntax(declaration) && declaration is not TypeDeclarationSyntax &&
             method.MethodKind is MethodKind.Ordinary or MethodKind.AnonymousFunction or MethodKind.Constructor or
                 MethodKind.StaticConstructor or MethodKind.PropertyGet or MethodKind.PropertySet or
                 MethodKind.ExplicitInterfaceImplementation;
+    }
+
+    internal static bool HasOneScalarOutParameter(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        var references = method.Parameters.Where(static parameter => parameter.RefKind != RefKind.None).ToImmutableArray();
+        return references.Length == 1 && references[0].RefKind == RefKind.Out && IsScalar(references[0].Type);
+    }
+
+    private static bool IsScalar(ITypeSymbol type)
+    {
+        return type.TypeKind == TypeKind.Enum || type.SpecialType is SpecialType.System_Boolean or SpecialType.System_Char or
+            SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16 or
+            SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64;
     }
 
     private static bool IsUnsupportedType(ITypeSymbol type)

@@ -82,6 +82,14 @@ internal sealed class CompilerSemanticSession
             cancellationToken: _cancellationToken);
     }
 
+    // The companion member a ContractFor companion declares for method, if any.
+    internal IMethodSymbol? ResolveCompanionMember(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        var resolution = ResolveContractSource(method);
+        return resolution.UsesCompanion ? resolution.Source : null;
+    }
+
     internal bool IsContractCompanion(IMethodSymbol method)
     {
         _cancellationToken.ThrowIfCancellationRequested();

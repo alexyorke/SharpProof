@@ -71,7 +71,11 @@ internal static class TotalContractInvocationMaterialization
                     : null
                 : api.IsOld(invocation.TargetMethod) && invocation.Arguments.Length == 1
                     ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.PreState)
-                    : null)
+                    // An out parameter's value at return is its final value.
+                    : api.IsValueAtReturn(invocation.TargetMethod) && invocation.Arguments.Length == 1 &&
+                        invocation.Arguments[0].Value is IParameterReferenceOperation { Parameter.RefKind: RefKind.Out }
+                        ? lowerer.LowerClause(invocation.Arguments[0].Value, TotalParameterState.Current)
+                        : null)
         };
         var allowedBuilder = context.Inputs.SelectMany(binding => ImmutableArray.Create(binding.Entry, binding.Current, binding.PreState)).ToImmutableHashSet().ToBuilder();
         if (context.Result is { } resultVariable)

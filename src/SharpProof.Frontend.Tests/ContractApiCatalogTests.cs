@@ -15,7 +15,8 @@ public sealed class ContractApiCatalogTests
                 "Ensures",
                 "Assume",
                 "Old",
-                "Result"]));
+                "Result",
+                "ValueAtReturn"]));
         Assert.That(
             ContractApiCatalog.Attributes.Select(
                 static attribute => attribute.MetadataName),

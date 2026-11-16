@@ -41,8 +41,12 @@ listing changes against an earlier one. Development history is in the Git log.
 ### Contract API
 
 - Contracts are ordinary C# calls in a method's prologue: `Contract.Requires`,
-  `Ensures`, `Assume`, `Result` and `Old`. They are compiled out of the binary
-  and add no runtime checks.
+  `Ensures`, `Assume`, `Result`, `Old` and `ValueAtReturn`. They are compiled
+  out of the binary and add no runtime checks.
+- `Contract.ValueAtReturn(out x)` names an out parameter's final value in a
+  postcondition. A method with one `bool`, character, integer or enum out
+  parameter has its postconditions verified when its body touches no memory
+  and makes no call; effect claims on it stay Unknown.
 - Closed attributes state common conditions: `[NonNull]`, `[Positive]` and
   `[InRange]` on parameters and returns.
 - Effect contracts: `[EnforcePure]`, `[EffectContract]`, `[ZeroAllocations]`,
@@ -50,7 +54,10 @@ listing changes against an earlier one. Development history is in the Git log.
 - `[ResourceUpperBound]` declares upper bounds on loop-body entries, array
   allocations, allocated elements and allocated bytes.
 - `[ContractFor]` companions attach contracts to members you do not own.
-  `[SharpProofTrusted]` and `[SharpProofSuppress]` record a reviewed
+  A companion member can also declare `[EnforcePure]`, `[ZeroAllocations]`,
+  `[AllowedCapabilities]`, `[DoesNotThrow]` and `[AllowedExceptions]` for its
+  target; `[EffectContract]` and `[ResourceUpperBound]` there are an error
+  (SPCF0011). `[SharpProofTrusted]` and `[SharpProofSuppress]` record a reviewed
   assumption or a reporting choice; neither is proof.
 - Attribute constructors and properties reject unknown flag bits, and
   exception-type arrays are copied on the way in and out.

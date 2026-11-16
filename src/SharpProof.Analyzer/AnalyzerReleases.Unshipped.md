@@ -27,3 +27,4 @@ SPCF0007 | SharpProof.ContractFor.Usage | Error | ContractFor member body requir
 SPCF0008 | SharpProof.ContractFor.Usage | Error | Invalid ContractFor clause placement.
 SPCF0009 | SharpProof.ContractFor.Usage | Error | ContractFor companion targets itself.
 SPCF0010 | SharpProof.ContractFor.Usage | Error | Cyclic ContractFor relationship.
+SPCF0011 | SharpProof.ContractFor.Usage | Error | Unsupported attribute on a ContractFor member.

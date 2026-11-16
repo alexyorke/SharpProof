@@ -52,6 +52,7 @@ Matching includes generic constraints, ref kinds, nullability, receiver shape, a
 - A mismatched overload/signature produces SPCF0005.
 - A missing source body produces SPCF0007.
 - Self-targeting and cycles produce SPCF0009 and SPCF0010.
+- `[EffectContract]` or `[ResourceUpperBound]` on a companion member produces SPCF0011. The other effect attributes, such as `[DoesNotThrow]`, declare that claim for the target.
 
 Validation runs at compilation end after generator syntax is available. The packaged generator is a loading hook and emits no companion implementation source.
 

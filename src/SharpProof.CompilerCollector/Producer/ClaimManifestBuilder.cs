@@ -342,7 +342,8 @@ internal sealed partial class ClaimManifestBuilder(
         var trustedAttributes = TrustedAttributes(target).ToImmutableArray();
         var selection = _attributes.Select(
             target,
-            resolution.HasSelectedContractIntent);
+            resolution.HasSelectedContractIntent,
+            usesCompanion ? resolution.Source : null);
         var selected = SelectFeatures(
             selection,
             !trustedAttributes.IsDefaultOrEmpty);
@@ -383,7 +384,7 @@ internal sealed partial class ClaimManifestBuilder(
         var selectedSubset = !(analyzerContractsSelected || analyzerEffectsSelected) ||
             (seed.Method.IsAbstract || seed.Method.IsExtern) && analyzerEffectsSelected && !analyzerContractsSelected &&
                 _effectSession.ResolveEffectContract(seed.Method).Kind == EffectContractResolutionKind.Valid ||
-            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration) ||
+            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration, allowOutParameter: true) ||
             analyzerEffectsSelected && seed.Method.IsAsync &&
                 ResourceForkJoinPlan.TryCreate(seed.Method, _compilation, cancellationToken) is { ConfiguredAwait: true };
         var supported =
@@ -399,7 +400,11 @@ internal sealed partial class ClaimManifestBuilder(
         var effects = EffectsEnabled
             ? CreateEffectClaims(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
-                target, callableId, postconditions.Length, supported, CompanionDeclarationLocation(resolution))
+                target, callableId, postconditions.Length,
+                // A write to an out parameter writes the caller's storage, which
+                // effect claims do not model: they stay unsupported.
+                supported && !target.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out),
+                CompanionDeclarationLocation(resolution))
             : [];
         if (effects.Any(claim => claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
             seed.Declaration is MethodDeclarationSyntax resourceDeclaration && seed.Model is { } resourceModel)

@@ -4,8 +4,10 @@ internal sealed class ContractApiSymbols(
     ContractClauseSymbols clauses,
     IMethodSymbol result,
     IMethodSymbol old,
+    IMethodSymbol? valueAtReturn,
     ContractSelectionInventory selections)
 {
+    internal IMethodSymbol? ValueAtReturn { get; } = valueAtReturn;
     internal ContractClauseSymbols Clauses { get; } = (clauses ?? throw new System.ArgumentNullException(nameof(clauses)));
     internal IMethodSymbol Result { get; } = (result ?? throw new System.ArgumentNullException(nameof(result)));
     internal IMethodSymbol Old { get; } = (old ?? throw new System.ArgumentNullException(nameof(old)));
@@ -32,7 +34,14 @@ internal sealed class ContractApiSymbols(
             clauses,
             result,
             old,
+            identity.ValueAtReturn,
             selections);
+    }
+
+    internal bool IsValueAtReturn(IMethodSymbol method)
+    {
+        ArgumentNullGuard.NotNull(method, nameof(method));
+        return ValueAtReturn != null && SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, ValueAtReturn);
     }
 
     internal bool IsResult(IMethodSymbol method)

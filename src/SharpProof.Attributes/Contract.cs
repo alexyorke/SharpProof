@@ -80,4 +80,19 @@ public static class Contract
     {
         throw new InvalidOperationException("Contract.Old(...) is valid only inside Contract.Ensures(...).");
     }
+
+    /// <summary>Represents the value an out parameter holds at a normal return, inside a postcondition.</summary>
+    /// <typeparam name="T">The out parameter type.</typeparam>
+    /// <param name="value">An out parameter of the enclosing callable, passed as <c>out value</c>.</param>
+    /// <returns>A static-analysis placeholder for the parameter's value at return.</returns>
+    /// <remarks>
+    /// Valid only inside <see cref="Ensures"/>, for example <c>Contract.Ensures(Contract.ValueAtReturn(out count) &gt;= 0)</c>.
+    /// C# does not allow reading an out parameter before the body assigns it, so a postcondition names its final value this way.
+    /// Do not nest it inside Old. Throws if executed.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The expression is executed at runtime.</exception>
+    public static T ValueAtReturn<T>(out T value)
+    {
+        throw new InvalidOperationException("Contract.ValueAtReturn(...) is valid only inside Contract.Ensures(...).");
+    }
 }

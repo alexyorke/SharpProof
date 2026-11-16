@@ -44,8 +44,8 @@ See [selection and configuration](configuration.md#activation-and-claim-selectio
 contiguous prologue clauses. They are compiler-elided unless
 `SHARPPROOF_CONTRACTS` is defined. That symbol is reserved and unsupported in
 every SharpProof profile: it emits calls to clause methods whose bodies do not
-check conditions, while direct `Contract.Result<T>()` and `Contract.Old<T>(T)`
-calls throw. SharpProof provides no runtime contract-checking mode. Package
+check conditions, while direct `Contract.Result<T>()`, `Contract.Old<T>(T)` and
+`Contract.ValueAtReturn<T>(out T)` calls throw. SharpProof provides no runtime contract-checking mode. Package
 builds reject the symbol in project constants even when
 `SharpProofProfile=off`; active analyzer builds also report SP0025 for an
 effective source-local or generated definition.
@@ -70,6 +70,22 @@ interface or class. The analyzer validates the association and member matching
 at compilation end, after all generators have contributed their syntax trees,
 using compiler symbol identity. SharpProof ships no source generator. The companion must be distinct from its target (SPCF0009), and
 companion-to-target relationships must be acyclic (SPCF0010).
+A companion member can also declare the effect claims `EnforcePureAttribute`,
+`ZeroAllocationsAttribute`, `AllowedCapabilitiesAttribute`,
+`DoesNotThrowAttribute` and `AllowedExceptionsAttribute` for its target;
+`EffectContractAttribute` and `ResourceUpperBoundAttribute` there produce
+SPCF0011.
+
+A postcondition names an out parameter's final value with
+`Contract.ValueAtReturn(out name)`, because C# does not allow a prologue clause
+to read an out parameter before the body assigns it. It is valid only inside
+`Contract.Ensures`, outside `Contract.Old`, and only for an out parameter of
+the enclosing callable (SP0024 otherwise). A method verifies postconditions
+with one out parameter of a `bool`, character, integer or enum type and no
+other `ref`, `in` or `out` parameter. The caller may pass a field or array
+element as that argument, so a write to it may change memory: the body is
+verified only when it reads and writes no field, array or object and makes no
+call, and effect claims on such a method stay Unknown.
 
 Instance target members use a static companion member with an explicit first
 receiver parameter of the target type. Static target members have no added
