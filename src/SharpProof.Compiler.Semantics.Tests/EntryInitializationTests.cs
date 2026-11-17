@@ -181,6 +181,9 @@ public sealed class EntryInitializationTests
         "private static readonly System.Int128 MinWide = (System.Int128)MinNanoseconds; }")]
     [TestCase("public static class Subject { private static readonly int[] Table = Build(); " +
         "private static int[] Build() { var table = new int[12]; for (var i = 0; i < table.Length; i++) { table[i] = i * 31; } return table; } }")]
+    // BigInteger arithmetic past the inline range allocates.
+    [TestCase("using System.Numerics; public static class Subject { private static readonly BigInteger Big = Make(); " +
+        "private static BigInteger Make() { var x = BigInteger.One; for (var i = 0; i < 70; i++) { x = x + x; } return x; } }")]
     public void AllocatingClosedComputationsAreFreshValues(string source)
     { AssertClassified(source, (int)InitializationEffect.FreshValues); }
 
@@ -199,6 +202,23 @@ public sealed class EntryInitializationTests
     [TestCase("using System.Numerics; public static class Subject { private static readonly decimal TooLarge = (decimal)(BigInteger.One << 100); }")]
     [TestCase("using System.Numerics; public static class Subject { private static readonly long TooLarge = (long)(BigInteger.One << 70); }")]
     [TestCase("public static class Subject { private static readonly int Loop = Spin(); private static int Spin() { var i = 0; while (true) { i++; } } }")]
+    // C# resolves an assigned array element before the value, and a
+    // compound assignment or increment resolves it once.
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i] = (i = 1); return 1 / (a[0] - 1); } }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i++] += 1; return 1 / (a[0] - 1); } }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i++]++; return 1 / (a[0] - 1); } }")]
+    // A covariant array store of another sealed type throws.
+    [TestCase("public sealed class First { } public sealed class Second { } public static class Subject { " +
+        "private static readonly object[] Items = Make(); private static object[] Make() { object[] a = new First[1]; a[0] = new Second(); return a; } }")]
+    // A struct's type initializer runs before its instance members, and
+    // this one throws.
+    [TestCase("public readonly struct Fragile { static Fragile() { throw new System.InvalidOperationException(); } public int Get() => 1; } " +
+        "public static class Subject { private static readonly int Value = default(Fragile).Get(); }")]
+    [TestCase("public readonly struct Fragile { static Fragile() { throw new System.InvalidOperationException(); } public int Count { get; } } " +
+        "public static class Subject { private static readonly int Value = default(Fragile).Count; }")]
     public void ThrowingClosedComputationsAreEffectful(string source)
     { AssertClassified(source, (int)InitializationEffect.Effectful); }
 
@@ -217,6 +237,18 @@ public sealed class EntryInitializationTests
     [TestCase("public static class Subject { private static readonly int Value = Make(); " +
         "private static int Make() { try { return 1; } catch (System.Exception) { return 2; } } }")]
     [TestCase("public static class Subject { private static readonly int Value = Make<int>(); private static int Make<T>() => 1; }")]
+    // A settable property of another initialization's object may have
+    // changed since.
+    [TestCase("public sealed class Holder { public int Value { get; set; } } public static class Other { public static readonly Holder Shared = new Holder(); } " +
+        "public static class Subject { private static readonly int Value = 1 / (1 - Other.Shared.Value); }")]
+    // Overlapping fields share storage.
+    [TestCase("[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] public struct Union { " +
+        "[System.Runtime.InteropServices.FieldOffset(0)] public int A; [System.Runtime.InteropServices.FieldOffset(0)] public int B; " +
+        "public Union(int x) { A = 0; B = x; } } public static class Subject { private static readonly int Value = 1 / (1 - new Union(1).A); }")]
+    // Operands that grow past the size bound give up instead of running out
+    // of memory.
+    [TestCase("using System.Numerics; public static class Subject { private static readonly BigInteger Huge = Make(); " +
+        "private static BigInteger Make() { var x = BigInteger.One + BigInteger.One; for (var i = 0; i < 40; i++) { x = x * x; } return x; } }")]
     public void OpenComputationsAreEffectful(string source)
     { AssertClassified(source, (int)InitializationEffect.Effectful); }
 
