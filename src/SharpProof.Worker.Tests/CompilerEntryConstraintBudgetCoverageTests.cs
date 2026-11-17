@@ -13,10 +13,12 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerEntryConstraintBudgetCoverageTests
 {
+    // Past the structural rules' budget, the closed-initializer evaluator,
+    // with its own larger budget, still finds these initializers empty.
     [TestCase("fields-before", 1, 1, true)]
-    [TestCase("fields-before", 2048, 0, true)]
-    [TestCase("fields-after", 2048, 0, true)]
-    [TestCase("fields-after", 4096, 0, false)]
+    [TestCase("fields-before", 2048, 1, true)]
+    [TestCase("fields-after", 2048, 1, true)]
+    [TestCase("fields-after", 4096, 1, true)]
     [TestCase("module", 0, 1, true)]
     // The module-initializer search is exact, so assembly size no longer
     // drops entry completeness or the exception constraint.
@@ -26,9 +28,11 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
     // its entry is effect-free until its statements exhaust the budget.
     // Constants cost no classification work.
     [TestCase("empty-body", 1, 1, true)]
-    [TestCase("empty-body", 4096, 0, false)]
+    [TestCase("empty-body", 4096, 1, true)]
     [TestCase("constructor-reference", 1, 1, true)]
-    [TestCase("constructor-reference", 4094, 0, true)]
+    [TestCase("constructor-reference", 4094, 1, true)]
+    // A loop that outlasts the evaluator's budget stays an entry effect.
+    [TestCase("long-loop", 1, 0, false)]
     [TestCase("value-work", 1, 1, false)]
     [TestCase("value-work", 1363, 0, false)]
     [TestCase("type-work", 1, 1, false)]
@@ -49,6 +53,7 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
             "module" => root,
             "empty-body" => root + "static Subject() {" + new string(';', count) + "}",
             "constructor-reference" => constants + "static Subject() { }" + root,
+            "long-loop" => root + "static Subject() { var i = 0; while (i < 10000000) { i++; } }",
             "value-work" => "public static int State;" + root + "static Subject() {;" + stores + "}",
             "type-work" => "public static int State;" + root + "static Subject() {" + stores + "Other.State=0;}",
             _ => throw new AssertionException("Unknown source shape")

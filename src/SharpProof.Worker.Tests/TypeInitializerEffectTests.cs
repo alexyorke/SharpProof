@@ -54,7 +54,7 @@ internal sealed class TypeInitializerEffectTests
 
     // A call, a read of a static whose initializer is effectful, a throw, a
     // cross-type cycle and a static constructor with logic.
-    [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[3];")]
+    [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount];")]
     [TestCase("private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } };")]
     [TestCase("private static readonly int[] Copy = Effectful.Data;")]
     [TestCase("private static readonly object Value = (object)null ?? throw new System.InvalidOperationException();")]
@@ -129,7 +129,7 @@ internal sealed class TypeInitializerEffectTests
     }
 
     [TestCase("public static int State = 1;")]
-    [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[3];")]
+    [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount];")]
     public async Task SameTypeCalleeDoesNotAdmitAnEffectfulInitializer(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -139,11 +139,12 @@ internal sealed class TypeInitializerEffectTests
 
     // Another type's initializer can run in the middle of the body, and a
     // nested type's member can run before the enclosing initializer has, so
-    // a callee outside the caller's own type keeps the stricter rule.
-    [TestCase("private static readonly int[] Cache = new int[3]; private static class Nested { internal static int Helper(int x) { return x; } }",
+    // a callee outside the caller's own type is inlined only when that
+    // type's initializer, and every enclosing one, is admitted on its own.
+    [TestCase("private static readonly int Seed = System.Environment.ProcessorCount; private static class Nested { internal static int Helper(int x) { return x; } }",
         "public static int Target(int x) { return Nested.Helper(x); }")]
-    [TestCase("", "public static int Target(int x) { return Other.Helper(x); }")]
-    [TestCase("private static readonly int[] Cache = new int[3]; private static int Helper(int x) { return x; } " +
+    [TestCase("", "public static int Target(int x) { return Effectful.Helper(x); }")]
+    [TestCase("private static readonly int Seed = System.Environment.ProcessorCount; private static int Helper(int x) { return x; } " +
         "private static class Nested { internal static int Twice(int x) { return Helper(x); } }",
         "public static int Target(int x) { return Nested.Twice(x); }")]
     public async Task CalleeOutsideTheCallerTypeKeepsTheStricterRule(string members, string body)
@@ -152,6 +153,46 @@ internal sealed class TypeInitializerEffectTests
         System.ArgumentNullException.ThrowIfNull(body);
         var purity = await VerifyAsync(members, "[EnforcePure]", NativeEffectSiteVerifier.VerifyPurityAsync, body);
         Assert.That(purity.Outcome, Is.Null);
+    }
+
+    // The same calls when every initializer they reach only makes fresh
+    // values: purity ignores the allocation, an allocation claim does not.
+    [TestCase("private static readonly int[] Cache = new int[3]; private static class Nested { internal static int Helper(int x) { return x; } }",
+        "public static int Target(int x) { return Nested.Helper(x); }")]
+    [TestCase("", "public static int Target(int x) { return Other.Helper(x); }")]
+    [TestCase("private static readonly int[] Cache = new int[3]; private static int Helper(int x) { return x; } " +
+        "private static class Nested { internal static int Twice(int x) { return Helper(x); } }",
+        "public static int Target(int x) { return Nested.Twice(x); }")]
+    public async Task CalleeOutsideTheCallerTypeIsInlinedUnderFreshValueInitializers(string members, string body)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        System.ArgumentNullException.ThrowIfNull(body);
+        var purity = await VerifyAsync(members, "[EnforcePure]", NativeEffectSiteVerifier.VerifyPurityAsync, body);
+        var allocation = await VerifyAsync(members, "[ZeroAllocations]", NativeEffectSiteVerifier.VerifyAsync, body);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(purity.Outcome, Is.TypeOf<ProvenOutcome>());
+            Assert.That(allocation.Outcome, Is.Null);
+        }
+    }
+
+    // A callee whose type's initializer is a closed computation that
+    // allocates nothing is inlined for every claim: a validating factory
+    // called with constants never throws.
+    [Test]
+    public async Task CalleeUnderAClosedComputationInitializerIsInlined()
+    {
+        const string members = "private readonly struct Span { private readonly int seconds; public static readonly Span Max = FromSeconds(64800); " +
+            "public static Span FromSeconds(int seconds) { if (seconds < -64800 || seconds > 64800) { throw new System.ArgumentOutOfRangeException(); } " +
+            "return new Span(seconds); } private Span(int seconds) { this.seconds = seconds; } public static int Twice(int x) { return x + x; } }";
+        const string body = "public static int Target(int x) { return unchecked(Span.Twice(x)); }";
+        var purity = await VerifyAsync(members, "[EnforcePure]", NativeEffectSiteVerifier.VerifyPurityAsync, body);
+        var allocation = await VerifyAsync(members, "[ZeroAllocations]", NativeEffectSiteVerifier.VerifyAsync, body);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(purity.Outcome, Is.TypeOf<ProvenOutcome>());
+            Assert.That(allocation.Outcome, Is.TypeOf<ProvenOutcome>());
+        }
     }
 
     private static async Task<PassiveCallableCheckResult> VerifyAsync(string members, string attribute,
@@ -167,7 +208,8 @@ internal sealed class TypeInitializerEffectTests
             "public struct Point { private readonly int x; public Point(int x) { this.x = x; } } " +
             "public static class Admitted { public static readonly int[] Data = new int[2]; } " +
             "public static class Other { private static readonly int[] Table = new int[2]; public static int Helper(int x) { return x; } } " +
-            "public static class Effectful { public static readonly int[] Data = Make(); private static int[] Make() => new int[1]; } " +
+            "public static class Effectful { public static readonly int[] Data = Make(); private static int[] Make() => new int[System.Environment.ProcessorCount]; " +
+            "public static int Helper(int x) { return x; } } " +
             (members.Contains("Cycle.", StringComparison.Ordinal) ? "public static class Cycle { public static readonly object Back = C.Gate; } " : "") +
             "public sealed class Counter { public static int Count; public Counter() { Count++; } } " +
             "public static class C { " + members + " " + attribute + " " + body + " }";

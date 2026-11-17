@@ -349,7 +349,7 @@ public sealed class CallPreconditionClaimTests
     [TestCase("""
         using SharpProof.Attributes;
         public static class T {
-            private static readonly int[] Table = new int[4];
+            private static readonly int Seed = System.Environment.ProcessorCount;
             public static int M(int n) { Contract.Requires(n > 0); return n; }
         }
         public static class C { public static int Caller() { return T.M(0); } }
@@ -380,6 +380,29 @@ public sealed class CallPreconditionClaimTests
             // A refutation needs an entry free of initializer effects, and
             // this initializer allocates, so the violation is not reported
             // as definite. It is never Proven.
+            Assert.That(SingleCallClaim(response, "C.Caller").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(SingleCallClaim(response, "C.Fine").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    // A callee in another type whose initializer only makes fresh values is
+    // checked at the call too, with the same reporting as above.
+    [Test]
+    public async Task CallToACalleeUnderAFreshValueInitializerIsChecked()
+    {
+        var response = await Verify("""
+            using SharpProof.Attributes;
+            public static class T {
+                private static readonly int[] Table = new int[4];
+                public static int M(int n) { Contract.Requires(n > 0); return n; }
+            }
+            public static class C {
+                public static int Caller() { return T.M(0); }
+                public static int Fine() { return T.M(1); }
+            }
+            """);
+        using (Assert.EnterMultipleScope())
+        {
             Assert.That(SingleCallClaim(response, "C.Caller").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(SingleCallClaim(response, "C.Fine").Result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
         }

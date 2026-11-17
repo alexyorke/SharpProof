@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SharpProof.Frontend.Host;
 
@@ -30,8 +31,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     private readonly ImmutableHashSet<string>.Builder _activeIl = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
     private readonly ImmutableDictionary<IMethodSymbol, bool>.Builder _iterators = ImmutableDictionary.CreateBuilder<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
     private readonly ImmutableDictionary<INamedTypeSymbol, bool>.Builder _typeInitialization = ImmutableDictionary.CreateBuilder<INamedTypeSymbol, bool>(SymbolEqualityComparer.Default);
+    private readonly HashSet<INamedTypeSymbol> _allocatingInitialization = new(SymbolEqualityComparer.Default);
     private int _remaining = RoslynTotalProgramLowerer.MaximumRegionSteps;
     internal bool SourceInitializationEffectsComplete { get; private set; } = true;
+    // A callee's type initialization the body reaches constructs fresh
+    // values: an effect only claims that count allocation see.
+    internal bool SourceInitializationAllocates { get; private set; }
     internal bool ConstructionLimitExceeded { get; private set; }
 
     internal static TotalSourceCallSession CreatePrepared(Compilation compilation,
@@ -651,9 +656,25 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool HasNoTypeInitialization(INamedTypeSymbol type)
     {
         if (_typeInitialization.TryGetValue(type, out var eligible))
-        { return Spend() && eligible; }
+        {
+            if (eligible && _allocatingInitialization.Contains(type))
+            { SourceInitializationAllocates = true; }
+            return Spend() && eligible;
+        }
         if (!TryCheckTypeInitialization(type, out eligible))
         { return false; }
+        // An initializer that is not only constants may still be a closed
+        // computation that finishes without an observable effect.
+        if (!eligible && _compilation is CSharpCompilation compilation &&
+            TypeInitialization.Classify(compilation, type, cancellationToken) is var effect && effect != InitializationEffect.Effectful)
+        {
+            eligible = true;
+            if (effect == InitializationEffect.FreshValues)
+            {
+                _allocatingInitialization.Add(type);
+                SourceInitializationAllocates = true;
+            }
+        }
         _typeInitialization[type] = eligible;
         return eligible;
     }

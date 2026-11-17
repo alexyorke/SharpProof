@@ -191,7 +191,7 @@ internal static class EffectContractDiagnostics
     private static string? EntryEffectGap(CSharpCompilation compilation, IMethodSymbol method, AdvisoryEffectAnalysis analysis,
         bool admitFreshValues, CancellationToken cancellationToken)
     {
-        if (!analysis.SourceInitializationEffectsComplete)
+        if (!analysis.SourceInitializationEffectsComplete || analysis.SourceInitializationAllocates && !admitFreshValues)
         { return "CalleeTypeInitializer"; }
         var gap = EntryInitialization.FindEffectGap(compilation, method.ContainingType, cancellationToken, admitFreshValues);
         return gap == EntryInitializationGap.None ? null : gap.ToString();
