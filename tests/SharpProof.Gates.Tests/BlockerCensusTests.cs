@@ -61,11 +61,12 @@ public sealed class BlockerCensusTests
 
     // The census lowers a body as the compiler collector does, so a struct
     // member reads `this` as an input, and a target-typed `new(...)` of a
-    // modeled struct builds a value.
+    // modeled struct builds a value, also through a `: this(...)` chain.
     [TestCase("public Span Plus(Span other) => this + other;")]
     [TestCase("public bool Same(Span other) => this == other;")]
     [TestCase("public static Span FromTicks(long ticks) => new(ticks * 100);")]
     [TestCase("public static Span Sum(long a, long b) { return new(a, b); }")]
+    [TestCase("public static Span Narrow(int ticks) => new Span(ticks, true);")]
     public void StructMembersLowerExactly(string member)
     {
         ArgumentNullException.ThrowIfNull(member);
@@ -75,6 +76,7 @@ public sealed class BlockerCensusTests
                 private readonly long ticks;
                 public Span(long ticks) { this.ticks = ticks; }
                 internal Span(long a, long b) { ticks = a + b; }
+                internal Span(int ticks, bool scaled) : this(scaled ? ticks * 100L : ticks) { }
                 public static Span operator +(Span left, Span right) => new Span(left.ticks + right.ticks);
                 public static bool operator ==(Span left, Span right) => left.ticks == right.ticks;
                 public static bool operator !=(Span left, Span right) => left.ticks != right.ticks;

@@ -617,7 +617,7 @@ OSS0351.baseline|Unknown|Unknown|SP0002@Warning@nodatime/src/NodaTime/LocalTime.
 OSS0352.baseline|Proven|Unknown|
 OSS0353.baseline|Proven|Unknown|
 OSS0354.baseline|Unknown|Unknown|SP0002@Warning@nodatime/src/NodaTime/OffsetDateTime.cs:262:20-262:29@TWV0aG9kICdUb0luc3RhbnQnIGlzIG1hcmtlZCBbRW5mb3JjZVB1cmVdLCBidXQgaXRzIGVmZmVjdHMgZG8gbm90IHByb3ZlIG9ic2VydmFibGUgcHVyaXR5
-OSS0355.baseline|Unknown|Abstained|SP0047@Warning@nodatime/src/NodaTime/OffsetTime.cs:194:23-194:33@U2hhcnBQcm9vZiBjb3VsZCBub3QgY29tcGxldGVseSBhbmFseXplIHNlbGVjdGVkIG1ldGhvZCAnV2l0aE9mZnNldCc6IEFkdmlzb3J5Okxvd2VyaW5nOlVuc3VwcG9ydGVkT3BlcmF0aW9uS2luZA==
+OSS0355.baseline|Proven|Unknown|
 OSS0356.baseline|Proven|Unknown|
 OSS0357.baseline|Proven|Unknown|
 OSS0358.baseline|Unknown|Abstained|SP0047@Warning@nodatime/src/NodaTime/SystemClock.cs:37:20-37:37@U2hhcnBQcm9vZiBjb3VsZCBub3QgY29tcGxldGVseSBhbmFseXplIHNlbGVjdGVkIG1ldGhvZCAnR2V0Q3VycmVudEluc3RhbnQnOiBBZHZpc29yeTpMb3dlcmluZzpVbnN1cHBvcnRlZE9wZXJhdGlvbktpbmQ=

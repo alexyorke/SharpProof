@@ -142,7 +142,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsPlainConstructor(IMethodSymbol constructor, CancellationToken cancellationToken)
     {
         constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
-        return IsDirectObjectConstructor(constructor, false, cancellationToken);
+        return IsDirectObjectConstructor(constructor, false, cancellationToken) && !ChainsToThis(constructor, cancellationToken);
     }
 
     internal static bool IsDirectObjectConstructor(IMethodSymbol constructor, bool includeInitializers, CancellationToken cancellationToken)
@@ -155,12 +155,15 @@ internal static partial class CSharpOperationSemantics
             constructor.ContainingType is { TypeKind: TypeKind.Struct } && !IsModeledStruct(constructor.ContainingType))
         { return false; }
         var type = constructor.ContainingType;
+        // `: this(arguments)` runs another constructor of the same type on the
+        // same object first; the body graph holds that call, which the lowerer
+        // inlines on the receiver. `: base(arguments)` is not admitted.
         foreach (var reference in constructor.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax syntax ||
                 syntax.Initializer is { } initializer &&
-                (initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword) ||
-                    initializer.ArgumentList.Arguments.Count != 0))
+                !initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword) &&
+                initializer.ArgumentList.Arguments.Count != 0)
             { return false; }
         }
         foreach (var reference in type.DeclaringSyntaxReferences)
@@ -182,6 +185,31 @@ internal static partial class CSharpOperationSemantics
 
         static bool IsStatic(SyntaxTokenList modifiers)
         { return modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)); }
+    }
+
+    // A constructor declared `: this(arguments)`. Instance field and property
+    // initializers run in the constructor it chains to, not in this one.
+    internal static bool ChainsToThis(IMethodSymbol constructor, CancellationToken cancellationToken)
+    {
+        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
+        return constructor.MethodKind == MethodKind.Constructor && constructor.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax(cancellationToken) is Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax { Initializer: { } initializer } &&
+            initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword));
+    }
+
+    // The call a `: this(arguments)` initializer makes: another constructor
+    // of the type under construction, on the object under construction. C#
+    // has no other way to call a constructor on `this`.
+    internal static bool IsChainedConstructorCall(IInvocationOperation invocation, IMethodSymbol owner)
+    {
+        invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
+        owner = RepositoryParameterGuard.NotNull(owner, nameof(owner));
+        return invocation is
+        {
+            TargetMethod.MethodKind: MethodKind.Constructor,
+            Instance: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance }
+        } && owner.MethodKind == MethodKind.Constructor &&
+            SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, owner.ContainingType);
     }
 
     internal static bool IsObjectConstructorCall(IOperation? operation)
