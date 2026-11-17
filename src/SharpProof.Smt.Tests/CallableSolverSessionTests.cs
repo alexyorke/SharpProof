@@ -41,6 +41,39 @@ public sealed class CallableSolverSessionTests
         Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
 
+    // A widened sum with a constant is encoded linearly in the widened
+    // operand. For every operand it must equal the widening of the wrapped
+    // narrow sum, which y names here without a cast over the sum.
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    public async Task WidenedConstantSumEqualsTheWidenedWrappedSum(bool isSigned, bool constantFirst)
+    {
+        foreach (var op in new[] { IrBinaryOperator.Add, IrBinaryOperator.Subtract })
+        {
+            if (constantFirst && op == IrBinaryOperator.Subtract)
+            { continue; }
+            foreach (var k in new[] { 0UL, 1UL, 2UL, 127UL, 128UL, 254UL, 255UL })
+            {
+                var factory = new IrFactory();
+                var source = factory.GetOrCreateIntegerType(8, isSigned);
+                var target = factory.GetOrCreateIntegerType(16, true);
+                var x = factory.CreateVariable("x", source);
+                var y = factory.CreateVariable("y", source);
+                var constant = factory.IntegerBits(source, k);
+                var sum = constantFirst ? factory.Binary(op, constant, factory.Variable(x)) : factory.Binary(op, factory.Variable(x), constant);
+                var wrapped = constantFirst ? factory.Binary(op, factory.IntegerBits(source, k), factory.Variable(x))
+                    : factory.Binary(op, factory.Variable(x), factory.IntegerBits(source, k));
+                using var session = new CallableSolverSession(factory, new IrSmtBackendOptions());
+                var outcome = await new ProofKernel(session).VerifyAsync(Query(factory,
+                    [Assume(factory, Equal(factory, factory.Variable(y), wrapped))],
+                    Equal(factory, factory.Cast(target, sum), factory.Cast(target, factory.Variable(y)))), TestContext.CurrentContext.CancellationToken);
+                Assert.That(outcome, Is.TypeOf<ProvenOutcome>(), () => op + " " + k);
+            }
+        }
+    }
+
     [TestCase(8, true, 255UL, 64, false, ulong.MaxValue)]
     [TestCase(8, false, 255UL, 32, true, 255UL)]
     [TestCase(64, false, ulong.MaxValue, 8, true, 255UL)]
