@@ -430,7 +430,8 @@ internal static partial class PortableIrGraphCodec
         }
 
         // A write is a field store (location), an element store (target and
-        // index) or a bare region write, and nothing else.
+        // index), an element write naming only its array, or a bare region
+        // write, and nothing else.
         private IrWriteInstruction DecodeWrite(IrProgramBuilder builder, IrBlockId block, PortableIrInstruction row)
         {
             RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -444,6 +445,8 @@ internal static partial class PortableIrGraphCodec
             }
             if (OptionalTerm(row.B) is { } stored)
             {
+                if (row.A == (int)IrWriteRegion.Element && row.C < 0 && row.Items.Length == 0)
+                { return builder.Write(block, Operation(row.Operation), IrWriteRegion.Element, stored); }
                 return row.A == (int)IrWriteRegion.Element && row.Items.Length is 1 or 2 && OptionalTerm(row.C) is { } index
                     ? builder.ElementStore(block, Operation(row.Operation), stored, index, Term(row.Items[0]),
                         row.Items.Length == 2 ? Term(row.Items[1]) : null)

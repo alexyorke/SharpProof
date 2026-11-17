@@ -220,7 +220,7 @@ public sealed class GoldenLoweringTests
                     (value.Target is { } stored ? $" {printer.Print(stored)}" +
                         (value.Index is { } index ? $"[{printer.Print(index)}]" : "") +
                         (value.Field is { } field ? $".m{factory.GetMemberInfo(field).Id.Value}" : "") +
-                        $" = {printer.Print(value.Value!)}" : ""),
+                        (value.Value is { } written ? $" = {printer.Print(written)}" : "") : ""),
                 IrLockInstruction value => $"Lock {printer.Print(value.Receiver)}",
                 IrAssignInstruction value => $"Assign {Variable(value.Target)} = {printer.Print(value.Value)}",
                 IrLoadInstruction value => $"Load {Variable(value.Target)} = {Location(value.Location)}",

@@ -92,6 +92,26 @@ internal sealed class NativeMutationBoundaryTests
         Assert.That(response.ClaimResults.Single().Outcome, Is.EqualTo(outcome));
     }
 
+    // A store of a reference into an array is not modeled, since arrays of
+    // other element types may be the same object, but it names its array: a
+    // store into one the body allocated is no write a caller can see.
+    [TestCase("public static string[] Target() { var a = new string[2]; a[0] = \"x\"; a[1] = \"y\"; return a; }", false)]
+    [TestCase("public static T[] Target<T>(T x) { var a = new T[1]; a[0] = x; return a; }", false)]
+    [TestCase("public static object[] Target() { var a = new object[3]; for (var i = 0; i < a.Length; i++) { a[i] = \"x\"; } return a; }", false)]
+    [TestCase("public static string[] Target() { var a = new string[1]; a[0] += \"x\"; return a; }", false)]
+    [TestCase("public static void Target(string[] a) { Contract.Requires(a != null && a.Length > 0); a[0] = \"x\"; }", true)]
+    [TestCase("public static void Target(string[] p) { Contract.Requires(p != null && p.Length > 0); var a = new string[1]; a[0] = \"x\"; p[0] = \"y\"; }", true)]
+    public async Task ReferenceElementStoresAreRefutedOnlyForTheCallersArrays(string method, bool refuted)
+    {
+        System.ArgumentNullException.ThrowIfNull(method);
+        using var project = new ShadowTestProject("using SharpProof.Attributes; public static class C { [EnforcePure] " + method + " }");
+        using var worker = SharpProofWorker.Create(project.Request.Budgets);
+        var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
+        Assert.That(response.Errors, Is.Empty);
+        var outcome = response.ClaimResults.Single().Outcome;
+        Assert.That(outcome, refuted ? Is.EqualTo(WorkerClaimOutcome.Refuted) : Is.Not.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
     [TestCase("int?", "new int?[] { null }", WorkerClaimOutcome.Unknown)]
     [TestCase("int?", "[null]", WorkerClaimOutcome.Unknown)]
     [TestCase("object", "new object[] { null }", WorkerClaimOutcome.Proven)]
