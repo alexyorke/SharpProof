@@ -139,8 +139,11 @@ listing changes against an earlier one. Development history is in the Git log.
   ignore allocation. This opens NodaTime's `Duration`, `Instant`, `Offset` and
   `LocalTime` arithmetic.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
-  `days`, is checked as the same term a postcondition writes for it. A contract
-  that restates such a product no longer runs out of solver budget.
+  `days`, is checked as the same term a postcondition writes for it. A widened
+  input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is
+  checked as the widened input plus that constant, with the wrap of the
+  narrow sum accounted for. A contract that restates such a product no longer
+  runs out of solver budget.
 - A refuted contract is reported as SP0051 at the clause or call and fails the
   build under every verifier policy. SP0047 reports incomplete analysis and
   SP0048 a declared assumption; each links to its documentation.
