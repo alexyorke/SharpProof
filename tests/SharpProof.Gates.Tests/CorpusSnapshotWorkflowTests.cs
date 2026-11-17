@@ -25,15 +25,15 @@ public sealed class CorpusSnapshotWorkflowTests
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
         var method = manifest["methods"]!.AsArray().Single(static item =>
-            item!["id"]!.GetValue<string>() == "OSS0311")!;
+            item!["id"]!.GetValue<string>() == "OSS0307")!;
         var file = manifest["files"]!.AsArray().Single(item =>
             item!["sourceId"]!.GetValue<string>() == method["sourceId"]!.GetValue<string>() &&
             item["path"]!.GetValue<string>() == method["path"]!.GetValue<string>())!;
         var source = file["content"]!.GetValue<string>();
         // In this private fixture, a pragma replaces the blank line before
-        // the namespace and suppresses HebrewScripturalCalculator.IsLeapYear's
-        // only diagnostic, the SP0047 entry-initialization reason for its
-        // cache initializer's call; lines and the declaration are unchanged.
+        // the namespace and suppresses GJEraCalculator.ValidateEra's
+        // only diagnostic, an SP0047 lowering reason; lines and the
+        // declaration are unchanged.
         // The reviewed corpus itself remains untouched and has no silent
         // Unknown.
         const string blankBeforeNamespace = "using NodaTime.Utility;\n\nnamespace NodaTime.Calendars;";
@@ -49,11 +49,11 @@ public sealed class CorpusSnapshotWorkflowTests
         {
             Assert.That(result.Passed, Is.False);
             Assert.That(result.SilentUnknownCount, Is.EqualTo(1));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(491));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(482));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
             Assert.That(result.UnknownReasons.Single(static item => item.Reason == "silent-unclassified").Count, Is.EqualTo(1));
             Assert.That(result.Failures, Does.Contain("Corpus produced a new unreviewed Unknown reason 'silent-unclassified' (1 cases)."));
-            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for OSS0311.baseline:"));
+            Assert.That(result.Failures, Has.Some.StartsWith("Snapshot mismatch for OSS0307.baseline:"));
         }
     }
 

@@ -15,7 +15,7 @@ public sealed class EntryInitializationReasonTests
     // NodaTime's HebrewScripturalCalculator.IsLeapYear and Humanizer's
     // IcelandicNumberToWordsConverter.IsAndSplitNeeded: trivially pure bodies
     // in types whose static initializer calls code.
-    [TestCase("public static class Subject { private static readonly int[] Cache = Create(); private static int[] Create() => new int[3]; " +
+    [TestCase("public static class Subject { private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount]; " +
         "[EnforcePure] public static bool Target(int year) => ((year * 7) + 1) % 19 < 7; }")]
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; " +
         "[EnforcePure] public static bool Target(int number) => number <= 20; }")]
@@ -24,7 +24,7 @@ public sealed class EntryInitializationReasonTests
         "[ZeroAllocations] public static int Target(int x) => x; }")]
     [TestCase("public static class Subject { public static int State = 1; " +
         "[AllowedCapabilities(SharpProofCapability.None)] public static int Target(int x) => x; }")]
-    [TestCase("public static class Outer { private static readonly int[] Cache = Create(); private static int[] Create() => null; " +
+    [TestCase("public static class Outer { private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount]; " +
         "public static class Subject { [AllowedCapabilities(SharpProofCapability.None)] public static int Target(int x) => x; } }")]
     public async Task ATypeInitializerIsNamed(string source)
     {

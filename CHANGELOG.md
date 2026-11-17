@@ -129,6 +129,15 @@ listing changes against an earlier one. Development history is in the Git log.
 - The default API table specifies common framework members, including calendar
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
+- A type initializer that is a closed computation no longer blocks its
+  callers. SharpProof runs such an initializer at analysis time: constants,
+  validating constructors and helpers, loops, exact integer arithmetic and
+  `BigInteger` bounds, with floating-point and `decimal` results only stored.
+  When it finishes, it never throws and has no effect a body can observe, so
+  calls and constructions in its type are inlined and the type's own members
+  are admitted at entry. One that allocates is admitted only by claims that
+  ignore allocation. This opens NodaTime's `Duration`, `Instant`, `Offset` and
+  `LocalTime` arithmetic.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A contract
   that restates such a product no longer runs out of solver budget.

@@ -520,6 +520,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             _context.Variables, _context.Captures, _abstentions.ToImmutable(), _context.Origin)
         {
             SourceInitializationEffectsComplete = _calls?.SourceInitializationEffectsComplete ?? true,
+            SourceInitializationAllocates = _calls?.SourceInitializationAllocates ?? false,
             IsShadowCallSkeleton = _preserveSourceCall != null,
             PreservedSourceCalls = _preservedSourceCalls.ToImmutable(),
             CallPreconditions = _callPreconditions.ToImmutable()

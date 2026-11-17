@@ -64,8 +64,8 @@
     {
       "methodId": "OSS0310",
       "companion": "[SharpProof.Attributes.ContractFor(typeof(NodaTime.Calendars.HebrewMonthConverter))]\ninternal static class OSS0310Contracts\n{\n    public static int CivilToScriptural(int year, int month)\n    {\n        SharpProof.Attributes.Contract.Ensures(month < 7 || SharpProof.Attributes.Contract.Result<int>() != 1);\n        return default!;\n    }\n}\n",
-      "expectedVerdict": "Unknown",
-      "review": "Deliberately false: civil month 7 in a non-leap year is scriptural month 1 (Nisan). Unknown (CounterexampleNotReplayable): the witness runs through HebrewScripturalCalculator.IsLeapYear, whose declaring type has a static initializer the replay cannot certify."
+      "expectedVerdict": "Refuted",
+      "review": "Deliberately false: civil month 7 in a non-leap year is scriptural month 1 (Nisan). Refuted: the witness runs through HebrewScripturalCalculator.IsLeapYear, whose declaring type's initializer is a closed computation, so the counterexample replays."
     },
     {
       "methodId": "OSS0393",
