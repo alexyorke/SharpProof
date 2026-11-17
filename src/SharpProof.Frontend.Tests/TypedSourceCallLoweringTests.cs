@@ -346,7 +346,7 @@ public sealed class TypedSourceCallLoweringTests
 
     [TestCase("int Target(int x) { return Recurse(x); } static int Recurse(int value) { return Recurse(value); }")]
     [TestCase("int Target(int x) { return A(x); } static int A(int value) { return B(value); } static int B(int value) { return A(value); }")]
-    [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static External() { } public static int Add(int x) => x + 1; }")]
+    [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static External() { System.Console.WriteLine(); } public static int Add(int x) => x + 1; }")]
     [TestCase("int Target(int x) { return External.Add(x); }", "static class External { static int state = System.Environment.TickCount; public static int Add(int x) => x + 1; }")]
     [TestCase("int Target(int x) { return Params(x); } static int Params(params int[] value) => value[0];")]
     [TestCase("int Target(int x) { return System.Math.Abs(x); }")]

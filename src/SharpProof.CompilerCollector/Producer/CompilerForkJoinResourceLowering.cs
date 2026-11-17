@@ -37,7 +37,7 @@ internal static class CompilerForkJoinResourceLowering
             {
                 childBody = RepositoryParameterGuard.NotNull(childBody, nameof(childBody));
                 var lowered = TotalBodyLowering.Lower(compilation, childBody.Graph, context, cancellationToken);
-                if (!lowered.IsExact || lowered.ConstructionLimitExceeded || !lowered.SourceInitializationEffectsComplete ||
+                if (!lowered.IsExact || lowered.ConstructionLimitExceeded || !lowered.SourceInitializationEffectsComplete || lowered.SourceInitializationAllocates ||
                     CompilerTotalCallableLowerer.ConstructsValueStructs(context.Factory, lowered.Program))
                 { return new(null, "ForkJoinChildLoweringIncomplete"); }
                 if (!lowered.CallPreconditions.IsEmpty)

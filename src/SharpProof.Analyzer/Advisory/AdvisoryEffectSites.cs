@@ -31,6 +31,7 @@ internal sealed record AdvisoryEffectAnalysis(ImmutableArray<AdvisoryEffectSite>
     // the body does not model; the worker then has no complete effect
     // summary at entry.
     internal bool SourceInitializationEffectsComplete { get; init; } = true;
+    internal bool SourceInitializationAllocates { get; init; }
     public ImmutableArray<AdvisoryEffectSite> Sites { get; init; } = Sites.IsDefault ? throw new System.ArgumentException("Array must be initialized.", nameof(Sites)) : Sites;
 }
 
@@ -54,7 +55,10 @@ internal static class AdvisoryEffectSites
         if (body == null)
         { return Gap(gap ?? throw new System.InvalidOperationException("Lowering returned no body and no gap reason.")); }
         return Analyze(body.Program, body.Locate, method.Locations.FirstOrDefault() ?? Location.None, cancellationToken) with
-        { SourceInitializationEffectsComplete = body.Lowering.SourceInitializationEffectsComplete };
+        {
+            SourceInitializationEffectsComplete = body.Lowering.SourceInitializationEffectsComplete,
+            SourceInitializationAllocates = body.Lowering.SourceInitializationAllocates
+        };
     }
 
     internal static AdvisoryEffectAnalysis Analyze(IrProgram program, Func<OperationId, Location?> locate,

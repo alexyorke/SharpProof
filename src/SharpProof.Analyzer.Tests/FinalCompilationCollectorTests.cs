@@ -154,7 +154,7 @@ public sealed class FinalCompilationCollectorTests
                 }
             }
             internal static class Mutator {
-                static Mutator() { }
+                static Mutator() { System.Console.WriteLine(); }
                 internal static void Clear(int[] values) =>
                     System.Array.Clear(values, 0, values.Length);
             }

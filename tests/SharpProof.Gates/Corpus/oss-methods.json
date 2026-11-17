@@ -7479,8 +7479,8 @@
       "declarationSha256": "b8fc5ab226c72b423903c8a64e8f8d652260346c80eb6284d03ddfa45a9f1a14",
       "methodName": "CivilToScriptural",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0311",
@@ -7491,8 +7491,8 @@
       "declarationSha256": "f0132ff479210e44b44002657af11985efbf781e4bb6a48703bbcde803c5cc46",
       "methodName": "IsLeapYear",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0312",
@@ -7503,8 +7503,8 @@
       "declarationSha256": "cd883e6b7deeee26b7c9f5540d474eadb78bda8302df4744aa52889dab6e6102",
       "methodName": "CalendarToCivilMonth",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0313",
@@ -7611,8 +7611,8 @@
       "declarationSha256": "585a3a71192f1f8e5363c7236a0bfa3fbd0974b04dfe734012bb3e52b23a0389",
       "methodName": "ForMinDaysInFirstWeek",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0322",
@@ -7815,8 +7815,8 @@
       "declarationSha256": "93562888ff2e1251a4811000aa6316facb0b05a13ab122ac2fd8f341e0ca478f",
       "methodName": "ToDuration",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0339",
@@ -7911,8 +7911,8 @@
       "declarationSha256": "b53b625aef4f9134ed58588abcd96bb08f90936be2233eb18342174c007a2fda",
       "methodName": "FromTrustedDuration",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0347",
@@ -7923,8 +7923,8 @@
       "declarationSha256": "1dd460a521326f7c58cef6e8bc056a12444396da21e63376b0fb3b97a823b969",
       "methodName": "Contains",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0348",
@@ -7983,8 +7983,8 @@
       "declarationSha256": "31f75cfc4057decea64811175900886572b2ac46fa4fa144edf57b52f18e2175",
       "methodName": "Max",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0353",
@@ -8043,8 +8043,8 @@
       "declarationSha256": "ff1d3722ca0508d646709eb13718a4232c4a2774c54bcf27cb2367349eb06232",
       "methodName": "Build",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0358",

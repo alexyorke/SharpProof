@@ -1,4 +1,5 @@
 using System.Text;
+using SharpProof.Frontend;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -88,15 +89,12 @@ public sealed class EntryInitializationTests
     public void FreshValuesAreAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.FreshValues); }
 
-    // Each excluded shape stays an entry effect. First, a call in the
-    // initializer.
-    [TestCase("public static class Subject { private static readonly int[] Cache = Create(); private static int[] Create() => new int[3]; }")]
+    // Each excluded shape stays an entry effect. First, a call the
+    // evaluator cannot run.
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; }")]
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(); }")]
     [TestCase("public static class Subject { private static readonly System.Func<string> Text = \"x\".ToString; }")]
     // A read of another type's static whose initializer is not admitted.
-    [TestCase("public static class Other { public static readonly int[] Data = Make(); private static int[] Make() => null; } " +
-        "public static class Subject { private static readonly int[] Copy = Other.Data; }")]
     [TestCase("public static class Subject { private static readonly string Empty = string.Empty; }")]
     // A read of mutable or per-thread state is an ambient read, whatever its
     // type's initializer.
@@ -117,7 +115,6 @@ public sealed class EntryInitializationTests
     // A static constructor with logic.
     [TestCase("public static class Subject { private static readonly int Limit; " +
         "static Subject() { if (System.Environment.ProcessorCount > 1) { Limit = 1; } } }")]
-    [TestCase("public static class Subject { private static readonly int Limit; static Subject() { var local = 1; Limit = local; } }")]
     [TestCase("public static class Subject { public static int Count; static Subject() { Count = 1; } }")]
     // Mutable or per-thread state.
     [TestCase("public static class Subject { public static int State = 1; }")]
@@ -137,13 +134,128 @@ public sealed class EntryInitializationTests
     [TestCase("public sealed class Handle { ~Handle() { } } public static class Subject { private static readonly Handle Instance = new Handle(); }")]
     [TestCase("public class Base { } public sealed class Derived : Base { } " +
         "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
-    [TestCase("public sealed class Pair { private readonly int left; public Pair(int left) { this.left = left; } public Pair() : this(0) { } } " +
-        "public static class Subject { private static readonly Pair Instance = new Pair(); }")]
+    public void EffectfulInitializersAreNotAdmitted(string source)
+    { AssertClassified(source, (int)InitializationEffect.Effectful); }
+
+    // Closed computations the structural rules do not admit, which the
+    // evaluator runs to completion without allocating.
+    [TestCase("public static class Subject { private static readonly int Limit; static Subject() { var local = 1; Limit = local; } }")]
+    [TestCase("public static class Other { public static readonly int[] Data = Make(); private static int[] Make() => null; } " +
+        "public static class Subject { private static readonly int[] Copy = Other.Data; }")]
     [TestCase("public struct Meters { public static implicit operator Meters(int value) => default; } " +
         "public static class Subject { private static readonly Meters Length = 5; }")]
     [TestCase("public static class Outer { private static readonly int[] Cache = Make(); private static int[] Make() => null; public static class Subject { } }")]
-    public void EffectfulInitializersAreNotAdmitted(string source)
+    // The shape of NodaTime's value types: constants checked by a helper,
+    // stored through a validating constructor, with debug-only checks.
+    [TestCase(Checks + "public readonly struct Subject { private const int Max = 18 * 3600; private readonly int seconds; " +
+        "public static readonly Subject Zero = FromSeconds(0); public static readonly Subject MaxValue = FromSeconds(Max); " +
+        "public static Subject FromSeconds(int seconds) { Checks.Range(seconds, -Max, Max); return new Subject(seconds); } " +
+        "private Subject(int seconds) { Checks.Debug(seconds); this.seconds = seconds; } }")]
+    [TestCase("public readonly struct Duration { public const int MinDays = -(1 << 24); private readonly int days; private readonly long nanos; " +
+        "internal Duration(int days, long nanos) { if (days < MinDays) { throw new System.ArgumentOutOfRangeException(); } this.days = days; this.nanos = nanos; } } " +
+        "public readonly struct Subject { private readonly Duration duration; public static Subject MinValue { get; } = new Subject(Duration.MinDays, 0); " +
+        "internal Subject(int days, long nanos) => duration = new Duration(days, nanos); }")]
+    [TestCase("public readonly struct Subject { private readonly long ticks; public static Subject Midnight { get; } = new Subject(0, 0); " +
+        "public static Subject Noon { get; } = new Subject(12, 0); public Subject(int hour, int minute) { " +
+        "if (hour < 0 || hour > 23 || minute < 0 || minute > 59) { throw new System.ArgumentOutOfRangeException(); } " +
+        "ticks = unchecked(hour * 3600L + minute * 60L) * 10000000L; } }")]
+    // Integer arithmetic at the edges of its range: an unchecked wrap, a
+    // shift, and checked operations that fit.
+    [TestCase("public static class Subject { private static readonly int Wrapped = Make(); " +
+        "private static int Make() { var x = int.MaxValue; x = unchecked(x + 1); return x >> 31; } }")]
+    [TestCase("public static class Subject { private static readonly long Total = Sum(10); " +
+        "private static long Sum(int n) { long total = 0; for (var i = 1; i <= n; i++) { total = checked(total + i * (long)i); } return total; } }")]
+    public void ClosedComputationsAreEvaluated(string source)
+    { AssertClassified(source, (int)InitializationEffect.None); }
+
+    // Closed computations that allocate.
+    [TestCase("public static class Subject { private static readonly int[] Cache = Create(); private static int[] Create() => new int[3]; }")]
+    [TestCase("public sealed class Pair { private readonly int left; public Pair(int left) { this.left = left; } public Pair() : this(0) { } } " +
+        "public static class Subject { private static readonly Pair Instance = new Pair(); }")]
+    // NodaTime's Duration bounds: BigInteger arithmetic on constants, then
+    // conversions that would throw only out of range.
+    [TestCase("using System.Numerics; public static class Subject { private const int MinDays = -(1 << 24); private const long PerDay = 86400L * 1000000000L; " +
+        "internal static BigInteger MinNanoseconds { get; } = (BigInteger)MinDays * PerDay; " +
+        "internal static BigInteger MaxNanoseconds { get; } = (-MinDays + BigInteger.One) * PerDay - BigInteger.One; " +
+        "internal static decimal MinDecimal { get; } = (decimal)MinNanoseconds; private static readonly double MaxDouble = (double)MaxNanoseconds; " +
+        "private static readonly System.Int128 MinWide = (System.Int128)MinNanoseconds; }")]
+    [TestCase("public static class Subject { private static readonly int[] Table = Build(); " +
+        "private static int[] Build() { var table = new int[12]; for (var i = 0; i < table.Length; i++) { table[i] = i * 31; } return table; } }")]
+    // BigInteger arithmetic past the inline range allocates.
+    [TestCase("using System.Numerics; public static class Subject { private static readonly BigInteger Big = Make(); " +
+        "private static BigInteger Make() { var x = BigInteger.One; for (var i = 0; i < 70; i++) { x = x + x; } return x; } }")]
+    public void AllocatingClosedComputationsAreFreshValues(string source)
+    { AssertClassified(source, (int)InitializationEffect.FreshValues); }
+
+    // Each of these throws when its type initializes, or never finishes.
+    [TestCase(Checks + "public readonly struct Subject { private readonly int seconds; " +
+        "public static readonly Subject TooBig = FromSeconds(100000); " +
+        "public static Subject FromSeconds(int seconds) { Checks.Range(seconds, -64800, 64800); return new Subject(seconds); } " +
+        "private Subject(int seconds) { this.seconds = seconds; } }")]
+    [TestCase("public static class Subject { private static readonly int Overflow = Make(); private static int Make() { var x = int.MaxValue; return checked(x + 1); } }")]
+    [TestCase("public static class Subject { private static readonly int Quotient = Divide(0); private static int Divide(int d) => 10 / d; }")]
+    [TestCase("public static class Subject { private static readonly int Quotient = Divide(-1); private static int Divide(int d) => int.MinValue / d; }")]
+    [TestCase("public static class Subject { private static readonly int Remainder = Mod(-1); private static int Mod(int d) => int.MinValue % d; }")]
+    [TestCase("public static class Subject { private static readonly int Narrowed = Narrow(300); private static byte Narrow(int x) => checked((byte)x); }")]
+    [TestCase("public static class Subject { private static readonly int[] Table = Build(); " +
+        "private static int[] Build() { var table = new int[2]; table[2] = 1; return table; } }")]
+    [TestCase("using System.Numerics; public static class Subject { private static readonly decimal TooLarge = (decimal)(BigInteger.One << 100); }")]
+    [TestCase("using System.Numerics; public static class Subject { private static readonly long TooLarge = (long)(BigInteger.One << 70); }")]
+    [TestCase("public static class Subject { private static readonly int Loop = Spin(); private static int Spin() { var i = 0; while (true) { i++; } } }")]
+    // C# resolves an assigned array element before the value, and a
+    // compound assignment or increment resolves it once.
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i] = (i = 1); return 1 / (a[0] - 1); } }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i++] += 1; return 1 / (a[0] - 1); } }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { var a = new int[2]; var i = 0; a[i++]++; return 1 / (a[0] - 1); } }")]
+    // A covariant array store of another sealed type throws.
+    [TestCase("public sealed class First { } public sealed class Second { } public static class Subject { " +
+        "private static readonly object[] Items = Make(); private static object[] Make() { object[] a = new First[1]; a[0] = new Second(); return a; } }")]
+    // A struct's type initializer runs before its instance members, and
+    // this one throws.
+    [TestCase("public readonly struct Fragile { static Fragile() { throw new System.InvalidOperationException(); } public int Get() => 1; } " +
+        "public static class Subject { private static readonly int Value = default(Fragile).Get(); }")]
+    [TestCase("public readonly struct Fragile { static Fragile() { throw new System.InvalidOperationException(); } public int Count { get; } } " +
+        "public static class Subject { private static readonly int Value = default(Fragile).Count; }")]
+    public void ThrowingClosedComputationsAreEffectful(string source)
     { AssertClassified(source, (int)InitializationEffect.Effectful); }
+
+    // Each of these depends on something other than constants: floating
+    // point in a branch, library state, a virtual call, or another
+    // initialization's mutable object; or it boxes, handles exceptions or
+    // runs generic code.
+    [TestCase("public static class Subject { private static readonly int Sign = Make(0.1 + 0.2); private static int Make(double x) => x > 0.3 ? 1 : 0; }")]
+    [TestCase("public static class Subject { private static readonly int Length = Make(); private static int Make() => System.Environment.NewLine.Length; }")]
+    [TestCase("public static class Subject { private static readonly string Text = Make(); private static string Make() => \"a\" + 1; }")]
+    [TestCase("public abstract class Shape { public abstract int Sides(); } public sealed class Square : Shape { public override int Sides() => 4; } " +
+        "public static class Subject { private static readonly int Count = Make(new Square()); private static int Make(Shape shape) => shape.Sides(); }")]
+    [TestCase("public static class Other { public static readonly int[] Data = new int[2]; } " +
+        "public static class Subject { private static readonly int First = Other.Data[0]; }")]
+    [TestCase("public static class Subject { private static readonly object Boxed = Make(); private static object Make() => 5; }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make(); " +
+        "private static int Make() { try { return 1; } catch (System.Exception) { return 2; } } }")]
+    [TestCase("public static class Subject { private static readonly int Value = Make<int>(); private static int Make<T>() => 1; }")]
+    // A settable property of another initialization's object may have
+    // changed since.
+    [TestCase("public sealed class Holder { public int Value { get; set; } } public static class Other { public static readonly Holder Shared = new Holder(); } " +
+        "public static class Subject { private static readonly int Value = 1 / (1 - Other.Shared.Value); }")]
+    // Overlapping fields share storage.
+    [TestCase("[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] public struct Union { " +
+        "[System.Runtime.InteropServices.FieldOffset(0)] public int A; [System.Runtime.InteropServices.FieldOffset(0)] public int B; " +
+        "public Union(int x) { A = 0; B = x; } } public static class Subject { private static readonly int Value = 1 / (1 - new Union(1).A); }")]
+    // Operands that grow past the size bound give up instead of running out
+    // of memory.
+    [TestCase("using System.Numerics; public static class Subject { private static readonly BigInteger Huge = Make(); " +
+        "private static BigInteger Make() { var x = BigInteger.One + BigInteger.One; for (var i = 0; i < 40; i++) { x = x * x; } return x; } }")]
+    public void OpenComputationsAreEffectful(string source)
+    { AssertClassified(source, (int)InitializationEffect.Effectful); }
+
+    private const string Checks = "internal static class Checks { " +
+        "internal static void Range(int value, int min, int max) { if (value < min || value > max) { Throw(value); } } " +
+        "private static void Throw(int value) => throw new System.ArgumentOutOfRangeException(nameof(value)); " +
+        "[System.Diagnostics.Conditional(\"DEBUG\")] internal static void Debug(int value) { if (value > 0) { throw new System.Exception(); } } } ";
 
     // An allocation claim counts initializer allocation; a purity claim does not.
     [TestCase(false)]

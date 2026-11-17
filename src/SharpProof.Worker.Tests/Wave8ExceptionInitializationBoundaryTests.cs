@@ -37,7 +37,8 @@ internal sealed class Wave8ExceptionInitializationBoundaryTests
     [TestCase("mutable-constant", WorkerClaimOutcome.Proven)]
     [TestCase("callee-mutable-constant", WorkerClaimOutcome.Proven)]
     [TestCase("readonly-object", WorkerClaimOutcome.Proven)]
-    [TestCase("callee-empty-explicit", WorkerClaimOutcome.Unknown)]
+    [TestCase("callee-empty-explicit", WorkerClaimOutcome.Proven)]
+    [TestCase("callee-calling-explicit", WorkerClaimOutcome.Unknown)]
     [TestCase("base-constructor-fault", WorkerClaimOutcome.Unknown)]
     [TestCase("static-derived-base-fault", WorkerClaimOutcome.Proven)]
     [TestCase("instance-safe-initializer", WorkerClaimOutcome.Proven)]
@@ -69,6 +70,7 @@ internal sealed class Wave8ExceptionInitializationBoundaryTests
             "callee-mutable-constant" => "public static class Other { public static int State = 1; public static int Helper() { return 7; } } public static class Subject { [DoesNotThrow] public static int Target() { return Other.Helper(); } }",
             "readonly-object" => "public static class Subject { public static readonly object State = new object(); " + target + " }",
             "callee-empty-explicit" => "public static class Other { static Other() { } public static int Helper() { return 7; } } public static class Subject { [DoesNotThrow] public static int Target() { return Other.Helper(); } }",
+            "callee-calling-explicit" => "public static class Other { static Other() { System.Console.WriteLine(); } public static int Helper() { return 7; } } public static class Subject { [DoesNotThrow] public static int Target() { return Other.Helper(); } }",
             "base-constructor-fault" => "public class Base { static Base() { throw new System.InvalidOperationException(\"base\"); } public Base() { } } public class Subject : Base { [DoesNotThrow] public Subject() { } }",
             "static-derived-base-fault" => "public class Base { static Base() { throw new System.InvalidOperationException(\"unused base\"); } } public class Subject : Base { " + target + " }",
             "instance-safe-initializer" => "public class Subject { public static int State; static Subject() { State = 1; } [DoesNotThrow] public int Target() { return 7; } }",

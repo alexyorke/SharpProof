@@ -20,7 +20,10 @@ internal sealed class CalleeInitializationControlTests
 
     [TestCase("public static int State = 1;", WorkerClaimOutcome.Unknown)]
     [TestCase("public static readonly int State = 1;", WorkerClaimOutcome.Proven)]
-    [TestCase("static Other() { }", WorkerClaimOutcome.Unknown)]
+    // An empty static constructor runs nothing; one that calls code is an
+    // entry effect.
+    [TestCase("static Other() { }", WorkerClaimOutcome.Proven)]
+    [TestCase("static Other() { System.Console.WriteLine(); }", WorkerClaimOutcome.Unknown)]
     [TestCase("", WorkerClaimOutcome.Proven)]
     public async Task WorkerPreservesFunctionalInliningAndChecksInitializationEffects(string field, WorkerClaimOutcome pure)
     {
@@ -33,7 +36,7 @@ internal sealed class CalleeInitializationControlTests
         var callable = project.Snapshot.CompilerManifest.Callables.Single();
         var purity = callable.EffectClaims.Single().ClaimId;
         Assert.That(response.ClaimResults.Single(row => row.ClaimId == purity).Outcome, Is.EqualTo(pure));
-        if (field != "static Other() { }")
+        if (!field.StartsWith("static Other() { System", StringComparison.Ordinal))
         { Assert.That(response.ClaimResults.Single(row => row.ClaimId != purity).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
     }
 

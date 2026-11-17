@@ -197,6 +197,9 @@ internal static class CompilerTotalCallableLowerer
         // accept such a body, as they accept fresh-value initialization.
         if (entryInitialization == InitializationEffect.None && ConstructsValueStructs(context.Factory, program))
         { entryInitialization = InitializationEffect.FreshValues; }
+        // So does initialization a source callee reaches that allocates.
+        if (entryInitialization == InitializationEffect.None && lowering.SourceInitializationAllocates)
+        { entryInitialization = InitializationEffect.FreshValues; }
         var claimOrdinal = 0;
         var assumptionOrdinal = 0;
         var userAssumptionOrdinal = 0;
@@ -473,8 +476,14 @@ internal static class CompilerTotalCallableLowerer
         private readonly ImmutableHashSet<INamedTypeSymbol>.Builder _active = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(SymbolEqualityComparer.Default);
         private int _remaining = CompilerArtifactLimits.MaximumInstructions;
 
+        // An initializer the evaluator ran to completion never throws, except
+        // by running out of memory, which allocation already admits.
         internal bool NoFault(INamedTypeSymbol type)
-        { type = RepositoryParameterGuard.NotNull(type, nameof(type)); return NoFaultType(type) && NoFaultModule(); }
+        {
+            type = RepositoryParameterGuard.NotNull(type, nameof(type));
+            return (NoFaultType(type) || TypeInitialization.Classify(compilation, type, cancellationToken) != InitializationEffect.Effectful) &&
+                NoFaultModule();
+        }
 
         private bool Spend()
         {

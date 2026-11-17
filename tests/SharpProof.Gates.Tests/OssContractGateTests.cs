@@ -19,7 +19,8 @@ internal sealed class OssContractGateTests
         {
             Assert.That(result.Contracts, Is.EqualTo(15));
             Assert.That(result.Proven, Is.EqualTo(2));
-            Assert.That(result.Refuted, Is.Zero);
+            // OSS0310's deliberately false contract: its witness replays.
+            Assert.That(result.Refuted, Is.EqualTo(1));
             Assert.That(result.Passed, Is.True);
         }
     }
