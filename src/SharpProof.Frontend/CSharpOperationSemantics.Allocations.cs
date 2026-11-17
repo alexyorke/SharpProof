@@ -187,14 +187,19 @@ internal static partial class CSharpOperationSemantics
         { return modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)); }
     }
 
-    // A constructor declared `: this(arguments)`. Instance field and property
-    // initializers run in the constructor it chains to, not in this one.
+    // A constructor declared `: this(arguments)` that runs another declared
+    // constructor. Instance field and property initializers run in that one,
+    // not in this one. A struct's `: this()` to its implicit parameterless
+    // constructor only zeroes the value, so this constructor still runs the
+    // initializers after it.
     internal static bool ChainsToThis(IMethodSymbol constructor, CancellationToken cancellationToken)
     {
         constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
         return constructor.MethodKind == MethodKind.Constructor && constructor.DeclaringSyntaxReferences.Any(reference =>
             reference.GetSyntax(cancellationToken) is Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax { Initializer: { } initializer } &&
-            initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword));
+            initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword) &&
+            !(constructor.ContainingType.TypeKind == TypeKind.Struct && initializer.ArgumentList.Arguments.Count == 0 &&
+                constructor.ContainingType.InstanceConstructors.All(static other => !other.Parameters.IsEmpty || other.IsImplicitlyDeclared)));
     }
 
     // The call a `: this(arguments)` initializer makes: another constructor
