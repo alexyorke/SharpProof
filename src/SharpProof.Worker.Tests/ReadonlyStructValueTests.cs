@@ -58,8 +58,11 @@ public sealed class ReadonlyStructValueTests
         public readonly struct Zeroed
         {
             private readonly long ticks;
+            private readonly long seven = 7;
             public Zeroed(long ticks, bool keep) : this() { if (keep) { this.ticks = ticks; } }
+            public Zeroed(long ticks) : this(ticks, true) { }
             public long Ticks => ticks;
+            public long Seven => seven;
         }
         public sealed class Box
         {
@@ -129,6 +132,10 @@ public sealed class ReadonlyStructValueTests
         "Contract.Ensures(Contract.Result<long>() == a + b + c + 8); var v = new Chained(a, b, c); return v.Ticks + v.Extra; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 0); return new Zeroed(x, false).Ticks; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, true).Ticks; }")]
+    // `: this()` to a struct's implicit parameterless constructor zeroes the
+    // value, then this constructor runs the field initializers.
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 7); return new Zeroed(x, false).Seven; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + 7); var z = new Zeroed(x); return z.Ticks + z.Seven; }")]
     [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 2L * x + 3 + x); var b = new Box(x); return b.V + b.W; }")]
     public async Task ModeledStructClaimsAreProven(string member)
     {
@@ -144,6 +151,7 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + 1); Span s = new(x); return s.Ticks; }")]
     [TestCase("public static long M(int a, int b) { Contract.Ensures(Contract.Result<long>() == 7); return new Chained(a, b).Extra; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, false).Ticks; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 0); return new Zeroed(x, false).Seven; }")]
     [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 3); return new Box(x).W; }")]
     // Boxing a struct, even default(S), yields an object.
     [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return (object)default(Span); }")]
