@@ -28,6 +28,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // A user-defined operator declared in source, called with its operands.
     internal Func<IOperation, IMethodSymbol, ImmutableArray<IOperation>, IrBlockId, int, TotalBodyValue?>? SourceOperator { get; init; }
 
+    // The value a static holds once its type's initialization, run at
+    // analysis time, has finished; null when it has not, or when the code
+    // being lowered may run during that initialization.
+    internal Func<IFieldSymbol, InitializedValue?>? InitializedStatic { get; init; }
+
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
     internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
@@ -382,6 +387,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             CSharpOperationSemantics.SetterField(opaqueTarget.Property) == null &&
             OpaqueCall(operation, setMethod, opaqueTarget.Instance, opaqueTarget.Arguments, block, depth, opaqueStore.Value) is { } setterCalled)
         { return setterCalled; }
+        if (depth < 256 && InitializedStaticRead(operation, block) is { } initializedStatic)
+        { return initializedStatic; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
@@ -1209,7 +1216,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     block = ApplyRule(access, new TotalScalarRule(_factory.Boolean(true),
                         [new(IrExceptionKind.Unknown, _factory.Variable(mismatch))], FrontendSubsetClassification.Exact), block).Continuation;
                 }
-                if (modeled && value.Value.Type == _context.Type(elementType))
+                // A store of a modeled struct names its array too, so a store
+                // into one this body allocated is not taken for a write to
+                // state the caller can see. Such an array aliases no array of
+                // another element type: value types have no array covariance.
+                // Reads of its elements stay approximations.
+                if ((modeled || outside == null && CSharpOperationSemantics.IsModeledStruct(elementType)) &&
+                    value.Value.Type == _context.Type(elementType) &&
+                    _factory.GetTypeInfo(array.Value.Type).ElementType == value.Value.Type)
                 { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
                 else
                 { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
@@ -1316,6 +1330,61 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             captured ? _context.CapturedFieldReadSite(operation) : _context.Site(operation),
             IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
         return ApplyRule(operation, CSharpOperationSemantics.FieldRead(_factory, _factory.Variable(value), receiver), block);
+    }
+
+    // A read of a readonly static, or of a static get-only auto-property,
+    // that its type's initialization set to a value known at analysis time.
+    // The read runs that initialization, which has no effect a body can
+    // observe. A struct value is a fresh immutable object holding its fields:
+    // C# cannot tell two struct values with equal fields apart.
+    private TotalBodyValue? InitializedStaticRead(IOperation operation, IrBlockId block)
+    {
+        var field = operation switch
+        {
+            IFieldReferenceOperation { Field.IsStatic: true } read when !CSharpOperationSemantics.IsSupportedFieldRead(read.Field) => read.Field,
+            IPropertyReferenceOperation { Property.IsStatic: true, Arguments.Length: 0 } property when BodyGetterField(property) == null =>
+                CSharpOperationSemantics.StaticGetOnlyAutoPropertyField(property.Property),
+            _ => null
+        };
+        if (field == null || ShadowCallSkeleton || InitializedStatic?.Invoke(field) is not { } value ||
+            !CanMaterialize(value, _context.Type(field.Type), 0))
+        { return null; }
+        var count = 0;
+        return new(Materialize(operation, value, ref block, ref count), block, FrontendSubsetClassification.Exact);
+    }
+
+    private bool CanMaterialize(InitializedValue value, IrTypeId type, int depth)
+    {
+        if (depth > 8 || _context.Type(value.Type) != type)
+        { return false; }
+        if (value.Fields is { } fields)
+        {
+            return CSharpOperationSemantics.IsModeledStruct(value.Type) && fields.All(pair =>
+                FieldMember(pair.Field) is { } member && _factory.GetMemberInfo(member).ReturnType is var returned &&
+                CanMaterialize(pair.Value, returned, depth + 1));
+        }
+        return value.Scalar == null
+            ? CSharpOperationSemantics.IsReferenceDomain(value.Type)
+            : CSharpOperationSemantics.IsScalar(value.Type) &&
+                CSharpOperationSemantics.Literal(_factory, value.Type, value.Scalar).Type == type;
+    }
+
+    private IrTerm Materialize(IOperation operation, InitializedValue value, ref IrBlockId block, ref int count)
+    {
+        var type = _context.Type(value.Type);
+        if (value.Fields is not { } fields)
+        { return value.Scalar == null ? _factory.Null(type) : CSharpOperationSemantics.Literal(_factory, value.Type, value.Scalar); }
+        _factory.RegisterValueStructType(type);
+        var target = _context.Temporary(type);
+        _builder!.Allocate(block, _context.InitializedStaticSite(operation, count++), type, target);
+        var created = _factory.Variable(target);
+        foreach (var (field, content) in fields)
+        {
+            var stored = Materialize(operation, content, ref block, ref count);
+            if (!StoreInitializer(field, created, operation, stored, block, fresh: true))
+            { throw new InvalidOperationException("A checked initialized static could not be stored."); }
+        }
+        return created;
     }
 
     // The field a getter call reads, when the call can be read as that field.

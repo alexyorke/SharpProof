@@ -67,6 +67,8 @@ public sealed class BlockerCensusTests
     [TestCase("public static Span FromTicks(long ticks) => new(ticks * 100);")]
     [TestCase("public static Span Sum(long a, long b) { return new(a, b); }")]
     [TestCase("public static Span Narrow(int ticks) => new Span(ticks, true);")]
+    [TestCase("public static Span Zero { get; } = new Span(0L); public long Low => Zero.ticks;")]
+    [TestCase("public static readonly Span One = new Span(1L); public static bool IsOne(Span s) => s == One;")]
     public void StructMembersLowerExactly(string member)
     {
         ArgumentNullException.ThrowIfNull(member);

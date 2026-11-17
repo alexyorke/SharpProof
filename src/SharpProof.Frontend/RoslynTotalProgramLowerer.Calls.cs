@@ -426,6 +426,22 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         return true;
     }
+    // A static whose type's initialization ran to completion at analysis
+    // time holds the value it left, when that initialization never runs the
+    // callable being lowered: the callable, and everything it calls, then
+    // reaches the static only after the initialization has finished. A
+    // callable the initialization does run may see the static before it is
+    // set.
+    private InitializedValue? InitializedStaticValue(IFieldSymbol field)
+    {
+        if (_preserveSourceCall != null || _calls == null || _context.Compilation is not Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation ||
+            !_calls.HasNoTypeInitialization(field.ContainingType) ||
+            TypeInitialization.InitializedStatic(compilation, field, _cancellationToken) is not { } initialized ||
+            _calls.Root is not { } root || initialized.Runs.Contains(root.OriginalDefinition))
+        { return null; }
+        return initialized.Value;
+    }
+
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));

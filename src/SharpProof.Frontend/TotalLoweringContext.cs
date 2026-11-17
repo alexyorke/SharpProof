@@ -392,6 +392,14 @@ internal sealed partial class TotalLoweringContext
     }
 
     // A static field read is a read of ambient state.
+    // The allocation of the index-th struct value a read of an initialized
+    // static materializes.
+    internal OperationId InitializedStaticSite(IOperation operation, int index)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation("InitializedStatic@" + operation.Syntax.SpanStart + "#" + index, Span(operation.Syntax));
+    }
+
     internal OperationId StaticReadSite(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));

@@ -84,6 +84,37 @@ public sealed class ReadonlyStructValueTests
             public long V { get; }
             private static long Bump() { C.State = 1; return 3; }
         }
+        public readonly struct Limits
+        {
+            private readonly Span low;
+            private readonly long high;
+            private Limits(Span low, long high) { this.low = low; this.high = high; }
+            public static Limits Wide { get; } = new Limits(new Span(-5), 9);
+            public static readonly Limits Narrow = new Limits(Wide.low, 2);
+            public static readonly long Edge = 40L * 3;
+            public static readonly bool Flag = Edge > 100;
+            public Span Low => low;
+            public long High => high;
+        }
+        public static class Counter
+        {
+            public static long Shared = 3;
+        }
+        public readonly struct Late
+        {
+            public static readonly Late First = Make();
+            private readonly long v;
+            private Late(long v) { this.v = v; }
+            public long V => v;
+            public static Late Make() => new Late(First.v + 1);
+        }
+        public readonly struct Loud
+        {
+            static Loud() { C.State = 1; }
+            public static Loud Four { get; } = new Loud(4);
+            private Loud(long ticks) { Ticks = ticks; }
+            public long Ticks { get; }
+        }
         public readonly struct Noisy
         {
             public static int Count;
@@ -130,6 +161,15 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 0); return new Zeroed(x, false).Ticks; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, true).Ticks; }")]
     [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 2L * x + 3 + x); var b = new Box(x); return b.V + b.W; }")]
+    // A readonly static, or a static get-only auto-property, holds the value
+    // its type's initialization left, computed at analysis time.
+    [TestCase("[EnforcePure] public static long M() { return Limits.Wide.High; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 4); return Limits.Wide.Low.Ticks + Limits.Wide.High; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == -3); return Limits.Narrow.Low.Ticks + Limits.Narrow.High; }")]
+    [TestCase("public static bool M() { Contract.Ensures(Contract.Result<bool>()); return Limits.Edge == 120 && Limits.Flag; }")]
+    [TestCase("public static bool M(long x) { Contract.Ensures(Contract.Result<bool>() == (x == -5)); return Limits.Wide.Low == new Span(x); }")]
+    // Code the initialization did not run sees the finished value.
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 2); return Late.Make().V; }")]
     public async Task ModeledStructClaimsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -145,6 +185,8 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(int a, int b) { Contract.Ensures(Contract.Result<long>() == 7); return new Chained(a, b).Extra; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, false).Ticks; }")]
     [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 3); return new Box(x).W; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 8); return Limits.Wide.High; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 3); return Counter.Shared; }")]
     // Boxing a struct, even default(S), yields an object.
     [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return (object)default(Span); }")]
     [TestCase("public static object M(Span s) { Contract.Ensures(Contract.Result<object>() == null); return s; }")]
@@ -155,10 +197,37 @@ public sealed class ReadonlyStructValueTests
         Assert.That((await ResultAsync(member)).Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
+    // L's initialization runs M while First is still default(L), so M
+    // returns 1 then and 2 afterwards. The contract is in a companion, so
+    // the initialization can run M.
+    [Test]
+    public async Task StaticsAreNotValuedForCodeTheirInitializationRuns()
+    {
+        var result = await ResultAsync("public static long M() => L.First.V + 1;",
+            "public readonly struct L { public static readonly L First = new L(C.M()); private readonly long v; " +
+            "public L(long v) { this.v = v; } public long V => v; } " +
+            "[ContractFor(typeof(C))] public static class Companion { " +
+            "public static long M() { Contract.Ensures(Contract.Result<long>() == 2); return 0; } }");
+        Assert.That(result.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    // The same claim holds for code the initialization does not run.
+    [Test]
+    public async Task StaticsAreValuedForCodeTheirInitializationDoesNotRun()
+    {
+        var result = await ResultAsync("public static long M() => L.First.V + 1;",
+            "public readonly struct L { public static readonly L First = new L(Seed()); private readonly long v; " +
+            "public L(long v) { this.v = v; } public long V => v; private static long Seed() => 1; } " +
+            "[ContractFor(typeof(C))] public static class Companion { " +
+            "public static long M() { Contract.Ensures(Contract.Result<long>() == 2); return 0; } }");
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
+    }
+
     // The CLR does not heap-allocate a struct value, but the model does, so
     // a claim that counts allocation can neither be proved nor refuted.
     [TestCase("[ZeroAllocations] public static long M(long x) { return new Span(x).Ticks; }")]
     [TestCase("[EffectContract(SharpProofEffect.None)] public static long M(long x) { return new Span(x).Ticks; }")]
+    [TestCase("[ZeroAllocations] public static long M() { return Limits.Wide.High; }")]
     public async Task AllocationSensitiveClaimsStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -173,6 +242,7 @@ public sealed class ReadonlyStructValueTests
     [TestCase("[EnforcePure] public static long M() { return default(Initialized).Ticks; }")]
     [TestCase("[EnforcePure] public static long M(Initialized value) { return value.Ticks; }")]
     [TestCase("[EnforcePure] public static long M(long x) { return new Initialized(x).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M() { return Loud.Four.Ticks; }")]
     // An initializer's own effects stay effects, through a chain too.
     [TestCase("[EnforcePure] public static long M(long x) { return new Bumped(x).V; }")]
     [TestCase("[EnforcePure] public static long M(int x) { return new Bumped(x).V; }")]
@@ -180,6 +250,19 @@ public sealed class ReadonlyStructValueTests
     {
         System.ArgumentNullException.ThrowIfNull(member);
         Assert.That((await ResultAsync(member)).Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
+    }
+
+    // A struct store into an array this body allocated is not a write the
+    // caller can see, even when the array is returned; a store into the
+    // caller's array is.
+    [TestCase("[EnforcePure] public static Span[] M(long x) { var a = new Span[2]; a[0] = new Span(x); return a; }", false)]
+    [TestCase("[EnforcePure] public static Limits[] M() { var a = new Limits[2]; for (int i = 0; i < a.Length; i++) { a[i] = Limits.Wide; } return a; }", false)]
+    [TestCase("[EnforcePure] public static void M(Span[] a, long x) { a[0] = new Span(x); }", true)]
+    public async Task ElementStoresAreRefutedOnlyForTheCallersArrays(string member, bool refuted)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        var outcome = (await ResultAsync(member)).Outcome;
+        Assert.That(outcome == WorkerClaimOutcome.Refuted, Is.EqualTo(refuted), outcome.ToString());
     }
 
     // A mutable struct is not modeled.
@@ -190,10 +273,11 @@ public sealed class ReadonlyStructValueTests
         Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
-    private static async Task<WorkerClaimResult> ResultAsync(string member)
+    private static async Task<WorkerClaimResult> ResultAsync(string member, string outside = "")
     {
         System.ArgumentNullException.ThrowIfNull(member);
-        using var project = new ShadowTestProject(Types + "\npublic static class C { public static int State; " + member + " }\n");
+        System.ArgumentNullException.ThrowIfNull(outside);
+        using var project = new ShadowTestProject(Types + "\npublic static class C { public static int State; " + member + " }\n" + outside + "\n");
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));

@@ -7935,8 +7935,8 @@
       "declarationSha256": "4836189855d1f6e5709b1f236bb3d69aba1cf1ddd8b665f6c837e707348cd001",
       "methodName": "AtMidnight",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0349",

@@ -29,6 +29,25 @@ namespace SharpProof.Frontend;
 // regions, throws, virtual and interface calls, generic code, boxing, strings
 // other than constants, and every library call other than the BigInteger
 // operators named below give up.
+// A static's value as a closed initialization leaves it: a Boolean, an
+// integral or enum value, or null as Scalar, or a struct's fields.
+internal sealed class InitializedValue(ITypeSymbol type, object? scalar,
+    ImmutableArray<(IFieldSymbol Field, InitializedValue Value)>? fields)
+{
+    internal ITypeSymbol Type { get; } = RepositoryParameterGuard.NotNull(type, nameof(type));
+    internal object? Scalar { get; } = scalar;
+    // Null for a scalar or null value.
+    internal ImmutableArray<(IFieldSymbol Field, InitializedValue Value)>? Fields { get; } = fields;
+}
+
+// Every method the initialization ran may observe the static before it is
+// set, so only code outside Runs may read it as Value.
+internal sealed class InitializedStatic(InitializedValue value, ImmutableHashSet<IMethodSymbol> runs)
+{
+    internal InitializedValue Value { get; } = RepositoryParameterGuard.NotNull(value, nameof(value));
+    internal ImmutableHashSet<IMethodSymbol> Runs { get; } = RepositoryParameterGuard.NotNull(runs, nameof(runs));
+}
+
 internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, CancellationToken cancellationToken)
 {
     private const int MaximumSteps = 1 << 17;
@@ -89,6 +108,9 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         internal int Id { get; } = id;
         internal Dictionary<IFieldSymbol, object?> Statics { get; } = new(SymbolEqualityComparer.Default);
         internal bool Allocates { get; set; }
+        // Every source method and constructor the initialization ran,
+        // including those of the initializations it started.
+        internal HashSet<IMethodSymbol> Runs { get; } = new(SymbolEqualityComparer.Default);
     }
 
     private sealed class Frame(IMethodSymbol? method, object? instance)
@@ -105,6 +127,46 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         return Initialize(type) is { } run
             ? run.Allocates ? InitializationEffect.FreshValues : InitializationEffect.None
             : InitializationEffect.Effectful;
+    }
+
+    // The value a finished initialization leaves in one of its type's
+    // statics, when it is a Boolean, an integral or enum value, null, or a
+    // struct made of such values; and every method the initialization ran.
+    internal InitializedStatic? ReadInitializedStatic(IFieldSymbol field)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field)).OriginalDefinition;
+        if (!field.IsStatic || field.IsConst || Initialize(field.ContainingType) is not { } run)
+        { return null; }
+        if (!run.Statics.TryGetValue(field, out var value))
+        {
+            value = DefaultOf(field.Type, out var ok);
+            if (!ok)
+            { return null; }
+        }
+        return Describe(field.Type, value, 0) is { } described ? new(described, run.Runs.ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default)) : null;
+    }
+
+    private static InitializedValue? Describe(ITypeSymbol type, object? value, int depth)
+    {
+        switch (value)
+        {
+            case null:
+                return type.IsReferenceType ? new(type, null, null) : null;
+            case bool:
+                return type.SpecialType == SpecialType.System_Boolean ? new(type, value, null) : null;
+            case StructValue structure when depth < MaximumDepth &&
+                SymbolEqualityComparer.Default.Equals(structure.Type, type.OriginalDefinition):
+                var fields = ImmutableArray.CreateBuilder<(IFieldSymbol, InitializedValue)>(structure.Fields.Count);
+                foreach (var pair in structure.Fields)
+                {
+                    if (Describe(pair.Key.Type, pair.Value, depth + 1) is not { } described)
+                    { return null; }
+                    fields.Add((pair.Key, described));
+                }
+                return new(type, null, fields.MoveToImmutable());
+            default:
+                return IsIntegral(type) && IsIntegralValue(value) ? new(type, value, null) : null;
+        }
     }
 
     private bool Step()
@@ -124,7 +186,10 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         {
             // The type's initializer may run as part of the current one.
             if (known != null && _active.Count != 0)
-            { Current.Allocates |= known.Allocates; }
+            {
+                Current.Allocates |= known.Allocates;
+                Current.Runs.UnionWith(known.Runs);
+            }
             return known;
         }
         if (_active.Any(run => SymbolEqualityComparer.Default.Equals(run.Type, type)) || !Step() ||
@@ -139,7 +204,10 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         finally
         { _active.RemoveAt(_active.Count - 1); }
         if (finished && _active.Count != 0)
-        { Current.Allocates |= run.Allocates; }
+        {
+            Current.Allocates |= run.Allocates;
+            Current.Runs.UnionWith(run.Runs);
+        }
         _types[type] = finished ? run : null;
         return finished ? run : null;
     }
@@ -1070,6 +1138,7 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         if (declaration.DescendantNodes().Any(static node => node is YieldStatementSyntax) ||
             Graph(declaration) is not { } graph)
         { return false; }
+        Current.Runs.Add(method);
         var frame = new Frame(method, receiver);
         for (var index = 0; index < arguments.Length; index++)
         { frame.Variables[method.Parameters[index]] = arguments[index]; }
@@ -1152,6 +1221,7 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             _depth >= MaximumDepth)
         { return false; }
         var type = constructor.ContainingType;
+        Current.Runs.Add(constructor);
         if (constructor.IsImplicitlyDeclared)
         { return arguments.Length == 0 && RunInstanceInitializers(type, instance); }
         if (constructor.DeclaringSyntaxReferences.Length != 1 ||
