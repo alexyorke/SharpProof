@@ -55,10 +55,35 @@ Invoke-LintCheck 'Links' {
     Invoke-LintNative 'sh' @('eng/scripts/Test-SharpProofLinks.sh', (Join-Path $reportRoot 'links.md'))
 }
 Invoke-LintCheck 'ToolDependencies' {
-    Invoke-LintNative 'node' @(
-        '/usr/local/lib/node_modules/npm/bin/npm-cli.js', 'audit',
-        '--prefix', '/opt/sharpproof/lint', '--omit=dev', '--audit-level=low',
-        '--cache', (Join-Path ([IO.Path]::GetTempPath()) 'sharpproof-npm-cache'))
+    # Every advisory fails unless eng/lint/audit-exceptions.json lists it with a
+    # reason and an expiry date. An expired or unused exception fails too.
+    $report = & node '/usr/local/lib/node_modules/npm/bin/npm-cli.js' 'audit' `
+        '--prefix' '/opt/sharpproof/lint' '--omit=dev' '--audit-level=low' '--json' `
+        '--cache' (Join-Path ([IO.Path]::GetTempPath()) 'sharpproof-npm-cache')
+    $audit = ($report -join "`n") | ConvertFrom-Json -AsHashtable
+    if ($null -eq $audit -or -not $audit.ContainsKey('vulnerabilities')) { throw 'npm audit produced no report.' }
+    $found = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($vulnerability in $audit['vulnerabilities'].Values) {
+        foreach ($via in $vulnerability['via']) {
+            if ($via -is [Collections.IDictionary]) {
+                if ([string]$via['url'] -notmatch '/advisories/(GHSA-[a-z0-9-]+)$') { throw "Unrecognized advisory: $($via['url'])" }
+                $found.Add("$($Matches[1])|$($via['name'])") | Out-Null
+            }
+        }
+    }
+    $today = [DateTime]::UtcNow.Date
+    $accepted = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($exception in @(Get-Content -Raw 'eng/lint/audit-exceptions.json' | ConvertFrom-Json)) {
+        if ([string]::IsNullOrWhiteSpace($exception.reason)) { throw "Audit exception $($exception.advisory) has no reason." }
+        $expires = [DateTime]::ParseExact($exception.expires, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+        if ($expires -lt $today) { throw "Audit exception $($exception.advisory) expired on $($exception.expires)." }
+        $accepted.Add("$($exception.advisory)|$($exception.package)") | Out-Null
+    }
+    $unexpected = @($found | Where-Object { -not $accepted.Contains($_) })
+    $unused = @($accepted | Where-Object { -not $found.Contains($_) })
+    foreach ($entry in $found) { Write-Output "Advisory: $entry$(if ($accepted.Contains($entry)) { ' (reviewed exception)' })" }
+    if ($unexpected.Count -gt 0) { throw "Unreviewed tool dependency advisories: $($unexpected -join ', ')" }
+    if ($unused.Count -gt 0) { throw "Audit exceptions no longer needed: $($unused -join ', ')" }
 }
 Invoke-LintCheck 'Compatibility' { & (Join-Path $PSScriptRoot 'Test-SharpProofPackageCompatibility.ps1') }
 
