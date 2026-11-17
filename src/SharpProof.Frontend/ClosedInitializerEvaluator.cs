@@ -394,7 +394,9 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
                 value = Copy(items.Items[index]);
                 return true;
             case ISimpleAssignmentOperation { IsRef: false } assignment:
-                return Evaluate(assignment.Value, frame, out value) && Store(assignment.Target, Copy(value), frame);
+                // C# resolves the target's array and index before the value.
+                return Target(assignment.Target, frame, out var assigned, out var position) &&
+                    Evaluate(assignment.Value, frame, out value) && StoreAt(assignment.Target, assigned, position, Copy(value), frame);
             case ICompoundAssignmentOperation compound:
                 return Compound(compound, frame, out value);
             case IIncrementOrDecrementOperation increment:
@@ -543,7 +545,9 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
                 {
                     if (field.IsStatic || field.IsConst)
                     { continue; }
-                    if (field.IsFixedSizeBuffer)
+                    // Overlapping fields share storage that named slots
+                    // cannot model.
+                    if (field.IsFixedSizeBuffer || !CSharpOperationSemantics.HasIndependentFieldStorage(field))
                     { ok = false; return null; }
                     fields[field] = DefaultOf(field.Type, out ok);
                     if (!ok)
@@ -669,8 +673,13 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         { return false; }
         if (binary.OperatorMethod is { } method)
         {
-            return !IsLibrary(method.ContainingType) ? Call(method, null, [left, right], out value)
-                : left is BigInteger l && right is BigInteger r && BigBinary(binary.OperatorKind, l, r, out value);
+            if (!IsLibrary(method.ContainingType))
+            { return Call(method, null, [left, right], out value); }
+            if (left is not BigInteger l || right is not BigInteger r || !BigBinary(binary.OperatorKind, l, r, out value))
+            { return false; }
+            // A BigInteger result past the inline range is heap-backed.
+            Current.Allocates |= value is BigInteger;
+            return true;
         }
         if (binary.Type is not { } type)
         { return false; }
@@ -778,8 +787,15 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         }
     }
 
+    // Operands past this many bytes give up before the host arithmetic runs:
+    // repeated squaring would otherwise exhaust memory within a few steps.
+    private const int MaximumBigIntegerBytes = 1 << 10;
+
     private static bool BigBinary(BinaryOperatorKind kind, BigInteger x, BigInteger y, out object? value)
     {
+        value = null;
+        if (x.ToByteArray().Length > MaximumBigIntegerBytes || y.ToByteArray().Length > MaximumBigIntegerBytes)
+        { return false; }
         value = kind switch
         {
             BinaryOperatorKind.Add => x + y,
@@ -840,22 +856,25 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         value = null;
         if (compound.OperatorMethod != null || compound.InConversion.Exists && !compound.InConversion.IsIdentity ||
             compound.OutConversion.Exists && !compound.OutConversion.IsIdentity || compound.Target.Type is not { } type ||
-            !IsIntegral(type) || !Evaluate(compound.Target, frame, out var current) || !Evaluate(compound.Value, frame, out var operand) ||
+            !IsIntegral(type) || !Target(compound.Target, frame, out var array, out var position) ||
+            !ReadAt(compound.Target, array, position, frame, out var current) || !Evaluate(compound.Value, frame, out var operand) ||
             current == null || operand == null || !IsIntegralValue(current) || !IsIntegralValue(operand) ||
             !Arithmetic(compound.OperatorKind, ToBig(current), ToBig(operand), type, out var exact) ||
             !FromBig(exact, type, compound.IsChecked && CanOverflow(compound.OperatorKind), out value))
         { return false; }
-        return Store(compound.Target, value, frame);
+        return StoreAt(compound.Target, array, position, value, frame);
     }
 
     private bool Increment(IIncrementOrDecrementOperation increment, Frame frame, out object? value)
     {
         value = null;
         if (increment.OperatorMethod != null || increment.Target.Type is not { } type || !IsIntegral(type) ||
-            !Evaluate(increment.Target, frame, out var current) || current == null || !IsIntegralValue(current))
+            !Target(increment.Target, frame, out var array, out var position) ||
+            !ReadAt(increment.Target, array, position, frame, out var current) || current == null || !IsIntegralValue(current))
         { return false; }
         var delta = increment.Kind == OperationKind.Increment ? BigInteger.One : BigInteger.MinusOne;
-        if (!FromBig(ToBig(current) + delta, type, increment.IsChecked, out var next) || !Store(increment.Target, next, frame))
+        if (!FromBig(ToBig(current) + delta, type, increment.IsChecked, out var next) ||
+            !StoreAt(increment.Target, array, position, next, frame))
         { return false; }
         value = increment.IsPostfix ? current : next;
         return true;
@@ -950,8 +969,11 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             { return ReadStatic(backing, out value); }
             if (reference.Instance == null || !Evaluate(reference.Instance, frame, out var instance))
             { return false; }
-            if (instance is StructValue structure && structure.Fields.TryGetValue(backing, out value) ||
-                instance is ObjectValue target && target.Fields.TryGetValue(backing, out value))
+            // Reading a struct's property calls its getter, which runs the
+            // struct's type initializer. A mutable property of an object
+            // another run made may have changed since.
+            if (instance is StructValue structure && Initialized(structure.Type) && structure.Fields.TryGetValue(backing, out value) ||
+                instance is ObjectValue target && (backing.IsReadOnly || target.Run == Current.Id) && target.Fields.TryGetValue(backing, out value))
             {
                 value = Copy(value);
                 return true;
@@ -1007,16 +1029,50 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             case IPropertyReferenceOperation { Arguments.IsEmpty: true } property when BackingField(property.Property) is { } backing:
                 return StoreField(backing, property.Instance, value, frame);
             case IArrayElementReferenceOperation element:
-                if (!Element(element, frame, out var array, out var index) || array.Run != Current.Id ||
-                    // A covariant array store checks the element's runtime type.
-                    array.ElementType.IsReferenceType && array.ElementType.SpecialType != SpecialType.System_String &&
-                    !(array.ElementType is INamedTypeSymbol { IsSealed: true } && value is null or ObjectValue))
-                { return false; }
-                array.Items[index] = value;
-                return true;
+                return Element(element, frame, out var array, out var index) && StoreAt(target, array, index, value, frame);
             default:
                 return false;
         }
+    }
+
+    // An assignment's array element, resolved once, before the value is
+    // evaluated; null for any other target, whose operands have no effects.
+    private bool Target(IOperation target, Frame frame, out ArrayValue? array, out int index)
+    {
+        array = null;
+        index = 0;
+        if (target is not IArrayElementReferenceOperation element)
+        { return true; }
+        if (!Element(element, frame, out var items, out index))
+        { return false; }
+        array = items;
+        return true;
+    }
+
+    private bool ReadAt(IOperation target, ArrayValue? array, int index, Frame frame, out object? value)
+    {
+        value = null;
+        if (array == null)
+        { return Evaluate(target, frame, out value); }
+        if (array.Run != Current.Id)
+        { return false; }
+        value = Copy(array.Items[index]);
+        return true;
+    }
+
+    private bool StoreAt(IOperation target, ArrayValue? array, int index, object? value, Frame frame)
+    {
+        if (array == null)
+        { return Store(target, value, frame); }
+        if (array.Run != Current.Id ||
+            // A covariant array store checks the element's runtime type: a
+            // sealed element type takes null or exactly that type.
+            array.ElementType.IsReferenceType && array.ElementType.SpecialType != SpecialType.System_String &&
+            !(array.ElementType is INamedTypeSymbol { IsSealed: true } sealedType && (value is null ||
+                value is ObjectValue stored && SymbolEqualityComparer.Default.Equals(stored.Type.OriginalDefinition, sealedType.OriginalDefinition))))
+        { return false; }
+        array.Items[index] = value;
+        return true;
     }
 
     private bool StoreField(IFieldSymbol field, IOperation? instance, object? value, Frame frame)
@@ -1128,7 +1184,10 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         // not model.
         if (receiver is StructValue structure)
         {
-            if (!(structure.Type.IsReadOnly || method.IsReadOnly))
+            // Calling a value type's instance method runs its type
+            // initializer (ECMA-335 II.10.5.3.1); its instances may exist
+            // before that, as default values.
+            if (!(structure.Type.IsReadOnly || method.IsReadOnly) || !Initialized(structure.Type))
             { return false; }
             receiver = structure.Copy();
         }
@@ -1149,6 +1208,13 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         { return Execute(graph, frame, out value); }
         finally
         { _depth--; }
+    }
+
+    // A type whose initializer has finished, or is running.
+    private bool Initialized(INamedTypeSymbol type)
+    {
+        return _active.Any(run => SymbolEqualityComparer.Default.Equals(run.Type, type.OriginalDefinition)) ||
+            Initialize(type) != null;
     }
 
     private bool Create(IObjectCreationOperation creation, Frame frame, out object? value)
@@ -1189,6 +1255,8 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             var target = new ObjectValue(type, Current.Id);
             foreach (var field in type.GetMembers().OfType<IFieldSymbol>().Where(static field => !field.IsStatic && !field.IsConst))
             {
+                if (field.IsFixedSizeBuffer || !CSharpOperationSemantics.HasIndependentFieldStorage(field))
+                { return false; }
                 target.Fields[field] = DefaultOf(field.Type, out var ok);
                 if (!ok)
                 { return false; }
