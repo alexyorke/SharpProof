@@ -114,7 +114,7 @@ listing changes against an earlier one. Development history is in the Git log.
   the call is outside any `try` block of the caller. Before, such calls kept
   the whole caller `Unknown`.
 - Values of source `readonly struct` types are analyzed: construction,
-  `default`, field and property reads, instance members and user-defined
+  including target-typed `new(...)`, `default`, field and property reads, instance members and user-defined
   operators. Purity, capability and postcondition claims over them can be
   proved. A body that builds such a value keeps allocation, effect-contract
   and resource-bound claims `Unknown`, because the model allocates it and the

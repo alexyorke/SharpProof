@@ -314,6 +314,13 @@ internal static partial class CSharpOperationSemantics
                 [new(IrExceptionKind.NullReference, factory.Binary(IrBinaryOperator.Equal, receiver, factory.Null(receiver.Type)))],
                 FrontendSubsetClassification.Exact);
         }
+        // A target-typed `new(arguments)` of a modeled struct, or an identity
+        // conversion of one, keeps the value: the same object, or null for
+        // default(S).
+        if (operation is IConversionOperation { OperatorMethod: null } structConversion && IsModeledStruct(operation.Type) &&
+            (structConversion.Conversion.IsIdentity || IsTargetTypedCreation(structConversion)) &&
+            operands[0].Type == new RoslynTypeMapper(factory).GetTypeId(operation.Type))
+        { return Exact(operands[0]); }
         if (operation is IConversionOperation conversion && IsReferenceDomain(operation.Type))
         {
             var target = new RoslynTypeMapper(factory).GetTypeId(operation.Type);

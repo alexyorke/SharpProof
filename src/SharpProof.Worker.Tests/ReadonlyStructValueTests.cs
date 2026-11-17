@@ -23,6 +23,7 @@ public sealed class ReadonlyStructValueTests
             public static bool operator ==(Span left, Span right) => left.ticks == right.ticks;
             public static bool operator !=(Span left, Span right) => left.ticks != right.ticks;
             public Span Twice() => new Span(ticks * 2);
+            public Span Plus(Span other) => this + other;
             public override bool Equals(object? other) => false;
             public override int GetHashCode() => 0;
         }
@@ -80,6 +81,11 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(long x, int y) { Contract.Ensures(Contract.Result<long>() == x + y); var p = new Pair(new Span(x), y); return p.First.Ticks + p.Second; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Holder(new Span(x)).Value.Ticks; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); var a = new Span(x); var b = a; return b.Ticks; }")]
+    // A target-typed `new(...)` builds the same value as `new Span(...)`.
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); Span s = new(x); return s.Ticks; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 0); Span s = new(); return s.Ticks; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + x); return Make(x).Plus(Make(x)).Ticks; } " +
+        "private static Span Make(long x) => new(x);")]
     public async Task ModeledStructClaimsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -91,6 +97,7 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return (new Span(x) + new Span(x)).Ticks; }")]
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 1); return default(Span).Ticks; }")]
     [TestCase("public static bool M(long x, long y) { Contract.Ensures(Contract.Result<bool>()); return new Span(x) == new Span(y); }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + 1); Span s = new(x); return s.Ticks; }")]
     // Boxing a struct, even default(S), yields an object.
     [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return (object)default(Span); }")]
     [TestCase("public static object M(Span s) { Contract.Ensures(Contract.Result<object>() == null); return s; }")]

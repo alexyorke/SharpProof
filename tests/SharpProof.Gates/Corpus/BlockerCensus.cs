@@ -150,6 +150,8 @@ internal static class BlockerCensus
         var paths = compilation.SyntaxTrees.Select(static (tree, ordinal) => (tree, ordinal))
             .ToImmutableDictionary(static item => item.tree, static item => item.ordinal.ToString(CultureInfo.InvariantCulture));
         var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree]);
+        // As the compiler collector does: `this` of an instance member is an input.
+        context.ModelReceiver();
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
         if (!binding.IsSuccess)
         {
@@ -202,6 +204,9 @@ internal static class BlockerCensus
         {
             IInvocationOperation invocation => "call " + Member(invocation.TargetMethod, compilation) +
                 (SameType(invocation, invocation.TargetMethod.ContainingType) ? " [same-type]" : ""),
+            // A source struct, by name: which value types keep their callers from lowering.
+            IObjectCreationOperation { Constructor.ContainingType: { TypeKind: TypeKind.Struct, DeclaringSyntaxReferences.IsEmpty: false } structType } =>
+                "new source struct " + structType.Name + (structType.IsReadOnly ? "" : " [mutable]") + (structType.IsGenericType ? " [generic]" : ""),
             IObjectCreationOperation creation => "new " + (creation.Constructor is { } constructor
                 ? Owner(constructor.ContainingType, compilation)
                 : "unknown"),
@@ -219,6 +224,9 @@ internal static class BlockerCensus
             IIsPatternOperation { Pattern: IDeclarationPatternOperation or ITypePatternOperation or IRecursivePatternOperation } pattern
                 when pattern.Value.Type is { IsReferenceType: true } or ITypeParameterSymbol => "type pattern on " + Kind(pattern.Value.Type),
             IConversionOperation conversion => "conversion to " + Kind(conversion.Type),
+            // A source operator names its declaring type and what its declaration shows.
+            IBinaryOperation { OperatorMethod: { } userOperator } binary when SymbolEqualityComparer.Default.Equals(userOperator.ContainingAssembly, compilation.Assembly) =>
+                "binary " + binary.OperatorKind + " on " + Kind(binary.LeftOperand.Type) + " (" + userOperator.ContainingType.Name + ": " + Member(userOperator, compilation) + ")",
             IBinaryOperation binary => "binary " + binary.OperatorKind + " on " + Kind(binary.LeftOperand.Type),
             _ => operation.Kind + (operation.Type == null ? "" : " of " + Kind(operation.Type))
         };
