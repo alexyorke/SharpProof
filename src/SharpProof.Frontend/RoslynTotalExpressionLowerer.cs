@@ -1212,7 +1212,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 if (modeled && value.Value.Type == _context.Type(elementType))
                 { _builder!.ElementStore(block, writeSite, array.Value, indices[0], value.Value); }
                 else
-                { _builder!.Write(block, writeSite, IrWriteRegion.Element); }
+                { ElementWrite(block, writeSite, array.Value); }
                 return new(value.Value, block, FrontendSubsetClassification.Exact);
             }
             TotalBodyValue old;
@@ -1251,12 +1251,27 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 if (modeled && next.Value.Type == old.Value.Type)
                 { _builder!.ElementStore(next.Continuation, writeSite, array.Value, indices[0], next.Value); }
                 else
-                { _builder!.Write(next.Continuation, writeSite, IrWriteRegion.Element); }
+                { ElementWrite(next.Continuation, writeSite, array.Value); }
                 next = mutation is IIncrementOrDecrementOperation { IsPostfix: true } ? new(old.Value, next.Continuation, next.Classification) : next;
             }
             guarded = next;
         }
         return guarded;
+    }
+
+    // A store whose value is not modeled names its array when it is one
+    // dimensional. It still forgets memory, since arrays of different
+    // element types can be one object, but replay can then tell a store
+    // into an array this body allocated from a write a caller can see.
+    private void ElementWrite(IrBlockId block, OperationId site, IrTerm array)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
+        array = RepositoryParameterGuard.NotNull(array, nameof(array));
+        if (_factory.GetTypeInfo(array.Type).Kind == IrTypeKind.Sequence)
+        { _builder!.Write(block, site, IrWriteRegion.Element, array); }
+        else
+        { _builder!.Write(block, site, IrWriteRegion.Element); }
     }
 
     // Contract and attribute APIs are specifications, never opaque calls.

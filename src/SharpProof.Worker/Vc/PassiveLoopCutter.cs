@@ -436,6 +436,9 @@ internal sealed partial class PassiveLoopCutter
                     case IrWriteInstruction { Target: { } receiver, Field: { } field, Value: { } value } write:
                         builder.FieldStore(encoded, write.Operation, write.Region, receiver, field, value, write.Index);
                         break;
+                    case IrWriteInstruction { Target: { } named, Value: null } write:
+                        builder.Write(encoded, write.Operation, write.Region, named);
+                        break;
                     case IrWriteInstruction write:
                         builder.Write(encoded, write.Operation, write.Region);
                         break;

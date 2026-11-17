@@ -107,6 +107,9 @@ internal sealed class IrHeap
     private readonly ImmutableDictionary<object, ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder>.Builder _keyedFields = ImmutableDictionary.CreateBuilder<object, ImmutableDictionary<(IrMemberId Field, IrTypeId Type, ulong Key), IrValue>.Builder>(ObjectKey.Instance);
     private readonly ImmutableHashSet<IrValue>.Builder _freshArrays = ImmutableHashSet.CreateBuilder<IrValue>(IrValueIdentity.Instance);
     private readonly ImmutableHashSet<object>.Builder _freshObjects = ImmutableHashSet.CreateBuilder<object>(ObjectKey.Instance);
+    // Arrays and objects this run allocated whose contents an unknown store
+    // replaced: no caller can see them, but their cells are not known.
+    private readonly HashSet<object> _unpublished = new(ObjectKey.Instance);
     internal ImmutableDictionary<(object Identity, IrMemberId Field), IrValue>.Builder Fields { get; } = ImmutableDictionary.CreateBuilder<(object Identity, IrMemberId Field), IrValue>(FieldKey.Instance);
     internal bool ConsumedApproximation { get; private set; }
     private bool UnknownContents { get; set; }
@@ -150,6 +153,23 @@ internal sealed class IrHeap
 
     internal void Invalidate()
     {
+        ForgetContents();
+        _unpublished.Clear();
+    }
+
+    // A write of an unknown value into an array this body allocated forgets
+    // every cell, since arrays of other element types may be that array, but
+    // it publishes nothing: what no caller could see stays unseen, though its
+    // contents are no longer known.
+    internal void InvalidateUnpublished()
+    {
+        _unpublished.UnionWith(_freshArrays);
+        _unpublished.UnionWith(_freshObjects);
+        ForgetContents();
+    }
+
+    private void ForgetContents()
+    {
         UnknownContents = true;
         _elements.Clear();
         Fields.Clear();
@@ -171,8 +191,8 @@ internal sealed class IrHeap
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
         return value.Kind switch
         {
-            IrValueKind.Sequence => _freshArrays.Contains(value.SequenceIdentity),
-            IrValueKind.Reference => _freshObjects.Contains(value.Reference),
+            IrValueKind.Sequence => _freshArrays.Contains(value.SequenceIdentity) || _unpublished.Contains(value.SequenceIdentity),
+            IrValueKind.Reference => _freshObjects.Contains(value.Reference) || _unpublished.Contains(value.Reference),
             _ => false
         };
     }

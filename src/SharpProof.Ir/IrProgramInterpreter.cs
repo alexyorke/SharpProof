@@ -594,7 +594,19 @@ internal sealed partial class IrWriteInstruction
             { return IrProgramInterpreter.Unsupported(this, state.Values, state.Steps, "A field store needs an object receiver."); }
         }
         else if (this.Region is IrWriteRegion.Field or IrWriteRegion.Element or IrWriteRegion.Parameter or IrWriteRegion.Unknown)
-        { state.Values.Heap.Invalidate(); }
+        {
+            if (this.Target is { } named)
+            {
+                var target = state.Interpreter.Evaluate(named, state.Values, state.CancellationToken);
+                if (target.Status != IrEvaluationStatus.Value)
+                { return IrProgramInterpreter.FromEvaluation(target, this, state.Values, state.Steps); }
+                freshWriteReceiver = state.Values.Heap.IsFreshReceiver(target.Value!);
+            }
+            if (freshWriteReceiver)
+            { state.Values.Heap.InvalidateUnpublished(); }
+            else
+            { state.Values.Heap.Invalidate(); }
+        }
         state.ReplayOptions?.WriteObserver?.Invoke(this);
         state.ReplayOptions?.WritePrefixObserver?.Invoke(this, state.Values.ConsumedApproximation);
         if (!freshWriteReceiver)

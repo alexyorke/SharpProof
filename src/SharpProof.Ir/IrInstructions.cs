@@ -194,6 +194,19 @@ internal sealed partial class IrWriteInstruction : IrInstruction
         Region = region;
     }
 
+    // An element write that names its array but not the stored value. It
+    // forgets memory like a bare write; replay uses the array only to tell an
+    // array the body allocated from one a caller can see.
+    internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrWriteRegion region, IrTerm target)
+        : base(id, IrInstructionKind.Write, operation)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(id.IsDefault, nameof(id));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        Region = region;
+        Target = target;
+    }
+
     internal IrWriteInstruction(IrInstructionId id, OperationId operation, IrTerm target, IrTerm index, IrTerm value, IrTerm? length = null)
         : base(id, IrInstructionKind.Write, operation)
     {

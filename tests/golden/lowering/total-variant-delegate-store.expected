@@ -36,7 +36,7 @@ block: b9 throw
   i17 op8 Throw Unknown -> b4 source=total-variant-delegate-store.cs:tokens["values","[","0","]"]#1
 block: b10 normal
   i18 op9 Assign v11:bool[width=0,signed=False] = true source=total-variant-delegate-store.cs:tokens["values","[","0","]"]#1
-  i19 op3 Write Element source=total-variant-delegate-store.cs:tokens["values","[","0","]","=","item"]#1
+  i19 op3 Write Element v6 source=total-variant-delegate-store.cs:tokens["values","[","0","]","=","item"]#1
   i20 op0 Goto b3 source=none
 term: ir0 Variable type=t7:<no-assembly>::System.Func{System.Object}[] width=0 signed=False value=v0
 term: ir1 Variable type=t4:System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e::System.Func{System.Object} width=0 signed=False value=v3
