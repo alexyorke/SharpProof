@@ -73,6 +73,15 @@ internal sealed class IrProgramBuilder(IrFactory factory)
     public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region)
     { RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block)); RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation)); return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region)); }
 
+    // An element write into the named array, with no modeled value.
+    public IrWriteInstruction Write(IrBlockId block, OperationId operation, IrWriteRegion region, IrTerm sequence)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.ThrowIfInvalid(operation.IsDefault, nameof(operation));
+        sequence = RepositoryParameterGuard.NotNull(sequence, nameof(sequence));
+        return Append(block, new IrWriteInstruction(NextInstructionId(), operation, region, sequence));
+    }
+
     // Stores one cell, or every cell in [index, index + length). A range uses
     // Int32 positions and length. The caller guards nullness and the complete
     // nonnegative in-bounds interval; replay independently rejects invalid IR.
@@ -377,6 +386,11 @@ internal sealed class IrProgramBuilder(IrFactory factory)
                 _factory.GetTypeInfo(ValidateTerm(write.Target, "target")).Kind != IrTypeKind.Reference ||
                 ValidateTerm(write.Value, "value") != fieldInfo.ReturnType)
             { throw InvalidArgument("A field store requires an object, an instance field and a value of its type.", "field"); }
+        }
+        else if (write is { Target: { } named, Index: null, Value: null, Length: null })
+        {
+            if (write.Region != IrWriteRegion.Element || _factory.GetTypeInfo(ValidateTerm(named, "target")).Kind != IrTypeKind.Sequence)
+            { throw InvalidArgument("A named element write requires an array.", "target"); }
         }
         else if (write.Target is { } stored)
         {

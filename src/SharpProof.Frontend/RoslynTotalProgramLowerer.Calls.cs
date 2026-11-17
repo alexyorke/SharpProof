@@ -588,6 +588,9 @@ internal sealed partial class RoslynTotalProgramLowerer
                     case IrWriteInstruction { Target: { } storedReceiver, Field: { } field, Value: { } value } write:
                         _builder.FieldStore(destination, write.Operation, write.Region, storedReceiver, field, value, write.Index);
                         break;
+                    case IrWriteInstruction { Target: { } named, Value: null } write:
+                        _builder.Write(destination, write.Operation, write.Region, named);
+                        break;
                     case IrWriteInstruction write:
                         _builder.Write(destination, write.Operation, write.Region);
                         break;
