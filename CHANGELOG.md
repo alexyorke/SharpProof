@@ -129,9 +129,11 @@ listing changes against an earlier one. Development history is in the Git log.
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly
   struct` of those, such as NodaTime's `LocalTime.Midnight`. Code the
   initializer itself runs still sees an unknown value.
-- A store of a `readonly struct` value into an array the method allocated
-  and then returned was refuted as a write to the caller's state. It is now
-  `Unknown`; a store into an array the caller passed in is still refuted.
+- A store of a reference or a `readonly struct` value into an array the
+  method allocated and then returned, such as
+  `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
+  the caller's state. It is now `Unknown`; a store into an array the caller
+  passed in is still refuted.
 - A constructor's assignments to its own readonly fields and get-only
   auto-properties are modeled, so a value read back from an object built by such
   a constructor is known. Before, immutable objects built this way could not be

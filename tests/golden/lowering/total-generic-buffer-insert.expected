@@ -64,7 +64,7 @@ block: b14 throw
   i17 op10 Throw Unknown -> b9 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
 block: b15 normal
   i18 op11 Assign v10:bool[width=0,signed=False] = true source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]"]#1
-  i19 op5 Write Element source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]","=","value"]#1
+  i19 op5 Write Element v4 source=total-generic-buffer-insert.cs:tokens["_items","[","_end","]","=","value"]#1
   i20 op12 Havoc Variables/Approximation [v11:int[width=32,signed=True]] source=total-generic-buffer-insert.cs:tokens["_end"]#4
   i21 op13 Assign v12:int[width=32,signed=True] = v11 source=total-generic-buffer-insert.cs:tokens["_end"]#4
   i22 op14 Assign v13:int[width=32,signed=True] = 1 source=total-generic-buffer-insert.cs:tokens["1"]#2
