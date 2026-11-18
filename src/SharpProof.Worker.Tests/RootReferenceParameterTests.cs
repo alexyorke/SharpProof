@@ -13,7 +13,7 @@ public sealed class RootReferenceParameterTests
 {
     private const string Types = """
         using SharpProof.Attributes;
-        public static class S { public static int F; public static void Bump(ref int x) { x = x + 1; } }
+        public static class S { public static int F; public static void Bump(ref int x) { x = x + 1; } public static int Split(ref int a, ref int b) { a = 0; b = 1; return 1 / (a - 1); } }
         """;
 
     [TestCase("[DoesNotThrow] public static bool M(int x, out int half) { if (x % 2 != 0) { half = 0; return false; } half = x / 2; return true; }")]
@@ -27,8 +27,6 @@ public sealed class RootReferenceParameterTests
     [TestCase("[DoesNotThrow] public static bool M<T>(T x, bool ok, out T v) where T : class { if (ok) { v = x; return true; } v = null; return false; }")]
     [TestCase("[DoesNotThrow] public static bool M<T>(T x, out T v) { v = x; return true; }")]
     [TestCase("[ZeroAllocations] public static void M<T>(ref T a, ref T b) { var t = a; a = b; b = t; }")]
-    // A callee that writes the parameter back through its own ref parameter.
-    [TestCase("[DoesNotThrow] public static void M(ref int x) { S.Bump(ref x); }")]
     // The parameter keeps its own store, even if it is an element of the array.
     [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { x = 0; return a != null && a.Length > 0 ? a[x] : 0; }")]
     public async Task ReferenceParametersAreModeled(string member)
@@ -46,7 +44,9 @@ public sealed class RootReferenceParameterTests
     [TestCase("public static int M(ref int a, ref int b) { Contract.Ensures(Contract.Result<int>() == 1); a = 1; b = 2; return a; }")]
     [TestCase("[EnforcePure] public static void M(out int x) { x = 7; }")]
     [TestCase("[EnforcePure] public static void M<T>(out T x) { x = default; }")]
-    // The callee's write back is a store to the caller's storage too.
+    // A root's by-reference parameter is not forwarded to a copy-backed
+    // callee: M(ref v, ref v) makes a and b one variable, and a is 1.
+    [TestCase("[DoesNotThrow] public static int M(ref int x, ref int y) { return S.Split(ref x, ref y); }")]
     [TestCase("[EnforcePure] public static void M(ref int x) { S.Bump(ref x); }")]
     [TestCase("[EnforcePure] public static bool M(int x, out int half) { half = x / 2; return x % 2 == 0; }")]
     public async Task CallerVisibleStoresAreNotProven(string member)

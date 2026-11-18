@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Security.Cryptography;
 using NUnit.Framework;
 
@@ -32,6 +33,8 @@ public sealed class ExceptionResourceLockOracleTests
     [TestCase("InvalidOperation")]
     [TestCase("InvalidOperationNull")]
     [TestCase("DivideByZero")]
+    [TestCase("NotSupported")]
+    [TestCase("NotImplemented")]
     [TestCase("IOException")]
     [TestCase("ObjectDisposedName")]
     [TestCase("Aggregate")]
@@ -65,6 +68,86 @@ public sealed class ExceptionResourceLockOracleTests
         Assert.That(culture.AlwaysHeld, Is.True);
     }
 
+    private static readonly ImmutableArray<string> AuditedConstructorBody =
+    [
+        "ldarg.0", "call System.SR::get_Arg_{T}()", "call System.SystemException::.ctor(System.String)",
+        "ldarg.0", "ldc.i4 <int32>", "call System.Exception::set_HResult(System.Int32)", "ret"
+    ];
+
+    private static readonly ImmutableArray<string> AuditedResourcePropertyBody =
+        ["ldstr Arg_{T}", "call System.SR::GetResourceString(System.String)", "ret"];
+
+    // The parameterless NotSupportedException and NotImplementedException
+    // constructors were admitted by comparing their pinned-runtime IL with the
+    // audited InvalidOperationException(): each passes its own SR resource
+    // property, which only forwards its key to the hashed GetResourceString,
+    // to SystemException(string) and then stores a constant HResult.
+    [TestCase(typeof(NotSupportedException))]
+    [TestCase(typeof(NotImplementedException))]
+    public void ParameterlessConstructorBodyMatchesTheAuditedInvalidOperationBody(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        Assert.That(typeof(Exception).Assembly.ManifestModule.ModuleVersionId, Is.EqualTo(new Guid("067dffbc-1eee-41f1-8a2a-41abef72f2bb")));
+        var audited = typeof(InvalidOperationException);
+        var expected = Normalize(Body(audited.GetConstructor(Type.EmptyTypes)!), audited);
+        var actual = Normalize(Body(type.GetConstructor(Type.EmptyTypes)!), type);
+        Assert.That(actual, Is.EqualTo(expected));
+        Assert.That(expected, Is.EqualTo(AuditedConstructorBody));
+        var resources = typeof(Exception).Assembly.GetType("System.SR", throwOnError: true)!;
+        const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
+        Assert.That(Normalize(Body(resources.GetProperty("Arg_" + type.Name, flags)!.GetMethod!), type),
+            Is.EqualTo(Normalize(Body(resources.GetProperty("Arg_" + audited.Name, flags)!.GetMethod!), audited)));
+        Assert.That(Normalize(Body(resources.GetProperty("Arg_" + type.Name, flags)!.GetMethod!), type),
+            Is.EqualTo(AuditedResourcePropertyBody));
+    }
+
+    private static ImmutableArray<string> Normalize(ImmutableArray<string> body, Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return body.Select(instruction => instruction.Replace("Arg_" + type.Name, "Arg_{T}", StringComparison.Ordinal)).ToImmutableArray();
+    }
+
+    private static ImmutableArray<string> Body(MethodBase method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        var il = method.GetMethodBody()!.GetILAsByteArray()!;
+        var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Select(static field => (OpCode)field.GetValue(null)!).ToImmutableDictionary(static opcode => opcode.Value);
+        var body = ImmutableArray.CreateBuilder<string>();
+        for (var offset = 0; offset < il.Length;)
+        {
+            var value = il[offset] == 0xFE ? unchecked((short)(0xFE00 | il[offset + 1])) : il[offset];
+            offset += il[offset] == 0xFE ? 2 : 1;
+            var opcode = opcodes[value];
+            switch (opcode.OperandType)
+            {
+                case OperandType.InlineNone:
+                    body.Add(opcode.Name!);
+                    break;
+                case OperandType.InlineI:
+                    body.Add(opcode.Name + " <int32>");
+                    offset += 4;
+                    break;
+                case OperandType.InlineString:
+                    body.Add(opcode.Name + " " + method.Module.ResolveString(BitConverter.ToInt32(il, offset)));
+                    offset += 4;
+                    break;
+                case OperandType.InlineMethod:
+                    var callee = method.Module.ResolveMethod(BitConverter.ToInt32(il, offset))!;
+                    body.Add(opcode.Name + " " + callee.DeclaringType!.FullName + "::" + callee.Name + "(" +
+                        string.Join(",", callee.GetParameters().Select(static parameter => parameter.ParameterType.FullName)) + ")");
+                    offset += 4;
+                    break;
+                default:
+                    // Any other operand kind is outside the audited shape.
+                    body.Add("unaudited " + opcode.Name);
+                    offset = il.Length;
+                    break;
+            }
+        }
+        return body.ToImmutable();
+    }
+
     private static Exception Construct(string kind)
     {
         ArgumentNullException.ThrowIfNull(kind);
@@ -81,6 +164,8 @@ public sealed class ExceptionResourceLockOracleTests
             "InvalidOperation" => new InvalidOperationException(),
             "InvalidOperationNull" => new InvalidOperationException((string?)null),
             "DivideByZero" => new DivideByZeroException(),
+            "NotSupported" => new NotSupportedException(),
+            "NotImplemented" => new NotImplementedException(),
             "IOException" => new IOException(),
             "ObjectDisposedName" => new ObjectDisposedException(nameof(kind)),
             "Aggregate" => new AggregateException(),

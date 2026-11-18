@@ -141,6 +141,22 @@ listing changes against an earlier one. Development history is in the Git log.
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- A target-typed `switch` expression or `?:` over class values with no
+  common type, such as `i switch { 0 => token, 1 => block, _ => null }`
+  returning their base class, keeps the chosen reference. Before, the
+  conversion of the merged value to its own type was refused, so the method
+  did not lower.
+- A body that reads a readonly static holding an object no code can change,
+  such as `static readonly object Int64_0 = 0L;` or
+  `static readonly object TrueObject = true;`, now lowers. The static's own
+  initializer must store null, a constant string, a boxed constant or
+  `new object()`, nothing else in its type may store into it, and its type's
+  initializer must be admitted. The read is not an ambient read, so
+  `value ? TrueObject : FalseObject` can be proven pure. Before, any such read
+  left the method `Unknown`. The object itself is not modeled: unboxing it or
+  a postcondition about it stays `Unknown`. Statics holding arrays, class
+  instances or a library call's result, such as `Task.CompletedTask` or
+  `Task.FromResult(0)`, still abstain.
 - `s[i]` on a string, with an `int` index, faults exactly on a null string or
   an index outside `[0, s.Length)`. Before, a guarded read such as
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
@@ -176,6 +192,14 @@ listing changes against an earlier one. Development history is in the Git log.
   checked as the widened input plus that constant, with the wrap of the
   narrow sum accounted for. A contract that restates such a product no longer
   runs out of solver budget.
+- `throw new NotSupportedException()` and `throw new NotImplementedException()`,
+  the bodies of stub methods, are modeled like `new InvalidOperationException()`:
+  the constructor looks up its message in runtime resources, under a runtime
+  lock. With `SharpProofTrustExceptionMessages` a stub, or a method that throws
+  one behind a guard, can now be proved pure. Without it, the lock refutes an
+  effect claim on such a method, as for the other modeled constructors. Before,
+  both constructors were unknown calls, so these claims stayed `Unknown` even
+  with the property.
 - A refuted contract is reported as SP0051 at the clause or call and fails the
   build under every verifier policy. SP0047 reports incomplete analysis and
   SP0048 a declared assumption; each links to its documentation.
