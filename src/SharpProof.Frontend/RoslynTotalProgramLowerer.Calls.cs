@@ -85,6 +85,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceCall(IInvocationOperation invocation, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (CSharpOperationSemantics.IsChainedConstructorCall(invocation, _context.Target))
+        { return InlineChainedConstruction(invocation, block, depth); }
         if (_calls?.PrepareScalarCall(invocation) is { } model)
         { return _expressions.LowerScalarCall(invocation, model, block, depth); }
         if (_preserveSourceCall != null)
@@ -97,6 +99,35 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (ExactVirtualTarget(invocation.TargetMethod, invocation.Instance, baseCall: !invocation.IsVirtual) is { } exact)
         { return InlineSourceMember(invocation, exact, invocation.Instance, invocation.Arguments, block, depth, exactTarget: true); }
         return InlineSourceMember(invocation, invocation.TargetMethod, invocation.Instance, invocation.Arguments, block, depth);
+    }
+
+    // A constructor body whose `this` is only an unobserved receiver: every
+    // use reads or writes one of its fields, calls object's constructor, or
+    // chains with `: this(...)` to a constructor that does the same.
+    internal static bool KeepsConstructedReceiver(IOperation body, Compilation? compilation, int depth, CancellationToken cancellationToken)
+    {
+        body = RepositoryParameterGuard.NotNull(body, nameof(body));
+        return body.Descendants().OfType<IInstanceReferenceOperation>().All(receiver =>
+            receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
+            // A get-only auto-property names its backing field.
+            receiver.Parent is IPropertyReferenceOperation property && property.Instance == receiver &&
+                CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) != null ||
+            CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent) ||
+            receiver.Parent is IInvocationOperation chained && chained.Instance == receiver &&
+                SymbolEqualityComparer.Default.Equals(chained.TargetMethod.ContainingType, receiver.Type) && Chained(chained.TargetMethod));
+
+        bool Chained(IMethodSymbol target)
+        {
+            if (target.MethodKind != MethodKind.Constructor || depth >= 16)
+            { return false; }
+            if (target.IsImplicitlyDeclared)
+            { return target.ContainingType.TypeKind == TypeKind.Struct; }
+            return compilation != null && target.DeclaringSyntaxReferences.Length == 1 &&
+                target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is { } syntax &&
+                compilation.ContainsSyntaxTree(syntax.SyntaxTree) &&
+                CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree).GetOperation(syntax, cancellationToken) is { } targetBody &&
+                KeepsConstructedReceiver(targetBody, compilation, depth + 1, cancellationToken);
+        }
     }
 
     // The body a dispatched call runs when the program text fixes it: a base
@@ -203,12 +234,13 @@ internal sealed partial class RoslynTotalProgramLowerer
                     { throw new RegionIncompleteException(); }
                 }
             }
+            // An initializer cannot read `this`, so the object is still unseen.
             foreach (var (field, initializer) in initializers)
             {
                 SpendRegion();
                 var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
                 if (!lowered.Classification.IsExact ||
-                    !_expressions.StoreInitializer(field, created, initializer, lowered.Value, lowered.Continuation))
+                    !_expressions.StoreInitializer(field, created, initializer, lowered.Value, lowered.Continuation, fresh: true))
                 { throw new RegionIncompleteException(); }
                 current = lowered.Continuation;
             }
@@ -249,10 +281,48 @@ internal sealed partial class RoslynTotalProgramLowerer
         return body.Classification.IsExact ? Complete(body.Continuation) : new(created, body.Continuation, body.Classification);
     }
 
+    // `: this(arguments)` evaluates its arguments, then runs the other
+    // constructor on the object under construction: its instance
+    // initializers, unless it chains on, and its body. The object was
+    // allocated and zeroed when the outermost constructor was entered. The
+    // implicit parameterless constructor of a struct only zeroes it.
+    private TotalBodyValue? InlineChainedConstruction(IInvocationOperation invocation, IrBlockId block, int depth)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var constructor = invocation.TargetMethod;
+        if (_preserveSourceCall != null || _context.ReceiverValue() is not { } receiver)
+        { return null; }
+        if (constructor.IsImplicitlyDeclared)
+        {
+            return CSharpOperationSemantics.IsModeledStruct(constructor.ContainingType) && invocation.Arguments.IsEmpty
+                ? new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Exact) : null;
+        }
+        if (!CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) ||
+            !TryConstructionInitializers(constructor, out var initializers))
+        { return null; }
+        IrBlockId Initialize(IrBlockId current)
+        {
+            RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
+            foreach (var (field, initializer) in initializers)
+            {
+                SpendRegion();
+                var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
+                if (!lowered.Classification.IsExact ||
+                    !_expressions.StoreInitializer(field, receiver, initializer, lowered.Value, lowered.Continuation, fresh: _expressions.FreshReceiver))
+                { throw new RegionIncompleteException(); }
+                current = lowered.Continuation;
+            }
+            return current;
+        }
+        return InlineSourceMember(invocation, constructor, null, invocation.Arguments, block, depth, prelude: Initialize,
+            constructedReceiver: () => receiver);
+    }
+
     private bool TryConstructionInitializers(IMethodSymbol constructor, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
     {
         initializers = [];
         if (CSharpOperationSemantics.IsPlainConstructor(constructor, _cancellationToken) ||
+            CSharpOperationSemantics.ChainsToThis(constructor, _cancellationToken) ||
             !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken))
         { return true; }
         var type = constructor.ContainingType;

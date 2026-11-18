@@ -8019,8 +8019,8 @@
       "declarationSha256": "df1ee8fc7dc01eb69b319b705d5bd3d4862ccb44453f81fe407abf5cabcb7b52",
       "methodName": "WithOffset",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0356",

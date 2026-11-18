@@ -47,15 +47,45 @@ public sealed class ReadonlyStructValueTests
         public readonly struct Chained
         {
             private readonly long ticks;
+            private readonly long extra = 7;
             public Chained(long ticks) { this.ticks = ticks; }
             public Chained(int ticks) : this((long)ticks) { }
+            public Chained(int a, int b) : this(a + b) { extra = extra + 1; }
+            public Chained(int a, int b, int c) : this(a, b + c) { }
             public long Ticks => ticks;
+            public long Extra => extra;
+        }
+        public readonly struct Zeroed
+        {
+            private readonly long ticks;
+            private readonly long seven = 7;
+            public Zeroed(long ticks, bool keep) : this() { if (keep) { this.ticks = ticks; } }
+            public Zeroed(long ticks) : this(ticks, true) { }
+            public long Ticks => ticks;
+            public long Seven => seven;
+        }
+        public sealed class Box
+        {
+            private readonly long v;
+            private readonly long w = 3;
+            public Box(long v) { this.v = v; }
+            public Box(int v) : this(v * 2L) { w = w + v; }
+            public long V => v;
+            public long W => w;
         }
         public readonly struct Initialized
         {
             static Initialized() { C.State = 1; }
             public Initialized(long ticks) { Ticks = ticks; }
             public long Ticks { get; }
+        }
+        public sealed class Bumped
+        {
+            private readonly long w = Bump();
+            public Bumped(long v) { V = v; }
+            public Bumped(int v) : this((long)v) { }
+            public long V { get; }
+            private static long Bump() { C.State = 1; return 3; }
         }
         public readonly struct Noisy
         {
@@ -86,6 +116,27 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 0); Span s = new(); return s.Ticks; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + x); return Make(x).Plus(Make(x)).Ticks; } " +
         "private static Span Make(long x) => new(x);")]
+    // `: this(...)` runs the other constructor on the same object: its field
+    // initializers once, then its body, then the rest of this one.
+    [TestCase("[EnforcePure] public static long M(int x) { return new Chained(x).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(long x) { return new Zeroed(x, true).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(int x) { return new Box(x).V; }")]
+    // Field initializers write the object before anything has seen it.
+    [TestCase("[EnforcePure] public static long M(long x) { return new Chained(x).Ticks; }")]
+    [TestCase("[EnforcePure] public static long M(long x) { return new Box(x).V; }")]
+    [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == x); return new Chained(x).Ticks; }")]
+    [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 7); return new Chained(x).Extra; }")]
+    [TestCase("public static long M(int a, int b) { Contract.Requires(a >= 0 && a < 1000 && b >= 0 && b < 1000); " +
+        "Contract.Ensures(Contract.Result<long>() == a + b + 8); var c = new Chained(a, b); return c.Ticks + c.Extra; }")]
+    [TestCase("public static long M(int a, int b, int c) { Contract.Requires(a >= 0 && a < 1000 && b >= 0 && b < 1000 && c >= 0 && c < 1000); " +
+        "Contract.Ensures(Contract.Result<long>() == a + b + c + 8); var v = new Chained(a, b, c); return v.Ticks + v.Extra; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 0); return new Zeroed(x, false).Ticks; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, true).Ticks; }")]
+    // `: this()` to a struct's implicit parameterless constructor zeroes the
+    // value, then this constructor runs the field initializers.
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 7); return new Zeroed(x, false).Seven; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + 7); var z = new Zeroed(x); return z.Ticks + z.Seven; }")]
+    [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 2L * x + 3 + x); var b = new Box(x); return b.V + b.W; }")]
     public async Task ModeledStructClaimsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -98,6 +149,10 @@ public sealed class ReadonlyStructValueTests
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 1); return default(Span).Ticks; }")]
     [TestCase("public static bool M(long x, long y) { Contract.Ensures(Contract.Result<bool>()); return new Span(x) == new Span(y); }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x + 1); Span s = new(x); return s.Ticks; }")]
+    [TestCase("public static long M(int a, int b) { Contract.Ensures(Contract.Result<long>() == 7); return new Chained(a, b).Extra; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Zeroed(x, false).Ticks; }")]
+    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == 0); return new Zeroed(x, false).Seven; }")]
+    [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == 3); return new Box(x).W; }")]
     // Boxing a struct, even default(S), yields an object.
     [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return (object)default(Span); }")]
     [TestCase("public static object M(Span s) { Contract.Ensures(Contract.Result<object>() == null); return s; }")]
@@ -126,15 +181,17 @@ public sealed class ReadonlyStructValueTests
     [TestCase("[EnforcePure] public static long M() { return default(Initialized).Ticks; }")]
     [TestCase("[EnforcePure] public static long M(Initialized value) { return value.Ticks; }")]
     [TestCase("[EnforcePure] public static long M(long x) { return new Initialized(x).Ticks; }")]
+    // An initializer's own effects stay effects, through a chain too.
+    [TestCase("[EnforcePure] public static long M(long x) { return new Bumped(x).V; }")]
+    [TestCase("[EnforcePure] public static long M(int x) { return new Bumped(x).V; }")]
     public async Task RealEffectsAreNotProvenPure(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
         Assert.That((await ResultAsync(member)).Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
-    // A mutable struct, and a constructor that chains to another, are not modeled.
+    // A mutable struct is not modeled.
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Mutable(x).Ticks; }")]
-    [TestCase("public static long M(int x) { Contract.Ensures(Contract.Result<long>() == x); return new Chained(x).Ticks; }")]
     public async Task UnmodeledStructsStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

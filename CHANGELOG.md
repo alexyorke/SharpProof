@@ -114,11 +114,16 @@ listing changes against an earlier one. Development history is in the Git log.
   the call is outside any `try` block of the caller. Before, such calls kept
   the whole caller `Unknown`.
 - Values of source `readonly struct` types are analyzed: construction,
-  including target-typed `new(...)`, `default`, field and property reads, instance members and user-defined
+  including target-typed `new(...)` and constructors chained with `: this(...)`,
+  `default`, field and property reads, instance members and user-defined
   operators. Purity, capability and postcondition claims over them can be
   proved. A body that builds such a value keeps allocation, effect-contract
   and resource-bound claims `Unknown`, because the model allocates it and the
   CLR does not.
+- A class or struct constructor chained with `: this(...)` is inlined: the
+  other constructor runs on the same object, with its field initializers,
+  then the rest of this one. Instance field initializers no longer count as
+  effects, so `new` of a class with them can be proved pure.
 - A store of a reference into an array the method allocated and then
   returned, such as `var a = new string[1]; a[0] = "x"; return a;`, was
   refuted as a write to the caller's state. It is now `Unknown`; a store into

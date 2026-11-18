@@ -83,6 +83,10 @@ Once a constructor's stores to its own readonly fields and get-only auto-propert
 
 When a source callee declared in the caller's own type began to be inlined under that type's initializer (SEMANTICS.md, "Calls and loops"), 48 selected methods that had stopped at SP0047 `Advisory:Lowering:UnsupportedOperationKind` lowered completely. None of them became Proven or Refuted: each is still Unknown, now with SP0002 because its effects are not proved (most enumerate a caller's sequence or invoke a caller's delegate). The ratchet therefore moved 48 from the SP0047 ceiling (281 to 233) to the SP0002 ceiling (184 to 232). Total Unknown, the supported floors and every support label are unchanged. [verdicts-by-source.md](verdicts-by-source.md) shows the per-source split.
 
+### Reviewed classification for chained constructors
+
+Once a constructor chained with `: this(...)` was inlined (SEMANTICS.md, "Heap"), NodaTime `OffsetTime.WithOffset` (OSS0355, `=> new OffsetTime(TimeOfDay, offset)`) became Proven. That public constructor chains to `: this(time.NanosecondOfDay, offset.Seconds)`, whose body packs both values into one readonly field. It was reviewed against the body and marked Supported/Proven. The supported floors rose by one (280 to 281, 54 to 55), and the SP0047 ceiling (204 to 203) and total-Unknown ceiling (482 to 481) fell by one.
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.

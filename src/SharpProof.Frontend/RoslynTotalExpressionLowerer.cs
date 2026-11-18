@@ -1362,9 +1362,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     }
 
     // A scalar or reference instance field of a class: its reads and stores
-    // are modeled through an object-typed receiver.
+    // are modeled through an object-typed receiver. A zeroing or fresh store
+    // writes an object nothing else has seen yet, which is not an effect.
     internal bool StoreInitializer(IFieldSymbol field, IrTerm receiver, IOperation initializer, IrTerm value, IrBlockId block,
-        bool zeroInitialization = false)
+        bool zeroInitialization = false, bool fresh = false)
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));
         receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
@@ -1373,7 +1374,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         if (FieldMember(field) is not { } member || _factory.GetMemberInfo(member).ReturnType != value.Type)
         { return false; }
-        var site = zeroInitialization ? _context.FreshWriteSite(initializer) : _context.Site(initializer);
+        var site = zeroInitialization || fresh ? _context.FreshWriteSite(initializer) : _context.Site(initializer);
         _builder!.FieldStore(block, site, IrWriteRegion.Field, AsObject(receiver), member, value);
         return true;
     }
