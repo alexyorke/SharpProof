@@ -73,6 +73,7 @@ internal static class CompilerTotalCallableLowerer
         {
             CaptureCallFrames = true,
             AdmitsOutParameters = true,
+            AdmitsReferenceParameters = true,
             CaptureResourceLoopEntries = target.EffectClaims.Any(claim => claim.HasValidConstraint && claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound)
         };
         context.ModelReceiver();
@@ -128,7 +129,9 @@ internal static class CompilerTotalCallableLowerer
         // admitted only when it touches no memory and makes no call.
         // A clause that reads memory may read storage the out argument
         // aliases, so each clause must read parameters and the result alone.
-        if (target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) &&
+        // Without clauses, every by-reference store is already an argument
+        // write that forgets memory and the other by-reference parameters.
+        if (target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) && !binding.Clauses.IsEmpty &&
             (graph == null || !IsMemoryFree(graph.OriginalOperation, compilation) ||
                 binding.Clauses.Any(clause => !ReadsOnlyParameters(clause.Value, context) ||
                     !ReadsOnlyParameters(clause.SafeCondition, context))))
@@ -218,10 +221,9 @@ internal static class CompilerTotalCallableLowerer
             DisjointInputs = isBodyAbstraction ? [] : CompilerDisjointInputAnalysis.Collect(target.Method, cancellationToken),
             EffectsCompleteAtEntry = entryInitialization == InitializationEffect.None,
             EntryConstructsFreshValues = entryInitialization == InitializationEffect.FreshValues,
-            // A write to an out parameter writes the caller's storage, which
-            // effect claims do not model: none is verified on such a body.
-            ValidEffectClaimIds = target.Method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out) ? [] :
-                [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
+            // A store to an out or ref parameter is an argument write (see
+            // TotalLoweringContext.AdmitsReferenceParameters).
+            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
                     .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)

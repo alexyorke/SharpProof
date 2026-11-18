@@ -87,7 +87,8 @@ public sealed class OutParameterPostconditionTests
     }
 
     [Test]
-    public async Task EffectClaimOnAnOutParameterMethodIsUnknown()
+    // A store to an out parameter writes the caller's storage.
+    public async Task PurityClaimOnAnOutParameterStoreIsRefuted()
     {
         var response = await Verify("""
             using SharpProof.Attributes;
@@ -96,7 +97,7 @@ public sealed class OutParameterPostconditionTests
                 public static int Split(long ticks, out long rest) { rest = ticks & 7; return 0; }
             }
             """);
-        Assert.That(response.ClaimResults.Select(static result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Unknown }));
+        Assert.That(response.ClaimResults.Select(static result => result.Outcome), Is.EqualTo(new[] { WorkerClaimOutcome.Refuted }));
     }
 
     [Test]

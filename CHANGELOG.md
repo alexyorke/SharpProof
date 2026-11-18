@@ -129,6 +129,12 @@ listing changes against an earlier one. Development history is in the Git log.
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly
   struct` of those, such as NodaTime's `LocalTime.Midnight`. Code the
   initializer itself runs still sees an unknown value.
+- Effect claims cover methods with their own `ref` or `out` parameters of a
+  scalar or reference type, such as `bool TryParse(string s, out int value)`.
+  The argument may be a field, an element or a variable passed twice, so each
+  store to one is a write to argument state that forgets memory and the other
+  by-reference parameters. Before, such methods were `Unknown` for every claim
+  except a postcondition on a single scalar `out` parameter.
 - A type pattern that declares a `string` or array variable from an object,
   such as `o is string s`, made the whole run fail: the frontend wrote a cast
   that the manifest reader then rejected. The pattern's variable is now

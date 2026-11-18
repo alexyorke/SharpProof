@@ -41,7 +41,7 @@ public sealed class OrdinaryNativeDiagnosticStateWorkflowTests
         {
             source.Append("[EnforcePure] public static void Mutating")
                 .Append(index.ToString("D2", CultureInfo.InvariantCulture))
-                .Append("(ref int value) { value++; }");
+                .Append("(ref int value) { ref int alias = ref value; alias++; }");
         }
         source.Append('}');
         var compilation = AnalyzerGateHost.CreateCompilation(source.ToString(),

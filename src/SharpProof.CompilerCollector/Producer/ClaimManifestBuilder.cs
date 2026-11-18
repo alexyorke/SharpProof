@@ -401,9 +401,8 @@ internal sealed partial class ClaimManifestBuilder(
             ? CreateEffectClaims(
                 EffectClaimDeclarations.Declare(target, _effectSession, cancellationToken),
                 target, callableId, postconditions.Length,
-                // A write to an out parameter writes the caller's storage, which
-                // effect claims do not model: they stay unsupported.
-                supported && !target.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out),
+                // A store to an out parameter is lowered as an argument write.
+                supported,
                 CompanionDeclarationLocation(resolution))
             : [];
         if (effects.Any(claim => claim.Entry.EffectContractKind == WorkerEffectContractKind.ResourceUpperBound) &&
