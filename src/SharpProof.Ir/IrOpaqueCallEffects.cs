@@ -135,7 +135,7 @@ internal static class IrOpaqueCallSite
         kind = RepositoryParameterGuard.NotNull(kind, nameof(kind));
         return kind is "Argument" or "ArgumentNull" or "ArgumentNullName" or "ArgumentRange" or "ArgumentRangeName" or
             "InvalidOperation" or "InvalidOperationNull" or "DivideByZero" or "IOException" or "ObjectDisposedName" or
-            "Aggregate" or "AggregateNull" or "KeyNotFoundNull";
+            "Aggregate" or "AggregateNull" or "KeyNotFoundNull" or "NotSupported" or "NotImplemented";
     }
 
     internal static string ExceptionInitialization(string kind)

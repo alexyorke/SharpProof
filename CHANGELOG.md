@@ -129,17 +129,45 @@ listing changes against an earlier one. Development history is in the Git log.
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly
   struct` of those, such as NodaTime's `LocalTime.Midnight`. Code the
   initializer itself runs still sees an unknown value.
+- Effect claims cover methods with their own `ref` or `out` parameters of a
+  scalar or reference type, such as `bool TryParse(string s, out int value)`.
+  The argument may be a field, an element or a variable passed twice, so each
+  store to one is a write to argument state that forgets memory and the other
+  by-reference parameters. Before, such methods were `Unknown` for every claim
+  except a postcondition on a single scalar `out` parameter.
 - A type pattern that declares a `string` or array variable from an object,
   such as `o is string s`, made the whole run fail: the frontend wrote a cast
   that the manifest reader then rejected. The pattern's variable is now
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- More patterns are exact:
+  - `x is null` and `x is not null` over a type-parameter value;
+  - string constant patterns such as `s is "." or ","` (false for `null`);
+  - `not` around a declaration or type pattern, such as `b is not Paragraph p`;
+  - the empty property pattern `{ }`, as in `b.Parent is not { } parent`.
+  A type or property pattern whose input already converts to the matched
+  type is a null test. In a build that is not optimized, `is null` on a
+  `T` that may be a value type boxes it, so allocation claims stay
+  conservative there. NodaTime methods that check their arguments with
+  `Preconditions.CheckNotNull` now lower; three in the OSS corpus are
+  refuted for purity, since a `null` argument throws.
 - A target-typed `switch` expression or `?:` over class values with no
   common type, such as `i switch { 0 => token, 1 => block, _ => null }`
   returning their base class, keeps the chosen reference. Before, the
   conversion of the merged value to its own type was refused, so the method
   did not lower.
+- A body that reads a readonly static holding an object no code can change,
+  such as `static readonly object Int64_0 = 0L;` or
+  `static readonly object TrueObject = true;`, now lowers. The static's own
+  initializer must store null, a constant string, a boxed constant or
+  `new object()`, nothing else in its type may store into it, and its type's
+  initializer must be admitted. The read is not an ambient read, so
+  `value ? TrueObject : FalseObject` can be proven pure. Before, any such read
+  left the method `Unknown`. The object itself is not modeled: unboxing it or
+  a postcondition about it stays `Unknown`. Statics holding arrays, class
+  instances or a library call's result, such as `Task.CompletedTask` or
+  `Task.FromResult(0)`, still abstain.
 - `s[i]` on a string, with an `int` index, faults exactly on a null string or
   an index outside `[0, s.Length)`. Before, a guarded read such as
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
@@ -185,6 +213,14 @@ listing changes against an earlier one. Development history is in the Git log.
   Enumerating the result is still an unknown call, and an iterator
   with `Requires`, `Ensures` or `Assume` stays `Unknown`, since its clauses
   would describe the enumeration.
+- `throw new NotSupportedException()` and `throw new NotImplementedException()`,
+  the bodies of stub methods, are modeled like `new InvalidOperationException()`:
+  the constructor looks up its message in runtime resources, under a runtime
+  lock. With `SharpProofTrustExceptionMessages` a stub, or a method that throws
+  one behind a guard, can now be proved pure. Without it, the lock refutes an
+  effect claim on such a method, as for the other modeled constructors. Before,
+  both constructors were unknown calls, so these claims stayed `Unknown` even
+  with the property.
 - A refuted contract is reported as SP0051 at the clause or call and fails the
   build under every verifier policy. SP0047 reports incomplete analysis and
   SP0048 a declared assumption; each links to its documentation.
