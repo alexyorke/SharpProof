@@ -37,6 +37,21 @@ internal static partial class CompilerLoweredArtifact
         };
     }
 
+    // A program the artifact encoder would leave out (see
+    // CompilerTotalCallableArtifactCodec.SupportedTermEvidence) is dropped
+    // before claims are attached to it, so no call-precondition claim or
+    // fork-join projection depends on a program the worker never receives.
+    internal static CompilerCallablePreparation WithoutUnreadablePrograms(CompilerCallablePreparation preparation,
+        CancellationToken cancellationToken)
+    {
+        preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
+        if (preparation.Total != null && CompilerTotalCallableArtifactCodec.Encode(preparation.Total, cancellationToken) == null)
+        { preparation = preparation with { Total = null }; }
+        if (preparation.TotalEntry != null && CompilerTotalCallableArtifactCodec.EncodeEntry(preparation.TotalEntry, cancellationToken) == null)
+        { preparation = preparation with { TotalEntry = null, ForkJoinProjection = null }; }
+        return preparation;
+    }
+
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
         ImmutableArray<CompilerCallableArtifact> artifacts,
         WorkerClaimManifest manifest,
