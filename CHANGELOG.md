@@ -135,6 +135,11 @@ listing changes against an earlier one. Development history is in the Git log.
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- A target-typed `switch` expression or `?:` over class values with no
+  common type, such as `i switch { 0 => token, 1 => block, _ => null }`
+  returning their base class, keeps the chosen reference. Before, the
+  conversion of the merged value to its own type was refused, so the method
+  did not lower.
 - `s[i]` on a string, with an `int` index, faults exactly on a null string or
   an index outside `[0, s.Length)`. Before, a guarded read such as
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the

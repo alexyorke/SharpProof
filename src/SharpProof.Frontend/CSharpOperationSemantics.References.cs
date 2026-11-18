@@ -303,6 +303,16 @@ internal static partial class CSharpOperationSemantics
             SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);
     }
 
+    // A target-typed `switch` or `?:` whose arms have no common type converts
+    // each arm to the target; the control-flow graph then puts a conversion of
+    // the merged value to that same type over it, which keeps the reference.
+    private static bool IsTargetTypedBranch(IConversionOperation conversion)
+    {
+        var kind = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(conversion);
+        return (kind.IsSwitchExpression || kind.IsConditionalExpression) &&
+            SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type);
+    }
+
     private static TotalScalarRule? ReferenceRule(IrFactory factory, IOperation operation, ImmutableArray<IrTerm> operands)
     {
         if (operation is IArrayElementReferenceOperation access)
@@ -328,7 +338,7 @@ internal static partial class CSharpOperationSemantics
             // yields a new object even for default(S), modeled as null.
             if (conversion.OperatorMethod == null && (operands[0] is IrNullTerm &&
                     !IsModeledStruct(conversion.Operand.Type) ||
-                    (conversion.Conversion.IsIdentity || IsTargetTypedCreation(conversion)) && operands[0].Type == target))
+                    (conversion.Conversion.IsIdentity || IsTargetTypedCreation(conversion) || IsTargetTypedBranch(conversion)) && operands[0].Type == target))
             {
                 return Exact(operands[0] is IrNullTerm ? factory.Null(target) : operands[0]);
             }
