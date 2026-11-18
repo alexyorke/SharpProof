@@ -137,4 +137,20 @@ public sealed class BlockerCensusTests
 
         Assert.That(BlockerCensus.Blockers(compilation, declaration, TestContext.CurrentContext.CancellationToken), Is.EqualTo(ExactRow));
     }
+
+    // Converting a lambda to a delegate runs none of its body, so factories
+    // that return or store one lower exactly, generic and capturing ones too.
+    [TestCase("public static System.Func<int,int> M() { return x => x + 1; }")]
+    [TestCase("public static System.Func<int,int> M(int k) { if (k < 0) { throw new System.ArgumentOutOfRangeException(nameof(k)); } return x => x + k; }")]
+    [TestCase("public static System.Func<T,int> M<T>(System.Func<T,int> g) { return t => g(t) + 1; }")]
+    [TestCase("public static System.Func<int,System.Func<int>> M() { return x => { int c = x * 2; return () => c; }; }")]
+    [TestCase("public static System.Func<int,int> M(int k) => x => x + k;")]
+    [TestCase("public static int M(System.Collections.Generic.List<int> l) { System.Predicate<int> p = x => x > 0; return l.Count; }")]
+    public void LambdaFactoriesLowerExactly(string member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var (compilation, declaration) = Compile("public static class C { " + member + " }");
+        var labels = BlockerCensus.Blockers(compilation, declaration, TestContext.CurrentContext.CancellationToken);
+        Assert.That(labels, Is.EqualTo(ExactRow), string.Join(" ; ", labels));
+    }
 }

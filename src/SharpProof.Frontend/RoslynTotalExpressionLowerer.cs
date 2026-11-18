@@ -285,6 +285,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return LowerExceptionCreation(operation, exceptionCreation, block, depth); }
         if (depth < 256 && operation is IDelegateCreationOperation capturedDelegate && RootClosure?.Matches(capturedDelegate) == true)
         { return RootClosureFrame is { } frame ? AllocateCapturedDelegate(operation, frame, block) : AllocateValue(operation, block); }
+        if (depth < 256 && operation is IDelegateCreationOperation lambdaCreation &&
+            AnonymousFunctionCreation.Captures(lambdaCreation, _context.Compilation, default) is { } captures)
+        { return LowerAnonymousFunctionCreation(operation, lambdaCreation, captures, block); }
         if (depth < 256 && operation is IDelegateCreationOperation delegateCreation &&
             CSharpOperationSemantics.IsExplicitDelegateCreation(delegateCreation))
         { return LowerExplicitDelegateCreation(operation, delegateCreation, block, depth); }
