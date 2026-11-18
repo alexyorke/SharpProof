@@ -221,7 +221,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var declared = pattern.Pattern is IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } ? local : null;
         if (matched == null || matched is ITypeParameterSymbol || matched.TypeKind == TypeKind.Dynamic ||
             !(matched.IsReferenceType || IsBoxableValue(matched)) ||
-            declared != null && (declared.RefKind != RefKind.None || RootClosure?.Captures.Contains(declared, SymbolEqualityComparer.Default) == true))
+            declared != null && (declared.RefKind != RefKind.None || RootClosure?.Captures.Contains(declared, SymbolEqualityComparer.Default) == true ||
+                // As for `as`, an object is not bridged to a string or array
+                // value: those are other value kinds, which no cast reaches.
+                matched is IArrayTypeSymbol || matched.SpecialType == SpecialType.System_String))
         { return null; }
         var value = LowerBodyValue(input, block, depth + 1);
         if (!value.Classification.IsExact)

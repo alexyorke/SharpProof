@@ -135,6 +135,12 @@ listing changes against an earlier one. Development history is in the Git log.
   store to one is a write to argument state that forgets memory and the other
   by-reference parameters. Before, such methods were `Unknown` for every claim
   except a postcondition on a single scalar `out` parameter.
+- A type pattern that declares a `string` or array variable from an object,
+  such as `o is string s`, made the whole run fail: the frontend wrote a cast
+  that the manifest reader then rejected. The pattern's variable is now
+  unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
+  encoder also leaves out any callable whose program the worker cannot read,
+  instead of writing a manifest no worker accepts.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
