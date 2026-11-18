@@ -175,6 +175,16 @@ listing changes against an earlier one. Development history is in the Git log.
   checked as the widened input plus that constant, with the wrap of the
   narrow sum accounted for. A contract that restates such a product no longer
   runs out of solver budget.
+- Iterator methods, which use `yield`, are analyzed. Calling one runs none of
+  its body: the call creates and returns a new enumerator, and the body,
+  argument checks included, runs only as the result is enumerated. So a claim
+  on an iterator, or on code that calls one, describes that call alone:
+  `[EnforcePure]` and `[DoesNotThrow]` can be proved, while `[ZeroAllocations]`
+  is refuted, because every call allocates. Before, such methods were
+  `Unknown`, and a call to one was an unknown call that could do anything.
+  Enumerating the result is still an unknown call, and an iterator
+  with `Requires`, `Ensures` or `Assume` stays `Unknown`, since its clauses
+  would describe the enumeration.
 - A refuted contract is reported as SP0051 at the clause or call and fails the
   build under every verifier policy. SP0047 reports incomplete analysis and
   SP0048 a declared assumption; each links to its documentation.

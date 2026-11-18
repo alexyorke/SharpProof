@@ -596,9 +596,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         RecordCallPreconditions(callee, arguments, block, site, callAncestry);
         // A recursive call checks its callee's preconditions, then runs the
         // callee as an unknown call: it may do anything, throw included. So
-        // does a call to an iterator, which has none, and a call whose
-        // callee body does not lower. An unknown call could write a local it
-        // received by reference to anything, so such a call is not expanded.
+        // does a call whose callee body does not lower. An unknown call
+        // could write a local it received by reference to anything, so such
+        // a call is not expanded.
         if (graph == null)
         {
             return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
