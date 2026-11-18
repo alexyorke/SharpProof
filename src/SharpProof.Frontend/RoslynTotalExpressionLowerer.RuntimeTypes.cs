@@ -135,8 +135,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
                     { return Approximate(operation, value.Continuation, FrontendAbstention.UnsupportedOperationKind); }
                     return Capture(operation, new(isType.IsNegated ? Not(test) : test, value.Continuation, FrontendSubsetClassification.Exact));
                 }
-            case IIsPatternOperation { Value: var input, Pattern: IDeclarationPatternOperation or ITypePatternOperation } pattern when
-                IsReferenceInput(input.Type):
+            case IIsPatternOperation { Value: var input } pattern when IsReferenceInput(input.Type) && TypePatternCore(pattern.Pattern).Core != null:
                 return TypePattern(operation, pattern, input, block, depth);
             // `x.Equals(o)` on a bool, char or integer: o is a box of exactly
             // that type holding the same value.
@@ -208,17 +207,35 @@ internal sealed partial class RoslynTotalExpressionLowerer
             source.Continuation, FrontendSubsetClassification.Exact));
     }
 
-    // `x is T` and `x is T t` over a reference input.
+    // A declaration, type or empty property pattern (`{ }`, which tests for
+    // a non-null value of the matched type), possibly under one `not`.
+    private static (IPatternOperation? Core, bool Negated) TypePatternCore(IPatternOperation pattern)
+    {
+        var negated = pattern is INegatedPatternOperation;
+        var core = pattern is INegatedPatternOperation not ? not.Pattern : pattern;
+        return core is IDeclarationPatternOperation or ITypePatternOperation or
+            IRecursivePatternOperation { DeconstructSymbol: null, DeconstructionSubpatterns.IsEmpty: true, PropertySubpatterns.IsEmpty: true }
+            ? (core, negated) : (null, false);
+    }
+
+    // `x is T`, `x is T t`, `x is { } t` and their negations over a reference input.
     private TotalBodyValue? TypePattern(IOperation operation, IIsPatternOperation pattern, IOperation input, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
-        var matched = pattern.Pattern switch
+        var (core, negated) = TypePatternCore(pattern.Pattern);
+        var matched = core switch
         {
             IDeclarationPatternOperation declaration => declaration.MatchedType,
             ITypePatternOperation type => type.MatchedType,
+            IRecursivePatternOperation recursive => recursive.MatchedType,
             _ => null
         };
-        var declared = pattern.Pattern is IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } ? local : null;
+        var declared = core switch
+        {
+            IDeclarationPatternOperation { DeclaredSymbol: ILocalSymbol local } => local,
+            IRecursivePatternOperation { DeclaredSymbol: ILocalSymbol local } => local,
+            _ => null
+        };
         if (matched == null || matched is ITypeParameterSymbol || matched.TypeKind == TypeKind.Dynamic ||
             !(matched.IsReferenceType || IsBoxableValue(matched)) ||
             declared != null && (declared.RefKind != RefKind.None || RootClosure?.Captures.Contains(declared, SymbolEqualityComparer.Default) == true ||
@@ -229,7 +246,13 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var value = LowerBodyValue(input, block, depth + 1);
         if (!value.Classification.IsExact)
         { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
-        if (RuntimeTypeIs(value.Value, matched) is not { } test)
+        // A value that already converts to the matched type by identity or an
+        // implicit reference conversion matches exactly when it is not null.
+        var test = input.Type is { } inputType && _context.Compilation is Microsoft.CodeAnalysis.CSharp.CSharpCompilation csharp &&
+            csharp.ClassifyConversion(inputType, matched) is { IsImplicit: true } conversion && (conversion.IsIdentity || conversion.IsReference)
+            ? _factory.Binary(IrBinaryOperator.NotEqual, value.Value, _factory.Null(value.Value.Type))
+            : RuntimeTypeIs(value.Value, matched);
+        if (test == null)
         { return Approximate(operation, value.Continuation, FrontendAbstention.UnsupportedOperationKind); }
         var current = value.Continuation;
         if (declared != null)
@@ -244,6 +267,6 @@ internal sealed partial class RoslynTotalExpressionLowerer
             var mutation = _builder!.Assign(current, _context.Site(operation), _context.Variable(declared), bound);
             _builder.Write(current, mutation.Operation, IrWriteRegion.Local);
         }
-        return Capture(operation, new(test, current, FrontendSubsetClassification.Exact));
+        return Capture(operation, new(negated ? Not(test) : test, current, FrontendSubsetClassification.Exact));
     }
 }

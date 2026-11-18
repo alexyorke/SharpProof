@@ -7779,8 +7779,8 @@
       "declarationSha256": "0621ca833e4fbc9270cc9ad83734665523ae7b1f580a80f583122b31153aaa94",
       "methodName": "ElapsedDuration",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0336",
@@ -7803,8 +7803,8 @@
       "declarationSha256": "0d4575e38c30e3caddc20fc50cc56906cae61c9cf7886f0240f40f17b5d074c3",
       "methodName": "ToClock",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0338",
@@ -8559,8 +8559,8 @@
       "declarationSha256": "ca502c9a1d1fd1d01aa7de3cc45bc881800cbb7d30ec50735e034313b72391d6",
       "methodName": "ForZone",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0401",

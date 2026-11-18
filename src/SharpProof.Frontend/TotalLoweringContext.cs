@@ -203,7 +203,8 @@ internal sealed partial class TotalLoweringContext
                 WritesBackReferences && binding.Parameter.RefKind is RefKind.Ref or RefKind.Out &&
                     (CSharpOperationSemantics.IsScalar(binding.Parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(binding.Parameter.Type)) ||
                 AdmitsOutParameters && binding.Parameter.RefKind == RefKind.Out && CSharpOperationSemantics.IsScalar(binding.Parameter.Type) &&
-                    Parameters.Count(other => other.Parameter.RefKind != RefKind.None) == 1) &&
+                    Parameters.Count(other => other.Parameter.RefKind != RefKind.None) == 1 ||
+                IsWritableRootReference(binding.Parameter)) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
 
@@ -215,6 +216,28 @@ internal sealed partial class TotalLoweringContext
     // memory. It must be the only by-reference parameter: a caller may pass
     // one variable to two of them, and writes to one would change the other.
     internal bool AdmitsOutParameters { get; set; }
+
+    // The root callable of a claim admits writable ref and out parameters of
+    // a scalar, reference or type-parameter type. Each is the caller's storage, which may be
+    // a field, an element, or the same variable as another such parameter.
+    // A store to one is a write the caller can see, so it counts as an
+    // argument write and forgets memory; the final program pass then forgets
+    // the other by-reference parameters, and forgets every one of them after
+    // any other write. Inlined frames do not inherit this: their by-reference
+    // parameters are copied back (WritesBackReferences) or refused.
+    internal bool AdmitsReferenceParameters { get; set; }
+
+    internal bool IsWritableRootReference(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        return AdmitsReferenceParameters && !WritesBackReferences && parameter.RefKind is RefKind.Ref or RefKind.Out &&
+            SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, Target) &&
+            (CSharpOperationSemantics.IsScalar(parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(parameter.Type) ||
+                // A type-parameter value is opaque. A call on it through the
+                // reference is an unknown call, which already forgets memory
+                // and every by-reference parameter.
+                parameter.Type is ITypeParameterSymbol);
+    }
 
     // An inlined frame whose caller passes each ref or out argument as one of
     // its own variables, used nowhere else in the call, and copies the
@@ -398,6 +421,14 @@ internal sealed partial class TotalLoweringContext
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return Factory.CreateOperation("InitializedStatic@" + operation.Syntax.SpanStart + "#" + index, Span(operation.Syntax));
+    }
+
+    // A read of a static that holds an object no code can change; unlike
+    // StaticReadSite, it is not an ambient read.
+    internal OperationId ImmutableStaticReadSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation("ImmutableStaticReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
     internal OperationId StaticReadSite(IOperation operation)
