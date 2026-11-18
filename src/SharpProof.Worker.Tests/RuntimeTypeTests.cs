@@ -65,6 +65,17 @@ public sealed class RuntimeTypeTests
         Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
+    // A pattern that declares a string or array variable from an object
+    // stays unmodeled, as `as` does, and leaves the rest of the run intact.
+    [TestCase("[DoesNotThrow] public static int M(object o) { return o is string s ? s.Length : 0; }")]
+    [TestCase("[DoesNotThrow] public static int M(object o) { return o is object[] a ? a.Length : 0; }")]
+    [TestCase("[DoesNotThrow] public static int M(object o) { if (!(o is int[] a)) { return 0; } return a.Length; }")]
+    public async Task StringAndArrayPatternVariablesStayUnknown(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
     // Boxing allocates on the CLR too.
     [Test]
     public async Task BoxingIsAnAllocation()

@@ -23,6 +23,8 @@ internal static class CompilerTotalCallableArtifactCodec
         { return null; }
         var artifact = EncodeCore(preparation.Program.Factory, preparation.Program, preparation.Parameters, preparation.Result,
             preparation.Clauses, preparation.IsBodyAbstraction, preparation.CallPreconditions, cancellationToken);
+        if (!artifact.Graph!.Terms.All(term => SupportedTermEvidence(artifact.Graph, term)))
+        { return null; }
         return artifact with
         {
             EffectsCompleteAtEntry = preparation.EffectsCompleteAtEntry,
@@ -48,7 +50,53 @@ internal static class CompilerTotalCallableArtifactCodec
         if (preparation == null)
         { return null; }
         var artifact = EncodeCore(preparation.Factory, null, preparation.Parameters, null, preparation.Clauses, false, default, cancellationToken);
+        if (!artifact.Graph!.Terms.All(term => SupportedTermEvidence(artifact.Graph, term)))
+        { return null; }
         return artifact with { HasReceiver = preparation.HasReceiver };
+    }
+
+    // Opaque values are owned instance field reads or immutable framework
+    // comparer caches. Neither case admits an arbitrary executable call.
+    private static bool IsDefaultComparerValue(PortableIrGraph graph, PortableIrTerm term)
+    {
+        return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: true } member &&
+            IrOpaqueCallSite.IsDefaultComparerValueName(member.Name) && member.DeclaringType == term.Type &&
+            member.ReturnType == term.Type && member.ParameterTypes.Length == 0 &&
+            term.B == -1 && term.Items.Length == 0 && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
+            PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure && graph.Types[term.Type].Kind == IrTypeKind.Reference;
+    }
+
+    private static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
+    {
+        return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
+            name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
+            graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
+            (term.Items is not { Length: > 0 } || term.Items is { Length: 1 } &&
+                term.Items[0] >= 0 && term.Items[0] < graph.Terms.Length &&
+                graph.Types[graph.Terms[term.Items[0]].Type].Kind == IrTypeKind.Integer) && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
+            PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure &&
+            graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.Reference or IrTypeKind.String or
+                IrTypeKind.Sequence;
+    }
+
+    // The terms the worker encodes. The encoder applies the same test, so a
+    // callable whose graph has another term gets no Total program (its claims
+    // stay Unknown) instead of a manifest no worker can read.
+    private static bool SupportedTermEvidence(PortableIrGraph graph, PortableIrTerm term)
+    {
+        return term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
+                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque or IrTermKind.TypeTest && SupportedType(graph, term.Type) &&
+                (term.Kind != IrTermKind.Opaque || IsFieldRead(graph, term) || IsDefaultComparerValue(graph, term)) &&
+                (term.Kind != IrTermKind.SequenceAccess || graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
+                (term.Kind != IrTermKind.EmptyArray || graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
+                (term.Kind != IrTermKind.Cast || graph.Types[graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
+                    graph.Types[term.Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
+                    graph.Types[graph.Terms[term.A].Type].Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||
+                    graph.Types[term.Type].Kind == IrTypeKind.Reference &&
+                    graph.Types[graph.Terms[term.A].Type].Kind == IrTypeKind.Reference) &&
+                (term.Kind != IrTermKind.Binary || graph.Types[graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
+                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat or
+                        IrBinaryOperator.StringEquals);
     }
 
     // The Requires another project exports: canonical parameters and Requires
@@ -262,43 +310,8 @@ internal static class CompilerTotalCallableArtifactCodec
         foreach (var term in artifact.Graph.Terms)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Require(term.Kind is IrTermKind.Boolean or IrTermKind.Integer or IrTermKind.String or IrTermKind.Variable or IrTermKind.Null or IrTermKind.EmptyArray or IrTermKind.Length or IrTermKind.SequenceAccess or IrTermKind.Unary or
-                IrTermKind.Binary or IrTermKind.Conditional or IrTermKind.Cast or IrTermKind.Opaque or IrTermKind.TypeTest && SupportedType(artifact.Graph, term.Type) &&
-                (term.Kind != IrTermKind.Opaque || IsFieldRead(artifact.Graph, term) || IsDefaultComparerValue(artifact.Graph, term)) &&
-                (term.Kind != IrTermKind.SequenceAccess || artifact.Graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer) &&
-                (term.Kind != IrTermKind.EmptyArray || artifact.Graph.Types[term.Type].Kind == IrTypeKind.Sequence) &&
-                (term.Kind != IrTermKind.Cast || artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Integer ||
-                    artifact.Graph.Types[term.Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
-                    artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence ||
-                    artifact.Graph.Types[term.Type].Kind == IrTypeKind.Reference &&
-                    artifact.Graph.Types[artifact.Graph.Terms[term.A].Type].Kind == IrTypeKind.Reference) &&
-                (term.Kind != IrTermKind.Binary || artifact.Graph.Types[artifact.Graph.Terms[term.B].Type].Kind != IrTypeKind.String ||
-                    (IrBinaryOperator)term.A is IrBinaryOperator.Equal or IrBinaryOperator.NotEqual or IrBinaryOperator.StringConcat or
-                        IrBinaryOperator.StringEquals),
+            Require(SupportedTermEvidence(artifact.Graph, term),
                 "The Total graph contains unsupported term evidence.");
-        }
-        // Opaque values are owned instance field reads or immutable framework
-        // comparer caches. Neither case admits an arbitrary executable call.
-        static bool IsDefaultComparerValue(PortableIrGraph graph, PortableIrTerm term)
-        {
-            return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: true } member &&
-                IrOpaqueCallSite.IsDefaultComparerValueName(member.Name) && member.DeclaringType == term.Type &&
-                member.ReturnType == term.Type && member.ParameterTypes.Length == 0 &&
-                term.B == -1 && term.Items.Length == 0 && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
-                PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure && graph.Types[term.Type].Kind == IrTypeKind.Reference;
-        }
-
-        static bool IsFieldRead(PortableIrGraph graph, PortableIrTerm term)
-        {
-            return term.A >= 0 && term.A < graph.Members.Length && graph.Members[term.A] is { IsStatic: false, Name: { } name } &&
-                name.StartsWith(IrFieldSites.Prefix, StringComparison.Ordinal) && term.B >= 0 && term.B < graph.Terms.Length &&
-                graph.Types[graph.Terms[term.B].Type] is { Kind: IrTypeKind.Reference, Name: "object" } &&
-                (term.Items is not { Length: > 0 } || term.Items is { Length: 1 } &&
-                    term.Items[0] >= 0 && term.Items[0] < graph.Terms.Length &&
-                    graph.Types[graph.Terms[term.Items[0]].Type].Kind == IrTypeKind.Integer) && term.C >= 0 && term.C < PortableIrWireCatalog.OpaquePurities.Length &&
-                PortableIrWireCatalog.OpaquePurities[term.C] == IrOpaquePurity.Pure &&
-                graph.Types[term.Type].Kind is IrTypeKind.Boolean or IrTypeKind.Integer or IrTypeKind.Reference or IrTypeKind.String or
-                    IrTypeKind.Sequence;
         }
         var identities = ImmutableHashSet.CreateBuilder<IrVarId>();
         IrVarId Variable(int index, string name)
