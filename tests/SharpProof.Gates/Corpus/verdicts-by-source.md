@@ -6,8 +6,8 @@
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Proven | 50 | 17 | 3 | 21 | 9 |
 | Refuted | 32 | 9 | 17 | 6 | 0 |
-| SP0002 | 224 | 123 | 27 | 36 | 38 |
-| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 158 | 32 | 50 | 36 | 40 |
+| SP0002 | 225 | 123 | 27 | 36 | 39 |
+| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 157 | 32 | 50 | 36 | 39 |
 | SP0047 `Advisory:Lowering:UnsupportedControlFlow` | 18 | 8 | 0 | 1 | 9 |
 | SP0047 `Advisory:ContractBinding:UnsupportedTarget` | 9 | 6 | 1 | 0 | 2 |
 | SP0047 `Advisory:Lowering:UnsupportedType` | 6 | 5 | 1 | 0 | 0 |
