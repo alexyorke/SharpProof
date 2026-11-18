@@ -122,6 +122,15 @@ Once creating a delegate from a lambda lowered without running its body (SEMANTI
 
 All eight were reviewed against the bodies. The supported floors rose by three, the total-Unknown ceiling fell by three, the SP0047 ceiling fell by eight and the SP0002 ceiling rose by five.
 
+### Reviewed classification for generic delegate parameters
+
+Once a delegate argument could be passed to a generic source callee whose parameter is declared with the callee's own type parameters (`Func<T, bool>` receiving `Func<int, bool>`), many MoreLINQ overloads that forward to such a callee, or pass it a lambda, began to lower. Together with lambda creation, 24 selected methods changed.
+
+- **Refuted (15):** MoreLINQ Assert (OSS0204), EquiZip (OSS0220), ExceptBy (OSS0222), Batch (OSS0227), FullJoin (OSS0239), LeftJoin (OSS0250), OrderBy (OSS0257), PartialSort (OSS0262), RightJoin (OSS0275), Scan (OSS0277), ScanBy (OSS0278), ScanRight (OSS0279), ToDelimitedString (OSS0295) and Trace (OSS0298), and NodaTime `CompositePatternBuilder.Add` (OSS0361). Each throws `ArgumentNullException` for a `null` argument, directly or in the overload it forwards to, and builds that exception from culture resources. MoreLINQ `Choose` (OSS0210) and `Pipe` (OSS0266) were already Refuted the same way.
+- **Unknown, now SP0002 (9):** OSS0224, OSS0232, OSS0233, OSS0242, OSS0245, OSS0254, OSS0271, OSS0280 and OSS0296. Each now lowers and stops on delegate invocations or other unknown calls.
+
+All 24 were reviewed against the bodies and marked accordingly. The supported floors rose by 15, the total-Unknown ceiling fell by 15, the SP0047 ceiling fell by 22 and the SP0002 ceiling rose by 7.
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.
