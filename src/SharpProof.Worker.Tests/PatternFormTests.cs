@@ -22,6 +22,8 @@ public sealed class PatternFormTests
     [TestCase("[DoesNotThrow] public static int M(Block b) { if (b is not Paragraph p) { return 0; } return 1; }")]
     [TestCase("[DoesNotThrow] public static int M(Block b) { if (b == null || b.Parent is not { } parent) { return 0; } return parent.Parent == null ? 1 : 2; }")]
     [TestCase("public static int M(Block b) { Contract.Ensures(Contract.Result<int>() == (b == null ? 0 : 1)); return b is { } x ? 1 : 0; }")]
+    // An inlined generic helper specialized to a scalar: the value is never null.
+    [TestCase("private static bool IsNull<T>(T x) { return x is null; } public static bool M(int i) { Contract.Ensures(!Contract.Result<bool>()); return IsNull(i); }")]
     public async Task PatternsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -38,6 +40,14 @@ public sealed class PatternFormTests
         System.ArgumentNullException.ThrowIfNull(member);
         var result = await ResultAsync(member);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.Reason.ToString());
+    }
+
+    // A pattern constant that is not well-formed UTF-16 is left unmodeled.
+    [TestCase("public static bool M(string s) { Contract.Ensures(!Contract.Result<bool>() || s != null); return s is \"\\uD800\"; }")]
+    public async Task MalformedStringPatternsStayUnknown(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     private static async Task<WorkerClaimResult> ResultAsync(string member)

@@ -511,7 +511,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType, "opaque-call:" + boundary, _factory.BooleanType, true);
                 _builder!.Call(tested.Continuation, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary), null, member, null);
             }
-            var isNull = _factory.Binary(IrBinaryOperator.Equal, tested.Value, _factory.Null(tested.Value.Type));
+            // A frame that specializes T to a scalar holds a value, never null.
+            var isNull = _factory.GetTypeInfo(tested.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence
+                ? _factory.Binary(IrBinaryOperator.Equal, tested.Value, _factory.Null(tested.Value.Type))
+                : _factory.Boolean(false);
             return Capture(operation, new(nullWhenTrue ? isNull : Not(isNull), tested.Continuation, FrontendSubsetClassification.Exact));
         }
         // A switch case, switch arm or `is` test over a built-in scalar,
@@ -2097,7 +2100,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // `s is "text"` compares content and is false for null.
         if (input.SpecialType == SpecialType.System_String &&
             pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: string text } } &&
-            _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.String)
+            Utf16WellFormedness.IsWellFormed(text) && _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.String)
         { return _factory.Binary(IrBinaryOperator.StringEquals, value, CSharpOperationSemantics.Literal(_factory, input, text)); }
 
         if (pattern is IConstantPatternOperation constant &&
