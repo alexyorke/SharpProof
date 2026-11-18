@@ -154,6 +154,20 @@ internal static partial class CSharpOperationSemantics
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
     }
 
+    // The backing field of a static get-only auto-property, whose getter
+    // only reads it.
+    internal static IFieldSymbol? StaticGetOnlyAutoPropertyField(IPropertySymbol property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        if (!property.IsStatic || property.IsIndexer || property.IsAbstract || property.IsExtern ||
+            property.SetMethod != null || property.GetMethod is not { } getter || HasSynchronizedEntry(getter) ||
+            getter.DeclaringSyntaxReferences.Length != 1 ||
+            getter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
+        { return null; }
+        return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+    }
+
     // An instance field read runs no code; its only fault is a null receiver.
     // A static field read runs no code when its type has no initializer.
     // A scalar or reference instance field of a class is modeled; any other

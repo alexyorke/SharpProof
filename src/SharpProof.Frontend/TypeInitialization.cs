@@ -39,6 +39,7 @@ internal static class TypeInitialization
     private sealed class Results
     {
         internal ConcurrentDictionary<INamedTypeSymbol, InitializationEffect> Types { get; } = new(SymbolEqualityComparer.Default);
+        internal ConcurrentDictionary<IFieldSymbol, InitializedStatic?> Statics { get; } = new(SymbolEqualityComparer.Default);
     }
 
     // Evaluating an initializer can be costly, and every callable of an
@@ -63,6 +64,23 @@ internal static class TypeInitialization
         // A cancelled classification throws before it reaches here, so only
         // complete results are kept.
         return results.GetOrAdd(type, effect);
+    }
+
+    // The value a static holds once its type's initialization, run by
+    // ClosedInitializerEvaluator, has finished; null when it does not finish
+    // or the value is not one InitializedValue describes.
+    internal static InitializedStatic? InitializedStatic(CSharpCompilation compilation, IFieldSymbol field,
+        CancellationToken cancellationToken)
+    {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        field = RepositoryParameterGuard.NotNull(field, nameof(field)).OriginalDefinition;
+        if (!TypeInitializerClassifier.IsInitializedOnly(field))
+        { return null; }
+        var results = Cache.GetValue(compilation, static _ => new()).Statics;
+        if (results.TryGetValue(field, out var known))
+        { return known; }
+        var value = new ClosedInitializerEvaluator(compilation, cancellationToken).ReadInitializedStatic(field);
+        return results.GetOrAdd(field, value);
     }
 
     private static InitializationEffect Max(InitializationEffect left, InitializationEffect right)
@@ -165,8 +183,9 @@ internal static class TypeInitialization
         }
 
         // A static only its type initializer writes, shared by all threads.
-        private static bool IsInitializedOnly(IFieldSymbol field)
+        internal static bool IsInitializedOnly(IFieldSymbol field)
         {
+            field = RepositoryParameterGuard.NotNull(field, nameof(field));
             return field is { IsStatic: true, IsConst: false, IsReadOnly: true, IsVolatile: false } &&
                 !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
                 {
