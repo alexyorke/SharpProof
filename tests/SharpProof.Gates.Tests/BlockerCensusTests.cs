@@ -63,6 +63,7 @@ public sealed class BlockerCensusTests
     [TestCase("public static System.Collections.Generic.IEnumerable<int> M() { yield return 1; }", "UnsupportedStatement: iterator")]
     [TestCase("public static async System.Threading.Tasks.Task M() { await System.Threading.Tasks.Task.Yield(); }", "ContractBinding: UnsupportedTarget: async")]
     [TestCase("public static void M(ref System.DateTime d) { }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
+    [TestCase("public static void M(out int value, ref System.DateTime d) { value = 0; }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
     [TestCase("public static int M(int x) { var text = $\"{x}\"; return text.Length; }", "UnsupportedOperationKind: InterpolatedString of System_String")]
     public void LabelsNameTheBlockingConstruct(string member, string label)
     {

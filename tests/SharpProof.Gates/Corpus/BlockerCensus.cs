@@ -23,6 +23,7 @@ internal static class BlockerCensus
 {
     private const string Exact = "(lowers exactly)";
     private const string WorkBudget = "(lowering work budget exhausted)";
+    private const string ByReference = "(by-reference signature; effect sites not tabulated)";
 
     private const string NotExact = "(does not lower exactly)";
     private const string NoSite = "(no purity-relevant effect site)";
@@ -54,7 +55,12 @@ internal static class BlockerCensus
                     var blockers = Blockers(compilation, declaration, cancellationToken);
                     if (effects)
                     {
-                        blockers = blockers is [Exact] ? EffectSites(compilation, declaration, cancellationToken) : [NotExact];
+                        // The advisory effect analysis does not admit by-reference
+                        // parameters, so it would report a binding gap instead.
+                        blockers = blockers is not [Exact] ? [NotExact]
+                            : declaration.ParameterList.Parameters.Any(static parameter => parameter.Modifiers.Any(static modifier =>
+                                modifier.IsKind(SyntaxKind.RefKeyword) || modifier.IsKind(SyntaxKind.OutKeyword) || modifier.IsKind(SyntaxKind.InKeyword)))
+                                ? [ByReference] : EffectSites(compilation, declaration, cancellationToken);
                     }
                     foreach (var blocker in blockers)
                     {
@@ -221,9 +227,12 @@ internal static class BlockerCensus
         {
             return "ref return";
         }
+        // Scalar, reference and type-parameter by-reference parameters are
+        // admitted in some combinations; name the first that never is.
         foreach (var parameter in method.Parameters)
         {
-            if (parameter.RefKind != RefKind.None)
+            if (parameter.RefKind != RefKind.None && !CSharpOperationSemantics.IsScalar(parameter.Type) &&
+                !CSharpOperationSemantics.IsReferenceDomain(parameter.Type) && parameter.Type is not ITypeParameterSymbol)
             {
                 return parameter.RefKind + " parameter of " + Kind(parameter.Type);
             }
@@ -232,9 +241,35 @@ internal static class BlockerCensus
                 return "parameter of " + Kind(parameter.Type);
             }
         }
+        if (method.Parameters.Any(static parameter => parameter.RefKind != RefKind.None))
+        {
+            return "by-reference parameters in a combination not admitted";
+        }
         return !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType)
             ? "return of " + Kind(method.ReturnType)
             : "callable shape";
+    }
+
+    // A callee type whose initializer, or an enclosing type's, has an
+    // observable effect refuses the call whatever the callee's body is.
+    private static string CalleeCause(
+        CSharpCompilation compilation, IMethodSymbol callee, Dictionary<SyntaxNode, string> memo,
+        HashSet<SyntaxNode> active, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(callee);
+        for (var type = callee.ContainingType; type != null; type = type.ContainingType)
+        {
+            if (TypeInitialization.Classify(compilation, type, cancellationToken) == InitializationEffect.Effectful)
+            {
+                return "(callee type initializer)";
+            }
+        }
+        return callee.DeclaringSyntaxReferences.Length == 1 &&
+            callee.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax body &&
+            compilation.ContainsSyntaxTree(body.SyntaxTree)
+            ? RootCause(compilation, body, memo, active, cancellationToken)
+            : "(callee has no source body)";
     }
 
     internal static string RootCause(CSharpCompilation compilation, MethodDeclarationSyntax declaration, CancellationToken cancellationToken)
@@ -266,18 +301,15 @@ internal static class BlockerCensus
         {
             cause = "(callee lowers exactly; the call is refused)";
         }
-        // A callee whose type has an initializer the frontend does not admit
-        // is refused for that, whatever its own body is.
-        else if (labels.Length == 1 && labels[0].Contains("[type-initializer]", StringComparison.Ordinal))
+        else if (labels.Length == 1 && sites.OfType<IInvocationOperation>()
+                     .Select(static call => call.TargetMethod.OriginalDefinition)
+                     .Distinct(SymbolEqualityComparer.Default).Cast<IMethodSymbol>().ToImmutableArray() is { Length: > 0 } callees)
         {
-            cause = "(callee type initializer)";
-        }
-        else if (labels.Length == 1 && sites.OfType<IInvocationOperation>().FirstOrDefault() is { } call &&
-                 call.TargetMethod.OriginalDefinition.DeclaringSyntaxReferences.Length == 1 &&
-                 call.TargetMethod.OriginalDefinition.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax callee &&
-                 compilation.ContainsSyntaxTree(callee.SyntaxTree))
-        {
-            cause = RootCause(compilation, callee, memo, active, cancellationToken);
+            // Every distinct callee behind the one label: the cause is shared,
+            // or the method stands for several.
+            var causes = callees.Select(callee => CalleeCause(compilation, callee, memo, active, cancellationToken))
+                .Distinct(StringComparer.Ordinal).ToImmutableArray();
+            cause = causes.Length == 1 ? causes[0] : "(several root causes)";
         }
         else
         {
