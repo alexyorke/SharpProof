@@ -14,6 +14,8 @@ internal sealed class ExceptionInitializationReplayTests
     [TestCase("InvalidOperation")]
     [TestCase("InvalidOperationNull")]
     [TestCase("DivideByZero")]
+    [TestCase("NotSupported")]
+    [TestCase("NotImplemented")]
     [TestCase("IOException")]
     [TestCase("ObjectDisposedName")]
     [TestCase("Aggregate")]

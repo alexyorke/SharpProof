@@ -172,6 +172,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             TypeInitializationFree = type => _calls?.HasNoTypeInitialization(type) == true,
             SourceGetter = InlineSourceGetter,
             InitializedStatic = InitializedStaticValue,
+            ImmutableStatic = HoldsImmutableStatic,
             SourceConstruction = InlineSourceConstruction,
             SourceSetter = InlineSourceSetter,
             FreshReceiver = freshReceiver,

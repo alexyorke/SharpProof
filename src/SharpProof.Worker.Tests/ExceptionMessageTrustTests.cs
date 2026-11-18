@@ -81,6 +81,66 @@ internal sealed class ExceptionMessageTrustTests
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
 
+    // A stub body (`throw new NotSupportedException();`) and a guarded throw of
+    // a parameterless constructor take the same resource-lookup path as
+    // InvalidOperationException(): Refuted by the lock without trust, Proven
+    // pure with it.
+    [TestCase("System.InvalidOperationException", false)]
+    [TestCase("System.NotSupportedException", false)]
+    [TestCase("System.NotImplementedException", false)]
+    [TestCase("System.InvalidOperationException", true)]
+    [TestCase("System.NotSupportedException", true)]
+    [TestCase("System.NotImplementedException", true)]
+    public async Task WithoutTrustAParameterlessConstructorRefutesPurity(string type, bool guarded)
+    {
+        var claim = await Verify("[EnforcePure]", ParameterlessThrow(type, guarded), trust: false);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
+            Assert.That(claim.Assumptions, Is.Empty);
+        }
+    }
+
+    [TestCase("System.InvalidOperationException", false)]
+    [TestCase("System.NotSupportedException", false)]
+    [TestCase("System.NotImplementedException", false)]
+    [TestCase("System.InvalidOperationException", true)]
+    [TestCase("System.NotSupportedException", true)]
+    [TestCase("System.NotImplementedException", true)]
+    public async Task TrustProvesAParameterlessConstructorPure(string type, bool guarded)
+    {
+        var claim = await Verify("[EnforcePure]", ParameterlessThrow(type, guarded), trust: true);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+            Assert.That(claim.Assumptions.Select(static assumption => (assumption.Kind, assumption.Used,
+                    assumption.Id.StartsWith(ExceptionMessageTrust.AssumptionPrefix, StringComparison.Ordinal))),
+                Is.EqualTo(new[] { (WorkerAssumptionKind.TrustedBoundary, true, true) }));
+        }
+    }
+
+    [TestCase("System.NotSupportedException")]
+    [TestCase("System.NotImplementedException")]
+    public async Task TrustDoesNotProveThatAStubDoesNotThrow(string type)
+    {
+        var claim = await Verify("[DoesNotThrow]", ParameterlessThrow(type, guarded: false), trust: true);
+        Assert.That(claim.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
+    }
+
+    [TestCase("System.NotSupportedException")]
+    [TestCase("System.NotImplementedException")]
+    public async Task TrustDoesNotHideARealEffectBeforeAStubThrow(string type)
+    {
+        var claim = await Verify("[EnforcePure]", "State = x; throw new " + type + "();", trust: true);
+        Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), claim.Reason.ToString());
+    }
+
+    private static string ParameterlessThrow(string type, bool guarded)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return guarded ? "if (x < 0) { throw new " + type + "(); } return x;" : "throw new " + type + "();";
+    }
+
     private static async Task<WorkerClaimResult> Verify(string attribute, string body, bool trust)
     {
         var source = "using SharpProof.Attributes; public static class C { public static int State; " +
