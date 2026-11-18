@@ -65,6 +65,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // A nondispatched callee in another assembly: the contract-only frame of
     // its checked clauses, and the recorder of those clauses at one call.
     internal Func<IMethodSymbol, TotalLoweringContext?>? MetadataCallee { get; init; }
+    // The caller variable each ref or out argument of a call writes to (none
+    // for a discard), when every one is a local or parameter of the caller
+    // passed once outside every try region; null otherwise.
+    internal Func<ImmutableArray<IArgumentOperation>, ImmutableArray<(int Ordinal, IrVarId? Local)>?>? OutArgumentStorage { get; init; }
     internal Action<IOperation, TotalLoweringContext, ImmutableArray<IrTerm>, IrBlockId>? MetadataPreconditions { get; init; }
 
     // `this` (or `base`) of a reference-type instance member is never null.
@@ -873,11 +877,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
             instance != null && !CSharpOperationSemantics.IsValueDomain(instance.Type) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            method.Parameters.Any(parameter => parameter.RefKind is not (RefKind.None or RefKind.Out) ||
+                parameter.RefKind == RefKind.Out && !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             arguments.Any(argument => argument.Parameter == null ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
             assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
         { return null; }
+        // An out argument is a caller local or parameter the callee may set
+        // before it returns or throws, so none may be visible to a handler.
+        ImmutableArray<(int Ordinal, IrVarId? Local)> outs = [];
+        if (method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out))
+        {
+            if (OutArgumentStorage?.Invoke(arguments) is not { } storage)
+            { return null; }
+            outs = storage;
+        }
         IrTerm? receiver = null;
         if (instance != null && !IsImplicitThis(instance))
         {
@@ -887,11 +901,18 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
-        var preconditions = dispatched ? null : MetadataCallee?.Invoke(method);
+        // Requires over a callee with out parameters are not checked here.
+        var preconditions = dispatched || !outs.IsEmpty ? null : MetadataCallee?.Invoke(method);
         var values = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned != null ? 1 : 0));
         values.Count = arguments.Length + (assigned != null ? 1 : 0);
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
+            // The callee never reads an out argument: it gets a placeholder.
+            if (argument.Parameter!.RefKind == RefKind.Out)
+            {
+                values[arguments.IndexOf(argument)] = CSharpOperationSemantics.DefaultValue(_factory, _context.Type(argument.Parameter.Type));
+                continue;
+            }
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
@@ -914,8 +935,19 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             ByParameter(method, arguments, values.ToImmutable(), assigned != null) is { } byParameter)
         { MetadataPreconditions!(operation, preconditions, byParameter, block); }
         // A dispatched call may run an override the specification does not describe.
-        return EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
+        var call = EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
+        // On normal return each out variable holds whatever the callee stored.
+        foreach (var (_, local) in outs)
+        {
+            if (local is not { } target)
+            { continue; }
+            var stored = _context.Temporary(_factory.GetVariableInfo(target).Type);
+            _builder!.Havoc(call.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, stored);
+            var mutation = _builder.Assign(call.Continuation, _context.Site(operation), target, _factory.Variable(stored));
+            _builder.Write(call.Continuation, mutation.Operation, IrWriteRegion.Local);
+        }
+        return call;
     }
 
     // A user-defined binary operator declared in another assembly is a call
