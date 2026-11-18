@@ -130,7 +130,7 @@ listing changes against an earlier one. Development history is in the Git log.
   struct` of those, such as NodaTime's `LocalTime.Midnight`. Code the
   initializer itself runs still sees an unknown value.
 - Effect claims cover methods with their own `ref` or `out` parameters of a
-  scalar or reference type, such as `bool TryParse(string s, out int value)`.
+  scalar, reference or type-parameter type, such as `bool TryParse(string s, out int value)`.
   The argument may be a field, an element or a variable passed twice, so each
   store to one is a write to argument state that forgets memory and the other
   by-reference parameters. Before, such methods were `Unknown` for every claim

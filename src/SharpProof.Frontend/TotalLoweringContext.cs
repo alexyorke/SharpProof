@@ -218,7 +218,7 @@ internal sealed partial class TotalLoweringContext
     internal bool AdmitsOutParameters { get; set; }
 
     // The root callable of a claim admits writable ref and out parameters of
-    // a scalar or reference type. Each is the caller's storage, which may be
+    // a scalar, reference or type-parameter type. Each is the caller's storage, which may be
     // a field, an element, or the same variable as another such parameter.
     // A store to one is a write the caller can see, so it counts as an
     // argument write and forgets memory; the final program pass then forgets
@@ -232,7 +232,11 @@ internal sealed partial class TotalLoweringContext
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
         return AdmitsReferenceParameters && !WritesBackReferences && parameter.RefKind is RefKind.Ref or RefKind.Out &&
             SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, Target) &&
-            (CSharpOperationSemantics.IsScalar(parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(parameter.Type));
+            (CSharpOperationSemantics.IsScalar(parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(parameter.Type) ||
+                // A type-parameter value is opaque. A call on it through the
+                // reference is an unknown call, which already forgets memory
+                // and every by-reference parameter.
+                parameter.Type is ITypeParameterSymbol);
     }
 
     // An inlined frame whose caller passes each ref or out argument as one of
