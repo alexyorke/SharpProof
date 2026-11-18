@@ -246,6 +246,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return LowerLocalArrayInitializer(operation, localArrayCreation, block, depth); }
         if (depth < 256 && CSharpOperationSemantics.IsStringConcatenation(operation))
         { return LowerStringConcatenation(operation, block, depth); }
+        if (depth < 256 && operation is IInterpolatedStringOperation interpolated)
+        { return LowerInterpolatedString(interpolated, block, depth); }
         if (depth < 256 && operation is IObjectCreationOperation creation &&
             CSharpOperationSemantics.IsCoreObjectCreation(creation))
         { return AllocateValue(operation, block); }
@@ -673,6 +675,38 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         var leaves = ImmutableArray.CreateBuilder<IOperation>();
         Collect(operation, depth);
+        // A CFG-captured prefix of an enclosing `+` chain defers its allocation.
+        var parent = operation.Syntax.Parent;
+        while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax)
+        { parent = parent.Parent; }
+        var deferred = operation.Parent is IFlowCaptureOperation &&
+            parent is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryParent &&
+            binaryParent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression);
+        return ConcatenateLeaves(operation, leaves.ToImmutable(), block, depth, deferred);
+
+        void Collect(IOperation current, int nesting)
+        {
+            Spend?.Invoke();
+            if (nesting < 256 && CSharpOperationSemantics.IsStringConcatenation(current) && !current.ConstantValue.HasValue)
+            {
+                var binary = (IBinaryOperation)current;
+                Collect(binary.LeftOperand, nesting + 1);
+                Collect(binary.RightOperand, nesting + 1);
+            }
+            else if (nesting < 256 && CSharpOperationSemantics.IdentityCastConcatenation(current) is { } castConcatenation)
+            { Collect(castConcatenation, nesting + 1); }
+            else
+            { leaves.Add(current); }
+        }
+    }
+
+    // String.Concat over the leaves in order, as the compiler emits it for a
+    // `+` chain or for an interpolated string whose holes are all strings.
+    private TotalBodyValue ConcatenateLeaves(IOperation operation, ImmutableArray<IOperation> leaves, IrBlockId block, int depth,
+        bool deferred)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        RepositoryParameterGuard.RequireInitialized(leaves.IsDefault, nameof(leaves), "Array must be initialized.");
         var operands = ImmutableArray.CreateBuilder<IrTerm>();
         var constant = ImmutableArray.CreateBuilder<string>();
         foreach (var leaf in leaves)
@@ -705,15 +739,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         FlushConstant();
         // The compiler merges adjacent constants and drops constant null/empty
         // strings before choosing a fixed overload or creating a params array.
-        if (operands.Count > 4)
-        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         // Admitted nonconstant chains retain an operand after constant coalescing.
-        var parent = operation.Syntax.Parent;
-        while (parent is Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedExpressionSyntax)
-        { parent = parent.Parent; }
-        var deferred = operation.Parent is IFlowCaptureOperation &&
-            parent is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryParent &&
-            binaryParent.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.AddExpression);
+        if (operands.Count > 4 || operands.Count == 0)
+        { return Approximate(operation, block, FrontendAbstention.UnsupportedOperationKind); }
         // The compiler emits one non-constant operand as `operand ?? ""`, not
         // as String.Concat: a distinct empty operand keeps its own reference.
         if (operands.Count == 1 && !deferred)
@@ -735,21 +763,6 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 operands.Add(_factory.String(text));
             }
             constant.Clear();
-        }
-
-        void Collect(IOperation current, int nesting)
-        {
-            Spend?.Invoke();
-            if (nesting < 256 && CSharpOperationSemantics.IsStringConcatenation(current) && !current.ConstantValue.HasValue)
-            {
-                var binary = (IBinaryOperation)current;
-                Collect(binary.LeftOperand, nesting + 1);
-                Collect(binary.RightOperand, nesting + 1);
-            }
-            else if (nesting < 256 && CSharpOperationSemantics.IdentityCastConcatenation(current) is { } castConcatenation)
-            { Collect(castConcatenation, nesting + 1); }
-            else
-            { leaves.Add(current); }
         }
     }
 
@@ -783,14 +796,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // and no concrete refutation is drawn from it.
     private const int MaximumStringLength = 0x3FFFFFDF;
 
-    private IrBlockId ExceedsMaximumStringLength(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block)
+    private IrBlockId ExceedsMaximumStringLength(IOperation operation, ImmutableArray<IrTerm> operands, IrBlockId block,
+        int reserved = 0, string label = "concat:beyond-maximum-length")
     {
         // Each prefix total stays within the limit until one operand exceeds
         // the remainder, so the subtraction cannot wrap before that disjunct.
 
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         RepositoryParameterGuard.RequireInitialized(operands.IsDefault, nameof(operands), "Array must be initialized.");
-        IrTerm remaining = _factory.Integer(MaximumStringLength);
+        IrTerm remaining = _factory.Integer(MaximumStringLength - reserved);
         IrTerm exceeds = _factory.Boolean(false);
         foreach (var operand in operands)
         {
@@ -799,7 +813,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 _factory.Binary(IrBinaryOperator.GreaterThan, length, remaining));
             remaining = _factory.Binary(IrBinaryOperator.Subtract, remaining, length);
         }
-        return MayFault(operation, exceeds, "concat:beyond-maximum-length", block);
+        return MayFault(operation, exceeds, label, block);
     }
 
     internal TotalBodyValue LowerDiscardedInstanceFieldMutation(IIncrementOrDecrementOperation operation, IrBlockId block)

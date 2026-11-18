@@ -140,6 +140,17 @@ listing changes against an earlier one. Development history is in the Git log.
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
   catalog let the call throw for any index. The character's value is still
   unknown.
+- Interpolated strings converted to `string` are modeled when every hole is a
+  `string`, `char`, `bool`, built-in integer or reference, with no alignment
+  or format clause. Before, any interpolation left the body unsupported. With
+  only `string` holes the value is the same `String.Concat` as the equivalent
+  `+` chain. Otherwise it is a fresh non-null string of unknown content, so
+  `$"line-{n}"` can be proved not to throw. An integer hole formats through
+  the ambient culture, an ambient read that keeps `EnforcePure` `Unknown` and
+  that the ambient-culture assumption now also covers; a reference hole's
+  `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
+  `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
+  clauses, and `FormattableString` or handler conversions stay unsupported.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
