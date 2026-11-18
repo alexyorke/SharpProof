@@ -1,8 +1,1 @@
-[
-  {
-    "advisory": "GHSA-fc5q-39xc-vjpf",
-    "package": "picomatch",
-    "expires": "2027-01-31",
-    "reason": "No picomatch release is patched (all versions through 4.0.7 are affected). CSpell is its only consumer here and matches only the reviewed globs in cspell.json against repository paths, so no untrusted pattern reaches the ReDoS."
-  }
-]
+[]
