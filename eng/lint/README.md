@@ -71,10 +71,7 @@ with the first patched release for `GHSA-gg6h-894w-4m9c`.
 
 The dependency audit fails on any advisory unless `audit-exceptions.json` lists
 it with a reason and an expiry date; an expired or unused exception fails too.
-`GHSA-fc5q-39xc-vjpf` (ReDoS in `picomatch`, through CSpell) has no patched
-release. CSpell matches only the reviewed globs in `cspell.json` against
-repository paths, so no untrusted pattern reaches it. Its exception expires on
-2027-01-31; remove it once a patched release can be pinned through `overrides`.
+No exception is listed today.
 
 One zizmor rule is disabled with an inline explanation in `zizmor.yml`:
 actionlint 1.7.12 rejects the newer self-repository syntax suggested by zizmor.
