@@ -66,7 +66,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         if (CSharpOperationSemantics.HasSynchronizedEntry(_context.Target))
         { throw new RegionIncompleteException(); }
         if (HasOwnIteratorBody(graph.OriginalOperation))
-        { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
+        { LowerIteratorCall(graph.OriginalOperation, createFrame); return; }
         _emissionCompilation = _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
         _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
@@ -305,6 +305,36 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             _builder.Assign(entry, structural, binding.Variable,
                 RoslynValueTypeValidation.LocalStorageDefault(_context.Factory, local.Type, binding.Variable));
         }
+    }
+
+    // Calling an iterator runs none of its body: the call only creates the
+    // compiler's enumerator object, which captures the receiver and the
+    // arguments, and returns it. The body, argument checks included, runs
+    // as the result is enumerated, which is a later call on that object
+    // (C# specification, iterators). So the call is a fresh allocation of
+    // an object whose runtime type is left unknown, and its result. An
+    // async iterator is excluded by the signature, and one with contract
+    // clauses is not modeled: those clauses would describe the enumeration.
+    private void LowerIteratorCall(IOperation root, Func<IrBlockId, SourceCallFrame>? createFrame)
+    {
+        root = RepositoryParameterGuard.NotNull(root, nameof(root));
+        if (!_context.HasScalarSignature || _context.Target.IsAsync || !_context.OwnsBody(root) ||
+            _context.HasSpecifications || _context.Result is not { } result || !_context.Target.ReturnType.IsReferenceType)
+        { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
+        var structural = _context.Factory.CreateOperation("candidate:cfg");
+        var entry = _builder.CreateBlock("entry");
+        if (createFrame == null)
+        { _builder.SetEntry(entry); }
+        else
+        { _frame = createFrame(entry); }
+        foreach (var binding in _context.Inputs)
+        {
+            _builder.Assign(entry, structural, binding.Current, _context.Factory.Variable(binding.Entry));
+            _builder.Assign(entry, structural, binding.PreState, _context.Factory.Variable(binding.Entry));
+        }
+        var site = _context.Site(root);
+        _builder.Allocate(entry, site, _context.Factory.GetVariableInfo(result).Type, result);
+        Return(entry, site, _context.Factory.Variable(result));
     }
 
     private bool HasOwnIteratorBody(IOperation root)

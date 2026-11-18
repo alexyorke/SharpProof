@@ -239,10 +239,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     // assigned value as its final `value` parameter. A generic callee runs its
     // declaration, whose parameters must share the call's value domains.
     // With `contractOnly`, a callee already being inlined (a recursive call)
-    // gets a frame for its preconditions and no body; so does an iterator
-    // without preconditions, whose body runs only as it is enumerated, and a
-    // class constructor whose body is not admitted. constructorInitializers is
-    // set only by a caller that explicitly lowers instance initializers.
+    // gets a frame for its preconditions and no body; so does a class
+    // constructor whose body is not admitted. An iterator's body runs only as
+    // its result is enumerated, so its frame lowers the call as the creation
+    // of that result; an iterator with preconditions is not admitted.
+    // constructorInitializers is set only by a caller that explicitly lowers
+    // instance initializers.
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default,
@@ -365,7 +367,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var iterator = false;
         if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
         {
-            if (!Spend() || iterator && !contractOnly)
+            if (!Spend())
             { return false; }
         }
         else
@@ -375,9 +377,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             {
                 if (!Spend())
                 { return false; }
-                iterator |= node is YieldStatementSyntax;
-                if (iterator && !contractOnly)
-                { _iterators[method.OriginalDefinition] = true; return false; }
+                if (node is YieldStatementSyntax)
+                { iterator = true; break; }
             }
             _iterators[method.OriginalDefinition] = iterator;
         }
@@ -496,13 +497,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))
         { frame = null; return false; }
+        // An iterator checks its preconditions only once enumerated, so a
+        // call cannot be checked against them.
+        if (iterator && !frame.SourceCallPreconditions.IsEmpty)
+        { frame = null; return false; }
         if (contractOnly)
-        {
-            // An iterator checks its preconditions only once enumerated.
-            if (iterator && !frame.SourceCallPreconditions.IsEmpty)
-            { frame = null; return false; }
-            return true;
-        }
+        { return true; }
         cancellationToken.ThrowIfCancellationRequested();
         if (localGraph != null)
         { graph = localGraph; return true; }

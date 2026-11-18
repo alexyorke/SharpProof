@@ -95,6 +95,15 @@ Once a readonly static, or a static get-only auto-property, took the value its t
 
 Once `x is null` over a type-parameter value became an exact null test, NodaTime `Preconditions.CheckNotNull<T>` lowers, and three methods that call it became Refuted: `StopwatchExtensions.ElapsedDuration` (OSS0335), `TimeProviderExtensions.ToClock` (OSS0337) and `CachedDateTimeZone.ForZone` (OSS0400). Each passes its argument to `CheckNotNull`, which throws `ArgumentNullException` for `null`, and building that exception reads the ambient culture's resources, so none of them is observably pure. They were reviewed against the bodies and marked Supported/Refuted. The supported floors rose by three (282 to 285, 56 to 59), and the SP0002 ceiling (243 to 240) and total-Unknown ceiling (480 to 477) fell by three.
 
+### Reviewed classification for iterator calls
+
+Once a call to a synchronous iterator lowered as a fresh allocation of its enumerator (SEMANTICS.md, "Effects"), 23 selected methods changed verdict.
+
+- **Proven (7, all from the C-Sharp-Algorithms source):** `TrieMapNode.GetByPrefix` (OSS0086), `TrieNode.GetByPrefix` (OSS0087), `DirectedSparseGraph.IncomingEdges` (OSS0131), `UndirectedSparseGraph.IncomingEdges` (OSS0135), `UndirectedWeightedSparseGraph.IncomingEdges` (OSS0137), `TrieMapNode.GetTerminalChildren` (OSS0167) and `TrieNode.GetTerminalChildren` (OSS0168). Each is an iterator itself. Calling one runs none of its body, so the claim, which describes the call, holds. They were SP0047 `UnsupportedStatement`.
+- **Refuted (16, all MoreLINQ):** Cartesian (OSS0209), Choose (OSS0210), Exclude (OSS0223), Generate (OSS0240), Insert (OSS0246), Pairwise (OSS0261), Permutations (OSS0265), Pipe (OSS0266), PreScan (OSS0267), Repeat (OSS0273), SkipUntil (OSS0284), Subsets (OSS0289), TagFirstLast (OSS0290), TakeUntil (OSS0292), TraverseBreadthFirst (OSS0299) and Unfold (OSS0300). Each checks its arguments eagerly and then returns an iterator. The iterator call is no longer an unknown call, so what remains is the throw path: `new ArgumentNullException(nameof(x))` and the other parameter-name constructors build their message through a resource lookup that reads the ambient culture. They were SP0002.
+
+All 23 were reviewed against the bodies and marked Supported. The supported floors rose by 23 (285 to 308, 59 to 82). The total-Unknown ceiling fell by 23 (477 to 454), the SP0047 ceiling by 7 (201 to 194) and the SP0002 ceiling by 16 (240 to 224).
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.

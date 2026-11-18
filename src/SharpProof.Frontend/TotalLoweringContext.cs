@@ -551,6 +551,14 @@ internal sealed partial class TotalLoweringContext
 
     internal ImmutableArray<(IrTerm Condition, OperationId Site)> EntrySpecificationAssumptions => _entryAssumptions.ToImmutable();
 
+    // Whether the target has any bound contract clause or assumption: a
+    // Requires, Ensures or Assume prologue call, or a companion or closed
+    // attribute fact.
+    internal bool HasSpecifications
+    {
+        get { return _specificationCalls.Count != 0 || _assumptions.Count != 0 || _entryAssumptions.Count != 0; }
+    }
+
     internal void RegisterSpecificationAssumption(IInvocationOperation invocation, IrTerm condition, OperationId site, bool atEntry = false)
     {
         RepositoryParameterGuard.ThrowIfInvalid(site.IsDefault, nameof(site));
