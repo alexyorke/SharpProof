@@ -501,6 +501,28 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                     FrontendSubsetClassification.Exact)
                 : value;
         }
+        // `x is null` or `x is not null` over a type-parameter value. A value
+        // type is never null, which the model also allows. The compiler tests
+        // a value-type T through `box`, which only an optimizing JIT folds.
+        if (depth < 256 && operation is IIsPatternOperation { Value: { Type: ITypeParameterSymbol typeParameter } nullTested } nullPattern &&
+            NullPatternPolarity(nullPattern.Pattern) is { } nullWhenTrue)
+        {
+            var tested = LowerBodyValue(nullTested, block, depth + 1);
+            if (!tested.Classification.IsExact)
+            { return Approximate(operation, tested.Continuation, tested.Classification.Abstention); }
+            if (!typeParameter.IsReferenceType &&
+                _context.Compilation is not Microsoft.CodeAnalysis.CSharp.CSharpCompilation { Options.OptimizationLevel: OptimizationLevel.Release })
+            {
+                const string boundary = "null-test-boxing";
+                var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType, "opaque-call:" + boundary, _factory.BooleanType, true);
+                _builder!.Call(tested.Continuation, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary), null, member, null);
+            }
+            // A frame that specializes T to a scalar holds a value, never null.
+            var isNull = _factory.GetTypeInfo(tested.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence
+                ? _factory.Binary(IrBinaryOperator.Equal, tested.Value, _factory.Null(tested.Value.Type))
+                : _factory.Boolean(false);
+            return Capture(operation, new(nullWhenTrue ? isNull : Not(isNull), tested.Continuation, FrontendSubsetClassification.Exact));
+        }
         // A switch case, switch arm or `is` test over a built-in scalar,
         // or a null test over a reference.
         if (depth < 256 && operation is IIsPatternOperation { Value: var patternInput } isPattern &&
@@ -2105,6 +2127,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } })
         { return _factory.Binary(IrBinaryOperator.Equal, value, _factory.Null(value.Type)); }
 
+        // `s is "text"` compares content and is false for null.
+        if (input.SpecialType == SpecialType.System_String &&
+            pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: string text } } &&
+            Utf16WellFormedness.IsWellFormed(text) && _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.String)
+        { return _factory.Binary(IrBinaryOperator.StringEquals, value, CSharpOperationSemantics.Literal(_factory, input, text)); }
+
         if (pattern is IConstantPatternOperation constant &&
             CSharpOperationSemantics.IsScalar(input) &&
             CSharpOperationSemantics.ScalarPatternConstant(_factory, constant.Value, input, value.Type) is { } literal)
@@ -2137,6 +2165,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
 
         return null;
+    }
+
+    // True for `null`, false for `not null`, otherwise none.
+    private static bool? NullPatternPolarity(IPatternOperation pattern)
+    {
+        return pattern switch
+        {
+            IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } => true,
+            INegatedPatternOperation { Pattern: IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } } => false,
+            _ => null
+        };
     }
 
     private IrTerm Default(ITypeSymbol? type)
