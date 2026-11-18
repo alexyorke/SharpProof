@@ -179,6 +179,17 @@ listing changes against an earlier one. Development history is in the Git log.
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
   catalog let the call throw for any index. The character's value is still
   unknown.
+- Interpolated strings converted to `string` are modeled when every hole is a
+  `string`, `char`, `bool`, built-in integer or reference, with no alignment
+  or format clause. Before, any interpolation left the body unsupported. With
+  only `string` holes the value is the same `String.Concat` as the equivalent
+  `+` chain. Otherwise it is a fresh non-null string of unknown content, so
+  `$"line-{n}"` can be proved not to throw. An integer hole formats through
+  the ambient culture, an ambient read that keeps `EnforcePure` `Unknown` and
+  that the ambient-culture assumption now also covers; a reference hole's
+  `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
+  `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
+  clauses, and `FormattableString` or handler conversions stay unsupported.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
@@ -203,6 +214,18 @@ listing changes against an earlier one. Development history is in the Git log.
   are admitted at entry. One that allocates is admitted only by claims that
   ignore allocation. This opens NodaTime's `Duration`, `Instant`, `Offset` and
   `LocalTime` arithmetic.
+- A type initializer that fills its readonly statics with new framework
+  collections counts as one that only builds fresh values, so purity and
+  capability claims accept it and callers in other types inline its type's
+  members. That covers `List`, `Queue`, `Stack`, `Dictionary`, `HashSet` and
+  `ConcurrentDictionary` built empty, with a constant capacity, or with
+  `StringComparer.Ordinal` or `OrdinalIgnoreCase`, and collection initializers
+  whose keys are distinct constant integers, characters, strings, enums or
+  `bool` values, such as Humanizer's ordinal tables. A comparer from source, a
+  culture comparer, keys of other types and repeated `Add` keys still leave the
+  claim `Unknown`, and a body that reads such a collection still reads state
+  other code can change. A target-typed `new(...)` in an initializer is now
+  admitted like the explicit form.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is

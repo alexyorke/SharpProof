@@ -55,7 +55,7 @@ internal sealed class TypeInitializerEffectTests
     // A call, a read of a static whose initializer is effectful, a throw, a
     // cross-type cycle and a static constructor with logic.
     [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount];")]
-    [TestCase("private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } };")]
+    [TestCase("private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 }, { 1, 3 } };")]
     [TestCase("private static readonly int[] Copy = Effectful.Data;")]
     [TestCase("private static readonly object Value = (object)null ?? throw new System.InvalidOperationException();")]
     [TestCase("static C() { throw new System.InvalidOperationException(); }")]
