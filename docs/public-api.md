@@ -85,7 +85,8 @@ with one out parameter of a `bool`, character, integer or enum type and no
 other `ref`, `in` or `out` parameter. The caller may pass a field or array
 element as that argument, so a write to it may change memory: the body is
 verified only when it reads and writes no field, array or object and makes no
-call, and effect claims on such a method stay Unknown.
+call. Effect claims on a method with `ref` or `out` parameters treat each store
+to one as a write to argument state, so `EnforcePure` is refuted by it.
 
 Instance target members use a static companion member with an explicit first
 receiver parameter of the target type. Static target members have no added

@@ -33,6 +33,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // being lowered may run during that initialization.
     internal Func<IFieldSymbol, InitializedValue?>? InitializedStatic { get; init; }
 
+    // Whether a static holds an object no code can change, set by its type's
+    // admitted initializer.
+    internal Func<IFieldSymbol, bool>? ImmutableStatic { get; init; }
+
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
     internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
@@ -61,6 +65,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // A nondispatched callee in another assembly: the contract-only frame of
     // its checked clauses, and the recorder of those clauses at one call.
     internal Func<IMethodSymbol, TotalLoweringContext?>? MetadataCallee { get; init; }
+    // The caller variable each ref or out argument of a call writes to (none
+    // for a discard), when every one is a local or parameter of the caller
+    // passed once outside every try region; null otherwise.
+    internal Func<ImmutableArray<IArgumentOperation>, ImmutableArray<(int Ordinal, IrVarId? Local)>?>? OutArgumentStorage { get; init; }
     internal Action<IOperation, TotalLoweringContext, ImmutableArray<IrTerm>, IrBlockId>? MetadataPreconditions { get; init; }
 
     // `this` (or `base`) of a reference-type instance member is never null.
@@ -394,6 +402,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return setterCalled; }
         if (depth < 256 && InitializedStaticRead(operation, block) is { } initializedStatic)
         { return initializedStatic; }
+        if (depth < 256 && ImmutableStaticRead(operation, block) is { } immutableStatic)
+        { return immutableStatic; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
@@ -496,6 +506,28 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 ? new(_factory.Binary(IrBinaryOperator.Equal, value.Value, _factory.Null(value.Value.Type)), value.Continuation,
                     FrontendSubsetClassification.Exact)
                 : value;
+        }
+        // `x is null` or `x is not null` over a type-parameter value. A value
+        // type is never null, which the model also allows. The compiler tests
+        // a value-type T through `box`, which only an optimizing JIT folds.
+        if (depth < 256 && operation is IIsPatternOperation { Value: { Type: ITypeParameterSymbol typeParameter } nullTested } nullPattern &&
+            NullPatternPolarity(nullPattern.Pattern) is { } nullWhenTrue)
+        {
+            var tested = LowerBodyValue(nullTested, block, depth + 1);
+            if (!tested.Classification.IsExact)
+            { return Approximate(operation, tested.Continuation, tested.Classification.Abstention); }
+            if (!typeParameter.IsReferenceType &&
+                _context.Compilation is not Microsoft.CodeAnalysis.CSharp.CSharpCompilation { Options.OptimizationLevel: OptimizationLevel.Release })
+            {
+                const string boundary = "null-test-boxing";
+                var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType, "opaque-call:" + boundary, _factory.BooleanType, true);
+                _builder!.Call(tested.Continuation, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary), null, member, null);
+            }
+            // A frame that specializes T to a scalar holds a value, never null.
+            var isNull = _factory.GetTypeInfo(tested.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence
+                ? _factory.Binary(IrBinaryOperator.Equal, tested.Value, _factory.Null(tested.Value.Type))
+                : _factory.Boolean(false);
+            return Capture(operation, new(nullWhenTrue ? isNull : Not(isNull), tested.Continuation, FrontendSubsetClassification.Exact));
         }
         // A switch case, switch arm or `is` test over a built-in scalar,
         // or a null test over a reference.
@@ -859,11 +891,21 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             method.ReturnsByRef || method.ReturnsByRefReadonly || method.IsStatic != (instance == null) ||
             instance != null && !CSharpOperationSemantics.IsValueDomain(instance.Type) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
-            method.Parameters.Any(parameter => parameter.RefKind != RefKind.None) ||
+            method.Parameters.Any(parameter => parameter.RefKind is not (RefKind.None or RefKind.Out) ||
+                parameter.RefKind == RefKind.Out && !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             arguments.Any(argument => argument.Parameter == null ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
             assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
         { return null; }
+        // An out argument is a caller local or parameter the callee may set
+        // before it returns or throws, so none may be visible to a handler.
+        ImmutableArray<(int Ordinal, IrVarId? Local)> outs = [];
+        if (method.Parameters.Any(static parameter => parameter.RefKind == RefKind.Out))
+        {
+            if (OutArgumentStorage?.Invoke(arguments) is not { } storage)
+            { return null; }
+            outs = storage;
+        }
         IrTerm? receiver = null;
         if (instance != null && !IsImplicitThis(instance))
         {
@@ -873,11 +915,18 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             receiver = lowered.Value;
             block = lowered.Continuation;
         }
-        var preconditions = dispatched ? null : MetadataCallee?.Invoke(method);
+        // Requires over a callee with out parameters are not checked here.
+        var preconditions = dispatched || !outs.IsEmpty ? null : MetadataCallee?.Invoke(method);
         var values = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length + (assigned != null ? 1 : 0));
         values.Count = arguments.Length + (assigned != null ? 1 : 0);
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
         {
+            // The callee never reads an out argument: it gets a placeholder.
+            if (argument.Parameter!.RefKind == RefKind.Out)
+            {
+                values[arguments.IndexOf(argument)] = CSharpOperationSemantics.DefaultValue(_factory, _context.Type(argument.Parameter.Type));
+                continue;
+            }
             var lowered = LowerBodyValue(CSharpOperationSemantics.OpaqueArgument(argument.Value), block, depth + 1);
             if (!lowered.Classification.IsExact)
             { return Approximate(operation, lowered.Continuation, lowered.Classification.Abstention); }
@@ -900,8 +949,19 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             ByParameter(method, arguments, values.ToImmutable(), assigned != null) is { } byParameter)
         { MetadataPreconditions!(operation, preconditions, byParameter, block); }
         // A dispatched call may run an override the specification does not describe.
-        return EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
+        var call = EmitOpaqueCall(operation, method, values.ToImmutable(), block, assigned != null ? values[values.Count - 1] : null,
             (dispatched ? null : OpaqueEffects?.Invoke(method)) ?? IrOpaqueCallEffects.All);
+        // On normal return each out variable holds whatever the callee stored.
+        foreach (var (_, local) in outs)
+        {
+            if (local is not { } target)
+            { continue; }
+            var stored = _context.Temporary(_factory.GetVariableInfo(target).Type);
+            _builder!.Havoc(call.Continuation, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, stored);
+            var mutation = _builder.Assign(call.Continuation, _context.Site(operation), target, _factory.Variable(stored));
+            _builder.Write(call.Continuation, mutation.Operation, IrWriteRegion.Local);
+        }
+        return call;
     }
 
     // A user-defined binary operator declared in another assembly is a call
@@ -1401,6 +1461,30 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return null; }
         var count = 0;
         return new(Materialize(operation, value, ref block, ref count), block, FrontendSubsetClassification.Exact);
+    }
+
+    // A read of a readonly static, or of a static get-only auto-property,
+    // whose type's admitted initializer stored an object no code can change,
+    // such as a boxed constant. The read runs that initializer, which has no
+    // effect a body can observe, so it is not an ambient read. The object
+    // itself is not modeled: the read yields an unknown reference, which may
+    // be null, since a callable the initializer itself runs may read the
+    // static before it is set.
+    private TotalBodyValue? ImmutableStaticRead(IOperation operation, IrBlockId block)
+    {
+        var field = operation switch
+        {
+            IFieldReferenceOperation { Field.IsStatic: true, Instance: null } read when !CSharpOperationSemantics.IsSupportedFieldRead(read.Field) => read.Field,
+            IPropertyReferenceOperation { Property.IsStatic: true, Arguments.Length: 0 } property when BodyGetterField(property) == null =>
+                CSharpOperationSemantics.StaticGetOnlyAutoPropertyField(property.Property),
+            _ => null
+        };
+        if (field == null || ShadowCallSkeleton || !CSharpOperationSemantics.IsReferenceDomain(field.Type) ||
+            ImmutableStatic?.Invoke(field) != true)
+        { return null; }
+        var value = _context.Temporary(_context.Type(field.Type));
+        _builder!.Havoc(block, _context.ImmutableStaticReadSite(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return new(_factory.Variable(value), block, FrontendSubsetClassification.Exact);
     }
 
     private bool CanMaterialize(InitializedValue value, IrTypeId type, int depth)
@@ -2089,6 +2173,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } })
         { return _factory.Binary(IrBinaryOperator.Equal, value, _factory.Null(value.Type)); }
 
+        // `s is "text"` compares content and is false for null.
+        if (input.SpecialType == SpecialType.System_String &&
+            pattern is IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: string text } } &&
+            Utf16WellFormedness.IsWellFormed(text) && _factory.GetTypeInfo(value.Type).Kind == IrTypeKind.String)
+        { return _factory.Binary(IrBinaryOperator.StringEquals, value, CSharpOperationSemantics.Literal(_factory, input, text)); }
+
         if (pattern is IConstantPatternOperation constant &&
             CSharpOperationSemantics.IsScalar(input) &&
             CSharpOperationSemantics.ScalarPatternConstant(_factory, constant.Value, input, value.Type) is { } literal)
@@ -2121,6 +2211,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         }
 
         return null;
+    }
+
+    // True for `null`, false for `not null`, otherwise none.
+    private static bool? NullPatternPolarity(IPatternOperation pattern)
+    {
+        return pattern switch
+        {
+            IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } => true,
+            INegatedPatternOperation { Pattern: IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } } => false,
+            _ => null
+        };
     }
 
     private IrTerm Default(ITypeSymbol? type)
