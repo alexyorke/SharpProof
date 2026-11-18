@@ -178,6 +178,8 @@ internal static partial class CSharpOperationSemantics
             "M:System.InvalidOperationException.#ctor" => "InvalidOperation",
             "M:System.InvalidOperationException.#ctor(System.String)" => "InvalidOperationNull",
             "M:System.DivideByZeroException.#ctor" => "DivideByZero",
+            "M:System.NotSupportedException.#ctor" => "NotSupported",
+            "M:System.NotImplementedException.#ctor" => "NotImplemented",
             "M:System.IO.IOException.#ctor" => "IOException",
             "M:System.ObjectDisposedException.#ctor(System.String)" => "ObjectDisposedName",
             "M:System.AggregateException.#ctor" => "Aggregate",

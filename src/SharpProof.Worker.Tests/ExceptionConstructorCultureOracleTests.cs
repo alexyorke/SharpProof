@@ -16,6 +16,8 @@ public sealed class ExceptionConstructorCultureOracleTests
     [TestCase("aggregate-null")]
     [TestCase("unreachable-null")]
     [TestCase("divide-zero-default")]
+    [TestCase("not-supported-default")]
+    [TestCase("not-implemented-default")]
     [TestCase("object-disposed-name")]
     public void ResourceMessageLookupCanMutateStateAndThrowThroughCulture(string scenario)
     {
@@ -32,6 +34,8 @@ public sealed class ExceptionConstructorCultureOracleTests
             "aggregate-null" => () => new AggregateException((string?)null),
             "unreachable-null" => () => new System.Diagnostics.UnreachableException((string?)null),
             "divide-zero-default" => () => new DivideByZeroException(),
+            "not-supported-default" => () => new NotSupportedException(),
+            "not-implemented-default" => () => new NotImplementedException(),
             "object-disposed-name" => () => new ObjectDisposedException("object"),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
@@ -44,6 +48,8 @@ public sealed class ExceptionConstructorCultureOracleTests
     [TestCase("argument-null-message")]
     [TestCase("argument-range-message")]
     [TestCase("argument-message")]
+    [TestCase("not-supported-message")]
+    [TestCase("not-implemented-message")]
     public void ExplicitMessageConstructionDoesNotConsultAmbientCulture(string scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
@@ -55,6 +61,8 @@ public sealed class ExceptionConstructorCultureOracleTests
             "argument-null-message" => () => new ArgumentNullException(nameof(scenario), "message"),
             "argument-range-message" => () => new ArgumentOutOfRangeException(nameof(scenario), "message"),
             "argument-message" => () => new ArgumentException((string?)null),
+            "not-supported-message" => () => new NotSupportedException("message"),
+            "not-implemented-message" => () => new NotImplementedException("message"),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         Observe(create, false);
