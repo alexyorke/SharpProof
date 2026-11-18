@@ -135,6 +135,17 @@ listing changes against an earlier one. Development history is in the Git log.
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- More patterns are exact:
+  - `x is null` and `x is not null` over a type-parameter value;
+  - string constant patterns such as `s is "." or ","` (false for `null`);
+  - `not` around a declaration or type pattern, such as `b is not Paragraph p`;
+  - the empty property pattern `{ }`, as in `b.Parent is not { } parent`.
+  A type or property pattern whose input already converts to the matched
+  type is a null test. In a build that is not optimized, `is null` on a
+  `T` that may be a value type boxes it, so allocation claims stay
+  conservative there. NodaTime methods that check their arguments with
+  `Preconditions.CheckNotNull` now lower; three in the OSS corpus are
+  refuted for purity, since a `null` argument throws.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
