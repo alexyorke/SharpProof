@@ -113,6 +113,11 @@ listing changes against an earlier one. Development history is in the Git log.
   each such argument is a local or parameter of the caller, passed once, and
   the call is outside any `try` block of the caller. Before, such calls kept
   the whole caller `Unknown`.
+- Calls to generic source methods with delegate parameters, such as
+  `Apply<T>(Func<T, bool> f, T x)` called with a `Func<int, bool>`, are
+  analyzed: the method's body is inlined as for any other non-virtual source
+  call. Before, such calls kept the whole caller `Unknown`. Invoking the
+  delegate is still an unknown call.
 - Values of source `readonly struct` types are analyzed: construction,
   including target-typed `new(...)` and constructors chained with `: this(...)`,
   `default`, field and property reads, instance members and user-defined
