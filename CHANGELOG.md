@@ -186,6 +186,14 @@ listing changes against an earlier one. Development history is in the Git log.
   checked as the widened input plus that constant, with the wrap of the
   narrow sum accounted for. A contract that restates such a product no longer
   runs out of solver budget.
+- `throw new NotSupportedException()` and `throw new NotImplementedException()`,
+  the bodies of stub methods, are modeled like `new InvalidOperationException()`:
+  the constructor looks up its message in runtime resources, under a runtime
+  lock. With `SharpProofTrustExceptionMessages` a stub, or a method that throws
+  one behind a guard, can now be proved pure. Without it, the lock refutes an
+  effect claim on such a method, as for the other modeled constructors. Before,
+  both constructors were unknown calls, so these claims stayed `Unknown` even
+  with the property.
 - A refuted contract is reported as SP0051 at the clause or call and fails the
   build under every verifier policy. SP0047 reports incomplete analysis and
   SP0048 a declared assumption; each links to its documentation.
