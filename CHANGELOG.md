@@ -214,6 +214,18 @@ listing changes against an earlier one. Development history is in the Git log.
   are admitted at entry. One that allocates is admitted only by claims that
   ignore allocation. This opens NodaTime's `Duration`, `Instant`, `Offset` and
   `LocalTime` arithmetic.
+- A type initializer that fills its readonly statics with new framework
+  collections counts as one that only builds fresh values, so purity and
+  capability claims accept it and callers in other types inline its type's
+  members. That covers `List`, `Queue`, `Stack`, `Dictionary`, `HashSet` and
+  `ConcurrentDictionary` built empty, with a constant capacity, or with
+  `StringComparer.Ordinal` or `OrdinalIgnoreCase`, and collection initializers
+  whose keys are distinct constant integers, characters, strings, enums or
+  `bool` values, such as Humanizer's ordinal tables. A comparer from source, a
+  culture comparer, keys of other types and repeated `Add` keys still leave the
+  claim `Unknown`, and a body that reads such a collection still reads state
+  other code can change. A target-typed `new(...)` in an initializer is now
+  admitted like the explicit form.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is

@@ -17,7 +17,7 @@ public sealed class EntryInitializationReasonTests
     // in types whose static initializer calls code.
     [TestCase("public static class Subject { private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount]; " +
         "[EnforcePure] public static bool Target(int year) => ((year * 7) + 1) % 19 < 7; }")]
-    [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; " +
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 }, { 1, 3 } }; " +
         "[EnforcePure] public static bool Target(int number) => number <= 20; }")]
     // An admitted initializer still allocates, which an allocation claim counts.
     [TestCase("public static class Subject { private static readonly object Gate = new object(); " +
