@@ -21,9 +21,11 @@ internal enum InitializationEffect
     // constructors, and reads statics of types whose own initializers are
     // admitted. It writes only the type's own readonly statics and the fields
     // of the values it constructs, and cannot throw except by running out of
-    // memory. It calls no other code, or, when ClosedInitializerEvaluator ran
-    // it to completion, only code that reads nothing but constants and the
-    // values it made.
+    // memory. It calls no other code but the framework collection
+    // constructors and Add methods that
+    // CSharpOperationSemantics.IsCallbackFreeCollectionCreation admits, or,
+    // when ClosedInitializerEvaluator ran it to completion, only code that
+    // reads nothing but constants and the values it made.
     FreshValues,
     // Anything else.
     Effectful
@@ -430,11 +432,15 @@ internal static class TypeInitialization
                     return Value(parenthesized.Operand, owner, constructor);
                 case IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion:
                     // Implicit identity, reference and numeric conversions run
-                    // no code and cannot throw; boxing allocates.
+                    // no code and cannot throw; boxing allocates. A
+                    // target-typed `new(...)` converts the object it creates
+                    // to the type it creates.
                     var converted = conversion.GetConversion();
                     return !converted.IsImplicit || converted.IsUserDefined ? InitializationEffect.Effectful
                         : converted.IsIdentity || converted.IsReference || converted.IsNumeric ||
-                            converted.IsCollectionExpression && conversion.Operand is ICollectionExpressionOperation
+                            converted.IsCollectionExpression && conversion.Operand is ICollectionExpressionOperation ||
+                            converted.IsObjectCreation && conversion.Operand is IObjectCreationOperation &&
+                            SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type)
                             ? Value(conversion.Operand, owner, constructor)
                         : converted.IsBoxing ? Max(InitializationEffect.FreshValues, Value(conversion.Operand, owner, constructor))
                         : InitializationEffect.Effectful;
@@ -511,6 +517,20 @@ internal static class TypeInitialization
         {
             if (CSharpOperationSemantics.IsCoreObjectCreation(creation))
             { return InitializationEffect.FreshValues; }
+            // A framework collection whose constructor and Add calls run no
+            // user code. The collection is mutable, so a read of a static
+            // that holds it stays an ambient read in a body.
+            if (CSharpOperationSemantics.IsCallbackFreeCollectionCreation(creation, out var stored))
+            {
+                var collected = InitializationEffect.FreshValues;
+                foreach (var value in stored)
+                {
+                    collected = Max(collected, Value(value, owner, constructor));
+                    if (collected == InitializationEffect.Effectful)
+                    { break; }
+                }
+                return collected;
+            }
             if (creation.Initializer != null || creation.Constructor is not { } created)
             { return InitializationEffect.Effectful; }
             var type = created.ContainingType;

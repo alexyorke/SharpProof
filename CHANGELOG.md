@@ -184,6 +184,17 @@ listing changes against an earlier one. Development history is in the Git log.
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
   catalog let the call throw for any index. The character's value is still
   unknown.
+- Interpolated strings converted to `string` are modeled when every hole is a
+  `string`, `char`, `bool`, built-in integer or reference, with no alignment
+  or format clause. Before, any interpolation left the body unsupported. With
+  only `string` holes the value is the same `String.Concat` as the equivalent
+  `+` chain. Otherwise it is a fresh non-null string of unknown content, so
+  `$"line-{n}"` can be proved not to throw. An integer hole formats through
+  the ambient culture, an ambient read that keeps `EnforcePure` `Unknown` and
+  that the ambient-culture assumption now also covers; a reference hole's
+  `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
+  `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
+  clauses, and `FormattableString` or handler conversions stay unsupported.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
@@ -208,6 +219,18 @@ listing changes against an earlier one. Development history is in the Git log.
   are admitted at entry. One that allocates is admitted only by claims that
   ignore allocation. This opens NodaTime's `Duration`, `Instant`, `Offset` and
   `LocalTime` arithmetic.
+- A type initializer that fills its readonly statics with new framework
+  collections counts as one that only builds fresh values, so purity and
+  capability claims accept it and callers in other types inline its type's
+  members. That covers `List`, `Queue`, `Stack`, `Dictionary`, `HashSet` and
+  `ConcurrentDictionary` built empty, with a constant capacity, or with
+  `StringComparer.Ordinal` or `OrdinalIgnoreCase`, and collection initializers
+  whose keys are distinct constant integers, characters, strings, enums or
+  `bool` values, such as Humanizer's ordinal tables. A comparer from source, a
+  culture comparer, keys of other types and repeated `Add` keys still leave the
+  claim `Unknown`, and a body that reads such a collection still reads state
+  other code can change. A target-typed `new(...)` in an initializer is now
+  admitted like the explicit form.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is
@@ -224,6 +247,21 @@ listing changes against an earlier one. Development history is in the Git log.
   Enumerating the result is still an unknown call, and an iterator
   with `Requires`, `Ensures` or `Assume` stays `Unknown`, since its clauses
   would describe the enumeration.
+- Lambdas and anonymous methods converted to a delegate are analyzed, so a
+  method that returns, stores or passes one, such as NodaTime's pattern
+  handler factories, no longer stays `Unknown` for that alone. Creating the
+  delegate runs none of its body, so `[EnforcePure]` and `[DoesNotThrow]` can
+  be proved however the body behaves. A capturing lambda allocates a new
+  delegate each time, so `[ZeroAllocations]` is refuted when one is reached;
+  a non-capturing one reuses a delegate the compiler caches, and a closure
+  frame is allocated where a captured variable's scope begins, so those leave
+  allocation claims `Unknown`. Invoking the delegate is still an unknown call.
+  A lambda is refused when it, or any other lambda or local function in the
+  method, writes a variable it captures, passes it by reference or calls a
+  mutating member of a captured struct, since an invocation the method cannot
+  see would then change the method's own variables. Expression trees, lambdas
+  that call local functions and lambdas capturing a constructor's `this` stay
+  `Unknown`.
 - `throw new NotSupportedException()` and `throw new NotImplementedException()`,
   the bodies of stub methods, are modeled like `new InvalidOperationException()`:
   the constructor looks up its message in runtime resources, under a runtime

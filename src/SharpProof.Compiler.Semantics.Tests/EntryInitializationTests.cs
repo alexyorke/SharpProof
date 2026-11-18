@@ -86,13 +86,21 @@ public sealed class EntryInitializationTests
         "public static class Subject { private static readonly int[] Copy = Other.Data; }")]
     [TestCase("public static class Subject { private static readonly int[] First = new int[1]; private static readonly int[] Copy = First; }")]
     [TestCase("public static class Outer { private static readonly int[] Cache = new int[3]; public static class Subject { } }")]
+    // A target-typed `new(...)` is the same construction as the explicit one.
+    [TestCase("public sealed class Subject { public static Subject Common { get; } = new(\"CE\"); " +
+        "internal Subject(string name) { Name = name; } public string Name { get; } }")]
+    // Framework collections whose constructors and Add calls run no user code.
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; }")]
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(); }")]
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.HashSet<string> Names = new(System.StringComparer.Ordinal) { \"a\" }; }")]
     public void FreshValuesAreAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.FreshValues); }
 
     // Each excluded shape stays an entry effect. First, a call the
     // evaluator cannot run.
-    [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; }")]
-    [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(); }")]
+    // Dictionary.Add throws for a key it already holds.
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 }, { 1, 3 } }; }")]
+    [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(System.Linq.Enumerable.Range(0, 2)); }")]
     [TestCase("public static class Subject { private static readonly System.Func<string> Text = \"x\".ToString; }")]
     // A read of another type's static whose initializer is not admitted.
     [TestCase("public static class Subject { private static readonly string Empty = string.Empty; }")]

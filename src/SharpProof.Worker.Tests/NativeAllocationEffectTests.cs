@@ -296,7 +296,6 @@ internal sealed class NativeAllocationEffectTests
 
     [TestCase("System.Action action = Sink;")]
     [TestCase("System.Action action = () => {};")]
-    [TestCase("System.Action action = () => { State = x; };")]
     [TestCase("System.Action action = new System.Action(() => {});")]
     [TestCase("System.Action action = new System.Action(instance.VirtualSink);")]
     [TestCase("System.Action action = new System.Action(Generic<int>);")]
@@ -309,6 +308,18 @@ internal sealed class NativeAllocationEffectTests
         var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
         Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
         Assert.That(result.AllocationWitness, Is.Null);
+    }
+
+    // A capturing lambda makes a new delegate every time it is evaluated, and
+    // a build that is not optimized keeps the unread local that holds it.
+    [Test]
+    public async Task CapturingLambdasAllocateTheirDelegate()
+    {
+        var preparation = Prepare("using SharpProof.Attributes; public static class C { public static int State; " +
+            "[ZeroAllocations] public static int Target(int x) { System.Action action = () => { State = x; }; return x; } }");
+        var result = await NativeEffectSiteVerifier.VerifyAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>());
+        Assert.That(result.AllocationWitness, Is.Not.Null);
     }
 
     [TestCase(false)]
