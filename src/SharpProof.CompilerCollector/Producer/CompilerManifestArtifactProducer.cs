@@ -69,7 +69,8 @@ internal static class CompilerManifestArtifactProducer
                     snapshot.SyntaxTrees,
                     snapshot.References,
                     contractExports);
-                return new CompilerCallPreconditionClaims.LoweredCallable(item, lowerer.Prepare(item, cancellationToken));
+                return new CompilerCallPreconditionClaims.LoweredCallable(item,
+                    CompilerLoweredArtifact.WithoutUnreadablePrograms(lowerer.Prepare(item, cancellationToken), cancellationToken));
             })];
             if (features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All)
             {
