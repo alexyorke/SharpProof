@@ -135,6 +135,12 @@ listing changes against an earlier one. Development history is in the Git log.
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- A call into another assembly may take `out` arguments, such as
+  `int.TryParse(s, out var v)` or `d.TryGetValue(k, out var v)`, when each
+  names a local or parameter of the caller passed once, outside every `try`
+  region: on normal return the variable holds an unknown value. A handler
+  could otherwise see a value the callee stored before it threw. Before,
+  such calls kept the whole method from lowering.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
