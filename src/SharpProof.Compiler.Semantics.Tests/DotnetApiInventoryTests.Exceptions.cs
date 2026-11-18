@@ -80,6 +80,8 @@ public sealed partial class DotnetApiInventoryTests
             "M:System.InvalidOperationException.#ctor" => "new System.InvalidOperationException()",
             "M:System.InvalidOperationException.#ctor(System.String)" => "new System.InvalidOperationException((string)null)",
             "M:System.DivideByZeroException.#ctor" => "new System.DivideByZeroException()",
+            "M:System.NotSupportedException.#ctor" => "new System.NotSupportedException()",
+            "M:System.NotImplementedException.#ctor" => "new System.NotImplementedException()",
             "M:System.IO.IOException.#ctor" => "new System.IO.IOException()",
             "M:System.ObjectDisposedException.#ctor(System.String)" => "new System.ObjectDisposedException(\"object\")",
             "M:System.AggregateException.#ctor" => "new System.AggregateException()",
