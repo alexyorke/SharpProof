@@ -400,6 +400,14 @@ internal sealed partial class TotalLoweringContext
         return Factory.CreateOperation("InitializedStatic@" + operation.Syntax.SpanStart + "#" + index, Span(operation.Syntax));
     }
 
+    // A read of a static that holds an object no code can change; unlike
+    // StaticReadSite, it is not an ambient read.
+    internal OperationId ImmutableStaticReadSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation("ImmutableStaticReference@" + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
     internal OperationId StaticReadSite(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));

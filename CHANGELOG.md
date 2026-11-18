@@ -140,6 +140,17 @@ listing changes against an earlier one. Development history is in the Git log.
   returning their base class, keeps the chosen reference. Before, the
   conversion of the merged value to its own type was refused, so the method
   did not lower.
+- A body that reads a readonly static holding an object no code can change,
+  such as `static readonly object Int64_0 = 0L;` or
+  `static readonly object TrueObject = true;`, now lowers. The static's own
+  initializer must store null, a constant string, a boxed constant or
+  `new object()`, nothing else in its type may store into it, and its type's
+  initializer must be admitted. The read is not an ambient read, so
+  `value ? TrueObject : FalseObject` can be proven pure. Before, any such read
+  left the method `Unknown`. The object itself is not modeled: unboxing it or
+  a postcondition about it stays `Unknown`. Statics holding arrays, class
+  instances or a library call's result, such as `Task.CompletedTask` or
+  `Task.FromResult(0)`, still abstain.
 - `s[i]` on a string, with an `int` index, faults exactly on a null string or
   an index outside `[0, s.Length)`. Before, a guarded read such as
   `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
