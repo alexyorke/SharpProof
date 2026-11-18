@@ -221,6 +221,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return nullableValue; }
         if (depth < 256 && RuntimeTypeBody(operation, block, depth) is { } runtimeTyped)
         { return runtimeTyped; }
+        if (depth < 256 && operation is IPropertyReferenceOperation { Instance: { } text, Arguments.Length: 1 } chars &&
+            CSharpOperationSemantics.IsStringCharsIndexer(chars.Property) && chars.Arguments[0].Value.Type?.SpecialType == SpecialType.System_Int32)
+        { return StringIndex(chars, text, chars.Arguments[0].Value, block, depth); }
         if (depth < 256 && operation is IConversionOperation
             { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } collectionConversion &&
             !collectionConversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(collectionConversion.Type, converted.Type) &&
@@ -1151,6 +1154,24 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // must not acquire default-field facts from this delayed allocation.
         _builder.CallSnapshot(deferred.Continuation, _context.OpaqueCallSite(creation, IrOpaqueCallEffects.Writes, display + ":initialized-state"), null, member, null, valueSnapshot);
         return deferred;
+    }
+
+    // `s[i]` reads the string, then the index, then faults on a null string
+    // or an index outside [0, Length). The character's value is not modeled.
+    private TotalBodyValue StringIndex(IPropertyReferenceOperation access, IOperation text, IOperation position, IrBlockId block, int depth)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var receiver = LowerBodyValue(text, block, depth + 1);
+        if (!receiver.Classification.IsExact)
+        { return Approximate(access, receiver.Continuation, receiver.Classification.Abstention); }
+        var index = LowerBodyValue(position, receiver.Continuation, depth + 1);
+        if (!index.Classification.IsExact)
+        { return Approximate(access, index.Continuation, index.Classification.Abstention); }
+        var guard = CSharpOperationSemantics.ElementGuard(_factory, receiver.Value, index.Value, null);
+        var continuation = ApplyRule(access, guard, index.Continuation).Continuation;
+        var value = _context.Temporary(_context.Type(access.Type));
+        _builder!.Havoc(continuation, _context.Site(access), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return new(_factory.Variable(value), continuation, FrontendSubsetClassification.Exact);
     }
 
     private TotalBodyValue LastStringIndex(IImplicitIndexerReferenceOperation access, IrBlockId block, int depth)
