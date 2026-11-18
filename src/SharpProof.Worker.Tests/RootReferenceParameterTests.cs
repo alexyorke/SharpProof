@@ -13,7 +13,7 @@ public sealed class RootReferenceParameterTests
 {
     private const string Types = """
         using SharpProof.Attributes;
-        public static class S { public static int F; }
+        public static class S { public static int F; public static void Bump(ref int x) { x = x + 1; } }
         """;
 
     [TestCase("[DoesNotThrow] public static bool M(int x, out int half) { if (x % 2 != 0) { half = 0; return false; } half = x / 2; return true; }")]
@@ -23,6 +23,8 @@ public sealed class RootReferenceParameterTests
     [TestCase("[DoesNotThrow] public static void M(ref string s) { s = null; }")]
     [TestCase("[DoesNotThrow] public static int M(int x, out bool even) { even = x % 2 == 0; return x; }")]
     [TestCase("[DoesNotThrow] public static bool M(string[] a, out string v) { if (a != null && a.Length > 0) { v = a[0]; return true; } v = null; return false; }")]
+    // A callee that writes the parameter back through its own ref parameter.
+    [TestCase("[DoesNotThrow] public static void M(ref int x) { S.Bump(ref x); }")]
     // The parameter keeps its own store, even if it is an element of the array.
     [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { x = 0; return a != null && a.Length > 0 ? a[x] : 0; }")]
     public async Task ReferenceParametersAreModeled(string member)
@@ -39,6 +41,8 @@ public sealed class RootReferenceParameterTests
     [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { x = 0; if (a != null && a.Length == 1) { a[0] = 5; return a[x]; } return 0; }")]
     [TestCase("public static int M(ref int a, ref int b) { Contract.Ensures(Contract.Result<int>() == 1); a = 1; b = 2; return a; }")]
     [TestCase("[EnforcePure] public static void M(out int x) { x = 7; }")]
+    // The callee's write back is a store to the caller's storage too.
+    [TestCase("[EnforcePure] public static void M(ref int x) { S.Bump(ref x); }")]
     [TestCase("[EnforcePure] public static bool M(int x, out int half) { half = x / 2; return x % 2 == 0; }")]
     public async Task CallerVisibleStoresAreNotProven(string member)
     {
@@ -54,6 +58,15 @@ public sealed class RootReferenceParameterTests
         System.ArgumentNullException.ThrowIfNull(member);
         var result = await ResultAsync(member);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.Reason.ToString());
+    }
+
+    // A postcondition on a method with an out parameter still needs a body
+    // that touches no memory: the out argument may be the field it reads.
+    [TestCase("public static int M(out int x) { Contract.Ensures(Contract.Result<int>() == 0); x = 0; return S.F * 0; }")]
+    public async Task OutParameterClausesKeepTheMemoryFreeRule(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     private static async Task<WorkerClaimResult> ResultAsync(string member)
