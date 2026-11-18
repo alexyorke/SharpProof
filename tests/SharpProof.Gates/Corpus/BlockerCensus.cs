@@ -172,8 +172,12 @@ internal static class BlockerCensus
         var paths = compilation.SyntaxTrees.Select(static (tree, ordinal) => (tree, ordinal))
             .ToImmutableDictionary(static item => item.tree, static item => item.ordinal.ToString(CultureInfo.InvariantCulture));
         // As the compiler collector does: `this` of an instance member is an
-        // input, and a scalar out parameter is admitted.
-        var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree]) { AdmitsOutParameters = true };
+        // input, and the method's own by-reference parameters are admitted.
+        var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree])
+        {
+            AdmitsOutParameters = true,
+            AdmitsReferenceParameters = true
+        };
         context.ModelReceiver();
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
         if (!binding.IsSuccess)
