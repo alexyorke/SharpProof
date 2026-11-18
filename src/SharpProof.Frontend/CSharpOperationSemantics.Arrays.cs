@@ -52,6 +52,18 @@ internal static partial class CSharpOperationSemantics
             new(IrExceptionKind.IndexOutOfRange, beyond)], FrontendSubsetClassification.Exact);
     }
 
+    // The BCL `string.this[int]` (`Chars`), which reads one UTF-16 unit.
+    internal static bool IsStringCharsIndexer(IPropertySymbol property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        return property is
+        {
+            IsIndexer: true, IsStatic: false, MetadataName: "Chars", Parameters.Length: 1,
+            Type.SpecialType: SpecialType.System_Char, ContainingType.SpecialType: SpecialType.System_String
+        } &&
+            property.Parameters[0] is { Type.SpecialType: SpecialType.System_Int32, RefKind: RefKind.None };
+    }
+
     // Only the intrinsic string indexer with a literal ^1 has this exact
     // lowering: read Length, subtract one, then read Chars. Other Index and
     // Range operations remain outside the supported subset.
