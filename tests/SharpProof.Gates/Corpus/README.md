@@ -108,6 +108,10 @@ All 23 were reviewed against the bodies and marked Supported. The supported floo
 
 Once an interpolated string over `string`, `char`, `bool`, integer and reference holes lowered (SEMANTICS.md, "Effects"), Humanizer `ArticlePrefixSort.AppendArticlePrefix` (OSS0401) stopped abstaining at its interpolation and now stops at SP0002: its body lowers, but it is not proven observably pure, since an integer hole formats through the current culture. The verdict stays Unknown. The SP0047 ceiling fell by one (194 to 193) and the SP0002 ceiling rose by one (224 to 225); the total-Unknown ceiling is unchanged.
 
+### Reviewed classification for collection initializers
+
+Once a static initializer that only builds framework collections, such as `new Dictionary<uint, BigInteger>()`, counted as making fresh values (SEMANTICS.md, "Type initialization"), `CatalanNumbers.GetNumberByBinomialCoefficients` (OSS0179) began to inline `BinomialCoefficients`, whose type has that cache. It now stops at SP0002 instead of SP0047: `Factorial` stores into the cache to memoize, a real write to shared state, so the verdict stays Unknown. The SP0047 ceiling fell by one (193 to 192) and the SP0002 ceiling rose by one (225 to 226); the total-Unknown ceiling is unchanged.
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.

@@ -4,10 +4,10 @@
   "minimumSupportedOpenSourceMethods": 82,
   "maximumTotalUnknown": 454,
   "maximumByReason": {
-    "SP0002": 225,
+    "SP0002": 226,
     "SP0016": 18,
     "SP0045": 9,
     "SP0046": 9,
-    "SP0047": 193
+    "SP0047": 192
   }
 }
