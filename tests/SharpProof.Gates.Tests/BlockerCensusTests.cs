@@ -59,6 +59,50 @@ public sealed class BlockerCensusTests
         Assert.That(rows.SelectMany(static row => row), Has.None.EqualTo("(does not lower exactly)"));
     }
 
+    // Labels name what keeps the body from lowering, not where Roslyn put it.
+    [TestCase("public static async System.Threading.Tasks.Task M() { await System.Threading.Tasks.Task.Yield(); }", "ContractBinding: UnsupportedTarget: async")]
+    [TestCase("public static void M(ref System.DateTime d) { }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
+    [TestCase("public static void M(out int value, ref System.DateTime d) { value = 0; }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
+    [TestCase("public static int M(int x) { var text = $\"{x}\"; return text.Length; }", "UnsupportedOperationKind: InterpolatedString of System_String")]
+    public void LabelsNameTheBlockingConstruct(string member, string label)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var (compilation, declaration) = Compile("public static class C { " + member + " }");
+        var labels = BlockerCensus.Blockers(compilation, declaration, TestContext.CurrentContext.CancellationToken);
+        Assert.That(labels, Is.EqualTo(new[] { label }), string.Join(" ; ", labels));
+    }
+
+    // A sole call into source code is charged to what refuses the call: the
+    // callee type's initializer, or what blocks the callee's own body.
+    [TestCase("""
+        public static class D
+        {
+            private static readonly int Seed = System.Environment.ProcessorCount;
+            public static int Leaf(int x) { return x + Seed; }
+        }
+        public static class C { public static int M(int x) { return D.Leaf(x); } }
+        """, "(callee type initializer)")]
+    public void SourceCallBlockersAreChargedToTheirRootCause(string source, string cause)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var (compilation, declaration) = Compile(source);
+        var cancellationToken = TestContext.CurrentContext.CancellationToken;
+        var labels = BlockerCensus.Blockers(compilation, declaration, cancellationToken);
+        Assert.That(labels.Single(), Does.Contain(": call source "), string.Join(" ; ", labels));
+        Assert.That(BlockerCensus.RootCause(compilation, declaration, cancellationToken), Is.EqualTo(cause));
+    }
+
+    private static (CSharpCompilation Compilation, MethodDeclarationSyntax Declaration) Compile(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var compilation = CSharpCompilation.Create("census", [CSharpSyntaxTree.ParseText(source, cancellationToken: TestContext.CurrentContext.CancellationToken)],
+            TrustedPlatformAssemblyPaths.Get().Select(static path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+        var declaration = compilation.SyntaxTrees[0].GetRoot(TestContext.CurrentContext.CancellationToken).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Last();
+        return (compilation, declaration);
+    }
+
     // The census lowers a body as the compiler collector does, so a struct
     // member reads `this` as an input, and a target-typed `new(...)` of a
     // modeled struct builds a value, also through a `: this(...)` chain.
