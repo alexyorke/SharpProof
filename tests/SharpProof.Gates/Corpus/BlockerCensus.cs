@@ -22,6 +22,7 @@ namespace SharpProof.Gates.Corpus;
 internal static class BlockerCensus
 {
     private const string Exact = "(lowers exactly)";
+    private const string WorkBudget = "(lowering work budget exhausted)";
 
     private const string NotExact = "(does not lower exactly)";
     private const string NoSite = "(no purity-relevant effect site)";
@@ -36,6 +37,7 @@ internal static class BlockerCensus
         var any = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
         var sole = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
         var totals = new int[sources.Length];
+        var roots = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
         for (var index = 0; index < sources.Length; index++)
         {
             var whole = NativeEffectOracleGate.ExpandToWholeSource(document, sources[index], cancellationToken);
@@ -43,6 +45,7 @@ internal static class BlockerCensus
             {
                 var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(
                     whole with { Methods = [.. batch] }, cancellationToken, purity: true);
+                var memo = new Dictionary<SyntaxNode, string>();
                 foreach (var declaration in compilation.SyntaxTrees
                              .SelectMany(tree => tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>())
                              .Where(static declaration => OpenSourceCorpusRunner.CorpusMethodId(declaration) != null))
@@ -60,11 +63,15 @@ internal static class BlockerCensus
                     if (blockers.Length == 1)
                     {
                         Count(sole, blockers[0], sources.Length)[index]++;
+                        if (!effects && IsSourceCall(blockers[0]))
+                        {
+                            Count(roots, RootCause(compilation, declaration, memo, [], cancellationToken), sources.Length)[index]++;
+                        }
                     }
                 }
             }
         }
-        return Render(sources, totals, any, sole, effects);
+        return Render(sources, totals, any, sole, effects) + (effects ? "" : RenderRoots(sources, roots));
     }
 
     // The distinct effect sites that can keep an exactly lowered body from
@@ -141,21 +148,32 @@ internal static class BlockerCensus
     {
         ArgumentNullException.ThrowIfNull(compilation);
         ArgumentNullException.ThrowIfNull(declaration);
+        return Analyze(compilation, declaration, cancellationToken).Labels;
+    }
+
+    // The labels, and the operations the abstentions name.
+    private static (ImmutableArray<string> Labels, ImmutableArray<IOperation> Sites) Analyze(
+        CSharpCompilation compilation, MethodDeclarationSyntax declaration, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(declaration);
         var model = CompilationModelProvider.GetSemanticModel(compilation, declaration.SyntaxTree);
         if (model.GetDeclaredSymbol(declaration, cancellationToken) is not { } method ||
             !TotalSourceCallSession.IsBodyDeclaration(declaration))
         {
-            return ["UnsupportedCallable"];
+            return (["UnsupportedCallable"], []);
         }
         var paths = compilation.SyntaxTrees.Select(static (tree, ordinal) => (tree, ordinal))
             .ToImmutableDictionary(static item => item.tree, static item => item.ordinal.ToString(CultureInfo.InvariantCulture));
-        var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree]);
-        // As the compiler collector does: `this` of an instance member is an input.
+        // As the compiler collector does: `this` of an instance member is an
+        // input, and a scalar out parameter is admitted.
+        var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree]) { AdmitsOutParameters = true };
         context.ModelReceiver();
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
         if (!binding.IsSuccess)
         {
-            return ["ContractBinding: " + binding.Failure];
+            return (["ContractBinding: " + binding.Failure +
+                (binding.Failure == ContractBindingFailure.UnsupportedTarget && !context.HasScalarSignature ? ": " + SignatureBlocker(method) : "")], []);
         }
         var graph = TotalSourceCallSession.CreateGraph(declaration, method, model, cancellationToken);
         var lowering = graph == null
@@ -163,22 +181,114 @@ internal static class BlockerCensus
             : TotalBodyLowering.Lower(compilation, graph, context, cancellationToken, opaqueCalls: true, stopAtFirstAbstention: false);
         if (lowering == null)
         {
-            return ["UnsupportedCallable"];
+            return (["UnsupportedCallable"], []);
         }
         if (lowering.IsExact)
         {
-            return [Exact];
+            return ([Exact], []);
+        }
+        // An exhausted work budget abandons the body wherever it stood, so
+        // whatever else was recorded says nothing about it.
+        if (lowering.ConstructionLimitExceeded)
+        {
+            return ([WorkBudget], []);
         }
         var trees = paths.ToImmutableDictionary(static item => item.Value, static item => item.Key, StringComparer.Ordinal);
-        var blockers = lowering.Abstentions
+        var described = lowering.Abstentions
             .Select(abstention => Describe(abstention, context.Factory, trees, compilation, cancellationToken))
+            .Select(item => item.Label == nameof(FrontendAbstention.UnsupportedStatement) &&
+                declaration.DescendantNodes().Any(static node => node is YieldStatementSyntax)
+                ? (Label: item.Label + ": iterator", item.Site) : item)
+            .ToImmutableArray();
+        var blockers = described.Select(static item => item.Label)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToImmutableArray();
-        return blockers.IsEmpty ? ["Lowering: " + lowering.Classification.Abstention] : blockers;
+        return blockers.IsEmpty
+            ? (["Lowering: " + lowering.Classification.Abstention], [])
+            : (blockers, [.. described.Where(static item => item.Site != null).Select(static item => item.Site!)]);
     }
 
-    private static string Describe(
+    // The first signature feature the lowering context does not admit.
+    private static string SignatureBlocker(IMethodSymbol method)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        if (method.IsAsync)
+        {
+            return "async";
+        }
+        if (method.ReturnsByRef || method.ReturnsByRefReadonly)
+        {
+            return "ref return";
+        }
+        foreach (var parameter in method.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None)
+            {
+                return parameter.RefKind + " parameter of " + Kind(parameter.Type);
+            }
+            if (!CSharpOperationSemantics.IsValueDomain(parameter.Type))
+            {
+                return "parameter of " + Kind(parameter.Type);
+            }
+        }
+        return !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType)
+            ? "return of " + Kind(method.ReturnType)
+            : "callable shape";
+    }
+
+    internal static string RootCause(CSharpCompilation compilation, MethodDeclarationSyntax declaration, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+        ArgumentNullException.ThrowIfNull(declaration);
+        return RootCause(compilation, declaration, [], [], cancellationToken);
+    }
+
+    // The first construct below a chain of source calls that each abstain
+    // only on the next call: which construct a sole call blocker stands for.
+    private static string RootCause(
+        CSharpCompilation compilation, MethodDeclarationSyntax declaration, Dictionary<SyntaxNode, string> memo,
+        HashSet<SyntaxNode> active, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(memo);
+        ArgumentNullException.ThrowIfNull(active);
+        if (memo.TryGetValue(declaration, out var known))
+        {
+            return known;
+        }
+        if (active.Count >= 16 || !active.Add(declaration))
+        {
+            return "(recursive or deep source calls)";
+        }
+        var (labels, sites) = Analyze(compilation, declaration, cancellationToken);
+        string cause;
+        if (labels is [Exact])
+        {
+            cause = "(callee lowers exactly; the call is refused)";
+        }
+        // A callee whose type has an initializer the frontend does not admit
+        // is refused for that, whatever its own body is.
+        else if (labels.Length == 1 && labels[0].Contains("[type-initializer]", StringComparison.Ordinal))
+        {
+            cause = "(callee type initializer)";
+        }
+        else if (labels.Length == 1 && sites.OfType<IInvocationOperation>().FirstOrDefault() is { } call &&
+                 call.TargetMethod.OriginalDefinition.DeclaringSyntaxReferences.Length == 1 &&
+                 call.TargetMethod.OriginalDefinition.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is MethodDeclarationSyntax callee &&
+                 compilation.ContainsSyntaxTree(callee.SyntaxTree))
+        {
+            cause = RootCause(compilation, callee, memo, active, cancellationToken);
+        }
+        else
+        {
+            cause = labels.Length == 1 ? labels[0] : "(several constructs)";
+        }
+        active.Remove(declaration);
+        memo[declaration] = cause;
+        return cause;
+    }
+
+    private static (string Label, IOperation? Site) Describe(
         FrontendProgramAbstention abstention, IrFactory factory, ImmutableDictionary<string, SyntaxTree> trees,
         CSharpCompilation compilation, CancellationToken cancellationToken)
     {
@@ -189,11 +299,16 @@ internal static class BlockerCensus
         if (factory.GetOperationInfo(abstention.Operation).SourceSpan is not { } span ||
             !trees.TryGetValue(span.Document, out var tree))
         {
-            return reason;
+            return (reason, null);
         }
         var node = tree.GetRoot(cancellationToken).FindNode(new TextSpan(span.Start, span.Length), getInnermostNodeForTie: true);
         var operation = CompilationModelProvider.GetSemanticModel(compilation, tree).GetOperation(node, cancellationToken);
-        return reason + ": " + (operation == null ? node.Kind().ToString() : Describe(operation, compilation));
+        // A declaration abstains for its initializer: name what that is.
+        if (operation is IVariableDeclaratorOperation { Initializer.Value: { } initial })
+        {
+            operation = initial;
+        }
+        return (reason + ": " + (operation == null ? node.Kind().ToString() : Describe(operation, compilation)), operation);
     }
 
     private static string Describe(IOperation operation, CSharpCompilation compilation)
@@ -315,6 +430,32 @@ internal static class BlockerCensus
             { TypeKind: TypeKind.Delegate } => "delegate",
             _ => "class"
         };
+    }
+
+    private static bool IsSourceCall(string blocker)
+    {
+        ArgumentNullException.ThrowIfNull(blocker);
+        return blocker.Contains(": call source ", StringComparison.Ordinal);
+    }
+
+    private static string RenderRoots(ImmutableArray<string> sources, SortedDictionary<string, int[]> roots)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var text = new StringBuilder("\n## Root causes of sole source-call blockers\n\n");
+        text.Append("A method whose only blocker is a call into source code is charged to the first construct below that chain of calls.\n\n");
+        text.Append("| Root cause | Methods | ").AppendJoin(" | ", sources.Select(static id => $"`{id}`")).Append(" |\n");
+        text.Append("| --- | ---: |").Insert(text.Length, " ---: |", sources.Length).Append('\n');
+        foreach (var row in roots.OrderByDescending(static row => row.Value.Sum()).ThenBy(static row => row.Key, StringComparer.Ordinal))
+        {
+            text.Append("| ").Append(row.Key.Replace("|", "\\|", StringComparison.Ordinal)).Append(" | ")
+                .Append(row.Value.Sum().ToString(CultureInfo.InvariantCulture));
+            foreach (var count in row.Value)
+            {
+                text.Append(" | ").Append(count.ToString(CultureInfo.InvariantCulture));
+            }
+            text.Append(" |\n");
+        }
+        return text.ToString();
     }
 
     private static string Render(
