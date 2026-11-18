@@ -55,6 +55,10 @@ public sealed class InterpolatedStringTests
     [TestCase("public static string M(int x) { Contract.Requires(x == 1); Contract.Ensures(Contract.Result<string>() == \"1\"); return $\"{x}\"; }")]
     [TestCase("public static string M(bool flag) { Contract.Ensures(Contract.Result<string>() == \"True\" || Contract.Result<string>() == \"False\"); return $\"{flag}\"; }")]
     [TestCase("public static int M(char c) { Contract.Ensures(Contract.Result<int>() == 1); return $\"{c}\".Length; }")]
+    // A hole with control flow is evaluated before an earlier hole is
+    // formatted in the model, but after it on the runtime: o.ToString() runs
+    // before the division that always throws.
+    [TestCase("[EnforcePure] public static string M(object o, bool b) { var z = 0; return $\"{o}{(b ? 1 / z : 2 / z)}\"; }")]
     public async Task UnmodeledFormattingStaysUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

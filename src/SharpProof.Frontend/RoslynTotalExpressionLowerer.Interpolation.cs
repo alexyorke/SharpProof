@@ -57,6 +57,21 @@ internal sealed partial class RoslynTotalExpressionLowerer
         var objectFormat = compilation == null ? null : ParameterlessToString(compilation.GetSpecialType(SpecialType.System_Object));
         var lengths = ImmutableArray.CreateBuilder<IrTerm>();
         // Characters the text and the bounded holes contribute at most.
+        // A hole with control flow makes the control-flow graph evaluate the
+        // holes into captures before this operation, while the handler formats
+        // each hole before it evaluates the next. A formatting effect would
+        // then be placed after a later hole that may already have thrown.
+        var lastHoisted = -1;
+        for (var index = 0; index < parts.Length; index++)
+        {
+            if (operation.Parts[index] is IInterpolationOperation { Expression: IFlowCaptureReferenceOperation })
+            { lastHoisted = index; }
+        }
+        for (var index = 0; index < lastHoisted; index++)
+        {
+            if (parts[index] is InterpolationPart.Integer or InterpolationPart.Reference)
+            { return Approximate(operation, block, FrontendAbstention.UnsupportedControlFlow); }
+        }
         long reserved = 0;
         var nonempty = false;
         var unbounded = false;
