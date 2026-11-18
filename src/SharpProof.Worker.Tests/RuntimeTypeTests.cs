@@ -70,6 +70,8 @@ public sealed class RuntimeTypeTests
     [TestCase("[DoesNotThrow] public static int M(object o) { return o is string s ? s.Length : 0; }")]
     [TestCase("[DoesNotThrow] public static int M(object o) { return o is object[] a ? a.Length : 0; }")]
     [TestCase("[DoesNotThrow] public static int M(object o) { if (!(o is int[] a)) { return 0; } return a.Length; }")]
+    // A checked call in the same body does not bring the failure back.
+    [TestCase("public static int Positive(int x) { Contract.Requires(x >= 0); return x; } [DoesNotThrow] public static int M(object o) { return o is string s ? Positive(s.Length) : Positive(1); }")]
     public async Task StringAndArrayPatternVariablesStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
