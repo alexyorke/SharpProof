@@ -33,6 +33,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // being lowered may run during that initialization.
     internal Func<IFieldSymbol, InitializedValue?>? InitializedStatic { get; init; }
 
+    // Whether a static holds an object no code can change, set by its type's
+    // admitted initializer.
+    internal Func<IFieldSymbol, bool>? ImmutableStatic { get; init; }
+
     internal Func<IPropertyReferenceOperation, IrBlockId, int, TotalBodyValue?>? SourceGetter { get; init; }
     internal Func<IObjectCreationOperation, IrBlockId, int, TotalBodyValue?>? SourceConstruction { get; init; }
     internal Func<ISimpleAssignmentOperation, IrBlockId, int, TotalBodyValue?>? SourceSetter { get; init; }
@@ -392,6 +396,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return setterCalled; }
         if (depth < 256 && InitializedStaticRead(operation, block) is { } initializedStatic)
         { return initializedStatic; }
+        if (depth < 256 && ImmutableStaticRead(operation, block) is { } immutableStatic)
+        { return immutableStatic; }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
@@ -1387,6 +1393,30 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return null; }
         var count = 0;
         return new(Materialize(operation, value, ref block, ref count), block, FrontendSubsetClassification.Exact);
+    }
+
+    // A read of a readonly static, or of a static get-only auto-property,
+    // whose type's admitted initializer stored an object no code can change,
+    // such as a boxed constant. The read runs that initializer, which has no
+    // effect a body can observe, so it is not an ambient read. The object
+    // itself is not modeled: the read yields an unknown reference, which may
+    // be null, since a callable the initializer itself runs may read the
+    // static before it is set.
+    private TotalBodyValue? ImmutableStaticRead(IOperation operation, IrBlockId block)
+    {
+        var field = operation switch
+        {
+            IFieldReferenceOperation { Field.IsStatic: true, Instance: null } read when !CSharpOperationSemantics.IsSupportedFieldRead(read.Field) => read.Field,
+            IPropertyReferenceOperation { Property.IsStatic: true, Arguments.Length: 0 } property when BodyGetterField(property) == null =>
+                CSharpOperationSemantics.StaticGetOnlyAutoPropertyField(property.Property),
+            _ => null
+        };
+        if (field == null || ShadowCallSkeleton || !CSharpOperationSemantics.IsReferenceDomain(field.Type) ||
+            ImmutableStatic?.Invoke(field) != true)
+        { return null; }
+        var value = _context.Temporary(_context.Type(field.Type));
+        _builder!.Havoc(block, _context.ImmutableStaticReadSite(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return new(_factory.Variable(value), block, FrontendSubsetClassification.Exact);
     }
 
     private bool CanMaterialize(InitializedValue value, IrTypeId type, int depth)

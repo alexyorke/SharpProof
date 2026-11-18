@@ -442,6 +442,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         return initialized.Value;
     }
 
+    // A readonly static of a type whose initializer is admitted, holding an
+    // object no code can change. The read runs that initializer, which has no
+    // effect a body can observe, and then always yields the same object.
+    private bool HoldsImmutableStatic(IFieldSymbol field)
+    {
+        return _preserveSourceCall == null && _calls != null &&
+            _context.Compilation is Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation &&
+            TypeInitialization.HoldsImmutableValue(compilation, field, _cancellationToken) &&
+            _calls.HasNoTypeInitialization(field.ContainingType);
+    }
+
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
