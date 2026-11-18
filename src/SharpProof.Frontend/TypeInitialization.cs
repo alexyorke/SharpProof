@@ -83,6 +83,105 @@ internal static class TypeInitialization
         return results.GetOrAdd(field, value);
     }
 
+    // A readonly static that only its own initializer stores, and that holds
+    // an object no code can change: null, a constant string, a boxed
+    // constant, or `new object()`. A boxed bool, integer, char,
+    // floating-point or enum value has no member that mutates it. Once the
+    // type's initializer has run, every read yields that same object, so a
+    // read of it is not an ambient read. Whether the initializer itself is
+    // admitted is for the caller to check.
+    internal static bool HoldsImmutableValue(CSharpCompilation compilation, IFieldSymbol field,
+        CancellationToken cancellationToken)
+    {
+        compilation = RepositoryParameterGuard.NotNull(compilation, nameof(compilation));
+        field = RepositoryParameterGuard.NotNull(field, nameof(field)).OriginalDefinition;
+        if (!TypeInitializerClassifier.IsInitializedOnly(field) || !field.Type.IsReferenceType || field.Type is IArrayTypeSymbol)
+        { return false; }
+        var declared = field.AssociatedSymbol is IPropertySymbol property ? (ISymbol)property : field;
+        if (declared.DeclaringSyntaxReferences.Length != 1 ||
+            Initializer(compilation, declared.DeclaringSyntaxReferences[0], cancellationToken) is not { } initializer ||
+            !IsImmutableValue(initializer.Value))
+        { return false; }
+        // C# lets a static constructor and the type's own static initializers
+        // store into a readonly static, or take a writable reference to it.
+        foreach (var member in field.ContainingType.GetMembers())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!member.IsStatic || member is IFieldSymbol { IsConst: true } ||
+                member is IMethodSymbol { MethodKind: not MethodKind.StaticConstructor })
+            { continue; }
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                var operation = member is IMethodSymbol
+                    ? Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree)
+                        .GetOperation(reference.GetSyntax(cancellationToken), cancellationToken)
+                    : Initializer(compilation, reference, cancellationToken);
+                if (operation != null && operation.Descendants().Any(child => MayStore(child, field, declared)))
+                { return false; }
+            }
+        }
+        return true;
+    }
+
+    private static ISymbolInitializerOperation? Initializer(CSharpCompilation compilation, SyntaxReference reference,
+        CancellationToken cancellationToken)
+    {
+        var clause = reference.GetSyntax(cancellationToken) switch
+        {
+            VariableDeclaratorSyntax variable => variable.Initializer,
+            PropertyDeclarationSyntax property => property.Initializer,
+            _ => null
+        };
+        return clause == null ? null
+            : Host.CompilationModelProvider.GetSemanticModel(compilation, reference.SyntaxTree)
+                .GetOperation(clause, cancellationToken) as ISymbolInitializerOperation;
+    }
+
+    private static bool IsImmutableValue(IOperation value)
+    {
+        if (value.ConstantValue.HasValue)
+        { return value.ConstantValue.Value is null or string; }
+        switch (value)
+        {
+            case IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion:
+                var converted = conversion.GetConversion();
+                if (converted.IsUserDefined)
+                { return false; }
+                if (converted.IsBoxing)
+                {
+                    return conversion.Operand.ConstantValue.HasValue && conversion.Operand.Type is { } operandType &&
+                        (CSharpOperationSemantics.IsScalar(operandType) || operandType.TypeKind == TypeKind.Enum ||
+                            operandType.SpecialType is SpecialType.System_Char or SpecialType.System_Single or SpecialType.System_Double);
+                }
+                return converted.IsImplicit && (converted.IsIdentity || converted.IsReference) && IsImmutableValue(conversion.Operand);
+            case IObjectCreationOperation creation:
+                return CSharpOperationSemantics.IsCoreObjectCreation(creation);
+            default:
+                return false;
+        }
+    }
+
+    // A reference to the static, or to its auto-property, other than a plain
+    // read of its value.
+    private static bool MayStore(IOperation operation, IFieldSymbol field, ISymbol declared)
+    {
+        var named = operation switch
+        {
+            IFieldReferenceOperation reference => SymbolEqualityComparer.Default.Equals(reference.Field.OriginalDefinition, field),
+            IPropertyReferenceOperation reference => SymbolEqualityComparer.Default.Equals(reference.Property.OriginalDefinition, declared),
+            _ => false
+        };
+        if (!named)
+        { return false; }
+        return operation.Parent switch
+        {
+            IAssignmentOperation assignment => assignment.Target == operation,
+            IIncrementOrDecrementOperation or IAddressOfOperation or ITupleOperation or IDeconstructionAssignmentOperation => true,
+            IArgumentOperation argument => argument.Parameter is not { RefKind: RefKind.None },
+            _ => operation.Syntax.Parent is RefExpressionSyntax
+        };
+    }
+
     private static InitializationEffect Max(InitializationEffect left, InitializationEffect right)
     { return left >= right ? left : right; }
 

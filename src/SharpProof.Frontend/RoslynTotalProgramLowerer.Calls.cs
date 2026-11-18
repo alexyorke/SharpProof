@@ -442,6 +442,17 @@ internal sealed partial class RoslynTotalProgramLowerer
         return initialized.Value;
     }
 
+    // A readonly static of a type whose initializer is admitted, holding an
+    // object no code can change. The read runs that initializer, which has no
+    // effect a body can observe, and then always yields the same object.
+    private bool HoldsImmutableStatic(IFieldSymbol field)
+    {
+        return _preserveSourceCall == null && _calls != null &&
+            _context.Compilation is Microsoft.CodeAnalysis.CSharp.CSharpCompilation compilation &&
+            TypeInitialization.HoldsImmutableValue(compilation, field, _cancellationToken) &&
+            _calls.HasNoTypeInitialization(field.ContainingType);
+    }
+
     private TotalBodyValue? InlineSourceGetter(IPropertyReferenceOperation property, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
@@ -596,9 +607,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         RecordCallPreconditions(callee, arguments, block, site, callAncestry);
         // A recursive call checks its callee's preconditions, then runs the
         // callee as an unknown call: it may do anything, throw included. So
-        // does a call to an iterator, which has none, and a call whose
-        // callee body does not lower. An unknown call could write a local it
-        // received by reference to anything, so such a call is not expanded.
+        // does a call whose callee body does not lower. An unknown call
+        // could write a local it received by reference to anything, so such
+        // a call is not expanded.
         if (graph == null)
         {
             return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
@@ -786,7 +797,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                 IParameterReferenceOperation owned => owned.Parameter,
                 _ => null
             };
-            if (symbol == null || !variables.Add(symbol) || !_expressions.TryReferenceArgumentStorage(value, out var storage))
+            // A root's own ref or out parameter may be a field, an element
+            // or another parameter's variable; a copy-backed callee would
+            // treat it as independent storage.
+            if (symbol == null || symbol is IParameterSymbol rootReference && _context.IsWritableRootReference(rootReference) ||
+                !variables.Add(symbol) || !_expressions.TryReferenceArgumentStorage(value, out var storage))
             { return null; }
             references.Add((parameter.Ordinal, storage));
         }

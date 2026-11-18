@@ -33,7 +33,7 @@ internal sealed class ReferenceNullPatternFlowTests
     [TestCase("return s is not null ? 0 : s!.Length;", WorkerClaimOutcome.Refuted, true)]
     [TestCase("return s switch { null => s!.Length, _ => 0 };", WorkerClaimOutcome.Refuted, true)]
     [TestCase("return s is { Length: > 0 } ? s.Length : 0;", WorkerClaimOutcome.Unknown, false)]
-    [TestCase("return s is \"x\" ? 0 : s!.Length;", WorkerClaimOutcome.Unknown, true)]
+    [TestCase("return s is \"x\" ? 0 : s!.Length;", WorkerClaimOutcome.Refuted, true)]
     public async Task RelatedReferencePatterns(string body, WorkerClaimOutcome expected, bool throwsForNull)
     {
         System.ArgumentNullException.ThrowIfNull(body);

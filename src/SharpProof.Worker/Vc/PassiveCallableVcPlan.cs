@@ -556,6 +556,8 @@ internal sealed class PassiveCallableVcPlan
             "InvalidOperation" => new InvalidOperationException(),
             "InvalidOperationNull" => new InvalidOperationException((string?)null),
             "DivideByZero" => new DivideByZeroException(),
+            "NotSupported" => new NotSupportedException(),
+            "NotImplemented" => new NotImplementedException(),
             "IOException" => new IOException(),
             "ObjectDisposedName" => new ObjectDisposedException(nameof(kind)),
             "Aggregate" => new AggregateException(),

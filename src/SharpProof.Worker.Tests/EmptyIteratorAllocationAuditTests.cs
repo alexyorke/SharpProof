@@ -41,7 +41,7 @@ public sealed class EmptyIteratorAllocationAuditTests
     [
         new("own-empty-iterator",
             "using System.Collections.Generic; using SharpProof.Attributes; public static class Subject { [ZeroAllocations] public static IEnumerable<int> Target() { yield break; } }",
-            null),
+            WorkerClaimOutcome.Refuted),
         new("ordinary-null-control",
             "using System.Collections.Generic; using SharpProof.Attributes; public static class Subject { [ZeroAllocations] public static IEnumerable<int>? Target() { return null; } }",
             WorkerClaimOutcome.Proven),
