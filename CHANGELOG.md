@@ -141,6 +141,11 @@ listing changes against an earlier one. Development history is in the Git log.
   unmodeled, as `as` already was, so that method stays `Unknown`. The artifact
   encoder also leaves out any callable whose program the worker cannot read,
   instead of writing a manifest no worker accepts.
+- `s[i]` on a string, with an `int` index, faults exactly on a null string or
+  an index outside `[0, s.Length)`. Before, a guarded read such as
+  `s.Length > 0 ? s[0] : ' '` was `Unknown` under `DoesNotThrow`, because the
+  catalog let the call throw for any index. The character's value is still
+  unknown.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
