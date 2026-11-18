@@ -18,8 +18,9 @@ public static class DiagnosticExamples
     [ZeroAllocations]
     public static int Unsupported()
     {
-        Func<int> value = () => 1;
-        return value();
+        int one = 1;
+        ref int value = ref one;
+        return value;
     }
 
     public static PositiveBox RefutedConstructor() => new(0);
