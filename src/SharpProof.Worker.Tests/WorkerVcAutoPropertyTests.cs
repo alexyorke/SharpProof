@@ -176,11 +176,12 @@ public sealed class WorkerVcAutoPropertyTests
         Assert.That(claim.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), claim.Reason.ToString());
     }
 
-    // A ref parameter the body writes stores into its caller's variable.
+    // A ref parameter the body writes stores into its caller's variable,
+    // and keeps that value until another write.
     [Test]
-    public void WrittenRefParameterStaysUnsupported()
+    public void WrittenRefParameterIsModeled()
     {
-        Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(Claim("WriteThroughRef").Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
     }
 
     [Test]

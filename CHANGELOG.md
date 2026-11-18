@@ -129,6 +129,12 @@ listing changes against an earlier one. Development history is in the Git log.
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly
   struct` of those, such as NodaTime's `LocalTime.Midnight`. Code the
   initializer itself runs still sees an unknown value.
+- Effect claims cover methods with their own `ref` or `out` parameters of a
+  scalar or reference type, such as `bool TryParse(string s, out int value)`.
+  The argument may be a field, an element or a variable passed twice, so each
+  store to one is a write to argument state that forgets memory and the other
+  by-reference parameters. Before, such methods were `Unknown` for every claim
+  except a postcondition on a single scalar `out` parameter.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
