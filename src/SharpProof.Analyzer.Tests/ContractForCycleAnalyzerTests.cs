@@ -12,8 +12,9 @@ public sealed class ContractForCycleAnalyzerTests
         ["SP0047", "SPCF0009", "SPCF0010"];
     private const string UnsupportedMapBody = """
                     Contract.Ensures(true);
-                    Func<int> unsupported = () => value;
-                    return unsupported();
+                    int local = value;
+                    ref int unsupported = ref local;
+                    return unsupported;
                 """;
 
     [Test]
