@@ -193,8 +193,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         if (_preserveSourceCall != null || creation.Constructor is not { } constructor)
         { return null; }
         var directConstructor = CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken);
-        if (!directConstructor &&
-            !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
+        var canCallOpaque = _expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared &&
+            constructor.ContainingType.TypeKind == TypeKind.Class;
+        if (!directConstructor && !canCallOpaque)
         { return null; }
         foreach (var initializer in creation.Initializer?.Initializers ?? [])
         {
@@ -207,7 +208,13 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return null; }
         }
         if (!TryConstructionInitializers(constructor, out var initializers))
-        { return null; }
+        {
+            if (!canCallOpaque || constructor.ContainingType.BaseType?.SpecialType == SpecialType.System_Object)
+            { return null; }
+            // Keep the existing opaque construction when a newly admitted
+            // chain's own initializers cannot be separated from its body.
+            directConstructor = false;
+        }
         var valueStruct = CSharpOperationSemantics.IsModeledStruct(creation.Type);
         if (valueStruct && constructor.IsImplicitlyDeclared)
         {
@@ -309,7 +316,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return new(created!, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
             return ran.Classification.IsExact ? Complete(ran.Continuation) : new(created!, ran.Continuation, ran.Classification);
         }
-        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate, constructedReceiver: () => created) is not { } body)
+        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate,
+            constructedReceiver: () => created, opaqueConstructor: !directConstructor) is not { } body)
         { return null; }
         if (created == null)
         {
@@ -588,12 +596,14 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
         Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default,
-        bool exactTarget = false)
+        bool exactTarget = false, bool opaqueConstructor = false)
     {
         var references = ReferenceArguments(callArguments);
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
+        if (_calls == null || opaqueConstructor && references != null ||
+            !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
-                exactTarget: exactTarget) &&
+                exactTarget: exactTarget, contractOnly: opaqueConstructor) &&
+            !opaqueConstructor &&
             !(_expressions.AllowOpaqueCalls && references == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget)))
