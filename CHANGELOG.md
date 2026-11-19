@@ -124,6 +124,12 @@ listing changes against an earlier one. Development history is in the Git log.
   other constructor runs on the same object, with its field initializers,
   then the rest of this one. Instance field initializers no longer count as
   effects, so `new` of a class with them can be proved pure.
+- `new` of a class whose base classes are source classes is inlined, with
+  `: base(...)` run in C#'s order: the class's own field initializers, the
+  base constructor's arguments, the base class's initializers and body, then
+  the class's body. Before, such a construction was an unknown call. A base
+  constructor that calls a virtual member of `this`, and a base class from
+  another assembly other than `object`, still leave the construction unknown.
 - A readonly static, or a static get-only auto-property, whose type's
   initializer runs to completion at analysis time holds the value that run
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly

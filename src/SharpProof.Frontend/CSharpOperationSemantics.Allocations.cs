@@ -148,22 +148,26 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsDirectObjectConstructor(IMethodSymbol constructor, bool includeInitializers, CancellationToken cancellationToken)
     {
         if (constructor is not { MethodKind: MethodKind.Constructor, IsStatic: false } ||
-            constructor.ContainingType is not
-            {
-                TypeKind: TypeKind.Class, IsRecord: false, BaseType.SpecialType: SpecialType.System_Object
-            } and not { TypeKind: TypeKind.Struct } ||
+            constructor.ContainingType is not { TypeKind: TypeKind.Class, IsRecord: false } and not { TypeKind: TypeKind.Struct } ||
             constructor.ContainingType is { TypeKind: TypeKind.Struct } && !IsModeledStruct(constructor.ContainingType))
         { return false; }
         var type = constructor.ContainingType;
+        // A class whose base is a source class runs that class's constructor
+        // first. Only a caller that runs instance initializers itself can run
+        // the chain in C#'s order, so only it admits one.
+        var sourceBase = type.TypeKind == TypeKind.Class && type.BaseType?.SpecialType != SpecialType.System_Object;
+        if (sourceBase && (!includeInitializers || !HasSourceBaseChain(type, cancellationToken)))
+        { return false; }
         // `: this(arguments)` runs another constructor of the same type on the
-        // same object first; the body graph holds that call, which the lowerer
-        // inlines on the receiver. `: base(arguments)` is not admitted.
+        // same object first, and `: base(arguments)` one of a source base
+        // class; the body graph holds that call, which the lowerer inlines on
+        // the receiver.
         foreach (var reference in constructor.DeclaringSyntaxReferences)
         {
             if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.ConstructorDeclarationSyntax syntax ||
                 syntax.Initializer is { } initializer &&
                 !initializer.ThisOrBaseKeyword.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ThisKeyword) &&
-                initializer.ArgumentList.Arguments.Count != 0)
+                initializer.ArgumentList.Arguments.Count != 0 && !sourceBase)
             { return false; }
         }
         foreach (var reference in type.DeclaringSyntaxReferences)
@@ -187,6 +191,106 @@ internal static partial class CSharpOperationSemantics
         { return modifiers.Any(static modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)); }
     }
 
+    // Every base class of a class down to object is a class declared in the
+    // same assembly, without a primary constructor and not a record. A
+    // metadata base other than object runs a constructor whose body is not
+    // available here.
+    internal static bool HasSourceBaseChain(INamedTypeSymbol type, CancellationToken cancellationToken)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        var depth = 0;
+        for (var ancestor = type.BaseType; ancestor is not { SpecialType: SpecialType.System_Object }; ancestor = ancestor.BaseType)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ancestor is not { TypeKind: TypeKind.Class, IsRecord: false } || ++depth > 16 ||
+                ancestor.DeclaringSyntaxReferences.IsEmpty ||
+                !SymbolEqualityComparer.Default.Equals(ancestor.ContainingAssembly, type.ContainingAssembly))
+            { return false; }
+            foreach (var reference in ancestor.DeclaringSyntaxReferences)
+            {
+                if (reference.GetSyntax(cancellationToken) is not Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax { ParameterList: null })
+                { return false; }
+            }
+        }
+        return true;
+    }
+
+    // The base constructor an implicitly declared constructor of a class
+    // runs: `base()` binds the base class's parameterless constructor when no
+    // other one can be called without arguments. Null when the base is
+    // object, whose constructor does nothing; false when the base is not a
+    // source class or the call is not that one.
+    internal static bool TryImplicitBaseConstructor(INamedTypeSymbol type, CancellationToken cancellationToken, out IMethodSymbol? constructor)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        constructor = null;
+        if (type.TypeKind != TypeKind.Class || type.BaseType is not { } baseType)
+        { return false; }
+        if (baseType.SpecialType == SpecialType.System_Object)
+        { return true; }
+        if (!HasSourceBaseChain(type, cancellationToken))
+        { return false; }
+        foreach (var candidate in baseType.InstanceConstructors)
+        {
+            if (candidate.Parameters.IsEmpty)
+            {
+                if (constructor != null || candidate.DeclaredAccessibility == Accessibility.Private)
+                { return false; }
+                constructor = candidate;
+            }
+            else if (candidate.Parameters.All(static parameter => parameter.IsOptional || parameter.IsParams))
+            { return false; }
+        }
+        return constructor != null;
+    }
+
+    // A constructor that can run on an object of a more derived class, or a
+    // constructor it chains to with `: this(arguments)`, dispatches a virtual
+    // member of `this`. Such a call runs the most derived override, which
+    // the declaration does not show. A `base.` access does not dispatch.
+    internal static bool ConstructorDispatchesOnThis(IMethodSymbol constructor, Compilation? compilation, CancellationToken cancellationToken)
+    {
+        constructor = RepositoryParameterGuard.NotNull(constructor, nameof(constructor));
+        for (var depth = 0; depth < 16; depth++)
+        {
+            if (constructor.IsImplicitlyDeclared)
+            { return false; }
+            if (compilation == null || constructor.DeclaringSyntaxReferences.Length != 1 ||
+                constructor.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not { } syntax ||
+                !compilation.ContainsSyntaxTree(syntax.SyntaxTree) ||
+                Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree).GetOperation(syntax, cancellationToken) is not { } body)
+            { return true; }
+            IMethodSymbol? chained = null;
+            foreach (var operation in body.Descendants())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                switch (operation)
+                {
+                    case IInvocationOperation { Instance: IInstanceReferenceOperation, TargetMethod.MethodKind: MethodKind.Constructor } call:
+                        if (SymbolEqualityComparer.Default.Equals(call.TargetMethod.ContainingType, constructor.ContainingType))
+                        { chained = call.TargetMethod; }
+                        break;
+                    case IInvocationOperation { Instance: IInstanceReferenceOperation, IsVirtual: true }:
+                    case IMethodReferenceOperation { Instance: IInstanceReferenceOperation, IsVirtual: true }:
+                        return true;
+                    case IPropertyReferenceOperation { Instance: IInstanceReferenceOperation receiver, Property: var property }
+                        when (property.IsVirtual || property.IsAbstract || property.IsOverride) && !IsBaseAccess(receiver):
+                        return true;
+                    case IEventReferenceOperation { Instance: IInstanceReferenceOperation receiver, Event: var accessed }
+                        when (accessed.IsVirtual || accessed.IsAbstract || accessed.IsOverride) && !IsBaseAccess(receiver):
+                        return true;
+                }
+            }
+            if (chained == null)
+            { return false; }
+            constructor = chained;
+        }
+        return true;
+
+        static bool IsBaseAccess(IOperation receiver)
+        { return receiver.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax; }
+    }
+
     // A constructor declared `: this(arguments)` that runs another declared
     // constructor. Instance field and property initializers run in that one,
     // not in this one. A struct's `: this()` to its implicit parameterless
@@ -203,8 +307,10 @@ internal static partial class CSharpOperationSemantics
     }
 
     // The call a `: this(arguments)` initializer makes: another constructor
-    // of the type under construction, on the object under construction. C#
-    // has no other way to call a constructor on `this`.
+    // of the type under construction, on the object under construction; or
+    // the call a `: base(arguments)` initializer, written or implicit, makes
+    // to a constructor of a source base class. C# has no other way to call a
+    // constructor on `this`.
     internal static bool IsChainedConstructorCall(IInvocationOperation invocation, IMethodSymbol owner)
     {
         invocation = RepositoryParameterGuard.NotNull(invocation, nameof(invocation));
@@ -214,7 +320,20 @@ internal static partial class CSharpOperationSemantics
             TargetMethod.MethodKind: MethodKind.Constructor,
             Instance: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance }
         } && owner.MethodKind == MethodKind.Constructor &&
-            SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, owner.ContainingType);
+            (SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, owner.ContainingType) ||
+                IsSourceBaseConstructorCall(invocation.TargetMethod, owner.ContainingType));
+    }
+
+    // A constructor of the direct base class of a class, declared in the
+    // same assembly.
+    internal static bool IsSourceBaseConstructorCall(IMethodSymbol target, INamedTypeSymbol? type)
+    {
+        target = RepositoryParameterGuard.NotNull(target, nameof(target));
+        return type is { TypeKind: TypeKind.Class, BaseType: { SpecialType: not SpecialType.System_Object } baseType } &&
+            target.MethodKind == MethodKind.Constructor && !target.IsStatic &&
+            SymbolEqualityComparer.Default.Equals(target.ContainingType, baseType) &&
+            SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, type.ContainingAssembly) &&
+            !baseType.DeclaringSyntaxReferences.IsEmpty;
     }
 
     internal static bool IsObjectConstructorCall(IOperation? operation)
