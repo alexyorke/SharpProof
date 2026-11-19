@@ -832,13 +832,15 @@ public sealed class AnalyzerModeAndEffectTests
             public static class Fixture {
                 [ZeroAllocations]
                 public static int Selected() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
 
                 public static int Unannotated() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
             }
             """,
@@ -861,8 +863,9 @@ public sealed class AnalyzerModeAndEffectTests
             public static class Fixture {
                 public static int SelectedByClause() {
                     Contract.Ensures(true);
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
 
                 [return: Positive]
@@ -876,8 +879,9 @@ public sealed class AnalyzerModeAndEffectTests
                 }
 
                 public static int Unannotated() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
             }
             """,
@@ -1246,8 +1250,9 @@ public sealed class AnalyzerModeAndEffectTests
             public static class Fixture {
                 [EffectContract(SharpProofEffect.None)]
                 public static int Selected() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
             }
             """,

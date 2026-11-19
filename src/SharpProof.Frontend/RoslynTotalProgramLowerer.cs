@@ -188,6 +188,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             DelegateBinding = _calls == null ? null : _calls.CanBindDelegate,
             ExceptionTarget = _frame == null ? null : (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (_frame.Search(kind, site, static target => target.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(target)) : (target)))
         };
+        if (closure == null)
+        { EmitClosureFrame(entry, graph.OriginalOperation); }
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
         { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }
         foreach (var source in selected)
@@ -265,6 +267,21 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             InitializeVisualBasicLocalStorage(graph, entry, structural);
             _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         }
+    }
+
+    // The compiler allocates a closure frame where the scope of a captured
+    // variable begins, also on paths that never create the delegate. A frame
+    // the root closure plan does not place is a possible allocation at entry.
+    private void EmitClosureFrame(IrBlockId entry, IOperation body)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(entry.IsDefault, nameof(entry));
+        var emission = _emission;
+        if (_preserveSourceCall != null || AnonymousFunctionCreation.FrameCapture(body, _context.Target,
+            emission == null ? null : operation => emission.IsElided(operation), _cancellationToken) is not { } function)
+        { return; }
+        var member = _context.Factory.GetOrCreateMember(_context.Factory.CreateIdentity(), _context.Factory.ObjectType,
+            "opaque-call:closure-frame", _context.Factory.BooleanType, true);
+        _builder.Call(entry, _context.OpaqueCallSite(function, IrOpaqueCallEffects.Allocates, "closure-frame"), null, member, null);
     }
 
     private void InitializeVisualBasicLocalStorage(ControlFlowGraph graph, IrBlockId entry, OperationId structural)

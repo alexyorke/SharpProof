@@ -132,6 +132,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             ExceptionTarget = (kind, site) => site.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(site)) : (EnclosingRegionFilter(_regionSource.EnclosingRegion) is { } filter
                 ? filter.Rejected : RegionExceptionTarget(_regionSource.EnclosingRegion, Token(kind, site)))
         };
+        EmitClosureFrame(entry, graph.OriginalOperation);
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
         var localInitialization = _regionLocals.Count == 0 ? default : RegionLocalInitialization();
         foreach (var source in graph.Blocks)
