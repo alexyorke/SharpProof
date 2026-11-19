@@ -161,19 +161,19 @@ Changing a pinned commit is a reviewed change too: methods that disappear are dr
 
 Entries marked `censusOnly` have a zero `methodQuota`. The nightly census reads committed C# files at the configured revisions and verifies the pinned license and notice text. Its artifacts contain aggregate reports. The upstream source files stay out of the checked-in corpus and the reports.
 
-| Census source | Reviewed license |
+| Census source ID | Reviewed license |
 | --- | --- |
-| Markdig | BSD-2-Clause, with MIT .NET polyfills |
-| YamlDotNet | MIT, including the separate libyaml notice |
-| Dapper | Apache-2.0 for the C# library |
-| CsvHelper | Apache-2.0 option of the upstream dual license |
-| Serilog | Apache-2.0 |
-| Polly | BSD-3-Clause |
-| Stateless | Apache-2.0 |
-| DiffPlex | Apache-2.0 |
-| Sprache | MIT |
-| Scriban | BSD-2-Clause |
-| Newtonsoft.Json | MIT, including .NET polyfills |
-| GuardClauses | MIT, including the JetBrains annotations |
+| `markdig` | BSD-2-Clause, with MIT .NET polyfills |
+| `yamldotnet` | MIT, including the separate `libyaml` notice |
+| `dapper` | Apache-2.0 for the C# library |
+| `csvhelper` | Apache-2.0 option of the upstream dual license |
+| `serilog` | Apache-2.0 |
+| `polly` | BSD-3-Clause |
+| `stateless` | Apache-2.0 |
+| `diffplex` | Apache-2.0 |
+| `sprache` | MIT |
+| `scriban` | BSD-2-Clause |
+| `newtonsoft` | MIT, including .NET polyfills |
+| `guardclauses` | MIT, including the JetBrains annotations |
 
 Review any new pin against the selected roots and refresh its license and notice hashes in [sources.json](sources.json). The BCL compilation settings in the lock apply to census compilation. The census does not run upstream build scripts or generators.
