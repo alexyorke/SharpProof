@@ -1354,8 +1354,9 @@ public sealed class RequiresAndControlTests
 
             public sealed class ValidSubject {
                 public int SelectedByCompanion() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
             }
 
@@ -1370,8 +1371,9 @@ public sealed class RequiresAndControlTests
 
             public sealed class MalformedSubject {
                 public int SelectedByMalformedCompanion() {
-                    Func<int> value = () => 1;
-                    return value();
+                    int one = 1;
+                    ref int value = ref one;
+                    return value;
                 }
             }
 

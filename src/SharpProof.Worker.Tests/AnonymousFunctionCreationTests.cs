@@ -75,12 +75,24 @@ public sealed class AnonymousFunctionCreationTests
     [TestCase("Counter c = default; c.Value = n; System.Action a = () => { c.Value++; }; a(); return c.Value;")]
     [TestCase("int x = n; System.Action a = () => { ref int r = ref x; r++; }; a(); return x;")]
     [TestCase("int x = n; int y = 0; System.Action a = () => { (x, y) = (y, x); }; a(); return x;")]
+    // A dynamic call may take its argument by reference.
+    [TestCase("object d = new object(); int x = n; System.Action a = () => ((dynamic)d).Bump(ref x); a(); return x;")]
     public async Task CapturedWritesStayUnknown(string body)
     {
         System.ArgumentNullException.ThrowIfNull(body);
         var result = await ResultAsync("public static class C { " + Statics +
             "public static int M(int n) { Contract.Ensures(Contract.Result<int>() == n); " + body + " } }");
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown), result.Reason.ToString());
+    }
+
+    // A call the compiler omits takes every lambda inside it with it, so no
+    // closure frame is made for them.
+    [Test]
+    public async Task LambdasInsideAnOmittedCallAllocateNothing()
+    {
+        var result = await ResultAsync("public static class C { [System.Diagnostics.Conditional(\"ABSENT\")] static void Sink(System.Func<System.Func<int>> f) { } " +
+            "[ZeroAllocations] public static void M(int n) { Sink(() => () => n); } }");
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
     }
 
     // A capturing lambda allocates its delegate every time. A non-capturing

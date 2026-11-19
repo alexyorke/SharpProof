@@ -113,7 +113,10 @@ internal static class AnonymousFunctionCreation
         {
             cancellationToken.ThrowIfCancellationRequested();
             var function = model.GetOperation(expression, cancellationToken);
-            if (function?.Parent is IDelegateCreationOperation creation && elided?.Invoke(creation) == true)
+            // A function inside an omitted call, at any depth, is removed with it.
+            if (expression.AncestorsAndSelf().OfType<AnonymousFunctionExpressionSyntax>().Any(enclosing =>
+                    model.GetOperation(enclosing, cancellationToken)?.Parent is IDelegateCreationOperation creation &&
+                    elided?.Invoke(creation) == true))
             { continue; }
             // A failed analysis is taken to capture.
             if (model.AnalyzeDataFlow(expression) is not { Succeeded: true } flow ||
@@ -164,6 +167,10 @@ internal static class AnonymousFunctionCreation
         { return true; }
         if (parent is IArgumentOperation argument)
         { return argument.Parameter is not { RefKind: RefKind.None or RefKind.In }; }
+        // A dynamic call binds at run time and may take the argument by
+        // reference; Roslyn gives its arguments no IArgumentOperation.
+        if (parent is IDynamicInvocationOperation or IDynamicObjectCreationOperation or IDynamicIndexerAccessOperation)
+        { return true; }
         // A deconstruction stores into each element of its target tuple.
         if (parent is ITupleOperation)
         { return MayChange(parent, depth + 1); }
