@@ -24,6 +24,8 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("private static readonly Point Origin = new Point(0);")]
     [TestCase("private static readonly object Gate; static C() { Gate = new object(); }")]
     [TestCase("private static readonly int[] Copy = Admitted.Data;")]
+    [TestCase("private static readonly object[] NoArguments = System.Array.Empty<object>();")]
+    [TestCase("private static readonly Era[] NoEras = System.Array.Empty<Era>();")]
     public async Task FreshValuesProvePurityAndCapabilities(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
