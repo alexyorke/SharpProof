@@ -584,16 +584,21 @@ internal static class TypeInitialization
                 foreach (var node in reference.GetSyntax(cancellationToken).DescendantNodes())
                 {
                     if (!Spend() || node is RefExpressionSyntax or RefTypeSyntax or FixedStatementSyntax or UnsafeStatementSyntax or
-                        PointerTypeSyntax or FunctionPointerTypeSyntax or ThisExpressionSyntax { Parent: not MemberAccessExpressionSyntax } ||
+                        PointerTypeSyntax or FunctionPointerTypeSyntax or MakeRefExpressionSyntax or RefValueExpressionSyntax or
+                        ThisExpressionSyntax { Parent: not MemberAccessExpressionSyntax } ||
                         node is MemberDeclarationSyntax member && member.Modifiers.Any(SyntaxKind.ExternKeyword) ||
                         node.IsKind(SyntaxKind.AddressOfExpression))
                     { return false; }
                     if (node is ArgumentSyntax argument && (argument.RefKindKeyword.RawKind != 0 ||
                         model.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter.RefKind: not RefKind.None }))
                     { return false; }
-                    if (node is ExpressionSyntax expression &&
-                        (HasReferenceSignature(model.GetConversion(expression, cancellationToken).MethodSymbol) ||
-                            UsesUntrackedStorage(model.GetSymbolInfo(expression, cancellationToken).Symbol)))
+                    if (node is not ExpressionSyntax expression)
+                    { continue; }
+                    var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
+                    if (HasReferenceSignature(model.GetConversion(expression, cancellationToken).MethodSymbol) ||
+                        UsesUntrackedStorage(symbol) ||
+                        expression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } &&
+                            symbol is IMethodSymbol { ReducedFrom: not null })
                     { return false; }
                 }
             }

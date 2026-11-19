@@ -101,6 +101,26 @@ public sealed class ImmutableStaticReadTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
+    [Test]
+    public async Task PassingTheReceiverToAnExtensionKeepsCacheReadsUnknown()
+    {
+        const string types = """
+            public static class Extensions
+            {
+                public static void Reset(this Box value) => typeof(Box).GetField("_value",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(value, 0);
+            }
+            public sealed class Box
+            {
+                private readonly int _value;
+                public Box(int value) { _value = value; }
+                public void Clear() => this.Reset();
+            }
+            """;
+        var result = await ResultAsync("private static readonly Box Item = new Box(42); [EnforcePure] public static Box M() => Item;", types);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
     // Newtonsoft's boxed-integer cache, Scriban's boxed Booleans, and the
     // other admitted shapes.
     [TestCase("private static readonly object Zero = 0L; private static readonly object One = 1L; " +
