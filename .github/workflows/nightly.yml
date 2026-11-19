@@ -1,7 +1,7 @@
 name: Nightly
 
 # Advisory only: never runs on pull requests and is not a required check.
-# Every job is a ./ci.sh lane, so `./ci.sh nightly` or
+# Every job is a ./ci.sh lane, so `./ci.sh nightly`, `./ci.sh oss-census` or
 # `LONGFUZZ_MINUTES=5 ./ci.sh fuzz-0` reproduces it locally.
 
 on:
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [nightly, fuzz-0, fuzz-1, fuzz-2, fuzz-3, fuzz-4, fuzz-5]
+        lane: [nightly, oss-census, fuzz-0, fuzz-1, fuzz-2, fuzz-3, fuzz-4, fuzz-5]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

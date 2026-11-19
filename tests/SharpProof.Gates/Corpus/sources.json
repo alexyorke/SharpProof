@@ -172,6 +172,668 @@
           "NETCOREAPP3_1_OR_GREATER"
         ]
       }
+    },
+    {
+      "id": "markdig",
+      "repository": "https://github.com/xoofx/markdig",
+      "commit": "797ae6637eb85a3a6cf94c285344e41760a076fc",
+      "licenseSpdx": "BSD-2-Clause",
+      "license": {
+        "path": "license.txt",
+        "sha256": "d76433184366ecebb23ce1b97a635c1e49ccd7c1035fdfbf8e7e17782ae7eee8"
+      },
+      "notices": [],
+      "roots": [
+        "src/Markdig"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "allowUnsafe": true,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0"
+        ]
+      }
+    },
+    {
+      "id": "yamldotnet",
+      "repository": "https://github.com/aaubry/YamlDotNet",
+      "commit": "4f7e6e346649ec2a402607a3c1ea352c6fb5ecd3",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "LICENSE.txt",
+        "sha256": "daea8b7f1b2bab48ea12ad50b0ce91634669d99d7dd0cb64aed8dffeeef69ed3"
+      },
+      "notices": [
+        {
+          "path": "LICENSE-libyaml",
+          "sha256": "d0d8b09800a45cd982e9568fc7669d9c1a4c330e275a821bbe24d54366d16fe9"
+        }
+      ],
+      "roots": [
+        "YamlDotNet"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0",
+          "SIGNED"
+        ]
+      }
+    },
+    {
+      "id": "dapper",
+      "repository": "https://github.com/DapperLib/Dapper",
+      "commit": "eb47546a408bbf6c178bda4f04dc205bc51ffbfe",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "License.txt",
+        "sha256": "06ca89b47c80c9dbf1ef7a1fff16397198167f0f14465cb1a7a99c9a59928e63"
+      },
+      "notices": [],
+      "roots": [
+        "Dapper"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "allowUnsafe": true,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER"
+        ]
+      }
+    },
+    {
+      "id": "csvhelper",
+      "repository": "https://github.com/JoshClose/CsvHelper",
+      "commit": "06fb8d3cd581b149148060cd8edf4e84d3876f01",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "LICENSE.txt",
+        "sha256": "9d4536859bfd0538ae5e846bcfbc030a77916dc2df9a81219318f0b4813a6781"
+      },
+      "notices": [],
+      "roots": [
+        "src/CsvHelper"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "allowUnsafe": true,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0"
+        ]
+      }
+    },
+    {
+      "id": "serilog",
+      "repository": "https://github.com/serilog/serilog",
+      "commit": "43105b35095337d77f022561a8f2d3db2f9a7937",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
+      },
+      "notices": [],
+      "roots": [
+        "src/Serilog"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [
+          "System",
+          "System.Collections.Generic",
+          "System.IO",
+          "System.Linq",
+          "System.Net.Http",
+          "System.Threading",
+          "System.Threading.Tasks"
+        ],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0",
+          "FEATURE_ITUPLE",
+          "FEATURE_DATE_AND_TIME_ONLY",
+          "FEATURE_SPAN",
+          "FEATURE_DEFAULT_INTERFACE",
+          "FEATURE_ASYNCDISPOSABLE",
+          "FEATURE_WRITE_STRINGBUILDER",
+          "FEATURE_TOHEXSTRING"
+        ]
+      }
+    },
+    {
+      "id": "polly",
+      "repository": "https://github.com/App-vNext/Polly",
+      "commit": "3bac1c877ac5b94f0c09cbf4efe4c15fafce639d",
+      "licenseSpdx": "BSD-3-Clause",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "1a99e4b057fa759e4c45c45d4e2f6c3051b460723067143c70fe3ba5621d2b63"
+      },
+      "notices": [],
+      "roots": [
+        "src/Polly.Core"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [
+          "System",
+          "System.Collections.Generic",
+          "System.IO",
+          "System.Linq",
+          "System.Net.Http",
+          "System.Threading",
+          "System.Threading.Tasks",
+          "Polly.Utils",
+          "System.Collections",
+          "System.Collections.Concurrent",
+          "System.Diagnostics",
+          "System.Reflection"
+        ],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0"
+        ]
+      }
+    },
+    {
+      "id": "stateless",
+      "repository": "https://github.com/dotnet-state-machine/stateless",
+      "commit": "587f143bacdcbc4c4ecf5cdc1430b9f4f3ea8eee",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "0fce32b1600dc7566dd0ecdc08c06a786946648e2decae5c268f34c28ab5cf39"
+      },
+      "notices": [],
+      "roots": [
+        "src/Stateless"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": false,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0",
+          "TASKS"
+        ]
+      }
+    },
+    {
+      "id": "diffplex",
+      "repository": "https://github.com/mmanela/diffplex",
+      "commit": "f500e73f28e28813f942f1f16dec5a34b40e48e3",
+      "licenseSpdx": "Apache-2.0",
+      "license": {
+        "path": "License.txt",
+        "sha256": "becde03a3c8b9b2e3d58c7b65ca7ffd9e18e98162396cc374052983c1faaa47c"
+      },
+      "notices": [],
+      "roots": [
+        "DiffPlex"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": false,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET6_0"
+        ]
+      }
+    },
+    {
+      "id": "sprache",
+      "repository": "https://github.com/sprache/Sprache",
+      "commit": "9d1721bb0dea638e35b9bbb2334fea6f99bf778e",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "licence.txt",
+        "sha256": "fa45290e457aea6f7b65d35899ac9fea96d68c18b115247d4d9e4c58fb27649a"
+      },
+      "notices": [],
+      "roots": [
+        "src/Sprache"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": false,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET5_0",
+          "STRING_IS_ENUMERABLE",
+          "STRING_JOIN_ENUMERABLE"
+        ]
+      }
+    },
+    {
+      "id": "scriban",
+      "repository": "https://github.com/scriban/scriban",
+      "commit": "6e278bc7f0058e12da0265b3eff69109b2ffaede",
+      "licenseSpdx": "BSD-2-Clause",
+      "license": {
+        "path": "license.txt",
+        "sha256": "d76433184366ecebb23ce1b97a635c1e49ccd7c1035fdfbf8e7e17782ae7eee8"
+      },
+      "notices": [],
+      "roots": [
+        "src/Scriban"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0"
+        ]
+      }
+    },
+    {
+      "id": "newtonsoft",
+      "repository": "https://github.com/JamesNK/Newtonsoft.Json",
+      "commit": "52fa3aef1f2cadcd3a3f874251eddc98d3efbbaa",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "LICENSE.md",
+        "sha256": "d7f83bbea3264a8e23d7739e44d9db1a4994b357274df6f00876eb2e623827ad"
+      },
+      "notices": [],
+      "roots": [
+        "Src/Newtonsoft.Json"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET8_0",
+          "HAVE_APPCONTEXT",
+          "HAVE_ADO_NET",
+          "HAVE_APP_DOMAIN",
+          "HAVE_ASYNC",
+          "HAVE_ASYNC_DISPOSABLE",
+          "HAVE_BIG_INTEGER",
+          "HAVE_BINARY_FORMATTER",
+          "HAVE_BINARY_SERIALIZATION",
+          "HAVE_BINARY_EXCEPTION_SERIALIZATION",
+          "HAVE_CHAR_TO_LOWER_WITH_CULTURE",
+          "HAVE_CHAR_TO_STRING_WITH_CULTURE",
+          "HAVE_COM_ATTRIBUTES",
+          "HAVE_COMPONENT_MODEL",
+          "HAVE_CONCURRENT_COLLECTIONS",
+          "HAVE_COVARIANT_GENERICS",
+          "HAVE_DATA_CONTRACTS",
+          "HAVE_DATE_TIME_OFFSET",
+          "HAVE_DB_NULL_TYPE_CODE",
+          "HAVE_DYNAMIC",
+          "HAVE_EMPTY_TYPES",
+          "HAVE_ENTITY_FRAMEWORK",
+          "HAVE_EXPRESSIONS",
+          "HAVE_FAST_REVERSE",
+          "HAVE_FSHARP_TYPES",
+          "HAVE_FULL_REFLECTION",
+          "HAVE_GUID_TRY_PARSE",
+          "HAVE_HASH_SET",
+          "HAVE_ICLONEABLE",
+          "HAVE_ICONVERTIBLE",
+          "HAVE_IGNORE_DATA_MEMBER_ATTRIBUTE",
+          "HAVE_INOTIFY_COLLECTION_CHANGED",
+          "HAVE_INOTIFY_PROPERTY_CHANGING",
+          "HAVE_ISET",
+          "HAVE_LINQ",
+          "HAVE_MEMORY_BARRIER",
+          "HAVE_METHOD_IMPL_ATTRIBUTE",
+          "HAVE_NON_SERIALIZED_ATTRIBUTE",
+          "HAVE_READ_ONLY_COLLECTIONS",
+          "HAVE_REFLECTION_EMIT",
+          "HAVE_REGEX_TIMEOUTS",
+          "HAVE_SECURITY_SAFE_CRITICAL_ATTRIBUTE",
+          "HAVE_SERIALIZATION_BINDER_BIND_TO_NAME",
+          "HAVE_STREAM_READER_WRITER_CLOSE",
+          "HAVE_STRING_JOIN_WITH_ENUMERABLE",
+          "HAVE_TIME_SPAN_PARSE_WITH_CULTURE",
+          "HAVE_TIME_SPAN_TO_STRING_WITH_CULTURE",
+          "HAVE_TIME_ZONE_INFO",
+          "HAVE_TRACE_WRITER",
+          "HAVE_TYPE_DESCRIPTOR",
+          "HAVE_UNICODE_SURROGATE_DETECTION",
+          "HAVE_VARIANT_TYPE_PARAMETERS",
+          "HAVE_VERSION_TRY_PARSE",
+          "HAVE_XLINQ",
+          "HAVE_XML_DOCUMENT",
+          "HAVE_XML_DOCUMENT_TYPE",
+          "HAVE_CONCURRENT_DICTIONARY",
+          "HAVE_INDEXOF_STRING_COMPARISON",
+          "HAVE_REPLACE_STRING_COMPARISON",
+          "HAVE_GETHASHCODE_STRING_COMPARISON",
+          "HAVE_NULLABLE_ATTRIBUTES",
+          "HAVE_DYNAMIC_CODE_COMPILED",
+          "HAS_ARRAY_EMPTY",
+          "HAVE_DATE_ONLY"
+        ]
+      }
+    },
+    {
+      "id": "guardclauses",
+      "repository": "https://github.com/ardalis/GuardClauses",
+      "commit": "514f157e91f55694742487d19e1f62f07bbd0657",
+      "licenseSpdx": "MIT",
+      "license": {
+        "path": "LICENSE",
+        "sha256": "8e0a1dd30992f00b9759f9367da0925664770bd32e00fa76b52e17529af8c12e"
+      },
+      "notices": [],
+      "roots": [
+        "src/GuardClauses"
+      ],
+      "excludes": [],
+      "methodQuota": 0,
+      "censusOnly": true,
+      "compilation": {
+        "nullable": true,
+        "checkOverflow": false,
+        "globalUsings": [],
+        "preprocessorSymbols": [
+          "NET",
+          "NETCOREAPP",
+          "TRACE",
+          "RELEASE",
+          "NET5_0_OR_GREATER",
+          "NET6_0_OR_GREATER",
+          "NET7_0_OR_GREATER",
+          "NET8_0_OR_GREATER",
+          "NET9_0_OR_GREATER",
+          "NET10_0_OR_GREATER",
+          "NETCOREAPP1_0_OR_GREATER",
+          "NETCOREAPP1_1_OR_GREATER",
+          "NETCOREAPP2_0_OR_GREATER",
+          "NETCOREAPP2_1_OR_GREATER",
+          "NETCOREAPP2_2_OR_GREATER",
+          "NETCOREAPP3_0_OR_GREATER",
+          "NETCOREAPP3_1_OR_GREATER",
+          "NETSTANDARD2_0_OR_GREATER",
+          "NETSTANDARD2_1_OR_GREATER",
+          "NETSTANDARD1_0_OR_GREATER",
+          "NETSTANDARD1_3_OR_GREATER",
+          "NETSTANDARD1_6_OR_GREATER",
+          "NET10_0"
+        ]
+      }
     }
   ]
 }
