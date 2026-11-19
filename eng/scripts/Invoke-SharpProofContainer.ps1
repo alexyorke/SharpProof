@@ -701,15 +701,16 @@ switch ($Command) {
             $oracleModes = @('exception-oracle', 'allocation-oracle', 'purity-oracle',
                 'capability-oracle', 'effectcontract-oracle')
             $sourcesPath = Join-Path $repositoryRoot 'tests/SharpProof.Gates/Corpus/sources.json'
-            $sourceIds = @((Get-Content -LiteralPath $sourcesPath -Raw | ConvertFrom-Json).sources |
-                Where-Object { $_.PSObject.Properties.Name -notcontains 'censusOnly' -or -not $_.censusOnly } |
-                ForEach-Object { $_.id })
+            $sourceConfig = Get-Content -LiteralPath $sourcesPath -Raw | ConvertFrom-Json
             foreach ($oracleMode in $oracleModes) {
                 $gateRuns.Add([string[]]@($oracleMode))
             }
-            foreach ($sourceId in $sourceIds) {
+            foreach ($source in $sourceConfig.sources) {
+                if ($source.PSObject.Properties.Name -contains 'censusOnly' -and $source.censusOnly) {
+                    continue
+                }
                 foreach ($oracleMode in $oracleModes) {
-                    $gateRuns.Add([string[]]@($oracleMode, '--source', $sourceId))
+                    $gateRuns.Add([string[]]@($oracleMode, '--source', $source.id))
                 }
             }
         }
