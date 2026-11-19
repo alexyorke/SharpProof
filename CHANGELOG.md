@@ -251,6 +251,21 @@ listing changes against an earlier one. Development history is in the Git log.
   Enumerating the result is still an unknown call, and an iterator
   with `Requires`, `Ensures` or `Assume` stays `Unknown`, since its clauses
   would describe the enumeration.
+- Lambdas and anonymous methods converted to a delegate are analyzed, so a
+  method that returns, stores or passes one, such as NodaTime's pattern
+  handler factories, no longer stays `Unknown` for that alone. Creating the
+  delegate runs none of its body, so `[EnforcePure]` and `[DoesNotThrow]` can
+  be proved however the body behaves. A capturing lambda allocates a new
+  delegate each time, so `[ZeroAllocations]` is refuted when one is reached;
+  a non-capturing one reuses a delegate the compiler caches, and a closure
+  frame is allocated where a captured variable's scope begins, so those leave
+  allocation claims `Unknown`. Invoking the delegate is still an unknown call.
+  A lambda is refused when it, or any other lambda or local function in the
+  method, writes a variable it captures, passes it by reference or calls a
+  mutating member of a captured struct, since an invocation the method cannot
+  see would then change the method's own variables. Expression trees, lambdas
+  that call local functions and lambdas capturing a constructor's `this` stay
+  `Unknown`.
 - `throw new NotSupportedException()` and `throw new NotImplementedException()`,
   the bodies of stub methods, are modeled like `new InvalidOperationException()`:
   the constructor looks up its message in runtime resources, under a runtime

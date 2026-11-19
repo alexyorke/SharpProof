@@ -112,6 +112,16 @@ Once an interpolated string over `string`, `char`, `bool`, integer and reference
 
 Once a static initializer that only builds framework collections, such as `new Dictionary<uint, BigInteger>()`, counted as making fresh values (SEMANTICS.md, "Type initialization"), `CatalanNumbers.GetNumberByBinomialCoefficients` (OSS0179) began to inline `BinomialCoefficients`, whose type has that cache. It now stops at SP0002 instead of SP0047: `Factorial` stores into the cache to memoize, a real write to shared state, so the verdict stays Unknown. The SP0047 ceiling fell by one (193 to 192) and the SP0002 ceiling rose by one (225 to 226); the total-Unknown ceiling is unchanged.
 
+### Reviewed classification for lambda creation
+
+Once creating a delegate from a lambda lowered without running its body (SEMANTICS.md, "Effects"), eight selected methods stopped abstaining at SP0047.
+
+- **Proven:** NodaTime `CreateYearOfEraHandler` (OSS0383) and `CreatePeriodHandler` (OSS0388). Each only returns a lambda over parameters that are never written, so the call is pure.
+- **Refuted:** NodaTime `GetAllZones` (OSS0332). It checks its argument with `Preconditions.CheckNotNull`, which throws for `null` and builds that exception from culture resources, as reviewed for OSS0335.
+- **Unknown, now SP0002:** `_tryGetEdge` in the directed and undirected weighted sparse graphs (OSS0049, OSS0053), MoreLINQ `AssertCount` (OSS0205) and `TakeEvery` (OSS0291), and Humanizer `DefaultCollectionFormatter.Humanize<T>` (OSS0430). Each now lowers past its lambda and stops on unknown library calls.
+
+All eight were reviewed against the bodies. The supported floors rose by three, the total-Unknown ceiling fell by three, the SP0047 ceiling fell by eight and the SP0002 ceiling rose by five.
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.
