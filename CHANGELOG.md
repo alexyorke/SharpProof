@@ -200,6 +200,8 @@ listing changes against an earlier one. Development history is in the Git log.
   also accept these values and record the write.
 - Target-typed `default` and `default!` count as effect-free values in type
   initialization, including in constructors of cached generic objects.
+- Reads of admitted readonly caches can return an opaque sealed source object
+  built from constants, default values and deferred delegate arguments.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to

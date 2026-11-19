@@ -38,7 +38,11 @@ public sealed class ImmutableStaticReadTests
     [TestCase("[EnforcePure] public static int M(int value) => CachedResult<int>.Identity(value);", true)]
     [TestCase("[DoesNotThrow] public static int M(int value) => CachedResult<int>.Identity(value);", true)]
     [TestCase("[ZeroAllocations] public static int M(int value) => CachedResult<int>.Identity(value);", false)]
-    [TestCase("[EnforcePure] public static CachedResult<int> M() => CachedResult<int>.Empty;", false)]
+    [TestCase("[EnforcePure] public static CachedResult<int> M() => CachedResult<int>.Empty;", true)]
+    [TestCase("[DoesNotThrow] public static CachedResult<int> M() => CachedResult<int>.Empty;", true)]
+    [TestCase("[ZeroAllocations] public static CachedResult<int> M() => CachedResult<int>.Empty;", false)]
+    [TestCase("[DoesNotThrow] public static System.Exception M() => CachedResult<int>.Empty.GetError();", false)]
+    [TestCase("public static CachedResult<int> M() { Contract.Ensures(Contract.Result<CachedResult<int>>() != null); return CachedResult<int>.Empty; }", false)]
     public async Task CachedResultKeepsInitializationAndReadEffectsSeparate(string members, bool proven)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -51,6 +55,69 @@ public sealed class ImmutableStaticReadTests
     {
         var eager = CachedResult.Replace("_failure = failure;", "failure(); _failure = failure;", StringComparison.Ordinal);
         var result = await ResultAsync("[DoesNotThrow] public static int M(int value) => CachedResult<int>.Identity(value);", eager);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("private int _mutable;")]
+    [TestCase("private readonly int[] _items = new int[1];")]
+    [TestCase("public void Change() => System.Runtime.CompilerServices.Unsafe.AsRef(in _value) = default!;")]
+    [TestCase("public void Change() => System.Runtime.CompilerServices.Unsafe.AsRef(_value) = default!;")]
+    [TestCase("public void Change() => typeof(CachedResult<T>).GetField(nameof(_value), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(this, default(T));")]
+    public async Task MutableStorageAndReferenceAliasesKeepCacheReadsUnknown(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        var wrapper = CachedResult.Replace("public bool CanContinue", member + " public bool CanContinue", StringComparison.Ordinal);
+        var result = await ResultAsync("[EnforcePure] public static CachedResult<int> M() => CachedResult<int>.Empty;", wrapper);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("1", true)]
+    [TestCase("new int[1]", false)]
+    public async Task ReadonlyFieldCacheRequiresAnImmutableConstructorArgument(string value, bool proven)
+    {
+        System.ArgumentNullException.ThrowIfNull(value);
+        const string type = "public sealed class Box<T> { private readonly T _value; public Box(T value) { _value = value; } }";
+        var cached = proven ? "Box<int>" : "Box<int[]>";
+        var result = await ResultAsync($"private static readonly {cached} Item = new({value}); [EnforcePure] public static {cached} M() => Item;", type);
+        Assert.That(result.Outcome, Is.EqualTo(proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task ImplicitByReferenceExtensionReceiverKeepsCacheReadsUnknown()
+    {
+        const string types = """
+            public static class Extensions
+            {
+                public static void Reset(this in int value) => System.Runtime.CompilerServices.Unsafe.AsRef(in value) = 0;
+            }
+            public sealed class Box
+            {
+                private readonly int _value;
+                public Box(int value) { _value = value; }
+                public void Reset() => _value.Reset();
+            }
+            """;
+        var result = await ResultAsync("private static readonly Box Item = new Box(42); [EnforcePure] public static Box M() => Item;", types);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task PassingTheReceiverToAnExtensionKeepsCacheReadsUnknown()
+    {
+        const string types = """
+            public static class Extensions
+            {
+                public static void Reset(this Box value) => typeof(Box).GetField("_value",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(value, 0);
+            }
+            public sealed class Box
+            {
+                private readonly int _value;
+                public Box(int value) { _value = value; }
+                public void Clear() => this.Reset();
+            }
+            """;
+        var result = await ResultAsync("private static readonly Box Item = new Box(42); [EnforcePure] public static Box M() => Item;", types);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 

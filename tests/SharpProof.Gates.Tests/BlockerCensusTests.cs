@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
+using SharpProof.Frontend;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;
@@ -10,6 +11,24 @@ namespace SharpProof.Gates.Test;
 public sealed class BlockerCensusTests
 {
     private static readonly string[] ExactRow = ["(lowers exactly)"];
+
+    [Test]
+    public void NodaTimeCachedEmptyParseResultHasImmutableStorage()
+    {
+        var token = TestContext.CurrentContext.CancellationToken;
+        var document = OpenSourceCorpusCatalog.Load(RepositoryLayout.FindRoot());
+        var source = document with
+        {
+            Methods = [.. document.Methods.Where(static method => method.SourceId == "nodatime").Take(1)]
+        };
+        var compilation = OpenSourceCorpusRunner.PrepareExceptionProbe(source, token, purity: true);
+        var type = compilation.GetTypeByMetadataName("NodaTime.Text.ParseResult`1")!;
+        var property = type.GetMembers("ValueStringEmpty").OfType<IPropertySymbol>().Single();
+        var field = CSharpOperationSemantics.StaticGetOnlyAutoPropertyField(property);
+        Assert.That(field, Is.Not.Null);
+        Assert.That(TypeInitialization.Classify(compilation, type, token), Is.EqualTo(InitializationEffect.FreshValues));
+        Assert.That(TypeInitialization.HoldsImmutableValue(compilation, field!, token), Is.True);
+    }
 
     [Test]
     public void EveryMethodHasAtLeastOneRowAndExactBodiesStandAlone()
