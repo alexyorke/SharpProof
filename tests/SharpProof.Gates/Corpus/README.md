@@ -124,7 +124,7 @@ All eight were reviewed against the bodies. The supported floors rose by three, 
 
 ### Reviewed lowering reasons for opaque floating-point conversions
 
-Five C-Sharp-Algorithms methods stay Unknown with SP0047 after their integer-to-floating conversions lower. The Sieve of Atkin (OSS0016) and `PrimesList.IsPrime` (OSS0124) stop at the conversion of `Math.Sqrt` back to `int`. The Sieve of Eratosthenes (OSS0017) and both comb-sort methods (OSS0107 and OSS0185) reach unsupported floating comparisons. Their verdicts, support classifications, and diagnostic ID counts are unchanged.
+Five C-Sharp-Algorithms methods stay Unknown with SP0047 after their integer-to-floating conversions lower. `SieveOfAtkin` (OSS0016) and `PrimesList.IsPrime` (OSS0124) stop at the conversion of `Math.Sqrt` back to `int`. The Sieve of Eratosthenes (OSS0017) and both comb-sort methods (OSS0107 and OSS0185) reach unsupported floating comparisons. Their verdicts, support classifications, and diagnostic ID counts are unchanged.
 
 ## Contracts on real code
 
