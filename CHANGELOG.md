@@ -190,6 +190,15 @@ listing changes against an earlier one. Development history is in the Git log.
   `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
   `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
   clauses, and `FormattableString` or handler conversions stay unsupported.
+- `float`, `double` and `decimal` values flow through bodies as opaque values.
+  A conversion into one from an integer, and `float` or `double` arithmetic
+  and comparisons, never throw and give an unknown value; a floating field of
+  a class can be stored. Before, any of these left the body unsupported, which
+  blocked forwarding helpers such as Humanizer's
+  `Seconds(this int s) => Seconds((double)s)`. Such helpers can be proved not
+  to throw when their callee is, while a claim that depends on a floating
+  value stays `Unknown`. Conversions out of floating point, `decimal`
+  arithmetic and floating values in contract clauses stay unsupported.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to

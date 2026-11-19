@@ -1784,14 +1784,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         {
             return Approximate(operation, block, classification.Abstention);
         }
-        if (operation is IBinaryOperation { IsLifted: false, OperatorMethod: null, OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals } binary &&
-            binary.LeftOperand.Type?.SpecialType is SpecialType.System_Single or SpecialType.System_Double &&
-            binary.RightOperand.Type?.SpecialType == binary.LeftOperand.Type?.SpecialType)
+        if (CSharpOperationSemantics.IsOpaqueFloatingOperation(operation))
         {
-            // Built-in floating equality runs no user code; its result is unknown to the IR.
-            var compared = _context.Temporary(_factory.BooleanType);
-            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, compared);
-            return new(_factory.Variable(compared), block, FrontendSubsetClassification.Exact);
+            // Built-in floating arithmetic, comparisons and conversions from
+            // integers run no user code and never throw; their results are
+            // unknown to the IR.
+            var unknown = _context.Temporary(_context.Type(operation.Type));
+            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+            return new(_factory.Variable(unknown), block, FrontendSubsetClassification.Exact);
         }
         var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)],
             _context.Compilation?.Options.CheckOverflow);
