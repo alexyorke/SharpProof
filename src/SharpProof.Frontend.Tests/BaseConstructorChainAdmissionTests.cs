@@ -137,6 +137,18 @@ public sealed class BaseConstructorChainAdmissionTests
         }
     }
 
+    [TestCase("public class Middle<T> : Root { } public class Leaf : Middle<int> { }")]
+    [TestCase("public class Leaf : Root { }")]
+    public void RejectedImplicitBaseChainCanUseAnOpaqueConstruction(string chain)
+    {
+        System.ArgumentNullException.ThrowIfNull(chain);
+        using var subject = TypedProgramSubject.Create("object Target() => new Leaf();",
+            "public class Root { static Root() { System.Console.WriteLine(1); } public Root() { } } " + chain);
+        var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowering.IsExact, Is.True);
+        Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions).OfType<IrCallInstruction>(), Has.Exactly(1).Items);
+    }
+
     private static readonly CSharpCompilation Compilation = CSharpCompilation.Create("Chains",
         [CSharpSyntaxTree.ParseText(Source, new CSharpParseOptions(LanguageVersion.CSharp12))],
         TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

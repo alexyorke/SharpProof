@@ -308,15 +308,20 @@ internal sealed partial class RoslynTotalProgramLowerer
                 baseConstructor == null ||
                 !baseConstructor.IsImplicitlyDeclared && !TryDeclaredBaseInitializers(baseConstructor, out baseInitializers))
             { return null; }
-            block = Allocate(block);
             var based = baseConstructor.IsImplicitlyDeclared
-                ? InlineImplicitConstruction(creation, baseConstructor.ContainingType, created!, block, depth, fresh: true)
+                ? InlineImplicitConstruction(creation, baseConstructor.ContainingType, () => created, block, depth, fresh: true, allocate: Allocate)
                 : InlineSourceMember(creation, baseConstructor, null, [], block, depth,
-                    prelude: current => StoreConstructionInitializers(baseInitializers, created!, current, depth, fresh: true),
+                    prelude: InitializeBase,
                     constructedReceiver: () => created);
             if (based is not { } ran)
-            { return new(created!, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+            { return null; }
             return ran.Classification.IsExact ? Complete(ran.Continuation) : new(created!, ran.Continuation, ran.Classification);
+
+            IrBlockId InitializeBase(IrBlockId current)
+            {
+                current = Allocate(current);
+                return StoreConstructionInitializers(baseInitializers, created!, current, depth, fresh: true);
+            }
         }
         if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate,
             constructedReceiver: () => created, opaqueConstructor: opaqueConstructor) is not { } body)
@@ -359,7 +364,7 @@ internal sealed partial class RoslynTotalProgramLowerer
                     ? new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Exact) : null;
             }
             return baseChain && invocation.Arguments.IsEmpty && constructor.ContainingType.TypeKind == TypeKind.Class
-                ? InlineImplicitConstruction(invocation, constructor.ContainingType, receiver, block, depth, _expressions.FreshReceiver)
+                ? InlineImplicitConstruction(invocation, constructor.ContainingType, () => receiver, block, depth, _expressions.FreshReceiver)
                 : null;
         }
         if (!CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) ||
@@ -376,7 +381,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     // initializers on the object, then its base class's parameterless
     // constructor, down to object's, which does nothing. Every implicit
     // level is checked before any of them emits a store.
-    private TotalBodyValue? InlineImplicitConstruction(IOperation site, INamedTypeSymbol type, IrTerm receiver, IrBlockId block, int depth, bool fresh)
+    private TotalBodyValue? InlineImplicitConstruction(IOperation site, INamedTypeSymbol type, Func<IrTerm?> constructedReceiver,
+        IrBlockId block, int depth, bool fresh, Func<IrBlockId, IrBlockId>? allocate = null)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var levels = ImmutableArray.CreateBuilder<ImmutableArray<(IFieldSymbol Field, IOperation Value)>>();
@@ -402,14 +408,20 @@ internal sealed partial class RoslynTotalProgramLowerer
         var baseInitializers = ImmutableArray<(IFieldSymbol Field, IOperation Value)>.Empty;
         if (declaredBase != null && !TryDeclaredBaseInitializers(declaredBase, out baseInitializers))
         { return null; }
-        foreach (var initializers in levels)
-        { block = StoreConstructionInitializers(initializers, receiver, block, depth, fresh); }
         if (declaredBase == null)
-        { return new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Exact); }
+        { return new(_context.Factory.Boolean(false), Initialize(block), FrontendSubsetClassification.Exact); }
         return InlineSourceMember(site, declaredBase, null, [], block, depth,
-                prelude: current => StoreConstructionInitializers(baseInitializers, receiver, current, depth, fresh),
-                constructedReceiver: () => receiver) ??
-            new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
+            prelude: Initialize, constructedReceiver: constructedReceiver);
+
+        IrBlockId Initialize(IrBlockId current)
+        {
+            if (allocate != null)
+            { current = allocate(current); }
+            var receiver = constructedReceiver()!;
+            foreach (var initializers in levels)
+            { current = StoreConstructionInitializers(initializers, receiver, current, depth, fresh); }
+            return StoreConstructionInitializers(baseInitializers, receiver, current, depth, fresh);
+        }
     }
 
     // A declared base class constructor the lowerer runs on an object of a
