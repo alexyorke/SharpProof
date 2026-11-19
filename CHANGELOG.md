@@ -198,6 +198,8 @@ listing changes against an earlier one. Development history is in the Git log.
   helpers such as Humanizer's `Seconds(this int s) => Seconds((double)s)`
   reach the callee's existing proof rules. Stores to admitted class fields
   also accept these values and record the write.
+- Target-typed `default` and `default!` count as effect-free values in type
+  initialization, including in constructors of cached generic objects.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to
