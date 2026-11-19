@@ -17,6 +17,9 @@ public sealed class BaseConstructorChainAdmissionTests
         public class Leaf : Mid { public Leaf() : base(1) { } }
         public class OverException : System.Exception { }
         public class Below : OverException { }
+        public class Finalizer { ~Finalizer() { } }
+        public class AfterFinalizer : Finalizer { }
+        public class WithOwnFinalizer : Root { ~WithOwnFinalizer() { } }
         public record class Rec { }
         public record class RecLeaf : Rec { }
         public class Primary(int x) { public int X => x; }
@@ -41,6 +44,8 @@ public sealed class BaseConstructorChainAdmissionTests
     [TestCase("Mid", true)]
     [TestCase("Root", true)]
     [TestCase("Below", false)]
+    [TestCase("AfterFinalizer", false)]
+    [TestCase("WithOwnFinalizer", false)]
     [TestCase("RecLeaf", false)]
     [TestCase("OnPrimary", false)]
     public void BaseChainsMustBeSourceClasses(string name, bool expected)

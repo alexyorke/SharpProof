@@ -192,19 +192,22 @@ internal static partial class CSharpOperationSemantics
     }
 
     // Every base class of a class down to object is a class declared in the
-    // same assembly, without a primary constructor and not a record. A
+    // same assembly, without a primary constructor or a finalizer and not a record. A
     // metadata base other than object runs a constructor whose body is not
     // available here.
     internal static bool HasSourceBaseChain(INamedTypeSymbol type, CancellationToken cancellationToken)
     {
         type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        if (HasFinalizer(type))
+        { return false; }
         var depth = 0;
         for (var ancestor = type.BaseType; ancestor is not { SpecialType: SpecialType.System_Object }; ancestor = ancestor.BaseType)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (ancestor is not { TypeKind: TypeKind.Class, IsRecord: false } || ++depth > 16 ||
                 ancestor.DeclaringSyntaxReferences.IsEmpty ||
-                !SymbolEqualityComparer.Default.Equals(ancestor.ContainingAssembly, type.ContainingAssembly))
+                !SymbolEqualityComparer.Default.Equals(ancestor.ContainingAssembly, type.ContainingAssembly) ||
+                HasFinalizer(ancestor))
             { return false; }
             foreach (var reference in ancestor.DeclaringSyntaxReferences)
             {
@@ -213,6 +216,9 @@ internal static partial class CSharpOperationSemantics
             }
         }
         return true;
+
+        static bool HasFinalizer(INamedTypeSymbol candidate)
+        { return candidate.GetMembers().Any(static member => member is IMethodSymbol { MethodKind: MethodKind.Destructor }); }
     }
 
     // The base constructor an implicitly declared constructor of a class

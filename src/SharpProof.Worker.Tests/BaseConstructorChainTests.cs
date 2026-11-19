@@ -143,6 +143,51 @@ public sealed class BaseConstructorChainTests
         {
             public CheckedLeaf(long x) : base(x) { if (x < 10) { throw new System.ArgumentException("small"); } }
         }
+        public class HiddenSlotBase
+        {
+            protected readonly long slot;
+            protected HiddenSlotBase() { BeforeWrite = slot; slot = 3; }
+            public long BeforeWrite { get; }
+        }
+        public sealed class HiddenSlotLeaf : HiddenSlotBase
+        {
+            private new readonly long slot = 8;
+            public long Sum => base.slot + slot;
+        }
+        public class PublishedBase
+        {
+            public static PublishedBase Latest;
+            protected PublishedBase() { Latest = this; }
+        }
+        public sealed class PublishedLeaf : PublishedBase
+        {
+            private readonly long value;
+            public PublishedLeaf(long input) { value = input; }
+        }
+        public class AmbientBase
+        {
+            private static readonly int count;
+            static AmbientBase() { count = System.Environment.ProcessorCount; }
+            protected AmbientBase() { }
+        }
+        public sealed class AmbientLeaf : AmbientBase { }
+        public class FinalizingBase
+        {
+            ~FinalizingBase() { Log.Value = 1; }
+        }
+        public sealed class FinalizingLeaf : FinalizingBase { }
+        public class IndirectDispatch
+        {
+            private readonly long value;
+            protected IndirectDispatch() { value = Read(); }
+            private long Read() => Compute();
+            protected virtual long Compute() => 1;
+            public long Value => value;
+        }
+        public sealed class IndirectLeaf : IndirectDispatch
+        {
+            protected override long Compute() => 2;
+        }
         """;
 
     // A derived class's initializers run before the base constructor's
@@ -176,6 +221,8 @@ public sealed class BaseConstructorChainTests
     [TestCase("public static long M(long x) { Contract.Requires(x > -1000 && x < 1000); " +
         "Contract.Ensures(Contract.Result<long>() == x + 8); return new Grown(x).Value; }")]
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 8); return new Implicit().Sum; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 0); return new HiddenSlotLeaf().BeforeWrite; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 11); return new HiddenSlotLeaf().Sum; }")]
     public async Task BaseChainsAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -196,6 +243,9 @@ public sealed class BaseConstructorChainTests
     // A base constructor's own effects stay effects.
     [TestCase("[EnforcePure] public static long M(long x) { return new Ordered(x).Early; }")]
     [TestCase("[EnforcePure] public static long M(long x) { return new Bumped(x).First; }")]
+    [TestCase("[EnforcePure] public static object M(long x) { return new PublishedLeaf(x); }")]
+    [TestCase("[EnforcePure] public static object M() { return new AmbientLeaf(); }")]
+    [TestCase("[EnforcePure] public static object M() { return new FinalizingLeaf(); }")]
     public async Task BaseConstructorEffectsAreNotProvenPure(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -207,6 +257,7 @@ public sealed class BaseConstructorChainTests
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 1); return new Overriding().Measured; }")]
     [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 2); return new Overriding().Measured; }")]
     [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Specific(x).Code; }")]
+    [TestCase("public static long M() { Contract.Ensures(Contract.Result<long>() == 1); return new IndirectLeaf().Value; }")]
     public async Task UnmodeledBaseConstructorsStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

@@ -190,9 +190,11 @@ internal sealed partial class RoslynTotalProgramLowerer
     // class constructor runs as an unknown call after its preconditions.
     private TotalBodyValue? InlineSourceConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
     {
-        if (_preserveSourceCall != null || creation.Constructor is not { } constructor ||
-            !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) &&
-                !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
+        if (_preserveSourceCall != null || creation.Constructor is not { } constructor)
+        { return null; }
+        var directConstructor = CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken);
+        if (!directConstructor &&
+            !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
         { return null; }
         foreach (var initializer in creation.Initializer?.Initializers ?? [])
         {
@@ -247,7 +249,8 @@ internal sealed partial class RoslynTotalProgramLowerer
             // An object of a class with source base classes starts with every
             // field of every class zeroed too. A field whose storage is not
             // modeled is left unknown, which covers its zero.
-            else if (!valueStruct && creation.Type is INamedTypeSymbol { BaseType.SpecialType: not SpecialType.System_Object } derived)
+            else if (directConstructor && !valueStruct &&
+                creation.Type is INamedTypeSymbol { BaseType.SpecialType: not SpecialType.System_Object } derived)
             {
                 for (INamedTypeSymbol? level = derived; level is { SpecialType: not SpecialType.System_Object }; level = level.BaseType)
                 {
