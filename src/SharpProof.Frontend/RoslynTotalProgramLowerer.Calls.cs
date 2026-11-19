@@ -103,7 +103,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     // A constructor body whose `this` is only an unobserved receiver: every
     // use reads or writes one of its fields, calls object's constructor, or
-    // chains with `: this(...)` to a constructor that does the same.
+    // chains with `: this(...)` or `: base(...)` to a constructor that does
+    // the same. An implicitly declared class constructor runs initializers,
+    // which cannot read `this`, then its base class's constructor.
     internal static bool KeepsConstructedReceiver(IOperation body, Compilation? compilation, int depth, CancellationToken cancellationToken)
     {
         body = RepositoryParameterGuard.NotNull(body, nameof(body));
@@ -114,19 +116,26 @@ internal sealed partial class RoslynTotalProgramLowerer
                 CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) != null ||
             CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent) ||
             receiver.Parent is IInvocationOperation chained && chained.Instance == receiver &&
-                SymbolEqualityComparer.Default.Equals(chained.TargetMethod.ContainingType, receiver.Type) && Chained(chained.TargetMethod));
+                (SymbolEqualityComparer.Default.Equals(chained.TargetMethod.ContainingType, receiver.Type) ||
+                    CSharpOperationSemantics.IsSourceBaseConstructorCall(chained.TargetMethod, receiver.Type as INamedTypeSymbol)) &&
+                Chained(chained.TargetMethod, depth));
 
-        bool Chained(IMethodSymbol target)
+        bool Chained(IMethodSymbol target, int level)
         {
-            if (target.MethodKind != MethodKind.Constructor || depth >= 16)
+            if (target.MethodKind != MethodKind.Constructor || level >= 16)
             { return false; }
+            if (target.IsImplicitlyDeclared && target.ContainingType.TypeKind == TypeKind.Class)
+            {
+                return CSharpOperationSemantics.TryImplicitBaseConstructor(target.ContainingType, cancellationToken, out var implicitBase) &&
+                    (implicitBase == null || Chained(implicitBase, level + 1));
+            }
             if (target.IsImplicitlyDeclared)
             { return target.ContainingType.TypeKind == TypeKind.Struct; }
             return compilation != null && target.DeclaringSyntaxReferences.Length == 1 &&
                 target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is { } syntax &&
                 compilation.ContainsSyntaxTree(syntax.SyntaxTree) &&
                 CompilationModelProvider.GetSemanticModel(compilation, syntax.SyntaxTree).GetOperation(syntax, cancellationToken) is { } targetBody &&
-                KeepsConstructedReceiver(targetBody, compilation, depth + 1, cancellationToken);
+                KeepsConstructedReceiver(targetBody, compilation, level + 1, cancellationToken);
         }
     }
 
@@ -176,13 +185,18 @@ internal sealed partial class RoslynTotalProgramLowerer
     // `new C(arguments)` evaluates the arguments, allocates the object and
     // runs instance initializers, the constructor body, then object initializers.
     // A body CFG does not contain the separate field/property initializers.
-    // Any other declared class constructor runs as an unknown call after its
-    // preconditions.
+    // A class with source base classes runs its own initializers before the
+    // base constructor, which the body graph calls first. Any other declared
+    // class constructor runs as an unknown call after its preconditions.
     private TotalBodyValue? InlineSourceConstruction(IObjectCreationOperation creation, IrBlockId block, int depth)
     {
-        if (_preserveSourceCall != null || creation.Constructor is not { } constructor ||
-            !CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) &&
-                !(_expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared && constructor.ContainingType.TypeKind == TypeKind.Class))
+        if (_preserveSourceCall != null || creation.Constructor is not { } constructor)
+        { return null; }
+        var directConstructor = CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken);
+        var canCallOpaque = _expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared &&
+            constructor.ContainingType.TypeKind == TypeKind.Class;
+        var opaqueConstructor = false;
+        if (!directConstructor && !canCallOpaque)
         { return null; }
         foreach (var initializer in creation.Initializer?.Initializers ?? [])
         {
@@ -195,7 +209,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             { return null; }
         }
         if (!TryConstructionInitializers(constructor, out var initializers))
-        { return null; }
+        {
+            if (!canCallOpaque || constructor.ContainingType.BaseType?.SpecialType == SpecialType.System_Object)
+            { return null; }
+            // Keep the existing opaque construction when a newly admitted
+            // chain's own initializers cannot be separated from its body.
+            directConstructor = false;
+            opaqueConstructor = true;
+        }
         var valueStruct = CSharpOperationSemantics.IsModeledStruct(creation.Type);
         if (valueStruct && constructor.IsImplicitlyDeclared)
         {
@@ -234,17 +255,26 @@ internal sealed partial class RoslynTotalProgramLowerer
                     { throw new RegionIncompleteException(); }
                 }
             }
-            // An initializer cannot read `this`, so the object is still unseen.
-            foreach (var (field, initializer) in initializers)
+            // An object of a class with source base classes starts with every
+            // field of every class zeroed too. A field whose storage is not
+            // modeled is left unknown, which covers its zero.
+            else if (directConstructor && !valueStruct &&
+                creation.Type is INamedTypeSymbol { BaseType.SpecialType: not SpecialType.System_Object } derived)
             {
-                SpendRegion();
-                var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
-                if (!lowered.Classification.IsExact ||
-                    !_expressions.StoreInitializer(field, created, initializer, lowered.Value, lowered.Continuation, fresh: true))
-                { throw new RegionIncompleteException(); }
-                current = lowered.Continuation;
+                for (INamedTypeSymbol? level = derived; level is { SpecialType: not SpecialType.System_Object }; level = level.BaseType)
+                {
+                    foreach (var member in level.GetMembers())
+                    {
+                        if (member is not IFieldSymbol { IsStatic: false, IsConst: false } field)
+                        { continue; }
+                        SpendRegion();
+                        var value = CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Type(field.Type));
+                        _ = _expressions.StoreInitializer(field, created, creation, value, current, zeroInitialization: true);
+                    }
+                }
             }
-            return current;
+            // An initializer cannot read `this`, so the object is still unseen.
+            return StoreConstructionInitializers(initializers, created, current, depth, fresh: true);
         }
         TotalBodyValue Complete(IrBlockId current)
         {
@@ -266,10 +296,35 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             if (!creation.Arguments.IsEmpty || _calls == null || !_calls.HasNoTypeInitialization(constructor.ContainingType))
             { return null; }
-            block = Allocate(block);
-            return Complete(block);
+            if (constructor.ContainingType.BaseType?.SpecialType == SpecialType.System_Object)
+            {
+                block = Allocate(block);
+                return Complete(block);
+            }
+            // The implicit constructor of a class with a source base class runs
+            // this class's initializers, then the base class's constructor.
+            var baseInitializers = ImmutableArray<(IFieldSymbol Field, IOperation Value)>.Empty;
+            if (!CSharpOperationSemantics.TryImplicitBaseConstructor(constructor.ContainingType, _cancellationToken, out var baseConstructor) ||
+                baseConstructor == null ||
+                !baseConstructor.IsImplicitlyDeclared && !TryDeclaredBaseInitializers(baseConstructor, out baseInitializers))
+            { return null; }
+            var based = baseConstructor.IsImplicitlyDeclared
+                ? InlineImplicitConstruction(creation, baseConstructor.ContainingType, () => created, block, depth, fresh: true, allocate: Allocate)
+                : InlineSourceMember(creation, baseConstructor, null, [], block, depth,
+                    prelude: InitializeBase,
+                    constructedReceiver: () => created);
+            if (based is not { } ran)
+            { return null; }
+            return ran.Classification.IsExact ? Complete(ran.Continuation) : new(created!, ran.Continuation, ran.Classification);
+
+            IrBlockId InitializeBase(IrBlockId current)
+            {
+                current = Allocate(current);
+                return StoreConstructionInitializers(baseInitializers, created!, current, depth, fresh: true);
+            }
         }
-        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate, constructedReceiver: () => created) is not { } body)
+        if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate,
+            constructedReceiver: () => created, opaqueConstructor: opaqueConstructor) is not { } body)
         { return null; }
         if (created == null)
         {
@@ -286,36 +341,116 @@ internal sealed partial class RoslynTotalProgramLowerer
     // initializers, unless it chains on, and its body. The object was
     // allocated and zeroed when the outermost constructor was entered. The
     // implicit parameterless constructor of a struct only zeroes it.
+    //
+    // `: base(arguments)`, written or implicit, to a source base class runs
+    // the same way: C# has already run this class's initializers, then
+    // evaluates the arguments and runs the base constructor on the object:
+    // the base class's initializers, its own base constructor, then its
+    // body. This constructor's body follows. The object's runtime type may
+    // be a more derived class, whose override a virtual call on `this`
+    // would run, so a base constructor that makes one is refused.
     private TotalBodyValue? InlineChainedConstruction(IInvocationOperation invocation, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         var constructor = invocation.TargetMethod;
         if (_preserveSourceCall != null || _context.ReceiverValue() is not { } receiver)
         { return null; }
+        var baseChain = !SymbolEqualityComparer.Default.Equals(constructor.ContainingType, _context.Target.ContainingType);
         if (constructor.IsImplicitlyDeclared)
         {
-            return CSharpOperationSemantics.IsModeledStruct(constructor.ContainingType) && invocation.Arguments.IsEmpty
-                ? new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Exact) : null;
+            if (CSharpOperationSemantics.IsModeledStruct(constructor.ContainingType))
+            {
+                return invocation.Arguments.IsEmpty
+                    ? new(_context.Factory.Boolean(false), block, FrontendSubsetClassification.Exact) : null;
+            }
+            return baseChain && invocation.Arguments.IsEmpty && constructor.ContainingType.TypeKind == TypeKind.Class
+                ? InlineImplicitConstruction(invocation, constructor.ContainingType, () => receiver, block, depth, _expressions.FreshReceiver)
+                : null;
         }
         if (!CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) ||
+            baseChain && CSharpOperationSemantics.ConstructorDispatchesOnThis(constructor, _context.Compilation, _cancellationToken) ||
             !TryConstructionInitializers(constructor, out var initializers))
         { return null; }
+        var fresh = _expressions.FreshReceiver;
+        return InlineSourceMember(invocation, constructor, null, invocation.Arguments, block, depth,
+            prelude: current => StoreConstructionInitializers(initializers, receiver, current, depth, fresh),
+            constructedReceiver: () => receiver);
+    }
+
+    // An implicitly declared class constructor runs its class's instance
+    // initializers on the object, then its base class's parameterless
+    // constructor, down to object's, which does nothing. Every implicit
+    // level is checked before any of them emits a store.
+    private TotalBodyValue? InlineImplicitConstruction(IOperation site, INamedTypeSymbol type, Func<IrTerm?> constructedReceiver,
+        IrBlockId block, int depth, bool fresh, Func<IrBlockId, IrBlockId>? allocate = null)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        var levels = ImmutableArray.CreateBuilder<ImmutableArray<(IFieldSymbol Field, IOperation Value)>>();
+        IMethodSymbol? declaredBase = null;
+        for (var current = type; ;)
+        {
+            SpendRegion();
+            if (levels.Count >= 16 || _calls == null || !_calls.HasNoTypeInitialization(current) ||
+                current.InstanceConstructors.FirstOrDefault(static candidate => candidate.IsImplicitlyDeclared && candidate.Parameters.IsEmpty) is not { } implicitConstructor ||
+                !TryConstructionInitializers(implicitConstructor, out var initializers) ||
+                !CSharpOperationSemantics.TryImplicitBaseConstructor(current, _cancellationToken, out var next))
+            { return null; }
+            levels.Add(initializers);
+            if (next == null)
+            { break; }
+            if (!next.IsImplicitlyDeclared)
+            {
+                declaredBase = next;
+                break;
+            }
+            current = next.ContainingType;
+        }
+        var baseInitializers = ImmutableArray<(IFieldSymbol Field, IOperation Value)>.Empty;
+        if (declaredBase != null && !TryDeclaredBaseInitializers(declaredBase, out baseInitializers))
+        { return null; }
+        if (declaredBase == null)
+        { return new(_context.Factory.Boolean(false), Initialize(block), FrontendSubsetClassification.Exact); }
+        return InlineSourceMember(site, declaredBase, null, [], block, depth,
+            prelude: Initialize, constructedReceiver: constructedReceiver);
+
         IrBlockId Initialize(IrBlockId current)
         {
-            RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
-            foreach (var (field, initializer) in initializers)
-            {
-                SpendRegion();
-                var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
-                if (!lowered.Classification.IsExact ||
-                    !_expressions.StoreInitializer(field, receiver, initializer, lowered.Value, lowered.Continuation, fresh: _expressions.FreshReceiver))
-                { throw new RegionIncompleteException(); }
-                current = lowered.Continuation;
-            }
-            return current;
+            if (allocate != null)
+            { current = allocate(current); }
+            var receiver = constructedReceiver()!;
+            foreach (var initializers in levels)
+            { current = StoreConstructionInitializers(initializers, receiver, current, depth, fresh); }
+            return StoreConstructionInitializers(baseInitializers, receiver, current, depth, fresh);
         }
-        return InlineSourceMember(invocation, constructor, null, invocation.Arguments, block, depth, prelude: Initialize,
-            constructedReceiver: () => receiver);
+    }
+
+    // A declared base class constructor the lowerer runs on an object of a
+    // derived class, and the initializers it runs first.
+    private bool TryDeclaredBaseInitializers(IMethodSymbol constructor, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
+    {
+        initializers = [];
+        return CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken) &&
+            !CSharpOperationSemantics.ConstructorDispatchesOnThis(constructor, _context.Compilation, _cancellationToken) &&
+            TryConstructionInitializers(constructor, out initializers);
+    }
+
+    // Instance initializers store into the object in declaration order. They
+    // cannot read `this`.
+    private IrBlockId StoreConstructionInitializers(ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers, IrTerm receiver,
+        IrBlockId current, int depth, bool fresh)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(current.IsDefault, nameof(current));
+        receiver = RepositoryParameterGuard.NotNull(receiver, nameof(receiver));
+        foreach (var (field, initializer) in initializers)
+        {
+            SpendRegion();
+            var lowered = _expressions.LowerBodyValue(initializer, current, depth + 1);
+            if (!lowered.Classification.IsExact ||
+                !_expressions.StoreInitializer(field, receiver, initializer, lowered.Value, lowered.Continuation, fresh: fresh))
+            { throw new RegionIncompleteException(); }
+            current = lowered.Continuation;
+        }
+        return current;
     }
 
     private bool TryConstructionInitializers(IMethodSymbol constructor, out ImmutableArray<(IFieldSymbol Field, IOperation Value)> initializers)
@@ -475,15 +610,16 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
         Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default,
-        bool exactTarget = false)
+        bool exactTarget = false, bool opaqueConstructor = false)
     {
         var references = ReferenceArguments(callArguments);
-        if (_calls == null || !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
+        if (_calls == null || opaqueConstructor && references != null ||
+            !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
-                exactTarget: exactTarget) &&
-            !(_expressions.AllowOpaqueCalls && references == null &&
+                exactTarget: exactTarget, contractOnly: opaqueConstructor) &&
+            (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
-                    constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget)))
+                    constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);
