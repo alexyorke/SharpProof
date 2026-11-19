@@ -103,6 +103,31 @@ public sealed class BlockerCensusTests
         return (compilation, declaration);
     }
 
+    // Floating-point values are opaque: an integer converted into one, an
+    // argument of a source helper and a field store lower
+    // without modeling the value. The last method is the one tabulated.
+    [TestCase("public static System.TimeSpan Seconds(double s) => System.TimeSpan.FromSeconds(s); public static System.TimeSpan M(int s) { return Seconds((double)s); }")]
+    [TestCase("public static decimal M(long x) { return x; }")]
+    [TestCase("public sealed class Box { public double Value; } public static void M(Box b, int v) { b.Value = v; }")]
+    public void FloatingValuesLowerExactly(string member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var (compilation, declaration) = Compile("public static class C { " + member + " }");
+        var labels = BlockerCensus.Blockers(compilation, declaration, TestContext.CurrentContext.CancellationToken);
+        Assert.That(labels, Is.EqualTo(ExactRow), string.Join(" ; ", labels));
+    }
+
+    // Conversions out of floating point and arithmetic still abstain.
+    [TestCase("public static int M(double x) { return checked((int)x); }")]
+    [TestCase("public static decimal M(decimal x) { return x + 1m; }")]
+    [TestCase("public static double M(double x) { return x * 2.0; }")]
+    public void FloatingFaultsStillAbstain(string member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var (compilation, declaration) = Compile("public static class C { " + member + " }");
+        Assert.That(BlockerCensus.Blockers(compilation, declaration, TestContext.CurrentContext.CancellationToken), Is.Not.EqualTo(ExactRow));
+    }
+
     // The census lowers a body as the compiler collector does, so a struct
     // member reads `this` as an input, and a target-typed `new(...)` of a
     // modeled struct builds a value, also through a `: this(...)` chain.
