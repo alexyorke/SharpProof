@@ -129,6 +129,11 @@ listing changes against an earlier one. Development history is in the Git log.
   other constructor runs on the same object, with its field initializers,
   then the rest of this one. Instance field initializers no longer count as
   effects, so `new` of a class with them can be proved pure.
+- `new` can inline source base constructors in classes without a destructor. The class's
+  own field initializers run before the base constructor's arguments, then
+  the base class's initializers and body run before the class's body. A
+  virtual call on the base constructor's receiver or a metadata base class
+  other than `object` leaves the construction unknown.
 - A readonly static, or a static get-only auto-property, whose type's
   initializer runs to completion at analysis time holds the value that run
   left, when it is a `bool`, an integer, an enum, `null` or a `readonly
@@ -195,6 +200,18 @@ listing changes against an earlier one. Development history is in the Git log.
   `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
   `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
   clauses, and `FormattableString` or handler conversions stay unsupported.
+- A static initializer may store `Array.Empty<T>()`: it returns one cached
+  zero-length array per `T` and runs no code of `T`, so it counts as making
+  fresh values, as `new T[0]` does.
+- Built-in integer conversions to `float`, `double` and `decimal`, and
+  widening from `float` to `double`, give opaque values. This lets forwarding
+  helpers such as Humanizer's `Seconds(this int s) => Seconds((double)s)`
+  reach the callee's existing proof rules. Stores to admitted class fields
+  also accept these values and record the write.
+- Target-typed `default` and `default!` count as effect-free values in type
+  initialization, including in constructors of cached generic objects.
+- Reads of admitted readonly caches can return an opaque sealed source object
+  built from constants, default values and deferred delegate arguments.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to

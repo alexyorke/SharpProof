@@ -121,6 +121,11 @@ internal static class OpenSourceCorpusImporter
                 $"The upstream checkout has unexpected origin '{remote}'; " +
                 "expected one of the repositories in sources.json: " +
                 string.Join(", ", configuration.Sources.Select(static candidate => candidate.Repository)) + ".");
+        if (source.CensusOnly)
+        {
+            throw new InvalidDataException($"Source {source.Id} is census-only and cannot be imported into the gate.");
+        }
+
         if (!string.Equals(commit, source.Commit, StringComparison.Ordinal))
         {
             throw new InvalidDataException(
@@ -278,7 +283,8 @@ internal static class OpenSourceCorpusImporter
                     $"OSS corpus source {source.Id} must pin a full Git commit.");
             }
 
-            if (!OpenSourceCorpusCatalog.AllowedLicenses.Contains(source.LicenseSpdx, StringComparer.Ordinal))
+            var censusLicense = source.CensusOnly && source.LicenseSpdx is "BSD-2-Clause" or "BSD-3-Clause";
+            if (!censusLicense && !OpenSourceCorpusCatalog.AllowedLicenses.Contains(source.LicenseSpdx, StringComparer.Ordinal))
             {
                 throw new InvalidDataException(
                     $"OSS corpus source {source.Id} uses unsupported license " +
@@ -295,7 +301,13 @@ internal static class OpenSourceCorpusImporter
                     $"OSS corpus source {source.Id} has invalid license, notice, root, or exclude paths.");
             }
 
-            if (source.MethodQuota <= 0)
+            if (source.CensusOnly && source.MethodQuota != 0)
+            {
+                throw new InvalidDataException(
+                    $"Census-only source {source.Id} must have a zero gate quota.");
+            }
+
+            if (!source.CensusOnly && source.MethodQuota <= 0)
             {
                 throw new InvalidDataException(
                     $"OSS corpus source {source.Id} must select at least one method.");
@@ -495,40 +507,16 @@ internal static class OpenSourceCorpusImporter
             }
         }
 
+        var files = await ReadSourceFilesAsync(upstreamRoot, source, cancellationToken).ConfigureAwait(false);
         var parseOptions = OpenSourceCorpusCatalog.GetParseOptions(source.Compilation);
-        var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
         var declarationHashes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var trackedPaths = await ReadGitAsync(
-                upstreamRoot,
-                ["ls-tree", "-r", "--name-only", source.Commit, "--", .. source.Roots],
-                cancellationToken)
-            .ConfigureAwait(false);
-        foreach (var relativePath in trackedPaths
-                     .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
-                     .Where(path => !IsExcluded(source.Excludes, path))
-                     .OrderBy(static path => path, StringComparer.Ordinal))
+        foreach (var file in files)
         {
-            // A byte-order mark is encoding, not source text.
-            var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
-                Encoding.UTF8.GetString(
-                    (await ReadGitBlobAsync(
-                            upstreamRoot,
-                            source.Commit,
-                            relativePath,
-                            cancellationToken)
-                        .ConfigureAwait(false)).AsSpan())).TrimStart(ByteOrderMark);
-            files.Add(
-                new OpenSourceCorpusFile(
-                    source.Id,
-                    relativePath,
-                    OpenSourceCorpusCatalog.ComputeNormalizedSha256(content),
-                    content));
             var tree = CSharpSyntaxTree.ParseText(
-                content,
+                file.Content,
                 parseOptions,
-                relativePath,
+                file.Path,
                 cancellationToken: cancellationToken);
             foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
                          .DescendantNodes()
@@ -552,7 +540,7 @@ internal static class OpenSourceCorpusImporter
                 var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
-                        relativePath,
+                        file.Path,
                         lineSpan.StartLinePosition.Line + 1,
                         lineSpan.EndLinePosition.Line + 1,
                         hash,
@@ -560,7 +548,42 @@ internal static class OpenSourceCorpusImporter
                     { SourceId = source.Id });
             }
         }
-        return (files.ToImmutable(), candidates.ToImmutable());
+        return (files, candidates.ToImmutable());
+    }
+
+    internal static async Task<ImmutableArray<OpenSourceCorpusFile>> ReadSourceFilesAsync(
+        string upstreamRoot,
+        OpenSourceCorpusSourceConfig source,
+        CancellationToken cancellationToken)
+    {
+        System.ArgumentNullException.ThrowIfNull(upstreamRoot);
+        System.ArgumentNullException.ThrowIfNull(source);
+        var trackedPaths = await ReadGitAsync(
+                upstreamRoot,
+                ["ls-tree", "-r", "--name-only", source.Commit, "--", .. source.Roots],
+                cancellationToken)
+            .ConfigureAwait(false);
+        var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
+        foreach (var relativePath in trackedPaths
+                     .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
+                     .Where(path => !IsExcluded(source.Excludes, path))
+                     .OrderBy(static path => path, StringComparer.Ordinal))
+        {
+            // A byte-order mark is encoding, not source text.
+            var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
+                Encoding.UTF8.GetString(
+                    (await ReadGitBlobAsync(
+                            upstreamRoot,
+                            source.Commit,
+                            relativePath,
+                            cancellationToken)
+                        .ConfigureAwait(false)).AsSpan())).TrimStart(ByteOrderMark);
+            files.Add(new OpenSourceCorpusFile(source.Id, relativePath,
+                OpenSourceCorpusCatalog.ComputeNormalizedSha256(content), content));
+        }
+
+        return files.ToImmutable();
     }
 
     // An exclude names a file or, with a trailing slash, a directory.

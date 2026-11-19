@@ -42,6 +42,7 @@ internal static class TypeInitialization
     {
         internal ConcurrentDictionary<INamedTypeSymbol, InitializationEffect> Types { get; } = new(SymbolEqualityComparer.Default);
         internal ConcurrentDictionary<IFieldSymbol, InitializedStatic?> Statics { get; } = new(SymbolEqualityComparer.Default);
+        internal ConcurrentDictionary<IFieldSymbol, bool> ImmutableStatics { get; } = new(SymbolEqualityComparer.Default);
     }
 
     // Evaluating an initializer can be costly, and every callable of an
@@ -86,10 +87,9 @@ internal static class TypeInitialization
     }
 
     // A readonly static that only its own initializer stores, and that holds
-    // an object no code can change: null, a constant string, a boxed
-    // constant, or `new object()`. A boxed bool, integer, char,
-    // floating-point or enum value has no member that mutates it. Once the
-    // type's initializer has run, every read yields that same object, so a
+    // an immutable object, including a sealed source object constructed
+    // entirely from immutable inputs and stored in private readonly state.
+    // Once the type's initializer has run, every read yields that same object, so a
     // read of it is not an ambient read. Whether the initializer itself is
     // admitted is for the caller to check.
     internal static bool HoldsImmutableValue(CSharpCompilation compilation, IFieldSymbol field,
@@ -99,10 +99,20 @@ internal static class TypeInitialization
         field = RepositoryParameterGuard.NotNull(field, nameof(field)).OriginalDefinition;
         if (!TypeInitializerClassifier.IsInitializedOnly(field) || !field.Type.IsReferenceType || field.Type is IArrayTypeSymbol)
         { return false; }
+        var results = Cache.GetValue(compilation, static _ => new()).ImmutableStatics;
+        if (results.TryGetValue(field, out var known))
+        { return known; }
+        var immutable = CheckImmutableValue(compilation, field, cancellationToken);
+        return results.GetOrAdd(field, immutable);
+    }
+
+    private static bool CheckImmutableValue(CSharpCompilation compilation, IFieldSymbol field,
+        CancellationToken cancellationToken)
+    {
         var declared = field.AssociatedSymbol is IPropertySymbol property ? (ISymbol)property : field;
         if (declared.DeclaringSyntaxReferences.Length != 1 ||
             Initializer(compilation, declared.DeclaringSyntaxReferences[0], cancellationToken) is not { } initializer ||
-            !IsImmutableValue(initializer.Value))
+            !IsImmutableValue(compilation, initializer.Value, field, cancellationToken))
         { return false; }
         // C# lets a static constructor and the type's own static initializers
         // store into a readonly static, or take a writable reference to it.
@@ -139,7 +149,8 @@ internal static class TypeInitialization
                 .GetOperation(clause, cancellationToken) as ISymbolInitializerOperation;
     }
 
-    private static bool IsImmutableValue(IOperation value)
+    private static bool IsImmutableValue(CSharpCompilation compilation, IOperation value, IFieldSymbol field,
+        CancellationToken cancellationToken)
     {
         if (value.ConstantValue.HasValue)
         { return value.ConstantValue.Value is null or string; }
@@ -155,9 +166,13 @@ internal static class TypeInitialization
                         (CSharpOperationSemantics.IsScalar(operandType) || operandType.TypeKind == TypeKind.Enum ||
                             operandType.SpecialType is SpecialType.System_Char or SpecialType.System_Single or SpecialType.System_Double);
                 }
-                return converted.IsImplicit && (converted.IsIdentity || converted.IsReference) && IsImmutableValue(conversion.Operand);
+                return converted.IsImplicit && (converted.IsIdentity || converted.IsReference ||
+                    converted.IsObjectCreation && conversion.Operand is IObjectCreationOperation &&
+                    SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type)) &&
+                    IsImmutableValue(compilation, conversion.Operand, field, cancellationToken);
             case IObjectCreationOperation creation:
-                return CSharpOperationSemantics.IsCoreObjectCreation(creation);
+                return CSharpOperationSemantics.IsCoreObjectCreation(creation) ||
+                    new TypeInitializerClassifier(compilation, cancellationToken).IsImmutableConstruction(creation, field);
             default:
                 return false;
         }
@@ -351,18 +366,20 @@ internal static class TypeInitialization
                 ? body : null;
         }
 
-        private InitializationEffect Statements(IConstructorBodyOperation body, INamedTypeSymbol owner, IMethodSymbol? constructor)
+        private InitializationEffect Statements(IConstructorBodyOperation body, INamedTypeSymbol owner, IMethodSymbol? constructor,
+            bool immutableValues = false)
         {
             var effect = InitializationEffect.None;
             foreach (var block in new[] { body.BlockBody, body.ExpressionBody })
             {
                 if (block != null)
-                { effect = Max(effect, Statement(block, owner, constructor)); }
+                { effect = Max(effect, Statement(block, owner, constructor, immutableValues)); }
             }
             return effect;
         }
 
-        private InitializationEffect Statement(IOperation statement, INamedTypeSymbol owner, IMethodSymbol? constructor)
+        private InitializationEffect Statement(IOperation statement, INamedTypeSymbol owner, IMethodSymbol? constructor,
+            bool immutableValues)
         {
             if (!Spend())
             { return InitializationEffect.Effectful; }
@@ -374,14 +391,14 @@ internal static class TypeInitialization
                     var effect = InitializationEffect.None;
                     foreach (var child in block.Operations)
                     {
-                        effect = Max(effect, Statement(child, owner, constructor));
+                        effect = Max(effect, Statement(child, owner, constructor, immutableValues));
                         if (effect == InitializationEffect.Effectful)
                         { break; }
                     }
                     return effect;
                 case IExpressionStatementOperation { Operation: ISimpleAssignmentOperation { IsRef: false } assignment }
                     when constructor == null ? IsStaticStore(assignment.Target, owner) : IsInstanceStore(assignment.Target, constructor.ContainingType):
-                    return Value(assignment.Value, owner, constructor);
+                    return Value(assignment.Value, owner, constructor, immutableValues);
                 default:
                     return InitializationEffect.Effectful;
             }
@@ -420,7 +437,8 @@ internal static class TypeInitialization
         // A value stored by an initializer of owner's statics, or, with a
         // constructor, by that instance constructor. A constructor may read
         // its own parameters, but no statics and no lambdas.
-        private InitializationEffect Value(IOperation? value, INamedTypeSymbol owner, IMethodSymbol? constructor)
+        private InitializationEffect Value(IOperation? value, INamedTypeSymbol owner, IMethodSymbol? constructor,
+            bool immutableValues = false)
         {
             if (value == null || !Spend())
             { return InitializationEffect.Effectful; }
@@ -429,39 +447,52 @@ internal static class TypeInitialization
             switch (value)
             {
                 case IParenthesizedOperation parenthesized:
-                    return Value(parenthesized.Operand, owner, constructor);
+                    return Value(parenthesized.Operand, owner, constructor, immutableValues);
                 case IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion:
                     // Implicit identity, reference and numeric conversions run
                     // no code and cannot throw; boxing allocates. A
                     // target-typed `new(...)` converts the object it creates
                     // to the type it creates.
                     var converted = conversion.GetConversion();
+                    // A default literal zeroes the target even when Roslyn
+                    // represents it as a conversion to a type parameter.
+                    if (converted.IsDefaultLiteral && conversion.Operand is IDefaultValueOperation)
+                    { return InitializationEffect.None; }
                     return !converted.IsImplicit || converted.IsUserDefined ? InitializationEffect.Effectful
                         : converted.IsIdentity || converted.IsReference || converted.IsNumeric ||
                             converted.IsCollectionExpression && conversion.Operand is ICollectionExpressionOperation ||
                             converted.IsObjectCreation && conversion.Operand is IObjectCreationOperation &&
                             SymbolEqualityComparer.Default.Equals(conversion.Type, conversion.Operand.Type)
-                            ? Value(conversion.Operand, owner, constructor)
-                        : converted.IsBoxing ? Max(InitializationEffect.FreshValues, Value(conversion.Operand, owner, constructor))
+                            ? Value(conversion.Operand, owner, constructor, immutableValues)
+                        : converted.IsBoxing && !immutableValues ? Max(InitializationEffect.FreshValues, Value(conversion.Operand, owner, constructor))
                         : InitializationEffect.Effectful;
                 case IDefaultValueOperation:
                     return InitializationEffect.None;
                 case IParameterReferenceOperation { Parameter: { RefKind: RefKind.None } parameter } when constructor != null &&
                     SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, constructor):
                     return InitializationEffect.None;
-                case IArrayCreationOperation array:
+                case IArrayCreationOperation array when !immutableValues:
                     return Array(array, owner, constructor);
                 case ICollectionExpressionOperation { Type: IArrayTypeSymbol { Rank: 1 }, ConstructMethod: null } collection
-                    when !collection.Elements.IsEmpty && collection.Elements.Length <= MaximumArrayLength:
+                    when !immutableValues && !collection.Elements.IsEmpty && collection.Elements.Length <= MaximumArrayLength:
                     return Elements(collection.Elements, owner, constructor);
-                case IObjectCreationOperation creation:
+                case IObjectCreationOperation creation when !immutableValues:
                     return Creation(creation, owner, constructor);
+                // `Array.Empty<T>()` returns one cached zero-length array per
+                // T; the first call may allocate it. Making a T[] runs no code
+                // of T, and a zero-length array has nothing to change.
+                case IInvocationOperation
+                {
+                    Instance: null, Arguments.IsEmpty: true,
+                    TargetMethod: { Name: "Empty", IsGenericMethod: true, Parameters.IsEmpty: true, ContainingType.SpecialType: SpecialType.System_Array }
+                } when !immutableValues:
+                    return InitializationEffect.FreshValues;
                 case IDelegateCreationOperation creation when constructor == null:
                     return creation.Target is IAnonymousFunctionOperation or IMethodReferenceOperation
                     {
                         Instance: null, Method: { IsStatic: true, IsAbstract: false, IsVirtual: false, MethodKind: MethodKind.Ordinary }
                     } ? InitializationEffect.FreshValues : InitializationEffect.Effectful;
-                case IFieldReferenceOperation { Field.IsStatic: true, Instance: null } field when constructor == null:
+                case IFieldReferenceOperation { Field.IsStatic: true, Instance: null } field when constructor == null && !immutableValues:
                     // Only a readonly, non-volatile, process-wide static holds
                     // nothing but what its initializer stored; reading any
                     // other static is an ambient read. Reading a static of the
@@ -509,6 +540,87 @@ internal static class TypeInitialization
             return effect;
         }
 
+        // The cache read can omit ambient state only if every reachable value
+        // is immutable. The stricter constructor pass reuses the initializer
+        // rules, admitting only copies of checked arguments, constants,
+        // defaults and deferred delegate arguments.
+        internal bool IsImmutableConstruction(IObjectCreationOperation creation, IFieldSymbol cache)
+        {
+            creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
+            cache = RepositoryParameterGuard.NotNull(cache, nameof(cache));
+            if (creation.Initializer != null || creation.Constructor is not { } created ||
+                created.ContainingType is not { IsSealed: true, TypeKind: TypeKind.Class, ContainingType: null } type ||
+                cache is not { DeclaredAccessibility: Accessibility.Private, ContainingType.ContainingType: null } ||
+                CSharpOperationSemantics.HasSynchronizedEntry(created))
+            { return false; }
+
+            var definition = type.OriginalDefinition;
+            var owner = cache.ContainingType;
+            if (definition.GetMembers().OfType<IFieldSymbol>().Any(static field => !field.IsStatic &&
+                (field is not { IsReadOnly: true, DeclaredAccessibility: Accessibility.Private, RefKind: RefKind.None } ||
+                    field.AssociatedSymbol is IPropertySymbol { SetMethod: not null } ||
+                    !CSharpOperationSemantics.HasIndependentFieldStorage(field))))
+            { return false; }
+            foreach (var argument in creation.Arguments)
+            {
+                if (Argument(argument, owner, constructor: null, immutableValues: true) == InitializationEffect.Effectful)
+                { return false; }
+            }
+            return Constructor(created.OriginalDefinition, immutableValues: true) != InitializationEffect.Effectful &&
+                HasNoReferenceAliases(definition) &&
+                (SymbolEqualityComparer.Default.Equals(definition, owner) || HasNoReferenceAliases(owner));
+        }
+
+        // Private readonly storage is only writable during construction in
+        // ordinary C#. Ref aliases, including implicit `in` arguments and
+        // reduced extension receivers, leave that boundary.
+        private bool HasNoReferenceAliases(INamedTypeSymbol type)
+        {
+            if (type.StaticConstructors.Any(CSharpOperationSemantics.HasSynchronizedEntry))
+            { return false; }
+            foreach (var reference in type.DeclaringSyntaxReferences)
+            {
+                var model = Host.CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree);
+                foreach (var node in reference.GetSyntax(cancellationToken).DescendantNodes())
+                {
+                    if (!Spend() || node is RefExpressionSyntax or RefTypeSyntax or FixedStatementSyntax or UnsafeStatementSyntax or
+                        PointerTypeSyntax or FunctionPointerTypeSyntax or MakeRefExpressionSyntax or RefValueExpressionSyntax or
+                        ThisExpressionSyntax { Parent: not MemberAccessExpressionSyntax } ||
+                        node is MemberDeclarationSyntax member && member.Modifiers.Any(SyntaxKind.ExternKeyword) ||
+                        node.IsKind(SyntaxKind.AddressOfExpression))
+                    { return false; }
+                    if (node is ArgumentSyntax argument && (argument.RefKindKeyword.RawKind != 0 ||
+                        model.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter.RefKind: not RefKind.None }))
+                    { return false; }
+                    if (node is not ExpressionSyntax expression)
+                    { continue; }
+                    var symbol = model.GetSymbolInfo(expression, cancellationToken).Symbol;
+                    if (HasReferenceSignature(model.GetConversion(expression, cancellationToken).MethodSymbol) ||
+                        UsesUntrackedStorage(symbol) ||
+                        expression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax } &&
+                            symbol is IMethodSymbol { ReducedFrom: not null })
+                    { return false; }
+                }
+            }
+            return true;
+        }
+
+        private static bool HasReferenceSignature(ISymbol? symbol)
+        {
+            return symbol is IPropertySymbol { RefKind: not RefKind.None } ||
+                symbol is IMethodSymbol method && (method.ReducedFrom ?? method) is var target &&
+                    (target.RefKind != RefKind.None || target.Parameters.Any(static parameter => parameter.RefKind != RefKind.None));
+        }
+
+        private static bool UsesUntrackedStorage(ISymbol? symbol)
+        {
+            return HasReferenceSignature(symbol) ||
+                symbol is IMethodSymbol
+                {
+                    ContainingNamespace: { Name: "Reflection", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } }
+                };
+        }
+
         // `new object()`, or a source class or struct whose constructor only
         // stores admitted values into the new instance's own fields.
         // Constructing an instance may run its type's initializer, so that
@@ -540,14 +652,20 @@ internal static class TypeInitialization
             {
                 if (effect == InitializationEffect.Effectful)
                 { return effect; }
-                effect = argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue &&
-                    argument.Parameter is { RefKind: RefKind.None }
-                    ? Max(effect, Value(argument.Value, owner, constructor)) : InitializationEffect.Effectful;
+                effect = Max(effect, Argument(argument, owner, constructor));
             }
             return effect == InitializationEffect.Effectful ? effect : Max(effect, Constructor(created.OriginalDefinition));
         }
 
-        private InitializationEffect Constructor(IMethodSymbol constructor)
+        private InitializationEffect Argument(IArgumentOperation argument, INamedTypeSymbol owner, IMethodSymbol? constructor,
+            bool immutableValues = false)
+        {
+            return argument.ArgumentKind is ArgumentKind.Explicit or ArgumentKind.DefaultValue &&
+                argument.Parameter is { RefKind: RefKind.None }
+                ? Value(argument.Value, owner, constructor, immutableValues) : InitializationEffect.Effectful;
+        }
+
+        private InitializationEffect Constructor(IMethodSymbol constructor, bool immutableValues = false)
         {
             var type = constructor.ContainingType;
             if (!IsSource(type) || type.IsAbstract || type.IsStatic || type.IsRecord || type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
@@ -558,7 +676,7 @@ internal static class TypeInitialization
             { return InitializationEffect.Effectful; }
             try
             {
-                var effect = InstanceInitializers(type, constructor);
+                var effect = InstanceInitializers(type, constructor, immutableValues);
                 if (constructor.IsImplicitlyDeclared || effect == InitializationEffect.Effectful)
                 { return effect; }
                 if (constructor.DeclaringSyntaxReferences.Length != 1 ||
@@ -574,7 +692,7 @@ internal static class TypeInitialization
                         }
                     }))
                 { return InitializationEffect.Effectful; }
-                return Max(effect, Statements(body, type, constructor));
+                return Max(effect, Statements(body, type, constructor, immutableValues));
             }
             finally
             { _activeConstructors.Remove(constructor); }
@@ -582,7 +700,7 @@ internal static class TypeInitialization
 
         // Instance field and auto-property initializers run in every
         // constructor that does not chain to another of the same type.
-        private InitializationEffect InstanceInitializers(INamedTypeSymbol type, IMethodSymbol constructor)
+        private InitializationEffect InstanceInitializers(INamedTypeSymbol type, IMethodSymbol constructor, bool immutableValues)
         {
             var effect = InitializationEffect.None;
             foreach (var member in type.GetMembers())
@@ -605,7 +723,7 @@ internal static class TypeInitialization
                     effect = member is IEventSymbol ? InitializationEffect.Effectful
                         : Max(effect, Host.CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree)
                             .GetOperation(clause, cancellationToken) is ISymbolInitializerOperation initializer
-                            ? Value(initializer.Value, type, constructor) : InitializationEffect.Effectful);
+                            ? Value(initializer.Value, type, constructor, immutableValues) : InitializationEffect.Effectful);
                     if (effect == InitializationEffect.Effectful)
                     { return effect; }
                 }

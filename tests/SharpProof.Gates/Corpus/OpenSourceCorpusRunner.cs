@@ -356,7 +356,8 @@ internal static class OpenSourceCorpusRunner
         var compilation = template
             .WithOptions(template.Options
                 .WithNullableContextOptions(options.Nullable ? NullableContextOptions.Enable : NullableContextOptions.Disable)
-                .WithOverflowChecks(options.CheckOverflow))
+                .WithOverflowChecks(options.CheckOverflow)
+                .WithAllowUnsafe(options.AllowUnsafe))
             .RemoveSyntaxTrees(template.SyntaxTrees)
             .AddSyntaxTrees(trees.ToImmutable());
         AnalyzerGateHost.ThrowIfCompilationHasErrors(

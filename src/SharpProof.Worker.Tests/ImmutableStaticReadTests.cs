@@ -15,6 +15,112 @@ public sealed class ImmutableStaticReadTests
         "public static class Other { public static readonly object Zero = 0L; }\n" +
         "public enum Color { Red, Green }\n";
 
+    private const string CachedResult =
+        """
+        public sealed class CachedResult<T>
+        {
+            private readonly T _value;
+            private readonly System.Func<System.Exception> _failure;
+            public bool CanContinue { get; }
+            private CachedResult(System.Func<System.Exception> failure, bool canContinue)
+            {
+                _failure = failure;
+                CanContinue = canContinue;
+                _value = default!;
+            }
+            public static CachedResult<T> Empty { get; } = new CachedResult<T>(
+                () => new System.InvalidOperationException(System.Environment.GetEnvironmentVariable("EXAMPLE")), false);
+            public static int Identity(int value) => value;
+            public System.Exception GetError() => _failure();
+        }
+        """;
+
+    [TestCase("[EnforcePure] public static int M(int value) => CachedResult<int>.Identity(value);", true)]
+    [TestCase("[DoesNotThrow] public static int M(int value) => CachedResult<int>.Identity(value);", true)]
+    [TestCase("[ZeroAllocations] public static int M(int value) => CachedResult<int>.Identity(value);", false)]
+    [TestCase("[EnforcePure] public static CachedResult<int> M() => CachedResult<int>.Empty;", true)]
+    [TestCase("[DoesNotThrow] public static CachedResult<int> M() => CachedResult<int>.Empty;", true)]
+    [TestCase("[ZeroAllocations] public static CachedResult<int> M() => CachedResult<int>.Empty;", false)]
+    [TestCase("[DoesNotThrow] public static System.Exception M() => CachedResult<int>.Empty.GetError();", false)]
+    [TestCase("public static CachedResult<int> M() { Contract.Ensures(Contract.Result<CachedResult<int>>() != null); return CachedResult<int>.Empty; }", false)]
+    public async Task CachedResultKeepsInitializationAndReadEffectsSeparate(string members, bool proven)
+    {
+        System.ArgumentNullException.ThrowIfNull(members);
+        var result = await ResultAsync(members, CachedResult);
+        Assert.That(result.Outcome, Is.EqualTo(proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task ExecutingTheCallbackInTheConstructorKeepsInitializationUnknown()
+    {
+        var eager = CachedResult.Replace("_failure = failure;", "failure(); _failure = failure;", StringComparison.Ordinal);
+        var result = await ResultAsync("[DoesNotThrow] public static int M(int value) => CachedResult<int>.Identity(value);", eager);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("private int _mutable;")]
+    [TestCase("private readonly int[] _items = new int[1];")]
+    [TestCase("public void Change() => System.Runtime.CompilerServices.Unsafe.AsRef(in _value) = default!;")]
+    [TestCase("public void Change() => System.Runtime.CompilerServices.Unsafe.AsRef(_value) = default!;")]
+    [TestCase("public void Change() => typeof(CachedResult<T>).GetField(nameof(_value), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(this, default(T));")]
+    public async Task MutableStorageAndReferenceAliasesKeepCacheReadsUnknown(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        var wrapper = CachedResult.Replace("public bool CanContinue", member + " public bool CanContinue", StringComparison.Ordinal);
+        var result = await ResultAsync("[EnforcePure] public static CachedResult<int> M() => CachedResult<int>.Empty;", wrapper);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [TestCase("1", true)]
+    [TestCase("new int[1]", false)]
+    public async Task ReadonlyFieldCacheRequiresAnImmutableConstructorArgument(string value, bool proven)
+    {
+        System.ArgumentNullException.ThrowIfNull(value);
+        const string type = "public sealed class Box<T> { private readonly T _value; public Box(T value) { _value = value; } }";
+        var cached = proven ? "Box<int>" : "Box<int[]>";
+        var result = await ResultAsync($"private static readonly {cached} Item = new({value}); [EnforcePure] public static {cached} M() => Item;", type);
+        Assert.That(result.Outcome, Is.EqualTo(proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task ImplicitByReferenceExtensionReceiverKeepsCacheReadsUnknown()
+    {
+        const string types = """
+            public static class Extensions
+            {
+                public static void Reset(this in int value) => System.Runtime.CompilerServices.Unsafe.AsRef(in value) = 0;
+            }
+            public sealed class Box
+            {
+                private readonly int _value;
+                public Box(int value) { _value = value; }
+                public void Reset() => _value.Reset();
+            }
+            """;
+        var result = await ResultAsync("private static readonly Box Item = new Box(42); [EnforcePure] public static Box M() => Item;", types);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    [Test]
+    public async Task PassingTheReceiverToAnExtensionKeepsCacheReadsUnknown()
+    {
+        const string types = """
+            public static class Extensions
+            {
+                public static void Reset(this Box value) => typeof(Box).GetField("_value",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(value, 0);
+            }
+            public sealed class Box
+            {
+                private readonly int _value;
+                public Box(int value) { _value = value; }
+                public void Clear() => this.Reset();
+            }
+            """;
+        var result = await ResultAsync("private static readonly Box Item = new Box(42); [EnforcePure] public static Box M() => Item;", types);
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
     // Newtonsoft's boxed-integer cache, Scriban's boxed Booleans, and the
     // other admitted shapes.
     [TestCase("private static readonly object Zero = 0L; private static readonly object One = 1L; " +
@@ -71,10 +177,11 @@ public sealed class ImmutableStaticReadTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown), result.Reason.ToString());
     }
 
-    private static async Task<WorkerClaimResult> ResultAsync(string members)
+    private static async Task<WorkerClaimResult> ResultAsync(string members, string additionalTypes = "")
     {
         System.ArgumentNullException.ThrowIfNull(members);
-        using var project = new ShadowTestProject(Types + "public static class C { " + members + " }\n");
+        System.ArgumentNullException.ThrowIfNull(additionalTypes);
+        using var project = new ShadowTestProject(Types + additionalTypes + "\npublic static class C { " + members + " }\n");
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));

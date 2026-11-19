@@ -6,7 +6,7 @@
 #   ./ci.sh build projects  run the named lanes
 #   ./ci.sh image           build the tooling image (or pull it; see pull_or_build_image)
 #   ./ci.sh coverage        merge artifacts/coverage/**/lines.tsv into summary.md
-#   ./ci.sh nightly fuzz-0  scheduled lanes (nightly.yml); release-packages (release.yml)
+#   ./ci.sh nightly oss-census fuzz-0  scheduled lanes (nightly.yml); release-packages (release.yml)
 #   ./ci.sh --list          print the lane names as JSON (the CI matrix)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -343,6 +343,7 @@ run_lane() {
       fi
       return "$nightly_status"
       ;;
+    oss-census) tooling oss-census -Configuration Release ;;
     fuzz-[0-9]*) fuzz_shard "${1#fuzz-}" ;;
     release-packages) release_packages ;;
     consumer-image) consumer_image ;;
@@ -351,7 +352,7 @@ run_lane() {
     # The floor applies to the merged total only; a single shard never sees it.
     coverage) pwsh -NoLogo -NoProfile -File eng/scripts/Invoke-SharpProofCoverage.ps1 -Part Merge -MinimumLinePercent 98.5 ;;
     *)
-      echo "Unknown lane '$1'. Lanes: ${lanes[*]} coverage nightly fuzz-<n> release-packages consumer-image image image-key" >&2
+      echo "Unknown lane '$1'. Lanes: ${lanes[*]} coverage nightly oss-census fuzz-<n> release-packages consumer-image image image-key" >&2
       return 2
       ;;
   esac

@@ -6207,8 +6207,8 @@
       "declarationSha256": "1d81e69182d62d5af0295bf1e85961262cfc9f6d2e1be558c9a3e314e35b5939",
       "methodName": "Assert",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0205",
@@ -6399,8 +6399,8 @@
       "declarationSha256": "9a47a973bbe5fc8bbd53cf8d6896cf61f415036d3e3cd18f2c4bf1d8e60ae77e",
       "methodName": "EquiZip",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0221",
@@ -6423,8 +6423,8 @@
       "declarationSha256": "4a56bb9078c2a2068d7c7206b24e3e7a0e9c73fecea8aed6723f618df0d8b6ef",
       "methodName": "ExceptBy",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0223",
@@ -6483,8 +6483,8 @@
       "declarationSha256": "d9cce5b4c2110637f67b2f103aa9d4ebe5ec6c8acb4734df1a9b7b6b9ae2afa7",
       "methodName": "Batch",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0228",
@@ -6627,8 +6627,8 @@
       "declarationSha256": "046c94d4c24e029e3fe5a380aa67d479d398bcb4e22359b0de9fc8657a6aaf32",
       "methodName": "FullJoin",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0240",
@@ -6759,8 +6759,8 @@
       "declarationSha256": "516ecdae6aa047d0bb40ae5fee4015b6c26c272aed820f33a2cbdd2e90305393",
       "methodName": "LeftJoin",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0251",
@@ -6843,8 +6843,8 @@
       "declarationSha256": "c91439f016c54041c0aecf86199f3308a4a99cdacd99232c88fa5efa38422e56",
       "methodName": "OrderBy",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0258",
@@ -6903,8 +6903,8 @@
       "declarationSha256": "668376ee81606bdeaa3f810f68e72e14e16241b4ab2cb8381c7dbfde2e87f0d5",
       "methodName": "PartialSort",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0263",
@@ -7059,8 +7059,8 @@
       "declarationSha256": "1493bb0b182fb9f37aad66afc7ace2f1436265397d169291416835a581a5a949",
       "methodName": "RightJoin",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0276",
@@ -7083,8 +7083,8 @@
       "declarationSha256": "a88cd2cce546b2e81c57f34f6d4e9342738264752b8d65a0d2c3055b9f8a1d04",
       "methodName": "Scan",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0278",
@@ -7095,8 +7095,8 @@
       "declarationSha256": "bf7c672939901ea8daf0018f4a175f37ee801f69b3ac157548e87965ab7f9fac",
       "methodName": "ScanBy",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0279",
@@ -7107,8 +7107,8 @@
       "declarationSha256": "818e73766974d9429394c93bce4467042b98de0e2ae8549a33be24905cb918dc",
       "methodName": "ScanRight",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0280",
@@ -7299,8 +7299,8 @@
       "declarationSha256": "aaa152935a866743320342d953baeb5b28b0002e6d36811d053eb3fcb13bb49e",
       "methodName": "ToDelimitedString",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0296",
@@ -7335,8 +7335,8 @@
       "declarationSha256": "33126a20358af7f6437a868a75687d80f911d326176ac19efd0f5a16c4671369",
       "methodName": "Trace",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0299",
@@ -8091,8 +8091,8 @@
       "declarationSha256": "3c494785c1022f4d2abeec64035a6ec8cb2f925627ca293408550cf09eac0dcf",
       "methodName": "Add",
       "mode": "effects",
-      "expectedVerdict": "Refuted",
-      "support": "Supported"
+      "expectedVerdict": "Unknown",
+      "support": "IntentionallyUnsupported"
     },
     {
       "id": "OSS0362",

@@ -30,10 +30,9 @@ internal static class BlockerCensus
 
     // effects: tabulate the purity-relevant effect sites of the bodies that
     // lower exactly, instead of the constructs that keep bodies from lowering.
-    internal static string Run(string root, CancellationToken cancellationToken, bool effects = false)
+    internal static string Run(OpenSourceCorpusDocument document, CancellationToken cancellationToken, bool effects = false)
     {
-        ArgumentNullException.ThrowIfNull(root);
-        var document = OpenSourceCorpusCatalog.Load(root);
+        ArgumentNullException.ThrowIfNull(document);
         var sources = document.Sources.Select(static source => source.Id).ToImmutableArray();
         var any = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
         var sole = new SortedDictionary<string, int[]>(StringComparer.Ordinal);

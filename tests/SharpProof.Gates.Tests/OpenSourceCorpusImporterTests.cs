@@ -138,7 +138,9 @@ public sealed class OpenSourceCorpusImporterTests
     }
 
     [TestCase("license", "unsupported license")]
+    [TestCase("gate-bsd", "unsupported license")]
     [TestCase("quota", "at most 500 are allowed")]
+    [TestCase("census-quota", "must have a zero gate quota")]
     [TestCase("id", "must be unique lowercase")]
     [TestCase("commit", "pin a full Git commit")]
     [TestCase("path", "invalid license, notice, root, or exclude paths")]
@@ -150,7 +152,9 @@ public sealed class OpenSourceCorpusImporterTests
         source = field switch
         {
             "license" => source with { LicenseSpdx = "GPL-3.0-only" },
+            "gate-bsd" => source with { LicenseSpdx = "BSD-2-Clause" },
             "quota" => source with { MethodQuota = 501 },
+            "census-quota" => source with { CensusOnly = true, MethodQuota = 1 },
             "id" => source with { Id = "Upper Case" },
             "commit" => source with { Commit = "main" },
             "path" => source with { Roots = ["../outside"] },
@@ -167,6 +171,10 @@ public sealed class OpenSourceCorpusImporterTests
     {
         var configuration = OpenSourceCorpusImporter.LoadSources(RepositoryLayout.FindRoot());
         Assert.That(configuration.Sources.Select(static source => source.LicenseSpdx), Has.Some.EqualTo("Apache-2.0"));
+        var censusSources = configuration.Sources.Where(static source => source.CensusOnly).ToImmutableArray();
+        Assert.That(censusSources, Has.Length.EqualTo(12));
+        Assert.That(censusSources.Select(static source => source.MethodQuota), Is.All.Zero);
+        Assert.That(censusSources.Select(static source => source.LicenseSpdx), Has.Some.EqualTo("BSD-3-Clause"));
         Assert.That(configuration.Sources.Sum(static source => source.MethodQuota),
             Is.LessThanOrEqualTo(OpenSourceCorpusCatalog.MaximumMethodCount));
     }

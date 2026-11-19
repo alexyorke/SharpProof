@@ -243,7 +243,7 @@ public sealed class CorpusGateTests
     {
         var repositoryRoot = RepositoryLayout.FindRoot();
         var configuration = OpenSourceCorpusImporter.LoadSources(repositoryRoot);
-        foreach (var source in configuration.Sources)
+        foreach (var source in configuration.Sources.Where(static source => !source.CensusOnly))
         {
             foreach (var reviewed in source.Notices.Prepend(source.License))
             {
@@ -904,15 +904,16 @@ public sealed class CorpusGateTests
         var root = RepositoryLayout.FindRoot();
         var document = OpenSourceCorpusCatalog.Load(root);
         var configuration = OpenSourceCorpusImporter.LoadSources(root);
+        var gateSources = configuration.Sources.Where(static source => !source.CensusOnly).ToImmutableArray();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(document.SchemaVersion, Is.EqualTo(OpenSourceCorpusCatalog.SchemaVersion));
             Assert.That(document.Sources.Select(static source => source.Id),
-                Is.EqualTo(configuration.Sources.Select(static source => source.Id)));
+                Is.EqualTo(gateSources.Select(static source => source.Id)));
             Assert.That(document.Sources.Select(static source => source.LicenseSpdx).Distinct(),
                 Is.EquivalentTo(OpenSourceCorpusCatalog.AllowedLicenses));
-            foreach (var (pinned, reviewed) in document.Sources.Zip(configuration.Sources))
+            foreach (var (pinned, reviewed) in document.Sources.Zip(gateSources))
             {
                 Assert.That(pinned.Repository, Is.EqualTo(reviewed.Repository));
                 Assert.That(pinned.Commit, Is.EqualTo(reviewed.Commit));
@@ -929,11 +930,11 @@ public sealed class CorpusGateTests
                 Assert.That(methods.Select(static method => method.Path).Distinct(StringComparer.Ordinal).Count(),
                     Is.GreaterThanOrEqualTo(OpenSourceCorpusCatalog.MinimumSourceFileCount), pinned.Id);
             }
-            Assert.That(document.Methods, Has.Length.EqualTo(configuration.Sources.Sum(static source => source.MethodQuota)));
+            Assert.That(document.Methods, Has.Length.EqualTo(gateSources.Sum(static source => source.MethodQuota)));
             Assert.That(
                 document.Methods.Count(static method =>
                     method.Support == CorpusSupport.Supported),
-                Is.EqualTo(100));
+                Is.EqualTo(85));
             Assert.That(
                 document.Methods.Select(static method => method.Support),
                 Has.None.EqualTo(CorpusSupport.Unspecified));
@@ -993,19 +994,19 @@ public sealed class CorpusGateTests
                     methods.Count(static method => method.ExpectedVerdict is CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown));
             })));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(436));
+            Assert.That(result.UnknownCount, Is.EqualTo(451));
             Assert.That(result.SilentUnknownCount, Is.Zero);
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(436));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(451));
             Assert.That(
                 ImmutableDictionaryCapture.Create(result.UnknownReasons
 , static item => item.Reason, static item => item.Count),
                 Is.EquivalentTo(
                     ImmutableDictionaryCapture.Create(ImmutableArray.Create(
-                        new KeyValuePair<string, int>("SP0002", 238),
+                        new KeyValuePair<string, int>("SP0002", 231),
                         new KeyValuePair<string, int>("SP0016", 18),
                         new KeyValuePair<string, int>("SP0045", 9),
                         new KeyValuePair<string, int>("SP0046", 9),
-                        new KeyValuePair<string, int>("SP0047", 162)),
+                        new KeyValuePair<string, int>("SP0047", 184)),
                         static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)));
             Assert.That(
                 result.UnknownRate,

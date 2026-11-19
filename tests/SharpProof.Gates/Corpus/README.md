@@ -122,14 +122,13 @@ Once creating a delegate from a lambda lowered without running its body (SEMANTI
 
 All eight were reviewed against the bodies. The supported floors rose by three, the total-Unknown ceiling fell by three, the SP0047 ceiling fell by eight and the SP0002 ceiling rose by five.
 
-### Reviewed classification for generic delegate parameters
+### Reviewed lowering reasons for opaque floating-point conversions
 
-Once a delegate argument could be passed to a generic source callee whose parameter is declared with the callee's own type parameters (`Func<T, bool>` receiving `Func<int, bool>`), many MoreLINQ overloads that forward to such a callee, or pass it a lambda, began to lower. Together with lambda creation, 24 selected methods changed.
+Five C-Sharp-Algorithms methods stay Unknown with SP0047 after their integer-to-floating conversions lower. `SieveOfAtkin` (OSS0016) and `PrimesList.IsPrime` (OSS0124) stop at the conversion of `Math.Sqrt` back to `int`. The Sieve of Eratosthenes (OSS0017) and both comb-sort methods (OSS0107 and OSS0185) reach unsupported floating comparisons. Their verdicts, support classifications, and diagnostic ID counts are unchanged.
 
-- **Refuted (15):** MoreLINQ Assert (OSS0204), the equal-length zip (OSS0220), ExceptBy (OSS0222), Batch (OSS0227), FullJoin (OSS0239), LeftJoin (OSS0250), OrderBy (OSS0257), PartialSort (OSS0262), RightJoin (OSS0275), Scan (OSS0277), ScanBy (OSS0278), ScanRight (OSS0279), ToDelimitedString (OSS0295) and Trace (OSS0298), and NodaTime `CompositePatternBuilder.Add` (OSS0361). Each throws `ArgumentNullException` for a `null` argument, directly or in the overload it forwards to, and builds that exception from culture resources. MoreLINQ `Choose` (OSS0210) and `Pipe` (OSS0266) were already Refuted the same way.
-- **Unknown, now SP0002 (9):** OSS0224, OSS0232, OSS0233, OSS0242, OSS0245, OSS0254, OSS0271, OSS0280 and OSS0296. Each now lowers and stops on delegate invocations or other unknown calls.
+### Reviewed diagnostic for source base constructors
 
-All 24 were reviewed against the bodies and marked accordingly. The supported floors rose by 15, the total-Unknown ceiling fell by 15, the SP0047 ceiling fell by 22 and the SP0002 ceiling rose by 7.
+NodaTime's `DateTimeZone.ForOffset` (OSS0326) can reach the source base constructors in `new FixedDateTimeZone(offset)`. Its SP0047 lowering reason moves from `UnsupportedOperationKind` to `UnsupportedControlFlow`. The method still produces an Unknown verdict and the diagnostic ID counts are unchanged.
 
 ## Contracts on real code
 
@@ -165,3 +164,24 @@ To add a source:
 5. Update the ratchet with the measured gate numbers, the table above, the [gate guide](../README.md), and `THIRD-PARTY-NOTICES.txt`.
 
 Changing a pinned commit is a reviewed change too: methods that disappear are dropped (later IDs shift down), and replacements are appended. For observation-only updates, run `sp corpus-update -Configuration Release` without the importer; it does not replace the source lock. See the [gate guide](../README.md) for classifications and invariance checks.
+
+## Census-only sources
+
+Entries marked `censusOnly` have a zero `methodQuota`. The nightly census reads committed C# files at the configured revisions and verifies the pinned license and notice text. Its artifacts contain aggregate reports. The upstream source files stay out of the checked-in corpus and the reports.
+
+| Census source ID | Reviewed license |
+| --- | --- |
+| `markdig` | BSD-2-Clause, with MIT .NET polyfills |
+| `yamldotnet` | MIT, including the separate `libyaml` notice |
+| `dapper` | Apache-2.0 for the C# library |
+| `csvhelper` | Apache-2.0 option of the upstream dual license |
+| `serilog` | Apache-2.0 |
+| `polly` | BSD-3-Clause |
+| `stateless` | Apache-2.0 |
+| `diffplex` | Apache-2.0 |
+| `sprache` | MIT |
+| `scriban` | BSD-2-Clause |
+| `newtonsoft` | MIT, including .NET polyfills |
+| `guardclauses` | MIT, including the JetBrains annotations |
+
+Review any new pin against the selected roots and refresh its license and notice hashes in [sources.json](sources.json). The BCL compilation settings in the lock apply to census compilation. The census does not run upstream build scripts or generators.
