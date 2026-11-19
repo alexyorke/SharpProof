@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'effect-oracles', 'perf-baseline', 'perf-self', 'library-build', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
+    [ValidateSet('lint', 'doctor', 'quick', 'pr', 'nightly', 'security', 'layout', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'samples', 'corpus', 'corpus-update', 'oss-census', 'effect-oracles', 'perf-baseline', 'perf-self', 'library-build', 'coverage', 'fuzz-nightly', 'dependency-audit', 'pack', 'pack-tool', 'format-check', 'docs')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -692,7 +692,7 @@ switch ($Command) {
             'Sample validation failed.' `
         ([ordered]@{ Configuration = $Configuration; PackageSource = $PackageSource }).AsReadOnly()
     }
-    { $_ -in @('corpus', 'corpus-update', 'effect-oracles', 'perf-baseline') } {
+    { $_ -in @('corpus', 'corpus-update', 'oss-census', 'effect-oracles', 'perf-baseline') } {
         # effect-oracles runs every native effect oracle over the selected
         # open-source methods, then over every method each pinned source
         # declares. Each run fails on a runtime contradiction.
@@ -701,7 +701,9 @@ switch ($Command) {
             $oracleModes = @('exception-oracle', 'allocation-oracle', 'purity-oracle',
                 'capability-oracle', 'effectcontract-oracle')
             $sourcesPath = Join-Path $repositoryRoot 'tests/SharpProof.Gates/Corpus/sources.json'
-            $sourceIds = @((Get-Content -LiteralPath $sourcesPath -Raw | ConvertFrom-Json).sources.id)
+            $sourceIds = @((Get-Content -LiteralPath $sourcesPath -Raw | ConvertFrom-Json).sources |
+                Where-Object { $_.PSObject.Properties.Name -notcontains 'censusOnly' -or -not $_.censusOnly } |
+                ForEach-Object { $_.id })
             foreach ($oracleMode in $oracleModes) {
                 $gateRuns.Add([string[]]@($oracleMode))
             }

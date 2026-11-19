@@ -156,3 +156,24 @@ To add a source:
 5. Update the ratchet with the measured gate numbers, the table above, the [gate guide](../README.md), and `THIRD-PARTY-NOTICES.txt`.
 
 Changing a pinned commit is a reviewed change too: methods that disappear are dropped (later IDs shift down), and replacements are appended. For observation-only updates, run `sp corpus-update -Configuration Release` without the importer; it does not replace the source lock. See the [gate guide](../README.md) for classifications and invariance checks.
+
+## Census-only sources
+
+Entries marked `censusOnly` have a zero `methodQuota`. The nightly census reads committed C# files at the configured revisions and verifies the pinned license and notice text. Its artifacts contain aggregate reports. The upstream source files stay out of the checked-in corpus and the reports.
+
+| Census source | Reviewed license |
+| --- | --- |
+| Markdig | BSD-2-Clause, with MIT .NET polyfills |
+| YamlDotNet | MIT, including the separate libyaml notice |
+| Dapper | Apache-2.0 for the C# library |
+| CsvHelper | Apache-2.0 option of the upstream dual license |
+| Serilog | Apache-2.0 |
+| Polly | BSD-3-Clause |
+| Stateless | Apache-2.0 |
+| DiffPlex | Apache-2.0 |
+| Sprache | MIT |
+| Scriban | BSD-2-Clause |
+| Newtonsoft.Json | MIT, including .NET polyfills |
+| GuardClauses | MIT, including the JetBrains annotations |
+
+Review any new pin against the selected roots and refresh its license and notice hashes in [sources.json](sources.json). The BCL compilation settings in the lock apply to census compilation. The census does not run upstream build scripts or generators.

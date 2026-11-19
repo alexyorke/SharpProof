@@ -85,13 +85,26 @@ internal static class Program
                 Log.Info(LibraryBuild.Summarize(report));
                 return report.Crashed ? 1 : 0;
             }
-            if (command is "blocker-census" or "effect-census")
+            if (command is "blocker-census" or "effect-census" or "oss-census")
             {
-                var census = BlockerCensus.Run(root, cancellation.Token, effects: command == "effect-census");
-                var directory = Path.Combine(root, "artifacts", "corpus");
-                Directory.CreateDirectory(directory);
-                await File.WriteAllTextAsync(Path.Combine(directory, command + ".md"), census, cancellation.Token).ConfigureAwait(false);
-                Log.Info(census);
+                if (args.Length != 1)
+                {
+                    throw new ArgumentException($"Use {command} without arguments.", nameof(args));
+                }
+
+                var document = command == "oss-census"
+                    ? await CensusSourceLoader.LoadAsync(root, cancellation.Token).ConfigureAwait(false)
+                    : OpenSourceCorpusCatalog.Load(root);
+                if (command is "blocker-census" or "oss-census")
+                {
+                    await WriteCensusAsync(root, document, effects: false, cancellation.Token).ConfigureAwait(false);
+                }
+
+                if (command is "effect-census" or "oss-census")
+                {
+                    await WriteCensusAsync(root, document, effects: true, cancellation.Token).ConfigureAwait(false);
+                }
+
                 return 0;
             }
             if (command == "perf-baseline")
@@ -129,7 +142,7 @@ internal static class Program
                 Log.Info("Updated the canonical corpus snapshot.");
                 return 0;
             }
-            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|library-build|perf-baseline|perf-self|contract-oracle|exception-oracle|allocation-oracle|purity-oracle|" +
+            Log.Error("Usage: SharpProof.Gates [corpus|corpus-update|blocker-census|effect-census|oss-census|library-build|perf-baseline|perf-self|contract-oracle|exception-oracle|allocation-oracle|purity-oracle|" +
                 "capability-oracle|effectcontract-oracle] [--limit <method-count> | --source <source-id>]");
             return 2;
         }
@@ -139,5 +152,18 @@ internal static class Program
             return 1;
         }
 
+    }
+
+    private static async Task WriteCensusAsync(
+        string root, OpenSourceCorpusDocument document, bool effects, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(document);
+        var census = BlockerCensus.Run(document, cancellationToken, effects);
+        var directory = Path.Combine(root, "artifacts", "corpus");
+        Directory.CreateDirectory(directory);
+        var file = effects ? "effect-census.md" : "blocker-census.md";
+        await File.WriteAllTextAsync(Path.Combine(directory, file), census, cancellationToken).ConfigureAwait(false);
+        Log.Info(census);
     }
 }

@@ -32,6 +32,10 @@ The executable also accepts `exception-oracle`, `allocation-oracle`, `purity-ora
 
 [Development workflows](../../docs/development-workflows.md#corpus-and-native-effect-oracles) gives the container invocation and report fields. Preserve the report's universe hash, checked count, `Exhaustive` flag, Unknown reasons, and explicit not-run oracle values. A successful developer report does not publish worker proof authority or establish runtime coverage of every verdict. See [NativeEffectOracleGate.cs](Corpus/NativeEffectOracleGate.cs) for applicable checks.
 
+## Nightly blocker and effect census
+
+Run `./ci.sh oss-census` to reproduce the nightly lane. The container fetches the 12 census-only pins, checks their reviewed license and notice hashes, and analyzes the C# files under the configured roots. It publishes `artifacts/corpus/blocker-census.md` and `artifacts/corpus/effect-census.md` for all 16 sources. The census-only methods have zero gate quota and produce no corpus expectations. [Source provenance](Corpus/README.md#census-only-sources) lists the reviewed licenses.
+
 ## Independent classifications and ratchet
 
 Each case has reviewed `Supported` or `IntentionallyUnsupported` classification, independent of expected verdict and snapshot. Supported cases must yield accountable Proven or Refuted; supported Unknown is a failure.

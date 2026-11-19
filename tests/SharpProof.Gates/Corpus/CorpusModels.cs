@@ -157,6 +157,9 @@ internal sealed record OpenSourceCorpusCompilationOptions(
     ImmutableArray<string> /* SPINT001: all values valid - raw corpus collections are validated by preflight */ GlobalUsings,
     ImmutableArray<string> /* SPINT001: all values valid - raw corpus collections are validated by preflight */ PreprocessorSymbols)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool AllowUnsafe { get; init; }
+
     internal static OpenSourceCorpusCompilationOptions Default { get; } = new(
         false,
         false,
@@ -177,6 +180,8 @@ internal sealed record OpenSourceCorpusSourceConfig(
     int MethodQuota,
     OpenSourceCorpusCompilationOptions Compilation)
 {
+    public bool CensusOnly { get; init; }
+
     public string Id { get; init; } = Id ?? throw new System.ArgumentNullException(nameof(Id));
     public string Repository { get; init; } = Repository ?? throw new System.ArgumentNullException(nameof(Repository));
     public string Commit { get; init; } = Commit ?? throw new System.ArgumentNullException(nameof(Commit));
