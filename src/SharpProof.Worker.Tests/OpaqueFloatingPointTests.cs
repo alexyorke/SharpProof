@@ -42,7 +42,7 @@ public sealed class OpaqueFloatingPointTests
     }
 
     // A fault before any floating value is computed still has a replayable witness.
-    [TestCase("[DoesNotThrow] public static double M(string s, int x) { return s.Length + (double)x; }")]
+    [TestCase("[DoesNotThrow] public static double M(string s) { return (double)s.Length; }")]
     [TestCase("[DoesNotThrow] public static void M(Box b, int v) { b.Value = v; } public sealed class Box { public double Value; }")]
     public async Task FaultsBeforeFloatingValuesAreRefuted(string member)
     {

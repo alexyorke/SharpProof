@@ -12,11 +12,8 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsOpaqueFloatingConversion(IConversionOperation conversion)
     {
         conversion = RepositoryParameterGuard.NotNull(conversion, nameof(conversion));
-        return conversion is
-            {
-                IsTryCast: false, OperatorMethod: null,
-                Conversion: { Exists: true, IsNumeric: true, IsUserDefined: false, IsNullable: false }
-            } &&
+        return conversion is { IsTryCast: false, OperatorMethod: null } &&
+            conversion.Conversion is { Exists: true, IsNumeric: true, IsUserDefined: false, IsNullable: false } &&
             IsFloatingPoint(conversion.Type) &&
             conversion.Operand.Type is { TypeKind: not TypeKind.Enum } source &&
             (TryGetScalarInteger(source.SpecialType, out _) ||
