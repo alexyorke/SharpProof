@@ -193,6 +193,11 @@ listing changes against an earlier one. Development history is in the Git log.
 - A static initializer may store `Array.Empty<T>()`: it returns one cached
   zero-length array per `T` and runs no code of `T`, so it counts as making
   fresh values, as `new T[0]` does.
+- Built-in integer conversions to `float`, `double` and `decimal`, and
+  widening from `float` to `double`, give opaque values. This lets forwarding
+  helpers such as Humanizer's `Seconds(this int s) => Seconds((double)s)`
+  reach the callee's existing proof rules. Stores to admitted class fields
+  also accept these values and record the write.
 - A store of a reference or a `readonly struct` value into an array the
   method allocated and then returned, such as
   `var a = new string[1]; a[0] = "x"; return a;`, was refuted as a write to

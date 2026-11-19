@@ -75,12 +75,14 @@ internal static partial class CSharpOperationSemantics
 
     // Stores project their scalar result and effects. Heap reads remain outside
     // this subset, so no subsequent value can depend on omitted heap state.
+    // A floating-point field is not modeled heap: its store is a write
+    // effect only, and every read of it is an unknown value.
     internal static bool IsSupportedFieldWrite(IFieldSymbol field, IAssemblySymbol sourceAssembly)
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));
         sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
         return HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
-            (IsScalar(field.Type) || IsReferenceDomain(field.Type)) && field.ContainingType.IsReferenceType &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsFloatingPoint(field.Type)) && field.ContainingType.IsReferenceType &&
             !field.IsVolatile && !field.IsReadOnly && !field.IsConst &&
             // An instance store never runs type initialization; a compiler-
             // generated static constructor only runs static field initializers.
@@ -136,7 +138,8 @@ internal static partial class CSharpOperationSemantics
             SymbolEqualityComparer.Default.Equals(target.ContainingType.OriginalDefinition, field.ContainingType.OriginalDefinition) &&
             instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
             HasIndependentFieldStorage(field) && SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
-            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsModeledStruct(field.Type)) &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsModeledStruct(field.Type) ||
+                IsFloatingPoint(field.Type) && field.ContainingType.IsReferenceType) &&
             (field.ContainingType.IsReferenceType || IsModeledStruct(field.ContainingType));
     }
 

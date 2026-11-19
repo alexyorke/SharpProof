@@ -1796,6 +1796,12 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, compared);
             return new(_factory.Variable(compared), block, FrontendSubsetClassification.Exact);
         }
+        if (operation is IConversionOperation conversion && CSharpOperationSemantics.IsOpaqueFloatingConversion(conversion))
+        {
+            var unknown = _context.Temporary(_context.Type(conversion.Type));
+            _builder!.Havoc(block, _context.Site(conversion), IrHavocKind.Variables, IrHavocOrigin.Approximation, unknown);
+            return new(_factory.Variable(unknown), block, FrontendSubsetClassification.Exact);
+        }
         var rule = CSharpOperationSemantics.Apply(_factory, operation, [.. children.Select(value => value.Value)],
             _context.Compilation?.Options.CheckOverflow);
         return ApplyClassifiedRule(operation, rule, block);
