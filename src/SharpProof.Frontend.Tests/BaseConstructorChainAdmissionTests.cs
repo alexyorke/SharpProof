@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Ir;
 
 namespace SharpProof.Frontend.Test;
 
@@ -118,6 +119,22 @@ public sealed class BaseConstructorChainAdmissionTests
         Assert.That(CSharpOperationSemantics.IsSourceBaseConstructorCall(root, null), Is.False);
         var exception = Type("Below").BaseType!.BaseType!.InstanceConstructors.First(static candidate => candidate.Parameters.IsEmpty);
         Assert.That(CSharpOperationSemantics.IsSourceBaseConstructorCall(exception, Type("OverException")), Is.False);
+    }
+
+    [TestCase("", true)]
+    [TestCase("static Split() { System.Console.WriteLine(1); }", false)]
+    public void PartialDerivedConstructionKeepsItsOpaqueCallBoundary(string typeInitializer, bool hasOpaqueCall)
+    {
+        System.ArgumentNullException.ThrowIfNull(typeInitializer);
+        using var subject = TypedProgramSubject.Create("object Target() => new Split();",
+            "public class Root { } public partial class Split : Root { public Split() { } " + typeInitializer + " } " +
+            "public partial class Split { private readonly int value = 3; }");
+        var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowering.IsExact, Is.EqualTo(hasOpaqueCall));
+        if (hasOpaqueCall)
+        {
+            Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions).OfType<IrCallInstruction>(), Has.Exactly(1).Items);
+        }
     }
 
     private static readonly CSharpCompilation Compilation = CSharpCompilation.Create("Chains",

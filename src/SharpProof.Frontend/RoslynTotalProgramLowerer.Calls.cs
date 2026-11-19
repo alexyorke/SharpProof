@@ -195,6 +195,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         var directConstructor = CSharpOperationSemantics.IsDirectObjectConstructor(constructor, true, _cancellationToken);
         var canCallOpaque = _expressions.AllowOpaqueCalls && !constructor.IsImplicitlyDeclared &&
             constructor.ContainingType.TypeKind == TypeKind.Class;
+        var opaqueConstructor = false;
         if (!directConstructor && !canCallOpaque)
         { return null; }
         foreach (var initializer in creation.Initializer?.Initializers ?? [])
@@ -214,6 +215,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             // Keep the existing opaque construction when a newly admitted
             // chain's own initializers cannot be separated from its body.
             directConstructor = false;
+            opaqueConstructor = true;
         }
         var valueStruct = CSharpOperationSemantics.IsModeledStruct(creation.Type);
         if (valueStruct && constructor.IsImplicitlyDeclared)
@@ -317,7 +319,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             return ran.Classification.IsExact ? Complete(ran.Continuation) : new(created!, ran.Continuation, ran.Classification);
         }
         if (InlineSourceMember(creation, constructor, null, creation.Arguments, block, depth, prelude: Allocate,
-            constructedReceiver: () => created, opaqueConstructor: !directConstructor) is not { } body)
+            constructedReceiver: () => created, opaqueConstructor: opaqueConstructor) is not { } body)
         { return null; }
         if (created == null)
         {
@@ -603,10 +605,9 @@ internal sealed partial class RoslynTotalProgramLowerer
             !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
                 exactTarget: exactTarget, contractOnly: opaqueConstructor) &&
-            !opaqueConstructor &&
-            !(_expressions.AllowOpaqueCalls && references == null &&
+            (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
-                    constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget)))
+                    constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
         { return null; }
         var callee = frame!;
         var site = _context.Site(invocation);

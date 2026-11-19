@@ -124,7 +124,7 @@ listing changes against an earlier one. Development history is in the Git log.
   other constructor runs on the same object, with its field initializers,
   then the rest of this one. Instance field initializers no longer count as
   effects, so `new` of a class with them can be proved pure.
-- `new` can inline source base constructors without finalizers. The class's
+- `new` can inline source base constructors in classes without a destructor. The class's
   own field initializers run before the base constructor's arguments, then
   the base class's initializers and body run before the class's body. A
   virtual call on the base constructor's receiver or a metadata base class
