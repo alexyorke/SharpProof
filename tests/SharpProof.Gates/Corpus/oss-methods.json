@@ -7743,8 +7743,8 @@
       "declarationSha256": "e977d37bb58ca7c462e470ccc5c6bc46bfdf21426123ba7cbf272c82b599e5c3",
       "methodName": "GetAllZones",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0333",
@@ -8355,8 +8355,8 @@
       "declarationSha256": "d11b7dfe1872b33a54ab0890f30949687aea931373fbe36a8686d923bcd7f64f",
       "methodName": "CreateYearOfEraHandler",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0384",
@@ -8415,8 +8415,8 @@
       "declarationSha256": "31cbadfdbc232a45fcd7aeca8a621158670ae2a191a2b92f9d491643712f23ba",
       "methodName": "CreatePeriodHandler",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Proven",
+      "support": "Supported"
     },
     {
       "id": "OSS0389",

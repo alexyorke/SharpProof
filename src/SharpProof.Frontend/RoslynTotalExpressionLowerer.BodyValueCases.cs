@@ -157,6 +157,28 @@ internal sealed partial class RoslynTotalExpressionLowerer
             : AllocateValue(operation, block);
     }
 
+    // A lambda or anonymous method converted to a delegate. Its body does not
+    // run. A capturing one allocates a new delegate each time; a
+    // non-capturing one reads the compiler's cached delegate, allocated by
+    // whichever evaluation came first, so it may allocate and its value is
+    // an unknown reference. Release may drop a store nothing reads, and
+    // with it the allocation, so such a capturing one may allocate too.
+    private TotalBodyValue LowerAnonymousFunctionCreation(IOperation operation, IDelegateCreationOperation creation, bool captures, IrBlockId block)
+    {
+        if (captures && !CSharpOperationSemantics.DelegateValueIsErased(creation, _context.Compilation))
+        { return AllocateValue(operation, block); }
+        var site = _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, "anonymous-function");
+        if (!ShadowCallSkeleton)
+        {
+            var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType,
+                "opaque-call:anonymous-function", _factory.BooleanType, true);
+            _builder!.Call(block, site, null, member, null);
+        }
+        var value = _context.Temporary(_context.Type(creation.Type));
+        _builder!.Havoc(block, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, value);
+        return new(_factory.Variable(value), block, FrontendSubsetClassification.Exact);
+    }
+
     // An implicit boxing conversion passed as an argument to an opaque call.
     private TotalBodyValue LowerOpaqueBoxing(IOperation operation, IConversionOperation opaqueBoxing, IrBlockId block, int depth)
     {
