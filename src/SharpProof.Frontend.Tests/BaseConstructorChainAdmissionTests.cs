@@ -146,7 +146,9 @@ public sealed class BaseConstructorChainAdmissionTests
             "public class Root { static Root() { System.Console.WriteLine(1); } public Root() { } } " + chain);
         var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowering.IsExact, Is.True);
-        Assert.That(lowering.Program.Blocks.SelectMany(static block => block.Instructions).OfType<IrCallInstruction>(), Has.Exactly(1).Items);
+        var effects = lowering.Program.Blocks.SelectMany(static block => block.Instructions).OfType<IrCallInstruction>()
+            .Select(call => IrOpaqueCallSite.Effects(subject.Context.Factory, call.Operation));
+        Assert.That(effects, Is.EquivalentTo(new[] { IrOpaqueCallEffects.All, IrOpaqueCallEffects.Writes }));
     }
 
     private static readonly CSharpCompilation Compilation = CSharpCompilation.Create("Chains",
