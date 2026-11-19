@@ -122,6 +122,10 @@ Once creating a delegate from a lambda lowered without running its body (SEMANTI
 
 All eight were reviewed against the bodies. The supported floors rose by three, the total-Unknown ceiling fell by three, the SP0047 ceiling fell by eight and the SP0002 ceiling rose by five.
 
+### Reviewed lowering reasons for opaque floating-point conversions
+
+Five C-Sharp-Algorithms methods stay Unknown with SP0047 after their integer-to-floating conversions lower. The Sieve of Atkin (OSS0016) and `PrimesList.IsPrime` (OSS0124) stop at the conversion of `Math.Sqrt` back to `int`. The Sieve of Eratosthenes (OSS0017) and both comb-sort methods (OSS0107 and OSS0185) reach unsupported floating comparisons. Their verdicts, support classifications, and diagnostic ID counts are unchanged.
+
 ## Contracts on real code
 
 The corpus above checks one purity claim per method. [oss-contracts.json](oss-contracts.json) adds hand-written postconditions and preconditions for 15 of those methods, so contracts are also tested on real code. Each entry is a `[ContractFor]` companion class, compiled beside the unchanged pinned source with no effect attribute (`OpenSourceCorpusRunner.PrepareContracts`). A type has at most one companion, so a second method of the same type names the first entry in `sharedWith`. Each expected verdict was checked against the method's body, and its `review` says why it holds or why it is not decided. Two contracts are deliberately false.
