@@ -16,7 +16,7 @@ public sealed class CompilerOwnedBodyAbstractionEffectAdmissionTests
                 Contract.Requires(x >= 0);
                 Contract.Ensures(Contract.Result<int>() == Contract.Result<int>());
                 Contract.Ensures(Contract.Result<int>() == x);
-                var unsupported = (int)(1.5 * x);
+                var unsupported = 1.5 * x;
                 throw null!;
             }
         }

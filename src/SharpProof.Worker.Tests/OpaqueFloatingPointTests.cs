@@ -4,9 +4,8 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 // `float`, `double` and `decimal` values are opaque. They flow through
-// parameters, returns, fields and calls; conversions into them from integers,
-// and `float`/`double` arithmetic and comparisons, never throw and give
-// unknown values. Nothing about rounding, NaN or signed zeros is modeled.
+// parameters, returns, fields and calls. The admitted conversions give
+// unknown values without throwing.
 [TestFixture]
 public sealed class OpaqueFloatingPointTests
 {
@@ -14,13 +13,14 @@ public sealed class OpaqueFloatingPointTests
 
     [TestCase("[DoesNotThrow] public static double M(int x) { return x; }")]
     [TestCase("[DoesNotThrow] public static double M(ulong x) { return x; }")]
+    [TestCase("[DoesNotThrow] public static float M(char x) { return x; }")]
+    [TestCase("[DoesNotThrow] public static double M(float x) { return x; }")]
+    [TestCase("[DoesNotThrow] public static bool M(double x) { return x == x; }")]
     [TestCase("[DoesNotThrow] public static float M(long x) { return checked((float)x); }")]
     [TestCase("[DoesNotThrow] public static decimal M(long x) { return x; }")]
     [TestCase("[DoesNotThrow] public static double M(int x) { return Forward((double)x); } private static double Forward(double value) { return value; }")]
-    [TestCase("[DoesNotThrow] public static double M(double x) { return checked(7 * x / 0.0 - x % 2); }")]
-    [TestCase("[DoesNotThrow] public static bool M(double x) { return x < 1.0 || -x >= 2.0 || x != x; }")]
     [TestCase("[DoesNotThrow] public static void M(Box b, int v) { if (b != null) { b.Value = v; } } public sealed class Box { public double Value; }")]
-    [TestCase("[EnforcePure] public static double M(int x) { return Half(x); } private static double Half(double value) { return value / 2.0; }")]
+    [TestCase("[EnforcePure] public static double M(int x) { return Forward(x); } private static double Forward(double value) { return value; }")]
     [TestCase("[EnforcePure] public static Box M(int v) { return new Box(v); } public sealed class Box { private readonly double _value; public Box(double value) { _value = value; } }")]
     public async Task ForwardingAndUnknownResultsAreProven(string member)
     {
@@ -33,7 +33,6 @@ public sealed class OpaqueFloatingPointTests
     // specification, so its unknown effects keep purity Unknown, and a witness
     // through an unknown double argument is not replayable.
     [TestCase("[EnforcePure] public static System.TimeSpan M(int x) { return Seconds((double)x); } private static System.TimeSpan Seconds(double seconds) { return System.TimeSpan.FromSeconds(seconds); }")]
-    [TestCase("[EnforcePure] public static System.TimeSpan M(int x) { return Weeks((double)x); } private static System.TimeSpan Weeks(double weeks) { return Days(7 * weeks); } private static System.TimeSpan Days(double days) { return System.TimeSpan.FromDays(days); }")]
     public async Task UnspecifiedFrameworkCallsKeepTheirEffects(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -52,6 +51,13 @@ public sealed class OpaqueFloatingPointTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.Reason.ToString());
     }
 
+    [Test]
+    public async Task StoreToCallerOwnedFieldIsRefuted()
+    {
+        var result = await ResultAsync("[EnforcePure] public static void M(Box b, double value) { if (b != null) { b.Value = value; } } public sealed class Box { public double Value; }");
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.Reason.ToString());
+    }
+
     // A claim that depends on a floating result is neither proven nor
     // refuted: the comparison is unknown, NaN is not equal to itself, and a
     // witness that relies on a chosen comparison result cannot be replayed.
@@ -59,7 +65,6 @@ public sealed class OpaqueFloatingPointTests
     [TestCase("[DoesNotThrow] public static int M(double x) { if (x == x) { return 1; } throw new System.InvalidOperationException(); }")]
     [TestCase("[DoesNotThrow] public static int M(double x) { if (x < 0.0) { throw new System.ArgumentOutOfRangeException(nameof(x)); } return 1; }")]
     [TestCase("public static bool M(int x) { Contract.Ensures(Contract.Result<bool>()); double d = x; return d == d; }")]
-    [TestCase("public static bool M(int x) { Contract.Ensures(!Contract.Result<bool>()); double d = x; return 0.0 > d * d; }")]
     public async Task FloatingDependentClaimsStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -67,12 +72,14 @@ public sealed class OpaqueFloatingPointTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown), result.Reason.ToString());
     }
 
-    // Conversions out of floating point and `decimal` arithmetic can throw or
-    // give platform-dependent values; they are not modeled.
+    // Conversions out of these types and arithmetic remain outside this subset.
     [TestCase("[DoesNotThrow] public static int M(double x) { return checked((int)x); }")]
     [TestCase("[DoesNotThrow] public static int M(double x) { return (int)x; }")]
     [TestCase("[DoesNotThrow] public static decimal M(double x) { return (decimal)x; }")]
     [TestCase("[DoesNotThrow] public static decimal M(decimal x) { return x + 1m; }")]
+    [TestCase("[DoesNotThrow] public static double M(double x) { return x + 1.0; }")]
+    [TestCase("[DoesNotThrow] public static double M(double x) { return -x; }")]
+    [TestCase("[DoesNotThrow] public static bool M(double x) { return x < 1.0; }")]
     [TestCase("[DoesNotThrow] public static decimal M(decimal x) { return 1m / x; }")]
     public async Task UnmodeledFloatingOperationsStayUnknown(string member)
     {

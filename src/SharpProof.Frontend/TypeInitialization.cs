@@ -456,6 +456,15 @@ internal static class TypeInitialization
                     return Elements(collection.Elements, owner, constructor);
                 case IObjectCreationOperation creation:
                     return Creation(creation, owner, constructor);
+                // `Array.Empty<T>()` returns one cached zero-length array per
+                // T; the first call may allocate it. Making a T[] runs no code
+                // of T, and a zero-length array has nothing to change.
+                case IInvocationOperation
+                {
+                    Instance: null, Arguments.IsEmpty: true,
+                    TargetMethod: { Name: "Empty", IsGenericMethod: true, Parameters.IsEmpty: true, ContainingType.SpecialType: SpecialType.System_Array }
+                }:
+                    return InitializationEffect.FreshValues;
                 case IDelegateCreationOperation creation when constructor == null:
                     return creation.Target is IAnonymousFunctionOperation or IMethodReferenceOperation
                     {

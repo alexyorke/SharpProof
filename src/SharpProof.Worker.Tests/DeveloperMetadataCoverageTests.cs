@@ -60,7 +60,7 @@ internal sealed class DeveloperMetadataCoverageTests
                     Contract.Requires(originalValue >= 0);
                     Contract.Ensures(Contract.Result<int>() == Contract.Result<int>());
                     Contract.Ensures(Contract.Result<int>() == originalValue);
-                    var unsupported = (int)(1.5 * originalValue);
+                    var unsupported = 1.5 * originalValue;
                     throw null!;
                 }
             }
