@@ -436,6 +436,10 @@ internal static class TypeInitialization
                     // target-typed `new(...)` converts the object it creates
                     // to the type it creates.
                     var converted = conversion.GetConversion();
+                    // A default literal zeroes the target even when Roslyn
+                    // represents it as a conversion to a type parameter.
+                    if (converted.IsDefaultLiteral && conversion.Operand is IDefaultValueOperation)
+                    { return InitializationEffect.None; }
                     return !converted.IsImplicit || converted.IsUserDefined ? InitializationEffect.Effectful
                         : converted.IsIdentity || converted.IsReference || converted.IsNumeric ||
                             converted.IsCollectionExpression && conversion.Operand is ICollectionExpressionOperation ||
