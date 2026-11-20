@@ -57,7 +57,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         {
             // The framework initializer allocates its empty array and writes its
             // own cache, without calling element constructors or callbacks.
-            var constructor = ((IObjectCreationOperation)operation).Constructor!;
+            var constructor = CSharpOperationSemantics.EmptyCreationConstructor(operation)!;
             block = ListRuntimeEffects(operation, constructor, [], _factory.Boolean(false), block, initialization: true);
             return AllocateValue(operation, block);
         }

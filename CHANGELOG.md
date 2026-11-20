@@ -118,6 +118,14 @@ listing changes against an earlier one. Development history is in the Git log.
   analyzed: the method's body is inlined as for any other non-virtual source
   call. Before, such calls kept the whole caller `Unknown`. Invoking the
   delegate is still an unknown call.
+- A source call whose inlined body runs out of the lowering work budget
+  becomes an unknown call, after its `Requires` is checked, instead of
+  leaving the whole caller `Unknown`. Such a call may do anything, so it does
+  not help purity or exception claims; claims that do not depend on the call
+  can now be proved.
+- An empty collection expression `[]` whose target is `List<T>`,
+  `HashSet<T>` or `Dictionary<TKey, TValue>` is analyzed as `new T()`, in a
+  body or a field initializer.
 - Values of source `readonly struct` types are analyzed: construction,
   including target-typed `new(...)` and constructors chained with `: this(...)`,
   `default`, field and property reads, instance members and user-defined

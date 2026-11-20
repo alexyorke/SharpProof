@@ -36,8 +36,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsEmptyListCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return operation is IObjectCreationOperation { Constructor: { Parameters.IsEmpty: true } constructor, Initializer: null } &&
-            IsListStateMember(constructor);
+        return EmptyCreationConstructor(operation) is { Parameters.IsEmpty: true } constructor && IsListStateMember(constructor);
     }
 }
 
