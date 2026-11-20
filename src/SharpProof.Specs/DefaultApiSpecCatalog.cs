@@ -607,8 +607,6 @@ internal sealed partial class ApiSpecTable
                     new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
                     new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
                 []),
-            StringConcatDeclaration("bcl.string.concat.string-string-string", 3, assemblySetFramework, evidenceDocumented, evidenceObserved),
-            StringConcatDeclaration("bcl.string.concat.string-string-string-string", 4, assemblySetFramework, evidenceDocumented, evidenceObserved),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
                     "bcl.string.compare-ordinal.string-string",
@@ -908,27 +906,6 @@ internal sealed partial class ApiSpecTable
                 new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
                 new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
                 new SpecNullnessFacet(SpecNullness.NotApplicable, documented),
-                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
-                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
-            []);
-    }
-
-    // The three- and four-string Concat overloads join their arguments, a
-    // null one counting as empty, exactly as the two-string overload does.
-    private static ApiSpecDeclaration StringConcatDeclaration(string identifier, int arity,
-        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
-    {
-        RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
-        return new ApiSpecDeclaration(
-            new ApiSpecTarget(identifier,
-                "M:System.String.Concat(" + string.Join(",", Enumerable.Repeat("System.String", arity)) + ")",
-                "System.String", SpecTargetMemberKind.Method, "Concat",
-                true, 0, null, [.. Enumerable.Repeat(IrTypeKind.String, arity)], IrTypeKind.String, assemblies),
-            new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.None, observed),
-                new SpecAllocationFacet(SpecAllocationBehavior.MayAllocate, documented),
-                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
-                new SpecNullnessFacet(SpecNullness.NonNull, documented),
                 new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
                 new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
             []);

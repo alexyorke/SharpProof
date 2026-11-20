@@ -228,10 +228,9 @@ listing changes against an earlier one. Development history is in the Git log.
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
 - The default API table (version 13) also specifies `List<T>.Clear`,
-  `Dictionary<TKey, TValue>.Clear`, the three- and four-string
-  `string.Concat` overloads and `string.CompareOrdinal(string, string)`. A
-  guarded `list.Clear()` or `string.Concat(a, b, c)` can now be proven not to
-  throw, and `string.CompareOrdinal` is pure and allocates nothing. `Clear`
+  `Dictionary<TKey, TValue>.Clear` and `string.CompareOrdinal(string, string)`.
+  A guarded `list.Clear()` can now be proven not to throw, and
+  `string.CompareOrdinal` is pure and allocates nothing. `Clear`
   writes its receiver and forgets what the body knew about the collection's
   contents. Members that consult the element or key comparer, such as
   `List<T>.Contains`, `Dictionary` `ContainsKey` and `TryGetValue`, or call

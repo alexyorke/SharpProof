@@ -4,7 +4,7 @@ This is a hand-maintained reference to [DefaultApiSpecCatalog.cs](../src/SharpPr
 
 - Table identity: `SharpProof.ApiSpec.Default`
 - Table version: `13`
-- Declarations: 92
+- Declarations: 90
 
 ## Matching and evidence
 
@@ -79,8 +79,6 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.stack.count` | <code>P:System.Collections.Generic.Stack&#96;1.Count</code> |
 | `bcl.string.compare-ordinal.string-string` | <code>M:System.String.CompareOrdinal(System.String,System.String)</code> |
 | `bcl.string.concat.string-string` | <code>M:System.String.Concat(System.String,System.String)</code> |
-| `bcl.string.concat.string-string-string` | <code>M:System.String.Concat(System.String,System.String,System.String)</code> |
-| `bcl.string.concat.string-string-string-string` | <code>M:System.String.Concat(System.String,System.String,System.String,System.String)</code> |
 | `bcl.string.is-null-or-empty` | <code>M:System.String.IsNullOrEmpty(System.String)</code> |
 | `bcl.string.item.int32` | <code>M:System.String.get_Chars(System.Int32)</code> |
 | `bcl.string.length` | <code>P:System.String.Length</code> |
@@ -163,11 +161,12 @@ type-initialization boundary that keeps the `Array.Empty` and
 
 ## String members
 
-The three- and four-string `Concat` overloads behave like the two-string row:
-a null argument counts as empty, the result is never null, and they may
-allocate but do not throw. `CompareOrdinal(string, string)` compares UTF-16
+`CompareOrdinal(string, string)` compares UTF-16
 code units without consulting the culture, so it is pure, allocates nothing
 and does not throw. No row relates a result to its arguments. `string.Join`
 and the `object` overloads of `Concat` call `ToString` or enumerate their
 argument, and `IsNullOrWhiteSpace` reads Unicode category data whose .NET
-Framework type initializer loads a resource, so none of them has a row.
+Framework type initializer loads a resource, so none of them has a row. The
+three- and four-string `Concat` overloads have no row either: past the
+maximum string length they throw `OutOfMemoryException`, which the two-string
+overload's model checks and a row cannot.

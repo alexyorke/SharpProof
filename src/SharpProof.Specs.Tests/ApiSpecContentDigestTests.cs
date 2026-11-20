@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 13 adds List and Dictionary Clear, three- and four-string Concat and CompareOrdinal.
+        // Version 13 adds List and Dictionary Clear and CompareOrdinal.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
             Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("13"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "56e8fd9279b5bad35e9179d303057338c2694be7e34b834597ebcfb24b4c5b8b"));
+                "9dff4dfa50e9aa8a3e07259c62607d52b79260a6fcf575c39fe96150c0bb9e19"));
         }
     }
 

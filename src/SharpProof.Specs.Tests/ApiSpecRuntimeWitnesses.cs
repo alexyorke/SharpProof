@@ -33,8 +33,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
         witnesses.Add("bcl.object.ctor", CreateBclObjectCtorWitness());
         witnesses.Add("bcl.string.compare-ordinal.string-string", CreateStringCompareOrdinalWitness());
         witnesses.Add("bcl.string.concat.string-string", CreateBclStringConcatStringStringWitness());
-        witnesses.Add("bcl.string.concat.string-string-string", CreateStringConcatWitness(3));
-        witnesses.Add("bcl.string.concat.string-string-string-string", CreateStringConcatWitness(4));
         witnesses.Add("bcl.string.is-null-or-empty", CreateBclStringIsNullOrEmptyWitness());
         witnesses.Add("bcl.string.item.int32", CreateBclStringItemInt32Witness());
         witnesses.Add("bcl.string.length", CreateBclStringLengthWitness());

@@ -25,9 +25,6 @@ public sealed class CollectionAndStringCatalogTests
     [TestCase("[DoesNotThrow] public static void M(Dictionary<int, int> d) { if (d != null) { d.Clear(); } }")]
     [TestCase("[DoesNotThrow] public static void M(Dictionary<U, U> d) { if (d != null) { d.Clear(); } }")]
     [TestCase("[DoesNotThrow] public static int M(List<int> l) { if (l == null) { return 0; } l.Clear(); return l.Count; }")]
-    [TestCase("[DoesNotThrow] public static string M(string a, string b, string c) { return string.Concat(a, b, c); }")]
-    [TestCase("[DoesNotThrow] public static string M(string a, string b, string c, string d) { return string.Concat(a, b, c, d); }")]
-    [TestCase("[EnforcePure] public static string M(string a, string b, string c) { return string.Concat(a, b, c); }")]
     [TestCase("[DoesNotThrow] public static int M(string a, string b) { return string.CompareOrdinal(a, b); }")]
     [TestCase("[EnforcePure] public static bool M(string a, string b) { return string.CompareOrdinal(a, b) < 0; }")]
     [TestCase("[ZeroAllocations] public static int M(string a, string b) { return string.CompareOrdinal(a, b); }")]
@@ -48,11 +45,9 @@ public sealed class CollectionAndStringCatalogTests
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted), result.Reason.ToString());
     }
 
-    // Clear writes the receiver, Concat allocates, and no row relates a
-    // result to its inputs. Members that consult a comparer, or call
+    // Clear writes the receiver, and no row relates a result to its inputs. Members that consult a comparer, or call
     // ToString on elements, have no row, so user code keeps them Unknown.
     [TestCase("[EnforcePure] public static void M(List<int> l) { if (l != null) { l.Clear(); } }")]
-    [TestCase("[ZeroAllocations] public static string M(string a, string b, string c) { return string.Concat(a, b, c); }")]
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 0); return string.CompareOrdinal(\"a\", \"b\"); }")]
     [TestCase("[DoesNotThrow] public static bool M(List<U> l, U x) { return l != null && l.Contains(x); }")]
     [TestCase("[DoesNotThrow] public static bool M(List<int> l, int x) { return l != null && l.Contains(x); }")]
@@ -63,6 +58,16 @@ public sealed class CollectionAndStringCatalogTests
     {
         System.ArgumentNullException.ThrowIfNull(member);
         Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+    }
+
+    // Concat over more than two strings throws OutOfMemoryException past the
+    // maximum string length, so it is not proven not to throw.
+    [TestCase("[DoesNotThrow] public static string M(string a, string b, string c) { return string.Concat(a, b, c); }")]
+    [TestCase("[DoesNotThrow] public static string M(string a, string b, string c, string d) { return string.Concat(a, b, c, d); }")]
+    public async Task LongConcatenationsAreNotProvenThrowFree(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        Assert.That((await ResultAsync(member)).Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven));
     }
 
     // Clear's opaque write must invalidate what the body knew about the
