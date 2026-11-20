@@ -8,11 +8,13 @@ internal sealed partial class RoslynTotalProgramLowerer
         // aliases no field or element, so no write can change it. A root's
         // writable ref or out parameter is the caller's storage.
         var writable = _context.Parameters.Where(binding => _context.IsWritableRootReference(binding.Parameter)).ToImmutableArray();
-        // `this` of a member of a mutable struct is the caller's storage too,
+        // `this` of a member of a modeled struct is the caller's storage too,
         // unless the frame's caller passed one of its own variables or a copy.
+        // Code the body calls can change that storage through another alias,
+        // even for a readonly struct, whose members get it by reference.
         ImmutableArray<IrVarId> receiver = _context.Receiver is { } self && !_context.CopiesReceiver && !_context.Target.IsStatic &&
             _context.Target.MethodKind != MethodKind.Constructor &&
-            CSharpOperationSemantics.IsMutableModeledStruct(_context.Target.ContainingType)
+            CSharpOperationSemantics.IsModeledStruct(_context.Target.ContainingType)
             ? [self.Current] : [];
         var references = _context.Parameters.Where(binding => binding.Parameter.RefKind is RefKind.Ref or RefKind.In &&
                 !(_context.WritesBackReferences && binding.Parameter.RefKind == RefKind.Ref) ||

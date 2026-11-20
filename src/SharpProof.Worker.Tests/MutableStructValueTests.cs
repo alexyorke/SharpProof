@@ -47,6 +47,13 @@ public sealed class MutableStructValueTests
             [EnforcePure] public void Increment() { Bump(); }
             private void Bump() { F++; }
             [EnforcePure] public readonly int Get() => F;
+            public readonly int Peek(int ignored) => F;
+            public readonly bool ReadsLate(System.Func<int> f)
+            {
+                Contract.Ensures(Contract.Result<bool>());
+                var before = F;
+                return before == Peek(f());
+            }
             public bool Same(System.Action action)
             {
                 Contract.Ensures(Contract.Result<bool>());
@@ -60,6 +67,19 @@ public sealed class MutableStructValueTests
             public Fixed(int value) { Value = value; }
             public int Value { get; }
             public int Plus(int y) => Value + y;
+            public bool Same(System.Action action)
+            {
+                Contract.Ensures(Contract.Result<bool>());
+                var before = Value;
+                action();
+                return before == Value;
+            }
+        }
+        public struct Loud
+        {
+            public static int Hits;
+            static Loud() { Hits++; }
+            public int P { get; set; }
         }
         public static class Helpers
         {
@@ -140,6 +160,8 @@ public sealed class MutableStructValueTests
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 0); Ticker t = default; ITick i = t; i.Tick(); return ((Ticker)i).N; }")]
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 0); Ticker t = default; t.ToString(); return t.N; }")]
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 0); Ticker t = default; t.Tick(); return t.N; }")]
+    // An auto-property setter runs the struct's static constructor.
+    [TestCase("[EnforcePure] public static int M() { Loud s = default; s.P = 1; return s.P; }")]
     public async Task InPlaceMutationsAreNotIgnored(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -173,6 +195,8 @@ public sealed class MutableStructValueTests
     [TestCase("Settable.Set")]
     [TestCase("Settable.Increment")]
     [TestCase("Settable.Same")]
+    [TestCase("Settable.ReadsLate")]
+    [TestCase("Fixed.Same")]
     public async Task ReceiverStorageIsNotProven(string callable)
     {
         System.ArgumentNullException.ThrowIfNull(callable);

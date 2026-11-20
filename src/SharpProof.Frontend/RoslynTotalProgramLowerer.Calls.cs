@@ -1008,6 +1008,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         // C# makes on a copy of it leaves alone.
         var copied = _expressions.IsCopiedStructReceiver(instance);
         copies = copied && (mutating || !_expressions.IsImplicitThis(instance));
+        // A member that cannot change `this` gets the caller's `this` by
+        // reference too, so it reads it once the arguments ran, which may
+        // have changed the storage it names. C# copies `this` for a mutating
+        // member before the arguments run.
+        if (!mutating && _expressions.IsImplicitThis(instance) && _context.Receiver is { } self)
+        { live = self.Current; }
         return copied || !mutating;
     }
 

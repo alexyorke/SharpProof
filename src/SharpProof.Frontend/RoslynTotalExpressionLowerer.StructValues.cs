@@ -108,8 +108,14 @@ internal sealed partial class RoslynTotalExpressionLowerer
             field = fieldTarget.Field;
             instance = fieldTarget.Instance;
         }
+        // A setter is a method of the struct, so calling it runs the type's
+        // initializer (ECMA-335 II.10.5.3.1); a store of its backing field
+        // stands for it only when that initializer has no effect, or when
+        // the caller belongs to the struct and has run it already.
         else if (target is IPropertyReferenceOperation { Arguments.Length: 0 } propertyTarget &&
-            CSharpOperationSemantics.StructAutoPropertyField(propertyTarget.Property) is { } backing)
+            CSharpOperationSemantics.StructAutoPropertyField(propertyTarget.Property) is { } backing &&
+            (SymbolEqualityComparer.Default.Equals(_context.Target.ContainingType, backing.ContainingType) ||
+                TypeInitializationFree?.Invoke(backing.ContainingType) == true))
         {
             field = backing;
             instance = propertyTarget.Instance;
