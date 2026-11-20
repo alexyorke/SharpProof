@@ -125,6 +125,20 @@ listing changes against an earlier one. Development history is in the Git log.
   proved. A body that builds such a value keeps allocation, effect-contract
   and resource-bound claims `Unknown`, because the model allocates it and the
   CLR does not.
+- Values of mutable source structs are analyzed the same way, with C#'s copy
+  semantics. A store into a field or auto-property of a local or by-value
+  parameter, including `+=` and `++`, changes only that variable, and so does
+  a mutating member called on it: the callee works on a copy of `this` that
+  the caller assigns back on normal return. A copy, element or box made
+  earlier keeps the old value. Mutations through a field of an object, an
+  array element, a `ref` local, a struct field of a struct, an assignment to
+  `this`, or a mutating call inside a `try` block keep the method `Unknown`,
+  as do stores and mutating calls on the analyzed member's own `this`, which
+  is its caller's storage.
+- An instance member of a modeled struct called on a local or parameter sees
+  what its arguments did to that variable: C# passes the variable by
+  reference, so the callee's `this` is read once the arguments have run.
+  Before, it was read before them.
 - A class or struct constructor chained with `: this(...)` is inlined: the
   other constructor runs on the same object, with its field initializers,
   then the rest of this one. Instance field initializers no longer count as
