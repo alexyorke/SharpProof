@@ -3,8 +3,8 @@
 This is a hand-maintained reference to [DefaultApiSpecCatalog.cs](../src/SharpProof.Specs/DefaultApiSpecCatalog.cs). The C# declarations are the runtime authority.
 
 - Table identity: `SharpProof.ApiSpec.Default`
-- Table version: `12`
-- Declarations: 87
+- Table version: `13`
+- Declarations: 92
 
 ## Matching and evidence
 
@@ -54,6 +54,7 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.date-time.ticks` | <code>P:System.DateTime.Ticks</code> |
 | `bcl.date-time.time-of-day` | <code>P:System.DateTime.TimeOfDay</code> |
 | `bcl.date-time.year` | <code>P:System.DateTime.Year</code> |
+| `bcl.dictionary.clear` | <code>M:System.Collections.Generic.Dictionary&#96;2.Clear</code> |
 | `bcl.dictionary.count` | <code>P:System.Collections.Generic.Dictionary&#96;2.Count</code> |
 | `bcl.enumerable.empty` | <code>M:System.Linq.Enumerable.Empty&#96;&#96;1</code> |
 | `bcl.exception.ctor` | <code>M:System.Exception.#ctor</code> |
@@ -63,6 +64,7 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.key-value-pair.key` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Key</code> |
 | `bcl.key-value-pair.value` | <code>P:System.Collections.Generic.KeyValuePair&#96;2.Value</code> |
 | `bcl.list.add` | <code>M:System.Collections.Generic.List&#96;1.Add(&#96;0)</code> |
+| `bcl.list.clear` | <code>M:System.Collections.Generic.List&#96;1.Clear</code> |
 | `bcl.list.count` | <code>P:System.Collections.Generic.List&#96;1.Count</code> |
 | `bcl.list.item.int32` | <code>M:System.Collections.Generic.List&#96;1.get_Item(System.Int32)</code> |
 | `bcl.math.abs.int32` | <code>M:System.Math.Abs(System.Int32)</code> |
@@ -75,7 +77,10 @@ Evidence distinguishes documented contracts, supported-runtime observations, typ
 | `bcl.object.ctor` | <code>M:System.Object.#ctor</code> |
 | `bcl.queue.count` | <code>P:System.Collections.Generic.Queue&#96;1.Count</code> |
 | `bcl.stack.count` | <code>P:System.Collections.Generic.Stack&#96;1.Count</code> |
+| `bcl.string.compare-ordinal.string-string` | <code>M:System.String.CompareOrdinal(System.String,System.String)</code> |
 | `bcl.string.concat.string-string` | <code>M:System.String.Concat(System.String,System.String)</code> |
+| `bcl.string.concat.string-string-string` | <code>M:System.String.Concat(System.String,System.String,System.String)</code> |
+| `bcl.string.concat.string-string-string-string` | <code>M:System.String.Concat(System.String,System.String,System.String,System.String)</code> |
 | `bcl.string.is-null-or-empty` | <code>M:System.String.IsNullOrEmpty(System.String)</code> |
 | `bcl.string.item.int32` | <code>M:System.String.get_Chars(System.Int32)</code> |
 | `bcl.string.length` | <code>P:System.String.Length</code> |
@@ -132,7 +137,7 @@ Enable the pack with the consumer property `SharpProofSpecificationPacks` set to
 
 See [configuration](configuration.md), [compiler pack parsing](../src/SharpProof.CompilerCollector/FinalCompilationCollector.cs), [pack-provider tests](../src/SharpProof.Worker.Tests/CompilerSpecificationPackProviderTests.cs), and [coverage and limits](coverage-and-limits.md). The catalog's member, pack, and catalog versions are separate from the compiler artifact's specification-pack wire schema; use [release constants](release-constants.md) when changing them.
 
-## Concrete collection getters
+## Concrete collection members
 
 The Count getters on List, Dictionary, Queue, and Stack read receiver state,
 allocate nothing, terminate, and do not throw for a non-null receiver in the
@@ -144,3 +149,25 @@ Its effects remain Unknown because exceptional helpers may initialize ambient
 resources. Setter behavior, element identity/content relations, and numeric Count
 relations are not supplied by these entries. Interface dispatch and comparer-driven
 collection methods retain conservative behavior.
+
+`List.Clear` and `Dictionary.Clear` write their receiver's own storage. They
+allocate nothing, terminate, do not throw for a non-null receiver, and call no
+comparer, element or key member. A body that called `Clear` forgets what it
+knew about the collection's contents. `List.Contains`, `Dictionary.ContainsKey`
+and `Dictionary.TryGetValue` have no row: they call the element or key
+comparer, which can be user code for any type argument, and the catalog cannot
+restrict a row to particular type arguments. `List.ToArray` has no row either:
+on an empty receiver it reads a generic static cache, the same
+type-initialization boundary that keeps the `Array.Empty` and
+`Enumerable.Empty` effects Unknown.
+
+## String members
+
+The three- and four-string `Concat` overloads behave like the two-string row:
+a null argument counts as empty, the result is never null, and they may
+allocate but do not throw. `CompareOrdinal(string, string)` compares UTF-16
+code units without consulting the culture, so it is pure, allocates nothing
+and does not throw. No row relates a result to its arguments. `string.Join`
+and the `object` overloads of `Concat` call `ToString` or enumerate their
+argument, and `IsNullOrWhiteSpace` reads Unicode category data whose .NET
+Framework type initializer loads a resource, so none of them has a row.

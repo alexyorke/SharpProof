@@ -11,13 +11,13 @@ public sealed class ApiSpecContentDigestTests
     [Test]
     public void ValidatedTraversalPreservesPublishedDefaultCatalogDigest()
     {
-        // Version 11 accounts for resource callbacks on exceptional framework calls.
+        // Version 13 adds List and Dictionary Clear, three- and four-string Concat and CompareOrdinal.
         // Internal representation changes must preserve this semantic identity.
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("12"));
+            Assert.That(ApiSpecTable.DefaultTableVersion, Is.EqualTo("13"));
             Assert.That(ApiSpecTable.Default.ContentSha256, Is.EqualTo(
-                "89077ec8ad379951c77e8ae65a76439899e410843cd8f538aaafc60fa0d43a89"));
+                "56e8fd9279b5bad35e9179d303057338c2694be7e34b834597ebcfb24b4c5b8b"));
         }
     }
 

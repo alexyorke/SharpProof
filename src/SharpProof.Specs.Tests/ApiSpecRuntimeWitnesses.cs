@@ -13,6 +13,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         witnesses.Add("bcl.list.count", CreateCollectionCountWitness("List"));
         witnesses.Add("bcl.queue.count", CreateCollectionCountWitness("Queue"));
         witnesses.Add("bcl.stack.count", CreateCollectionCountWitness("Stack"));
+        witnesses.Add("bcl.dictionary.clear", CreateCollectionClearWitness("Dictionary"));
+        witnesses.Add("bcl.list.clear", CreateCollectionClearWitness("List"));
         witnesses.Add("bcl.list.item.int32", CreateCollectionItemWitness());
         witnesses.Add("bcl.array.empty", CreateBclArrayEmptyWitness());
         witnesses.Add("bcl.enumerable.empty", CreateBclEnumerableEmptyWitness());
@@ -29,7 +31,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         witnesses.Add("bcl.nullable.has-value", CreateBclNullableHasValueWitness());
         witnesses.Add("bcl.nullable.value", CreateBclNullableValueWitness());
         witnesses.Add("bcl.object.ctor", CreateBclObjectCtorWitness());
+        witnesses.Add("bcl.string.compare-ordinal.string-string", CreateStringCompareOrdinalWitness());
         witnesses.Add("bcl.string.concat.string-string", CreateBclStringConcatStringStringWitness());
+        witnesses.Add("bcl.string.concat.string-string-string", CreateStringConcatWitness(3));
+        witnesses.Add("bcl.string.concat.string-string-string-string", CreateStringConcatWitness(4));
         witnesses.Add("bcl.string.is-null-or-empty", CreateBclStringIsNullOrEmptyWitness());
         witnesses.Add("bcl.string.item.int32", CreateBclStringItemInt32Witness());
         witnesses.Add("bcl.string.length", CreateBclStringLengthWitness());
