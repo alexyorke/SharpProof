@@ -88,6 +88,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
             IObjectCreationOperation { Type: { IsReferenceType: true, TypeKind: TypeKind.Class or TypeKind.Delegate } created } => created,
             IDelegateCreationOperation { Type: { TypeKind: TypeKind.Delegate } created } => created,
             IArrayCreationOperation { Type: IArrayTypeSymbol created } => created,
+            _ when CSharpOperationSemantics.EmptyCollectionConstructor(operation) is { } constructor => constructor.ContainingType,
             _ => null!
         };
         return runtime != null && !RuntimeTypeRelationsIsOpen(runtime);

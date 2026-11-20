@@ -800,20 +800,38 @@ internal sealed partial class RoslynTotalProgramLowerer
             WriteBack(continued);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
+        // A callee whose expansion runs out of work, or does not fit in what
+        // is left, runs as the same unknown call as one whose body does not
+        // lower: its preconditions were recorded above, and it may do
+        // anything, throw included. The abandoned work is given back, within
+        // the session's bounded allowance, so the caller's body can go on.
+        // An unknown call could change the variable a mutating struct call
+        // writes back, so such a call has no fallback.
+        var fallback = _expressions.AllowOpaqueCalls && references == null && writeBack == null;
+        var mark = _calls.Mark();
         var expanded = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry);
         var lowering = expanded.Lower(graph!);
         if (!lowering.IsExact)
-        { return _expressions.AllowOpaqueCalls && references == null && writeBack == null ? Opaque() : new(marker, block, lowering.Classification); }
-        ImportExplicitThrowTypes(expanded);
+        {
+            if (fallback && lowering.ConstructionLimitExceeded)
+            { _ = _calls.TryRecover(mark); }
+            return fallback ? Opaque() : new(marker, block, lowering.Classification);
+        }
         var program = lowering.Program;
         var instructionCount = 0;
         foreach (var source in program.Blocks)
         {
-            SpendRegion();
+            _cancellationToken.ThrowIfCancellationRequested();
             instructionCount += source.Instructions.Length;
         }
-        if (!_calls.Spend(program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
-        { throw new RegionIncompleteException(); }
+        // Counting the blocks costs one step each, as copying them does.
+        if (!_calls.Spend(2 * program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
+        {
+            if (fallback && _calls.TryRecover(mark))
+            { return Opaque(); }
+            throw new RegionIncompleteException();
+        }
+        ImportExplicitThrowTypes(expanded);
         var continuation = _builder.CreateBlock("call:continued");
         var blocks = ImmutableDictionaryCapture.Create(program.Blocks, source => source.Id, source => _builder.CreateBlock("call:body"));
         foreach (var parameter in callee.Parameters)

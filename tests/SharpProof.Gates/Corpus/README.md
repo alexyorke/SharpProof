@@ -130,6 +130,12 @@ Five C-Sharp-Algorithms methods stay Unknown with SP0047 after their integer-to-
 
 NodaTime's `DateTimeZone.ForOffset` (OSS0326) can reach the source base constructors in `new FixedDateTimeZone(offset)`. Its SP0047 lowering reason moves from `UnsupportedOperationKind` to `UnsupportedControlFlow`. The method still produces an Unknown verdict and the diagnostic ID counts are unchanged.
 
+### Reviewed reasons for source calls that run out of work
+
+Once a source callee whose expansion runs out of the lowering work budget became an unknown call instead of leaving its caller `Unknown` (SEMANTICS.md, "Calls and loops"), two C-Sharp-Algorithms methods began to lower. `BTree.Insert` (OSS0074) and `DijkstraShortestPaths._initialize` (OSS0098) now stop at SP0002 instead of SP0047. Both store into their own object's fields, and the unknown call may do anything, so their purity verdicts stay Unknown. The SP0047 ceiling fell by two (162 to 160) and the SP0002 ceiling rose by two (238 to 240); the total-Unknown ceiling is unchanged.
+
+Four more methods get further before they abstain, so their SP0047 lowering reason moves from `UnsupportedControlFlow` to `UnsupportedOperationKind`: `BinomialMinHeap._mergeForestOnly` (OSS0142), `TernarySearchTree.Insert` (OSS0162), NodaTime's `DateTimeZone.ForOffset` (OSS0326) and Humanizer's `MalteseNumberToWordsConvertor.Convert` (OSS0487). Their verdicts and diagnostic ID counts are unchanged.
+
 ### Reviewed classification for generic delegate parameters
 
 Once a delegate argument could be passed to a generic source callee whose parameter is declared with the callee's own type parameters (`Func<T, bool>` receiving `Func<int, bool>`), many MoreLINQ overloads that forward to such a callee, or pass it a lambda, began to lower. 24 selected methods changed.
