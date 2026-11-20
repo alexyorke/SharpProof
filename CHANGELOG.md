@@ -241,6 +241,15 @@ listing changes against an earlier one. Development history is in the Git log.
 - The default API table specifies common framework members, including calendar
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
+- The default API table (version 13) also specifies `List<T>.Clear`,
+  `Dictionary<TKey, TValue>.Clear` and `string.CompareOrdinal(string, string)`.
+  A guarded `list.Clear()` can now be proven not to throw, and
+  `string.CompareOrdinal` is pure and allocates nothing. `Clear`
+  writes its receiver and forgets what the body knew about the collection's
+  contents. Members that consult the element or key comparer, such as
+  `List<T>.Contains`, `Dictionary` `ContainsKey` and `TryGetValue`, or call
+  `ToString` on elements, such as `string.Join`, stay unspecified because they
+  can run user code.
 - A type initializer that is a closed computation no longer blocks its
   callers. SharpProof runs such an initializer at analysis time: constants,
   validating constructors and helpers, loops, exact integer arithmetic and
@@ -311,7 +320,7 @@ listing changes against an earlier one. Development history is in the Git log.
   contain a tilde; only 8.3 short names are rejected. ReFS volumes, including
   Dev Drives, are not supported.
 - Protocol 49, manifest 9, cache 72, compiler artifact 61, default API table
-  version 12.
+  version 13.
 
 ### Resource bounds
 
