@@ -59,6 +59,33 @@ internal static partial class CSharpOperationSemantics
         return hasLocal;
     }
 
+    // An empty collection expression `[]` whose target is a class with a
+    // parameterless constructor, such as List<T>, HashSet<T> or
+    // Dictionary<TKey, TValue>, runs that constructor and adds nothing: it
+    // is `new T()`. Its identity conversion to the same type is the
+    // expression. The constructor, or null for any other operation.
+    internal static IMethodSymbol? EmptyCollectionConstructor(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false, Operand: ICollectionExpressionOperation converted } conversion &&
+            !conversion.Conversion.IsUserDefined && SymbolEqualityComparer.Default.Equals(conversion.Type, converted.Type))
+        { operation = converted; }
+        return operation is ICollectionExpressionOperation
+        {
+            Elements.IsEmpty: true, Type: INamedTypeSymbol { TypeKind: TypeKind.Class } type,
+            ConstructMethod: IMethodSymbol { MethodKind: MethodKind.Constructor, IsStatic: false, Parameters.IsEmpty: true } constructor
+        } && SymbolEqualityComparer.Default.Equals(constructor.ContainingType, type) ? constructor : null;
+    }
+
+    // The constructor that `new T(...)` without an initializer, or an empty
+    // `[]`, runs; null for any other operation.
+    internal static IMethodSymbol? EmptyCreationConstructor(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return operation is IObjectCreationOperation { Initializer: null, Constructor: { } constructor }
+            ? constructor : EmptyCollectionConstructor(operation);
+    }
+
     internal static bool IsSupportedConstantArrayCollection(ICollectionExpressionOperation collection)
     {
         collection = RepositoryParameterGuard.NotNull(collection, nameof(collection));

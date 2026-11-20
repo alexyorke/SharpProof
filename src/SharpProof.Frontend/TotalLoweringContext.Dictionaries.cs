@@ -30,8 +30,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsEmptyDefaultDictionaryCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return operation is IObjectCreationOperation { Constructor: { } constructor, Initializer: null } &&
-            IsDefaultDictionaryStateMember(constructor);
+        return EmptyCreationConstructor(operation) is { } constructor && IsDefaultDictionaryStateMember(constructor);
     }
 }
 

@@ -94,11 +94,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
         { return null; }
         if (CSharpOperationSemantics.IsEmptyDefaultDictionaryCreation(operation))
         {
-            var creation = (IObjectCreationOperation)operation;
-            var constructor = creation.Constructor!;
-            var constructorValuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(creation.Arguments.Length);
-            constructorValuesBuilder.Count = creation.Arguments.Length;
-            foreach (var argument in creation.Arguments.OrderBy(argument => argument.Syntax.SpanStart))
+            // An empty `[]` passes no arguments.
+            var constructor = CSharpOperationSemantics.EmptyCreationConstructor(operation)!;
+            var creationArguments = (operation as IObjectCreationOperation)?.Arguments ?? [];
+            var constructorValuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(creationArguments.Length);
+            constructorValuesBuilder.Count = creationArguments.Length;
+            foreach (var argument in creationArguments.OrderBy(argument => argument.Syntax.SpanStart))
             {
                 var value = LowerBodyValue(argument.Value, block, depth + 1);
                 if (!value.Classification.IsExact)
