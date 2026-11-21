@@ -28,6 +28,7 @@ public sealed class InSourceCalleeTests
             public static int ReadAfterWrite(in int x) { F = 5; return x; }
             public static int Bump(ref int x, in int y) { x = x + 1; return y; }
             public static int Length(in string s) { return s.Length; }
+            public static int Sum(in int a, in int b) { Contract.Requires(a > -1000 && a < 1000); return a + b; }
         }
         """;
 
@@ -66,11 +67,13 @@ public sealed class InSourceCalleeTests
 
     // A place another path can write stays unmodeled: a mutable static or
     // instance field, an array element, the same variable passed by `ref`
-    // too.
+    // too. The caller's own `in` parameter is shared with one callee
+    // parameter at most.
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 5); T.F = 0; return T.ReadAfterWrite(in T.F); }")]
     [TestCase("public static int M(Box b) { Contract.Requires(b != null); Contract.Ensures(Contract.Result<int>() == b.Loose); return T.First(in b.Loose, 0); }")]
     [TestCase("public static int M(int[] a) { Contract.Requires(a != null && a.Length > 0); Contract.Ensures(Contract.Result<int>() == a[0]); return T.First(in a[0], 0); }")]
     [TestCase("public static int M(int x) { Contract.Ensures(Contract.Result<int>() == x + 1); var y = x; return T.Bump(ref y, in y); }")]
+    [TestCase("public static int M(in int x) { Contract.Requires(x > -1000 && x < 1000); Contract.Ensures(Contract.Result<int>() == 2 * x); return T.Sum(in x, in x); }")]
     public async Task UnadmittedReadOnlyArgumentsStayUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

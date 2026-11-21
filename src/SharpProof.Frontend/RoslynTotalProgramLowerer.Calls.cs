@@ -1039,7 +1039,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     // The caller's own `in` parameter, or a parameter that is its caller's
     // storage, is not copied but shared, as such a ref argument is (see
     // ReferenceArguments): the context that owns it forgets its current
-    // value after any write that may alias it. Any other place (a mutable
+    // value after any write that may alias it. One such variable is shared
+    // with at most one callee parameter. Any other place (a mutable
     // field, an element, a ref local, `this` of a struct) may change through
     // an alias the callee writes. Null when the call has no `in` argument or
     // one is not admitted.
@@ -1059,7 +1060,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                     var sharing = owned is { RefKind: not RefKind.None };
                     if (sharing && !(owned!.RefKind == RefKind.In && _context.OwnsParameter(owned) || _context.IsCallerStorageReference(owned)) ||
                         !_expressions.TryReferenceArgumentStorage(argument.Value, out var storage) ||
-                        references?.Any(reference => reference.Local == storage) == true)
+                        references?.Any(reference => reference.Local == storage) == true ||
+                        sharing && admitted.Any(other => other.Local == storage))
                     { return null; }
                     if (sharing)
                     { _ = shared.Add(parameter.Ordinal); }
