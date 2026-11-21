@@ -279,6 +279,13 @@ listing changes against an earlier one. Development history is in the Git log.
   claim `Unknown`, and a body that reads such a collection still reads state
   other code can change. A target-typed `new(...)` in an initializer is now
   admitted like the explicit form.
+- A type initializer may construct an instance of a class derived from a
+  source base class, such as a `static readonly Instance = new Derived();`
+  singleton. The constructors down the chain, written `: base(arguments)` or
+  implicit, must each only store into the new instance, and each base class's
+  own initializer must be admitted. Before, any class whose base was not
+  `object` made its constructing initializer an entry effect. A base
+  constructor that stores into a virtual auto-property still does.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is
