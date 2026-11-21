@@ -51,6 +51,18 @@ internal static class TotalBodyLowering
             cancellationToken.ThrowIfCancellationRequested();
             if (initializationFree != null && !initializationFree(frame.Target.ContainingType))
             { return false; }
+            // A class's primary constructor is declared by the class itself.
+            // It has no body, so no Requires, and it only ever runs as an
+            // unknown call. One with attributes, which may be closed
+            // contracts, is not called.
+            if (frame.Target is { MethodKind: MethodKind.Constructor, DeclaringSyntaxReferences.Length: 1 } &&
+                frame.Target.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is TypeDeclarationSyntax { ParameterList: not null })
+            {
+                if (!frame.Target.GetAttributes().IsEmpty || frame.Target.Parameters.Any(static parameter => !parameter.GetAttributes().IsEmpty))
+                { return false; }
+                frame.SourceCallPreconditions = [];
+                return true;
+            }
             var contracts = (binder ??= new TotalContractBinder(compilation, context.Factory)).BindTotalRequires(frame,
                 cancellationToken: cancellationToken);
             if (!contracts.IsSuccess || frame.Target.DeclaringSyntaxReferences.Length != 1)

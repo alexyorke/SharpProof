@@ -212,10 +212,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         if (!TryConstructionInitializers(constructor, out var initializers))
         {
-            if (!canCallOpaque || constructor.ContainingType.BaseType?.SpecialType == SpecialType.System_Object)
+            if (!canCallOpaque)
             { return null; }
-            // Keep the existing opaque construction when a newly admitted
-            // chain's own initializers cannot be separated from its body.
+            // A declared constructor whose class's instance initializers
+            // cannot be separated from its body, such as those of a generic
+            // class or a class with a field-like event, runs as an unknown
+            // call with its initializers.
             directConstructor = false;
             opaqueConstructor = true;
         }

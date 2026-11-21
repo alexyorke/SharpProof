@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
-  "minimumSupportedCases": 327,
-  "minimumSupportedOpenSourceMethods": 101,
-  "maximumTotalUnknown": 435,
+  "minimumSupportedCases": 328,
+  "minimumSupportedOpenSourceMethods": 102,
+  "maximumTotalUnknown": 434,
   "maximumByReason": {
-    "SP0002": 258,
+    "SP0002": 260,
     "SP0016": 18,
     "SP0045": 9,
     "SP0046": 9,
-    "SP0047": 141
+    "SP0047": 138
   }
 }
