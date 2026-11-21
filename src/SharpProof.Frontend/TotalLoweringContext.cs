@@ -125,8 +125,64 @@ internal sealed partial class TotalLoweringContext
                 factory.CreateVariable("current:" + parameter.Ordinal, type),
                 factory.CreateVariable("old:" + parameter.Ordinal, type));
         })];
-        Result = target.ReturnsVoid ? null : factory.CreateVariable("result", _types.GetTypeId(target.ReturnType));
+        Result = ReturnedType(target) is { } returned ? factory.CreateVariable("result", _types.GetTypeId(returned)) : null;
     }
+
+    // An async root (AdmitsAsync), or the frame of an async callee whose call
+    // is the operand of an await (AwaitsAsync), may be lowered when
+    // IsAdmittedAsync holds; see RoslynTotalProgramLowerer.Async.cs.
+    internal bool AdmitsAsync { get; init; }
+    internal bool AwaitsAsync { get; set; }
+
+    // The async methods whose body can be lowered as written: one returning
+    // Task, Task<T>, ValueTask or ValueTask<T> through the default builder
+    // of that type. `async void` rethrows on the synchronization context, a
+    // method-level builder or another task-like type runs arbitrary builder
+    // code, and an instance method of a struct runs on a copy of `this`
+    // held by the state machine, so a store to `this` is not a store to the
+    // caller's value. An async iterator returns neither task type.
+    internal static bool IsAdmittedAsync(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        return method.IsAsync && AsyncResultKind(method.ReturnType) != AsyncReturnKind.None &&
+            (method.IsStatic || method.ContainingType.IsReferenceType) &&
+            !method.GetAttributes().Any(static attribute => attribute.AttributeClass is
+            {
+                Name: "AsyncMethodBuilderAttribute",
+                ContainingNamespace: { Name: "CompilerServices", ContainingNamespace: { Name: "Runtime", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } } }
+            });
+    }
+
+    private enum AsyncReturnKind { None, Completion, Value }
+
+    // Task, Task<T>, ValueTask or ValueTask<T> of the core library.
+    internal static bool IsTaskType(ITypeSymbol type)
+    { return AsyncResultKind(RepositoryParameterGuard.NotNull(type, nameof(type))) != AsyncReturnKind.None; }
+
+    private static AsyncReturnKind AsyncResultKind(ITypeSymbol type)
+    {
+        type = RepositoryParameterGuard.NotNull(type, nameof(type));
+        if (type is not INamedTypeSymbol { ContainingNamespace: { Name: "Tasks", ContainingNamespace: { Name: "Threading", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } } } } named ||
+            named.ContainingType != null || named.Name is not ("Task" or "ValueTask") || !named.DeclaringSyntaxReferences.IsEmpty ||
+            named.ContainingAssembly is not { } assembly || !SymbolEqualityComparer.Default.Equals(assembly, assembly.GetTypeByMetadataName("System.Object")?.ContainingAssembly))
+        { return AsyncReturnKind.None; }
+        return named.Arity switch { 0 => AsyncReturnKind.Completion, 1 => AsyncReturnKind.Value, _ => AsyncReturnKind.None };
+    }
+
+    // The type a `return` statement of the body converts its value to: the
+    // declared return type, or for an async method the task's result type,
+    // which `return` of an async body supplies. Null when a `return` carries
+    // no value.
+    internal static ITypeSymbol? ReturnedType(IMethodSymbol method)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        if (method.IsAsync && AsyncResultKind(method.ReturnType) is var kind && kind != AsyncReturnKind.None)
+        { return kind == AsyncReturnKind.Value ? ((INamedTypeSymbol)method.ReturnType).TypeArguments[0] : null; }
+        return method.ReturnsVoid ? null : method.ReturnType;
+    }
+
+    internal ITypeSymbol? ReturnedType()
+    { return ReturnedType(Target); }
 
     public IrFactory Factory { get; }
     public IMethodSymbol Target { get; }
@@ -213,7 +269,7 @@ internal sealed partial class TotalLoweringContext
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or
         MethodKind.PropertySet or MethodKind.Constructor or MethodKind.LocalFunction or MethodKind.ExplicitInterfaceImplementation &&
         !Target.IsAbstract) &&
-        !Target.IsAsync && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
+        (!Target.IsAsync || (AdmitsAsync || AwaitsAsync) && IsAdmittedAsync(Target)) && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&
@@ -224,7 +280,7 @@ internal sealed partial class TotalLoweringContext
                     Parameters.Count(other => other.Parameter.RefKind != RefKind.None) == 1 ||
                 IsCallerStorageReference(binding.Parameter)) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
-        (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
+        (ReturnedType() is not { } returned || CSharpOperationSemantics.IsValueDomain(returned));
 
     // A root callable verified for its postconditions, and its companion's
     // contract frame, admit a scalar out parameter. It is an ordinary

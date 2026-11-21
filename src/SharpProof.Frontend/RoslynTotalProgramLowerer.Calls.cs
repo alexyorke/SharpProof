@@ -612,8 +612,10 @@ internal sealed partial class RoslynTotalProgramLowerer
     private TotalBodyValue? InlineSourceMember(IOperation invocation, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> callArguments, IrBlockId block, int depth, IOperation? assigned = null,
         Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default,
-        bool exactTarget = false, bool opaqueConstructor = false)
+        bool exactTarget = false, bool opaqueConstructor = false, bool awaited = false)
     {
+        // An awaited async callee runs its body; its value is the task's result.
+        awaited = awaited && method.IsAsync;
         var shared = new HashSet<int>();
         var references = ReferenceArguments(callArguments, shared);
         var readOnly = ReadOnlyArguments(callArguments, references, shared);
@@ -631,8 +633,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
                 exactTarget: exactTarget, contractOnly: opaqueConstructor, readOnlyArguments: readOnly != null,
                 sharedReferences: [.. (references ?? []).Concat(readOnly ?? [])
-                    .Where(item => shared.Contains(item.Ordinal)).Select(static item => (item.Ordinal, item.Local!.Value))]) &&
-            (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null && writeBack == null &&
+                    .Where(item => shared.Contains(item.Ordinal)).Select(static item => (item.Ordinal, item.Local!.Value))], awaited: awaited) &&
+            (opaqueConstructor || awaited || !(_expressions.AllowOpaqueCalls && references == null && writeBack == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
         { return null; }
@@ -646,7 +648,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         var externalFilterSearch = _externalFilterSearch || callerFilter != null || HasEnclosingCatchFilter(callerRegion);
         var returned = callee.Result is { } result ? _context.Temporary(_context.Factory.GetVariableInfo(result).Type) : (IrVarId?)null;
         // A generic container's declaration types bridge to the caller's.
-        IrTerm marker = returned is { } resultStorage ? Bridge(_context.Factory.Variable(resultStorage), _context.Type(method.ReturnType))
+        var awaitedType = awaited ? TotalLoweringContext.ReturnedType(method) : null;
+        IrTerm marker = returned is { } resultStorage
+            ? Bridge(_context.Factory.Variable(resultStorage), _context.Type(awaited ? awaitedType : method.ReturnType))
             : _context.Factory.Boolean(false);
         IrTerm? receiver = null;
         if (instance != null && !_expressions.IsImplicitThis(instance) && liveReceiver == null)
@@ -780,7 +784,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         // a call is not expanded.
         if (graph == null)
         {
-            return references != null || writeBack != null
+            return references != null || writeBack != null || awaited && !_expressions.AllowOpaqueCalls
                 ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
                 : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
         }
@@ -813,6 +817,7 @@ internal sealed partial class RoslynTotalProgramLowerer
             { _builder.Assign(block, site, parameter.Entry, arguments[parameter.Parameter.Ordinal]); }
             _builder.Goto(block, site, composed._frame!.Entry);
             WriteBack(continued);
+            Resumed(continued);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
         // A callee whose expansion runs out of work, or does not fit in what
@@ -916,7 +921,15 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
         WriteBack(continuation);
+        Resumed(continuation);
         return new(marker, continuation, FrontendSubsetClassification.Exact);
+
+        // The caller of an awaited callee that may have suspended resumes later.
+        void Resumed(IrBlockId continued)
+        {
+            if (awaited && MaySuspend(callee.Target.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken)))
+            { EmitAsyncResume(continued, invocation); }
+        }
 
         // On normal return a ref or out local holds what the callee last
         // assigned to the parameter.
@@ -944,10 +957,14 @@ internal sealed partial class RoslynTotalProgramLowerer
         // A recursive call into a root without preconditions is marked so
         // that purity alone may assume it by induction; see
         // IrOpaqueCallSite.DescribeInductiveRootCall.
+        // An awaited callee run as an unknown call returns an unknown task,
+        // which the await then awaits as an unknown call.
         TotalBodyValue Opaque(bool inductiveRoot = false)
         {
             var called = _expressions.EmitOpaqueCall(invocation, method, arguments, block, assigned != null ? marker : null,
                 IrOpaqueCallEffects.All, inductiveRoot);
+            if (awaited)
+            { return _expressions.EmitUnknownAwait(invocation, called.Value, awaitedType, called.Continuation); }
             return method.ReturnsVoid && assigned == null ? new(marker, called.Continuation, called.Classification) : called;
         }
 

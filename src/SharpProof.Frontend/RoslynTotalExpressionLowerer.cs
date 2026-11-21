@@ -385,6 +385,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IInvocationOperation conversionCall &&
             IntegralConvertBody(conversionCall, block, depth) is { } convertedCall)
         { return convertedCall; }
+        if (depth < 256 && operation is IAwaitOperation awaitOperation &&
+            LowerAwait(awaitOperation, block, depth) is { } awaitedValue)
+        { return awaitedValue; }
         if (depth < 256 && operation is IInvocationOperation invocation &&
             SourceCall?.Invoke(invocation, block, depth) is { } called)
         { return called; }

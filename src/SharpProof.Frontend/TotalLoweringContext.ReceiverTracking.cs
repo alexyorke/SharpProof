@@ -517,9 +517,9 @@ internal sealed partial class TotalLoweringContext
         { _receiverElementOrder.Add(parameter); }
         _receiverElements[parameter] = scalar;
         _types.TypeSpecializer = SpecializeReceiverElement;
-        if (Target.ReturnType is ITypeParameterSymbol && Result is { } result &&
-            Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
-        { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+        if (ReturnedType() is ITypeParameterSymbol returned && Result is { } result &&
+            Factory.GetVariableInfo(result).Type != Type(returned))
+        { Result = Factory.CreateVariable("result", Type(returned)); }
     }
 
     internal void SpecializeSourceReferenceType(ITypeSymbol declared, ITypeSymbol actual)
@@ -532,7 +532,7 @@ internal sealed partial class TotalLoweringContext
         Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter.Type, declared) && Factory.GetVariableInfo(binding.Entry).Type != type
                 ? new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
                     Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type)) : binding)];
-        if (SymbolEqualityComparer.Default.Equals(Target.ReturnType, declared) && Result is { } result && Factory.GetVariableInfo(result).Type != type)
+        if (SymbolEqualityComparer.Default.Equals(ReturnedType(), declared) && Result is { } result && Factory.GetVariableInfo(result).Type != type)
         { Result = Factory.CreateVariable("result", type); }
     }
 
@@ -548,8 +548,8 @@ internal sealed partial class TotalLoweringContext
                 new TotalParameterBinding(binding.Parameter, Factory.CreateVariable("entry:" + binding.Parameter.Ordinal, type),
                     Factory.CreateVariable("current:" + binding.Parameter.Ordinal, type), Factory.CreateVariable("old:" + binding.Parameter.Ordinal, type));
         })];
-        if (Result is { } result && Factory.GetVariableInfo(result).Type != Type(Target.ReturnType))
-        { Result = Factory.CreateVariable("result", Type(Target.ReturnType)); }
+        if (Result is { } result && ReturnedType() is { } returned && Factory.GetVariableInfo(result).Type != Type(returned))
+        { Result = Factory.CreateVariable("result", Type(returned)); }
     }
 
     internal void SpecializeScalarParameter(IParameterSymbol parameter, ITypeSymbol scalar)

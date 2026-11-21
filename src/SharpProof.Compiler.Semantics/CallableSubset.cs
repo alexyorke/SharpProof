@@ -1,19 +1,22 @@
 namespace SharpProof.Compiler.Semantics;
 
-// The callables whose shape the verifier can represent at all: synchronous,
-// non-generic, by-value signatures over managed types, outside unsafe code.
+// The callables whose shape the verifier can represent at all: synchronous
+// unless the caller admits async roots, non-generic, by-value signatures over managed types, outside unsafe code.
 // Whether their bodies are supported is decided by lowering.
 internal static class CallableSubset
 {
     // With allowOutParameter, one out parameter of a bool, integer or enum
     // type is admitted: its postconditions can be verified, but writes to it
     // are writes to the caller's storage, which effect claims do not model.
-    internal static bool IsSupported(IMethodSymbol method, SyntaxNode declaration, bool allowOutParameter = false)
+    // With allowAsync, an async method the lowering admits as a root
+    // (TotalLoweringContext.IsAdmittedAsync) is supported; whether its body
+    // never awaits is decided by lowering.
+    internal static bool IsSupported(IMethodSymbol method, SyntaxNode declaration, bool allowOutParameter = false, bool allowAsync = false)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         declaration = ArgumentNullGuard.NotNull(declaration, nameof(declaration));
         var outParameters = allowOutParameter && HasOneScalarOutParameter(method) ? 1 : 0;
-        return !method.IsAsync && method.TypeParameters.Length == 0 && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
+        return (!method.IsAsync || allowAsync && TotalLoweringContext.IsAdmittedAsync(method)) && method.TypeParameters.Length == 0 && !method.ReturnsByRef && !method.ReturnsByRefReadonly &&
             !IsUnsupportedType(method.ReturnType) &&
             method.Parameters.Count(static parameter => parameter.RefKind != RefKind.None) == outParameters &&
             !method.Parameters.Any(static parameter => IsUnsupportedType(parameter.Type)) &&

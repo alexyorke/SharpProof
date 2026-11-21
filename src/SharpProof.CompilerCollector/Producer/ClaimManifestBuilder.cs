@@ -384,7 +384,7 @@ internal sealed partial class ClaimManifestBuilder(
         var selectedSubset = !(analyzerContractsSelected || analyzerEffectsSelected) ||
             (seed.Method.IsAbstract || seed.Method.IsExtern) && analyzerEffectsSelected && !analyzerContractsSelected &&
                 _effectSession.ResolveEffectContract(seed.Method).Kind == EffectContractResolutionKind.Valid ||
-            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration, allowOutParameter: true) ||
+            seed.Declaration != null && seed.Model != null && CallableSubset.IsSupported(seed.Method, seed.Declaration, allowOutParameter: true, allowAsync: true) ||
             analyzerEffectsSelected && seed.Method.IsAsync &&
                 ResourceForkJoinPlan.TryCreate(seed.Method, _compilation, cancellationToken) is { ConfiguredAwait: true };
         var supported =
