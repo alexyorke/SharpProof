@@ -290,7 +290,7 @@ internal sealed class ApiSpecTemplate
 internal sealed partial class ApiSpecTable
 {
     public const string DefaultTableIdentity = "SharpProof.ApiSpec.Default";
-    public const string DefaultTableVersion = "12";
+    public const string DefaultTableVersion = "13";
 
     private static ImmutableArray<ApiSpecDeclaration> CreateDefaultDeclarations()
     {
@@ -332,6 +332,8 @@ internal sealed partial class ApiSpecTable
             CollectionCountDeclaration("bcl.list.count", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.queue.count", "System.Collections.Generic.Queue`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             CollectionCountDeclaration("bcl.stack.count", "System.Collections.Generic.Stack`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionClearDeclaration("bcl.dictionary.clear", "System.Collections.Generic.Dictionary`2", assemblySetFramework, evidenceDocumented, evidenceObserved),
+            CollectionClearDeclaration("bcl.list.clear", "System.Collections.Generic.List`1", assemblySetFramework, evidenceDocumented, evidenceObserved),
             .. CalendarValueDeclarations(assemblySetFramework, evidenceDocumented, evidenceObserved),
             new ApiSpecDeclaration(
                 new ApiSpecTarget("bcl.list.item.int32", "M:System.Collections.Generic.List`1.get_Item(System.Int32)",
@@ -607,6 +609,24 @@ internal sealed partial class ApiSpecTable
                 []),
             new ApiSpecDeclaration(
                 new ApiSpecTarget(
+                    "bcl.string.compare-ordinal.string-string",
+                    "M:System.String.CompareOrdinal(System.String,System.String)",
+                    "System.String",
+                    SpecTargetMemberKind.Method, "CompareOrdinal",
+                    true, 0, null, [IrTypeKind.String, IrTypeKind.String], IrTypeKind.Integer,
+                    assemblySetFramework),
+                new ApiSpecFacets(
+                    // Ordinal comparison reads only the two immutable strings:
+                    // no culture, comparer or callback.
+                    new SpecEffectFacet(SpecEffect.None, evidenceObserved),
+                    new SpecAllocationFacet(SpecAllocationBehavior.None, evidenceObserved),
+                    new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], evidenceDocumented),
+                    new SpecNullnessFacet(SpecNullness.NotApplicable, evidenceDocumented),
+                    new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, evidenceDocumented),
+                    new SpecTerminationFacet(SpecTerminationBehavior.Terminates, evidenceObserved)),
+                []),
+            new ApiSpecDeclaration(
+                new ApiSpecTarget(
                     "bcl.string.is-null-or-empty",
                     "M:System.String.IsNullOrEmpty(System.String)",
                     "System.String",
@@ -863,6 +883,26 @@ internal sealed partial class ApiSpecTable
                 false, 0, IrTypeKind.Reference, [], IrTypeKind.Integer, assemblies),
             new ApiSpecFacets(
                 new SpecEffectFacet(SpecEffect.ReadsReceiverState, documented),
+                new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
+                new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
+                new SpecNullnessFacet(SpecNullness.NotApplicable, documented),
+                new SpecCardinalityFacet(SpecCardinality.NotApplicable, null, documented),
+                new SpecTerminationFacet(SpecTerminationBehavior.Terminates, observed)),
+            []);
+    }
+
+    // List.Clear and Dictionary.Clear reset the receiver's own storage. They
+    // call no comparer, element or key member, read no static state and list
+    // no exception.
+    private static ApiSpecDeclaration CollectionClearDeclaration(string identifier, string type,
+        ImmutableArray<ApiSpecAssemblyIdentity> assemblies, SpecEvidence documented, SpecEvidence observed)
+    {
+        RepositoryParameterGuard.RequireInitialized(assemblies.IsDefault, nameof(assemblies), "Array must be initialized.");
+        return new ApiSpecDeclaration(
+            new ApiSpecTarget(identifier, "M:" + type + ".Clear", type, SpecTargetMemberKind.Method, "Clear",
+                false, 0, IrTypeKind.Reference, [], null, assemblies),
+            new ApiSpecFacets(
+                new SpecEffectFacet(SpecEffect.WritesReceiverState, documented),
                 new SpecAllocationFacet(SpecAllocationBehavior.None, observed),
                 new SpecThrowFacet(SpecThrowBehavior.DoesNotThrow, [], documented),
                 new SpecNullnessFacet(SpecNullness.NotApplicable, documented),

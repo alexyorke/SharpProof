@@ -41,8 +41,7 @@ internal static partial class CSharpOperationSemantics
     internal static bool IsEmptyDefaultHashSetCreation(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
-        return operation is IObjectCreationOperation { Constructor: { } constructor, Initializer: null } &&
-            IsHashSetStateMember(constructor);
+        return EmptyCreationConstructor(operation) is { } constructor && IsHashSetStateMember(constructor);
     }
 }
 

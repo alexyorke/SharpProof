@@ -40,9 +40,13 @@ internal sealed partial class WorkerTests
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.Errors, Is.Empty);
-            Assert.That(result.Outcome, Is.EqualTo(readonlyState ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown),
+            // Storing into a mutable static is classed with fresh values:
+            // capability claims accept it, while allocation and complete
+            // effect contracts count it.
+            var proven = readonlyState || attribute.StartsWith("[AllowedCapabilities", StringComparison.Ordinal);
+            Assert.That(result.Outcome, Is.EqualTo(proven ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown),
                 WorkerProtocolJson.SerializeResponse(response));
-            Assert.That(result.Reason, Is.EqualTo(readonlyState ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
+            Assert.That(result.Reason, Is.EqualTo(proven ? WorkerClaimReason.None : WorkerClaimReason.UnsupportedBody));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }

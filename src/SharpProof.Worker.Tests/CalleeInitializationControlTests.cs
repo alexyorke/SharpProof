@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class CalleeInitializationControlTests
 {
-    [TestCase("public static int State = 1;")]
+    [TestCase("[System.ThreadStatic] public static int State = 1;")]
     [TestCase("static C() { System.Console.WriteLine(); }")]
     public async Task ExistingRootInitializationAdmissionIsClosed(string members)
     {
@@ -18,7 +18,8 @@ internal sealed class CalleeInitializationControlTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
-    [TestCase("public static int State = 1;", WorkerClaimOutcome.Unknown)]
+    [TestCase("public static int State = 1;", WorkerClaimOutcome.Proven)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", WorkerClaimOutcome.Unknown)]
     [TestCase("public static readonly int State = 1;", WorkerClaimOutcome.Proven)]
     // An empty static constructor runs nothing; one that calls code is an
     // entry effect.
@@ -38,6 +39,22 @@ internal sealed class CalleeInitializationControlTests
         Assert.That(response.ClaimResults.Single(row => row.ClaimId == purity).Outcome, Is.EqualTo(pure));
         if (!field.StartsWith("static Other() { System", StringComparison.Ordinal))
         { Assert.That(response.ClaimResults.Single(row => row.ClaimId != purity).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
+    }
+
+    // A singleton of a class derived from a source base: the chain of
+    // constructors only stores into the new instance.
+    [TestCase("public sealed class Derived : Base { }", WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class Derived : Base { public Derived() : base(2) { } }", WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class Derived : Base { public Derived() : base(2) { Counter.Count++; } }", WorkerClaimOutcome.Unknown)]
+    public async Task DerivedSingletonInitializersAreAdmitted(string derived, WorkerClaimOutcome pure)
+    {
+        System.ArgumentNullException.ThrowIfNull(derived);
+        var source = "using SharpProof.Attributes; public static class Counter { public static int Count; } " +
+            "public abstract class Base { private readonly int size; protected Base() { size = 1; } protected Base(int size) { this.size = size; } } " + derived +
+            " public static class Other { private static readonly Base Default = new Derived(); public static int Helper(int x) { return x; } } " +
+            "public static class C { [EnforcePure] public static int Target(int x) { return Other.Helper(x); } }";
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome is ProvenOutcome ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown, Is.EqualTo(pure), result.Reason.ToString());
     }
 
     [Test]
@@ -62,9 +79,11 @@ internal sealed class CalleeInitializationControlTests
     }
 
     [TestCase("public static int State;", "public static int Helper(int x) => x;", "Other.Helper(x)", true)]
-    [TestCase("public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", false)]
+    [TestCase("public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", true)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", false)]
     [TestCase("public static readonly int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", true)]
-    [TestCase("public static int State = 1;", "", "new Other(); return x", false)]
+    [TestCase("public static int State = 1;", "", "new Other(); return x", true)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", "", "new Other(); return x", false)]
     [TestCase("public static readonly int State = 1;", "", "new Other(); return x", true)]
     public async Task MemberAndImplicitConstructorInitializationIsPreserved(string field, string helper, string body, bool pure)
     {

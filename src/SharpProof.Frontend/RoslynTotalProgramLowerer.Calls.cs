@@ -111,9 +111,11 @@ internal sealed partial class RoslynTotalProgramLowerer
         body = RepositoryParameterGuard.NotNull(body, nameof(body));
         return body.Descendants().OfType<IInstanceReferenceOperation>().All(receiver =>
             receiver.Parent is IFieldReferenceOperation field && field.Instance == receiver ||
-            // A get-only auto-property names its backing field.
+            // A get-only auto-property names its backing field, as an
+            // auto-property of a mutable modeled struct does.
             receiver.Parent is IPropertyReferenceOperation property && property.Instance == receiver &&
-                CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) != null ||
+                (CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) != null ||
+                    CSharpOperationSemantics.StructAutoPropertyField(property.Property) != null) ||
             CSharpOperationSemantics.IsObjectConstructorCall(receiver.Parent) ||
             receiver.Parent is IInvocationOperation chained && chained.Instance == receiver &&
                 (SymbolEqualityComparer.Default.Equals(chained.TargetMethod.ContainingType, receiver.Type) ||
@@ -613,15 +615,24 @@ internal sealed partial class RoslynTotalProgramLowerer
         bool exactTarget = false, bool opaqueConstructor = false)
     {
         var references = ReferenceArguments(callArguments);
+        IrVarId? liveReceiver = null;
+        IrVarId? writeBack = null;
+        var copiesReceiver = false;
+        if (constructedReceiver == null &&
+            !TryStructReceiver(method, instance, references, out liveReceiver, out writeBack, out copiesReceiver))
+        { return null; }
+        // An unknown call could change the variable a mutating call is on,
+        // so only an expanded body may write it back.
         if (_calls == null || opaqueConstructor && references != null ||
             !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
                 exactTarget: exactTarget, contractOnly: opaqueConstructor) &&
-            (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null &&
+            (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null && writeBack == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
         { return null; }
         var callee = frame!;
+        callee.CopiesReceiver = copiesReceiver;
         var site = _context.Site(invocation);
         // Nested lowering has its own region state. Capture the caller's lexical
         // search/unwind context before expanding arguments or the callee body.
@@ -633,7 +644,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         IrTerm marker = returned is { } resultStorage ? Bridge(_context.Factory.Variable(resultStorage), _context.Type(method.ReturnType))
             : _context.Factory.Boolean(false);
         IrTerm? receiver = null;
-        if (instance != null && !_expressions.IsImplicitThis(instance))
+        if (instance != null && !_expressions.IsImplicitThis(instance) && liveReceiver == null)
         {
             var lowered = _expressions.LowerBodyValue(instance, block, depth + 1);
             if (!lowered.Classification.IsExact)
@@ -642,10 +653,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             block = lowered.Continuation;
         }
         // The callee's `this` is the receiver as evaluated before the
-        // arguments; an unmodeled caller `this` is unknown.
+        // arguments; an unmodeled caller `this` is unknown. A struct variable
+        // is passed by reference, so it is read once the arguments ran.
         // Construction binds its fresh receiver after argument evaluation and
         // allocation below; it has no caller receiver to approximate here.
-        if (constructedReceiver == null && callee.Receiver is { } self)
+        if (constructedReceiver == null && liveReceiver == null && callee.Receiver is { } self)
         {
             if ((receiver ?? _context.ReceiverValue()) is { } value)
             { _builder.Assign(block, site, self.Entry, Bridge(value, _context.Factory.GetVariableInfo(self.Entry).Type)); }
@@ -726,6 +738,11 @@ internal sealed partial class RoslynTotalProgramLowerer
             }
         }
         var arguments = argumentBuffer.ToImmutable();
+        if (liveReceiver is { } variable && callee.Receiver is { } entered)
+        {
+            _builder.Assign(block, site, entered.Entry, Bridge(_context.Factory.Variable(variable),
+                _context.Factory.GetVariableInfo(entered.Entry).Type));
+        }
         if (receiver != null && !CSharpOperationSemantics.IsModeledStruct(method.ContainingType))
         { block = _expressions.CheckReceiver(invocation, receiver, block); }
         if (prelude != null)
@@ -748,7 +765,8 @@ internal sealed partial class RoslynTotalProgramLowerer
         // a call is not expanded.
         if (graph == null)
         {
-            return references != null ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
+            return references != null || writeBack != null
+                ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
                 : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
         }
         if (externalFilterSearch)
@@ -782,20 +800,38 @@ internal sealed partial class RoslynTotalProgramLowerer
             WriteBack(continued);
             return new(marker, continued, FrontendSubsetClassification.Exact);
         }
+        // A callee whose expansion runs out of work, or does not fit in what
+        // is left, runs as the same unknown call as one whose body does not
+        // lower: its preconditions were recorded above, and it may do
+        // anything, throw included. The abandoned work is given back, within
+        // the session's bounded allowance, so the caller's body can go on.
+        // An unknown call could change the variable a mutating struct call
+        // writes back, so such a call has no fallback.
+        var fallback = _expressions.AllowOpaqueCalls && references == null && writeBack == null;
+        var mark = _calls.Mark();
         var expanded = new RoslynTotalProgramLowerer(callee, _cancellationToken, _calls, externalFilterSearch, shadowAncestry: callAncestry, captureShadowCallAncestry: _captureShadowCallAncestry);
         var lowering = expanded.Lower(graph!);
         if (!lowering.IsExact)
-        { return _expressions.AllowOpaqueCalls && references == null ? Opaque() : new(marker, block, lowering.Classification); }
-        ImportExplicitThrowTypes(expanded);
+        {
+            if (fallback && lowering.ConstructionLimitExceeded)
+            { _ = _calls.TryRecover(mark); }
+            return fallback ? Opaque() : new(marker, block, lowering.Classification);
+        }
         var program = lowering.Program;
         var instructionCount = 0;
         foreach (var source in program.Blocks)
         {
-            SpendRegion();
+            _cancellationToken.ThrowIfCancellationRequested();
             instructionCount += source.Instructions.Length;
         }
-        if (!_calls.Spend(program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
-        { throw new RegionIncompleteException(); }
+        // Counting the blocks costs one step each, as copying them does.
+        if (!_calls.Spend(2 * program.Blocks.Length + instructionCount + callee.Parameters.Length + 2))
+        {
+            if (fallback && _calls.TryRecover(mark))
+            { return Opaque(); }
+            throw new RegionIncompleteException();
+        }
+        ImportExplicitThrowTypes(expanded);
         var continuation = _builder.CreateBlock("call:continued");
         var blocks = ImmutableDictionaryCapture.Create(program.Blocks, source => source.Id, source => _builder.CreateBlock("call:body"));
         foreach (var parameter in callee.Parameters)
@@ -880,6 +916,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                 var write = _builder.Assign(continued, site, storage, value);
                 _builder.Write(continued, write.Operation, IrWriteRegion.Local);
             }
+            // So does the variable a mutating struct member was called on,
+            // with the callee's final `this`.
+            if (writeBack is { } receiverStorage && callee.Receiver is { } mutated)
+            {
+                var write = _builder.Assign(continued, site, receiverStorage,
+                    Bridge(_context.Factory.Variable(mutated.Current), _context.Factory.GetVariableInfo(receiverStorage).Type));
+                _builder.Write(continued, write.Operation, IrWriteRegion.Local);
+            }
         }
 
         // A recursive call into a root without preconditions is marked so
@@ -942,6 +986,64 @@ internal sealed partial class RoslynTotalProgramLowerer
             references.Add((parameter.Ordinal, storage));
         }
         return references.Count == 0 ? null : references.ToImmutable();
+    }
+
+    // How `this` of an instance member of a modeled struct reaches the
+    // callee. C# passes a variable by reference, so the callee's `this` is
+    // read from it once the arguments ran (live). A member that is not
+    // readonly may change it: the callee gets a copy and, on normal return,
+    // the caller assigns the callee's final `this` to the variable (write
+    // back). Outside every try region an exception leaves the variable
+    // unread, as for a ref argument. On a value, such as a call result, a
+    // readonly local or `this` of a readonly member, C# itself calls on a
+    // copy, which a mutation changes unseen. False for a mutating call on any
+    // other place: a field of an object, an element, a ref local, or the
+    // caller's storage that a root struct member's `this` is.
+    private bool TryStructReceiver(IMethodSymbol method, IOperation? instance, ImmutableArray<(int Ordinal, IrVarId? Local)>? references,
+        out IrVarId? live, out IrVarId? writeBack, out bool copies)
+    {
+        method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        live = null;
+        writeBack = null;
+        copies = false;
+        if (instance == null || method.IsStatic || method.MethodKind == MethodKind.Constructor ||
+            !CSharpOperationSemantics.IsModeledStruct(method.ContainingType) ||
+            !SymbolEqualityComparer.Default.Equals(instance.Type, method.ContainingType))
+        { return true; }
+        var mutating = CSharpOperationSemantics.IsMutableModeledStruct(method.ContainingType) && !method.IsReadOnly;
+        if (_expressions.TryStructStorage(instance, out var storage))
+        {
+            // A ref argument naming the same variable would alias `this`.
+            if (references?.Any(reference => reference.Local == storage) == true ||
+                mutating && !OutsideTryRegions())
+            { return false; }
+            live = storage;
+            writeBack = mutating ? storage : null;
+            copies = true;
+            return true;
+        }
+        // `this` of a readonly member is the caller's storage, which a call
+        // C# makes on a copy of it leaves alone.
+        var copied = _expressions.IsCopiedStructReceiver(instance);
+        copies = copied && (mutating || !_expressions.IsImplicitThis(instance));
+        // A member that cannot change `this` gets the caller's `this` by
+        // reference too, so it reads it once the arguments ran, which may
+        // have changed the storage it names. C# copies `this` for a mutating
+        // member before the arguments run.
+        if (!mutating && _expressions.IsImplicitThis(instance) && _context.Receiver is { } self)
+        { live = self.Current; }
+        return copied || !mutating;
+    }
+
+    // Whether this frame lowers the current block outside every try region.
+    private bool OutsideTryRegions()
+    {
+        for (var region = _regionGraph == null ? null : _regionSource.EnclosingRegion; region != null; region = region.EnclosingRegion)
+        {
+            if (region.Kind is not (ControlFlowRegionKind.Root or ControlFlowRegionKind.LocalLifetime))
+            { return false; }
+        }
+        return true;
     }
 
     private IrTerm Bridge(IrTerm value, IrTypeId type)

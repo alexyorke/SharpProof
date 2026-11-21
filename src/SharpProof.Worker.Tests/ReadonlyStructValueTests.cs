@@ -273,12 +273,21 @@ public sealed class ReadonlyStructValueTests
         Assert.That(outcome == WorkerClaimOutcome.Refuted, Is.EqualTo(refuted), outcome.ToString());
     }
 
-    // A mutable struct is not modeled.
-    [TestCase("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Mutable(x).Ticks; }")]
-    public async Task UnmodeledStructsStayUnknown(string member)
+    // A mutable struct is modeled too (see MutableStructValueTests); a
+    // generic one is not.
+    [Test]
+    public async Task MutableStructsAreModeled()
     {
-        System.ArgumentNullException.ThrowIfNull(member);
-        Assert.That((await ResultAsync(member)).Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        var result = await ResultAsync("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Mutable(x).Ticks; }");
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task GenericStructsStayUnknown()
+    {
+        var result = await ResultAsync("public static long M(long x) { Contract.Ensures(Contract.Result<long>() == x); return new Box<long>(x).Ticks; }",
+            "public struct Box<T> { public T Ticks; public Box(T ticks) { Ticks = ticks; } }");
+        Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
     }
 
     private static async Task<WorkerClaimResult> ResultAsync(string member, string outside = "")
