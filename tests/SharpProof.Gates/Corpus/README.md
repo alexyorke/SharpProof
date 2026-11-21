@@ -146,6 +146,8 @@ Once more type initializers were admitted (SEMANTICS.md: `string.Empty`, `typeof
 
 Four more methods get further before they abstain, so their SP0047 lowering reason moves from `UnsupportedControlFlow` to `UnsupportedOperationKind`: `BinomialMinHeap._mergeForestOnly` (OSS0142), `TernarySearchTree.Insert` (OSS0162), NodaTime's `DateTimeZone.ForOffset` (OSS0326) and Humanizer's `MalteseNumberToWordsConvertor.Convert` (OSS0487). Their verdicts and diagnostic ID counts are unchanged.
 
+Once a source constructor the lowerer cannot expand, such as a class's primary constructor or one of a class whose instance initializers cannot be run apart from its body, ran as an unknown call (SEMANTICS.md, "Calls and loops"), four MoreLINQ methods changed. `Delegate.Disposable` (OSS0217), `PendNode.WithSource` (OSS0264) and `Return` (OSS0274) construct primary-constructor classes; they now lower and stop at SP0002 instead of SP0047, with purity still Unknown. `Minima` (OSS0254) moved from Unknown to Refuted: it forwards to the overload that throws `new ArgumentNullException(nameof(source))` for a `null` source, which builds its message from culture resources, as reviewed for OSS0335. The supported floors rose by one (327 to 328, 101 to 102), the total-Unknown ceiling fell by one (435 to 434), the SP0047 ceiling fell by three (141 to 138) and the SP0002 ceiling rose by two (258 to 260).
+
 ### Reviewed classification for generic delegate parameters
 
 Once a delegate argument could be passed to a generic source callee whose parameter is declared with the callee's own type parameters (`Func<T, bool>` receiving `Func<int, bool>`), many MoreLINQ overloads that forward to such a callee, or pass it a lambda, began to lower. 24 selected methods changed.

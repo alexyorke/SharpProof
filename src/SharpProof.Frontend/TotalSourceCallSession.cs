@@ -377,9 +377,14 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         var reference = method.DeclaringSyntaxReferences[0];
         var declaration = reference.GetSyntax(cancellationToken);
         // An expression-bodied property or indexer (`int P => 0;`) declares
-        // its getter by the arrow clause itself.
+        // its getter by the arrow clause itself. A class's primary
+        // constructor is declared by the class itself; it has no body to
+        // expand, so it runs only as an unknown call.
+        var primaryConstructor = contractOnly && method.MethodKind == MethodKind.Constructor &&
+            method.ContainingType.TypeKind == TypeKind.Class &&
+            declaration is TypeDeclarationSyntax { ParameterList: not null };
         if (!_compilation.ContainsSyntaxTree(reference.SyntaxTree) ||
-            declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or OperatorDeclarationSyntax or
+            !primaryConstructor && declaration is not (MethodDeclarationSyntax or ConstructorDeclarationSyntax or OperatorDeclarationSyntax or
                 AccessorDeclarationSyntax { Body: not null } or
                 AccessorDeclarationSyntax { ExpressionBody: not null } or
                 ArrowExpressionClauseSyntax { Parent: PropertyDeclarationSyntax or IndexerDeclarationSyntax } or
@@ -406,7 +411,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             { return false; }
         }
         var iterator = false;
-        if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
+        if (primaryConstructor)
+        {
+            if (!Spend())
+            { return false; }
+        }
+        else if (_iterators.TryGetValue(method.OriginalDefinition, out iterator))
         {
             if (!Spend())
             { return false; }
