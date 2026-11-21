@@ -217,7 +217,7 @@ internal sealed partial class TotalLoweringContext
                     (CSharpOperationSemantics.IsScalar(binding.Parameter.Type) || CSharpOperationSemantics.IsReferenceDomain(binding.Parameter.Type)) ||
                 AdmitsOutParameters && binding.Parameter.RefKind == RefKind.Out && CSharpOperationSemantics.IsScalar(binding.Parameter.Type) &&
                     Parameters.Count(other => other.Parameter.RefKind != RefKind.None) == 1 ||
-                IsWritableRootReference(binding.Parameter)) &&
+                IsCallerStorageReference(binding.Parameter)) &&
             CSharpOperationSemantics.IsValueDomain(binding.Parameter.Type)) &&
         (Target.ReturnsVoid || CSharpOperationSemantics.IsValueDomain(Target.ReturnType));
 
@@ -237,7 +237,8 @@ internal sealed partial class TotalLoweringContext
     // argument write and forgets memory; the final program pass then forgets
     // the other by-reference parameters, and forgets every one of them after
     // any other write. Inlined frames do not inherit this: their by-reference
-    // parameters are copied back (WritesBackReferences) or refused.
+    // parameters are copied back (WritesBackReferences), share the caller's
+    // own cell (ShareReference), or are refused.
     internal bool AdmitsReferenceParameters { get; set; }
 
     internal bool IsWritableRootReference(IParameterSymbol parameter)
@@ -257,6 +258,37 @@ internal sealed partial class TotalLoweringContext
     // parameter back on normal return. Such a parameter is an ordinary
     // variable of the frame.
     internal bool WritesBackReferences { get; set; }
+
+    // Parameters of an inlined frame whose entry and current cell are the
+    // caller's own by-reference parameter: the caller passed its storage on,
+    // not a copy. A store to it is a store to that parameter, which the
+    // root's final pass treats as a write to argument state.
+    private readonly HashSet<IParameterSymbol> _sharedReferences = new(SymbolEqualityComparer.Default);
+
+    internal bool IsSharedReference(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        return _sharedReferences.Contains(parameter);
+    }
+
+    // A by-reference parameter whose cell is storage of this frame's caller,
+    // which may be a field, an element or another such parameter. It is
+    // never copied into a callee, only shared.
+    internal bool IsCallerStorageReference(IParameterSymbol parameter)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        return IsWritableRootReference(parameter) || IsSharedReference(parameter);
+    }
+
+    internal void ShareReference(IParameterSymbol parameter, IrVarId storage)
+    {
+        parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        RepositoryParameterGuard.ThrowIfInvalid(storage.IsDefault, nameof(storage));
+        _ = _sharedReferences.Add(parameter);
+        Parameters = [.. Parameters.Select(binding => SymbolEqualityComparer.Default.Equals(binding.Parameter, parameter)
+            ? new TotalParameterBinding(parameter, storage, storage, Factory.CreateVariable("old:" + parameter.Ordinal, Factory.GetVariableInfo(storage).Type))
+            : binding)];
+    }
 
     // A `ref` or `in` parameter of a scalar or reference type that the body
     // never writes (no assignment, increment, compound assignment or ref or
