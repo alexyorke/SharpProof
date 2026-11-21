@@ -1883,9 +1883,9 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 Microsoft.DotNet.Arcade.Sdk and eng/common bootstrapper scripts
-Version: 9.0.0-beta.26553.12
-Source: https://github.com/dotnet/arcade/tree/8018080f69d112044bcd7e0589a45e59e209bf30
-License: MIT (https://github.com/dotnet/arcade/blob/8018080f69d112044bcd7e0589a45e59e209bf30/LICENSE.TXT)
+Version: 9.0.0-beta.26561.5
+Source: https://github.com/dotnet/arcade/tree/22d6512a34c1219c826b834c07f53cda666b9ddb
+License: MIT (https://github.com/dotnet/arcade/blob/22d6512a34c1219c826b834c07f53cda666b9ddb/LICENSE.TXT)
 
 Repository test corpus sources (not redistributed in any package)
 

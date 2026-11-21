@@ -7587,8 +7587,8 @@
       "declarationSha256": "cf80c0d752d1a0b398c0b969d26db3987e51a9695dc7abb0a6ae69a877e4fd51",
       "methodName": "ValidateEra",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0320",

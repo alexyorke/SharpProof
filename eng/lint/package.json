@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "engines": { "node": ">=22.18.0" },
   "dependencies": {
-    "markdownlint": "0.42.0",
-    "cspell": "10.4.0"
+    "markdownlint": "0.42.1",
+    "cspell": "10.4.1"
   },
   "overrides": {
     "katex": "0.18.11",

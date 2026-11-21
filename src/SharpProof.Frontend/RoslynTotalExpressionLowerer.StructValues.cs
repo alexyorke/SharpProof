@@ -70,7 +70,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private bool MayMutateStructPlace(IMethodSymbol method, IOperation? instance)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
-        if (instance?.Type is not INamedTypeSymbol type || method.IsStatic || method.IsReadOnly ||
+        // A type-parameter receiver is the struct its frame specializes it to.
+        if (instance == null || _context.SpecializeSourceType(instance.Type) is not INamedTypeSymbol type || method.IsStatic || method.IsReadOnly ||
             !CSharpOperationSemantics.IsMutableModeledStruct(type) || IsCopiedStructReceiver(instance))
         { return false; }
         if (SymbolEqualityComparer.Default.Equals(method.ContainingType, type) || method.ContainingType.TypeKind == TypeKind.Interface)
