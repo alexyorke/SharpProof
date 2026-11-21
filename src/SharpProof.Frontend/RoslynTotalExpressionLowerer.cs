@@ -419,6 +419,17 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         { return initializedStatic; }
         if (depth < 256 && ImmutableStaticRead(operation, block) is { } immutableStatic)
         { return immutableStatic; }
+        // A static auto-property, or a static getter that only returns a
+        // static field of its type, whose type's initializer is admitted. The
+        // getter runs that initializer, which has no effect a body can observe,
+        // and then reads the field as in a type with no initializer.
+        if (depth < 256 && !ShadowCallSkeleton &&
+            operation is IPropertyReferenceOperation { Property.IsStatic: true, Arguments.Length: 0 } initializedProperty &&
+            BodyGetterField(initializedProperty) == null &&
+            CSharpOperationSemantics.GetterField(initializedProperty.Property,
+                admits: CSharpOperationSemantics.IsStaticFieldReadAfterInitialization) is { } initializedBacking &&
+            TypeInitializationFree?.Invoke(initializedBacking.ContainingType) == true)
+        { return FieldRead(operation, initializedBacking, null, block, depth); }
         if (depth < 256 && operation is IPropertyReferenceOperation sourceProperty &&
             BodyGetterField(sourceProperty) == null &&
             SourceGetter?.Invoke(sourceProperty, block, depth) is { } gotten)
