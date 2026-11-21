@@ -7,7 +7,10 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CalleeInitializationAuditTests
 {
-    [TestCase("public static int State = 1;", false)]
+    // No code reads a mutable static before its initializer finishes; a
+    // per-thread one starts zeroed on every other thread.
+    [TestCase("public static int State = 1;", true)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", false)]
     [TestCase("public static readonly int State = 1;", true)]
     [TestCase("", true)]
     public async Task CalleeInitializationIsIncludedInPurityAdmission(string field, bool pure)
@@ -20,6 +23,6 @@ public sealed class CalleeInitializationAuditTests
         if (pure)
         { Assert.That(result.Outcome, Is.TypeOf<ProvenOutcome>(), result.Reason.ToString()); }
         else
-        { Assert.That(result.Outcome, Is.Null, "Mutable callee type initialization cannot be proven pure."); }
+        { Assert.That(result.Outcome, Is.Null, "Per-thread callee type initialization cannot be proven pure."); }
     }
 }

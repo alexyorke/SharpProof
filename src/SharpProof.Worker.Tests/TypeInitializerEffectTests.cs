@@ -64,7 +64,7 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("public static readonly object Gate = Cycle.Back;")]
     [TestCase("private static readonly int Limit; static C() { if (System.Environment.ProcessorCount > 1) { Limit = 1; } }")]
     [TestCase("private static readonly Counter Instance = new Counter();")]
-    [TestCase("public static int State = 1;")]
+    [TestCase("[System.ThreadStatic] public static int State = 1;")]
     public async Task OtherInitializersLeavePurityUnknown(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -130,7 +130,7 @@ internal sealed class TypeInitializerEffectTests
         Assert.That(allocation.Outcome, Is.Null);
     }
 
-    [TestCase("public static int State = 1;")]
+    [TestCase("[System.ThreadStatic] public static int State = 1;")]
     [TestCase("private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount];")]
     public async Task SameTypeCalleeDoesNotAdmitAnEffectfulInitializer(string members)
     {

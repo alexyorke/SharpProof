@@ -134,6 +134,8 @@ NodaTime's `DateTimeZone.ForOffset` (OSS0326) can reach the source base construc
 
 Once a source callee whose expansion runs out of the lowering work budget became an unknown call instead of leaving its caller `Unknown` (SEMANTICS.md, "Calls and loops"), two C-Sharp-Algorithms methods began to lower. `BTree.Insert` (OSS0074) and `DijkstraShortestPaths._initialize` (OSS0098) now stop at SP0002 instead of SP0047. Both store into their own object's fields, and the unknown call may do anything, so their purity verdicts stay Unknown. The SP0047 ceiling fell by two (162 to 160) and the SP0002 ceiling rose by two (238 to 240); the total-Unknown ceiling is unchanged.
 
+Once a type initializer could store into its own mutable statics (SEMANTICS.md, "Effects"), NodaTime's `BclDateTimeZoneSource.GetIds` (OSS0399) began to lower: `TimeZoneInfoInterceptor` keeps its shim in a mutable static. The method reads the system time-zone list through that shim, so its purity verdict stays Unknown and it stops at SP0002 instead of SP0047. The SP0047 ceiling fell by one (160 to 159) and the SP0002 ceiling rose by one (240 to 241); the total-Unknown ceiling is unchanged.
+
 Four more methods get further before they abstain, so their SP0047 lowering reason moves from `UnsupportedControlFlow` to `UnsupportedOperationKind`: `BinomialMinHeap._mergeForestOnly` (OSS0142), `TernarySearchTree.Insert` (OSS0162), NodaTime's `DateTimeZone.ForOffset` (OSS0326) and Humanizer's `MalteseNumberToWordsConvertor.Convert` (OSS0487). Their verdicts and diagnostic ID counts are unchanged.
 
 ### Reviewed classification for generic delegate parameters

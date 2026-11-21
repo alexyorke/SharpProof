@@ -697,6 +697,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         if (!TryCheckTypeInitialization(type, out eligible))
         { return false; }
+        if (eligible && _allocatingInitialization.Contains(type))
+        { SourceInitializationAllocates = true; }
         // An initializer that is not only constants may still be a closed
         // computation that finishes without an observable effect.
         if (!eligible && _compilation is CSharpCompilation compilation &&
@@ -740,10 +742,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     if (value != null && (!CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
                         !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : (member as IPropertySymbol)?.Type)))
                     { return true; }
-                    // Constant initialization is functionally safe to inline,
-                    // but writing mutable static state is still an entry effect.
+                    // Storing a constant into a mutable static is no more
+                    // observable than into a readonly one (TypeInitialization),
+                    // but it is classed with fresh values: claims that count
+                    // every write of static state still see an effect.
                     if (value != null && member is IFieldSymbol { IsReadOnly: false } or IPropertySymbol { SetMethod: not null })
-                    { SourceInitializationEffectsComplete = false; }
+                    {
+                        if (member.GetAttributes().Any(static attribute => attribute.AttributeClass is { Name: "ThreadStaticAttribute" }))
+                        { SourceInitializationEffectsComplete = false; }
+                        else
+                        { _allocatingInitialization.Add(type); }
+                    }
                 }
             }
         }
