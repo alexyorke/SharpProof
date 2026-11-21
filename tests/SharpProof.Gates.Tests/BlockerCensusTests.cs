@@ -83,6 +83,9 @@ public sealed class BlockerCensusTests
     [TestCase("public static void M(ref System.DateTime d) { }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
     [TestCase("public static void M(out int value, ref System.DateTime d) { value = 0; }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
     [TestCase("public static int M(int x) { var text = $\"{x:X}\"; return text.Length; }", "UnsupportedOperationKind: InterpolatedString of System_String")]
+    // A call whose argument does not lower is charged to that argument, not
+    // to the call its statement records.
+    [TestCase("static int Id(object o, int x) { return x; } public static int M(int x) { return Id(new { A = x }, x) + 1; }", "UnsupportedOperationKind: AnonymousObjectCreation of class")]
     public void LabelsNameTheBlockingConstruct(string member, string label)
     {
         ArgumentNullException.ThrowIfNull(member);
