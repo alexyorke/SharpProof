@@ -6807,8 +6807,8 @@
       "declarationSha256": "8a7c5f81b26405dd0da8d4ec5f5b02b54cd6090438c8c1e169b10a6520fd195f",
       "methodName": "Minima",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0255",
