@@ -248,7 +248,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 unwrap.Type is { } unwrapped && CSharpOperationSemantics.ModeledNullableUnderlying(unwrapped) == null &&
                 CanCarry(underlying, unwrapped) &&
                 (SymbolEqualityComparer.Default.Equals(underlying, unwrapped) || ConversionChecked(unwrap) != null):
-                return WithParts(unwrap.Operand, block, depth, (parts, current) =>
+                return WithParts(operation, unwrap.Operand, block, depth, (parts, current) =>
                 {
                     var value = RequireNullableValue(operation, unwrap.Operand.Type!, parts, current);
                     return SymbolEqualityComparer.Default.Equals(underlying, unwrapped) || !value.Classification.IsExact ? value
@@ -257,12 +257,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 });
             case IPropertyReferenceOperation { Instance: { } instance, Property.Name: "HasValue" or "Value" } property when
                 CSharpOperationSemantics.ModeledNullableUnderlying(instance.Type) is { }:
-                return WithParts(instance, block, depth, (parts, current) => property.Property.Name == "HasValue"
+                return WithParts(operation, instance, block, depth, (parts, current) => property.Property.Name == "HasValue"
                     ? Capture(operation, new(parts.HasValue, current, FrontendSubsetClassification.Exact))
                     : RequireNullableValue(operation, instance.Type!, parts, current));
             case IInvocationOperation { Instance: { } instance, TargetMethod.Name: "GetValueOrDefault" } invocation when
                 CSharpOperationSemantics.ModeledNullableUnderlying(instance.Type) is { } && invocation.Arguments.Length <= 1:
-                return WithParts(instance, block, depth, (parts, current) =>
+                return WithParts(operation, instance, block, depth, (parts, current) =>
                 {
                     if (invocation.Arguments.IsEmpty)
                     { return Capture(operation, new(parts.Value, current, FrontendSubsetClassification.Exact)); }
@@ -274,10 +274,10 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 });
             // Roslyn's null test for `??` and `?.` runs no code.
             case IIsNullOperation { Operand: var tested } when CSharpOperationSemantics.ModeledNullableUnderlying(tested.Type) is { }:
-                return WithParts(tested, block, depth, (parts, current) =>
+                return WithParts(operation, tested, block, depth, (parts, current) =>
                     new(Not(parts.HasValue), current, FrontendSubsetClassification.Exact));
             case IIsPatternOperation { Value: var input } isPattern when CSharpOperationSemantics.ModeledNullableUnderlying(input.Type) is { } underlying:
-                return WithParts(input, block, depth, (parts, current) =>
+                return WithParts(operation, input, block, depth, (parts, current) =>
                 {
                     if (NullablePattern(isPattern.Pattern, input.Type!, underlying, parts, depth + 1, top: true) is not { } matched)
                     { return Approximate(operation, current, FrontendAbstention.UnsupportedOperationKind); }
@@ -317,12 +317,12 @@ internal sealed partial class RoslynTotalExpressionLowerer
                 return LiftedStore(operation, compound.Target, compound, block, depth, null, returnsOld: false);
             case IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsUserDefined: false }, Type.SpecialType: SpecialType.System_Object } boxing when
                 CSharpOperationSemantics.ModeledNullableUnderlying(boxing.Operand.Type) is { } boxed && IsBoxableValue(boxed):
-                return WithParts(boxing.Operand, block, depth, (parts, current) => BoxNullable(operation, parts, current, boxed));
+                return WithParts(operation, boxing.Operand, block, depth, (parts, current) => BoxNullable(operation, parts, current, boxed));
             case IInvocationOperation { Instance: { } instance, Arguments.Length: <= 1 } member when
                 CSharpOperationSemantics.ModeledNullableUnderlying(instance.Type) is { } underlying && CSharpOperationSemantics.IsScalar(underlying) &&
                 member.TargetMethod.ContainingType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
                 NullableMember(member, underlying) is { } shape:
-                return WithParts(instance, block, depth, (parts, current) => shape(parts, current));
+                return WithParts(operation, instance, block, depth, (parts, current) => shape(parts, current));
             default:
                 return null;
         }
@@ -500,14 +500,17 @@ internal sealed partial class RoslynTotalExpressionLowerer
         return new(_factory.Variable(result), join, FrontendSubsetClassification.Exact);
     }
 
-    private TotalBodyValue? WithParts(IOperation operand, IrBlockId block, int depth, Func<NullableParts, IrBlockId, TotalBodyValue> use)
+    // An operand that does not lower exactly leaves the whole operation
+    // approximated, at the operation's own type.
+    private TotalBodyValue? WithParts(IOperation operation, IOperation operand, IrBlockId block, int depth,
+        Func<NullableParts, IrBlockId, TotalBodyValue> use)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
         use = RepositoryParameterGuard.NotNull(use, nameof(use));
         if (BodyParts(operand, block, depth + 1) is not { } lowered)
         { return null; }
         return lowered.Lowered.Classification.IsExact ? use(lowered.Parts, lowered.Lowered.Continuation)
-            : Approximate(operand, lowered.Lowered.Continuation, lowered.Lowered.Classification.Abstention);
+            : Approximate(operation, lowered.Lowered.Continuation, lowered.Lowered.Classification.Abstention);
     }
 
     private static bool IsComparison(BinaryOperatorKind kind)

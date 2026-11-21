@@ -260,8 +260,11 @@ internal static partial class CSharpOperationSemantics
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
     }
 
-    internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false)
+    // admits: which backing or returned field the read may stand for;
+    // IsSupportedFieldRead when none is given.
+    internal static IFieldSymbol? GetterField(IPropertySymbol property, bool nonVirtual = false, Func<IFieldSymbol, bool>? admits = null)
     {
+        admits ??= IsSupportedFieldRead;
         if (property.IsIndexer || !nonVirtual && (property.IsVirtual || property.IsOverride) ||
             property.IsAbstract || property.GetMethod is not { } getter || HasSynchronizedEntry(getter) ||
             !property.IsStatic && !property.ContainingType.IsReferenceType && !IsModeledStruct(property.ContainingType))
@@ -269,7 +272,7 @@ internal static partial class CSharpOperationSemantics
         var backing = property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
         if (backing != null)
-        { return IsSupportedFieldRead(backing) ? backing : null; }
+        { return admits(backing) ? backing : null; }
         if (getter.DeclaringSyntaxReferences.Length != 1)
         { return null; }
         var expression = getter.DeclaringSyntaxReferences[0].GetSyntax() switch
@@ -294,7 +297,7 @@ internal static partial class CSharpOperationSemantics
         };
         var field = name == null ? null : property.ContainingType.GetMembers(name).OfType<IFieldSymbol>().SingleOrDefault();
         return field != null && field.IsStatic == property.IsStatic && SymbolEqualityComparer.Default.Equals(field.Type, property.Type) &&
-            IsSupportedFieldRead(field) ? field : null;
+            admits(field) ? field : null;
     }
 
     internal static TotalScalarRule FieldWrite(IrFactory factory, IrTerm value, IrTerm? receiver)
