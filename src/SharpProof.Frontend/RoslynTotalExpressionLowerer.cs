@@ -395,6 +395,9 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is ICompoundAssignmentOperation { Target: IPropertyReferenceOperation arrayCompound } &&
             ArrayCollectionBody(arrayCompound, operation, null, block, depth) is { } arrayCompounded)
         { return arrayCompounded; }
+        if (depth < 256 && operation is ISimpleAssignmentOperation or ICompoundAssignmentOperation or IIncrementOrDecrementOperation &&
+            StructMutation(operation, block, depth) is { } structMutated)
+        { return structMutated; }
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation } setter &&
             SourceSetter?.Invoke(setter, block, depth) is { } set)
         { return set; }
@@ -614,7 +617,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                         _context.Target.ContainingAssembly):
                 return FieldWrite(assignment, field, block, depth);
             case ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Arguments.Length: 0 } property } assignment
-                when CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) is { } backing &&
+                when (CSharpOperationSemantics.GetOnlyAutoPropertyField(property.Property) ??
+                        CSharpOperationSemantics.StructAutoPropertyField(property.Property)) is { } backing &&
                     CSharpOperationSemantics.IsConstructorReadOnlyStore(BoundField(backing), property.Instance, _context.Target,
                         _context.Target.ContainingAssembly):
                 return FieldWrite(assignment, BoundField(backing), property.Instance, block, depth);
@@ -881,8 +885,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     // type, and its effects are unknown; the worker treats its site as a
     // possible allocation, write and lock. Arguments pass by value. A class
     // receiver, including a type parameter that may be a reference, is
-    // null-checked; a struct receiver is an opaque value, so a mutation
-    // through `this` is unobservable. Nonvirtual
+    // null-checked; an unmodeled struct receiver is an opaque value, so a
+    // mutation through `this` is unobservable. A member of a mutable modeled
+    // struct, or an interface member it may implement, that is not readonly
+    // could change the place it is called on, so it is not called opaquely on
+    // anything but a value C# copies first. Nonvirtual
     // source callees stay with inlining.
     // A setter takes the assigned value last; the assignment's value is it.
     private TotalBodyValue? OpaqueCall(IOperation operation, IMethodSymbol method, IOperation? instance,
@@ -898,7 +905,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 parameter.RefKind == RefKind.Out && !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             arguments.Any(argument => argument.Parameter == null ||
                 argument.ArgumentKind is not (ArgumentKind.Explicit or ArgumentKind.DefaultValue)) ||
-            assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type))
+            assigned != null && !CSharpOperationSemantics.IsValueDomain(assigned.Type) ||
+            MayMutateStructPlace(method, instance))
         { return null; }
         // An out argument is a caller local or parameter the callee may set
         // before it returns or throws, so none may be visible to a handler.
@@ -2078,6 +2086,11 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
             // Null stands for default(S) of a modeled struct.
             IDefaultValueOperation when CSharpOperationSemantics.IsModeledStruct(operation.Type) =>
+                _factory.Null(_context.Type(operation.Type)),
+            // So does a `default` literal converted to one.
+            IConversionOperation { OperatorMethod: null, Operand: IDefaultValueOperation } literal when
+                CSharpOperationSemantics.IsModeledStruct(operation.Type) && literal.Language == LanguageNames.CSharp &&
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(literal).IsDefaultLiteral =>
                 _factory.Null(_context.Type(operation.Type)),
             IParameterReferenceOperation parameter => _factory.Variable(_context.Variable(parameter.Parameter, state)),
             ILocalReferenceOperation local when local.Local.HasConstantValue => CSharpOperationSemantics.Literal(_factory, local.Type!, local.Local.ConstantValue),

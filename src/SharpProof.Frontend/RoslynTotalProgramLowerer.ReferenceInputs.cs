@@ -8,10 +8,18 @@ internal sealed partial class RoslynTotalProgramLowerer
         // aliases no field or element, so no write can change it. A root's
         // writable ref or out parameter is the caller's storage.
         var writable = _context.Parameters.Where(binding => _context.IsWritableRootReference(binding.Parameter)).ToImmutableArray();
+        // `this` of a member of a modeled struct is the caller's storage too,
+        // unless the frame's caller passed one of its own variables or a copy.
+        // Code the body calls can change that storage through another alias,
+        // even for a readonly struct, whose members get it by reference.
+        ImmutableArray<IrVarId> receiver = _context.Receiver is { } self && !_context.CopiesReceiver && !_context.Target.IsStatic &&
+            _context.Target.MethodKind != MethodKind.Constructor &&
+            CSharpOperationSemantics.IsModeledStruct(_context.Target.ContainingType)
+            ? [self.Current] : [];
         var references = _context.Parameters.Where(binding => binding.Parameter.RefKind is RefKind.Ref or RefKind.In &&
                 !(_context.WritesBackReferences && binding.Parameter.RefKind == RefKind.Ref) ||
                 _context.IsWritableRootReference(binding.Parameter))
-            .Select(binding => binding.Current).Distinct()
+            .Select(binding => binding.Current).Concat(receiver).Distinct()
             .OrderBy(variable => variable.IsDefault ? throw new System.ArgumentOutOfRangeException(nameof(variable)) : (variable.Value)).ToImmutableArray();
         if (references.IsEmpty)
         { return program; }
@@ -46,7 +54,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                 // The caller may have passed a field or element by reference.
                 // Preserve entry snapshots, but a write may change its current
                 // cell even when no assignment names the parameter itself.
-                next = Forget(program, instructions, instruction.Operation, references, next);
+                // A fresh store writes an object this body built after the
+                // call began, which holds no storage of the caller's.
+                next = Forget(program, instructions, instruction.Operation,
+                    instruction is IrWriteInstruction write && !IrWriteSites.IsObservable(_context.Factory, write)
+                        ? references.Except(receiver) : references, next);
             }
             blocks.Add(new(block.Id, block.Name, instructions.ToImmutable()));
         }
