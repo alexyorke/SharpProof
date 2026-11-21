@@ -90,21 +90,29 @@ internal static partial class CSharpOperationSemantics
                 !field.IsStatic && field.ContainingType.StaticConstructors.All(constructor => constructor.IsImplicitlyDeclared));
     }
 
-    // A source readonly struct whose instance fields hold scalars, references
-    // or other such structs. Its value is modeled as a reference to an
-    // immutable object, and null stands for default(S): the two cannot be told
-    // apart, because every modeled read of a struct value is guarded and
-    // returns the field's default for null, boxing yields an unconstrained
-    // reference, and C# has no reference comparison of struct values.
-    // Readonly fields make construction the only store.
+    // A source struct whose instance fields hold scalars, references or other
+    // such structs. Its value is modeled as a reference to an immutable
+    // object, and null stands for default(S): the two cannot be told apart,
+    // because every modeled read of a struct value is guarded and returns the
+    // field's default for null, boxing yields an unconstrained reference, and
+    // C# has no reference comparison of struct values. Construction is the
+    // only store into such an object. A readonly struct has no other
+    // mutation; a mutation of a variable of a mutable one builds a new object
+    // and assigns it to the variable, which is value semantics.
     internal static bool IsModeledStruct(ITypeSymbol? type)
     { return IsModeledStruct(type, 0); }
+
+    // A modeled struct that is not readonly: a store into one of its fields,
+    // or a call of one of its members that is not readonly, can change a
+    // variable that holds it.
+    internal static bool IsMutableModeledStruct(ITypeSymbol? type)
+    { return type is INamedTypeSymbol { IsReadOnly: false } && IsModeledStruct(type, 0); }
 
     private static bool IsModeledStruct(ITypeSymbol? type, int depth)
     {
         if (depth > 8 || type is not INamedTypeSymbol
             {
-                TypeKind: TypeKind.Struct, IsReadOnly: true, IsRefLikeType: false, IsRecord: false, IsGenericType: false,
+                TypeKind: TypeKind.Struct, IsRefLikeType: false, IsRecord: false, IsGenericType: false,
                 SpecialType: SpecialType.None, IsUnmanagedType: var _
             } named ||
             named.DeclaringSyntaxReferences.IsEmpty || named.ContainingType is { IsGenericType: true } ||
@@ -112,6 +120,11 @@ internal static partial class CSharpOperationSemantics
             {
                 Name: "StructLayoutAttribute", ContainingNamespace: { Name: "InteropServices" }
             }))
+        { return false; }
+        // A primary constructor's parameters can be state that no declared
+        // field holds.
+        if (!named.IsReadOnly && named.DeclaringSyntaxReferences.Any(static reference =>
+            reference.GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.StructDeclarationSyntax { ParameterList: null }))
         { return false; }
         foreach (var member in named.GetMembers())
         {
@@ -127,13 +140,15 @@ internal static partial class CSharpOperationSemantics
     // readonly instance field, and only through its own `this`: the object
     // under construction. Such a store is modeled like any other instance
     // store. A store through another instance of the type, or from any other
-    // member, is not.
+    // member, is not. A constructor of a mutable modeled struct stores any of
+    // its own fields through `this` the same way.
     internal static bool IsConstructorReadOnlyStore(IFieldSymbol field, IOperation? instance, IMethodSymbol target, IAssemblySymbol sourceAssembly)
     {
         field = RepositoryParameterGuard.NotNull(field, nameof(field));
         target = RepositoryParameterGuard.NotNull(target, nameof(target));
         sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
-        return field is { IsReadOnly: true, IsStatic: false, IsVolatile: false, IsConst: false } &&
+        return field is { IsStatic: false, IsVolatile: false, IsConst: false } &&
+            (field.IsReadOnly || IsMutableModeledStruct(field.ContainingType)) &&
             target is { MethodKind: MethodKind.Constructor, IsStatic: false } &&
             SymbolEqualityComparer.Default.Equals(target.ContainingType.OriginalDefinition, field.ContainingType.OriginalDefinition) &&
             instance is IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance } &&
@@ -155,6 +170,29 @@ internal static partial class CSharpOperationSemantics
         { return null; }
         return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+    }
+
+    // The backing field of an instance auto-property of a mutable modeled
+    // struct whose accessors are both compiler-implemented: its setter, or
+    // init accessor, only stores that field.
+    internal static IFieldSymbol? StructAutoPropertyField(IPropertySymbol property)
+    {
+        property = RepositoryParameterGuard.NotNull(property, nameof(property));
+        if (property.IsStatic || property.IsIndexer || property.IsAbstract || property.IsExtern ||
+            !IsMutableModeledStruct(property.ContainingType) ||
+            property.GetMethod is not { } getter || property.SetMethod is not { } setter ||
+            HasSynchronizedEntry(getter) || HasSynchronizedEntry(setter) ||
+            !IsCompilerAccessor(getter) || !IsCompilerAccessor(setter))
+        { return null; }
+        return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
+            .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property));
+
+        static bool IsCompilerAccessor(IMethodSymbol accessor)
+        {
+            accessor = RepositoryParameterGuard.NotNull(accessor, nameof(accessor));
+            return accessor.DeclaringSyntaxReferences.Length == 1 &&
+                accessor.DeclaringSyntaxReferences[0].GetSyntax() is Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null };
+        }
     }
 
     // The backing field of a static get-only auto-property, whose getter

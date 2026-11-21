@@ -133,6 +133,40 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         return true;
     }
 
+    // The work a source callee's expansion may give back when it runs out
+    // and the call becomes an unknown call instead. Work given back is never
+    // given back again, so a lowering does at most this much more work than
+    // its budget, however many of its calls fall back.
+    internal const int MaximumRecoveredSteps = 3 * RoslynTotalProgramLowerer.MaximumRegionSteps;
+    private int _recovered;
+
+    internal readonly struct BudgetMark(int remaining, bool exceeded)
+    {
+        internal int Remaining { get; } = remaining;
+        internal bool Exceeded { get; } = exceeded;
+    }
+
+    internal BudgetMark Mark()
+    { return new(_remaining, ConstructionLimitExceeded); }
+
+    // Gives back the work spent since the mark, when the expansion it paid
+    // for produced nothing the caller keeps. False, leaving the budget as it
+    // is, once that work would exceed what is left of the allowance. A frame
+    // below the root keeps one budget of the allowance in reserve, so a deep
+    // chain that keeps running out still falls back where the root calls it.
+    internal bool TryRecover(BudgetMark mark)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var spent = mark.Remaining - _remaining;
+        var reserve = _active.Count > 1 ? RoslynTotalProgramLowerer.MaximumRegionSteps : 0;
+        if (spent < 0 || spent > MaximumRecoveredSteps - _recovered - reserve)
+        { return false; }
+        _recovered += spent;
+        _remaining = mark.Remaining;
+        ConstructionLimitExceeded = mark.Exceeded;
+        return true;
+    }
+
     internal bool Enter(IMethodSymbol method)
     {
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -663,6 +697,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         }
         if (!TryCheckTypeInitialization(type, out eligible))
         { return false; }
+        if (eligible && _allocatingInitialization.Contains(type))
+        { SourceInitializationAllocates = true; }
         // An initializer that is not only constants may still be a closed
         // computation that finishes without an observable effect.
         if (!eligible && _compilation is CSharpCompilation compilation &&
@@ -706,10 +742,17 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     if (value != null && (!CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree).GetConstantValue(value, cancellationToken).HasValue ||
                         !CSharpOperationSemantics.IsScalar(member is IFieldSymbol field ? field.Type : (member as IPropertySymbol)?.Type)))
                     { return true; }
-                    // Constant initialization is functionally safe to inline,
-                    // but writing mutable static state is still an entry effect.
+                    // Storing a constant into a mutable static is no more
+                    // observable than into a readonly one (TypeInitialization),
+                    // but it is classed with fresh values: claims that count
+                    // every write of static state still see an effect.
                     if (value != null && member is IFieldSymbol { IsReadOnly: false } or IPropertySymbol { SetMethod: not null })
-                    { SourceInitializationEffectsComplete = false; }
+                    {
+                        if (member.GetAttributes().Any(static attribute => attribute.AttributeClass is { Name: "ThreadStaticAttribute" }))
+                        { SourceInitializationEffectsComplete = false; }
+                        else
+                        { _allocatingInitialization.Add(type); }
+                    }
                 }
             }
         }

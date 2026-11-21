@@ -93,6 +93,32 @@ public sealed class EntryInitializationTests
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.Dictionary<int, int> Map = new() { { 1, 2 } }; }")]
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(); }")]
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.HashSet<string> Names = new(System.StringComparer.Ordinal) { \"a\" }; }")]
+    // A chain of source base constructors that only store into the new
+    // instance: implicit, explicit with arguments, through a generic base,
+    // and from the base class's own initializer.
+    [TestCase("public class Base { } public sealed class Derived : Base { } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public abstract class Base { protected readonly int[] Items; protected Base() { Items = new int[2]; } } " +
+        "public sealed class Derived : Base { } public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public abstract class Base { private readonly int size; protected Base(int size) { this.size = size; } } " +
+        "public class Middle : Base { private readonly string name = \"m\"; public Middle(int size) : base(size) { } } " +
+        "public sealed class Derived : Middle { public Derived() : base(4) { } } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public abstract class Accessor<TKey, TValue> { private readonly TKey key; protected Accessor(TKey key) { this.key = key; } } " +
+        "public sealed class Derived : Accessor<string, object> { public Derived() : base(\"k\") { } } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public abstract class Subject { public static readonly Subject Unit = new Square(); } public sealed class Square : Subject { }")]
+    [TestCase("public class Base { public int Value { get; } public Base() { Value = 1; } } public sealed class Derived : Base { } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    // A store into the type's own mutable static: nothing reads it before the
+    // initializer finishes. It is classed with fresh values even for a
+    // constant, so claims that count every static write still see one.
+    [TestCase("public static class Subject { public static int State = 1; }")]
+    [TestCase("public static class Subject { private static int[] Cache = new int[3]; }")]
+    [TestCase("public static class Subject { public static int Value { get; set; } = 7; }")]
+    [TestCase("public static class Subject { public static int Count; static Subject() { Count = 1; } }")]
+    [TestCase("public static class Subject { private static System.Collections.Generic.Dictionary<int, int> map; " +
+        "static Subject() { map = new System.Collections.Generic.Dictionary<int, int> { [1] = 2 }; } }")]
     public void FreshValuesAreAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.FreshValues); }
 
@@ -123,13 +149,11 @@ public sealed class EntryInitializationTests
     // A static constructor with logic.
     [TestCase("public static class Subject { private static readonly int Limit; " +
         "static Subject() { if (System.Environment.ProcessorCount > 1) { Limit = 1; } } }")]
-    [TestCase("public static class Subject { public static int Count; static Subject() { Count = 1; } }")]
-    // Mutable or per-thread state.
-    [TestCase("public static class Subject { public static int State = 1; }")]
-    [TestCase("public static class Subject { private static int[] Cache = new int[3]; }")]
-    [TestCase("public static class Subject { public static int Value { get; set; } = 7; }")]
+    // A field-like event, or per-thread state.
     [TestCase("public static class Subject { private static event System.Action Ready = () => { }; }")]
     [TestCase("public static class Subject { [System.ThreadStatic] private static readonly int[] PerThread = new int[1]; }")]
+    [TestCase("public static class Subject { [System.ThreadStatic] private static int[] perThread = new int[1]; }")]
+    [TestCase("public static class Subject { [System.ThreadStatic] private static int counter; static Subject() { counter = 1; } }")]
     // Constructors that do more than store into the new instance.
     [TestCase("public sealed class Counter { public static int Count; public Counter() { Count++; } } " +
         "public static class Subject { private static readonly Counter Instance = new Counter(); }")]
@@ -140,7 +164,24 @@ public sealed class EntryInitializationTests
     [TestCase("public sealed class Counter { public int Value { get; set; } } " +
         "public static class Subject { private static readonly Counter Instance = new Counter { Value = 1 }; }")]
     [TestCase("public sealed class Handle { ~Handle() { } } public static class Subject { private static readonly Handle Instance = new Handle(); }")]
-    [TestCase("public class Base { } public sealed class Derived : Base { } " +
+    // A base constructor chain that does more than store into the new
+    // instance, or that this file does not declare.
+    [TestCase("public class Base { public static int Count; public Base() { Count++; } } public sealed class Derived : Base { } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public sealed class Derived : System.Collections.Generic.List<int> { } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public class Base { ~Base() { } } public sealed class Derived : Base { } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    [TestCase("public abstract class Base { private readonly int size; protected Base(int size) { this.size = size; } } " +
+        "public sealed class Derived : Base { public Derived() : base(System.Environment.ProcessorCount) { } } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    // A base constructor's store to a virtual property runs the override.
+    [TestCase("public static class Counter { public static int Count; } " +
+        "public class Base { public virtual int Value { get; set; } public Base() { Value = 1; } } " +
+        "public sealed class Derived : Base { public override int Value { get => 0; set => Counter.Count++; } } " +
+        "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    // Running the base constructor may run the base class's initializer.
+    [TestCase("public class Base { [System.ThreadStatic] public static int State = 1; } public sealed class Derived : Base { } " +
         "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
     public void EffectfulInitializersAreNotAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.Effectful); }

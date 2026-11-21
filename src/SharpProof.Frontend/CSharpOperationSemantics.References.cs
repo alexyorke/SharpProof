@@ -68,8 +68,10 @@ internal static partial class CSharpOperationSemantics
     }
 
     // A constructed signature type may differ from its declaration (a generic
-    // container's type arguments). Class, interface and type-parameter values
-    // are all references, so a cast bridges them; any other type must match.
+    // container's type arguments). Class, interface, delegate and
+    // type-parameter values are all references, so a cast bridges them (a
+    // `Func<T, bool>` parameter receives a `Func<int, bool>`); any other type
+    // must match.
     internal static bool SharesValueDomain(ITypeSymbol constructed, ITypeSymbol declared)
     {
         constructed = RepositoryParameterGuard.NotNull(constructed, nameof(constructed));
@@ -79,7 +81,7 @@ internal static partial class CSharpOperationSemantics
 
         static bool IsBridgedReference(ITypeSymbol type)
         {
-            return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.TypeParameter &&
+            return type.TypeKind is TypeKind.Class or TypeKind.Interface or TypeKind.Delegate or TypeKind.TypeParameter &&
                 type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
         }
     }

@@ -44,20 +44,23 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (ShadowCallSkeleton)
         { return null; }
         var creation = operation as IObjectCreationOperation;
+        // An empty `[]` is a construction without arguments.
+        var emptyCollection = CSharpOperationSemantics.EmptyCollectionConstructor(operation);
+        var created = creation != null || emptyCollection != null;
         var invocation = operation as IInvocationOperation;
         var property = operation as IPropertyReferenceOperation;
-        var method = creation?.Constructor ?? invocation?.TargetMethod ?? property?.Property.GetMethod;
+        var method = creation?.Constructor ?? emptyCollection ?? invocation?.TargetMethod ?? property?.Property.GetMethod;
         var instance = invocation?.Instance ?? property?.Instance;
-        if (method == null || creation == null && instance == null || creation?.Initializer != null ||
+        if (method == null || !created && instance == null || creation?.Initializer != null ||
             !CSharpOperationSemantics.IsHashSetStateMember(method,
                 _context.KnownValueType(method.ContainingType.TypeArguments.FirstOrDefault())))
         { return null; }
         var isCount = method.AssociatedSymbol is IPropertySymbol { Name: "Count" };
-        if (creation == null && (!isCount || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(method.AssociatedSymbol ?? (ISymbol)method)) &&
+        if (!created && (!isCount || CSharpOperationSemantics.IsHashSetInterfaceStateDeclaration(method.AssociatedSymbol ?? (ISymbol)method)) &&
             !_context.IsDefaultHashSetOrigin(instance!))
         { return null; }
         TotalBodyValue? receiver = null;
-        if (creation == null)
+        if (!created)
         {
             receiver = LowerBodyValue(instance!, block, depth + 1);
             if (!receiver.Value.Classification.IsExact)
@@ -65,7 +68,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
             receiver = Pin(operation, receiver.Value);
             block = receiver.Value.Continuation;
         }
-        var arguments = creation?.Arguments ?? invocation?.Arguments ?? property!.Arguments;
+        var arguments = creation?.Arguments ?? (emptyCollection != null ? [] : invocation?.Arguments ?? property!.Arguments);
         var valuesBuilder = ImmutableArray.CreateBuilder<IrTerm>(arguments.Length);
         valuesBuilder.Count = arguments.Length;
         foreach (var argument in arguments.OrderBy(argument => argument.Syntax.SpanStart))
@@ -79,7 +82,7 @@ internal sealed partial class RoslynTotalExpressionLowerer
         }
         var values = valuesBuilder.ToImmutable();
         var site = _context.Site(operation);
-        if (creation != null)
+        if (created)
         {
             block = ListRuntimeEffects(operation, method, values, values.Length == 0 ? _factory.Boolean(false) :
                 _factory.Binary(IrBinaryOperator.LessThan, values[0], _factory.Integer(0)), block, initialization: true);

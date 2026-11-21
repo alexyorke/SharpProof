@@ -179,6 +179,19 @@ internal sealed partial class TotalLoweringContext
     internal IrTerm? ThisValue(TotalParameterState state = TotalParameterState.Current)
     { return Target.MethodKind == MethodKind.Constructor ? null : ReceiverValue(state); }
 
+    // An inlined frame whose `this` is a struct value no other code can
+    // reach: its caller passed a copy, or one of its own variables, which it
+    // assigns the frame's final `this` to on normal return. Elsewhere `this`
+    // of a struct member is the caller's storage, which may be a field or an
+    // element that other code can write.
+    internal bool CopiesReceiver { get; set; }
+
+    // Whether a store into `this`, or a mutating call on it, changes only
+    // the frame's receiver variable. A readonly member cannot change `this`,
+    // and a constructor builds the object its caller already holds.
+    internal bool MutatesOwnReceiver => CopiesReceiver && Receiver != null && !Target.IsStatic && !Target.IsReadOnly &&
+        Target.MethodKind != MethodKind.Constructor && CSharpOperationSemantics.IsMutableModeledStruct(Target.ContainingType);
+
     internal ImmutableArray<TotalInputBinding> Inputs =>
         Receiver == null ? [.. Parameters.Select(parameter => parameter.Input)]
             : [.. Parameters.Select(parameter => parameter.Input), Receiver];
@@ -368,6 +381,10 @@ internal sealed partial class TotalLoweringContext
             ? Variable(variable) : null;
     }
 
+    // The local or parameter every capture of this id names.
+    internal ISymbol? StorageCaptureSymbol(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup key */)
+    { return _storageCaptures.TryGetValue(capture, out var variable) ? variable : null; }
+
     internal IrVarId Capture(CaptureId capture /* SPINT001: all values valid - every capture token, including zero, is a valid lookup or storage key */, ITypeSymbol? type)
     {
         if (!_captures.TryGetValue(capture, out var variable))
@@ -400,6 +417,13 @@ internal sealed partial class TotalLoweringContext
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return Factory.CreateOperation(IrWriteSites.FreshPrefix + operation.Syntax.SpanStart, Span(operation.Syntax));
+    }
+
+    // The allocation of the new value a mutation of a struct variable builds.
+    internal OperationId StructUpdateSite(IOperation operation)
+    {
+        operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
+        return Factory.CreateOperation("StructUpdate@" + operation.Syntax.SpanStart, Span(operation.Syntax));
     }
 
     internal OperationId StaticDelegateAllocationSite(IOperation operation)

@@ -91,7 +91,7 @@ public sealed class CollectionInitializerTests
     [TestCase("private static readonly System.Collections.Generic.SortedDictionary<int, int> Map = new();")]
     [TestCase("private static readonly System.Text.RegularExpressions.Regex Pattern = new(\"a+\");")]
     [TestCase("private static readonly Bag Items = new() { 1 };")]
-    [TestCase("private static " + Generic + "List<int> Items = new();")]
+    [TestCase("[System.ThreadStatic] private static " + Generic + "List<int> items = new();")]
     public async Task OtherCollectionsLeavePurityUnknown(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
