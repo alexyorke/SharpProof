@@ -239,6 +239,12 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- A body may read a static auto-property of such a type, with or without a
+  setter, under the same rule. Before, its getter was an unknown call that
+  left the body unsupported. Boxing a `T?` whose value does not lower, such as
+  the result of a user-defined conversion, is now approximated as the boxed
+  object; before, inside a `try` block it stopped the whole run with an
+  internal type error.
 - `typeof(X)` is a value. It has no effect, cannot throw, allocates nothing
   and does not run `X`'s type initializer, so a method that passes
   `typeof(X)` to a helper can be proved pure. Before, any `typeof` left the
