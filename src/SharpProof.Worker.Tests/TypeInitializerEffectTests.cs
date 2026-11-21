@@ -26,6 +26,18 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("private static readonly int[] Copy = Admitted.Data;")]
     [TestCase("private static readonly object[] NoArguments = System.Array.Empty<object>();")]
     [TestCase("private static readonly Era[] NoEras = System.Array.Empty<Era>();")]
+    [TestCase("private static readonly Era[] NoEras = [];")]
+    [TestCase("private static readonly System.Type Key = typeof(Era);")]
+    [TestCase("private static readonly System.Type[] NoTypes = System.Type.EmptyTypes;")]
+    [TestCase("private static readonly System.Collections.Generic.IEqualityComparer<string> Names = System.StringComparer.Ordinal;")]
+    [TestCase("private static readonly object Half = 0.5m;")]
+    [TestCase("private static readonly System.Globalization.IdnMapping Mapping = new();")]
+    [TestCase("private static readonly System.Buffers.SearchValues<char> Chars = System.Buffers.SearchValues.Create(\"<>&\");")]
+    [TestCase("private static readonly int[] Copy = Exposed.Table;")]
+    [TestCase("private static readonly System.Collections.Generic.IEnumerable<Era> NoEras = System.Linq.Enumerable.Empty<Era>();")]
+    [TestCase("private static readonly System.Collections.Concurrent.ConcurrentQueue<Era> Pool = new();")]
+    [TestCase("private static readonly System.Collections.Generic.Dictionary<System.Type, int> Codes = new() { { typeof(int), 1 }, { typeof(Era), 2 } };")]
+    [TestCase("private static readonly System.Collections.Generic.HashSet<System.Type> Scalars = new() { typeof(bool), typeof(string) };")]
     public async Task FreshValuesProvePurityAndCapabilities(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -47,6 +59,11 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("private static readonly string Name = \"CE\";")]
     [TestCase("static C() { }")]
     [TestCase("private static readonly int Limit; static C() { Limit = 3; }")]
+    [TestCase("private static readonly string Empty = string.Empty;")]
+    [TestCase("private static readonly string Separator = System.Environment.NewLine;")]
+    // Floating-point arithmetic, Math.Ceiling and an unchecked conversion to
+    // long never throw, so the closed computation finishes.
+    [TestCase("private static readonly double Scale = 3 / 1024.0; private static readonly long Bits = (long)System.Math.Ceiling(-Scale * 8);")]
     public async Task ConstantsProveAllocationClaims(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -65,6 +82,12 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("private static readonly int Limit; static C() { if (System.Environment.ProcessorCount > 1) { Limit = 1; } }")]
     [TestCase("private static readonly Counter Instance = new Counter();")]
     [TestCase("[System.ThreadStatic] public static int State = 1;")]
+    [TestCase("private static readonly System.StringComparer Names = System.StringComparer.CurrentCulture;")]
+    [TestCase("private static readonly int[] Copy = Exposed.Settable;")]
+    [TestCase("private static readonly System.Buffers.SearchValues<char> Chars = System.Buffers.SearchValues.Create(System.Environment.NewLine);")]
+    [TestCase("private static readonly double Scale = 2.0; private static readonly long Bits = checked((long)Scale);")]
+    [TestCase("private static readonly double Scale = 2.0; private static readonly int Sign = Scale > 0 ? 1 : 0;")]
+    [TestCase("private static readonly System.Collections.Generic.Dictionary<System.Type, int> Codes = new() { { typeof(nint), 1 }, { typeof(System.IntPtr), 2 } };")]
     public async Task OtherInitializersLeavePurityUnknown(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -214,6 +237,7 @@ internal sealed class TypeInitializerEffectTests
             "public static int Helper(int x) { return x; } } " +
             (members.Contains("Cycle.", StringComparison.Ordinal) ? "public static class Cycle { public static readonly object Back = C.Gate; } " : "") +
             "public sealed class Counter { public static int Count; public Counter() { Count++; } } " +
+            "public static class Exposed { public static int[] Table { get; } = new int[2]; public static int[] Settable { get; set; } = new int[2]; } " +
             "public static class C { " + members + " " + attribute + " " + body + " }";
         return await verify(Prepare(source), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken, null);
     }

@@ -5,13 +5,14 @@
 | Verdict or diagnostic | Total | `aalhour-c-sharp-algorithms` | `morelinq` | `nodatime` | `humanizer` |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Proven | 52 | 17 | 3 | 23 | 9 |
-| Refuted | 49 | 9 | 31 | 9 | 0 |
-| SP0002 | 258 | 132 | 36 | 41 | 49 |
-| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 110 | 30 | 27 | 25 | 28 |
+| Refuted | 50 | 9 | 31 | 9 | 1 |
+| SP0002 | 259 | 132 | 36 | 41 | 50 |
+| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 107 | 30 | 27 | 25 | 25 |
 | SP0047 `Advisory:Lowering:UnsupportedControlFlow` | 13 | 3 | 0 | 2 | 8 |
 | SP0047 `Advisory:ContractBinding:UnsupportedTarget` | 9 | 6 | 1 | 0 | 2 |
 | SP0047 `Advisory:Lowering:UnsupportedType` | 4 | 1 | 1 | 0 | 2 |
 | SP0047 `Advisory:Lowering:ConversionMayChangeValue` | 3 | 2 | 0 | 0 | 1 |
 | SP0047 `Advisory:EntryInitialization:TypeInitializer` | 1 | 0 | 0 | 0 | 1 |
 | SP0047 `Advisory:Lowering:InvalidOperation` | 1 | 0 | 1 | 0 | 0 |
+| SP0047 `Advisory:Lowering:UnsupportedMutation` | 1 | 0 | 0 | 0 | 1 |
 | **Total** | 500 | 200 | 100 | 100 | 100 |

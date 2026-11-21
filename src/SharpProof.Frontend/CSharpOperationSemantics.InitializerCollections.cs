@@ -5,8 +5,8 @@ namespace SharpProof.Frontend;
 // code and cannot throw except by running out of memory.
 //
 // - The parameterless and capacity constructors of List, Dictionary,
-//   HashSet, Queue and Stack, and the parameterless ConcurrentDictionary
-//   constructor, only allocate storage. For a reference-type key, the
+//   HashSet, Queue and Stack, and the parameterless ConcurrentQueue and
+//   ConcurrentDictionary constructors, only allocate storage. For a reference-type key, the
 //   Dictionary, HashSet and ConcurrentDictionary constructors read
 //   EqualityComparer<T>.Default, whose framework initializer picks a
 //   framework comparer by reflection and calls no member of T. A negative
@@ -25,7 +25,10 @@ namespace SharpProof.Frontend;
 //   the ordinal comparers, are framework code. OrdinalIgnoreCase keys must be
 //   ASCII, which every runtime folds the same way without culture data.
 //   Dictionary.Add throws for a key the dictionary already holds, so its keys
-//   must differ under the comparer.
+//   must differ under the comparer. A key may also be `typeof(X)` of a type
+//   of the analyzed assembly or the framework, for a Type key: the runtime
+//   type object hashes and compares by identity in framework code, and two
+//   operands that name one runtime type count as the same key.
 //
 // SharpProof.Worker.Tests' CollectionInitializerTests records these on the
 // supported runtime.
@@ -52,6 +55,7 @@ internal static partial class CSharpOperationSemantics
         "M:System.Collections.Generic.HashSet`1.#ctor", "M:System.Collections.Generic.HashSet`1.#ctor(System.Int32)",
         "M:System.Collections.Generic.HashSet`1.#ctor(System.Collections.Generic.IEqualityComparer{`0})",
         "M:System.Collections.Generic.HashSet`1.#ctor(System.Int32,System.Collections.Generic.IEqualityComparer{`0})",
+        "M:System.Collections.Concurrent.ConcurrentQueue`1.#ctor",
         "M:System.Collections.Concurrent.ConcurrentDictionary`2.#ctor",
         "M:System.Collections.Concurrent.ConcurrentDictionary`2.#ctor(System.Collections.Generic.IEqualityComparer{`0})");
 
@@ -191,6 +195,13 @@ internal static partial class CSharpOperationSemantics
     // to be callback-free and fault-free.
     private static object? Key(IOperation value, ITypeSymbol keyType, KeyComparison comparison)
     {
+        if (value is ITypeOfOperation typeOf)
+        {
+            return comparison == KeyComparison.Default && keyType.GetDocumentationCommentId() == "T:System.Type" &&
+                IsFrameworkSymbol(keyType) && SymbolEqualityComparer.Default.Equals(value.Type, keyType) &&
+                value.SemanticModel?.Compilation.Assembly is { } assembly && RuntimeTypeKey(typeOf.TypeOperand, assembly) is { } runtime
+                ? runtime : null;
+        }
         if (value.ConstantValue is not { HasValue: true, Value: { } constant } || !IsHashedKeyType(keyType) ||
             !SymbolEqualityComparer.Default.Equals(value.Type, keyType))
         { return null; }
@@ -208,6 +219,48 @@ internal static partial class CSharpOperationSemantics
             folded.Append(character is >= 'a' and <= 'z' ? (char)(character - ('a' - 'A')) : character);
         }
         return folded.ToString();
+    }
+
+    // A name that two `typeof` operands share exactly when they yield the
+    // same runtime type object: C# names that one runtime type has, such as
+    // `nint` and `IntPtr` or tuples with different element names, share it.
+    // Only types of the analyzed assembly and of the framework assemblies
+    // that always load are named; the runtime type's hash and equality are
+    // framework code that calls no user code.
+    private static string? RuntimeTypeKey(ITypeSymbol type, IAssemblySymbol assembly)
+    {
+        switch (type)
+        {
+            case IArrayTypeSymbol array:
+                return RuntimeTypeKey(array.ElementType, assembly) is { } element
+                    ? element + (array.IsSZArray ? "[]" : "[" + new string(',', array.Rank - 1) + "*]") : null;
+            case INamedTypeSymbol { TypeKind: not TypeKind.Error } named:
+                var definition = named.OriginalDefinition;
+                var source = SymbolEqualityComparer.Default.Equals(definition.ContainingAssembly, assembly);
+                if (!source && !IsFrameworkSymbol(definition))
+                { return null; }
+                var outer = named.ContainingType != null ? RuntimeTypeKey(named.ContainingType, assembly)
+                    : (source ? "source:" : "framework:") + NamespaceName(definition.ContainingNamespace);
+                if (outer == null)
+                { return null; }
+                var text = new StringBuilder(outer).Append('/').Append(definition.MetadataName);
+                if (named.IsUnboundGenericType)
+                { return text.Append("<>").ToString(); }
+                foreach (var argument in named.TypeArguments)
+                {
+                    if (RuntimeTypeKey(argument, assembly) is not { } key)
+                    { return null; }
+                    text.Append('<').Append(key).Append('>');
+                }
+                return text.ToString();
+            default:
+                return null;
+        }
+    }
+
+    private static string NamespaceName(INamespaceSymbol? space)
+    {
+        return space is null or { IsGlobalNamespace: true } ? "" : NamespaceName(space.ContainingNamespace) + "." + space.Name;
     }
 
     private static bool IsHashedKeyType(ITypeSymbol type)

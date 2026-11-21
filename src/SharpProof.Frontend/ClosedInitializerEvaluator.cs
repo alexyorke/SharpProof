@@ -19,7 +19,10 @@ namespace SharpProof.Frontend;
 // MinValue / -1. BigInteger arithmetic runs on the host's BigInteger. Floating
 // point, decimal and 128-bit values are only stored: a conversion into one
 // that cannot throw makes an opaque value, and any use of an opaque value
-// other than storing it gives up, so no branch ever depends on rounding.
+// other than storing it gives up, so no branch ever depends on rounding. The
+// exceptions are floating-point arithmetic, conversions between floating
+// types, unchecked conversions to integral types and a few Math functions of
+// a double: none of them throws, and each yields another opaque value.
 //
 // Effects are bounded the same way the structural rules bound them: a store
 // must go to a local, to the initializing type's own initialized-only static,
@@ -621,8 +624,21 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             value = new Opaque(target);
             return true;
         }
+        // A floating-point value converts to another floating-point type by
+        // rounding, and to an integral type, unchecked, to an unspecified
+        // value; neither throws. Only a checked conversion to an integral
+        // type, and any conversion to decimal, can throw.
+        if (kind.IsNumeric && operand is Opaque && IsFloating(source) &&
+            (IsFloating(target) || IsIntegral(target) && !isChecked && target.TypeKind != TypeKind.Enum))
+        {
+            value = new Opaque(target);
+            return true;
+        }
         return false;
     }
+
+    private static bool IsFloating(ITypeSymbol type)
+    { return type.SpecialType is SpecialType.System_Single or SpecialType.System_Double; }
 
     private bool UserConversion(IMethodSymbol method, object? operand, ITypeSymbol source, ITypeSymbol target, out object? value)
     {
@@ -683,6 +699,16 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         }
         if (binary.Type is not { } type)
         { return false; }
+        // Floating-point arithmetic never throws: it rounds, overflows to an
+        // infinity or yields NaN. Its result can only be stored.
+        if (IsFloating(type) && left is Opaque && right is Opaque && binary.LeftOperand.Type is { } leftType && IsFloating(leftType) &&
+            binary.RightOperand.Type is { } rightType && IsFloating(rightType) &&
+            binary.OperatorKind is BinaryOperatorKind.Add or BinaryOperatorKind.Subtract or BinaryOperatorKind.Multiply or
+                BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder)
+        {
+            value = new Opaque(type);
+            return true;
+        }
         if (left is bool a && right is bool b)
         {
             value = binary.OperatorKind switch
@@ -838,6 +864,12 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         {
             value = unary.OperatorKind == UnaryOperatorKind.Not ? !flag : null;
             return value != null;
+        }
+        if (operand is Opaque && unary.Type is { } floating && IsFloating(floating) && unary.Operand.Type is { } operandType &&
+            IsFloating(operandType) && unary.OperatorKind is UnaryOperatorKind.Plus or UnaryOperatorKind.Minus)
+        {
+            value = new Opaque(floating);
+            return true;
         }
         if (operand == null || !IsIntegralValue(operand) || unary.Type is not { } type || !IsIntegral(type))
         { return false; }
@@ -1145,7 +1177,26 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             if (!Evaluate(invocation.Instance, frame, out receiver))
             { return false; }
         }
-        return Arguments(invocation.Arguments, frame, out var arguments) && Call(method, receiver, arguments, out value);
+        if (!Arguments(invocation.Arguments, frame, out var arguments))
+        { return false; }
+        // Rounding, the absolute value and the square root of a double never
+        // throw and read no state; the result can only be stored.
+        if (IsFloatingMath(method) && arguments.Length == 1 && arguments[0] is Opaque)
+        {
+            value = new Opaque(method.ReturnType);
+            return true;
+        }
+        return Call(method, receiver, arguments, out value);
+    }
+
+    private bool IsFloatingMath(IMethodSymbol method)
+    {
+        return method is
+        {
+            IsStatic: true, Name: "Ceiling" or "Floor" or "Truncate" or "Round" or "Abs" or "Sqrt",
+            ReturnType.SpecialType: SpecialType.System_Double, Parameters.Length: 1,
+            ContainingType: { Name: "Math", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } }
+        } && method.Parameters[0] is { Type.SpecialType: SpecialType.System_Double, RefKind: RefKind.None } && IsLibrary(method.ContainingType);
     }
 
     private bool Arguments(ImmutableArray<IArgumentOperation> arguments, Frame frame, out object?[] values)

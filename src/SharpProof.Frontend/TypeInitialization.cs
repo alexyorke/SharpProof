@@ -24,7 +24,9 @@ internal enum InitializationEffect
     // type's own statics and the fields of the values it constructs, and
     // cannot throw except by running out of memory. It calls no other code
     // but the framework collection constructors and Add methods that
-    // CSharpOperationSemantics.IsCallbackFreeCollectionCreation admits, or,
+    // CSharpOperationSemantics.IsCallbackFreeCollectionCreation admits, the
+    // framework values CSharpOperationSemantics.FrameworkInitializerValue
+    // admits and the runtime type objects `typeof` yields, or,
     // when ClosedInitializerEvaluator ran it to completion, only code that
     // reads nothing but constants and the values it made.
     FreshValues,
@@ -489,7 +491,18 @@ internal static class TypeInitialization
             if (value == null || !Spend())
             { return InitializationEffect.Effectful; }
             if (value.ConstantValue.HasValue)
-            { return IsConstant(value.Type, value.ConstantValue.Value) ? InitializationEffect.None : InitializationEffect.Effectful; }
+            {
+                // The compiler builds a decimal constant with a decimal
+                // constructor, or reads one of Decimal's own constants, which
+                // its framework initializer sets.
+                return IsConstant(value.Type, value.ConstantValue.Value) ? InitializationEffect.None
+                    : value.ConstantValue.Value is decimal ? InitializationEffect.FreshValues : InitializationEffect.Effectful;
+            }
+            // The empty string runs no initializer; the other framework values
+            // only make fresh objects.
+            if (CSharpOperationSemantics.FrameworkInitializerValue(value) is { } framework &&
+                (framework == InitializationEffect.None || !immutableValues))
+            { return framework; }
             switch (value)
             {
                 case IParenthesizedOperation parenthesized:
@@ -522,6 +535,16 @@ internal static class TypeInitialization
                 case ICollectionExpressionOperation { Type: IArrayTypeSymbol { Rank: 1 }, ConstructMethod: null } collection
                     when !immutableValues && !collection.Elements.IsEmpty && collection.Elements.Length <= MaximumArrayLength:
                     return Elements(collection.Elements, owner, constructor);
+                // An empty array collection expression is `Array.Empty<T>()`.
+                case ICollectionExpressionOperation { Type: IArrayTypeSymbol { Rank: 1 }, ConstructMethod: null, Elements.IsEmpty: true }
+                    when !immutableValues:
+                    return InitializationEffect.FreshValues;
+                // `typeof` loads a type handle and returns the runtime type
+                // object, which the runtime makes once per type; it runs no
+                // type initializer. A type of this assembly or of the core
+                // library always loads.
+                case ITypeOfOperation typeOf when !immutableValues && IsLoadedType(typeOf.TypeOperand):
+                    return InitializationEffect.FreshValues;
                 case IObjectCreationOperation creation when !immutableValues:
                     return Creation(creation, owner, constructor);
                 // `Array.Empty<T>()` returns one cached zero-length array per
@@ -547,8 +570,45 @@ internal static class TypeInitialization
                     return !IsInitializedOnly(field.Field) ? InitializationEffect.Effectful
                         : SymbolEqualityComparer.Default.Equals(field.Field.ContainingType, owner)
                         ? InitializationEffect.None : Classify(field.Field.ContainingType);
+                // A get-only static auto-property's getter only reads its
+                // readonly backing field, so the read is that field's.
+                case IPropertyReferenceOperation { Instance: null, Arguments.IsEmpty: true, Property: { IsStatic: true, SetMethod: null } property }
+                    when constructor == null && !immutableValues && AutoPropertyBackingField(property) is { } backing:
+                    return !IsInitializedOnly(backing) ? InitializationEffect.Effectful
+                        : SymbolEqualityComparer.Default.Equals(property.ContainingType.OriginalDefinition, owner)
+                        ? InitializationEffect.None : Classify(property.ContainingType);
                 default:
                     return InitializationEffect.Effectful;
+            }
+        }
+
+        private IFieldSymbol? AutoPropertyBackingField(IPropertySymbol property)
+        {
+            var definition = property.OriginalDefinition;
+            if (definition.ContainingType is not { TypeKind: TypeKind.Class or TypeKind.Struct } type || !IsSource(type) ||
+                definition.IsVirtual || definition.IsOverride || !IsAutoProperty(definition))
+            { return null; }
+            return type.GetMembers().OfType<IFieldSymbol>()
+                .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, definition));
+        }
+
+        // A type every part of which is declared in this assembly or in the
+        // core library, so loading it cannot fail.
+        private bool IsLoadedType(ITypeSymbol type)
+        {
+            switch (type)
+            {
+                case IArrayTypeSymbol array:
+                    return IsLoadedType(array.ElementType);
+                case INamedTypeSymbol { TypeKind: not TypeKind.Error } named:
+                    var assembly = named.OriginalDefinition.ContainingAssembly;
+                    if (!SymbolEqualityComparer.Default.Equals(assembly, _compilation.Assembly) &&
+                        !SymbolEqualityComparer.Default.Equals(assembly, _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly))
+                    { return false; }
+                    return (named.ContainingType == null || IsLoadedType(named.ContainingType)) &&
+                        (named.IsUnboundGenericType || named.TypeArguments.All(IsLoadedType));
+                default:
+                    return false;
             }
         }
 
