@@ -510,6 +510,13 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && operation is IFieldReferenceOperation fieldRead &&
             CSharpOperationSemantics.IsSupportedFieldRead(fieldRead.Field))
         { return FieldRead(operation, fieldRead.Field, fieldRead.Instance, block, depth); }
+        // A static of a type whose initializer is admitted. The read runs that
+        // initializer, which has no effect a body can observe, and then reads
+        // the static as it would in a type with no initializer.
+        if (depth < 256 && !ShadowCallSkeleton && operation is IFieldReferenceOperation { Field.IsStatic: true } initializedRead &&
+            CSharpOperationSemantics.IsStaticFieldReadAfterInitialization(initializedRead.Field) &&
+            TypeInitializationFree?.Invoke(initializedRead.Field.ContainingType) == true)
+        { return FieldRead(operation, initializedRead.Field, null, block, depth); }
         if (depth < 256 && operation is IPropertyReferenceOperation { Arguments.Length: 0 } propertyRead &&
             BodyGetterField(propertyRead) is { } getterField)
         { return FieldRead(operation, getterField, propertyRead.Instance, block, depth); }

@@ -233,6 +233,12 @@ listing changes against an earlier one. Development history is in the Git log.
   `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
   `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
   clauses, and `FormattableString` or handler conversions stay unsupported.
+- A body may read any static field of a source type whose initializer is
+  admitted, such as a cache built from a fresh `List<T>` or a mutable static
+  given a constant. Before, any static of a type with an initializer, outside
+  the known-value and immutable-value rules, left the body unsupported. The
+  value is unknown and the read is a read of static state, so `EnforcePure`
+  stays `Unknown`; other claims can now be proved.
 - `typeof(X)` is a value. It has no effect, cannot throw, allocates nothing
   and does not run `X`'s type initializer, so a method that passes
   `typeof(X)` to a helper can be proved pure. Before, any `typeof` left the
