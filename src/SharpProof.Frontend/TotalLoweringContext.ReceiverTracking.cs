@@ -476,6 +476,39 @@ internal sealed partial class TotalLoweringContext
         return CSharpOperationSemantics.IsValueDomain(known) ? known : null;
     }
 
+    // The type a generic source callee's type parameter stands for when its
+    // values cannot reach the declaration by a reference cast: a scalar, a
+    // string, object, a single-dimensional array, or a struct. The frame then
+    // maps the parameter to that type. A class, interface, delegate or open
+    // type-parameter argument already shares the declaration's reference
+    // domain (CSharpOperationSemantics.SharesValueDomain) and keeps it. A
+    // nullable value type can be null while boxed, and a ref struct cannot be
+    // held, so neither is specialized.
+    internal ITypeSymbol? KnownSourceSpecialization(ITypeSymbol? type)
+    {
+        if (type == null)
+        { return null; }
+        var known = SpecializeReceiverElement(type);
+        return known switch
+        {
+            _ when CSharpOperationSemantics.IsScalar(known) => known,
+            { SpecialType: SpecialType.System_String or SpecialType.System_Object } => known,
+            IArrayTypeSymbol { IsSZArray: true } when CSharpOperationSemantics.IsReferenceDomain(known) => known,
+            INamedTypeSymbol { IsValueType: true, IsRefLikeType: false } named when
+                named.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T && CSharpOperationSemantics.IsOpaqueDomain(named) => known,
+            _ => null
+        };
+    }
+
+    // default(T) for a type parameter this frame maps to a reference type or a
+    // modeled struct, whose default the IR writes as null.
+    internal bool SpecializesToNullDefault(ITypeSymbol? type)
+    {
+        return type is ITypeParameterSymbol && SpecializeReceiverElement(type) is { } known &&
+            !SymbolEqualityComparer.Default.Equals(known, type) &&
+            (CSharpOperationSemantics.IsReferenceDomain(known) || CSharpOperationSemantics.IsModeledStruct(known));
+    }
+
     internal void SpecializeTypeParameter(ITypeParameterSymbol parameter, ITypeSymbol scalar)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
