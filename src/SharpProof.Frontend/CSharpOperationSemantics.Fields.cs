@@ -230,6 +230,26 @@ internal static partial class CSharpOperationSemantics
             IsValueDomain(field.Type);
     }
 
+    // A store into a mutable static of a class whose type has an
+    // initializer: the store first runs that initializer, so only a caller
+    // that admits it may model the store, which is then the same static
+    // write as in a type with no initializer. A readonly static stays out:
+    // only the type's own initialization may store it. A thread-static one
+    // stays out too: each thread runs its initializer's stores on its own.
+    internal static bool IsStaticFieldWriteAfterInitialization(IFieldSymbol field, IAssemblySymbol sourceAssembly)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
+        return field is { IsStatic: true, IsVolatile: false, IsReadOnly: false, IsConst: false } &&
+            SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsFloatingPoint(field.Type)) && field.ContainingType.IsReferenceType &&
+            !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
+            {
+                Name: "ThreadStaticAttribute",
+                ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+            });
+    }
+
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
