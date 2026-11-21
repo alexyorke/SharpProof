@@ -118,6 +118,11 @@ listing changes against an earlier one. Development history is in the Git log.
   analyzed: the method's body is inlined as for any other non-virtual source
   call. Before, such calls kept the whole caller `Unknown`. Invoking the
   delegate is still an unknown call.
+- Calls to generic source methods, and to members of generic source types,
+  whose type parameter is instantiated with `string`, `object`, an array or a
+  struct are analyzed, such as `Id<T>(T x)` called with a `string`. The type
+  parameter takes that type in the inlined body. Before, such calls kept the
+  whole caller `Unknown`. `Nullable<T>` instantiations still do.
 - A source call whose inlined body runs out of the lowering work budget
   becomes an unknown call, after its `Requires` is checked, instead of
   leaving the whole caller `Unknown`. Such a call may do anything, so it does

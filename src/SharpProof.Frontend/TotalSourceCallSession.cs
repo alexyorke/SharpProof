@@ -299,7 +299,10 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         if (!Spend(method.Parameters.Length + 1))
         { return false; }
         // Scalar, reference and opaque specialization belongs to a supported collection
-        // boundary. Other generic source calls retain their existing scalar domain.
+        // boundary. Other generic source calls specialize a type parameter only
+        // to a type its declaration's values cannot carry by a reference cast
+        // (TotalLoweringContext.KnownSourceSpecialization); class, interface
+        // and delegate arguments stay bridged.
         // Most attempts are rejected before any type is specialized, so the
         // collection-parameter scan runs only when a type is first asked for.
         bool? collectionElementSpecialization = null;
@@ -309,7 +312,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                 TotalLoweringContext.IsListReceiverType(parameter.Type) ||
                     TotalLoweringContext.IsDictionaryReceiverType(parameter.Type) || TotalLoweringContext.IsStackReceiverType(parameter.Type) ||
                     TotalLoweringContext.IsHashSetReceiverType(parameter.Type) || TotalLoweringContext.IsQueueReceiverType(parameter.Type));
-            return collectionElementSpecialization.Value ? caller.KnownValueType(type) : caller.KnownScalarType(type);
+            return collectionElementSpecialization.Value ? caller.KnownValueType(type) : caller.KnownSourceSpecialization(type);
         }
         var valueReturnSpecialization = method.OriginalDefinition.ReturnType is ITypeParameterSymbol &&
             KnownSourceValue(method.ReturnType) != null;

@@ -439,6 +439,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (depth < 256 && (operation.ConstantValue.HasValue || AllowOpaqueCalls && operation is IDefaultValueOperation) &&
             CSharpOperationSemantics.IsOpaqueDomain(operation.Type) &&
             !(operation is IDefaultValueOperation && _context.KnownScalarType(operation.Type) != null) &&
+            !(operation is IDefaultValueOperation && _context.SpecializesToNullDefault(operation.Type)) &&
             !(operation is IDefaultValueOperation && CSharpOperationSemantics.IsModeledStruct(operation.Type)))
         {
             // Opaque constants and defaults have no effects; their values remain unknown.
@@ -529,8 +530,14 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType, "opaque-call:" + boundary, _factory.BooleanType, true);
                 _builder!.Call(tested.Continuation, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, boundary), null, member, null);
             }
-            // A frame that specializes T to a scalar holds a value, never null.
-            var isNull = _factory.GetTypeInfo(tested.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence
+            // A frame that specializes T to a scalar or a struct holds a value,
+            // never null, even where a modeled struct's default is null. A
+            // nullable value type without a value tests as null.
+            var isNull = _factory.GetTypeInfo(tested.Value.Type).Kind is IrTypeKind.Reference or IrTypeKind.String or IrTypeKind.Sequence &&
+                    _context.SpecializeSourceType(typeParameter) is not
+                    {
+                        IsValueType: true, OriginalDefinition.SpecialType: not SpecialType.System_Nullable_T
+                    }
                 ? _factory.Binary(IrBinaryOperator.Equal, tested.Value, _factory.Null(tested.Value.Type))
                 : _factory.Boolean(false);
             return Capture(operation, new(nullWhenTrue ? isNull : Not(isNull), tested.Continuation, FrontendSubsetClassification.Exact));
@@ -2082,6 +2089,10 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             ILiteralOperation literal => CSharpOperationSemantics.Literal(_factory, literal.Type!, literal.ConstantValue.Value),
             IDefaultValueOperation when _context.KnownScalarType(operation.Type) is { } scalar =>
                 CSharpOperationSemantics.Literal(_factory, scalar, null),
+            // A type parameter the frame specializes to a reference type or a
+            // modeled struct defaults to null.
+            IDefaultValueOperation when _context.SpecializesToNullDefault(operation.Type) =>
+                _factory.Null(_context.Type(operation.Type)),
             IDefaultValueOperation when !CSharpOperationSemantics.IsOpaqueDomain(operation.Type) =>
                 CSharpOperationSemantics.Literal(_factory, operation.Type!, null),
             // Null stands for default(S) of a modeled struct.
