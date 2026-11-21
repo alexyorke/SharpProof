@@ -197,6 +197,11 @@ internal sealed partial class TotalLoweringContext
             : [.. Parameters.Select(parameter => parameter.Input), Receiver];
     internal ImmutableArray<TotalMetadataPrecondition> MetadataCallPreconditions { get; set; } = [];
     internal ImmutableArray<TotalSourcePrecondition> SourceCallPreconditions { get; set; } = [];
+    // Developer evidence: told of each operation this frame's body
+    // approximates, innermost first, so a census can name the operand an
+    // abstention stands for rather than the statement that records it.
+    // Inlined frames have their own contexts and report nothing here.
+    internal Action<IOperation>? ApproximationObserver { get; init; }
     internal ImmutableArray<TotalExportedPrecondition> ExportedCallPreconditions { get; set; } = [];
     public IrVarId? Result { get; private set; }
     // The program's initialization reads Entry, so concrete replay must bind

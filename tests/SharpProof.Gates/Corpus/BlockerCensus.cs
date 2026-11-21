@@ -172,10 +172,14 @@ internal static class BlockerCensus
             .ToImmutableDictionary(static item => item.tree, static item => item.ordinal.ToString(CultureInfo.InvariantCulture));
         // As the compiler collector does: `this` of an instance member is an
         // input, and the method's own by-reference parameters are admitted.
+        // The approximated operations name which operand an abstention
+        // recorded at its whole statement stands for.
+        var approximated = new List<SyntaxNode>();
         var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree])
         {
             AdmitsOutParameters = true,
-            AdmitsReferenceParameters = true
+            AdmitsReferenceParameters = true,
+            ApproximationObserver = operation => approximated.Add(operation.Syntax)
         };
         context.ModelReceiver();
         var binding = new TotalContractBinder(compilation, context.Factory).BindTotal(context, cancellationToken: cancellationToken);
@@ -204,7 +208,7 @@ internal static class BlockerCensus
         }
         var trees = paths.ToImmutableDictionary(static item => item.Value, static item => item.Key, StringComparer.Ordinal);
         var described = lowering.Abstentions
-            .Select(abstention => Describe(abstention, context.Factory, trees, compilation, cancellationToken))
+            .Select(abstention => Describe(abstention, context.Factory, trees, approximated, compilation, cancellationToken))
             .Select(item => item.Label == nameof(FrontendAbstention.UnsupportedStatement) &&
                 declaration.DescendantNodes().Any(static node => node is YieldStatementSyntax)
                 ? (Label: item.Label + ": iterator", item.Site) : item)
@@ -325,10 +329,11 @@ internal static class BlockerCensus
 
     private static (string Label, IOperation? Site) Describe(
         FrontendProgramAbstention abstention, IrFactory factory, ImmutableDictionary<string, SyntaxTree> trees,
-        CSharpCompilation compilation, CancellationToken cancellationToken)
+        List<SyntaxNode> approximated, CSharpCompilation compilation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(trees);
+        ArgumentNullException.ThrowIfNull(approximated);
         ArgumentNullException.ThrowIfNull(compilation);
         var reason = abstention.Reason.ToString();
         if (factory.GetOperationInfo(abstention.Operation).SourceSpan is not { } span ||
@@ -337,6 +342,7 @@ internal static class BlockerCensus
             return (reason, null);
         }
         var node = tree.GetRoot(cancellationToken).FindNode(new TextSpan(span.Start, span.Length), getInnermostNodeForTie: true);
+        node = Innermost(node, approximated);
         var operation = CompilationModelProvider.GetSemanticModel(compilation, tree).GetOperation(node, cancellationToken);
         // A declaration abstains for its initializer: name what that is.
         if (operation is IVariableDeclaratorOperation { Initializer.Value: { } initial })
@@ -344,6 +350,21 @@ internal static class BlockerCensus
             operation = initial;
         }
         return (reason + ": " + (operation == null ? node.Kind().ToString() : Describe(operation, compilation)), operation);
+    }
+
+    // A statement records the abstention of any operand it could not lower.
+    // The operand that failed is the first approximated node inside the
+    // statement that contains no other approximated node; the statement's own
+    // node when none is inside it.
+    private static SyntaxNode Innermost(SyntaxNode node, List<SyntaxNode> approximated)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(approximated);
+        var inside = approximated.Where(candidate => candidate.SyntaxTree == node.SyntaxTree &&
+                node.Span.Contains(candidate.Span) && candidate.Span != node.Span)
+            .ToImmutableArray();
+        return inside.FirstOrDefault(candidate => !inside.Any(other =>
+            candidate.Span.Contains(other.Span) && other.Span != candidate.Span)) ?? node;
     }
 
     private static string Describe(IOperation operation, CSharpCompilation compilation)
