@@ -233,6 +233,15 @@ listing changes against an earlier one. Development history is in the Git log.
   `ToString` is an unknown call. `char` and `bool` holes are culture-free, so
   `$"{c}={flag}"` can be proved pure. Other hole types, alignment and format
   clauses, and `FormattableString` or handler conversions stay unsupported.
+- A `new` of a source class whose constructor the lowerer does not expand
+  now runs that constructor as an unknown call, as one of a class with source
+  base classes already did. That covers a class whose instance initializers
+  cannot be run apart from the constructor body, such as a generic class or
+  one with a field-like event, and a class's primary constructor, which has no
+  body to expand. Before, such a `new` left the body unsupported. The object
+  and the call's effects are unknown, so `EnforcePure` and allocation claims
+  stay `Unknown`; other claims can now be proved. A class whose type
+  initializer has an effect is still not constructed.
 - A body may read any static field of a source type whose initializer is
   admitted, such as a cache built from a fresh `List<T>` or a mutable static
   given a constant. Before, any static of a type with an initializer, outside
