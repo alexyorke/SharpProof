@@ -38,9 +38,11 @@ internal sealed partial class RoslynTotalProgramLowerer
                 // binding of its current cell, writes the caller's storage. It
                 // may be a field or element, which a bare write forgets, or
                 // another by-reference parameter, which is forgotten below.
+                // A callee that shares the cell binds it to itself on entry,
+                // which stores nothing.
                 if (instruction is IrAssignInstruction assign &&
                     writable.FirstOrDefault(binding => binding.Current == assign.Target) is { } stored &&
-                    !(assign.Value is IrVariableTerm { Variable: var source } && source == stored.Entry))
+                    !(assign.Value is IrVariableTerm { Variable: var source } && (source == stored.Entry || source == stored.Current)))
                 {
                     instructions.Add(new IrWriteInstruction(new(program.Scope, next++), instruction.Operation, IrWriteRegion.Parameter));
                     next = Forget(program, instructions, instruction.Operation, references.Where(reference => reference != stored.Current), next);

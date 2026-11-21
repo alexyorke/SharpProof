@@ -13,7 +13,20 @@ public sealed class RootReferenceParameterTests
 {
     private const string Types = """
         using SharpProof.Attributes;
-        public static class S { public static int F; public static void Bump(ref int x) { x = x + 1; } public static int Split(ref int a, ref int b) { a = 0; b = 1; return 1 / (a - 1); } }
+        public static class S
+        {
+            public static int F;
+            public static void Bump(ref int x) { x = x + 1; }
+            public static int Split(ref int a, ref int b) { a = 0; b = 1; return 1 / (a - 1); }
+            public static bool TryHalf(int x, out int half) { half = x / 2; return x % 2 == 0; }
+            public static void Set(ref int x, int value) { x = value; }
+            public static void ZeroThenStore(ref int x) { x = 0; F = 5; }
+            public static void Twice(ref int x) { Bump(ref x); Bump(ref x); }
+            public static void Through(ref int x) { ZeroThenStore(ref x); }
+            public static int Mapped(in int number, in int divisor, out int remainder) { remainder = number % divisor; return number / divisor; }
+            public static int Read(in int x) { return x; }
+            public static int StoreThenIndex(in int x, int[] a) { if (x != 0 || a == null || a.Length != 1) { return 0; } F = 5; return a[x]; }
+        }
         """;
 
     [TestCase("[DoesNotThrow] public static bool M(int x, out int half) { if (x % 2 != 0) { half = 0; return false; } half = x / 2; return true; }")]
@@ -29,6 +42,15 @@ public sealed class RootReferenceParameterTests
     [TestCase("[ZeroAllocations] public static void M<T>(ref T a, ref T b) { var t = a; a = b; b = t; }")]
     // The parameter keeps its own store, even if it is an element of the array.
     [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { x = 0; return a != null && a.Length > 0 ? a[x] : 0; }")]
+    // A source callee shares the parameter itself: its stores are the
+    // root's stores.
+    [TestCase("[DoesNotThrow] public static void M(ref int x) { S.Bump(ref x); }")]
+    [TestCase("[DoesNotThrow] public static bool M(int x, out int half) { return S.TryHalf(x, out half); }")]
+    [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { S.Set(ref x, 0); return a != null && a.Length > 0 ? a[x] : 0; }")]
+    [TestCase("[DoesNotThrow] public static int M(in int x) { return S.Read(x); }")]
+    [TestCase("[DoesNotThrow] public static void M(ref int x) { S.Twice(ref x); }")]
+    [TestCase("[DoesNotThrow] public static int M(in int number, out int remainder) { return S.Mapped(number, 100, out remainder); }")]
+    [TestCase("[ZeroAllocations] public static void M(ref int a, ref int b) { S.Set(ref a, 1); S.Set(ref b, 2); }")]
     public async Task ReferenceParametersAreModeled(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -48,6 +70,15 @@ public sealed class RootReferenceParameterTests
     // callee: M(ref v, ref v) makes a and b one variable, and a is 1.
     [TestCase("[DoesNotThrow] public static int M(ref int x, ref int y) { return S.Split(ref x, ref y); }")]
     [TestCase("[EnforcePure] public static void M(ref int x) { S.Bump(ref x); }")]
+    [TestCase("[EnforcePure] public static bool M(int x, out int half) { return S.TryHalf(x, out half); }")]
+    // The same aliases through a callee that shares the parameter:
+    // M(ref v, ref v, a), M(ref S.F, a) and M(in S.F, a) index a[5].
+    [TestCase("[DoesNotThrow] public static int M(ref int x, ref int y, int[] a) { S.Set(ref x, 0); S.Set(ref y, 5); return a != null && a.Length == 1 ? a[x] : 0; }")]
+    [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { S.ZeroThenStore(ref x); return a != null && a.Length == 1 ? a[x] : 0; }")]
+    [TestCase("[DoesNotThrow] public static int M(in int x, int[] a) { return S.StoreThenIndex(x, a); }")]
+    // A callee that shares the parameter shares it again with its own callee.
+    [TestCase("[DoesNotThrow] public static int M(ref int x, int[] a) { S.Through(ref x); return a != null && a.Length == 1 ? a[x] : 0; }")]
+    [TestCase("[EnforcePure] public static void M(ref int x) { S.Twice(ref x); }")]
     [TestCase("[EnforcePure] public static bool M(int x, out int half) { half = x / 2; return x % 2 == 0; }")]
     public async Task CallerVisibleStoresAreNotProven(string member)
     {
