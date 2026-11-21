@@ -24,6 +24,14 @@ internal sealed partial class RoslynTotalExpressionLowerer
             (CSharpOperationSemantics.IsScalar(type) || CSharpOperationSemantics.IsModeledStruct(type));
     }
 
+    // The value type a conversion from type boxes, seen through this frame's
+    // type-parameter specialization; null when it boxes nothing modeled.
+    private ITypeSymbol? BoxedValueType(ITypeSymbol? type)
+    {
+        var known = type is ITypeParameterSymbol ? _context.KnownValueType(type) : type;
+        return IsBoxableValue(known) ? known : null;
+    }
+
     // Whether value passes a test of the given kind against target.
     private IrTerm RuntimeTest(IrTerm value, ITypeSymbol target, RuntimeTypeRelations.TestKind kind)
     {
@@ -105,13 +113,15 @@ internal sealed partial class RoslynTotalExpressionLowerer
         switch (operation)
         {
             // Boxing a scalar, an enum or a modeled struct to object, ValueType,
-            // Enum or an interface allocates a box holding the value.
+            // Enum or an interface allocates a box holding the value. So does
+            // converting a type parameter that this frame specializes to one:
+            // its value, even default(T), is boxed, never a null reference.
             case IConversionOperation { OperatorMethod: null, IsTryCast: false, Conversion: { Exists: true, IsImplicit: true, IsUserDefined: false } } boxing when
-                IsBoxableValue(boxing.Operand.Type) && boxing.Type is { IsReferenceType: true } &&
+                BoxedValueType(boxing.Operand.Type) is { } boxedType && boxing.Type is { IsReferenceType: true } &&
                 boxing.Type is not ITypeParameterSymbol:
                 {
                     var value = LowerBodyValue(boxing.Operand, block, depth + 1);
-                    return value.Classification.IsExact ? AllocateBox(operation, boxing.Operand.Type!, value.Value, value.Continuation)
+                    return value.Classification.IsExact ? AllocateBox(operation, boxedType, value.Value, value.Continuation)
                         : Approximate(operation, value.Continuation, value.Classification.Abstention);
                 }
             // `(V)x` and `(V?)x` from a reference: null throws (or is empty for

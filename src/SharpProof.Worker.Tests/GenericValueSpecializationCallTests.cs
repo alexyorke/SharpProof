@@ -33,6 +33,8 @@ public sealed class GenericValueSpecializationCallTests
         {
             public static T Id<T>(T x) { return x; }
             public static T Def<T>() { return default(T); }
+            public static object Box<T>(T x) { return x; }
+            public static object BoxDef<T>() { return (object)default(T); }
             public static bool Eq<T>(T a, T b) { return System.Collections.Generic.EqualityComparer<T>.Default.Equals(a, b); }
             public static T Pick<T>(bool b, T x, T y) { return b ? x : y; }
             public static T Fail<T>(T x) { throw new InvalidOperationException(); }
@@ -55,6 +57,13 @@ public sealed class GenericValueSpecializationCallTests
     [TestCase("public static bool M(DateTime d) { Contract.Ensures(!Contract.Result<bool>()); return H.IsNull(d); }")]
     [TestCase("public static string M() { Contract.Ensures(Contract.Result<string>() == null); return H.Def<string>(); }")]
     [TestCase("public static int M() { Contract.Ensures(Contract.Result<int>() == 0); return H.Def<P>().V; }")]
+    // Converting a value-type T to object boxes it: the box is a new,
+    // non-null object even for default(T).
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() != null); return H.BoxDef<P>(); }")]
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() != null); return H.BoxDef<int>(); }")]
+    [TestCase("public static object M(P p) { Contract.Ensures(Contract.Result<object>() != null); return H.Box(p); }")]
+    [TestCase("public static bool M(P p) { Contract.Ensures(!Contract.Result<bool>()); return H.Box(p) == H.Box(p); }")]
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return H.BoxDef<string>(); }")]
     public async Task SpecializedCalleesAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -66,6 +75,8 @@ public sealed class GenericValueSpecializationCallTests
     [TestCase("public static string M(string a, string b) { Contract.Ensures(Contract.Result<string>() == a); return H.Pick(false, a, b); }")]
     [TestCase("public static bool M() { Contract.Ensures(Contract.Result<bool>()); return H.IsNull(default(P)); }")]
     [TestCase("[DoesNotThrow] public static P M(P p) { return H.Fail(p); }")]
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return H.BoxDef<P>(); }")]
+    [TestCase("public static object M() { Contract.Ensures(Contract.Result<object>() == null); return H.BoxDef<int>(); }")]
     public async Task SpecializedCalleesAreRefuted(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
