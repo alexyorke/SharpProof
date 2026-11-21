@@ -28,6 +28,7 @@ public sealed class AsyncMethodTests
             public static async Task<int> Awaits(Task<int> t) { return await t; }
             public static async Task Wait(Task t) { await t; }
             public static async Task Fail() { throw new System.InvalidOperationException("x"); }
+            public static async Task<int> Positive(int x) { Contract.Requires(x > 0); return x - 1; }
             public static async Task<int> Caught(int x) { try { throw new System.InvalidOperationException("x"); } catch (System.InvalidOperationException) { return x; } }
         }
         """;
@@ -41,6 +42,8 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { return await Inner.Next(x).ConfigureAwait(false); }")]
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { var y = await Inner.Twice(x); return y + await Inner.Next(y); }")]
     [TestCase("[EnforcePure] public static async Task M() { await Inner.Nothing(); await Inner.Nothing().ConfigureAwait(true); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(int x) { Contract.Requires(x > 1); return await Inner.Positive(x); }")]
+    [TestCase("[EnforcePure] public async Task<int> M(int x) { return await Inner.Next(x); }")]
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { return await Inner.Caught(x); }")]
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { try { await Inner.Fail(); } catch (System.InvalidOperationException) { } return x; }")]
     [TestCase("[EffectContract(SharpProofEffect.Allocates, Complete = true)] public static async Task<int> M(int x) { return await Inner.Next(x); }")]
@@ -119,7 +122,7 @@ public sealed class AsyncMethodTests
     private static async Task<WorkerClaimResult> ResultAsync(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
-        using var project = new ShadowTestProject(Types + "\npublic static class C { " + member + " }\n");
+        using var project = new ShadowTestProject(Types + "\npublic sealed class C { " + member + " }\n");
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
