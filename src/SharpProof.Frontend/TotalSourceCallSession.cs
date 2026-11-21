@@ -282,7 +282,8 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
     internal bool TryPrepare(TotalLoweringContext caller, IMethodSymbol method, IOperation? instance,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default,
-        bool referenceArguments = false, bool exactTarget = false)
+        bool referenceArguments = false, bool exactTarget = false, bool readOnlyArguments = false,
+        ImmutableArray<(int Ordinal, IrVarId Storage)> sharedReferences = default)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
@@ -340,9 +341,12 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             }).Any() ||
             !CSharpOperationSemantics.SharesValueDomain(method.ReturnType, method.OriginalDefinition.ReturnType) && !valueReturnSpecialization ||
             // A ref or out parameter is admitted only when the caller has checked
-            // that each such argument is a local it can write back.
+            // that each such argument is a local it can write back, and an
+            // in parameter only when each in argument is a place nothing
+            // writes while the call runs.
             method.Parameters.Any(parameter => parameter.RefKind != RefKind.None &&
-                    !(referenceArguments && parameter.RefKind is RefKind.Ref or RefKind.Out) ||
+                    !(referenceArguments && parameter.RefKind is RefKind.Ref or RefKind.Out) &&
+                    !(readOnlyArguments && parameter.RefKind == RefKind.In) ||
                 parameter.IsParams && parameter.Type is not IArrayTypeSymbol { IsSZArray: true } ||
                 !CSharpOperationSemantics.IsValueDomain(parameter.Type)) ||
             !method.ReturnsVoid && !CSharpOperationSemantics.IsValueDomain(method.ReturnType) ||
@@ -527,6 +531,15 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
             }
         }
         frame.RefreshSourceBindingTypes();
+        // A parameter the caller shares is the caller's own cell, so the two
+        // must have one representation.
+        foreach (var (ordinal, storage) in sharedReferences.IsDefault ? [] : sharedReferences)
+        {
+            var binding = frame.Parameters.Single(item => item.Parameter.Ordinal == ordinal);
+            if (caller.Factory.GetVariableInfo(storage).Type != frame.Factory.GetVariableInfo(binding.Entry).Type)
+            { frame = null; return false; }
+            frame.ShareReference(binding.Parameter, storage);
+        }
         if (instance != null || constructorInitializers && method.MethodKind == MethodKind.Constructor)
         { frame.ModelReceiver(); }
         if (prepareCallee == null || !prepareCallee(frame))

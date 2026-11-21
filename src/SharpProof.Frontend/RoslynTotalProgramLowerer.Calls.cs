@@ -614,19 +614,24 @@ internal sealed partial class RoslynTotalProgramLowerer
         Func<IrBlockId, IrBlockId>? prelude = null, Func<IrTerm?>? constructedReceiver = null, ImmutableArray<IOperation> operands = default,
         bool exactTarget = false, bool opaqueConstructor = false)
     {
-        var references = ReferenceArguments(callArguments);
+        var shared = new HashSet<int>();
+        var references = ReferenceArguments(callArguments, shared);
+        var readOnly = ReadOnlyArguments(callArguments, references, shared);
         IrVarId? liveReceiver = null;
         IrVarId? writeBack = null;
         var copiesReceiver = false;
         if (constructedReceiver == null &&
-            !TryStructReceiver(method, instance, references, out liveReceiver, out writeBack, out copiesReceiver))
+            !TryStructReceiver(method, instance, references == null && readOnly == null ? null : [.. references ?? [], .. readOnly ?? []],
+                out liveReceiver, out writeBack, out copiesReceiver))
         { return null; }
         // An unknown call could change the variable a mutating call is on,
         // so only an expanded body may write it back.
         if (_calls == null || opaqueConstructor && references != null ||
             !_calls.TryPrepare(_context, method, instance, callArguments, out var frame, out var graph, assigned != null,
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
-                exactTarget: exactTarget, contractOnly: opaqueConstructor) &&
+                exactTarget: exactTarget, contractOnly: opaqueConstructor, readOnlyArguments: readOnly != null,
+                sharedReferences: [.. (references ?? []).Concat(readOnly ?? [])
+                    .Where(item => shared.Contains(item.Ordinal)).Select(static item => (item.Ordinal, item.Local!.Value))]) &&
             (opaqueConstructor || !(_expressions.AllowOpaqueCalls && references == null && writeBack == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
@@ -689,13 +694,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             // An out argument's value is never read: the callee assigns it
             // first. A ref argument passes the variable itself, so its value
             // is read when the callee is entered, after every argument.
-            if (parameter.RefKind == RefKind.Out)
+            if (parameter.RefKind == RefKind.Out && !shared.Contains(parameter.Ordinal))
             {
                 argumentBuffer[parameter.Ordinal] = CSharpOperationSemantics.DefaultValue(_context.Factory,
                     _context.Factory.GetVariableInfo(callee.Parameters[parameter.Ordinal].Entry).Type);
                 continue;
             }
-            if (parameter.RefKind == RefKind.Ref && references != null)
+            if (parameter.RefKind is RefKind.Ref or RefKind.Out && references != null ||
+                parameter.RefKind == RefKind.In && readOnly?.Any(item => item.Ordinal == parameter.Ordinal && item.Local != null) == true)
             { continue; }
             if (TotalSourceCallSession.IsEmptyParamsArray(argument))
             {
@@ -729,9 +735,18 @@ internal sealed partial class RoslynTotalProgramLowerer
                 _context.Factory.GetVariableInfo(callee.Parameters[callee.Parameters.Length - 1].Entry).Type);
             marker = value.Value;
         }
+        // A shared parameter's entry is its reference cell itself.
         foreach (var (ordinal, local) in references ?? [])
         {
-            if (local is { } storage && method.Parameters[ordinal].RefKind == RefKind.Ref)
+            if (local is { } storage && (method.Parameters[ordinal].RefKind == RefKind.Ref || shared.Contains(ordinal)))
+            {
+                argumentBuffer[ordinal] = Bridge(_context.Factory.Variable(storage),
+                    _context.Factory.GetVariableInfo(callee.Parameters[ordinal].Entry).Type);
+            }
+        }
+        foreach (var (ordinal, local) in readOnly ?? [])
+        {
+            if (local is { } storage)
             {
                 argumentBuffer[ordinal] = Bridge(_context.Factory.Variable(storage),
                     _context.Factory.GetVariableInfo(callee.Parameters[ordinal].Entry).Type);
@@ -909,7 +924,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             foreach (var (ordinal, local) in references ?? [])
             {
-                if (local is not { } storage)
+                if (local is not { } storage || shared.Contains(ordinal))
                 { continue; }
                 var value = Bridge(_context.Factory.Variable(callee.Parameters[ordinal].Input.Current),
                     _context.Factory.GetVariableInfo(storage).Type);
@@ -953,6 +968,20 @@ internal sealed partial class RoslynTotalProgramLowerer
     // locals. Null when the call has no such argument or one is not admitted.
     private ImmutableArray<(int Ordinal, IrVarId? Local)>? ReferenceArguments(ImmutableArray<IArgumentOperation> arguments)
     {
+        return ReferenceArguments(arguments, null);
+    }
+
+    // With `shared`, a source callee may also take the caller's own ref or
+    // out parameter that is the caller's caller's storage (a root's, or one
+    // an inlined caller itself shares); its ordinal is added to `shared`.
+    // The callee's parameter is then that same reference cell, not a copy:
+    // each store the callee makes to it is the caller's store, so the
+    // root's alias rules (a store is a write to argument state, and any
+    // write forgets every by-reference parameter) apply to it as they do to
+    // the root's own body, on every path out of the call. It is not
+    // written back.
+    private ImmutableArray<(int Ordinal, IrVarId? Local)>? ReferenceArguments(ImmutableArray<IArgumentOperation> arguments, HashSet<int>? shared)
+    {
         RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
         var references = ImmutableArray.CreateBuilder<(int Ordinal, IrVarId? Local)>();
         var variables = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
@@ -980,12 +1009,90 @@ internal sealed partial class RoslynTotalProgramLowerer
             // A root's own ref or out parameter may be a field, an element
             // or another parameter's variable; a copy-backed callee would
             // treat it as independent storage.
-            if (symbol == null || symbol is IParameterSymbol rootReference && _context.IsWritableRootReference(rootReference) ||
-                !variables.Add(symbol) || !_expressions.TryReferenceArgumentStorage(value, out var storage))
+            if (symbol == null || !variables.Add(symbol) || !_expressions.TryReferenceArgumentStorage(value, out var storage))
             { return null; }
+            if (symbol is IParameterSymbol callerReference && _context.IsCallerStorageReference(callerReference))
+            {
+                if (shared == null)
+                { return null; }
+                _ = shared.Add(parameter.Ordinal);
+            }
             references.Add((parameter.Ordinal, storage));
         }
         return references.Count == 0 ? null : references.ToImmutable();
+    }
+
+    // The `in` arguments of a call, with the caller variable whose value
+    // each one passes (none for a value read where the argument is). C#
+    // passes the place itself, which the callee cannot write, so the callee
+    // sees the place's value at each read; a copy is the same only for a
+    // place nothing can write while the call runs:
+    //  - a value that is not a variable, which C# copies into a temporary;
+    //  - a local or by-value parameter of the caller, not passed by
+    //    reference or as a struct receiver in the same call, which only the
+    //    caller writes (no anonymous or local function may write a variable
+    //    it captures); its value is read once the arguments ran, as a ref
+    //    argument's is;
+    //  - a readonly field of a class or a static readonly field, read
+    //    outside every constructor and init accessor, which no other code
+    //    can store into.
+    // The caller's own `in` parameter, or a parameter that is its caller's
+    // storage, is not copied but shared, as such a ref argument is (see
+    // ReferenceArguments): the context that owns it forgets its current
+    // value after any write that may alias it. Any other place (a mutable
+    // field, an element, a ref local, `this` of a struct) may change through
+    // an alias the callee writes. Null when the call has no `in` argument or
+    // one is not admitted.
+    private ImmutableArray<(int Ordinal, IrVarId? Local)>? ReadOnlyArguments(ImmutableArray<IArgumentOperation> arguments,
+        ImmutableArray<(int Ordinal, IrVarId? Local)>? references, HashSet<int> shared)
+    {
+        RepositoryParameterGuard.RequireInitialized(arguments.IsDefault, nameof(arguments), "Array must be initialized.");
+        var admitted = ImmutableArray.CreateBuilder<(int Ordinal, IrVarId? Local)>();
+        foreach (var argument in arguments)
+        {
+            if (argument.Parameter is not { RefKind: RefKind.In } parameter)
+            { continue; }
+            switch (argument.Value)
+            {
+                case ILocalReferenceOperation or IParameterReferenceOperation:
+                    var owned = (argument.Value as IParameterReferenceOperation)?.Parameter;
+                    var sharing = owned is { RefKind: not RefKind.None };
+                    if (sharing && !(owned!.RefKind == RefKind.In && _context.OwnsParameter(owned) || _context.IsCallerStorageReference(owned)) ||
+                        !_expressions.TryReferenceArgumentStorage(argument.Value, out var storage) ||
+                        references?.Any(reference => reference.Local == storage) == true)
+                    { return null; }
+                    if (sharing)
+                    { _ = shared.Add(parameter.Ordinal); }
+                    admitted.Add((parameter.Ordinal, storage));
+                    break;
+                case IFieldReferenceOperation { Field: { IsReadOnly: true } field }
+                    when (field.IsStatic || field.ContainingType.IsReferenceType) &&
+                        _context.Target.MethodKind is not (MethodKind.Constructor or MethodKind.StaticConstructor) && !_context.Target.IsInitOnly:
+                    admitted.Add((parameter.Ordinal, null));
+                    break;
+                case var value when !IsVariable(value):
+                    admitted.Add((parameter.Ordinal, null));
+                    break;
+                default:
+                    return null;
+            }
+        }
+        return admitted.Count == 0 ? null : admitted.ToImmutable();
+
+        // An operation that may name storage C# can pass by reference. An
+        // operation without a public kind, such as a pointer indirection,
+        // counts as one.
+        static bool IsVariable(IOperation value)
+        {
+            return value.Kind == OperationKind.None || value is ILocalReferenceOperation or IParameterReferenceOperation or
+                IFieldReferenceOperation or IArrayElementReferenceOperation or IInstanceReferenceOperation or
+                IInlineArrayAccessOperation or IImplicitIndexerReferenceOperation or
+                IDynamicMemberReferenceOperation or IDynamicIndexerAccessOperation or IFlowCaptureReferenceOperation or
+                IInvocationOperation { TargetMethod.RefKind: not RefKind.None } or
+                IPropertyReferenceOperation { Property.RefKind: not RefKind.None } or
+                IConditionalOperation { IsRef: true } or ISimpleAssignmentOperation { IsRef: true } ||
+                value is IConversionOperation { Conversion.IsIdentity: true, Operand: var operand } && IsVariable(operand);
+        }
     }
 
     // How `this` of an instance member of a modeled struct reaches the

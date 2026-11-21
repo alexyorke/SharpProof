@@ -113,6 +113,12 @@ listing changes against an earlier one. Development history is in the Git log.
   each such argument is a local or parameter of the caller, passed once, and
   the call is outside any `try` block of the caller. Before, such calls kept
   the whole caller `Unknown`.
+- A method can pass its own `ref`, `out` or `in` parameter on to a source
+  method, which then stores through the same reference. Calls to source
+  methods with `in` parameters are analyzed when each `in` argument is a value,
+  a local or by-value parameter of the caller passed once by reference, or a
+  `readonly` field read outside constructors. Fields and array elements passed
+  by `ref`, `out` or `in` still keep the caller `Unknown`.
 - Calls to generic source methods with delegate parameters, such as
   `Apply<T>(Func<T, bool> f, T x)` called with a `Func<int, bool>`, are
   analyzed: the method's body is inlined as for any other non-virtual source
