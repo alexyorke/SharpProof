@@ -221,6 +221,15 @@ internal static partial class CSharpOperationSemantics
                 : field.ContainingType.IsReferenceType || IsModeledStruct(field.ContainingType));
     }
 
+    // A static field read whose type has an initializer: the read first runs
+    // that initializer, so only a caller that admits it may model the read.
+    internal static bool IsStaticFieldReadAfterInitialization(IFieldSymbol field)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        return field.IsStatic && HasIndependentFieldStorage(field) && !field.IsVolatile && !field.HasConstantValue &&
+            IsValueDomain(field.Type);
+    }
+
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
