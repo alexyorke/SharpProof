@@ -239,6 +239,11 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- `typeof(X)` is a value. It has no effect, cannot throw, allocates nothing
+  and does not run `X`'s type initializer, so a method that passes
+  `typeof(X)` to a helper can be proved pure. Before, any `typeof` left the
+  body unsupported. Which `Type` object it yields is not modeled: neither its
+  identity nor that it is non-null is proven.
 - A static initializer may store `Array.Empty<T>()`: it returns one cached
   zero-length array per `T` and runs no code of `T`, so it counts as making
   fresh values, as `new T[0]` does.
