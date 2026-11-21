@@ -342,6 +342,15 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
             opaqueBoxing.Parent is IArgumentOperation &&
             CSharpOperationSemantics.IsImplicitOpaqueBoxing(opaqueBoxing, _context.Compilation))
         { return LowerOpaqueBoxing(operation, opaqueBoxing, block, depth); }
+        // `typeof(X)` loads the runtime's Type object for X. It has no effect,
+        // cannot throw and does not run X's type initializer. Which object it
+        // is stays unknown: it may be one the program already holds.
+        if (operation is ITypeOfOperation { Type: { } typeType } && CSharpOperationSemantics.IsReferenceDomain(typeType))
+        {
+            var loaded = _context.Temporary(_context.Type(typeType));
+            _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, loaded);
+            return new(_factory.Variable(loaded), block, FrontendSubsetClassification.Exact);
+        }
         if (depth < 256 && operation is IInvocationOperation synchronization &&
             CSharpOperationSemantics.IsMonitorAttempt(synchronization))
         {
