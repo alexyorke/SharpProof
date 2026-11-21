@@ -618,6 +618,8 @@ internal sealed partial class RoslynTotalProgramLowerer
     {
         // An awaited async callee runs its body; its value is the task's result.
         awaited = awaited && method.IsAsync;
+        // An async callee whose task is not awaited runs detached from it.
+        var detached = !awaited && method.IsAsync;
         var shared = new HashSet<int>();
         var references = ReferenceArguments(callArguments, shared);
         var readOnly = ReadOnlyArguments(callArguments, references, shared);
@@ -635,7 +637,8 @@ internal sealed partial class RoslynTotalProgramLowerer
                 constructorInitializers: constructedReceiver != null, operands: operands, referenceArguments: references != null,
                 exactTarget: exactTarget, contractOnly: opaqueConstructor, readOnlyArguments: readOnly != null,
                 sharedReferences: [.. (references ?? []).Concat(readOnly ?? [])
-                    .Where(item => shared.Contains(item.Ordinal)).Select(static item => (item.Ordinal, item.Local!.Value))], awaited: awaited) &&
+                    .Where(item => shared.Contains(item.Ordinal)).Select(static item => (item.Ordinal, item.Local!.Value))], awaited: awaited,
+                detached: detached) &&
             (opaqueConstructor || awaited || !(_expressions.AllowOpaqueCalls && references == null && writeBack == null &&
                 _calls.TryPrepare(_context, method, instance, callArguments, out frame, out graph, assigned != null, contractOnly: true,
                     constructorInitializers: constructedReceiver != null, operands: operands, exactTarget: exactTarget))))
@@ -651,7 +654,9 @@ internal sealed partial class RoslynTotalProgramLowerer
         var returned = callee.Result is { } result ? _context.Temporary(_context.Factory.GetVariableInfo(result).Type) : (IrVarId?)null;
         // A generic container's declaration types bridge to the caller's.
         var awaitedType = awaited ? TotalLoweringContext.ReturnedType(method) : null;
-        IrTerm marker = returned is { } resultStorage
+        // A detached call's value is its task, known only once the callee ran.
+        IrTerm marker = detached ? _context.Factory.Null(_context.Type(method.ReturnType))
+            : returned is { } resultStorage
             ? Bridge(_context.Factory.Variable(resultStorage), _context.Type(awaited ? awaitedType : method.ReturnType))
             : _context.Factory.Boolean(false);
         IrTerm? receiver = null;
@@ -790,6 +795,10 @@ internal sealed partial class RoslynTotalProgramLowerer
                 ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
                 : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
         }
+        // A detached callee's exceptions fault its task, but a shared frame
+        // sends them to the caller's handlers.
+        if (externalFilterSearch && detached)
+        { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))
@@ -924,12 +933,23 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         WriteBack(continuation);
         Resumed(continuation);
-        return new(marker, continuation, FrontendSubsetClassification.Exact);
+        return new(detached ? DetachedTask(continuation) : marker, continuation, FrontendSubsetClassification.Exact);
 
-        // The caller of an awaited callee that may have suspended resumes later.
+        // A detached call returns the callee's task, which this model does not
+        // represent: an unknown reference.
+        IrTerm DetachedTask(IrBlockId continued)
+        {
+            var task = _context.Temporary(_context.Type(method.ReturnType));
+            _builder.Havoc(continued, site, IrHavocKind.Variables, IrHavocOrigin.Approximation, task);
+            return _context.Factory.Variable(task);
+        }
+
+        // The caller of an awaited callee that may have suspended resumes
+        // later; a detached callee that may have suspended runs the rest of its
+        // body alongside the caller's.
         void Resumed(IrBlockId continued)
         {
-            if (awaited && MaySuspend(callee.Target.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken)))
+            if ((awaited || detached) && MaySuspend(callee.Target.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken)))
             { EmitAsyncResume(continued, invocation); }
         }
 

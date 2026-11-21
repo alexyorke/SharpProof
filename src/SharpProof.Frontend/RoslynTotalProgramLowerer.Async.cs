@@ -34,7 +34,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private bool IsAsyncBody => _context.Target.IsAsync && _context.HasScalarSignature;
 
-    private bool IsAsyncRoot => IsAsyncBody && _context.AdmitsAsync;
+    // A root, or a callee whose task the caller does not await: an exception
+    // that leaves the body faults the task rather than reaching the caller.
+    private bool IsAsyncRoot => IsAsyncBody && (_context.AdmitsAsync || _context.DetachesAsync);
 
     private void EmitAsyncEntry(IrBlockId entry, IOperation body)
     {

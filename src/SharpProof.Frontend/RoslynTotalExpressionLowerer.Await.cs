@@ -31,6 +31,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
             operation.Type.SpecialType != SpecialType.System_Void && !CSharpOperationSemantics.IsValueDomain(operation.Type))
         { return null; }
         var awaited = WithoutConfigureAwait(operation.Operation);
+        if (LowerCompletedAwait(operation, awaited, block, depth) is { } completed)
+        { return completed; }
         // A dispatched call that does not resolve to this body may run
         // another override; it is then an unknown call like any other.
         if (awaited is IInvocationOperation call && call.TargetMethod.IsAsync && !call.TargetMethod.DeclaringSyntaxReferences.IsEmpty)
@@ -74,6 +76,52 @@ internal sealed partial class RoslynTotalExpressionLowerer
     }
 
     internal const string AwaitMember = "await";
+    private const string FromResultMember = "task-from-result";
+
+    // A task that is complete when it is created: Task.CompletedTask,
+    // ValueTask.CompletedTask, Task.FromResult(x), ValueTask.FromResult(x)
+    // and new ValueTask<T>(x). Awaiting it does not suspend: its awaiter's
+    // IsCompleted is true, and GetResult returns x (C# specification,
+    // awaitable expressions; runtime TaskAwaiter and ValueTaskAwaiter). So the
+    // await is the value x, evaluated where the operand is. Task.FromResult
+    // allocates its task unless it returns a cached one: a possible allocation.
+    private TotalBodyValue? LowerCompletedAwait(IAwaitOperation operation, IOperation awaited, IrBlockId block, int depth)
+    {
+        RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        switch (awaited)
+        {
+            case IPropertyReferenceOperation { Property: { Name: "CompletedTask", IsStatic: true } property, Instance: null }
+                when TotalLoweringContext.IsTaskType(property.ContainingType) && operation.Type?.SpecialType == SpecialType.System_Void:
+                return new(_factory.Boolean(false), block, FrontendSubsetClassification.Exact);
+            case IInvocationOperation { TargetMethod: { Name: "FromResult", IsStatic: true, Parameters.Length: 1 } method, Arguments.Length: 1 } call
+                when TotalLoweringContext.IsTaskType(method.ContainingType) && method.ContainingType.Arity == 0 &&
+                    TotalLoweringContext.IsTaskType(method.ReturnType) && operation.Type?.SpecialType != SpecialType.System_Void:
+                {
+                    var value = LowerBodyValue(call.Arguments[0].Value, block, depth + 1);
+                    if (!value.Classification.IsExact)
+                    { return Approximate(operation, value.Continuation, value.Classification.Abstention); }
+                    if (method.ContainingType.Name == "Task")
+                    {
+                        var member = _factory.GetOrCreateMember(_factory.CreateIdentity(), _factory.ObjectType,
+                            "opaque-call:" + FromResultMember, _factory.BooleanType, true);
+                        _builder!.Call(value.Continuation, _context.OpaqueCallSite(operation, IrOpaqueCallEffects.Allocates, FromResultMember), null, member, null);
+                    }
+                    return new(_context.BridgeValue(value.Value, _context.Type(operation.Type)), value.Continuation, FrontendSubsetClassification.Exact);
+                }
+            case IObjectCreationOperation { Constructor: { Parameters.Length: 1 } constructor, Arguments.Length: 1, Initializer: null } creation
+                when TotalLoweringContext.IsTaskType(constructor.ContainingType) && constructor.ContainingType.Name == "ValueTask" &&
+                    constructor.ContainingType.Arity == 1 &&
+                    SymbolEqualityComparer.Default.Equals(constructor.Parameters[0].Type, constructor.ContainingType.TypeArguments[0]):
+                {
+                    var value = LowerBodyValue(creation.Arguments[0].Value, block, depth + 1);
+                    return value.Classification.IsExact
+                        ? new(_context.BridgeValue(value.Value, _context.Type(operation.Type)), value.Continuation, FrontendSubsetClassification.Exact)
+                        : Approximate(operation, value.Continuation, value.Classification.Abstention);
+                }
+            default:
+                return null;
+        }
+    }
 
     // `t.ConfigureAwait(c)` on one of the four task types only wraps t with
     // the choice of context: awaiting either runs the same task.

@@ -47,6 +47,18 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { return await Inner.Caught(x); }")]
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { try { await Inner.Fail(); } catch (System.InvalidOperationException) { } return x; }")]
     [TestCase("[EffectContract(SharpProofEffect.Allocates, Complete = true)] public static async Task<int> M(int x) { return await Inner.Next(x); }")]
+    // An awaited task that is complete when created does not suspend.
+    [TestCase("[EnforcePure] public static async Task M() { await Task.CompletedTask; await ValueTask.CompletedTask.ConfigureAwait(false); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(int x) { return await Task.FromResult(x) + await ValueTask.FromResult(1); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(int x) { return await new ValueTask<int>(x).ConfigureAwait(false); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(int x) { var y = await Task.FromResult(x).ConfigureAwait(false); return await Inner.Next(y); }")]
+    // A call whose task is not awaited runs its body until it suspends; its
+    // exceptions fault that task.
+    [TestCase("[EnforcePure] public static void M() { _ = Inner.Next(1); }")]
+    [TestCase("[EnforcePure] public static Task<int> M(int x) { return Inner.Next(x); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(int x) { var t = Inner.Next(x); return await Inner.Next(x); }")]
+    [TestCase("[DoesNotThrow] public static void M() { _ = Inner.Fail(); }")]
+    [TestCase("[DoesNotThrow] public static Task M(Task t) { return Inner.Wait(t); }")]
     public async Task PureAsyncBodiesAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -61,6 +73,7 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task M() { await Inner.Store(); }")]
     [TestCase("[EnforcePure] public static async Task M() { await Inner.Nothing(); Inner.S = 3; }")]
     [TestCase("[ZeroAllocations] public static async Task M() { var o = new object(); }")]
+    [TestCase("[EnforcePure] public static void M() { _ = Inner.Store(); }")]
     public async Task ObservableEffectsAreRefuted(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -86,6 +99,11 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task M(System.Func<Task> f) { await f(); }")]
     [TestCase("[EnforcePure] public static async Task M() { System.Func<Task> f = async () => { Inner.S = 1; }; await f(); }")]
     [TestCase("[ZeroAllocations] public static async Task M() { }")]
+    [TestCase("[ZeroAllocations] public static async Task<int> M(int x) { return await Task.FromResult(x); }")]
+    [TestCase("[ZeroAllocations] public static void M() { _ = Inner.Next(1); }")]
+    [TestCase("[EnforcePure] public static void M() { _ = Inner.Fail(); }")]
+    [TestCase("[EnforcePure] public static void M(Task t) { _ = Inner.Wait(t); }")]
+    [TestCase("[EnforcePure] public static async Task<int> M(Task<int> t) { return await Task.FromResult(t).Result; }")]
     [TestCase("[ZeroAllocations] public static async Task<int> M(int x) { return await Inner.Next(x); }")]
     [TestCase("[EffectContract(SharpProofEffect.None, Complete = true)] public static async Task M() { }")]
     [TestCase("[DoesNotThrow] public static async Task M() { }")]
@@ -98,9 +116,7 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task M(System.IAsyncDisposable d) { await using (d) { } }")]
     [TestCase("[EnforcePure] public static async Task M(System.IAsyncDisposable d) { await using var e = d; }")]
     [TestCase("[EnforcePure] public static async System.Collections.Generic.IAsyncEnumerable<int> M() { yield return 1; }")]
-    [TestCase("[EnforcePure] public static void M() { _ = Inner.Next(1); }")]
     [TestCase("[EnforcePure] public static int M() { return Inner.Next(1).Result; }")]
-    [TestCase("[EnforcePure] public static Task<int> M(int x) { return Inner.Next(x); }")]
     [TestCase("[EnforcePure] public static async Task M(Counter c) { await c.Bump(); }")]
     public async Task UnmodeledAsyncBehaviorStaysUnknown(string member)
     {
