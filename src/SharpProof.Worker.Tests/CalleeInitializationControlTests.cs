@@ -7,7 +7,7 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 internal sealed class CalleeInitializationControlTests
 {
-    [TestCase("public static int State = 1;")]
+    [TestCase("[System.ThreadStatic] public static int State = 1;")]
     [TestCase("static C() { System.Console.WriteLine(); }")]
     public async Task ExistingRootInitializationAdmissionIsClosed(string members)
     {
@@ -18,7 +18,8 @@ internal sealed class CalleeInitializationControlTests
         Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
-    [TestCase("public static int State = 1;", WorkerClaimOutcome.Unknown)]
+    [TestCase("public static int State = 1;", WorkerClaimOutcome.Proven)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", WorkerClaimOutcome.Unknown)]
     [TestCase("public static readonly int State = 1;", WorkerClaimOutcome.Proven)]
     // An empty static constructor runs nothing; one that calls code is an
     // entry effect.
@@ -78,9 +79,11 @@ internal sealed class CalleeInitializationControlTests
     }
 
     [TestCase("public static int State;", "public static int Helper(int x) => x;", "Other.Helper(x)", true)]
-    [TestCase("public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", false)]
+    [TestCase("public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", true)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", false)]
     [TestCase("public static readonly int State = 1;", "public int Helper(int x) => x;", "new Other().Helper(x)", true)]
-    [TestCase("public static int State = 1;", "", "new Other(); return x", false)]
+    [TestCase("public static int State = 1;", "", "new Other(); return x", true)]
+    [TestCase("[System.ThreadStatic] public static int State = 1;", "", "new Other(); return x", false)]
     [TestCase("public static readonly int State = 1;", "", "new Other(); return x", true)]
     public async Task MemberAndImplicitConstructorInitializationIsPreserved(string field, string helper, string body, bool pure)
     {

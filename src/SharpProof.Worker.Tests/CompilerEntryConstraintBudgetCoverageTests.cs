@@ -33,8 +33,12 @@ public sealed class CompilerEntryConstraintBudgetCoverageTests
     [TestCase("constructor-reference", 4094, 1, true)]
     // A loop that outlasts the evaluator's budget stays an entry effect.
     [TestCase("long-loop", 1, 0, false)]
+    // Stores into the type's own mutable static are admitted structurally,
+    // as fresh values, until they exhaust the structural budget; the
+    // evaluator does not admit mutable statics.
     [TestCase("value-work", 1, 1, false)]
-    [TestCase("value-work", 1363, 0, false)]
+    [TestCase("value-work", 2046, 1, false)]
+    [TestCase("value-work", 2047, 0, false)]
     [TestCase("type-work", 1, 1, false)]
     [TestCase("type-work", 1362, 0, false)]
     public async Task ActualSourceTraversalRetainsOnlyCompleteEntryExceptionConstraints(

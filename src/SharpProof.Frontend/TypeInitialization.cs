@@ -10,19 +10,20 @@ namespace SharpProof.Frontend;
 // access to a static member, or, for a beforefieldinit type, at any earlier
 // point. No code can observe a type's statics before its initializer has run,
 // except code that the initializer itself reaches through a cycle. An
-// initializer that only fills in the type's own readonly statics with values
-// it makes from nothing therefore has no effect a body can observe. It still
-// runs code and may allocate, so only claims that ignore allocation admit it.
+// initializer that only fills in the type's own statics with values it makes
+// from nothing therefore has no effect a body can observe. It still runs code
+// and may allocate, so only claims that ignore allocation admit it.
 internal enum InitializationEffect
 {
     // Stores constants, or nothing, into the type's own readonly statics.
     None,
     // Also constructs fresh arrays, delegates and objects through admitted
     // constructors, including a chain of admitted source base constructors,
-    // and reads statics of types whose own initializers are admitted. It writes only the type's own readonly statics and the fields
-    // of the values it constructs, and cannot throw except by running out of
-    // memory. It calls no other code but the framework collection
-    // constructors and Add methods that
+    // reads statics of types whose own initializers are admitted, or stores
+    // admitted values into the type's own mutable statics. It writes only the
+    // type's own statics and the fields of the values it constructs, and
+    // cannot throw except by running out of memory. It calls no other code
+    // but the framework collection constructors and Add methods that
     // CSharpOperationSemantics.IsCallbackFreeCollectionCreation admits, or,
     // when ClosedInitializerEvaluator ran it to completion, only code that
     // reads nothing but constants and the values it made.
@@ -277,10 +278,12 @@ internal static class TypeInitialization
                 {
                     IMethodSymbol { MethodKind: MethodKind.StaticConstructor, IsImplicitlyDeclared: false } constructor =>
                         StaticConstructor(constructor, owner),
-                    IFieldSymbol { IsStatic: true, IsConst: false } field => StaticInitializers(field, owner, IsStaticTarget(field, owner)),
-                    IPropertySymbol { IsStatic: true } property => StaticInitializers(property, owner, IsStaticTarget(property, owner)),
+                    IFieldSymbol { IsStatic: true, IsConst: false } field =>
+                        StaticInitializers(field, owner, IsStaticTarget(field, owner), IsMutableStaticTarget(field, owner)),
+                    IPropertySymbol { IsStatic: true } property =>
+                        StaticInitializers(property, owner, IsStaticTarget(property, owner), IsMutableStaticTarget(property, owner)),
                     // A field-like event's backing field is mutable state.
-                    IEventSymbol { IsStatic: true } staticEvent => StaticInitializers(staticEvent, owner, admitted: false),
+                    IEventSymbol { IsStatic: true } staticEvent => StaticInitializers(staticEvent, owner, admitted: false, mutable: false),
                     _ => InitializationEffect.None
                 });
                 if (effect == InitializationEffect.Effectful)
@@ -289,14 +292,37 @@ internal static class TypeInitialization
             return effect;
         }
 
-        // Writing a mutable static is an entry effect: the existing policy is
-        // that only readonly state is filled in unobservably.
+        // A static of owner that its initializer may store into: a readonly
+        // one, or a mutable one (below).
         private bool IsStaticTarget(ISymbol member, INamedTypeSymbol owner)
         {
             return SymbolEqualityComparer.Default.Equals(member.ContainingType, owner) && member switch
             {
-                IFieldSymbol field => IsInitializedOnly(field),
+                IFieldSymbol field => IsInitializedOnly(field) || IsMutableStaticTarget(field, owner),
                 IPropertySymbol { IsStatic: true, SetMethod: null } property => IsAutoProperty(property),
+                IPropertySymbol property => IsMutableStaticTarget(property, owner),
+                _ => false
+            };
+        }
+
+        // A process-wide mutable static of owner, or a static auto-property
+        // with a setter. No code reads it before the initializer that stores
+        // into it has finished, so that store is no more observable than one
+        // into a readonly static; later reads of it are ambient reads, since
+        // other code may store into it. A [ThreadStatic] field starts zeroed
+        // on every thread but the one that runs the initializer.
+        private bool IsMutableStaticTarget(ISymbol member, INamedTypeSymbol owner)
+        {
+            return SymbolEqualityComparer.Default.Equals(member.ContainingType, owner) && member switch
+            {
+                IFieldSymbol { IsStatic: true, IsConst: false, IsReadOnly: false, AssociatedSymbol: null } field =>
+                    !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
+                    {
+                        Name: "ThreadStaticAttribute",
+                        ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+                    }),
+                IPropertySymbol { IsStatic: true, SetMethod: not null } property => IsAutoProperty(property) &&
+                    !property.GetAttributes().Any(static attribute => attribute.AttributeClass is { Name: "ThreadStaticAttribute" }),
                 _ => false
             };
         }
@@ -324,7 +350,10 @@ internal static class TypeInitialization
                 } && accessors.Accessors.All(static accessor => accessor.Body == null && accessor.ExpressionBody == null);
         }
 
-        private InitializationEffect StaticInitializers(ISymbol member, INamedTypeSymbol owner, bool admitted)
+        // A store into a mutable static belongs to the fresh-values class
+        // even when the value is a constant, so claims that count every write
+        // of static state, such as effect contracts, still see an effect.
+        private InitializationEffect StaticInitializers(ISymbol member, INamedTypeSymbol owner, bool admitted, bool mutable)
         {
             var effect = InitializationEffect.None;
             foreach (var reference in member.DeclaringSyntaxReferences)
@@ -344,6 +373,8 @@ internal static class TypeInitialization
                 var model = Host.CompilationModelProvider.GetSemanticModel(_compilation, reference.SyntaxTree);
                 effect = Max(effect, model.GetOperation(clause, cancellationToken) is ISymbolInitializerOperation initializer
                     ? Value(initializer.Value, owner, constructor: null) : InitializationEffect.Effectful);
+                if (mutable)
+                { effect = Max(effect, InitializationEffect.FreshValues); }
                 if (effect == InitializationEffect.Effectful)
                 { return effect; }
             }
@@ -401,10 +432,21 @@ internal static class TypeInitialization
                     return effect;
                 case IExpressionStatementOperation { Operation: ISimpleAssignmentOperation { IsRef: false } assignment }
                     when constructor == null ? IsStaticStore(assignment.Target, owner) : IsInstanceStore(assignment.Target, constructor.ContainingType):
-                    return Value(assignment.Value, owner, constructor, immutableValues);
+                    var stored = Value(assignment.Value, owner, constructor, immutableValues);
+                    return constructor == null && IsMutableStore(assignment.Target, owner) ? Max(stored, InitializationEffect.FreshValues) : stored;
                 default:
                     return InitializationEffect.Effectful;
             }
+        }
+
+        private bool IsMutableStore(IOperation target, INamedTypeSymbol owner)
+        {
+            return target switch
+            {
+                IFieldReferenceOperation { Instance: null } field => IsMutableStaticTarget(field.Field, owner),
+                IPropertyReferenceOperation { Instance: null, Arguments.IsEmpty: true } property => IsMutableStaticTarget(property.Property, owner),
+                _ => false
+            };
         }
 
         private bool IsStaticStore(IOperation target, INamedTypeSymbol owner)

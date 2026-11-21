@@ -279,6 +279,15 @@ listing changes against an earlier one. Development history is in the Git log.
   claim `Unknown`, and a body that reads such a collection still reads state
   other code can change. A target-typed `new(...)` in an initializer is now
   admitted like the explicit form.
+- A type initializer may store into its own type's mutable statics, such as
+  `static int State = 1;` or a static constructor that fills a
+  `private static Dictionary<,>` it may later replace. Nothing reads such a
+  static before the initializer finishes, so purity and capability claims
+  accept the store, and callers in other types inline the type's members.
+  The store counts as fresh values, so allocation, effect-contract and
+  resource-bound claims stay `Unknown`, and a body's read of the static is
+  still an ambient read. `[ThreadStatic]` statics and static events still
+  make the initializer an entry effect.
 - A type initializer may construct an instance of a class derived from a
   source base class, such as a `static readonly Instance = new Derived();`
   singleton. The constructors down the chain, written `: base(arguments)` or

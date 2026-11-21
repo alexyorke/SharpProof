@@ -110,6 +110,15 @@ public sealed class EntryInitializationTests
     [TestCase("public abstract class Subject { public static readonly Subject Unit = new Square(); } public sealed class Square : Subject { }")]
     [TestCase("public class Base { public int Value { get; } public Base() { Value = 1; } } public sealed class Derived : Base { } " +
         "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
+    // A store into the type's own mutable static: nothing reads it before the
+    // initializer finishes. It is classed with fresh values even for a
+    // constant, so claims that count every static write still see one.
+    [TestCase("public static class Subject { public static int State = 1; }")]
+    [TestCase("public static class Subject { private static int[] Cache = new int[3]; }")]
+    [TestCase("public static class Subject { public static int Value { get; set; } = 7; }")]
+    [TestCase("public static class Subject { public static int Count; static Subject() { Count = 1; } }")]
+    [TestCase("public static class Subject { private static System.Collections.Generic.Dictionary<int, int> map; " +
+        "static Subject() { map = new System.Collections.Generic.Dictionary<int, int> { [1] = 2 }; } }")]
     public void FreshValuesAreAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.FreshValues); }
 
@@ -140,13 +149,11 @@ public sealed class EntryInitializationTests
     // A static constructor with logic.
     [TestCase("public static class Subject { private static readonly int Limit; " +
         "static Subject() { if (System.Environment.ProcessorCount > 1) { Limit = 1; } } }")]
-    [TestCase("public static class Subject { public static int Count; static Subject() { Count = 1; } }")]
-    // Mutable or per-thread state.
-    [TestCase("public static class Subject { public static int State = 1; }")]
-    [TestCase("public static class Subject { private static int[] Cache = new int[3]; }")]
-    [TestCase("public static class Subject { public static int Value { get; set; } = 7; }")]
+    // A field-like event, or per-thread state.
     [TestCase("public static class Subject { private static event System.Action Ready = () => { }; }")]
     [TestCase("public static class Subject { [System.ThreadStatic] private static readonly int[] PerThread = new int[1]; }")]
+    [TestCase("public static class Subject { [System.ThreadStatic] private static int[] perThread = new int[1]; }")]
+    [TestCase("public static class Subject { [System.ThreadStatic] private static int counter; static Subject() { counter = 1; } }")]
     // Constructors that do more than store into the new instance.
     [TestCase("public sealed class Counter { public static int Count; public Counter() { Count++; } } " +
         "public static class Subject { private static readonly Counter Instance = new Counter(); }")]
@@ -174,7 +181,7 @@ public sealed class EntryInitializationTests
         "public sealed class Derived : Base { public override int Value { get => 0; set => Counter.Count++; } } " +
         "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
     // Running the base constructor may run the base class's initializer.
-    [TestCase("public class Base { public static int State = 1; } public sealed class Derived : Base { } " +
+    [TestCase("public class Base { [System.ThreadStatic] public static int State = 1; } public sealed class Derived : Base { } " +
         "public static class Subject { private static readonly Derived Instance = new Derived(); }")]
     public void EffectfulInitializersAreNotAdmitted(string source)
     { AssertClassified(source, (int)InitializationEffect.Effectful); }
