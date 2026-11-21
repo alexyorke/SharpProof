@@ -1,6 +1,6 @@
 # Repository layout
 
-SharpProof adopts the [Arcade SDK repository requirements](https://github.com/dotnet/arcade/blob/8018080f69d112044bcd7e0589a45e59e209bf30/Documentation/ArcadeSdk.md).
+SharpProof adopts the [Arcade SDK repository requirements](https://github.com/dotnet/arcade/blob/22d6512a34c1219c826b834c07f53cda666b9ddb/Documentation/ArcadeSdk.md).
 [`global.json`](../global.json) pins the exact .NET SDK and Arcade SDK versions;
 Dependabot updates the Arcade pin, and the layout check keeps `eng/common` in step
 with it.
