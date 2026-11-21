@@ -2185,6 +2185,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
     private TotalBodyValue Approximate(IOperation operation, IrBlockId block, FrontendAbstention reason)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        _context.ApproximationObserver?.Invoke(operation);
         var target = _context.Temporary(_context.Type(operation.Type));
         _builder!.Havoc(block, _context.Site(operation), IrHavocKind.Variables, IrHavocOrigin.Approximation, target);
         return new(_factory.Variable(target), block, FrontendSubsetClassification.Abstain(reason));
