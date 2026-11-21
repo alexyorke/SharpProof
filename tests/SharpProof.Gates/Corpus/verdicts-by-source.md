@@ -6,9 +6,9 @@
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Proven | 52 | 17 | 3 | 23 | 9 |
 | Refuted | 48 | 9 | 31 | 8 | 0 |
-| SP0002 | 238 | 126 | 36 | 36 | 40 |
-| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 128 | 32 | 27 | 31 | 38 |
-| SP0047 `Advisory:Lowering:UnsupportedControlFlow` | 19 | 8 | 0 | 2 | 9 |
+| SP0002 | 241 | 128 | 36 | 37 | 40 |
+| SP0047 `Advisory:Lowering:UnsupportedOperationKind` | 131 | 34 | 27 | 31 | 39 |
+| SP0047 `Advisory:Lowering:UnsupportedControlFlow` | 13 | 4 | 0 | 1 | 8 |
 | SP0047 `Advisory:ContractBinding:UnsupportedTarget` | 9 | 6 | 1 | 0 | 2 |
 | SP0047 `Advisory:Lowering:ConversionMayChangeValue` | 3 | 2 | 0 | 0 | 1 |
 | SP0047 `Advisory:EntryInitialization:TypeInitializer` | 1 | 0 | 0 | 0 | 1 |

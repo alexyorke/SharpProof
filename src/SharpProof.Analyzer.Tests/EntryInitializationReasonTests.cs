@@ -22,7 +22,7 @@ public sealed class EntryInitializationReasonTests
     // An admitted initializer still allocates, which an allocation claim counts.
     [TestCase("public static class Subject { private static readonly object Gate = new object(); " +
         "[ZeroAllocations] public static int Target(int x) => x; }")]
-    [TestCase("public static class Subject { public static int State = 1; " +
+    [TestCase("public static class Subject { [System.ThreadStatic] public static int State = 1; " +
         "[AllowedCapabilities(SharpProofCapability.None)] public static int Target(int x) => x; }")]
     [TestCase("public static class Outer { private static readonly int[] Cache = Create(); private static int[] Create() => new int[System.Environment.ProcessorCount]; " +
         "public static class Subject { [AllowedCapabilities(SharpProofCapability.None)] public static int Target(int x) => x; } }")]

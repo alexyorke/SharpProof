@@ -118,6 +118,14 @@ listing changes against an earlier one. Development history is in the Git log.
   analyzed: the method's body is inlined as for any other non-virtual source
   call. Before, such calls kept the whole caller `Unknown`. Invoking the
   delegate is still an unknown call.
+- A source call whose inlined body runs out of the lowering work budget
+  becomes an unknown call, after its `Requires` is checked, instead of
+  leaving the whole caller `Unknown`. Such a call may do anything, so it does
+  not help purity or exception claims; claims that do not depend on the call
+  can now be proved.
+- An empty collection expression `[]` whose target is `List<T>`,
+  `HashSet<T>` or `Dictionary<TKey, TValue>` is analyzed as `new T()`, in a
+  body or a field initializer.
 - Values of source `readonly struct` types are analyzed: construction,
   including target-typed `new(...)` and constructors chained with `: this(...)`,
   `default`, field and property reads, instance members and user-defined
@@ -125,6 +133,20 @@ listing changes against an earlier one. Development history is in the Git log.
   proved. A body that builds such a value keeps allocation, effect-contract
   and resource-bound claims `Unknown`, because the model allocates it and the
   CLR does not.
+- Values of mutable source structs are analyzed the same way, with C#'s copy
+  semantics. A store into a field or auto-property of a local or by-value
+  parameter, including `+=` and `++`, changes only that variable, and so does
+  a mutating member called on it: the callee works on a copy of `this` that
+  the caller assigns back on normal return. A copy, element or box made
+  earlier keeps the old value. Mutations through a field of an object, an
+  array element, a `ref` local, a struct field of a struct, an assignment to
+  `this`, or a mutating call inside a `try` block keep the method `Unknown`,
+  as do stores and mutating calls on the analyzed member's own `this`, which
+  is its caller's storage.
+- An instance member of a modeled struct called on a local or parameter sees
+  what its arguments did to that variable: C# passes the variable by
+  reference, so the callee's `this` is read once the arguments have run.
+  Before, it was read before them.
 - A class or struct constructor chained with `: this(...)` is inlined: the
   other constructor runs on the same object, with its field initializers,
   then the rest of this one. Instance field initializers no longer count as
@@ -227,6 +249,15 @@ listing changes against an earlier one. Development history is in the Git log.
 - The default API table specifies common framework members, including calendar
   and time-of-day getters and comparisons on `DateTime`, `DateOnly`, `TimeOnly`
   and `TimeSpan`.
+- The default API table (version 13) also specifies `List<T>.Clear`,
+  `Dictionary<TKey, TValue>.Clear` and `string.CompareOrdinal(string, string)`.
+  A guarded `list.Clear()` can now be proven not to throw, and
+  `string.CompareOrdinal` is pure and allocates nothing. `Clear`
+  writes its receiver and forgets what the body knew about the collection's
+  contents. Members that consult the element or key comparer, such as
+  `List<T>.Contains`, `Dictionary` `ContainsKey` and `TryGetValue`, or call
+  `ToString` on elements, such as `string.Join`, stay unspecified because they
+  can run user code.
 - A type initializer that is a closed computation no longer blocks its
   callers. SharpProof runs such an initializer at analysis time: constants,
   validating constructors and helpers, loops, exact integer arithmetic and
@@ -248,6 +279,22 @@ listing changes against an earlier one. Development history is in the Git log.
   claim `Unknown`, and a body that reads such a collection still reads state
   other code can change. A target-typed `new(...)` in an initializer is now
   admitted like the explicit form.
+- A type initializer may store into its own type's mutable statics, such as
+  `static int State = 1;` or a static constructor that fills a
+  `private static Dictionary<,>` it may later replace. Nothing reads such a
+  static before the initializer finishes, so purity and capability claims
+  accept the store, and callers in other types inline the type's members.
+  The store counts as fresh values, so allocation, effect-contract and
+  resource-bound claims stay `Unknown`, and a body's read of the static is
+  still an ambient read. `[ThreadStatic]` statics and static events still
+  make the initializer an entry effect.
+- A type initializer may construct an instance of a class derived from a
+  source base class, such as a `static readonly Instance = new Derived();`
+  singleton. The constructors down the chain, written `: base(arguments)` or
+  implicit, must each only store into the new instance, and each base class's
+  own initializer must be admitted. Before, any class whose base was not
+  `object` made its constructing initializer an entry effect. A base
+  constructor that stores into a virtual auto-property still does.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is
@@ -297,7 +344,7 @@ listing changes against an earlier one. Development history is in the Git log.
   contain a tilde; only 8.3 short names are rejected. ReFS volumes, including
   Dev Drives, are not supported.
 - Protocol 49, manifest 9, cache 72, compiler artifact 61, default API table
-  version 12.
+  version 13.
 
 ### Resource bounds
 
