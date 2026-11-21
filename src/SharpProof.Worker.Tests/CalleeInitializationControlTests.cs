@@ -40,6 +40,22 @@ internal sealed class CalleeInitializationControlTests
         { Assert.That(response.ClaimResults.Single(row => row.ClaimId != purity).Outcome, Is.EqualTo(WorkerClaimOutcome.Proven)); }
     }
 
+    // A singleton of a class derived from a source base: the chain of
+    // constructors only stores into the new instance.
+    [TestCase("public sealed class Derived : Base { }", WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class Derived : Base { public Derived() : base(2) { } }", WorkerClaimOutcome.Proven)]
+    [TestCase("public sealed class Derived : Base { public Derived() : base(2) { Counter.Count++; } }", WorkerClaimOutcome.Unknown)]
+    public async Task DerivedSingletonInitializersAreAdmitted(string derived, WorkerClaimOutcome pure)
+    {
+        System.ArgumentNullException.ThrowIfNull(derived);
+        var source = "using SharpProof.Attributes; public static class Counter { public static int Count; } " +
+            "public abstract class Base { private readonly int size; protected Base() { size = 1; } protected Base(int size) { this.size = size; } } " + derived +
+            " public static class Other { private static readonly Base Default = new Derived(); public static int Helper(int x) { return x; } } " +
+            "public static class C { [EnforcePure] public static int Target(int x) { return Other.Helper(x); } }";
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(Prepare(source), new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome is ProvenOutcome ? WorkerClaimOutcome.Proven : WorkerClaimOutcome.Unknown, Is.EqualTo(pure), result.Reason.ToString());
+    }
+
     [Test]
     public void MutableConstantInitializerContainsAnObservableStaticStore()
     {

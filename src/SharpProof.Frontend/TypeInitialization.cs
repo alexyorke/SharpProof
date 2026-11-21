@@ -18,8 +18,8 @@ internal enum InitializationEffect
     // Stores constants, or nothing, into the type's own readonly statics.
     None,
     // Also constructs fresh arrays, delegates and objects through admitted
-    // constructors, and reads statics of types whose own initializers are
-    // admitted. It writes only the type's own readonly statics and the fields
+    // constructors, including a chain of admitted source base constructors,
+    // and reads statics of types whose own initializers are admitted. It writes only the type's own readonly statics and the fields
     // of the values it constructs, and cannot throw except by running out of
     // memory. It calls no other code but the framework collection
     // constructors and Add methods that
@@ -218,6 +218,9 @@ internal static class TypeInitialization
         private readonly Dictionary<INamedTypeSymbol, InitializationEffect> _types = new(SymbolEqualityComparer.Default);
         private readonly HashSet<INamedTypeSymbol> _activeTypes = new(SymbolEqualityComparer.Default);
         private readonly HashSet<IMethodSymbol> _activeConstructors = new(SymbolEqualityComparer.Default);
+        // Base constructors being classified. Their stores run on an object
+        // of a more derived class, where a virtual property may be overridden.
+        private int _baseConstructors;
         private int _remaining = MaximumWork;
 
         private bool Spend()
@@ -429,7 +432,8 @@ internal static class TypeInitialization
                     Property.IsStatic: false, Arguments.IsEmpty: true,
                     Instance: IInstanceReferenceOperation { ReferenceKind: InstanceReferenceKind.ContainingTypeInstance }
                 } property => SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, type) &&
-                    IsAutoProperty(property.Property),
+                    IsAutoProperty(property.Property) &&
+                    (_baseConstructors == 0 || property.Property is { IsVirtual: false, IsAbstract: false, IsOverride: false }),
                 _ => false
             };
         }
@@ -566,7 +570,7 @@ internal static class TypeInitialization
                 if (Argument(argument, owner, constructor: null, immutableValues: true) == InitializationEffect.Effectful)
                 { return false; }
             }
-            return Constructor(created.OriginalDefinition, immutableValues: true) != InitializationEffect.Effectful &&
+            return Constructor(created.OriginalDefinition, owner, immutableValues: true) != InitializationEffect.Effectful &&
                 HasNoReferenceAliases(definition) &&
                 (SymbolEqualityComparer.Default.Equals(definition, owner) || HasNoReferenceAliases(owner));
         }
@@ -654,7 +658,7 @@ internal static class TypeInitialization
                 { return effect; }
                 effect = Max(effect, Argument(argument, owner, constructor));
             }
-            return effect == InitializationEffect.Effectful ? effect : Max(effect, Constructor(created.OriginalDefinition));
+            return effect == InitializationEffect.Effectful ? effect : Max(effect, Constructor(created.OriginalDefinition, owner));
         }
 
         private InitializationEffect Argument(IArgumentOperation argument, INamedTypeSymbol owner, IMethodSymbol? constructor,
@@ -665,37 +669,93 @@ internal static class TypeInitialization
                 ? Value(argument.Value, owner, constructor, immutableValues) : InitializationEffect.Effectful;
         }
 
-        private InitializationEffect Constructor(IMethodSymbol constructor, bool immutableValues = false)
+        // A constructor of a class, or with asBase the constructor of a source
+        // base class that a derived constructor chains to, run on a new
+        // instance created in owner's initialization.
+        private InitializationEffect Constructor(IMethodSymbol constructor, INamedTypeSymbol owner, bool immutableValues = false,
+            bool asBase = false)
         {
             var type = constructor.ContainingType;
-            if (!IsSource(type) || type.IsAbstract || type.IsStatic || type.IsRecord || type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
-                type.TypeKind == TypeKind.Class && type.BaseType?.SpecialType != SpecialType.System_Object ||
+            // A source base class runs its own constructor chain on the new
+            // object first. The immutable-value pass checks only the created
+            // type's own fields, so it admits no inherited ones.
+            var sourceBase = type.TypeKind == TypeKind.Class && type.BaseType?.SpecialType != SpecialType.System_Object;
+            if (!IsSource(type) || type.IsAbstract && !asBase || type.IsStatic || type.IsRecord ||
+                type.TypeKind is not (TypeKind.Class or TypeKind.Struct) ||
+                sourceBase && (immutableValues || !CSharpOperationSemantics.HasSourceBaseChain(type, cancellationToken)) ||
                 // The finalizer of every constructed instance runs later.
                 type.GetMembers().Any(static member => member is IMethodSymbol { MethodKind: MethodKind.Destructor }) ||
                 !_activeConstructors.Add(constructor))
             { return InitializationEffect.Effectful; }
+            if (asBase)
+            { _baseConstructors++; }
             try
             {
                 var effect = InstanceInitializers(type, constructor, immutableValues);
-                if (constructor.IsImplicitlyDeclared || effect == InitializationEffect.Effectful)
+                if (effect == InitializationEffect.Effectful)
                 { return effect; }
+                if (constructor.IsImplicitlyDeclared)
+                {
+                    return !sourceBase ? effect
+                        : CSharpOperationSemantics.TryImplicitBaseConstructor(type, cancellationToken, out var implicitBase) && implicitBase != null
+                        ? Max(effect, BaseConstructor(implicitBase, type, owner, [], constructor))
+                        : InitializationEffect.Effectful;
+                }
                 if (constructor.DeclaringSyntaxReferences.Length != 1 ||
                     constructor.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not ConstructorDeclarationSyntax declaration ||
                     declaration.Initializer is { } chained && (!chained.IsKind(SyntaxKind.BaseConstructorInitializer) ||
-                        chained.ArgumentList.Arguments.Count != 0) ||
-                    Body(constructor) is not { } body ||
-                    body.Initializer is not (null or IExpressionStatementOperation
+                        !sourceBase && chained.ArgumentList.Arguments.Count != 0) ||
+                    Body(constructor) is not { } body)
+                { return InitializationEffect.Effectful; }
+                if (!sourceBase)
+                {
+                    return body.Initializer is not (null or IExpressionStatementOperation
                     {
                         Operation: IInvocationOperation
                         {
                             Arguments.IsEmpty: true, TargetMethod: { MethodKind: MethodKind.Constructor, ContainingType.SpecialType: SpecialType.System_Object }
                         }
-                    }))
+                    })
+                        ? InitializationEffect.Effectful : Max(effect, Statements(body, type, constructor, immutableValues));
+                }
+                // The base constructor call, explicit or implicit, on the
+                // object under construction.
+                if (body.Initializer is not IExpressionStatementOperation
+                    {
+                        Operation: IInvocationOperation
+                        {
+                            Instance: IInstanceReferenceOperation, TargetMethod: { MethodKind: MethodKind.Constructor } chainedBase
+                        } call
+                    } ||
+                    !SymbolEqualityComparer.Default.Equals(chainedBase.ContainingType.OriginalDefinition, type.BaseType!.OriginalDefinition))
                 { return InitializationEffect.Effectful; }
-                return Max(effect, Statements(body, type, constructor, immutableValues));
+                effect = Max(effect, BaseConstructor(chainedBase, type, owner, call.Arguments, constructor));
+                return effect == InitializationEffect.Effectful ? effect : Max(effect, Statements(body, type, constructor, immutableValues));
             }
             finally
-            { _activeConstructors.Remove(constructor); }
+            {
+                if (asBase)
+                { _baseConstructors--; }
+                _activeConstructors.Remove(constructor);
+            }
+        }
+
+        // Running a base constructor may run its class's type initializer,
+        // unless that class is the one being initialized. Its arguments may
+        // read the derived constructor's parameters.
+        private InitializationEffect BaseConstructor(IMethodSymbol baseConstructor, INamedTypeSymbol derived, INamedTypeSymbol owner,
+            ImmutableArray<IArgumentOperation> arguments, IMethodSymbol constructor)
+        {
+            var baseType = baseConstructor.ContainingType.OriginalDefinition;
+            var effect = SymbolEqualityComparer.Default.Equals(baseType, owner) ? InitializationEffect.None : Classify(baseType);
+            foreach (var argument in arguments)
+            {
+                if (effect == InitializationEffect.Effectful)
+                { return effect; }
+                effect = Max(effect, Argument(argument, derived, constructor));
+            }
+            return effect == InitializationEffect.Effectful ? effect
+                : Max(effect, Constructor(baseConstructor.OriginalDefinition, owner, asBase: true));
         }
 
         // Instance field and auto-property initializers run in every
