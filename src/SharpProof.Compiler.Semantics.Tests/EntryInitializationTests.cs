@@ -63,6 +63,8 @@ public sealed class EntryInitializationTests
     [TestCase("public static class Subject { static Subject() { } }")]
     [TestCase("public static class Subject { private static readonly int Limit; static Subject() { Limit = 3; } }")]
     [TestCase("public static class Subject { private static readonly int Limit = Other; private const int Other = 4; }")]
+    // The runtime sets the empty string before any managed code runs.
+    [TestCase("public static class Subject { private static readonly string Empty = string.Empty; }")]
     public void ConstantsAreNoInitializationEffect(string source)
     { AssertClassified(source, (int)InitializationEffect.None); }
 
@@ -129,7 +131,7 @@ public sealed class EntryInitializationTests
     [TestCase("public static class Subject { private static readonly System.Collections.Generic.List<int> Items = new(System.Linq.Enumerable.Range(0, 2)); }")]
     [TestCase("public static class Subject { private static readonly System.Func<string> Text = \"x\".ToString; }")]
     // A read of another type's static whose initializer is not admitted.
-    [TestCase("public static class Subject { private static readonly string Empty = string.Empty; }")]
+    [TestCase("public static class Subject { private static readonly object Missing = System.DBNull.Value; }")]
     // A read of mutable or per-thread state is an ambient read, whatever its
     // type's initializer.
     [TestCase("public static class Input { public static int Current; } " +
