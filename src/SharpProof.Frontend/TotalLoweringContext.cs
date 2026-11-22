@@ -133,6 +133,9 @@ internal sealed partial class TotalLoweringContext
     // IsAdmittedAsync holds; see RoslynTotalProgramLowerer.Async.cs.
     internal bool AdmitsAsync { get; init; }
     internal bool AwaitsAsync { get; set; }
+    // The frame of an async callee whose call is not awaited: its task is
+    // stored, returned or passed on, so its exceptions fault that task.
+    internal bool DetachesAsync { get; set; }
 
     // The async methods whose body can be lowered as written: one returning
     // Task, Task<T>, ValueTask or ValueTask<T> through the default builder
@@ -269,7 +272,7 @@ internal sealed partial class TotalLoweringContext
     internal bool HasScalarSignature => (Target.IsStatic || Target.MethodKind is MethodKind.Ordinary or MethodKind.PropertyGet or
         MethodKind.PropertySet or MethodKind.Constructor or MethodKind.LocalFunction or MethodKind.ExplicitInterfaceImplementation &&
         !Target.IsAbstract) &&
-        (!Target.IsAsync || (AdmitsAsync || AwaitsAsync) && IsAdmittedAsync(Target)) && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
+        (!Target.IsAsync || (AdmitsAsync || AwaitsAsync || DetachesAsync) && IsAdmittedAsync(Target)) && (Target.Arity == 0 && (!Target.ContainingType.IsGenericType || _allowGenericContainer) ||
             SymbolEqualityComparer.Default.Equals(Target, Target.OriginalDefinition)) &&
         Target.PartialImplementationPart == null &&
         !Target.ReturnsByRef && !Target.ReturnsByRefReadonly &&

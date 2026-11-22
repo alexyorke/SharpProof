@@ -44,6 +44,20 @@ public sealed class AsyncLoweringTests
         Assert.That(Reachable(lowering.Program).Any(block => lowering.Program.GetBlock(block).Terminator is IrExceptionalExitInstruction), Is.False);
     }
 
+    // A call whose task is not awaited runs its callee detached: the callee's
+    // exceptions fault that task, and the value is an unknown task.
+    [TestCase("System.Threading.Tasks.Task<int> Target(int x) { return Inner.Next(x); }")]
+    [TestCase("int Target(int x) { return Inner.Next(x).Result; }")]
+    [TestCase("async System.Threading.Tasks.Task Target(int x) { await System.Threading.Tasks.Task.CompletedTask; await System.Threading.Tasks.Task.FromResult(x); }")]
+    public void DetachedCallsAndCompletedTasksLowerExactly(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        using var subject = TypedProgramSubject.Create(member, Helpers, admitsAsync: true);
+        var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowering.IsExact, Is.True, string.Join(", ", lowering.Abstentions.Select(static abstention => abstention.Reason)));
+        Assert.That(OpaqueMembers(subject, lowering), Has.None.EqualTo("await"));
+    }
+
     [Test]
     public void AnEscapingExceptionReachesTheFaultPublication()
     {
@@ -72,8 +86,6 @@ public sealed class AsyncLoweringTests
     [TestCase("async System.Threading.Tasks.Task Target(System.Collections.Generic.IAsyncEnumerable<int> s) { await foreach (var x in s) { } }", true, true)]
     [TestCase("async System.Threading.Tasks.Task Target(System.IAsyncDisposable d) { await using (d) { } }", true, true)]
     [TestCase("async System.Threading.Tasks.Task Target(System.IAsyncDisposable d) { await using var e = d; }", true, true)]
-    [TestCase("System.Threading.Tasks.Task<int> Target(int x) { return Inner.Next(x); }", true, true)]
-    [TestCase("int Target(int x) { return Inner.Next(x).Result; }", true, true)]
     public void UnadmittedAsyncShapesDoNotLowerExactly(string member, bool admitsAsync, bool opaqueCalls)
     {
         System.ArgumentNullException.ThrowIfNull(member);
