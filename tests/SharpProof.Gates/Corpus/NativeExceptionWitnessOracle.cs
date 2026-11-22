@@ -90,12 +90,17 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
         _ = ((IAsyncResult)task).AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(10));
         if (!task.IsCompleted)
         { throw new InvalidDataException("A replayed async witness did not complete."); }
+        if (task.IsFaulted)
+        { return task.Exception!.InnerException; }
+        if (!task.IsCanceled)
+        { return null; }
+        // A canceled task rethrows the cancellation exception it stores.
         try
         {
             task.GetAwaiter().GetResult();
             return null;
         }
-        catch (Exception exception)
+        catch (OperationCanceledException exception)
         {
             return exception;
         }
