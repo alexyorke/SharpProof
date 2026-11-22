@@ -248,6 +248,10 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- Calls inside async methods are checked against their callees' `Requires`,
+  as calls in ordinary methods are. Before, each such call was counted as
+  unchecked. A violation reached only after an unknown await stays `Unknown`,
+  as after any unknown call.
 - `async` methods returning `Task`, `Task<T>`, `ValueTask` or `ValueTask<T>`
   are analyzed. Before, every claim on one was `Unknown` at its signature.
   `[EnforcePure]`, `[AllowedCapabilities]` and `[EffectContract]` describe the

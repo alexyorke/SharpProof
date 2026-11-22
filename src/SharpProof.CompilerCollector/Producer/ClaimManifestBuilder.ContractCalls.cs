@@ -201,7 +201,7 @@ internal sealed partial class ClaimManifestBuilder
             CreateSeed(method).Declaration is MethodDeclarationSyntax or ConstructorDeclarationSyntax &&
             CreateSeed(method).Declaration is BaseMethodDeclarationSyntax { } declaration &&
             (declaration.Body != null || declaration.ExpressionBody != null) &&
-            CallableSubset.IsSupported(method, declaration) &&
+            CallableSubset.IsSupported(method, declaration, allowAsync: true) &&
             !ContractForSymbolMatcher.IsCompanionType(_contractSources.Companions, method.ContainingType);
     }
 
