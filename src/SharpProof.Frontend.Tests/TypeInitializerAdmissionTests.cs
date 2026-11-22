@@ -129,11 +129,91 @@ internal sealed class TypeInitializerAdmissionTests
         Assert.That(Classify(Size.Replace(original, replacement, StringComparison.Ordinal), "Size"), Is.EqualTo(InitializationEffect.Effectful));
     }
 
-    private static InitializationEffect Classify(string source, string typeName)
+    private const string Layouts = """
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)]
+        public struct BadLayout
+        {
+            [System.Runtime.InteropServices.FieldOffset(0)] public object Reference;
+            [System.Runtime.InteropServices.FieldOffset(0)] public int Number;
+        }
+        public struct Holder { public BadLayout Inner; }
+        public static class Outer { [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] public struct Nested { } public sealed class Inside { } }
+        public struct Plain { public int Value; public string Name; }
+        public sealed class Constrained<T> where T : struct { }
+        """;
+
+    // A type the runtime may refuse to load: an explicit layout, directly,
+    // in a field, an element or type argument, or an enclosing type; and a
+    // violated generic constraint. A sequential struct loads.
+    [TestCase("typeof(BadLayout)")]
+    [TestCase("typeof(BadLayout[])")]
+    [TestCase("typeof(Holder)")]
+    [TestCase("typeof(System.Collections.Generic.IEnumerable<BadLayout>)")]
+    [TestCase("typeof(Outer.Nested)")]
+    [TestCase("typeof(Constrained<string>)")]
+    public void TypeOfAnUnloadableTypeStaysEffectful(string typeOf)
+    {
+        System.ArgumentNullException.ThrowIfNull(typeOf);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Classify(Layouts + "public static class C { private static readonly System.Type Key = " + typeOf + "; }", "C"),
+                Is.EqualTo(InitializationEffect.Effectful));
+            Assert.That(Classify(Layouts + "public static class C { private static readonly System.Collections.Generic.HashSet<System.Type> Keys = new() { " +
+                typeOf + " }; }", "C"), Is.EqualTo(InitializationEffect.Effectful));
+        }
+    }
+
+    [TestCase("typeof(Plain)")]
+    [TestCase("typeof(Outer.Inside)")]
+    [TestCase("typeof(Constrained<int>)")]
+    public void TypeOfALoadableSourceTypeIsAdmitted(string typeOf)
+    {
+        System.ArgumentNullException.ThrowIfNull(typeOf);
+        Assert.That(Classify(Layouts + "public static class C { private static readonly System.Type Key = " + typeOf + "; }", "C"),
+            Is.EqualTo(InitializationEffect.FreshValues));
+    }
+
+    // A synchronized getter takes a lock, so its read is not a field read.
+    // Both the structural rules and a closed computation must see the lock.
+    [TestCase("System.Array.Empty<int>()")]
+    [TestCase("new int[2]")]
+    public void SynchronizedGetterStaysEffectful(string value)
+    {
+        System.ArgumentNullException.ThrowIfNull(value);
+        var source = "public static class Locked { public static int[] Table { " +
+            "[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.Synchronized)] get; } = " + value + "; } " +
+            "public static class C { private static readonly int[] Copy = Locked.Table; }";
+        Assert.That(Classify(source, "C"), Is.EqualTo(InitializationEffect.Effectful));
+    }
+
+    // A referenced assembly's own System.Math or System.Environment is not
+    // the framework's, even when an extern alias names it unambiguously.
+    [TestCase("public static class C { private static readonly double Scale = 2.0; private static readonly long Bits = (long)Fake::System.Math.Ceiling(Scale); }")]
+    [TestCase("public static class C { private static readonly string Separator = Fake::System.Environment.NewLine; }")]
+    [TestCase("public static class C { private static readonly System.Type[] Types = Fake::System.Type.EmptyTypes; }")]
+    public void AliasedFrameworkLookalikesStayEffectful(string source)
+    {
+        System.ArgumentNullException.ThrowIfNull(source);
+        var token = TestContext.CurrentContext.CancellationToken;
+        var fake = CSharpCompilation.Create("Fake", [CSharpSyntaxTree.ParseText("""
+            namespace System
+            {
+                public static class Math { public static double Ceiling(double value) { throw new InvalidOperationException(); } }
+                public static class Environment { public static string NewLine => throw new InvalidOperationException(); }
+                public static class Type { public static readonly object[] EmptyTypes = new object[1 << 30]; }
+            }
+            """, cancellationToken: token)], TestMetadataReferences.Platform, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var reference = fake.ToMetadataReference(aliases: ["Fake"]);
+        Assert.That(Classify("extern alias Fake;\n" + source, "C", reference), Is.EqualTo(InitializationEffect.Effectful));
+    }
+
+    private static InitializationEffect Classify(string source, string typeName, MetadataReference? extra = null)
     {
         var token = TestContext.CurrentContext.CancellationToken;
-        var tree = CSharpSyntaxTree.ParseText(Shared + "\n" + source, cancellationToken: token);
-        var compilation = CSharpCompilation.Create("TypeInitializerAdmission", [tree], TestMetadataReferences.Platform,
+        var tree = CSharpSyntaxTree.ParseText(source.StartsWith("extern alias", StringComparison.Ordinal) ? source + "\n" + Shared : Shared + "\n" + source,
+            cancellationToken: token);
+        var compilation = CSharpCompilation.Create("TypeInitializerAdmission", [tree],
+            extra == null ? TestMetadataReferences.Platform : TestMetadataReferences.Platform.Add(extra),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var type = compilation.GetTypeByMetadataName(typeName);
         Assert.That(type, Is.Not.Null);

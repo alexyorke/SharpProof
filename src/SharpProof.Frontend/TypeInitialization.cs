@@ -342,14 +342,16 @@ internal static class TypeInitialization
         }
 
         // An auto-property's accessors read and write its backing field and
-        // nothing else.
+        // nothing else. A synchronized accessor also takes a lock.
         private bool IsAutoProperty(IPropertySymbol property)
         {
             return !property.IsAbstract && !property.IsExtern && !property.IsIndexer && property.DeclaringSyntaxReferences.Length == 1 &&
                 property.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is PropertyDeclarationSyntax
                 {
                     ExpressionBody: null, AccessorList: { } accessors
-                } && accessors.Accessors.All(static accessor => accessor.Body == null && accessor.ExpressionBody == null);
+                } && accessors.Accessors.All(static accessor => accessor.Body == null && accessor.ExpressionBody == null) &&
+                (property.GetMethod == null || !CSharpOperationSemantics.HasSynchronizedEntry(property.GetMethod)) &&
+                (property.SetMethod == null || !CSharpOperationSemantics.HasSynchronizedEntry(property.SetMethod));
         }
 
         // A store into a mutable static belongs to the fresh-values class
@@ -543,7 +545,7 @@ internal static class TypeInitialization
                 // object, which the runtime makes once per type; it runs no
                 // type initializer. A type of this assembly or of the core
                 // library always loads.
-                case ITypeOfOperation typeOf when !immutableValues && IsLoadedType(typeOf.TypeOperand):
+                case ITypeOfOperation typeOf when !immutableValues && IsLoadedTypeOf(typeOf):
                     return InitializationEffect.FreshValues;
                 case IObjectCreationOperation creation when !immutableValues:
                     return Creation(creation, owner, constructor);
@@ -588,28 +590,141 @@ internal static class TypeInitialization
             if (definition.ContainingType is not { TypeKind: TypeKind.Class or TypeKind.Struct } type || !IsSource(type) ||
                 definition.IsVirtual || definition.IsOverride || !IsAutoProperty(definition))
             { return null; }
-            return type.GetMembers().OfType<IFieldSymbol>()
-                .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, definition));
+            // The compiler-implemented getter, not synchronized.
+            return CSharpOperationSemantics.StaticGetOnlyAutoPropertyField(definition);
         }
 
-        // A type every part of which is declared in this assembly or in the
-        // core library, so loading it cannot fail.
+        // `typeof` of a type that always loads.
+        private bool IsLoadedTypeOf(ITypeOfOperation typeOf)
+        {
+            return IsLoadedType(typeOf.TypeOperand);
+        }
+
+        // A type that loading cannot reject: one of the core library, or a
+        // source class, struct, interface or enum whose containing types,
+        // base types, interfaces, type arguments and value-type fields load
+        // too. C# accepts some types the runtime rejects with
+        // TypeLoadException, so a source type also needs: no explicit layout
+        // or field offset (an explicit layout can overlap a reference with
+        // other data), no fixed buffer, no cycle of value-type fields, a
+        // class base that is a source or core class neither sealed nor
+        // static, and type arguments that meet the parameter's constraints
+        // (only an unconstrained parameter, or a `struct` one given a
+        // non-nullable value type, is checked to accept its argument).
         private bool IsLoadedType(ITypeSymbol type)
         {
+            return !ContainsTypeParameter(type) && IsLoadedType(type, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
+        }
+
+        private static bool ContainsTypeParameter(ITypeSymbol type)
+        {
+            return type switch
+            {
+                ITypeParameterSymbol => true,
+                IArrayTypeSymbol array => ContainsTypeParameter(array.ElementType),
+                INamedTypeSymbol named => !named.IsUnboundGenericType && named.TypeArguments.Any(ContainsTypeParameter) ||
+                    named.ContainingType != null && ContainsTypeParameter(named.ContainingType),
+                _ => false
+            };
+        }
+
+        private bool IsLoadedType(ITypeSymbol type, HashSet<ITypeSymbol> visited)
+        {
+            if (!Spend())
+            { return false; }
             switch (type)
             {
                 case IArrayTypeSymbol array:
-                    return IsLoadedType(array.ElementType);
+                    return IsLoadedType(array.ElementType, visited);
                 case INamedTypeSymbol { TypeKind: not TypeKind.Error } named:
-                    var assembly = named.OriginalDefinition.ContainingAssembly;
-                    if (!SymbolEqualityComparer.Default.Equals(assembly, _compilation.Assembly) &&
-                        !SymbolEqualityComparer.Default.Equals(assembly, _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly))
+                    var definition = named.OriginalDefinition;
+                    if (!visited.Add(named))
+                    { return true; }
+                    if (!named.IsUnboundGenericType && (!MeetsConstraints(named) || !named.TypeArguments.All(argument => IsLoadedType(argument, visited))))
                     { return false; }
-                    return (named.ContainingType == null || IsLoadedType(named.ContainingType)) &&
-                        (named.IsUnboundGenericType || named.TypeArguments.All(IsLoadedType));
+                    if (SymbolEqualityComparer.Default.Equals(definition.ContainingAssembly,
+                        _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly))
+                    { return true; }
+                    return IsSource(definition) && IsLoadableSourceDefinition(definition, visited);
+                // A type parameter of a definition being checked: each
+                // constructed type checks its own arguments.
+                case ITypeParameterSymbol:
+                    return true;
                 default:
                     return false;
             }
+        }
+
+        private static bool MeetsConstraints(INamedTypeSymbol type)
+        {
+            for (var index = 0; index < type.TypeParameters.Length; index++)
+            {
+                var parameter = type.TypeParameters[index];
+                var argument = type.TypeArguments[index];
+                if (parameter.HasReferenceTypeConstraint || parameter.HasUnmanagedTypeConstraint || parameter.HasConstructorConstraint ||
+                    !parameter.ConstraintTypes.IsEmpty)
+                { return false; }
+                if (parameter.HasValueTypeConstraint && (argument is ITypeParameterSymbol || !argument.IsValueType ||
+                    argument.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T))
+                { return false; }
+            }
+            return true;
+        }
+
+        private bool IsLoadableSourceDefinition(INamedTypeSymbol definition, HashSet<ITypeSymbol> visited)
+        {
+            if (definition.TypeKind is not (TypeKind.Class or TypeKind.Struct or TypeKind.Interface or TypeKind.Enum) ||
+                HasExplicitLayout(definition) ||
+                definition.TypeKind == TypeKind.Class && definition.BaseType is { } baseType &&
+                    (baseType.IsSealed || baseType.IsStatic || baseType.TypeKind != TypeKind.Class) ||
+                definition.TypeKind == TypeKind.Struct && !HasAcyclicLayout(definition, new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default)) ||
+                definition.ContainingType != null && !IsLoadedType(definition.ContainingType, visited) ||
+                definition.BaseType != null && !IsLoadedType(definition.BaseType, visited) ||
+                !definition.Interfaces.All(face => IsLoadedType(face, visited)))
+            { return false; }
+            foreach (var member in definition.GetMembers())
+            {
+                // A value-type field is laid out inside the type; a reference
+                // field is a pointer whose type loads only when used.
+                if (member is IFieldSymbol { IsConst: false } field &&
+                    (field.GetAttributes().Any(static attribute => IsInteropAttribute(attribute, "FieldOffsetAttribute")) ||
+                        field.IsFixedSizeBuffer || field.Type.IsValueType && !IsLoadedType(field.Type, visited)))
+                { return false; }
+            }
+            return true;
+        }
+
+        // No struct contains itself through its instance fields.
+        private static bool HasAcyclicLayout(INamedTypeSymbol type, HashSet<INamedTypeSymbol> laying)
+        {
+            if (!laying.Add(type.OriginalDefinition))
+            { return false; }
+            foreach (var member in type.GetMembers())
+            {
+                if (member is IFieldSymbol { IsStatic: false, Type: INamedTypeSymbol { TypeKind: TypeKind.Struct } inner } &&
+                    !inner.DeclaringSyntaxReferences.IsEmpty && !HasAcyclicLayout(inner, laying))
+                { return false; }
+            }
+            laying.Remove(type.OriginalDefinition);
+            return true;
+        }
+
+        private static bool HasExplicitLayout(INamedTypeSymbol type)
+        {
+            return type.GetAttributes().Any(static attribute => IsInteropAttribute(attribute, "StructLayoutAttribute") &&
+                (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value is not (0 or 3)));
+        }
+
+        private static bool IsInteropAttribute(AttributeData attribute, string name)
+        {
+            return attribute.AttributeClass is
+            {
+                ContainingNamespace:
+                {
+                    Name: "InteropServices",
+                    ContainingNamespace: { Name: "Runtime", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } }
+                }
+            } named && named.Name == name;
         }
 
         private static bool IsConstant(ITypeSymbol? type, object? value)
@@ -738,7 +853,7 @@ internal static class TypeInitialization
             // A framework collection whose constructor and Add calls run no
             // user code. The collection is mutable, so a read of a static
             // that holds it stays an ambient read in a body.
-            if (CSharpOperationSemantics.IsCallbackFreeCollectionCreation(creation, out var stored))
+            if (CSharpOperationSemantics.IsCallbackFreeCollectionCreation(creation, out var stored, IsLoadedTypeOf))
             {
                 var collected = InitializationEffect.FreshValues;
                 foreach (var value in stored)

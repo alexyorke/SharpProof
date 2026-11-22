@@ -24,8 +24,14 @@ namespace SharpProof.Frontend;
 //   implementation it picks depends on the characters and on the hardware,
 //   never on state a program can change.
 //
-// SharpProof.Worker.Tests' TypeInitializerAdmissionWaveTests record these on
-// the supported runtime.
+// Each member is bound by identity, not by name: its type must be the one the
+// compilation resolves for that metadata name, which is none when two
+// references declare it, and must come from a framework assembly. A
+// referenced assembly that declares its own System.Environment, say, makes
+// the name ambiguous, and the value stays an entry effect.
+//
+// SharpProof.Worker.Tests' TypeInitializerEffectTests and
+// SharpProof.Frontend.Tests' TypeInitializerAdmissionTests record these.
 internal static partial class CSharpOperationSemantics
 {
     private const int MaximumSearchValuesLength = 1 << 16;
@@ -37,31 +43,34 @@ internal static partial class CSharpOperationSemantics
     internal static InitializationEffect? FrameworkInitializerValue(IOperation value)
     {
         value = RepositoryParameterGuard.NotNull(value, nameof(value));
+        var compilation = value.SemanticModel?.Compilation;
         switch (value)
         {
-            case IFieldReferenceOperation { Instance: null, Field: { IsStatic: true, Name: "Empty", ContainingType.SpecialType: SpecialType.System_String } field }
-                when IsFrameworkSymbol(field):
+            case IFieldReferenceOperation { Instance: null, Field: { IsStatic: true, Name: "Empty" } field }
+                when IsBoundFrameworkType(field.ContainingType, "System.String", compilation):
                 return InitializationEffect.None;
             // The platform's line separator, a literal of the framework.
             case IPropertyReferenceOperation { Instance: null, Property: { IsStatic: true, Name: "NewLine" } property }
-                when IsFrameworkSymbol(property) && property.ContainingType.GetDocumentationCommentId() == "T:System.Environment":
+                when IsBoundFrameworkType(property.ContainingType, "System.Environment", compilation):
                 return InitializationEffect.None;
             // One cached empty sequence per element type, as Array.Empty.
-            case IInvocationOperation { Instance: null, Arguments.IsEmpty: true, TargetMethod: { Name: "Empty", IsGenericMethod: true } empty }
-                when IsFrameworkSymbol(empty) && empty.ContainingType.GetDocumentationCommentId() == "T:System.Linq.Enumerable":
+            case IInvocationOperation
+            {
+                Instance: null, Arguments.IsEmpty: true, TargetMethod: { Name: "Empty", IsGenericMethod: true, Parameters.IsEmpty: true } empty
+            } when IsBoundFrameworkType(empty.ContainingType, "System.Linq.Enumerable", compilation):
                 return InitializationEffect.FreshValues;
             case IFieldReferenceOperation { Instance: null, Field: { IsStatic: true, Name: "EmptyTypes" } field }
-                when IsFrameworkSymbol(field) && field.ContainingType.GetDocumentationCommentId() == "T:System.Type":
+                when IsBoundFrameworkType(field.ContainingType, "System.Type", compilation):
                 return InitializationEffect.FreshValues;
             case IPropertyReferenceOperation when OrdinalStringComparer(value) != null:
                 return InitializationEffect.FreshValues;
             case IObjectCreationOperation { Initializer: null, Arguments.IsEmpty: true, Constructor: { Parameters.IsEmpty: true } constructor }
-                when IsFrameworkSymbol(constructor) &&
-                    constructor.ContainingType.GetDocumentationCommentId() == "T:System.Globalization.IdnMapping":
+                when IsBoundFrameworkType(constructor.ContainingType, "System.Globalization.IdnMapping", compilation):
                 return InitializationEffect.FreshValues;
             case IInvocationOperation { Instance: null, TargetMethod: { } method, Arguments.Length: 1 } invocation
-                when IsFrameworkSymbol(method) && method.OriginalDefinition.GetDocumentationCommentId() == SearchValuesCreate &&
-                    invocation.Arguments[0].ArgumentKind == ArgumentKind.Explicit && IsConstantSpan(invocation.Arguments[0].Value):
+                when IsBoundFrameworkType(method.ContainingType, "System.Buffers.SearchValues", compilation) &&
+                    method.OriginalDefinition.GetDocumentationCommentId() == SearchValuesCreate &&
+                    invocation.Arguments[0].ArgumentKind == ArgumentKind.Explicit && IsConstantSpan(invocation.Arguments[0].Value, compilation):
                 return InitializationEffect.FreshValues;
             default:
                 return null;
@@ -69,7 +78,7 @@ internal static partial class CSharpOperationSemantics
     }
 
     // `"..."` converted to ReadOnlySpan<char> by the framework conversion.
-    private static bool IsConstantSpan(IOperation value)
+    private static bool IsConstantSpan(IOperation value, Compilation? compilation)
     {
         // Before C# 14 the conversion calls String's implicit operator; C# 14
         // makes it a built-in span conversion that the compiler emits as the
@@ -77,11 +86,28 @@ internal static partial class CSharpOperationSemantics
         return value is IConversionOperation
         {
             Operand.ConstantValue: { HasValue: true, Value: string { Length: <= MaximumSearchValuesLength } },
-            Type: INamedTypeSymbol { Name: "ReadOnlySpan", Arity: 1 } span
+            Type: INamedTypeSymbol { Arity: 1 } span
         } conversion && conversion.Conversion.IsImplicit &&
-            span.TypeArguments[0].SpecialType == SpecialType.System_Char && IsFrameworkSymbol(span.OriginalDefinition) &&
-            (conversion.OperatorMethod is null || conversion.OperatorMethod is { Name: "op_Implicit", ContainingType.SpecialType: SpecialType.System_String } method &&
-                IsFrameworkSymbol(method));
+            span.TypeArguments[0].SpecialType == SpecialType.System_Char && IsBoundFrameworkType(span, "System.ReadOnlySpan`1", compilation) &&
+            (conversion.OperatorMethod is null || conversion.OperatorMethod is { Name: "op_Implicit" } method &&
+                IsBoundFrameworkType(method.ContainingType, "System.String", compilation));
+    }
+
+    // The framework type the compilation binds to metadataName.
+    internal static bool IsBoundFrameworkType(ITypeSymbol? type, string metadataName, Compilation? compilation)
+    {
+        metadataName = RepositoryParameterGuard.NotNull(metadataName, nameof(metadataName));
+        return type is INamedTypeSymbol named && compilation?.GetTypeByMetadataName(metadataName) is { } bound &&
+            SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, bound) && IsFrameworkSymbol(bound);
+    }
+
+    // A top-level type's metadata name with its namespace.
+    private static string MetadataFullName(INamedTypeSymbol type)
+    {
+        var name = type.MetadataName;
+        for (var space = type.ContainingNamespace; space is { IsGlobalNamespace: false }; space = space.ContainingNamespace)
+        { name = space.Name + "." + name; }
+        return name;
     }
 
     private static bool IsFrameworkSymbol(ISymbol symbol)
@@ -93,8 +119,8 @@ internal static partial class CSharpOperationSemantics
         {
             "System.Private.CoreLib" => identity.PublicKeyToken.SequenceEqual(CoreLibToken),
             "mscorlib" => identity.PublicKeyToken.SequenceEqual(EcmaToken),
-            "System.Runtime" => identity.PublicKeyToken.SequenceEqual(MicrosoftToken),
-            "System.Linq" => identity.PublicKeyToken.SequenceEqual(MicrosoftToken),
+            "System.Runtime" or "System.Linq" or "System.Collections" or "System.Collections.Concurrent" =>
+                identity.PublicKeyToken.SequenceEqual(MicrosoftToken),
             // SearchValues' reference assembly.
             "System.Memory" => identity.PublicKeyToken.SequenceEqual(NetStandardToken),
             "netstandard" => identity.PublicKeyToken.SequenceEqual(NetStandardToken),

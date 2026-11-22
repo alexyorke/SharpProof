@@ -1029,7 +1029,10 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
             property.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken) is not PropertyDeclarationSyntax
             {
                 ExpressionBody: null, AccessorList: { } accessors
-            } || accessors.Accessors.Any(static accessor => accessor.Body != null || accessor.ExpressionBody != null))
+            } || accessors.Accessors.Any(static accessor => accessor.Body != null || accessor.ExpressionBody != null) ||
+            // A synchronized accessor also takes a lock.
+            property.GetMethod is { } getter && CSharpOperationSemantics.HasSynchronizedEntry(getter) ||
+            property.SetMethod is { } setter && CSharpOperationSemantics.HasSynchronizedEntry(setter))
         { return null; }
         return property.ContainingType.GetMembers().OfType<IFieldSymbol>()
             .FirstOrDefault(field => SymbolEqualityComparer.Default.Equals(field.AssociatedSymbol, property))?.OriginalDefinition;
@@ -1189,14 +1192,19 @@ internal sealed class ClosedInitializerEvaluator(CSharpCompilation compilation, 
         return Call(method, receiver, arguments, out value);
     }
 
+    // System.Math of the core library, bound by identity: the type the
+    // compilation resolves for that name, which is none when another
+    // reference declares one too, declared in the assembly of System.Object.
     private bool IsFloatingMath(IMethodSymbol method)
     {
         return method is
         {
             IsStatic: true, Name: "Ceiling" or "Floor" or "Truncate" or "Round" or "Abs" or "Sqrt",
-            ReturnType.SpecialType: SpecialType.System_Double, Parameters.Length: 1,
-            ContainingType: { Name: "Math", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } }
-        } && method.Parameters[0] is { Type.SpecialType: SpecialType.System_Double, RefKind: RefKind.None } && IsLibrary(method.ContainingType);
+            ReturnType.SpecialType: SpecialType.System_Double, Parameters.Length: 1
+        } && method.Parameters[0] is { Type.SpecialType: SpecialType.System_Double, RefKind: RefKind.None } &&
+            _compilation.GetTypeByMetadataName("System.Math") is { } math &&
+            SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, math) &&
+            SymbolEqualityComparer.Default.Equals(math.ContainingAssembly, _compilation.GetSpecialType(SpecialType.System_Object).ContainingAssembly);
     }
 
     private bool Arguments(ImmutableArray<IArgumentOperation> arguments, Frame frame, out object?[] values)

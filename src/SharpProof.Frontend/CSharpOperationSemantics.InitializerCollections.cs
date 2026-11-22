@@ -25,8 +25,8 @@ namespace SharpProof.Frontend;
 //   the ordinal comparers, are framework code. OrdinalIgnoreCase keys must be
 //   ASCII, which every runtime folds the same way without culture data.
 //   Dictionary.Add throws for a key the dictionary already holds, so its keys
-//   must differ under the comparer. A key may also be `typeof(X)` of a type
-//   of the analyzed assembly or the framework, for a Type key: the runtime
+//   must differ under the comparer. A key may also be `typeof(X)` of a type that
+//   always loads (the caller decides), for a Type key: the runtime
 //   type object hashes and compares by identity in framework code, and two
 //   operands that name one runtime type count as the same key.
 //
@@ -67,13 +67,16 @@ internal static partial class CSharpOperationSemantics
     // A `new` of one of the collections above. values receives the values it
     // stores other than its keys, which the caller must still admit; keys are
     // checked here.
-    internal static bool IsCallbackFreeCollectionCreation(IObjectCreationOperation creation, out ImmutableArray<IOperation> values)
+    // loadedType admits a `typeof` key; without it, such keys are refused.
+    internal static bool IsCallbackFreeCollectionCreation(IObjectCreationOperation creation, out ImmutableArray<IOperation> values,
+        Func<ITypeOfOperation, bool>? loadedType = null)
     {
         creation = RepositoryParameterGuard.NotNull(creation, nameof(creation));
         values = ImmutableArray<IOperation>.Empty;
         if (creation.Constructor is not { } constructor || creation.Type is not INamedTypeSymbol { TypeArguments.IsEmpty: false } type ||
             !IsInitializerCollectionMember(constructor) ||
-            !InitializerCollectionConstructors.Contains(constructor.OriginalDefinition.GetDocumentationCommentId() ?? ""))
+            !InitializerCollectionConstructors.Contains(constructor.OriginalDefinition.GetDocumentationCommentId() ?? "") ||
+            !IsBoundFrameworkType(type, MetadataFullName(type.OriginalDefinition), creation.SemanticModel?.Compilation))
         { return false; }
         var comparison = KeyComparison.Default;
         foreach (var argument in creation.Arguments)
@@ -91,7 +94,7 @@ internal static partial class CSharpOperationSemantics
             else
             { return false; }
         }
-        return creation.Initializer == null || Entries(creation.Initializer, type, comparison, out values);
+        return creation.Initializer == null || Entries(creation.Initializer, type, comparison, loadedType, out values);
     }
 
     // The framework assemblies that define these collections.
@@ -116,7 +119,7 @@ internal static partial class CSharpOperationSemantics
                 Instance: null, Arguments.IsEmpty: true,
                 Property: { IsStatic: true, GetMethod: { } getter } property
             } || !IsFrameworkCollectionMember(getter) ||
-            property.ContainingType.GetDocumentationCommentId() != "T:System.StringComparer")
+            !IsBoundFrameworkType(property.ContainingType, "System.StringComparer", value.SemanticModel?.Compilation))
         { return null; }
         return property.Name switch
         {
@@ -127,7 +130,7 @@ internal static partial class CSharpOperationSemantics
     }
 
     private static bool Entries(IObjectOrCollectionInitializerOperation initializer, INamedTypeSymbol type, KeyComparison comparison,
-        out ImmutableArray<IOperation> values)
+        Func<ITypeOfOperation, bool>? loadedType, out ImmutableArray<IOperation> values)
     {
         values = ImmutableArray<IOperation>.Empty;
         if (initializer.Initializers.Length > MaximumInitializerCollectionSize)
@@ -148,9 +151,9 @@ internal static partial class CSharpOperationSemantics
                     // HashSet.Add keeps the set as it is for a key it holds;
                     // Dictionary.Add throws.
                     var admitted = id == ListAdd ? arguments.Length == 1
-                        : id == HashSetAdd ? arguments.Length == 1 && Key(arguments[0].Value, type.TypeArguments[0], comparison) != null
+                        : id == HashSetAdd ? arguments.Length == 1 && Key(arguments[0].Value, type.TypeArguments[0], comparison, loadedType) != null
                         : id == DictionaryAdd && arguments.Length == 2 &&
-                            Key(arguments[0].Value, type.TypeArguments[0], comparison) is { } key && keys.Add(key);
+                            Key(arguments[0].Value, type.TypeArguments[0], comparison, loadedType) is { } key && keys.Add(key);
                     if (!admitted)
                     { return false; }
                     if (id != HashSetAdd)
@@ -168,7 +171,7 @@ internal static partial class CSharpOperationSemantics
                     } target
                 } assignment when IsFrameworkCollectionMember(setter) && PositionalArguments(target.Arguments) &&
                     indexer.OriginalDefinition.GetDocumentationCommentId() == DictionaryIndexer &&
-                    Key(target.Arguments[0].Value, type.TypeArguments[0], comparison) is { } replaced:
+                    Key(target.Arguments[0].Value, type.TypeArguments[0], comparison, loadedType) is { } replaced:
                     keys.Add(replaced);
                     stored.Add(assignment.Value);
                     break;
@@ -193,12 +196,13 @@ internal static partial class CSharpOperationSemantics
 
     // The key as the comparer sees it, or null when hashing it is not known
     // to be callback-free and fault-free.
-    private static object? Key(IOperation value, ITypeSymbol keyType, KeyComparison comparison)
+    private static object? Key(IOperation value, ITypeSymbol keyType, KeyComparison comparison, Func<ITypeOfOperation, bool>? loadedType)
     {
         if (value is ITypeOfOperation typeOf)
         {
-            return comparison == KeyComparison.Default && keyType.GetDocumentationCommentId() == "T:System.Type" &&
-                IsFrameworkSymbol(keyType) && SymbolEqualityComparer.Default.Equals(value.Type, keyType) &&
+            return comparison == KeyComparison.Default && loadedType != null && loadedType(typeOf) &&
+                IsBoundFrameworkType(keyType, "System.Type", value.SemanticModel?.Compilation) &&
+                SymbolEqualityComparer.Default.Equals(value.Type, keyType) &&
                 value.SemanticModel?.Compilation.Assembly is { } assembly && RuntimeTypeKey(typeOf.TypeOperand, assembly) is { } runtime
                 ? runtime : null;
         }

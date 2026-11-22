@@ -88,6 +88,12 @@ internal sealed class TypeInitializerEffectTests
     [TestCase("private static readonly double Scale = 2.0; private static readonly long Bits = checked((long)Scale);")]
     [TestCase("private static readonly double Scale = 2.0; private static readonly int Sign = Scale > 0 ? 1 : 0;")]
     [TestCase("private static readonly System.Collections.Generic.Dictionary<System.Type, int> Codes = new() { { typeof(nint), 1 }, { typeof(System.IntPtr), 2 } };")]
+    // The runtime refuses an explicit layout that overlaps a reference.
+    [TestCase("[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] private struct BadLayout { " +
+        "[System.Runtime.InteropServices.FieldOffset(0)] public object Reference; [System.Runtime.InteropServices.FieldOffset(0)] public int Number; } " +
+        "private static readonly System.Type Key = typeof(BadLayout);")]
+    // A synchronized getter takes a lock.
+    [TestCase("private static readonly int[] Copy = LockedTable.Table;")]
     public async Task OtherInitializersLeavePurityUnknown(string members)
     {
         System.ArgumentNullException.ThrowIfNull(members);
@@ -238,6 +244,7 @@ internal sealed class TypeInitializerEffectTests
             (members.Contains("Cycle.", StringComparison.Ordinal) ? "public static class Cycle { public static readonly object Back = C.Gate; } " : "") +
             "public sealed class Counter { public static int Count; public Counter() { Count++; } } " +
             "public static class Exposed { public static int[] Table { get; } = new int[2]; public static int[] Settable { get; set; } = new int[2]; } " +
+            "public static class LockedTable { public static int[] Table { [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.Synchronized)] get; } = new int[2]; } " +
             "public static class C { " + members + " " + attribute + " " + body + " }";
         return await verify(Prepare(source), new WorkerBudgets(), TestContext.CurrentContext.CancellationToken, null);
     }
