@@ -254,6 +254,18 @@ listing changes against an earlier one. Development history is in the Git log.
   the result of a user-defined conversion, is now approximated as the boxed
   object; before, inside a `try` block it stopped the whole run with an
   internal type error.
+- A body may also store into, increment or compound-assign a mutable static
+  of a source class whose initializer is admitted, such as `s_count++` next
+  to a cached `List<T>`. Before, such a write left the body unsupported. The
+  write is a write of static state, so `EnforcePure` is refuted for a plain
+  store or a discarded `int` increment; other claims can now be proved.
+  Readonly, volatile and `[ThreadStatic]` statics stay unsupported.
+  An increment or compound assignment of any supported static, such as
+  `s_total += x`, is also lowered in a type with no initializer. An
+  increment or compound assignment through a property, static or instance,
+  is read as its backing field only when both accessors are automatic;
+  before, a C# 14 `field`-backed property with a custom getter and an
+  automatic setter skipped the getter.
 - `typeof(X)` is a value. It has no effect, cannot throw, allocates nothing
   and does not run `X`'s type initializer, so a method that passes
   `typeof(X)` to a helper can be proved pure. Before, any `typeof` left the

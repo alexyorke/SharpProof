@@ -52,10 +52,12 @@ public sealed class OrdinarySummaryWriteInvocationReportTests
         Assert.That(report.Passed, Is.True);
     }
 
+    // An initializer that is not admitted leaves the store unsupported. (An
+    // admitted one, such as `Seed = 1`, lets the store lower as a static write.)
     [Test]
     public async Task ActualSameOwnerInitializationKeepsItsUnsupportedBodyVisible()
     {
-        const string source = "public class SummaryInvocation { public static readonly int Seed = 1; public static int Counter; public static void Target() { Counter = 1; } }";
+        const string source = "public class SummaryInvocation { public static readonly int Seed = System.Environment.ProcessorCount; public static int Counter; public static void Target() { Counter = 1; } }";
         var compilation = await PrepareAsync(source);
         var discovery = new ClaimManifestBuilder(compilation, WorkerFeatureSet.Effects).Build();
         var artifact = CompilerManifestArtifactProducer.Create(compilation, RepositoryLayout.FindRoot(), "net9.0",

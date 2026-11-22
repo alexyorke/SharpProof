@@ -502,7 +502,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         // A nonvirtual auto-property's setter only stores its backing field.
         if (depth < 256 && operation is ISimpleAssignmentOperation { IsRef: false, Target: IPropertyReferenceOperation { Arguments.Length: 0 } setProperty } propertyStore &&
             CSharpOperationSemantics.SetterField(setProperty.Property) is { } setField &&
-            CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(setField), _context.Target.ContainingAssembly))
+            (CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(setField), _context.Target.ContainingAssembly) ||
+                IsInitializedStaticWrite(setField)))
         { return FieldWrite(propertyStore, setField, setProperty.Instance, block, depth); }
         if (depth < 256 && operation is IIncrementOrDecrementOperation { Target: IPropertyReferenceOperation { Arguments.Length: 0 } incrementedProperty } &&
             CSharpOperationSemantics.SetterField(incrementedProperty.Property, readsValue: true) is { } incrementedBacking &&
@@ -647,6 +648,7 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
                 }
             case ISimpleAssignmentOperation { IsRef: false, Target: IFieldReferenceOperation field } assignment
                 when CSharpOperationSemantics.IsSupportedFieldWrite(BoundField(field.Field), _context.Target.ContainingAssembly) ||
+                    IsInitializedStaticWrite(field.Field) ||
                     CSharpOperationSemantics.IsConstructorReadOnlyStore(BoundField(field.Field), field.Instance, _context.Target,
                         _context.Target.ContainingAssembly):
                 return FieldWrite(assignment, field, block, depth);
@@ -1646,16 +1648,36 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
 
     // A field increment or compound assignment on `this`, a parameter or a
     // local reads the field (faulting on a null receiver), computes from that
-    // approximated value, and writes it back.
+    // approximated value, and writes it back. One on a static reads an
+    // unknown value and writes static state.
     private bool IsMutableField(IFieldReferenceOperation field)
     { return IsMutableField(field.Field, field.Instance); }
 
     private bool IsMutableField(IFieldSymbol field, IOperation? instance)
     {
         field = BoundField(field);
+        if (field.IsStatic)
+        {
+            return instance == null && (CSharpOperationSemantics.IsSupportedFieldRead(field) &&
+                    CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) ||
+                CSharpOperationSemantics.IsStaticFieldReadAfterInitialization(field) && IsInitializedStaticWrite(field));
+        }
         return CSharpOperationSemantics.IsSupportedFieldRead(field) &&
             CSharpOperationSemantics.IsSupportedFieldWrite(field, _context.Target.ContainingAssembly) &&
             (IsImplicitThis(instance) || instance is IParameterReferenceOperation or ILocalReferenceOperation);
+    }
+
+    // A store into a mutable static of a type whose initializer is admitted.
+    // The store runs that initializer, which has no effect a body can
+    // observe, and then writes the static as in a type with no initializer.
+    // Every read of a static, before or after, is an unknown value, so no
+    // value the initializer left is assumed past the store.
+    internal bool IsInitializedStaticWrite(IFieldSymbol field)
+    {
+        field = BoundField(RepositoryParameterGuard.NotNull(field, nameof(field)));
+        return !ShadowCallSkeleton && field.IsStatic &&
+            CSharpOperationSemantics.IsStaticFieldWriteAfterInitialization(field, _context.Target.ContainingAssembly) &&
+            TypeInitializationFree?.Invoke(field.ContainingType) == true;
     }
 
     private TotalBodyValue FieldMutation(IOperation operation, IFieldReferenceOperation field, IrBlockId block, int depth,
@@ -1688,7 +1710,8 @@ internal sealed partial class RoslynTotalExpressionLowerer(TotalLoweringContext 
         if (next.Classification.IsExact)
         {
             var stored = ApplyRule(operation, CSharpOperationSemantics.FieldWrite(_factory, next.Value, receiver), next.Continuation);
-            var region = instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
+            var region = field.IsStatic ? IrWriteRegion.Static :
+                instance is IParameterReferenceOperation ? IrWriteRegion.Parameter : IrWriteRegion.Field;
             Store(stored.Continuation, ReceiverWriteSite(operation, instance), region, field,
                 receiver ?? (captured ? null : ImplicitReceiver(instance)), next.Value);
             next = operation is IIncrementOrDecrementOperation { IsPostfix: true }
