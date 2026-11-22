@@ -248,6 +248,11 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- On an async method, `[DoesNotThrow]` states that the returned task never
+  faults or is canceled, and `[AllowedExceptions]` bounds the exceptions it
+  can hold. Both are proved when no exception can leave the body and refuted
+  by a replayed throw; after an unknown await they stay `Unknown`. Before,
+  both were `Unknown` on every async method.
 - Awaiting `Task.CompletedTask`, `Task.FromResult(x)`, `ValueTask.CompletedTask`,
   `ValueTask.FromResult(x)` or `new ValueTask<T>(x)` is the value itself: the
   task is already complete, so the await does not suspend. A call to a source
@@ -263,8 +268,8 @@ listing changes against an earlier one. Development history is in the Git log.
   other `await` is an unknown call. An exception that leaves the body faults
   the returned task and may later run `UnobservedTaskException` handlers, so
   it counts as an unknown call. The returned task is a possible allocation,
-  so `[ZeroAllocations]` is never proved. `[DoesNotThrow]`,
-  `[AllowedExceptions]`, `Ensures` and resource bounds stay `Unknown`.
+  so `[ZeroAllocations]` is never proved. `Ensures` and resource bounds stay
+  `Unknown`.
   `async void`, async iterators, custom builders, async struct members,
   `await foreach` and `await using` stay unsupported. See SEMANTICS.md, "Async methods".
 - A `return` inside a `try`, `using` or `lock` region now converts its value
