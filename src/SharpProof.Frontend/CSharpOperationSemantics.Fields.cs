@@ -266,12 +266,22 @@ internal static partial class CSharpOperationSemantics
         return instance is IInstanceReferenceOperation && instance.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax;
     }
 
+    // A read-modify-write through the property calls its getter too, so the
+    // backing field stands for that read only when the getter is also
+    // compiler-implemented. A C# 14 `field`-backed property may pair an
+    // automatic setter with a getter that has a body.
+    private static bool IsAutoGetter(IMethodSymbol? getter)
+    {
+        return getter is { } method && !HasSynchronizedEntry(method) && method.DeclaringSyntaxReferences.Length == 1 &&
+            method.DeclaringSyntaxReferences[0].GetSyntax() is Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null };
+    }
+
     // The backing field a nonvirtual auto-property's setter stores.
     internal static IFieldSymbol? SetterField(IPropertySymbol property, bool readsValue = false)
     {
         if (property.IsIndexer || property.IsVirtual || property.IsOverride || property.IsAbstract ||
             property.SetMethod is not { IsInitOnly: false } setter || HasSynchronizedEntry(setter) ||
-            readsValue && property.GetMethod is { } getter && HasSynchronizedEntry(getter) ||
+            readsValue && !IsAutoGetter(property.GetMethod) ||
             !property.IsStatic && !property.ContainingType.IsReferenceType ||
             setter.DeclaringSyntaxReferences.Length != 1 ||
             setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })

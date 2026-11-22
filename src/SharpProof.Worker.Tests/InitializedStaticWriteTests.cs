@@ -100,6 +100,37 @@ public sealed class InitializedStaticWriteTests
         Assert.That(result.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
     }
 
+    // A read-modify-write through a property runs its getter. A C# 14
+    // `field`-backed property whose setter is automatic but whose getter
+    // has a body is not read as its backing field, static or instance.
+    [TestCase("[DoesNotThrow] public static void M() { Guarded.Count++; }")]
+    [TestCase("[DoesNotThrow] public static void M(int x) { Guarded.Count += x; }")]
+    [TestCase("[DoesNotThrow] public static void M(Box b) { if (b != null) { b.Count++; } }")]
+    [TestCase("[DoesNotThrow] public static void M(Box b, int x) { if (b != null) { b.Count += x; } }")]
+    public async Task ACustomGetterIsNotSkipped(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        const string guarded = """
+            using SharpProof.Attributes;
+            public static class Guarded
+            {
+                public static int Count { get => throw new System.InvalidOperationException(); set; } = 0;
+            }
+            public sealed class Box
+            {
+                public int Count { get => throw new System.InvalidOperationException(); set; }
+            }
+            """;
+        var compilation = TestCompilation.Create("FieldBacked", [("Subject.cs", guarded + " public static class C { " + member + " }")],
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
+        TestCompilation.AssertNoErrors(compilation);
+        var artifact = SharpProof.CompilerCollector.CompilerManifestArtifactProducer.Create(compilation, "/project", "net9.0", WorkerFeatureSet.All,
+            new SharpProof.CompilerCollector.ClaimManifestBuilder(compilation).Build(), WorkerBudgets.DefaultMaximumExpressionDepth, TestContext.CurrentContext.CancellationToken);
+        using var project = new ShadowTestProject(artifact);
+        var result = await ResultAsync(project);
+        Assert.That(result.Outcome, Is.AnyOf(WorkerClaimOutcome.Unknown, WorkerClaimOutcome.Refuted), result.Reason.ToString());
+    }
+
     // A readonly static's initialized value is still known after a body
     // stores another static of its type: the store cannot reach it, and
     // the initialization stores no static a body can write.
@@ -117,6 +148,12 @@ public sealed class InitializedStaticWriteTests
     {
         System.ArgumentNullException.ThrowIfNull(member);
         using var project = new ShadowTestProject(Types + "\npublic static class C { " + member + " }\n");
+        return await ResultAsync(project);
+    }
+
+    private static async Task<WorkerClaimResult> ResultAsync(ShadowTestProject project)
+    {
+        System.ArgumentNullException.ThrowIfNull(project);
         using var worker = SharpProofWorker.CreateNative(project.Request.Budgets);
         var response = await worker.VerifyAsync(project.Request, project.Snapshot, TestContext.CurrentContext.CancellationToken);
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
