@@ -79,7 +79,9 @@ public sealed class BlockerCensusTests
     }
 
     // Labels name what keeps the body from lowering, not where Roslyn put it.
-    [TestCase("public static async System.Threading.Tasks.Task M() { await System.Threading.Tasks.Task.Yield(); }", "ContractBinding: UnsupportedTarget: async")]
+    [TestCase("public static async void M() { await System.Threading.Tasks.Task.Yield(); }", "ContractBinding: UnsupportedTarget: async void")]
+    [TestCase("public static async System.Collections.Generic.IAsyncEnumerable<int> M() { yield return 1; }", "ContractBinding: UnsupportedTarget: async iterator")]
+    [TestCase("public static async System.Threading.Tasks.Task<int> M(System.Threading.Tasks.Task<int> t) { return await t.ConfigureAwait(false) + 1; }", "(lowers exactly)")]
     [TestCase("public static void M(ref System.DateTime d) { }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
     [TestCase("public static void M(out int value, ref System.DateTime d) { value = 0; }", "ContractBinding: UnsupportedTarget: Ref parameter of System_DateTime")]
     [TestCase("public static int M(int x) { var text = $\"{x:X}\"; return text.Length; }", "UnsupportedOperationKind: InterpolatedString of System_String")]

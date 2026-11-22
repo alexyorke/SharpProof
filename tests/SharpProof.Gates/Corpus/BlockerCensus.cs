@@ -177,6 +177,7 @@ internal static class BlockerCensus
         var approximated = new List<SyntaxNode>();
         var context = new TotalLoweringContext(new IrFactory(), method, tree => paths[tree])
         {
+            AdmitsAsync = true,
             AdmitsOutParameters = true,
             AdmitsReferenceParameters = true,
             ApproximationObserver = operation => approximated.Add(operation.Syntax)
@@ -226,9 +227,13 @@ internal static class BlockerCensus
     private static string SignatureBlocker(IMethodSymbol method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        if (method.IsAsync)
+        // An admitted async method fails only on what follows.
+        if (method.IsAsync && !TotalLoweringContext.IsAdmittedAsync(method))
         {
-            return "async";
+            return method.ReturnsVoid ? "async void"
+                : method.ReturnType.Name is "IAsyncEnumerable" or "IAsyncEnumerator" ? "async iterator"
+                : !TotalLoweringContext.IsTaskType(method.ReturnType) ? "async return of " + Kind(method.ReturnType)
+                : !method.IsStatic && method.ContainingType.IsValueType ? "async struct member" : "async method builder";
         }
         if (method.ReturnsByRef || method.ReturnsByRefReadonly)
         {

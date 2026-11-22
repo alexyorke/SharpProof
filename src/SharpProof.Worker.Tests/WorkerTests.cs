@@ -1303,7 +1303,7 @@ internal sealed partial class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            // Async bodies stay unsupported; the others allocate `new object()`.
+            // An `async void` body stays unsupported; the others allocate `new object()`.
             Assert.That(response.ClaimResults, Has.Length.EqualTo(3));
             foreach (var result in response.ClaimResults)
             {

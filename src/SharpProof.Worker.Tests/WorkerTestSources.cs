@@ -11,10 +11,11 @@ internal static class WorkerTestSources
             public static object Generic<T>() =>
                 new object();
 
+            // `async void` stays outside the admitted async shapes.
             [ZeroAllocations]
-            public static async Task<object> Async() {
+            public static async void Async() {
                 await Task.Yield();
-                return new object();
+                _ = new object();
             }
 
             [ZeroAllocations]
@@ -36,10 +37,10 @@ internal static class WorkerTestSources
                 return 1;
             }
 
-            public static async Task<int> Async() {
+            // `async void` stays outside the admitted async shapes.
+            public static async void Async() {
                 Contract.Ensures(true);
                 await Task.Yield();
-                return 1;
             }
         }
         """;
