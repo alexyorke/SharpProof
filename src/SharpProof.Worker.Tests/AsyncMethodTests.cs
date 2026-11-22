@@ -27,6 +27,7 @@ public sealed class AsyncMethodTests
             public static async Task Store() { S = 1; }
             public static async Task<int> Awaits(Task<int> t) { return await t; }
             public static async Task Wait(Task t) { await t; }
+            public static async Task Spin(Task t) { try { await t; } catch (System.Exception) { } while (true) { } }
             public static async Task Fail() { throw new System.InvalidOperationException("x"); }
             public static async Task<int> Positive(int x) { Contract.Requires(x > 0); return x - 1; }
             public static async Task Unwinds(Box b) { try { throw new System.InvalidOperationException("x"); } finally { b.F = 1; } }
@@ -59,7 +60,6 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static Task<int> M(int x) { return Inner.Next(x); }")]
     [TestCase("[EnforcePure] public static async Task<int> M(int x) { var t = Inner.Next(x); return await Inner.Next(x); }")]
     [TestCase("[DoesNotThrow] public static void M() { _ = Inner.Fail(); }")]
-    [TestCase("[DoesNotThrow] public static Task M(Task t) { return Inner.Wait(t); }")]
     public async Task PureAsyncBodiesAreProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -115,6 +115,8 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async System.Collections.Generic.IAsyncEnumerable<int> M() { yield return 1; }")]
     [TestCase("[EnforcePure] public static int M() { return Inner.Next(1).Result; }")]
     [TestCase("[EnforcePure] public static async Task M(Counter c) { await c.Bump(); }")]
+    // A detached callee that may suspend is an unknown call.
+    [TestCase("[DoesNotThrow] public static Task M(Task t) { return Inner.Wait(t); }")]
     public async Task UnmodeledAsyncBehaviorStaysUnknown(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);
@@ -128,6 +130,8 @@ public sealed class AsyncMethodTests
     // The callee's finally runs before its task faults, so the caller's filter
     // sees b.F == 1 and the store runs (UnwoundCalleeFaultRunsTheFilteredHandler).
     [TestCase("[EnforcePure] public static async Task M() { var b = new Box(); try { await Inner.Unwinds(b); } catch (System.InvalidOperationException) when (b.F == 1) { Inner.S = 5; } catch (System.InvalidOperationException) { } }")]
+    // The caller goes on once Spin suspends, though Spin never ends.
+    [TestCase("[EnforcePure] public static void M(Task t) { _ = Inner.Spin(t); Inner.S = 1; }")]
     public async Task FaultsThatTheAwaitMaySeeDifferentlyAreNotProven(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

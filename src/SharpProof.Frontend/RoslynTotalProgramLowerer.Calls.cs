@@ -795,6 +795,14 @@ internal sealed partial class RoslynTotalProgramLowerer
                 ? new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape))
                 : Opaque(inductiveRoot: callee.SourceCallPreconditions.IsEmpty && _calls.IsRecursiveRootCall(method));
         }
+        // A detached callee that may suspend lets its caller go on while the
+        // rest of its body runs, or never ends: the caller does not wait for
+        // it, so its body is not inlined, and the call is an unknown call.
+        if (detached && MaySuspend(callee.Target.DeclaringSyntaxReferences[0].GetSyntax(_cancellationToken)))
+        {
+            return _expressions.AllowOpaqueCalls ? Opaque()
+                : new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
+        }
         // A detached callee's exceptions fault its task, but a shared frame
         // sends them to the caller's handlers.
         if (externalFilterSearch && detached)

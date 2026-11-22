@@ -30,7 +30,9 @@ internal sealed partial class RoslynTotalExpressionLowerer
         if (ShadowCallSkeleton || !_context.Target.IsAsync || operation.Type == null ||
             operation.Type.SpecialType != SpecialType.System_Void && !CSharpOperationSemantics.IsValueDomain(operation.Type))
         { return null; }
-        var awaited = WithoutConfigureAwait(operation.Operation);
+        // An intercepted call runs the interceptor, not the method it names.
+        var awaited = CSharpOperationSemantics.IsIntercepted(operation.Operation, _context.Compilation)
+            ? operation.Operation : WithoutConfigureAwait(operation.Operation);
         if (LowerCompletedAwait(operation, awaited, block, depth) is { } completed)
         { return completed; }
         // A dispatched call that does not resolve to this body may run
@@ -88,6 +90,8 @@ internal sealed partial class RoslynTotalExpressionLowerer
     private TotalBodyValue? LowerCompletedAwait(IAwaitOperation operation, IOperation awaited, IrBlockId block, int depth)
     {
         RepositoryParameterGuard.ThrowIfInvalid(block.IsDefault, nameof(block));
+        if (CSharpOperationSemantics.IsIntercepted(awaited, _context.Compilation))
+        { return null; }
         switch (awaited)
         {
             case IPropertyReferenceOperation { Property: { Name: "CompletedTask", IsStatic: true } property, Instance: null }

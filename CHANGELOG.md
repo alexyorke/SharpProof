@@ -372,6 +372,25 @@ listing changes against an earlier one. Development history is in the Git log.
   own initializer must be admitted. Before, any class whose base was not
   `object` made its constructing initializer an entry effect. A base
   constructor that stores into a virtual auto-property still does.
+- More type initializers count as effect-free, so their types' statics can be
+  read and their members inlined. `string.Empty` and `Environment.NewLine`
+  are constants. Fresh values now include `typeof(X)` of a core-library type
+  or a source type that always loads (no explicit layout, field offsets or
+  fixed buffers, no value-type field cycle, a loadable base chain and type
+  arguments that meet their constraints), empty array collection expressions,
+  `decimal` constants, `StringComparer.Ordinal` and `OrdinalIgnoreCase` as
+  values, `Type.EmptyTypes`, `Enumerable.Empty<T>()`, `new IdnMapping()`,
+  `SearchValues.Create` over a constant string, a parameterless
+  `ConcurrentQueue<T>`, `Dictionary` and `HashSet` initializers keyed by
+  distinct `typeof` operands, and reads of another admitted type's get-only
+  static auto-properties whose getters are not synchronized. Each framework
+  member is bound by identity, so a referenced lookalike type does not
+  qualify. A closed-computation initializer may run
+  floating-point arithmetic, unchecked conversions from `float` and `double`,
+  and `Math.Ceiling`, `Floor`, `Truncate`, `Round`, `Abs` and `Sqrt`, which
+  never throw, so Humanizer's `ByteSize` bounds no longer block its members.
+  Culture comparers, checked conversions, conversions to `decimal`, branches
+  on floating-point values and other framework calls stay entry effects.
 - A product of a widened input, such as `days * TicksPerDay` with an `int`
   `days`, is checked as the same term a postcondition writes for it. A widened
   input plus or minus a constant, such as `(days + 1) * TicksPerDay`, is
