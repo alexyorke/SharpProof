@@ -29,6 +29,7 @@ public sealed class AsyncMethodTests
             public static async Task Wait(Task t) { await t; }
             public static async Task Fail() { throw new System.InvalidOperationException("x"); }
             public static async Task<int> Positive(int x) { Contract.Requires(x > 0); return x - 1; }
+            public static async Task Unwinds(Box b) { try { throw new System.InvalidOperationException("x"); } finally { b.F = 1; } }
             public static async Task<int> Caught(int x) { try { throw new System.InvalidOperationException("x"); } catch (System.InvalidOperationException) { return x; } }
         }
         """;
@@ -107,6 +108,37 @@ public sealed class AsyncMethodTests
         System.ArgumentNullException.ThrowIfNull(member);
         var result = await ResultAsync(member);
         Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown), result.Reason.ToString());
+    }
+
+    // SuppressThrowing completes the await without rethrowing the fault, so
+    // the store after it runs; only ConfigureAwait(bool) is a plain await.
+    [TestCase("[EnforcePure] public static async Task M() { try { await Inner.Fail().ConfigureAwait(System.Threading.Tasks.ConfigureAwaitOptions.SuppressThrowing); Inner.S = 1; } catch (System.InvalidOperationException) { } }")]
+    // The callee's finally runs before its task faults, so the caller's filter
+    // sees b.F == 1 and the store runs (UnwoundCalleeFaultRunsTheFilteredHandler).
+    [TestCase("[EnforcePure] public static async Task M() { var b = new Box(); try { await Inner.Unwinds(b); } catch (System.InvalidOperationException) when (b.F == 1) { Inner.S = 5; } catch (System.InvalidOperationException) { } }")]
+    public async Task FaultsThatTheAwaitMaySeeDifferentlyAreNotProven(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        var result = await ResultAsync(member);
+        Assert.That(result.Outcome, Is.Not.EqualTo(WorkerClaimOutcome.Proven), result.Reason.ToString());
+    }
+
+    [Test]
+    public async Task UnwoundCalleeFaultRunsTheFilteredHandler()
+    {
+        const string source = Types + "public sealed class C { public static async Task M() { var b = new Box(); try { await Inner.Unwinds(b); } " +
+            "catch (System.InvalidOperationException) when (b.F == 1) { Inner.S = 5; } catch (System.InvalidOperationException) { } } }";
+        using var image = new MemoryStream();
+        Assert.That(TestCompilation.Create("AsyncFilterRuntime", source).Emit(image).Success, Is.True);
+        image.Position = 0;
+        var context = new System.Runtime.Loader.AssemblyLoadContext("AsyncFilterRuntime", isCollectible: true);
+        try
+        {
+            var assembly = context.LoadFromStream(image);
+            await (Task)assembly.GetType("C")!.GetMethod("M")!.Invoke(null, null)!;
+            Assert.That(assembly.GetType("Inner")!.GetField("S")!.GetValue(null), Is.EqualTo(5));
+        }
+        finally { context.Unload(); }
     }
 
     // An exception claim on an async method states nothing about its task.
