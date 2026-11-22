@@ -22,6 +22,17 @@ public sealed class InitializedStaticReadTests
             public static int Count;
             static Loud() { System.Console.WriteLine(); }
         }
+        public static class Keys
+        {
+            public static readonly System.Type Key = typeof(Keys);
+            public static readonly System.Buffers.SearchValues<char> Markup = System.Buffers.SearchValues.Create("<>&");
+            public static int Hits = 3;
+        }
+        public static class Sizes
+        {
+            public static readonly double Scale = 3 / 1024.0;
+            public static readonly long Bits = (long)System.Math.Ceiling(Scale * 8);
+        }
         public static class H
         {
             public static int Tag(object o, int x) { return x + 1; }
@@ -30,6 +41,9 @@ public sealed class InitializedStaticReadTests
 
     [TestCase("public static int M(int x) { Contract.Requires(x < 1000 && x > -1000); Contract.Ensures(Contract.Result<int>() == x + 1); return Cache.Hits >= 0 ? x + 1 : x + 1; }")]
     [TestCase("public static int M(int x) { Contract.Requires(x < 1000 && x > -1000); Contract.Ensures(Contract.Result<int>() == x + 1); return H.Tag(Cache.Items, x); }")]
+    [TestCase("public static int M(int x) { Contract.Requires(x < 1000 && x > -1000); Contract.Ensures(Contract.Result<int>() == x + 1); return Keys.Hits >= 0 ? x + 1 : x + 1; }")]
+    [TestCase("public static int M(int x) { Contract.Requires(x < 1000 && x > -1000); Contract.Ensures(Contract.Result<int>() == x + 1); return H.Tag(Keys.Key, x); }")]
+    [TestCase("public static int M(int x) { Contract.Requires(x < 1000 && x > -1000); Contract.Ensures(Contract.Result<int>() == x + 1); return Sizes.Bits >= 0 ? x + 1 : x + 1; }")]
     public async Task AdmittedInitializerStaticsAreRead(string member)
     {
         System.ArgumentNullException.ThrowIfNull(member);

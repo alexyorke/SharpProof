@@ -9555,8 +9555,8 @@
       "declarationSha256": "06a98a86427cc2a7f1343e071ee70d2af591f9c638f42e83ec34fc310f88e3cd",
       "methodName": "Convert",
       "mode": "effects",
-      "expectedVerdict": "Unknown",
-      "support": "IntentionallyUnsupported"
+      "expectedVerdict": "Refuted",
+      "support": "Supported"
     },
     {
       "id": "OSS0484",
