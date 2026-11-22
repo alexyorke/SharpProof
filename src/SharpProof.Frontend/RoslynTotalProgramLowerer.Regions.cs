@@ -106,11 +106,12 @@ internal sealed partial class RoslynTotalProgramLowerer
         }
         _compilerElision.RestoreCompilerElidedReachability(filterRegions.ToImmutable());
         _regionExceptionalExit = RegionBlock("exceptional:exit");
-        _builder.ExceptionalExit(_regionExceptionalExit, structural);
+        EmitRootExceptionalExit(_regionExceptionalExit, structural, graph.OriginalOperation);
         _expressions = new(_context, _builder, _regionExceptionalExit)
         {
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            AwaitedSourceCall = InlineAwaitedSourceCall,
             SourceOperator = InlineSourceOperator,
             TypeInitializationFree = type => _calls?.HasNoTypeInitialization(type) == true,
             SourceGetter = InlineSourceGetter,
@@ -134,6 +135,7 @@ internal sealed partial class RoslynTotalProgramLowerer
         };
         EmitClosureFrame(entry, graph.OriginalOperation);
         _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]);
+        EmitAsyncEntry(_blocks[graph.Blocks[0]], graph.OriginalOperation);
         var localInitialization = _regionLocals.Count == 0 ? default : RegionLocalInitialization();
         foreach (var source in graph.Blocks)
         {
@@ -295,8 +297,10 @@ internal sealed partial class RoslynTotalProgramLowerer
         {
             if (source.BranchValue is { } expression && _context.Result is { } result)
             {
+                // As on the ordinary path, a generic or widened value bridges
+                // to the result's declared type.
                 var value = Value(expression, block);
-                _builder.Assign(value.Continuation, site, result, value.Value);
+                _builder.Assign(value.Continuation, site, result, Bridge(value.Value, _context.Factory.GetVariableInfo(result).Type));
                 block = value.Continuation;
             }
             if (branch.FinallyRegions.IsEmpty)

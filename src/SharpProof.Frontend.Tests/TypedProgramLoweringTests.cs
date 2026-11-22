@@ -343,7 +343,8 @@ internal sealed class TypedProgramSubject : IDisposable
     internal TotalLoweringContext Context { get; }
     internal IrFactory Factory => Context.Factory;
 
-    internal static TypedProgramSubject Create(string members, string additionalSource = "", IEnumerable<string>? preprocessorSymbols = null)
+    internal static TypedProgramSubject Create(string members, string additionalSource = "", IEnumerable<string>? preprocessorSymbols = null,
+        bool admitsAsync = false)
     {
         System.ArgumentNullException.ThrowIfNull(additionalSource);
         System.ArgumentNullException.ThrowIfNull(members);
@@ -354,7 +355,7 @@ internal sealed class TypedProgramSubject : IDisposable
         Assert.That(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), Is.Empty);
         var syntax = tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single(method => method.Identifier.ValueText == "Target");
         var model = compilation.GetSemanticModel(tree);
-        var context = new TotalLoweringContext(new IrFactory(), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!);
+        var context = new TotalLoweringContext(new IrFactory(), (IMethodSymbol)model.GetDeclaredSymbol(syntax)!) { AdmitsAsync = admitsAsync };
         using var stream = new MemoryStream();
         var emitted = compilation.Emit(stream);
         Assert.That(emitted.Success, Is.True, string.Join(Environment.NewLine, emitted.Diagnostics));

@@ -17,9 +17,9 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
-        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree]);
+        var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree]) { AdmitsAsync = true };
         context.ModelReceiver();
-        if (target.Method.IsAsync)
+        if (target.Method.IsAsync && ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) != null)
         {
             // An owned scalar entry for resource projection only. This does not
             // admit an async functional body or bypass any source contract.
@@ -69,8 +69,12 @@ internal static class CompilerTotalCallableLowerer
         RequireCapturedTrees(compilation, capturedTrees);
         var documents = ImmutableDictionaryCapture.Create(compilation.SyntaxTrees.Select((tree, ordinal) => ((ordinal < 0) ? throw new System.ArgumentException("Value must be initialized.", nameof(ordinal)) : (tree is null ? throw new System.ArgumentNullException(nameof(tree)) : ((Tree: tree, Path: capturedTrees[ordinal].Path)))))
             , static item => item.Tree, static item => item.Path);
+        // A configured async join has its own resource projection (PrepareEntry).
+        if (target.Method.IsAsync && ResourceForkJoinPlan.TryCreate(target.Method, compilation, cancellationToken) != null)
+        { return null; }
         var context = new TotalLoweringContext(new IrFactory(), target.Method, tree => documents[tree])
         {
+            AdmitsAsync = true,
             CaptureCallFrames = true,
             AdmitsOutParameters = true,
             AdmitsReferenceParameters = true,
@@ -223,7 +227,8 @@ internal static class CompilerTotalCallableLowerer
             EntryConstructsFreshValues = entryInitialization == InitializationEffect.FreshValues,
             // A store to an out or ref parameter is an argument write (see
             // TotalLoweringContext.AdmitsReferenceParameters).
-            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint)
+            ValidEffectClaimIds = [.. target.EffectClaims.Where(claim => claim.HasValidConstraint &&
+                        !(target.Method.IsAsync && !IsAsyncEffectClaim(claim.Entry.EffectContractKind)))
                     .Select(claim => claim.Evidence.ClaimId).OrderBy(id => id, StringComparer.Ordinal)],
             ExceptionConstraints = ExceptionConstraints(compilation, target, cancellationToken),
             CallPreconditions = isBodyAbstraction ? [] : CreateCallPreconditions(lowering)
@@ -243,6 +248,17 @@ internal static class CompilerTotalCallableLowerer
         if (context.Result is { } result)
         { allowed.Add(result); }
         return IrTraversal.CollectVariables(term).All(allowed.Contains);
+    }
+
+    // The effect claims an async body's program decides. Its effects are those
+    // of the call. Its exceptions are not: the call stores each in the task it
+    // returns, and DoesNotThrow states only that no synchronous exception
+    // escapes, which then always holds and says nothing about the task. Its
+    // resource cost includes the builder's, which the body does not show.
+    private static bool IsAsyncEffectClaim(WorkerEffectContractKind kind)
+    {
+        return kind is WorkerEffectContractKind.EnforcePure or WorkerEffectContractKind.ZeroAllocations or
+            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract;
     }
 
     // A body over locals, parameters and constants alone: no field, element,

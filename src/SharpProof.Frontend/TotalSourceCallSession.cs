@@ -283,10 +283,13 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         ImmutableArray<IArgumentOperation> arguments, out TotalLoweringContext? frame, out ControlFlowGraph? graph,
         bool assigned = false, bool contractOnly = false, bool constructorInitializers = false, ImmutableArray<IOperation> operands = default,
         bool referenceArguments = false, bool exactTarget = false, bool readOnlyArguments = false,
-        ImmutableArray<(int Ordinal, IrVarId Storage)> sharedReferences = default)
+        ImmutableArray<(int Ordinal, IrVarId Storage)> sharedReferences = default, bool awaited = false)
     {
         caller = RepositoryParameterGuard.NotNull(caller, nameof(caller));
         method = RepositoryParameterGuard.NotNull(method, nameof(method));
+        // An async callee runs as its body only when its call is awaited
+        // (RoslynTotalProgramLowerer.Async.cs); a contract alone describes no task.
+        awaited = awaited && method.IsAsync && !contractOnly && TotalLoweringContext.IsAdmittedAsync(method.OriginalDefinition);
         if (arguments.IsDefault)
         { throw new ArgumentNullException(nameof(arguments)); }
         // Operands stand for the arguments of a user-defined operator, which
@@ -330,7 +333,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
                     SymbolEqualityComparer.Default.Equals(instance.Type, method.ContainingType)) ||
             // A dispatched member runs this body only when the caller resolved
             // it as the call's exact target.
-            !exactTarget && (method.IsVirtual || method.IsOverride) || method.IsAbstract || method.IsAsync || method.IsExtern ||
+            !exactTarget && (method.IsVirtual || method.IsOverride) || method.IsAbstract || method.IsAsync && !awaited || method.IsExtern ||
             method.ReducedFrom != null || method.ReturnsByRef || method.ReturnsByRefReadonly ||
             method.PartialDefinitionPart != null || method.PartialImplementationPart != null ||
             method.Parameters.Where((parameter, ordinal) =>
@@ -449,6 +452,7 @@ internal sealed class TotalSourceCallSession(Compilation compilation,
         // Source operations bind to declaration symbols. Reconcile parameter and
         // result storage from validated arguments before binding contracts or bodies.
         frame = caller.CreateFrame(method.OriginalDefinition);
+        frame.AwaitsAsync = awaited;
         frame.WritesBackReferences = referenceArguments;
         if (readsOwner)
         { frame.CaptureOwner = caller; }

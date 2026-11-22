@@ -197,6 +197,14 @@ internal sealed class TotalContractBinder
         if (resolution.Failure != ContractBindingFailure.None &&
             (!requiresOnly || resolution.Failure != ContractBindingFailure.InvalidClausePlacement || ContractBinder.HasRequiresPlacementErrors(resolution.Inventory)))
         { return Fail(resolution.Failure); }
+        // A postcondition of an async method would describe the task's
+        // completion, which can come after the call returns, or never; the
+        // body's result is the task's, not the call's. No Ensures clause or
+        // return-value attribute of one is bound.
+        // Return-value attributes are refused in BindTotalAttributes.
+        if (context.Target.IsAsync && !requiresOnly &&
+            resolution.Inventory.Clauses.Any(static occurrence => occurrence.IsValid && occurrence.Kind == BoundContractKind.Ensures))
+        { return Fail(ContractBindingFailure.UnsupportedTarget); }
         var candidates = resolution.Inventory.Clauses
             .Where(static occurrence => occurrence.IsValid)
             .Select(static occurrence => new ContractInvocationCandidate(
@@ -246,13 +254,13 @@ internal sealed class TotalContractBinder
             var bound = ClosedContractAttributeBinding.BindValue(
                 _factory, _classifier.Api!.Selections, site.Attributes, site.Type, site.RefKind,
                 () => site.IsReturn
-                    ? context.Result is { } result ? _factory.Variable(result) : null
+                    ? context.Result is { } result && !context.Target.IsAsync ? _factory.Variable(result) : null
                     : _factory.Variable(context.Parameters[site.ParameterIndex].Entry), name,
                 site.IsReturn ? BoundContractKind.Ensures : BoundContractKind.Requires,
                 syntax => context.AttributeSite(syntax!));
             if (bound.Failure != ContractBindingFailure.None)
             {
-                return bound.Failure;
+                return site.IsReturn && context.Target.IsAsync ? ContractBindingFailure.UnsupportedTarget : bound.Failure;
             }
             foreach (var clause in bound.Clauses)
             {

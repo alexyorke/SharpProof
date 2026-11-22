@@ -67,6 +67,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { throw new RegionIncompleteException(); }
         if (HasOwnIteratorBody(graph.OriginalOperation))
         { LowerIteratorCall(graph.OriginalOperation, createFrame); return; }
+        if (HasAsyncDisposal(graph.OriginalOperation))
+        { throw new RegionIncompleteException(FrontendAbstention.UnsupportedStatement); }
         _emissionCompilation = _context.Compilation ??= graph.OriginalOperation.SemanticModel?.Compilation;
         _emission = _emissionCompilation == null ? null : new(_emissionCompilation);
         _compilerElision = new(graph, _context, _emission, _regionWork, _emissionCompilation);
@@ -123,7 +125,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         }
         var exceptionalExit = _builder.CreateBlock("exceptional:exit");
         _ordinaryExceptionalExit = exceptionalExit;
-        _builder.ExceptionalExit(exceptionalExit, structural);
+        EmitRootExceptionalExit(exceptionalExit, structural, graph.OriginalOperation);
         var closure = RootParameterClosurePlan.TryCreate(_context.Target, _context.Compilation, _cancellationToken);
         IrTerm? rootClosureFrame = null;
         ImmutableArray<IrMemberId> rootClosureFields = [];
@@ -168,6 +170,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             RootClosureFields = rootClosureFields,
             Spend = SpendRegion,
             SourceCall = InlineSourceCall,
+            AwaitedSourceCall = InlineAwaitedSourceCall,
             SourceOperator = InlineSourceOperator,
             TypeInitializationFree = type => _calls?.HasNoTypeInitialization(type) == true,
             SourceGetter = InlineSourceGetter,
@@ -192,6 +195,7 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
         { EmitClosureFrame(entry, graph.OriginalOperation); }
         if (graph.OriginalOperation.Language != LanguageNames.VisualBasic)
         { _builder.Goto(entry, structural, _blocks[graph.Blocks[0]]); }
+        EmitAsyncEntry(_blocks[graph.Blocks[0]], graph.OriginalOperation);
         foreach (var source in selected)
         {
             var block = _blocks[source];

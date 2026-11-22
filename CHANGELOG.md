@@ -248,6 +248,23 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- `async` methods returning `Task`, `Task<T>`, `ValueTask` or `ValueTask<T>`
+  are analyzed. Before, every claim on one was `Unknown` at its signature.
+  `[EnforcePure]`, `[AllowedCapabilities]` and `[EffectContract]` describe the
+  whole operation the call starts, including the part after a suspension. An
+  awaited call to a source async method runs that method's body in place; any
+  other `await` is an unknown call. An exception that leaves the body faults
+  the returned task and may later run `UnobservedTaskException` handlers, so
+  it counts as an unknown call. The returned task is a possible allocation,
+  so `[ZeroAllocations]` is never proved. `[DoesNotThrow]`,
+  `[AllowedExceptions]`, `Ensures` and resource bounds stay `Unknown`.
+  `async void`, async iterators, custom builders, async struct members,
+  `await foreach`, `await using` and calls to async methods that are not
+  awaited stay unsupported. See SEMANTICS.md, "Async methods".
+- A `return` inside a `try`, `using` or `lock` region now converts its value
+  to the method's declared result type, as other returns do. Before, a
+  widened or generic value there stopped the whole project's analysis with
+  "The assigned value does not match the target type".
 - A body may read a static auto-property of such a type, with or without a
   setter, under the same rule. Before, its getter was an unknown call that
   left the body unsupported. Boxing a `T?` whose value does not lower, such as
