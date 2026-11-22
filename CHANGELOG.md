@@ -248,6 +248,13 @@ listing changes against an earlier one. Development history is in the Git log.
   the known-value and immutable-value rules, left the body unsupported. The
   value is unknown and the read is a read of static state, so `EnforcePure`
   stays `Unknown`; other claims can now be proved.
+- Awaiting `Task.CompletedTask`, `Task.FromResult(x)`, `ValueTask.CompletedTask`,
+  `ValueTask.FromResult(x)` or `new ValueTask<T>(x)` is the value itself: the
+  task is already complete, so the await does not suspend. A call to a source
+  async method that is not awaited, such as `return InnerAsync(x);` in a
+  method returning `Task`, runs that method's body; its exceptions fault the
+  returned task instead of reaching the caller, and the task itself is
+  unknown.
 - `async` methods returning `Task`, `Task<T>`, `ValueTask` or `ValueTask<T>`
   are analyzed. Before, every claim on one was `Unknown` at its signature.
   `[EnforcePure]`, `[AllowedCapabilities]` and `[EffectContract]` describe the
@@ -259,8 +266,7 @@ listing changes against an earlier one. Development history is in the Git log.
   so `[ZeroAllocations]` is never proved. `[DoesNotThrow]`,
   `[AllowedExceptions]`, `Ensures` and resource bounds stay `Unknown`.
   `async void`, async iterators, custom builders, async struct members,
-  `await foreach`, `await using` and calls to async methods that are not
-  awaited stay unsupported. See SEMANTICS.md, "Async methods".
+  `await foreach` and `await using` stay unsupported. See SEMANTICS.md, "Async methods".
 - A `return` inside a `try`, `using` or `lock` region now converts its value
   to the method's declared result type, as other returns do. Before, a
   widened or generic value there stopped the whole project's analysis with
