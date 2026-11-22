@@ -173,7 +173,6 @@ internal sealed class NativePurityEffectTests
     }
 
     [TestCase("public static volatile int State;", "State = x; return x;")]
-    [TestCase("public static int State = 1;", "State = x; return x;")]
     [TestCase("[System.ThreadStatic] public static object State = new object();", "return x;")]
     public async Task UnmodeledEffectsAndInitializationRemainUnknown(string members, string body)
     {
@@ -554,20 +553,54 @@ internal sealed class NativePurityEffectTests
         Assert.That(observed, Is.EqualTo(1));
     }
 
+    // A store, or a discarded unchecked int increment, of a static of a type
+    // whose initializer is admitted writes static state as in a type with
+    // no initializer.
+    [TestCase("public static int State; static C() { State = 1; }", "State++; return x;")]
+    [TestCase("public static int State = 1;", "State++; return x;")]
+    [TestCase("public static int State = 1;", "--State; return x;")]
+    [TestCase("public static int State = 1;", "State = x; return x;")]
+    public async Task InitializedStaticWritesRefutePurity(string members, string body)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(members);
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members)));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.TypeOf<RefutedOutcome>(), result.Reason.ToString());
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Select(static write => write.Region), Is.All.EqualTo(IrWriteRegion.Static));
+    }
+
+    // Any other increment or compound assignment of a supported static, in
+    // a type with no initializer or with an admitted one, reads an unknown
+    // value and writes static state. Replay does not reproduce the read, so
+    // purity stays Unknown, but the body lowers.
     [TestCase("public static int State;", "return State++;")]
     [TestCase("public static int State;", "checked { State++; } return x;")]
     [TestCase("public static int State;", "State += x; return x;")]
-    [TestCase("public static volatile int State;", "State++; return x;")]
-    [TestCase("public static int State; static C() { State = 1; }", "State++; return x;")]
-    [TestCase("public static int State = 1;", "State++; return x;")]
+    [TestCase("public static int State = 1;", "State += x; return x;")]
+    [TestCase("public static int State = 1;", "return ++State;")]
     [TestCase("public static byte State;", "State++; return x;")]
     [TestCase("public static int State;", "int _ = 0; _ = State++; return x;")]
     [TestCase("public static int State;", "long _ = 0; _ = (long)State++; return x;")]
     [TestCase("public static int State;", "_ = checked((byte)unchecked(State++)); return x;")]
     [TestCase("public static int State;", "_ = (object)State++; return x;")]
-    [TestCase("public static int State; public struct Wrapper { public static implicit operator Wrapper(int value) => default; }", "_ = (Wrapper)State++; return x;")]
     [TestCase("public static int State;", "int ignored = State++; return x;")]
     [TestCase("public static int State;", "return State++ + x;")]
+    public async Task StaticFieldMutationsLowerAsStaticWrites(string members, string body)
+    {
+        System.ArgumentNullException.ThrowIfNull(body);
+        System.ArgumentNullException.ThrowIfNull(members);
+        var preparation = Prepare(CompilerTotalCallableArtifactTests.CreateArtifact(Source(body, members)));
+        var result = await NativeEffectSiteVerifier.VerifyPurityAsync(preparation, new WorkerBudgets(), cancellationToken: TestContext.CurrentContext.CancellationToken);
+        Assert.That(result.Outcome, Is.Not.TypeOf<ProvenOutcome>(), result.Reason.ToString());
+        Assert.That(result.Reason, Is.Not.EqualTo(WorkerClaimReason.UnsupportedBody));
+        Assert.That(preparation.Total!.Program.Blocks.SelectMany(block => block.Instructions)
+            .OfType<IrWriteInstruction>().Select(static write => write.Region), Does.Contain(IrWriteRegion.Static));
+    }
+
+    [TestCase("public static volatile int State;", "State++; return x;")]
+    [TestCase("public static int State; public struct Wrapper { public static implicit operator Wrapper(int value) => default; }", "_ = (Wrapper)State++; return x;")]
     public async Task UnsupportedStaticFieldMutationSlicesRemainUnknown(string members, string body)
     {
         System.ArgumentNullException.ThrowIfNull(body);

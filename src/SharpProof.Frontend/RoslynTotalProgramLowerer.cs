@@ -418,7 +418,8 @@ internal sealed partial class RoslynTotalProgramLowerer(TotalLoweringContext con
             discarded = conversion.Operand;
         }
         return discarded is IIncrementOrDecrementOperation { IsChecked: false, OperatorMethod: null, Target: IFieldReferenceOperation { Field.IsStatic: true, Field.Type.SpecialType: SpecialType.System_Int32, Instance: null } field } increment &&
-            CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) ? increment : null;
+            (CSharpOperationSemantics.IsSupportedFieldWrite(field.Field, _context.Target.ContainingAssembly) ||
+                _expressions.IsInitializedStaticWrite(field.Field)) ? increment : null;
     }
 
     private IIncrementOrDecrementOperation? TryDiscardedInstanceFieldMutation(IOperation operation)

@@ -230,6 +230,26 @@ internal static partial class CSharpOperationSemantics
             IsValueDomain(field.Type);
     }
 
+    // A store into a mutable static of a class whose type has an
+    // initializer: the store first runs that initializer, so only a caller
+    // that admits it may model the store, which is then the same static
+    // write as in a type with no initializer. A readonly static stays out:
+    // only the type's own initialization may store it. A thread-static one
+    // stays out too: each thread runs its initializer's stores on its own.
+    internal static bool IsStaticFieldWriteAfterInitialization(IFieldSymbol field, IAssemblySymbol sourceAssembly)
+    {
+        field = RepositoryParameterGuard.NotNull(field, nameof(field));
+        sourceAssembly = RepositoryParameterGuard.NotNull(sourceAssembly, nameof(sourceAssembly));
+        return field is { IsStatic: true, IsVolatile: false, IsReadOnly: false, IsConst: false } &&
+            SymbolEqualityComparer.Default.Equals(field.ContainingAssembly, sourceAssembly) &&
+            (IsScalar(field.Type) || IsReferenceDomain(field.Type) || IsFloatingPoint(field.Type)) && field.ContainingType.IsReferenceType &&
+            !field.GetAttributes().Any(static attribute => attribute.AttributeClass is
+            {
+                Name: "ThreadStaticAttribute",
+                ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+            });
+    }
+
     internal static TotalScalarRule FieldRead(IrFactory factory, IrTerm value, IrTerm? receiver)
     {
         factory = RepositoryParameterGuard.NotNull(factory, nameof(factory));
@@ -246,12 +266,22 @@ internal static partial class CSharpOperationSemantics
         return instance is IInstanceReferenceOperation && instance.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.BaseExpressionSyntax;
     }
 
+    // A read-modify-write through the property calls its getter too, so the
+    // backing field stands for that read only when the getter is also
+    // compiler-implemented. A C# 14 `field`-backed property may pair an
+    // automatic setter with a getter that has a body.
+    private static bool IsAutoGetter(IMethodSymbol? getter)
+    {
+        return getter is { } method && !HasSynchronizedEntry(method) && method.DeclaringSyntaxReferences.Length == 1 &&
+            method.DeclaringSyntaxReferences[0].GetSyntax() is Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null };
+    }
+
     // The backing field a nonvirtual auto-property's setter stores.
     internal static IFieldSymbol? SetterField(IPropertySymbol property, bool readsValue = false)
     {
         if (property.IsIndexer || property.IsVirtual || property.IsOverride || property.IsAbstract ||
             property.SetMethod is not { IsInitOnly: false } setter || HasSynchronizedEntry(setter) ||
-            readsValue && property.GetMethod is { } getter && HasSynchronizedEntry(getter) ||
+            readsValue && !IsAutoGetter(property.GetMethod) ||
             !property.IsStatic && !property.ContainingType.IsReferenceType ||
             setter.DeclaringSyntaxReferences.Length != 1 ||
             setter.DeclaringSyntaxReferences[0].GetSyntax() is not Microsoft.CodeAnalysis.CSharp.Syntax.AccessorDeclarationSyntax { Body: null, ExpressionBody: null })
