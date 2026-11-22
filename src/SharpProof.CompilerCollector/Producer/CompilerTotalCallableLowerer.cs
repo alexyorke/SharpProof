@@ -251,14 +251,16 @@ internal static class CompilerTotalCallableLowerer
     }
 
     // The effect claims an async body's program decides. Its effects are those
-    // of the call. Its exceptions are not: the call stores each in the task it
-    // returns, and DoesNotThrow states only that no synchronous exception
-    // escapes, which then always holds and says nothing about the task. Its
-    // resource cost includes the builder's, which the body does not show.
+    // of the call. Its exceptions are those that leave the body, which the call
+    // stores in the task it returns: on an async method DoesNotThrow states that
+    // the task never faults or is canceled, and AllowedExceptions bounds what
+    // it holds. Its resource cost includes the builder's, which the body does
+    // not show.
     private static bool IsAsyncEffectClaim(WorkerEffectContractKind kind)
     {
         return kind is WorkerEffectContractKind.EnforcePure or WorkerEffectContractKind.ZeroAllocations or
-            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract;
+            WorkerEffectContractKind.AllowedCapabilities or WorkerEffectContractKind.EffectContract or
+            WorkerEffectContractKind.DoesNotThrow or WorkerEffectContractKind.AllowedExceptions;
     }
 
     // A body over locals, parameters and constants alone: no field, element,

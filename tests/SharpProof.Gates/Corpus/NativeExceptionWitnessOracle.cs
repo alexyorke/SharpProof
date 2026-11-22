@@ -65,14 +65,39 @@ internal sealed class NativeExceptionWitnessOracle(CSharpCompilation compilation
     {
         System.ArgumentNullException.ThrowIfNull(values, nameof(values));
         System.ArgumentNullException.ThrowIfNull(callable);
+        object? returned;
         try
         {
-            callable.Invoke(null, values);
-            return null;
+            returned = callable.Invoke(null, values);
         }
         catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
             return exception.InnerException;
+        }
+        // An async method stores its exception in the task it returns; a
+        // replayed witness runs no unknown await, so the task is complete.
+        var task = returned switch
+        {
+            System.Threading.Tasks.Task completed => completed,
+            System.Threading.Tasks.ValueTask value => value.AsTask(),
+            not null when returned.GetType() is { IsGenericType: true } type &&
+                type.GetGenericTypeDefinition() == typeof(System.Threading.Tasks.ValueTask<>) =>
+                (System.Threading.Tasks.Task)type.GetMethod("AsTask")!.Invoke(returned, null)!,
+            _ => null
+        };
+        if (task == null)
+        { return null; }
+        _ = ((IAsyncResult)task).AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(10));
+        if (!task.IsCompleted)
+        { throw new InvalidDataException("A replayed async witness did not complete."); }
+        try
+        {
+            task.GetAwaiter().GetResult();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
         }
     }
 

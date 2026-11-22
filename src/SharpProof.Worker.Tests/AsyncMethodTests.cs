@@ -107,10 +107,6 @@ public sealed class AsyncMethodTests
     [TestCase("[EnforcePure] public static async Task<int> M(Task<int> t) { return await Task.FromResult(t).Result; }")]
     [TestCase("[ZeroAllocations] public static async Task<int> M(int x) { return await Inner.Next(x); }")]
     [TestCase("[EffectContract(SharpProofEffect.None, Complete = true)] public static async Task M() { }")]
-    [TestCase("[DoesNotThrow] public static async Task M() { }")]
-    [TestCase("[DoesNotThrow] public static async Task M() { throw new System.InvalidOperationException(\"x\"); }")]
-    [TestCase("[DoesNotThrow] public static async Task M(Task t) { await t; }")]
-    [TestCase("[AllowedExceptions(typeof(System.InvalidOperationException))] public static async Task M() { throw new System.InvalidOperationException(\"x\"); }")]
     [TestCase("public static async Task<int> M(int x) { Contract.Ensures(Contract.Result<Task<int>>() != null); return x; }")]
     [TestCase("[EnforcePure] public static async void M() { }")]
     [TestCase("[EnforcePure] public static async Task M(System.Collections.Generic.IAsyncEnumerable<int> s) { await foreach (var x in s) { } }")]
@@ -157,14 +153,27 @@ public sealed class AsyncMethodTests
         finally { context.Unload(); }
     }
 
-    // An exception claim on an async method states nothing about its task.
-    [TestCase("[DoesNotThrow] public static async Task M() { }")]
-    [TestCase("[DoesNotThrow] public static async Task<int> M(int x) { return await Inner.Next(x); }")]
-    public async Task ExceptionClaimsAreUnsupported(string member)
+    // On an async method DoesNotThrow states that the returned task never
+    // faults or is canceled; AllowedExceptions bounds what it may hold.
+    [TestCase("[DoesNotThrow] public static async Task M() { }", "Proven")]
+    [TestCase("[DoesNotThrow] public static async Task<int> M(int x) { return await Inner.Next(x); }", "Proven")]
+    [TestCase("[DoesNotThrow] public static async Task<int> M(int x) { return await Inner.Caught(x); }", "Proven")]
+    [TestCase("[DoesNotThrow] public static async Task<int> M(int x) { return await Task.FromResult(x); }", "Proven")]
+    [TestCase("[DoesNotThrow] public static async Task M() { throw new System.InvalidOperationException(\"x\"); }", "Refuted")]
+    [TestCase("[DoesNotThrow] public static async Task M() { await Inner.Fail(); }", "Refuted")]
+    [TestCase("[DoesNotThrow] public static async ValueTask<int> M(int[] a) { return a.Length; }", "Refuted")]
+    [TestCase("[AllowedExceptions(typeof(System.InvalidOperationException))] public static async Task M() { throw new System.InvalidOperationException(\"x\"); }", "Proven")]
+    [TestCase("[AllowedExceptions(typeof(System.ArgumentException))] public static async Task M() { await Inner.Fail(); }", "Refuted")]
+    // An unknown await may fault with anything, which no replay shows.
+    [TestCase("[DoesNotThrow] public static async Task M(Task t) { await t; }", "Unknown")]
+    [TestCase("[DoesNotThrow] public static async Task M(Task t) { await Inner.Wait(t); }", "Unknown")]
+    public async Task ExceptionClaimsDescribeTheReturnedTask(string member, string outcome)
     {
         System.ArgumentNullException.ThrowIfNull(member);
+        System.ArgumentNullException.ThrowIfNull(outcome);
+        var expected = Enum.Parse<WorkerClaimOutcome>(outcome);
         var result = await ResultAsync(member);
-        Assert.That((result.Outcome, result.Reason), Is.EqualTo((WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract)));
+        Assert.That(result.Outcome, Is.EqualTo(expected), result.Reason.ToString());
     }
 
     private static async Task<WorkerClaimResult> ResultAsync(string member)
