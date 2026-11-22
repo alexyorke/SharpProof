@@ -799,6 +799,15 @@ internal sealed partial class RoslynTotalProgramLowerer
         // sends them to the caller's handlers.
         if (externalFilterSearch && detached)
         { return new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape)); }
+        // A shared frame searches the caller's filters before the callee's own
+        // finally blocks run. An awaited callee instead finishes unwinding and
+        // faults its task, which the await then rethrows, so it is not shared:
+        // the call and its await are unknown calls.
+        if (externalFilterSearch && awaited)
+        {
+            return _expressions.AllowOpaqueCalls ? Opaque()
+                : new(marker, block, FrontendSubsetClassification.Abstain(FrontendAbstention.UnsupportedInvocationShape));
+        }
         if (externalFilterSearch)
         {
             if (!_calls.Spend(callee.Parameters.Length + 2))

@@ -123,17 +123,22 @@ internal sealed partial class RoslynTotalExpressionLowerer
         }
     }
 
-    // `t.ConfigureAwait(c)` on one of the four task types only wraps t with
-    // the choice of context: awaiting either runs the same task.
+    // `t.ConfigureAwait(c)`, the Boolean overload with a constant `c` on one
+    // of the four framework task types, only wraps t with the choice of
+    // context: awaiting either runs the same task and rethrows its fault. The
+    // ConfigureAwaitOptions overload can suppress that rethrow
+    // (SuppressThrowing), so it, like any other overload, stays an operand
+    // of an unknown await.
     internal static IOperation WithoutConfigureAwait(IOperation operation)
     {
         operation = RepositoryParameterGuard.NotNull(operation, nameof(operation));
         return operation is IInvocationOperation
         {
-            TargetMethod: { Name: "ConfigureAwait", IsStatic: false, Parameters.Length: 1 } configure,
+            TargetMethod: { Name: "ConfigureAwait", IsStatic: false, IsExtensionMethod: false, ReducedFrom: null, Parameters.Length: 1 } configure,
             Instance: { } awaited,
             Arguments.Length: 1
-        } invocation && invocation.Arguments[0].Value.ConstantValue.HasValue &&
+        } invocation && configure.Parameters[0].Type.SpecialType == SpecialType.System_Boolean &&
+            invocation.Arguments[0].Value.ConstantValue.HasValue &&
             TotalLoweringContext.IsTaskType(configure.ContainingType) ? awaited : operation;
     }
 }
