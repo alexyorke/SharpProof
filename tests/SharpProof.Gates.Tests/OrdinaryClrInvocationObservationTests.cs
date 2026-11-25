@@ -63,4 +63,36 @@ public sealed class OrdinaryClrInvocationObservationTests
             context.Unload();
         }
     }
+
+    // An async method stores its exception in the task it returns: the oracle
+    // observes the task's fault, or its cancellation exception.
+    [TestCase("System.Threading.Tasks.Task", "throw new System.InvalidOperationException(\"async-fault\");", typeof(InvalidOperationException))]
+    [TestCase("System.Threading.Tasks.ValueTask<int>", "throw new System.InvalidOperationException(\"async-fault\");", typeof(InvalidOperationException))]
+    [TestCase("System.Threading.Tasks.Task<int>", "throw new System.OperationCanceledException(\"async-fault\");", typeof(OperationCanceledException))]
+    [TestCase("System.Threading.Tasks.ValueTask", "return;", null)]
+    public void AsyncInvocationObservesTheReturnedTasksFault(string returnType, string body, Type? expected)
+    {
+        ArgumentNullException.ThrowIfNull(returnType);
+        ArgumentNullException.ThrowIfNull(body);
+        var source = "public static class AsyncProbe { public static async " + returnType + " Target(bool fail) { if (fail) { " + body +
+            " } " + (returnType.EndsWith("<int>", StringComparison.Ordinal) ? "return 1; " : "") + "} }";
+        var compilation = AnalyzerGateHost.CreateCompilation(source, "SharpProofAsyncInvocationObservation");
+        using var image = new MemoryStream();
+        var emission = compilation.Emit(image);
+        Assert.That(emission.Success, Is.True, string.Join(Environment.NewLine, emission.Diagnostics));
+        image.Position = 0;
+        var context = new AssemblyLoadContext("SharpProof.AsyncInvocation." + Guid.NewGuid().ToString("N"), isCollectible: true);
+        try
+        {
+            var method = context.LoadFromStream(image).GetType("AsyncProbe", throwOnError: true)!
+                .GetMethod("Target", BindingFlags.Public | BindingFlags.Static)!;
+            var observed = NativeExceptionWitnessOracle.ObserveInvocationException(method, [true]);
+            Assert.That(observed?.GetType(), Is.EqualTo(expected));
+            Assert.That(NativeExceptionWitnessOracle.ObserveInvocationException(method, [false]), Is.Null);
+        }
+        finally
+        {
+            context.Unload();
+        }
+    }
 }

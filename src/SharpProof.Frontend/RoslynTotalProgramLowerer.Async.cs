@@ -34,7 +34,9 @@ internal sealed partial class RoslynTotalProgramLowerer
 
     private bool IsAsyncBody => _context.Target.IsAsync && _context.HasScalarSignature;
 
-    private bool IsAsyncRoot => IsAsyncBody && _context.AdmitsAsync;
+    // A root, or a callee whose task the caller does not await: an exception
+    // that leaves the body faults the task rather than reaching the caller.
+    private bool IsAsyncRoot => IsAsyncBody && (_context.AdmitsAsync || _context.DetachesAsync);
 
     private void EmitAsyncEntry(IrBlockId entry, IOperation body)
     {
@@ -63,7 +65,14 @@ internal sealed partial class RoslynTotalProgramLowerer
             return;
         }
         EmitAsyncCall(block, body, IrOpaqueCallEffects.All, AsyncFaultMember);
-        // The faulted task has no result; the value returned stands for none.
+        // At a root the exception stays visible to the exception claims, which
+        // state that the returned task never faults or is canceled with it.
+        if (_context.AdmitsAsync)
+        {
+            _builder.ExceptionalExit(block, structural);
+            return;
+        }
+        // A detached task's fault is not the caller's: the call returns.
         Return(block, structural, _context.Result is { } result
             ? CSharpOperationSemantics.DefaultValue(_context.Factory, _context.Factory.GetVariableInfo(result).Type) : null);
     }

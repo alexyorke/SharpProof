@@ -39,9 +39,27 @@ public sealed class AsyncLoweringTests
         using var subject = TypedProgramSubject.Create(member, Helpers, admitsAsync: true);
         var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
         Assert.That(lowering.IsExact, Is.True, string.Join(", ", lowering.Abstentions.Select(static abstention => abstention.Reason)));
-        // The task may be allocated, and an escaping exception is stored in it.
+        // The task may be allocated.
         Assert.That(OpaqueMembers(subject, lowering), Does.Contain("async-task"));
-        Assert.That(Reachable(lowering.Program).Any(block => lowering.Program.GetBlock(block).Terminator is IrExceptionalExitInstruction), Is.False);
+        // An exception that leaves the body first reaches the fault publication.
+        Assert.That(Reachable(lowering.Program).Select(lowering.Program.GetBlock)
+            .Where(static block => block.Terminator is IrExceptionalExitInstruction)
+            .All(block => block.Instructions.OfType<IrCallInstruction>().Any(call =>
+                subject.Factory.GetString(subject.Factory.GetMemberInfo(call.Member).Name) == "opaque-call:async-fault")), Is.True);
+    }
+
+    // A call whose task is not awaited runs its callee detached: the callee's
+    // exceptions fault that task, and the value is an unknown task.
+    [TestCase("System.Threading.Tasks.Task<int> Target(int x) { return Inner.Next(x); }")]
+    [TestCase("int Target(int x) { return Inner.Next(x).Result; }")]
+    [TestCase("async System.Threading.Tasks.Task Target(int x) { await System.Threading.Tasks.Task.CompletedTask; await System.Threading.Tasks.Task.FromResult(x); }")]
+    public void DetachedCallsAndCompletedTasksLowerExactly(string member)
+    {
+        System.ArgumentNullException.ThrowIfNull(member);
+        using var subject = TypedProgramSubject.Create(member, Helpers, admitsAsync: true);
+        var lowering = subject.LowerSourceCalls(false, opaqueCalls: true);
+        Assert.That(lowering.IsExact, Is.True, string.Join(", ", lowering.Abstentions.Select(static abstention => abstention.Reason)));
+        Assert.That(OpaqueMembers(subject, lowering), Has.None.EqualTo("await"));
     }
 
     [Test]
@@ -72,8 +90,6 @@ public sealed class AsyncLoweringTests
     [TestCase("async System.Threading.Tasks.Task Target(System.Collections.Generic.IAsyncEnumerable<int> s) { await foreach (var x in s) { } }", true, true)]
     [TestCase("async System.Threading.Tasks.Task Target(System.IAsyncDisposable d) { await using (d) { } }", true, true)]
     [TestCase("async System.Threading.Tasks.Task Target(System.IAsyncDisposable d) { await using var e = d; }", true, true)]
-    [TestCase("System.Threading.Tasks.Task<int> Target(int x) { return Inner.Next(x); }", true, true)]
-    [TestCase("int Target(int x) { return Inner.Next(x).Result; }", true, true)]
     public void UnadmittedAsyncShapesDoNotLowerExactly(string member, bool admitsAsync, bool opaqueCalls)
     {
         System.ArgumentNullException.ThrowIfNull(member);
