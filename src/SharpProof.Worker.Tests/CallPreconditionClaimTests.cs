@@ -329,7 +329,6 @@ public sealed class CallPreconditionClaimTests
         }
     }
 
-    [TestCase("public static async System.Threading.Tasks.Task<int> Caller() { await System.Threading.Tasks.Task.Yield(); return F(-1); }", TestName = "Async")]
     [TestCase("public static System.Func<int> Caller() { return () => F(-1); }", TestName = "Lambda")]
     [TestCase("private static int P => F(-1); public static int Caller() { return P; }", TestName = "AccessorWithoutASelectedCaller")]
     public async Task CallInAnUnmodeledBodyHasNoClaim(string caller)
@@ -528,7 +527,7 @@ public sealed class CallPreconditionClaimTests
 
     [TestCase("public static int Caller() { return F(1); }", 0, TestName = "Checked")]
     [TestCase("public static System.Func<int> Caller() { return () => F(-1); }", 1, TestName = "Lambda")]
-    [TestCase("public static async System.Threading.Tasks.Task<int> Caller() { await System.Threading.Tasks.Task.Yield(); return F(-1); }", 1, TestName = "AsyncCaller")]
+    [TestCase("public static async System.Threading.Tasks.Task<int> Caller() { await System.Threading.Tasks.Task.Yield(); return F(1); }", 0, TestName = "AsyncCaller")]
     [TestCase("public static int First() { return F(1); } public static System.Func<int> Second() { return () => F(1) + F(2); }", 2, TestName = "CheckedAndUnchecked")]
     public void SummaryCountsVisibleCallsNoClaimChecks(string members, int expected)
     {
