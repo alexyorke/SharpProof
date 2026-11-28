@@ -6,6 +6,20 @@ listing changes against an earlier one. Development history is in the Git log.
 
 ## Unreleased
 
+### Documentation validation claims
+
+- New analyzer rule SP0061 (warning). An XML documentation `<param>` or
+  `<returns>` sentence from a closed grammar, such as "Must be between 1 and
+  100" or "Must not be null", is compared with the SharpProof declaration on the
+  same value: `[NonNull]`, `[Positive]`, `[InRange]`, or a prologue
+  `Contract.Requires` or `Contract.Ensures` clause. It reports a claim that the
+  declaration does not establish, and a claim that no declaration backs. Any
+  other sentence, and any declaration it cannot read, stays silent. This checks
+  the documentation against the declarations. It does not read ASP.NET Core
+  routing, model binding or OpenAPI output, and it does not prove that the
+  implementation enforces a documented range at runtime. See
+  [diagnostic examples](docs/diagnostic-examples.md#sp0061).
+
 ### Packages and requirements
 
 - One reference is the whole setup. `SharpProof` brings the contract API

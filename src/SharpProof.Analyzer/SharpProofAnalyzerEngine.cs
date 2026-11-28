@@ -21,7 +21,8 @@ internal sealed partial class SharpProofAnalyzerEngine
     internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         [
             .. GeneratedDiagnosticDescriptors.SupportedDiagnostics,
-            .. ContractForDiagnosticDescriptors.SupportedDiagnostics
+            .. ContractForDiagnosticDescriptors.SupportedDiagnostics,
+            .. DocumentedValidationDiagnosticDescriptors.SupportedDiagnostics
         ];
 
     internal void RegisterActions(AnalysisContext context)
@@ -146,6 +147,14 @@ internal sealed partial class SharpProofAnalyzerEngine
                     symbolContext,
                     session),
                 SymbolKind.Method);
+            if (configuration.ContractsEnabled)
+            {
+                context.RegisterSymbolAction(
+                    symbolContext => DocumentedValidationAnalyzer.Validate(
+                        symbolContext,
+                        session),
+                    SymbolKind.Method);
+            }
             context.RegisterSymbolAction(
                 symbolContext =>
                     SharpProofControlAttributePolicy.ValidateDeclaredScope(
