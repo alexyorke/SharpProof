@@ -32,6 +32,16 @@ internal static class DocumentedValidationDiagnosticDescriptors
         description: "Reports a bound or non-null requirement that a runtime guard or DataAnnotation enforces on a parameter whose XML documentation does not state it.",
         helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0063");
 
+    internal static readonly DiagnosticDescriptor ReviewRule = new(
+        id: "SP0064",
+        title: "Documentation claim awaits review",
+        messageFormat: "{0}",
+        category: "Documentation",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports a validation claim that a local model proposed from a parameter's documentation and that a person has not accepted or rejected, or that the model could not read as a claim. Only accepted claims are checked.",
+        helpLinkUri: "https://github.com/alexyorke/SharpProof/blob/master/docs/diagnostic-examples.md#sp0064");
+
     internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        [MismatchRule, OpenApiRule, UndocumentedRule];
+        [MismatchRule, OpenApiRule, UndocumentedRule, ReviewRule];
 }

@@ -23,6 +23,9 @@ internal sealed class HttpEntryRoute
 // left out and get no HTTP-entry checks.
 internal static class HttpEntryCatalog
 {
+    // Nested MapGroup and declaration hops followed before a route is left out.
+    private const int MaximumRouteGroupDepth = 16;
+
     private static readonly Regex RouteParameter = new(
         @"\{([^{}:?]+)[^{}]*\}",
         RegexOptions.CultureInvariant);
@@ -101,8 +104,17 @@ internal static class HttpEntryCatalog
     internal static DeclaredValidation DeclaredFrameworkValidation(IParameterSymbol parameter)
     {
         parameter = RepositoryParameterGuard.NotNull(parameter, nameof(parameter));
+        return DataAnnotationValidation(parameter.GetAttributes(), includeRequired: true);
+    }
+
+    // The DataAnnotations Range, and Required when requested, that a symbol declares.
+    // Required restates non-nullability for a reference type, which a caller of a
+    // documentation check may want to separate from a bound.
+    internal static DeclaredValidation DataAnnotationValidation(ImmutableArray<AttributeData> attributes, bool includeRequired)
+    {
+        RepositoryParameterGuard.RequireInitialized(attributes.IsDefault, nameof(attributes), "Array must be initialized.");
         var facts = DeclaredValidation.None;
-        foreach (var attribute in parameter.GetAttributes())
+        foreach (var attribute in attributes)
         {
             var attributeClass = attribute.AttributeClass;
             if (attributeClass is null ||
@@ -120,7 +132,7 @@ internal static class HttpEntryCatalog
                         ? facts.And(new(false, minimum, maximum, false))
                         : facts.And(DeclaredValidation.Opaque);
             }
-            else if (attributeClass.Name == "RequiredAttribute")
+            else if (includeRequired && attributeClass.Name == "RequiredAttribute")
             {
                 facts = facts.And(new(true, null, null, false));
             }
@@ -172,7 +184,87 @@ internal static class HttpEntryCatalog
             return null;
         }
 
-        return (handler, new HttpEntryRoute(verb, NormalizeRoute(pattern)));
+        var receiver = invocation.Expression is MemberAccessExpressionSyntax member ? member.Expression : null;
+        if (RoutePrefix(model, receiver, depth: 0, cancellationToken) is not { } prefix)
+        {
+            return null;
+        }
+
+        return (handler, new HttpEntryRoute(verb, NormalizeRoute(JoinRoute(prefix, pattern))));
+    }
+
+    // The route prefix a route builder carries from the MapGroup calls that made it.
+    // A receiver that is the application, or a value with no MapGroup in its
+    // declaration, contributes no prefix. A declaration this resolver cannot follow
+    // yields null, so its routes are left out instead of compared at the wrong path.
+    private static string? RoutePrefix(
+        SemanticModel model,
+        ExpressionSyntax? receiver,
+        int depth,
+        CancellationToken cancellationToken)
+    {
+        if (depth > MaximumRouteGroupDepth)
+        {
+            return null;
+        }
+
+        switch (receiver)
+        {
+            case null:
+                return string.Empty;
+            case InvocationExpressionSyntax call when call.Expression is MemberAccessExpressionSyntax access:
+                var parent = RoutePrefix(model, access.Expression, depth + 1, cancellationToken);
+                if (parent is null)
+                {
+                    return null;
+                }
+
+                if (model.GetSymbolInfo(call, cancellationToken).Symbol is IMethodSymbol { Name: "MapGroup" } group &&
+                    NamespaceNames.Of(group.ContainingNamespace).StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal))
+                {
+                    var arguments = call.ArgumentList.Arguments;
+                    return arguments.Count > 0 &&
+                        model.GetConstantValue(arguments[0].Expression, cancellationToken).Value is string pattern
+                            ? JoinRoute(parent, pattern)
+                            : null;
+                }
+
+                // A fluent call such as HasApiVersion returns the same group.
+                return parent;
+            case IdentifierNameSyntax or MemberAccessExpressionSyntax:
+                var declaration = DeclaringInitializer(model, receiver, cancellationToken);
+                return declaration is null
+                    ? string.Empty
+                    : RoutePrefix(model, declaration, depth + 1, cancellationToken);
+            // A value created in place, such as the application object, is a root.
+            case ObjectCreationExpressionSyntax:
+                return string.Empty;
+            default:
+                return null;
+        }
+    }
+
+    // The initializer of the local or field a name refers to, when it has one.
+    private static ExpressionSyntax? DeclaringInitializer(
+        SemanticModel model,
+        ExpressionSyntax name,
+        CancellationToken cancellationToken)
+    {
+        var symbol = model.GetSymbolInfo(name, cancellationToken).Symbol;
+        foreach (var reference in symbol?.DeclaringSyntaxReferences ?? ImmutableArray<SyntaxReference>.Empty)
+        {
+            if (reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax { Initializer.Value: { } value })
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string JoinRoute(string prefix, string pattern)
+    {
+        return string.Join("/", new[] { prefix.Trim('/'), pattern.Trim('/') }.Where(static part => part.Length > 0));
     }
 
     private static string? MinimalApiVerb(string name)

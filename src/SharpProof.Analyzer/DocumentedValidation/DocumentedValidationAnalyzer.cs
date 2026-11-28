@@ -1,13 +1,14 @@
 namespace SharpProof.Analyzer;
 
-// Compares the validation that XML documentation states with what the code does.
+// Compares the validation that documentation states with what the code does.
 // For a method that is not an HTTP entry, the evidence on a parameter is its
 // declarations (attributes and Contract.Requires) together with its runtime guards.
 // For an HTTP entry handler, which no in-program caller checks, the evidence is
 // the runtime guards together with the DataAnnotations and required-ness the
-// framework applies. OpenAPI parameter constraints are compared with both.
-// A sentence the claim grammar does not recognize is never reported, and
-// evidence the readers cannot establish exactly leaves its subject silent.
+// framework applies. A property's evidence is its DataAnnotations Range. OpenAPI
+// parameter constraints are compared with the handler's evidence and documentation.
+// A sentence the claim grammar does not recognize is never reported, and evidence
+// the readers cannot establish exactly leaves its subject silent.
 internal static class DocumentedValidationAnalyzer
 {
     private static readonly DeclaredValidation RequiredFact = new(true, null, null, false);
@@ -22,13 +23,18 @@ internal static class DocumentedValidationAnalyzer
         "no [return: Positive], [return: InRange] attribute or Contract.Ensures bounds it",
         "its declared contract admits ");
 
-    internal static void Validate(CompilationAnalysisContext context, AnalyzerSession session)
+    private static readonly Reasons PropertyReasons = new(
+        string.Empty,
+        string.Empty,
+        "its DataAnnotations admit ");
+
+    internal static void Validate(CompilationAnalysisContext context)
     {
-        session = RepositoryParameterGuard.NotNull(session, nameof(session));
         var compilation = context.Compilation;
         var cancellationToken = context.CancellationToken;
         var entries = HttpEntryCatalog.Collect(compilation, cancellationToken);
         var openApi = OpenApiDocumentReader.Find(context.Options.AdditionalFiles, cancellationToken);
+        var sidecar = ClaimReviewSidecar.Read(context.Options.AdditionalFiles, cancellationToken);
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -38,7 +44,8 @@ internal static class DocumentedValidationAnalyzer
             }
 
             var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
-            foreach (var declaration in tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>())
+            var root = tree.GetRoot(cancellationToken);
+            foreach (var declaration in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
             {
                 if (model.GetDeclaredSymbol(declaration, cancellationToken) is not IMethodSymbol method ||
                     !IsCandidate(method))
@@ -56,7 +63,9 @@ internal static class DocumentedValidationAnalyzer
                     continue;
                 }
 
-                var resolution = session.ResolveContractSource(method);
+                var resolution = EffectiveContractSourceResolver
+                    .ForCompilation(compilation, cancellationToken)
+                    .Resolve(method, null, cancellationToken);
 
                 // A companion's contract declares another method's clauses, and a
                 // failed binding has no reliable contract. Neither is compared.
@@ -69,14 +78,82 @@ internal static class DocumentedValidationAnalyzer
                     compilation,
                     method,
                     documented,
-                    DocumentedClaimParser.Parse(documentation),
+                    ApplyReview(method, documentation, DocumentedClaimParser.Parse(documentation), sidecar, context.ReportDiagnostic),
                     routes,
                     resolution,
                     openApi,
                     context.ReportDiagnostic,
                     cancellationToken);
             }
+
+            foreach (var declaration in root.DescendantNodes().OfType<PropertyDeclarationSyntax>())
+            {
+                if (model.GetDeclaredSymbol(declaration, cancellationToken) is IPropertySymbol property)
+                {
+                    AnalyzeProperty(property, context.ReportDiagnostic, cancellationToken);
+                }
+            }
         }
+    }
+
+    // Merges the claims a person accepted into their parameters, and reports the
+    // proposals still awaiting review. Only a parameter whose documentation text
+    // matches an entry's key is affected.
+    private static ImmutableDictionary<string, ImmutableArray<DocumentedClaim>> ApplyReview(
+        IMethodSymbol method,
+        string documentation,
+        ImmutableDictionary<string, ImmutableArray<DocumentedClaim>> claims,
+        ClaimReviewSidecar sidecar,
+        Action<Diagnostic> report)
+    {
+        if (sidecar.IsEmpty)
+        {
+            return claims;
+        }
+
+        var merged = claims.ToBuilder();
+        foreach (var parameter in method.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None ||
+                DocumentedClaimParser.ParameterText(documentation, parameter.Name) is not { } text)
+            {
+                continue;
+            }
+
+            foreach (var entry in sidecar.For(parameter.Name, text))
+            {
+                switch (entry.Status)
+                {
+                    case ReviewStatus.Accepted when entry.Claim is { } accepted:
+                        var existing = merged.TryGetValue(parameter.Name, out var found)
+                            ? found
+                            : ImmutableArray<DocumentedClaim>.Empty;
+
+                        // A claim the grammar already reads from the same text is not
+                        // added twice, so its bounds are not reported twice.
+                        if (!existing.Any(claim => claim.Kind == accepted.Kind && claim.Lower == accepted.Lower && claim.Upper == accepted.Upper))
+                        {
+                            merged[parameter.Name] = existing.Add(accepted);
+                        }
+
+                        break;
+                    case ReviewStatus.Proposed:
+                        report(Diagnostic.Create(
+                            DocumentedValidationDiagnosticDescriptors.ReviewRule,
+                            FirstLocation(parameter.Locations),
+                            $"Parameter '{parameter.Name}' has a validation claim proposed from its documentation that awaits review: '{entry.SourceText}'"));
+                        break;
+                    case ReviewStatus.Ambiguous:
+                        report(Diagnostic.Create(
+                            DocumentedValidationDiagnosticDescriptors.ReviewRule,
+                            FirstLocation(parameter.Locations),
+                            $"Parameter '{parameter.Name}' has documentation the local model could not read as a validation claim: {entry.Reason}"));
+                        break;
+                }
+            }
+        }
+
+        return merged.ToImmutable();
     }
 
     private static void AnalyzeMethod(
@@ -108,11 +185,13 @@ internal static class DocumentedValidationAnalyzer
             var location = FirstLocation(parameter.Locations);
             if (isEntry)
             {
-                // The framework's checks are declared, so they count as evidence of
-                // the entry but are not the runtime guards SP0063 reports.
-                var explicitFacts = runtime.And(HttpEntryCatalog.DeclaredFrameworkValidation(parameter));
-                var required = HttpEntryCatalog.IsRequestBound(parameter) ? RequiredFact : DeclaredValidation.None;
-                var evidence = explicitFacts.And(required);
+                // Required restates non-nullability, so it counts as evidence of the
+                // entry but is not reported as undocumented validation. The bounds and
+                // runtime guards are what SP0063 reports.
+                var bounds = runtime.And(HttpEntryCatalog.DataAnnotationValidation(parameter.GetAttributes(), includeRequired: false));
+                var evidence = runtime
+                    .And(HttpEntryCatalog.DeclaredFrameworkValidation(parameter))
+                    .And(HttpEntryCatalog.IsRequestBound(parameter) ? RequiredFact : DeclaredValidation.None);
                 var declaredBounds = !declaredFacts.Unknown && (declaredFacts.Lower is not null || declaredFacts.Upper is not null);
                 if (!parameterClaims.IsEmpty)
                 {
@@ -126,7 +205,7 @@ internal static class DocumentedValidationAnalyzer
                         EntryReasons(declaredBounds));
                 }
 
-                ReportUndocumented(parameter, parameterClaims, explicitFacts, location, report);
+                ReportUndocumented(parameter, parameterClaims, bounds, location, report);
                 if (openApi is not null)
                 {
                     CompareOpenApi(parameter, routes, parameterClaims, evidence, openApi, location, report);
@@ -168,6 +247,51 @@ internal static class DocumentedValidationAnalyzer
         }
     }
 
+    // A property is validated by its DataAnnotations Range, which model binding
+    // applies. Its documentation is compared only where a Range exists, so prose
+    // about validation the analyzer cannot see produces no finding.
+    private static void AnalyzeProperty(
+        IPropertySymbol property,
+        Action<Diagnostic> report,
+        CancellationToken cancellationToken)
+    {
+        var range = HttpEntryCatalog.DataAnnotationValidation(property.GetAttributes(), includeRequired: false);
+        if (range.Unknown || !IntegralDomain.TryGet(property.Type, out var minimum, out var maximum))
+        {
+            return;
+        }
+
+        var documentation = property.GetDocumentationCommentXml(cancellationToken: cancellationToken) ?? string.Empty;
+        var claims = DocumentedClaimParser.ParseDescription(documentation);
+        var intervalClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.Interval).ToImmutableArray();
+        var hasBounds = range.Lower is not null || range.Upper is not null;
+        if (!hasBounds && intervalClaims.IsEmpty)
+        {
+            return;
+        }
+
+        var subject = $"Property '{property.Name}'";
+        var location = FirstLocation(property.Locations);
+        if (hasBounds && !intervalClaims.IsEmpty)
+        {
+            CompareInterval(subject, property.Type, intervalClaims, range, location, report, PropertyReasons);
+            return;
+        }
+
+        if (hasBounds)
+        {
+            var (lower, upper) = Admitted(range, minimum, maximum);
+            if (lower <= upper && (lower > minimum || upper < maximum))
+            {
+                report(Diagnostic.Create(
+                    DocumentedValidationDiagnosticDescriptors.UndocumentedRule,
+                    location,
+                    subject,
+                    RangePhrase(lower, upper, minimum, maximum)));
+            }
+        }
+    }
+
     private static void CompareClaims(
         string subject,
         ITypeSymbol type,
@@ -194,7 +318,22 @@ internal static class DocumentedValidationAnalyzer
         }
 
         var intervalClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.Interval).ToImmutableArray();
-        if (intervalClaims.IsEmpty || !IntegralDomain.TryGet(type, out var minimum, out var maximum))
+        if (!intervalClaims.IsEmpty)
+        {
+            CompareInterval(subject, type, intervalClaims, evidence, location, report, reasons);
+        }
+    }
+
+    private static void CompareInterval(
+        string subject,
+        ITypeSymbol type,
+        ImmutableArray<DocumentedClaim> intervalClaims,
+        DeclaredValidation evidence,
+        Location location,
+        Action<Diagnostic> report,
+        Reasons reasons)
+    {
+        if (evidence.Unknown || !IntegralDomain.TryGet(type, out var minimum, out var maximum))
         {
             return;
         }
@@ -223,7 +362,7 @@ internal static class DocumentedValidationAnalyzer
             reason));
     }
 
-    // Reports what the runtime checks or DataAnnotations enforce that the
+    // Reports what the runtime checks or DataAnnotations bounds enforce that the
     // documentation does not state. Declared contracts are not included here,
     // because a caller precondition is not runtime behavior of the method.
     private static void ReportUndocumented(

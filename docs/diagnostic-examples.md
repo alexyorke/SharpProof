@@ -32,7 +32,10 @@ Profile and feature selection are compilation-global. Use MSBuild properties or 
 | SP0049 | Error | Final compiler manifest emission failed |
 | SP0050 | Error | Referenced contract API payload could not be verified |
 | SP0052 | Warning | Complete body summary exceeds declared effect contract |
-| SP0061 | Warning | XML documentation validation claim disagrees with, or lacks, a declared contract |
+| SP0061 | Warning | XML documentation validation claim disagrees with the declarations and runtime guards on the same value, or has none |
+| SP0062 | Warning | OpenAPI parameter bound or nullability disagrees with the handler's validation or documentation |
+| SP0063 | Info | Runtime validation enforced on a parameter is not stated in its XML documentation |
+| SP0064 | Info | A model-proposed documentation claim awaits review, or could not be read |
 
 ## SP0002
 
@@ -135,6 +138,18 @@ The strict profile, the default, always runs the check. The advisory profile run
 The check is silent when it cannot establish the declared side: a clause that mentions the value and uses another form, a companion-declared contract, an override, an interface member, a generated file, an invalid clause placement, or an unsupported type such as `ulong`, `double` or a nullable value type. It does not run on `ref` or `out` parameters.
 
 SP0061 compares declarations with documentation. It does not prove the implementation rejects inputs outside the documented range, and it does not read ASP.NET Core routing, model binding, validation attributes, or OpenAPI output. Parsing doc comments requires them to be present in the compilation (for example with `GenerateDocumentationFile`).
+
+## SP0062
+
+An OpenAPI 3 document in the build's additional files declares a parameter bound or nullability for an HTTP entry route that disagrees with what the handler enforces at runtime, or with the parameter's XML documentation. The message names the route and the two values that differ. Hand-written or generated OpenAPI that describes a rule the handler does not enforce is reported here.
+
+## SP0063
+
+A runtime guard, `ArgumentException` ThrowIf call, or DataAnnotations `Range` enforces a bound or non-null requirement on a parameter whose XML documentation does not state it. This is informational. `Required` alone is not reported, because it restates non-nullability.
+
+## SP0064
+
+A validation claim a local or hosted model proposed from documentation is waiting for review, or the model could not read a claim. Nothing is checked until a person accepts the claim in the review sidecar. Only an accepted claim becomes a claim of its parameter. A rejected entry is ignored. An entry is used only when its key equals the SHA-256 of its own parameter name, a newline, and the normalized documentation text. The key is written in uppercase hexadecimal.
 
 ## ContractFor diagnostics
 

@@ -357,6 +357,20 @@ public sealed class DocumentedValidationClaimTests
     // The strict profile is the consumer default and always runs symbol
     // analysis. The advisory profile runs it only in files that use SharpProof
     // attributes, so these tests must not depend on that gate.
+    // The documentation check reports and proves nothing, so the advisory profile
+    // runs it too, even in a file with no SharpProof attributes.
+    [Test]
+    public async Task AdvisoryProfileRunsDocumentationChecksWithoutSharpProofAttributes()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync("""
+            public static class Fixture {
+                /// <param name="name">Must not be null.</param>
+                public static int Length(string name) => name.Length;
+            }
+            """, "contracts", [Rule], profile: "advisory");
+        AnalyzerTestHost.AssertIds(diagnostics, [Rule]);
+    }
+
     private static Task<ImmutableArray<Diagnostic>> Analyze(string source)
     {
         return AnalyzerTestHost.AnalyzeAsync(source, "contracts", [Rule], profile: "strict");

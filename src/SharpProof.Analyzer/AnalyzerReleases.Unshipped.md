@@ -20,6 +20,7 @@ SP0060 | Resources | Disabled | Opt-in proven loop/cumulative array bounds or ex
 SP0061 | Documentation | Warning | Reports an XML documentation `<param>` or `<returns>` validation sentence that the declarations and runtime checks on the same value do not establish, or that no declaration or runtime check backs.
 SP0062 | Documentation | Warning | Reports an OpenAPI 3 parameter bound or nullability that disagrees with the handler's runtime validation or its XML documentation.
 SP0063 | Documentation | Info | Reports a bound or non-null requirement enforced at runtime that the XML documentation does not state.
+SP0064 | Documentation | Info | Reports a validation claim a local model proposed from documentation that a person has not accepted or rejected, or that the model could not read as a claim.
 SPCF0001 | SharpProof.ContractFor.Usage | Error | Invalid ContractFor target.
 SPCF0002 | SharpProof.ContractFor.Usage | Error | Duplicate ContractFor companion.
 SPCF0003 | SharpProof.ContractFor.Usage | Error | Invalid ContractFor companion type.

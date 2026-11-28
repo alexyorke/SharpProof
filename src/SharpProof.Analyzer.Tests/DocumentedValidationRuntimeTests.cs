@@ -25,6 +25,7 @@ public sealed class DocumentedValidationRuntimeTests
             {
                 public static void MapGet(this object app, string pattern, System.Func<int, object> handler) { }
                 public static void MapGet(this object app, string pattern, System.Func<string, object> handler) { }
+                public static object MapGroup(this object app, string prefix) => app;
             }
         }
         namespace Microsoft.AspNetCore.Http
@@ -36,6 +37,8 @@ public sealed class DocumentedValidationRuntimeTests
         }
         namespace System.ComponentModel.DataAnnotations
         {
+            [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Property)]
+            public sealed class RequiredAttribute : System.Attribute { }
             [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Property)]
             public sealed class RangeAttribute : System.Attribute
             {
@@ -338,6 +341,104 @@ public sealed class DocumentedValidationRuntimeTests
             }
             """, "{\"openapi\":\"3.0.1\",\"paths\":{");
         AnalyzerTestHost.AssertIds(diagnostics, []);
+    }
+
+    [Test]
+    public async Task ClauseAfterADescriptionIsReadAsAClaim()
+    {
+        var diagnostics = await Analyze("""
+            using System;
+            public static class Fixture {
+                /// <param name="quality">Quality setting, from 0-100.</param>
+                public static int Encode(int quality) {
+                    if (quality < 0 || quality > 90) throw new ArgumentOutOfRangeException(nameof(quality));
+                    return quality;
+                }
+            }
+            """, [MismatchRule]);
+        AnalyzerTestHost.AssertIds(diagnostics, [MismatchRule]);
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0],
+            "Parameter 'quality' is documented as 'from 0-100', but its declarations and runtime guards admit 0 through 90");
+    }
+
+    [Test]
+    public async Task PropertyDocumentedBoundsAreComparedWithItsRangeAttribute()
+    {
+        var diagnostics = await Analyze(AspNetStubs + """
+
+            public sealed class Request {
+                /// <summary>Items per page.</summary>
+                /// <remarks>Minimum 10, maximum 1000.</remarks>
+                [System.ComponentModel.DataAnnotations.Range(10, 500)]
+                public int Limit { get; set; }
+            }
+            """, [MismatchRule]);
+        AnalyzerTestHost.AssertIds(diagnostics, [MismatchRule]);
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0],
+            "Property 'Limit' is documented as 'Minimum 10, maximum 1000', but its DataAnnotations admit 10 through 500");
+    }
+
+    [Test]
+    public async Task UndocumentedPropertyRangeIsReportedAsInfo()
+    {
+        var diagnostics = await Analyze(AspNetStubs + """
+
+            public sealed class Request {
+                [System.ComponentModel.DataAnnotations.Range(10, 1000)]
+                public int Limit { get; set; }
+            }
+            """, [UndocumentedRule]);
+        AnalyzerTestHost.AssertIds(diagnostics, [UndocumentedRule]);
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0],
+            "Property 'Limit' is checked at runtime and admits 10 through 1000, but its XML documentation does not state it");
+    }
+
+    // Required restates non-nullability on a request-bound parameter, so on its own it
+    // is not reported as runtime validation the documentation omits.
+    [Test]
+    public async Task RequiredAloneOnAnHttpEntryIsNotReportedAsUndocumentedValidation()
+    {
+        var diagnostics = await Analyze(AspNetStubs + """
+
+            public static class Handlers {
+                public static object Find([System.ComponentModel.DataAnnotations.Required] string name) => name;
+            }
+            public static class Program {
+                public static void Main() {
+                    object app = new object();
+                    app.MapGet("/items", Handlers.Find);
+                }
+            }
+            """, [UndocumentedRule]);
+        AnalyzerTestHost.AssertIds(diagnostics, []);
+    }
+
+    [Test]
+    public async Task RoutesBehindAMapGroupPrefixAreComparedWithOpenApi()
+    {
+        const string openApi = """
+            {"openapi":"3.0.1","paths":{"/api/items/{id}":{"get":{"parameters":[
+              {"name":"id","in":"path","required":true,"schema":{"type":"integer","minimum":1,"maximum":1000}}]}}}}
+            """;
+        var diagnostics = await AnalyzeWithOpenApi(AspNetStubs + """
+
+            public static class Handlers {
+                /// <param name="id">Must be between 1 and 100.</param>
+                public static object GetItem(int id) {
+                    if (id < 1 || id > 100) return Microsoft.AspNetCore.Http.Results.BadRequest();
+                    return id;
+                }
+            }
+            public static class Program {
+                public static void Main() {
+                    object app = new object();
+                    object group = app.MapGroup("api/items");
+                    group.MapGet("/{id}", Handlers.GetItem);
+                }
+            }
+            """, openApi);
+        AnalyzerTestHost.AssertIds(diagnostics, [OpenApiRule, OpenApiRule]);
+        AnalyzerTestHost.AssertMessageContains(diagnostics[0], "of GET /api/items/{id}");
     }
 
     private static Task<ImmutableArray<Diagnostic>> Analyze(string source, string[] enabledIds)

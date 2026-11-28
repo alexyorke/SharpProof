@@ -115,6 +115,15 @@ internal sealed partial class SharpProofAnalyzerEngine
 
         ResourceBoundsDiagnostics.Register(context);
 
+        // Documentation checks report diagnostics and prove nothing, so they run in
+        // every profile that enables contracts. They do not wait for the advisory
+        // profile's SharpProof attribute gate, and they never need the verifier.
+        if (configuration.ContractsEnabled)
+        {
+            context.RegisterCompilationEndAction(
+                compilationContext => DocumentedValidationAnalyzer.Validate(compilationContext));
+        }
+
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
                 context.Compilation,
@@ -147,13 +156,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     symbolContext,
                     session),
                 SymbolKind.Method);
-            if (configuration.ContractsEnabled)
-            {
-                context.RegisterCompilationEndAction(
-                    compilationContext => DocumentedValidationAnalyzer.Validate(
-                        compilationContext,
-                        session));
-            }
             context.RegisterSymbolAction(
                 symbolContext =>
                     SharpProofControlAttributePolicy.ValidateDeclaredScope(
