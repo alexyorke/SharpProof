@@ -149,11 +149,10 @@ internal sealed partial class SharpProofAnalyzerEngine
                 SymbolKind.Method);
             if (configuration.ContractsEnabled)
             {
-                context.RegisterSymbolAction(
-                    symbolContext => DocumentedValidationAnalyzer.Validate(
-                        symbolContext,
-                        session),
-                    SymbolKind.Method);
+                context.RegisterCompilationEndAction(
+                    compilationContext => DocumentedValidationAnalyzer.Validate(
+                        compilationContext,
+                        session));
             }
             context.RegisterSymbolAction(
                 symbolContext =>

@@ -1,76 +1,414 @@
 namespace SharpProof.Analyzer;
 
-// Compares the validation sentences in a method's XML documentation with the
-// declared SharpProof contract on the same parameter or return value. This is a
-// consistency check over declarations, not a proof of the implementation: it
-// reports a documented claim that no declaration backs, and a declaration whose
-// bounds disagree with the documented bounds. Anything the reader cannot
-// establish is left silent.
+// Compares the validation that XML documentation states with what the code does.
+// For a method that is not an HTTP entry, the evidence on a parameter is its
+// declarations (attributes and Contract.Requires) together with its runtime guards.
+// For an HTTP entry handler, which no in-program caller checks, the evidence is
+// the runtime guards together with the DataAnnotations and required-ness the
+// framework applies. OpenAPI parameter constraints are compared with both.
+// A sentence the claim grammar does not recognize is never reported, and
+// evidence the readers cannot establish exactly leaves its subject silent.
 internal static class DocumentedValidationAnalyzer
 {
-    internal static void Validate(SymbolAnalysisContext context, AnalyzerSession session)
+    private static readonly DeclaredValidation RequiredFact = new(true, null, null, false);
+
+    private static readonly Reasons ParameterReasons = new(
+        "neither a NonNull attribute, a Contract.Requires clause, nor a runtime guard makes it non-null",
+        "neither a Positive or InRange attribute, a Contract.Requires clause, nor a runtime guard bounds it",
+        "its declarations and runtime guards admit ");
+
+    private static readonly Reasons ReturnReasons = new(
+        "no [return: NonNull] attribute or Contract.Ensures makes the result non-null",
+        "no [return: Positive], [return: InRange] attribute or Contract.Ensures bounds it",
+        "its declared contract admits ");
+
+    internal static void Validate(CompilationAnalysisContext context, AnalyzerSession session)
     {
-        context.CancellationToken.ThrowIfCancellationRequested();
-        var method = (IMethodSymbol)context.Symbol;
-        if (!IsCandidate(method) ||
-            AnalyzerGeneratedCodePolicy.IsGenerated(
-                method,
-                method.DeclaringSyntaxReferences[0].SyntaxTree,
-                context.Compilation,
-                context.CancellationToken))
+        session = RepositoryParameterGuard.NotNull(session, nameof(session));
+        var compilation = context.Compilation;
+        var cancellationToken = context.CancellationToken;
+        var entries = HttpEntryCatalog.Collect(compilation, cancellationToken);
+        var openApi = OpenApiDocumentReader.Find(context.Options.AdditionalFiles, cancellationToken);
+        foreach (var tree in compilation.SyntaxTrees)
         {
-            return;
-        }
-
-        var documentation = method.GetDocumentationCommentXml(cancellationToken: context.CancellationToken);
-        var claims = DocumentedClaimParser.Parse(documentation ?? string.Empty);
-        if (claims.IsEmpty)
-        {
-            return;
-        }
-
-        var resolution = session.ResolveContractSource(method);
-
-        // A companion's contract declares another method's clauses, and a failed
-        // binding has no reliable contract. Neither is compared.
-        if (resolution.UsesCompanion || resolution.Failure != ContractBindingFailure.None)
-        {
-            return;
-        }
-
-        var reader = new DeclaredValidationReader(context.Compilation, method, resolution);
-        foreach (var parameter in method.Parameters)
-        {
-            if (parameter.RefKind != RefKind.None ||
-                !claims.TryGetValue(parameter.Name, out var parameterClaims))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (AnalyzerGeneratedCodePolicy.IsGenerated(tree, compilation, cancellationToken))
             {
                 continue;
             }
 
-            Compare(
-                subject: $"Parameter '{parameter.Name}'",
-                type: parameter.Type,
-                claims: parameterClaims,
-                declared: reader.ForParameter(parameter),
-                location: FirstLocation(parameter.Locations),
-                report: context.ReportDiagnostic,
-                nonNullGap: "no NonNull attribute or Contract.Requires(... != null) makes it non-null",
-                boundsGap: "no Positive, InRange attribute or Contract.Requires bounds it");
+            var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(compilation, tree);
+            foreach (var declaration in tree.GetRoot(cancellationToken).DescendantNodes().OfType<MethodDeclarationSyntax>())
+            {
+                if (model.GetDeclaredSymbol(declaration, cancellationToken) is not IMethodSymbol method ||
+                    !IsCandidate(method))
+                {
+                    continue;
+                }
+
+                var routes = entries.TryGetValue(method, out var registered)
+                    ? registered
+                    : ImmutableArray<HttpEntryRoute>.Empty;
+                var documentation = method.GetDocumentationCommentXml(cancellationToken: cancellationToken) ?? string.Empty;
+                var documented = !string.IsNullOrWhiteSpace(documentation);
+                if (!documented && routes.IsEmpty)
+                {
+                    continue;
+                }
+
+                var resolution = session.ResolveContractSource(method);
+
+                // A companion's contract declares another method's clauses, and a
+                // failed binding has no reliable contract. Neither is compared.
+                if (resolution.UsesCompanion || resolution.Failure != ContractBindingFailure.None)
+                {
+                    continue;
+                }
+
+                AnalyzeMethod(
+                    compilation,
+                    method,
+                    documented,
+                    DocumentedClaimParser.Parse(documentation),
+                    routes,
+                    resolution,
+                    openApi,
+                    context.ReportDiagnostic,
+                    cancellationToken);
+            }
+        }
+    }
+
+    private static void AnalyzeMethod(
+        Compilation compilation,
+        IMethodSymbol method,
+        bool documented,
+        ImmutableDictionary<string, ImmutableArray<DocumentedClaim>> claims,
+        ImmutableArray<HttpEntryRoute> routes,
+        EffectiveContractSourceResolution resolution,
+        OpenApiDocument? openApi,
+        Action<Diagnostic> report,
+        CancellationToken cancellationToken)
+    {
+        var declared = new DeclaredValidationReader(compilation, method, resolution);
+        var guards = RuntimeGuardReader.Read(compilation, method, cancellationToken);
+        var isEntry = !routes.IsEmpty;
+        foreach (var parameter in method.Parameters)
+        {
+            if (parameter.RefKind != RefKind.None)
+            {
+                continue;
+            }
+
+            var parameterClaims = claims.TryGetValue(parameter.Name, out var found)
+                ? found
+                : ImmutableArray<DocumentedClaim>.Empty;
+            var declaredFacts = declared.ForParameter(parameter);
+            var runtime = guards.TryGetValue(parameter, out var guard) ? guard : DeclaredValidation.None;
+            var location = FirstLocation(parameter.Locations);
+            if (isEntry)
+            {
+                // The framework's checks are declared, so they count as evidence of
+                // the entry but are not the runtime guards SP0063 reports.
+                var explicitFacts = runtime.And(HttpEntryCatalog.DeclaredFrameworkValidation(parameter));
+                var required = HttpEntryCatalog.IsRequestBound(parameter) ? RequiredFact : DeclaredValidation.None;
+                var evidence = explicitFacts.And(required);
+                var declaredBounds = !declaredFacts.Unknown && (declaredFacts.Lower is not null || declaredFacts.Upper is not null);
+                if (!parameterClaims.IsEmpty)
+                {
+                    CompareClaims(
+                        $"Parameter '{parameter.Name}'",
+                        parameter.Type,
+                        parameterClaims,
+                        evidence,
+                        location,
+                        report,
+                        EntryReasons(declaredBounds));
+                }
+
+                ReportUndocumented(parameter, parameterClaims, explicitFacts, location, report);
+                if (openApi is not null)
+                {
+                    CompareOpenApi(parameter, routes, parameterClaims, evidence, openApi, location, report);
+                }
+            }
+            else
+            {
+                if (!parameterClaims.IsEmpty)
+                {
+                    CompareClaims(
+                        $"Parameter '{parameter.Name}'",
+                        parameter.Type,
+                        parameterClaims,
+                        declaredFacts.And(runtime),
+                        location,
+                        report,
+                        ParameterReasons);
+                }
+
+                if (documented)
+                {
+                    ReportUndocumented(parameter, parameterClaims, runtime, location, report);
+                }
+            }
         }
 
-        if (!method.ReturnsVoid &&
+        if (documented &&
+            !method.ReturnsVoid &&
             claims.TryGetValue(DocumentedClaimParser.ReturnKey, out var returnClaims))
         {
-            Compare(
-                subject: $"The return value of '{method.Name}'",
-                type: method.ReturnType,
-                claims: returnClaims,
-                declared: reader.ForReturn(),
-                location: FirstLocation(method.Locations),
-                report: context.ReportDiagnostic,
-                nonNullGap: "no [return: NonNull] attribute or Contract.Ensures makes the result non-null",
-                boundsGap: "no [return: Positive], [return: InRange] attribute or Contract.Ensures bounds it");
+            CompareClaims(
+                $"The return value of '{method.Name}'",
+                method.ReturnType,
+                returnClaims,
+                declared.ForReturn(),
+                FirstLocation(method.Locations),
+                report,
+                ReturnReasons);
         }
+    }
+
+    private static void CompareClaims(
+        string subject,
+        ITypeSymbol type,
+        ImmutableArray<DocumentedClaim> claims,
+        DeclaredValidation evidence,
+        Location location,
+        Action<Diagnostic> report,
+        Reasons reasons)
+    {
+        if (evidence.Unknown)
+        {
+            return;
+        }
+
+        var nonNullClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.NonNull).ToImmutableArray();
+        if (!nonNullClaims.IsEmpty && type.IsReferenceType && !evidence.NonNull)
+        {
+            report(Diagnostic.Create(
+                DocumentedValidationDiagnosticDescriptors.MismatchRule,
+                location,
+                subject,
+                JoinSentences(nonNullClaims),
+                reasons.NonNullGap));
+        }
+
+        var intervalClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.Interval).ToImmutableArray();
+        if (intervalClaims.IsEmpty || !IntegralDomain.TryGet(type, out var minimum, out var maximum))
+        {
+            return;
+        }
+
+        // Contradictory prose such as "between 5 and 1" admits nothing to compare,
+        // so it is not reported as a mismatch.
+        if (!TryDocumented(intervalClaims, minimum, maximum, out var documentedLower, out var documentedUpper))
+        {
+            return;
+        }
+
+        var (admittedLower, admittedUpper) = Admitted(evidence, minimum, maximum);
+        if (admittedLower == documentedLower && admittedUpper == documentedUpper)
+        {
+            return;
+        }
+
+        var reason = evidence.Lower is null && evidence.Upper is null
+            ? reasons.BoundsGap
+            : reasons.AdmitsPrefix + RangePhrase(admittedLower, admittedUpper, minimum, maximum);
+        report(Diagnostic.Create(
+            DocumentedValidationDiagnosticDescriptors.MismatchRule,
+            location,
+            subject,
+            JoinSentences(intervalClaims),
+            reason));
+    }
+
+    // Reports what the runtime checks or DataAnnotations enforce that the
+    // documentation does not state. Declared contracts are not included here,
+    // because a caller precondition is not runtime behavior of the method.
+    private static void ReportUndocumented(
+        IParameterSymbol parameter,
+        ImmutableArray<DocumentedClaim> claims,
+        DeclaredValidation explicitFacts,
+        Location location,
+        Action<Diagnostic> report)
+    {
+        if (explicitFacts.Unknown)
+        {
+            return;
+        }
+
+        var subject = $"Parameter '{parameter.Name}'";
+        if (explicitFacts.NonNull && parameter.Type.IsReferenceType && !claims.Any(static claim => claim.Kind == DocumentedClaimKind.NonNull))
+        {
+            report(Diagnostic.Create(
+                DocumentedValidationDiagnosticDescriptors.UndocumentedRule,
+                location,
+                subject,
+                "non-null values"));
+        }
+
+        if (!IntegralDomain.TryGet(parameter.Type, out var minimum, out var maximum) ||
+            (explicitFacts.Lower is null && explicitFacts.Upper is null) ||
+            claims.Any(static claim => claim.Kind == DocumentedClaimKind.Interval))
+        {
+            return;
+        }
+
+        var (lower, upper) = Admitted(explicitFacts, minimum, maximum);
+        if (lower <= upper && (lower > minimum || upper < maximum))
+        {
+            report(Diagnostic.Create(
+                DocumentedValidationDiagnosticDescriptors.UndocumentedRule,
+                location,
+                subject,
+                RangePhrase(lower, upper, minimum, maximum)));
+        }
+    }
+
+    // Compares the OpenAPI constraints for each route the handler serves with the
+    // runtime evidence and with the documented claims.
+    private static void CompareOpenApi(
+        IParameterSymbol parameter,
+        ImmutableArray<HttpEntryRoute> routes,
+        ImmutableArray<DocumentedClaim> claims,
+        DeclaredValidation evidence,
+        OpenApiDocument openApi,
+        Location location,
+        Action<Diagnostic> report)
+    {
+        foreach (var route in routes)
+        {
+            if (!openApi.TryGetParameter(route.Verb, route.Route, parameter.Name, out var schema) || schema.Unknown)
+            {
+                continue;
+            }
+
+            var operation = route.Verb + " " + route.Route;
+            var name = parameter.Name;
+            if (IntegralDomain.TryGet(parameter.Type, out var minimum, out var maximum))
+            {
+                var declaredLower = Math.Max(schema.Minimum ?? minimum, minimum);
+                var declaredUpper = Math.Min(schema.Maximum ?? maximum, maximum);
+                if (!evidence.Unknown)
+                {
+                    var (admittedLower, admittedUpper) = Admitted(evidence, minimum, maximum);
+                    if (admittedLower != declaredLower || admittedUpper != declaredUpper)
+                    {
+                        report(Diagnostic.Create(
+                            DocumentedValidationDiagnosticDescriptors.OpenApiRule,
+                            location,
+                            $"OpenAPI declares {RangePhrase(declaredLower, declaredUpper, minimum, maximum)} for '{name}' of {operation}, but the HTTP entry admits {RangePhrase(admittedLower, admittedUpper, minimum, maximum)}"));
+                    }
+                }
+
+                var intervalClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.Interval).ToImmutableArray();
+                if (TryDocumented(intervalClaims, minimum, maximum, out var documentedLower, out var documentedUpper) &&
+                    (documentedLower != declaredLower || documentedUpper != declaredUpper))
+                {
+                    report(Diagnostic.Create(
+                        DocumentedValidationDiagnosticDescriptors.OpenApiRule,
+                        location,
+                        $"OpenAPI declares {RangePhrase(declaredLower, declaredUpper, minimum, maximum)} for '{name}' of {operation}, but its XML documentation says {RangePhrase(documentedLower, documentedUpper, minimum, maximum)}"));
+                }
+            }
+
+            if (schema.Nullable && parameter.Type.IsReferenceType)
+            {
+                if (!evidence.Unknown && evidence.NonNull)
+                {
+                    report(Diagnostic.Create(
+                        DocumentedValidationDiagnosticDescriptors.OpenApiRule,
+                        location,
+                        $"OpenAPI declares '{name}' of {operation} nullable, but the HTTP entry rejects null"));
+                }
+
+                if (claims.Any(static claim => claim.Kind == DocumentedClaimKind.NonNull))
+                {
+                    report(Diagnostic.Create(
+                        DocumentedValidationDiagnosticDescriptors.OpenApiRule,
+                        location,
+                        $"OpenAPI declares '{name}' of {operation} nullable, but its XML documentation says it is non-null"));
+                }
+            }
+        }
+    }
+
+    private static bool TryDocumented(
+        ImmutableArray<DocumentedClaim> intervalClaims,
+        long minimum,
+        long maximum,
+        out long lower,
+        out long upper)
+    {
+        lower = minimum;
+        upper = maximum;
+        foreach (var claim in intervalClaims)
+        {
+            lower = Math.Max(lower, claim.Lower ?? minimum);
+            upper = Math.Min(upper, claim.Upper ?? maximum);
+        }
+
+        return !intervalClaims.IsEmpty && lower <= upper;
+    }
+
+    private static (long Lower, long Upper) Admitted(DeclaredValidation facts, long minimum, long maximum)
+    {
+        return (Math.Max(facts.Lower ?? minimum, minimum), Math.Min(facts.Upper ?? maximum, maximum));
+    }
+
+    // How a closed interval reads in a diagnostic: "1 through 100", "at least 1",
+    // "at most 100", or "no bound" when neither side is narrower than the type.
+    internal static string RangePhrase(long lower, long upper, long minimum, long maximum)
+    {
+        var lowerBounded = lower > minimum;
+        var upperBounded = upper < maximum;
+        if (lowerBounded && upperBounded)
+        {
+            return Number(lower) + " through " + Number(upper);
+        }
+
+        if (lowerBounded)
+        {
+            return "at least " + Number(lower);
+        }
+
+        return upperBounded ? "at most " + Number(upper) : "no bound";
+    }
+
+    private static string Number(long value)
+    {
+        return value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static Reasons EntryReasons(bool declaredBounds)
+    {
+        return new Reasons(
+            "no runtime guard, DataAnnotation, or framework requirement makes it non-null on this HTTP entry",
+            "no runtime guard or DataAnnotation bounds it on this HTTP entry" +
+                (declaredBounds ? "; a declared contract checks only in-program callers" : string.Empty),
+            "the HTTP entry admits ");
+    }
+
+    private sealed class Reasons
+    {
+        public Reasons(string nonNullGap, string boundsGap, string admitsPrefix)
+        {
+            NonNullGap = RepositoryParameterGuard.NotNull(nonNullGap, nameof(nonNullGap));
+            BoundsGap = RepositoryParameterGuard.NotNull(boundsGap, nameof(boundsGap));
+            AdmitsPrefix = RepositoryParameterGuard.NotNull(admitsPrefix, nameof(admitsPrefix));
+        }
+
+        public string NonNullGap { get; }
+
+        public string BoundsGap { get; }
+
+        public string AdmitsPrefix { get; }
+    }
+
+    private static string JoinSentences(ImmutableArray<DocumentedClaim> claims)
+    {
+        return string.Join("; ", claims.Select(static claim => claim.Sentence));
     }
 
     private static bool IsCandidate(IMethodSymbol method)
@@ -84,85 +422,6 @@ internal static class DocumentedValidationAnalyzer
             method.ExplicitInterfaceImplementations.IsEmpty &&
             method.ContainingType.TypeKind != TypeKind.Interface &&
             !method.DeclaringSyntaxReferences.IsDefaultOrEmpty;
-    }
-
-    private static void Compare(
-        string subject,
-        ITypeSymbol type,
-        ImmutableArray<DocumentedClaim> claims,
-        DeclaredValidation declared,
-        Location location,
-        Action<Diagnostic> report,
-        string nonNullGap,
-        string boundsGap)
-    {
-        if (declared.Unknown)
-        {
-            return;
-        }
-
-        var nonNullClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.NonNull).ToImmutableArray();
-        if (!nonNullClaims.IsEmpty && type.IsReferenceType && !declared.NonNull)
-        {
-            report(Diagnostic.Create(
-                DocumentedValidationDiagnosticDescriptors.MismatchRule,
-                location,
-                subject,
-                JoinSentences(nonNullClaims),
-                nonNullGap));
-        }
-
-        var intervalClaims = claims.Where(static claim => claim.Kind == DocumentedClaimKind.Interval).ToImmutableArray();
-        if (intervalClaims.IsEmpty || !IntegralDomain.TryGet(type, out var minimum, out var maximum))
-        {
-            return;
-        }
-
-        var documentedLower = minimum;
-        var documentedUpper = maximum;
-        foreach (var claim in intervalClaims)
-        {
-            documentedLower = Math.Max(documentedLower, claim.Lower ?? minimum);
-            documentedUpper = Math.Min(documentedUpper, claim.Upper ?? maximum);
-        }
-
-        // Contradictory prose such as "between 5 and 1" has no admitted values
-        // to compare, so it is not reported as a mismatch.
-        if (documentedLower > documentedUpper)
-        {
-            return;
-        }
-
-        var declaredLower = declared.Lower is { } lower ? Math.Max(lower, minimum) : minimum;
-        var declaredUpper = declared.Upper is { } upper ? Math.Min(upper, maximum) : maximum;
-        if (declaredLower == documentedLower && declaredUpper == documentedUpper)
-        {
-            return;
-        }
-
-        var reason = declared.Lower is null && declared.Upper is null
-            ? boundsGap
-            : "its declared contract admits " +
-                Describe(declaredLower, minimum, "the type minimum") + " through " +
-                Describe(declaredUpper, maximum, "the type maximum");
-        report(Diagnostic.Create(
-            DocumentedValidationDiagnosticDescriptors.MismatchRule,
-            location,
-            subject,
-            JoinSentences(intervalClaims),
-            reason));
-    }
-
-    private static string JoinSentences(ImmutableArray<DocumentedClaim> claims)
-    {
-        return string.Join("; ", claims.Select(static claim => claim.Sentence));
-    }
-
-    private static string Describe(long bound, long domainBound, string domainName)
-    {
-        return bound == domainBound
-            ? domainName
-            : bound.ToString(CultureInfo.InvariantCulture);
     }
 
     private static Location FirstLocation(ImmutableArray<Location> locations)

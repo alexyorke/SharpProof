@@ -36,7 +36,7 @@ public sealed class DocumentedValidationClaimTests
             """);
         AnalyzerTestHost.AssertIds(diagnostics, [Rule]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0],
-            "Parameter 'name' is documented as 'Must not be null', but no NonNull attribute");
+            "Parameter 'name' is documented as 'Must not be null', but neither a NonNull attribute");
     }
 
     [Test]
@@ -96,7 +96,7 @@ public sealed class DocumentedValidationClaimTests
             """);
         AnalyzerTestHost.AssertIds(diagnostics, [Rule]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0],
-            "documented as 'Must be between 1 and 100', but its declared contract admits 1 through 50");
+            "documented as 'Must be between 1 and 100', but its declarations and runtime guards admit 1 through 50");
     }
 
     [Test]
@@ -146,7 +146,7 @@ public sealed class DocumentedValidationClaimTests
             """);
         AnalyzerTestHost.AssertIds(diagnostics, [Rule]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0],
-            "admits 1 through the type maximum");
+            "its declarations and runtime guards admit at least 1");
     }
 
     [Test]
@@ -160,7 +160,7 @@ public sealed class DocumentedValidationClaimTests
             """);
         AnalyzerTestHost.AssertIds(diagnostics, [Rule]);
         AnalyzerTestHost.AssertMessageContains(diagnostics[0],
-            "no Positive, InRange attribute or Contract.Requires bounds it");
+            "neither a Positive or InRange attribute, a Contract.Requires clause, nor a runtime guard bounds it");
     }
 
     [Test]

@@ -17,7 +17,9 @@ SP0049 | Infrastructure | Error | Reports failure to emit the selected final com
 SP0050 | Infrastructure | Error | Reports a referenced contract API assembly that could not be read to verify its payload.
 SP0052 | Contracts | Warning | Reports a complete body summary that exceeds its declared `[EffectContract]`.
 SP0060 | Resources | Disabled | Opt-in proven loop/cumulative array bounds or explicit Unknown reasons.
-SP0061 | Documentation | Warning | Reports an XML documentation `<param>` or `<returns>` validation sentence that the declared contract on the same value does not establish, or that no declared contract backs.
+SP0061 | Documentation | Warning | Reports an XML documentation `<param>` or `<returns>` validation sentence that the declarations and runtime checks on the same value do not establish, or that no declaration or runtime check backs.
+SP0062 | Documentation | Warning | Reports an OpenAPI 3 parameter bound or nullability that disagrees with the handler's runtime validation or its XML documentation.
+SP0063 | Documentation | Info | Reports a bound or non-null requirement enforced at runtime that the XML documentation does not state.
 SPCF0001 | SharpProof.ContractFor.Usage | Error | Invalid ContractFor target.
 SPCF0002 | SharpProof.ContractFor.Usage | Error | Duplicate ContractFor companion.
 SPCF0003 | SharpProof.ContractFor.Usage | Error | Invalid ContractFor companion type.
