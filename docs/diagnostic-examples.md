@@ -32,6 +32,10 @@ Profile and feature selection are compilation-global. Use MSBuild properties or 
 | SP0049 | Error | Final compiler manifest emission failed |
 | SP0050 | Error | Referenced contract API payload could not be verified |
 | SP0052 | Warning | Complete body summary exceeds declared effect contract |
+| SP0061 | Warning | XML documentation validation claim disagrees with the declarations and runtime guards on the same value, or has none |
+| SP0062 | Warning | OpenAPI parameter bound or nullability disagrees with the handler's validation or documentation |
+| SP0063 | Info | Runtime validation enforced on a parameter is not stated in its XML documentation |
+| SP0064 | Info | A model-proposed documentation claim awaits review, or could not be read |
 
 ## SP0002
 
@@ -100,6 +104,52 @@ The verifier found inputs for which a contract is false: a postcondition that do
 ## SP0052
 
 The complete modeled body summary exceeds an `[EffectContract]` declaration. Effect flags are independent: allowing exceptions does not allow allocation. Partial declarations and trusted external boundaries must be interpreted according to their accepted completeness evidence.
+
+## SP0061
+
+An XML documentation `<param>` or `<returns>` sentence states a validation, and the SharpProof declaration on the same value does not establish it. The reported sentence is the documented claim; the message names the declaration that disagrees with it or says that none backs it.
+
+```csharp
+using SharpProof.Attributes;
+
+public static class Handlers
+{
+    /// <param name="page">Must be between 1 and 100.</param>
+    public static int Get([InRange(1, 50)] int page) => page; // SP0061: the declared range admits 1 through 50
+}
+```
+
+The claim grammar is closed. A sentence is read as a claim only when it is exactly one of these, ignoring case and a trailing period:
+
+| Documented sentence | Claim |
+| --- | --- |
+| `Must not be null`, `Must be non-null`, `Must be non null`, `Cannot be null` | the value is non-null |
+| `Must be positive`, `Must be greater than zero`, `Must be greater than 0` | integral value `>= 1` |
+| `Must be between A and B` (optional `inclusive`) | integral value in `[A, B]` |
+| `Must be at least A`, `Must be at most B` | one-sided integral bound |
+
+Any other sentence is not a claim and is never reported. A documented claim is compared with the declarations on the same value:
+
+- `[NonNull]`, `[Positive]`, `[InRange]` on the parameter or `[return: ...]`;
+- valid `Contract.Requires` clauses on the parameter, or `Contract.Ensures` clauses on `Contract.Result<T>()`, whose conjuncts are `!= null`, `is not null`, or integral comparisons with a constant (either operand order). `==`, `>`, `<`, `>=` and `<=` against a constant are read as bounds.
+
+The strict profile, the default, always runs the check. The advisory profile runs symbol analysis only in files that use SharpProof attributes, so there the check is silent in files whose only SharpProof use is `Contract.Requires`.
+
+The check is silent when it cannot establish the declared side: a clause that mentions the value and uses another form, a companion-declared contract, an override, an interface member, a generated file, an invalid clause placement, or an unsupported type such as `ulong`, `double` or a nullable value type. It does not run on `ref` or `out` parameters.
+
+SP0061 compares declarations with documentation. It does not prove the implementation rejects inputs outside the documented range, and it does not read ASP.NET Core routing, model binding, validation attributes, or OpenAPI output. Parsing doc comments requires them to be present in the compilation (for example with `GenerateDocumentationFile`).
+
+## SP0062
+
+An OpenAPI 3 document in the build's additional files declares a parameter bound or nullability for an HTTP entry route that disagrees with what the handler enforces at runtime, or with the parameter's XML documentation. The message names the route and the two values that differ. Hand-written or generated OpenAPI that describes a rule the handler does not enforce is reported here.
+
+## SP0063
+
+A runtime guard, `ArgumentException` ThrowIf call, or DataAnnotations `Range` enforces a bound or non-null requirement on a parameter whose XML documentation does not state it. This is informational. `Required` alone is not reported, because it restates non-nullability.
+
+## SP0064
+
+A validation claim a local or hosted model proposed from documentation is waiting for review, or the model could not read a claim. Nothing is checked until a person accepts the claim in the review sidecar. Only an accepted claim becomes a claim of its parameter. A rejected entry is ignored. An entry is used only when its key equals the SHA-256 of its own parameter name, a newline, and the normalized documentation text. The key is written in uppercase hexadecimal.
 
 ## ContractFor diagnostics
 

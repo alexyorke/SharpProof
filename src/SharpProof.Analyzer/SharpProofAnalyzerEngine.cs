@@ -21,7 +21,8 @@ internal sealed partial class SharpProofAnalyzerEngine
     internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         [
             .. GeneratedDiagnosticDescriptors.SupportedDiagnostics,
-            .. ContractForDiagnosticDescriptors.SupportedDiagnostics
+            .. ContractForDiagnosticDescriptors.SupportedDiagnostics,
+            .. DocumentedValidationDiagnosticDescriptors.SupportedDiagnostics
         ];
 
     internal void RegisterActions(AnalysisContext context)
@@ -113,6 +114,15 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
 
         ResourceBoundsDiagnostics.Register(context);
+
+        // Documentation checks report diagnostics and prove nothing, so they run in
+        // every profile that enables contracts. They do not wait for the advisory
+        // profile's SharpProof attribute gate, and they never need the verifier.
+        if (configuration.ContractsEnabled)
+        {
+            context.RegisterCompilationEndAction(
+                compilationContext => DocumentedValidationAnalyzer.Validate(compilationContext));
+        }
 
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
